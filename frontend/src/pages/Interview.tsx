@@ -1,0 +1,263 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams } from "react-router-dom";
+import {
+  getInterviewInfo,
+  startInterview,
+  submitAudio,
+  InterviewInfo,
+} from "../api/interviews";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
+
+type Phase = "landing" | "interview" | "complete";
+
+export default function Interview() {
+  const { token } = useParams<{ token: string }>();
+  const [phase, setPhase] = useState<Phase>("landing");
+  const [info, setInfo] = useState<InterviewInfo | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [participantId, setParticipantId] = useState("");
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState("");
+  const [muted, setMuted] = useState(false);
+  const [turnCount, setTurnCount] = useState(0);
+  const [infoLoading, setInfoLoading] = useState(true);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { isRecording, error: recError, startRecording, stopRecording } =
+    useAudioRecorder();
+
+  // Load interview info
+  useEffect(() => {
+    if (!token) return;
+    getInterviewInfo(token)
+      .then(setInfo)
+      .catch(() => setError("This interview link is invalid or has expired."))
+      .finally(() => setInfoLoading(false));
+  }, [token]);
+
+  // Play TTS audio
+  const playTTS = useCallback(
+    (url: string) => {
+      if (muted) return;
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.play().catch(() => {
+        // autoplay blocked -- user will read the question
+      });
+    },
+    [muted]
+  );
+
+  async function handleStart() {
+    if (!token) return;
+    setStarting(true);
+    setError("");
+    try {
+      const res = await startInterview(token, displayName || undefined);
+      setParticipantId(res.participant_id);
+      setCurrentQuestion(res.first_question);
+      setTurnCount(1);
+      setPhase("interview");
+      if (res.tts_audio_url) {
+        playTTS(res.tts_audio_url);
+      }
+    } catch {
+      setError("Failed to start interview. Please try again.");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  async function handleStopAndSubmit() {
+    if (!token) return;
+    setProcessing(true);
+    try {
+      const blob = await stopRecording();
+      const res = await submitAudio(token, participantId, blob);
+      if (res.is_complete) {
+        setPhase("complete");
+        if (audioRef.current) audioRef.current.pause();
+      } else if (res.question_text) {
+        setCurrentQuestion(res.question_text);
+        setTurnCount((c) => c + 1);
+        if (res.tts_audio_url) {
+          playTTS(res.tts_audio_url);
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong. Please try recording again.";
+      setError(msg);
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  function toggleMute() {
+    setMuted((m) => {
+      const next = !m;
+      if (next && audioRef.current) {
+        audioRef.current.pause();
+      }
+      return next;
+    });
+  }
+
+  /* ---- Landing Phase ---- */
+  if (infoLoading) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container">
+          <p className="muted-text">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && phase === "landing" && !info) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container">
+          <p className="interview-error">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "landing" && info) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-landing">
+          <h1 className="interview-project-name">{info.project_name}</h1>
+          {info.welcome_message && (
+            <p className="interview-welcome">{info.welcome_message}</p>
+          )}
+          <p className="interview-instructions">
+            You will be asked a series of questions. For each question, hold the
+            record button and speak your answer. Take your time — there are no
+            wrong answers.
+          </p>
+
+          <div className="interview-name-field">
+            <label className="field-label">
+              Your name <span className="optional-tag">(optional)</span>
+            </label>
+            <input
+              type="text"
+              className="field-input"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="How you'd like to be identified"
+            />
+          </div>
+
+          {error && <div className="error-banner">{error}</div>}
+
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={handleStart}
+            disabled={starting}
+          >
+            {starting ? "Starting..." : "Start Interview"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- Interview Phase ---- */
+  if (phase === "interview") {
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-active">
+          {/* Progress */}
+          <div className="interview-progress">
+            <span className="interview-turn-count">Question {turnCount}</span>
+            <button
+              className={`mute-btn ${muted ? "muted" : ""}`}
+              onClick={toggleMute}
+              title={muted ? "Unmute" : "Mute"}
+            >
+              {muted ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                  <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                  <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.36 2.18" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Question */}
+          <div className="interview-question-area">
+            <p className="interview-question-text">{currentQuestion}</p>
+          </div>
+
+          {/* Error */}
+          {(error || recError) && (
+            <div className="error-banner">{error || recError}</div>
+          )}
+
+          {/* Recording UI */}
+          <div className="interview-controls">
+            {processing ? (
+              <div className="processing-indicator">
+                <div className="spinner" />
+                <span>Processing your response...</span>
+              </div>
+            ) : isRecording ? (
+              <>
+                <button
+                  className="record-btn recording"
+                  onClick={handleStopAndSubmit}
+                >
+                  <div className="record-btn-inner recording-pulse" />
+                </button>
+                <p className="record-label">Tap to stop recording</p>
+              </>
+            ) : (
+              <>
+                <button className="record-btn" onClick={startRecording}>
+                  <div className="record-btn-inner" />
+                </button>
+                <p className="record-label">Tap to start recording</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- Complete Phase ---- */
+  return (
+    <div className="interview-page">
+      <div className="interview-container interview-complete">
+        <div className="complete-icon">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+        </div>
+        <h1 className="interview-complete-title">Thank you!</h1>
+        <p className="interview-complete-text">
+          Your interview has been recorded successfully. You may now close this
+          page.
+        </p>
+      </div>
+    </div>
+  );
+}
