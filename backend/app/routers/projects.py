@@ -27,6 +27,7 @@ def create_project(
         language=body.language,
         interview_duration_minutes=body.interview_duration_minutes,
         system_prompt=body.system_prompt or Project.__table__.columns["system_prompt"].default.arg,
+        research_objective=body.research_objective or None,
     )
     db.add(project)
     db.flush()
@@ -123,6 +124,45 @@ def get_project(
     return _project_to_response(project)
 
 
+@router.put("/{project_id}", response_model=ProjectResponse)
+def update_project(
+    project_id: str,
+    body: ProjectCreate,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ProjectResponse:
+    project = _get_project_or_404(project_id, company.id, db)
+
+    project.name = body.name
+    project.language = body.language
+    project.interview_duration_minutes = body.interview_duration_minutes
+    project.research_objective = body.research_objective or None
+    if body.system_prompt is not None:
+        project.system_prompt = body.system_prompt
+
+    # Replace all questions
+    for q in list(project.guide_questions):
+        db.delete(q)
+    db.flush()
+
+    for idx, q in enumerate(body.questions):
+        question = InterviewGuideQuestion(
+            project_id=project.id,
+            section_index=q.section_index,
+            section_title=q.section_title,
+            question_index=q.question_index,
+            main_question=q.main_question,
+            interview_notes=q.interview_notes or "",
+            desired_learning=q.desired_learning or "",
+            sort_order=idx,
+        )
+        db.add(question)
+
+    db.commit()
+    db.refresh(project)
+    return _project_to_response(project)
+
+
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
     project_id: str,
@@ -169,6 +209,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
         language=project.language,
         interview_duration_minutes=project.interview_duration_minutes,
         system_prompt=project.system_prompt,
+        research_objective=project.research_objective,
         created_at=project.created_at,
         questions=questions,
     )

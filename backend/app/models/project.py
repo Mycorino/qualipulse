@@ -35,6 +35,7 @@ class Project(Base):
         Text, default=DEFAULT_SYSTEM_PROMPT, nullable=False
     )
     welcome_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    research_objective: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -49,6 +50,9 @@ class Project(Base):
     )
     participants = relationship(
         "Participant", back_populates="project", cascade="all, delete-orphan"
+    )
+    analysis = relationship(
+        "ProjectAnalysis", back_populates="project", uselist=False, cascade="all, delete-orphan"
     )
 
 

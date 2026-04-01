@@ -12,7 +12,7 @@ from app.schemas.interview import (
     TurnResponse,
 )
 from app.services.interview_engine import process_interview_turn, start_interview
-from app.services.storage import save_audio
+from app.services.storage import upload_audio
 
 router = APIRouter(prefix="/interview", tags=["interview"])
 
@@ -79,18 +79,13 @@ async def respond_to_question(
             detail="Interview is already completed",
         )
 
-    # Save uploaded audio
+    # Upload audio and process the turn
     audio_data = await audio.read()
     ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
-    audio_filename = f"{uuid.uuid4().hex}{ext}"
-    audio_rel_path = save_audio(
-        audio_data,
-        audio_filename,
-        subfolder=os.path.join("recordings", participant_id),
-    )
+    audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
+    upload_audio(audio_data, audio_key)
 
-    # Process the turn
-    result = process_interview_turn(participant_id, audio_rel_path, db)
+    result = process_interview_turn(participant_id, audio_key, db)
 
     return TurnResponse(
         question_text=result["question_text"],

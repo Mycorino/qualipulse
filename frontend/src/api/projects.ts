@@ -14,6 +14,7 @@ export interface ProjectCreate {
   language: string;
   interview_duration_minutes?: number;
   system_prompt?: string;
+  research_objective?: string;
   questions: QuestionCreate[];
 }
 
@@ -34,6 +35,7 @@ export interface ProjectResponse {
   language: string;
   interview_duration_minutes: number;
   system_prompt?: string;
+  research_objective?: string;
   created_at: string;
   questions: QuestionResponse[];
 }
@@ -63,7 +65,6 @@ export interface ParticipantResponse {
 }
 
 export interface TranscriptTurn {
-  id: string;
   turn_index: number;
   question_text: string;
   response_transcript: string | null;
@@ -84,7 +85,15 @@ export async function getProject(id: string): Promise<ProjectResponse> {
 export async function createProject(
   body: ProjectCreate
 ): Promise<ProjectResponse> {
-  const { data } = await client.post<ProjectResponse>("/projects", body);
+  const { data } = await client.post<ProjectResponse>("/projects/", body);
+  return data;
+}
+
+export async function updateProject(
+  id: string,
+  body: ProjectCreate
+): Promise<ProjectResponse> {
+  const { data } = await client.put<ProjectResponse>(`/projects/${id}`, body);
   return data;
 }
 
@@ -140,10 +149,52 @@ export async function getTranscript(
   projectId: string,
   participantId: string
 ): Promise<TranscriptTurn[]> {
-  const { data } = await client.get<TranscriptTurn[]>(
+  const { data } = await client.get<{ participant: ParticipantResponse; turns: TranscriptTurn[] }>(
     `/projects/${projectId}/participants/${participantId}/transcript`
   );
+  return data.turns;
+}
+
+export interface AnalysisTheme {
+  title: string;
+  summary: string;
+  quotes: string[];
+  frequency: string;
+}
+export interface AnalysisJTBD {
+  job: string;
+  insight: string;
+  frequency: string;
+}
+export interface AnalysisTension {
+  tension: string;
+  detail: string;
+}
+export interface AnalysisReport {
+  summary: string;
+  themes: AnalysisTheme[];
+  jobs_to_be_done: AnalysisJTBD[];
+  tensions: AnalysisTension[];
+  recommendations: string[];
+  confidence: string;
+  participant_count: number;
+}
+export interface AnalysisResponse {
+  status: "none" | "generating" | "ready" | "failed";
+  completed_count: number;
+  participant_count: number;
+  generated_at: string | null;
+  report: AnalysisReport | null;
+  error: string | null;
+}
+
+export async function getAnalysis(projectId: string): Promise<AnalysisResponse> {
+  const { data } = await client.get<AnalysisResponse>(`/projects/${projectId}/analysis`);
   return data;
+}
+
+export async function triggerAnalysis(projectId: string): Promise<void> {
+  await client.post(`/projects/${projectId}/analysis`);
 }
 
 export async function exportCSV(projectId: string): Promise<Blob> {

@@ -3,11 +3,8 @@ import openai
 from app.config import settings
 
 
-def generate_speech(text: str, output_path: str) -> str:
-    """Generate speech from text using OpenAI TTS and save to output_path.
-
-    Returns the output_path for convenience.
-    """
+def generate_speech(text: str) -> bytes:
+    """Generate speech from text using OpenAI TTS and return the audio bytes."""
     client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
 
     response = client.audio.speech.create(
@@ -16,6 +13,4 @@ def generate_speech(text: str, output_path: str) -> str:
         input=text,
     )
 
-    response.stream_to_file(output_path)
-
-    return output_path
+    return response.content

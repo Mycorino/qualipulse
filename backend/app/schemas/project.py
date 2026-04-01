@@ -17,6 +17,7 @@ class ProjectCreate(BaseModel):
     language: str = "en"
     interview_duration_minutes: int = 20
     system_prompt: str | None = None
+    research_objective: str | None = None
     questions: list[QuestionCreate] = []
 
 
@@ -39,6 +40,7 @@ class ProjectResponse(BaseModel):
     language: str
     interview_duration_minutes: int
     system_prompt: str | None = None
+    research_objective: str | None = None
     created_at: datetime
     questions: list[QuestionResponse] = []
 

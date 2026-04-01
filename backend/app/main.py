@@ -15,8 +15,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Create all database tables on startup
     Base.metadata.create_all(bind=engine)
 
-    # Ensure upload directory exists
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    # Ensure upload directory exists (only needed for local storage)
+    if not settings.R2_ACCOUNT_ID:
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
     yield
 
@@ -38,7 +39,7 @@ app.add_middleware(
 )
 
 # Import and register routers
-from app.routers import auth, projects, links, interview, export, audio
+from app.routers import auth, projects, links, interview, export, audio, research_assistant, analysis
 
 app.include_router(auth.router)
 app.include_router(projects.router)
@@ -46,6 +47,8 @@ app.include_router(links.router)
 app.include_router(interview.router)
 app.include_router(export.router)
 app.include_router(audio.router)
+app.include_router(research_assistant.router)
+app.include_router(analysis.router)
 
 
 @app.get("/", tags=["health"])

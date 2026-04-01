@@ -5,6 +5,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import ProjectDetail from "./pages/ProjectDetail";
 import Interview from "./pages/Interview";
+import CreateProjectWizard from "./pages/CreateProjectWizard";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -32,6 +33,22 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ProjectDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/new"
+        element={
+          <ProtectedRoute>
+            <CreateProjectWizard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:id/edit"
+        element={
+          <ProtectedRoute>
+            <CreateProjectWizard />
           </ProtectedRoute>
         }
       />

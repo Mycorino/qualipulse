@@ -12,7 +12,7 @@ from app.config import settings
 from app.models.interview import InterviewTurn, Participant
 from app.models.project import InterviewGuideQuestion, Project
 from app.services.stt import transcribe_audio
-from app.services.storage import get_audio_path
+from app.services.storage import upload_audio, download_audio
 from app.services.tts import generate_speech
 
 INTERVIEWER_SYSTEM_PROMPT = """\
@@ -125,6 +125,7 @@ def decide_next_action(
     elapsed_minutes: float,
     total_minutes: int,
     all_questions_done: bool,
+    research_objective: str | None = None,
 ) -> dict:
     """Call Claude to decide the next interview action.
 
@@ -132,8 +133,22 @@ def decide_next_action(
     """
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    user_message = f"""Here is the interview context:
+    objective_block = ""
+    if research_objective:
+        objective_block = f"""
+RESEARCH OBJECTIVE:
+{research_objective}
 
+As a skilled qualitative researcher, keep this objective top of mind. Use proven product marketing techniques:
+- Surface unmet needs, frustrations, and workarounds the participant may not explicitly state
+- Probe for the "job to be done" behind behaviours (why they do something, not just what)
+- Listen for emotional language and amplify it ("you said X frustrates you — can you tell me more?")
+- When an answer hints at insight relevant to the objective, follow up before moving on
+- Gently steer the conversation so the guide questions naturally uncover data that serves the objective
+"""
+
+    user_message = f"""Here is the interview context:
+{objective_block}
 INTERVIEW GUIDE:
 {interview_guide_str}
 
@@ -232,16 +247,9 @@ def start_interview(participant_id: str, db: Session) -> dict:
 
     question_text, q_index = _get_first_question(project)
 
-    # Generate TTS audio
-    tts_filename = f"{uuid.uuid4().hex}.mp3"
-    tts_subfolder = os.path.join("tts", participant_id)
-    tts_abs_dir = get_audio_path(tts_subfolder)
-    os.makedirs(tts_abs_dir, exist_ok=True)
-    tts_rel_path = os.path.join(tts_subfolder, tts_filename)
-    tts_abs_path = get_audio_path(tts_rel_path)
-    generate_speech(question_text, tts_abs_path)
-
-    tts_audio_url = f"/audio/{tts_rel_path}"
+    # Generate TTS audio and upload
+    tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
+    tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
 
     # Save the interviewer turn
     turn = InterviewTurn(
@@ -274,8 +282,9 @@ def process_interview_turn(
     Returns dict with: question_text, tts_audio_url, is_complete
     """
     # 1. Transcribe the participant's audio
-    abs_audio_path = get_audio_path(audio_path)
-    transcript = transcribe_audio(abs_audio_path)
+    audio_data = download_audio(audio_path)
+    filename = os.path.basename(audio_path)
+    transcript = transcribe_audio(audio_data, filename)
 
     # 2. Find the last interviewer turn to update with the participant's response
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
@@ -288,7 +297,7 @@ def process_interview_turn(
     if turns:
         last_turn = turns[-1]
         last_turn.response_transcript = transcript
-        last_turn.audio_recording_url = f"/audio/{audio_path}"
+        last_turn.audio_recording_url = audio_path  # key; resolved to URL via storage layer
         db.commit()
 
     # 3. Get context for Claude
@@ -303,22 +312,16 @@ def process_interview_turn(
         elapsed_minutes=context["elapsed_minutes"],
         total_minutes=context["total_minutes"],
         all_questions_done=context["all_questions_done"],
+        research_objective=context["project"].research_objective,
     )
 
     action = decision["action"]
     question_text = decision["question"]
     is_complete = action == "close"
 
-    # 5. Generate TTS for the next question / closing
-    tts_filename = f"{uuid.uuid4().hex}.mp3"
-    tts_subfolder = os.path.join("tts", participant_id)
-    tts_abs_dir = get_audio_path(tts_subfolder)
-    os.makedirs(tts_abs_dir, exist_ok=True)
-    tts_rel_path = os.path.join(tts_subfolder, tts_filename)
-    tts_abs_path = get_audio_path(tts_rel_path)
-    generate_speech(question_text, tts_abs_path)
-
-    tts_audio_url = f"/audio/{tts_rel_path}"
+    # 5. Generate TTS for the next question / closing and upload
+    tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
+    tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
 
     # 6. Determine the new turn metadata
     next_turn_index = (turns[-1].turn_index + 1) if turns else 0

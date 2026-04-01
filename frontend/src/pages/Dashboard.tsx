@@ -25,7 +25,6 @@ const LANGUAGES = [
 export default function Dashboard() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -58,21 +57,11 @@ export default function Dashboard() {
           <h2>Projects</h2>
           <button
             className="btn btn-primary"
-            onClick={() => setShowCreate(true)}
+            onClick={() => navigate("/projects/new")}
           >
             + Create Project
           </button>
         </div>
-
-        {showCreate && (
-          <CreateProjectForm
-            onClose={() => setShowCreate(false)}
-            onCreated={() => {
-              setShowCreate(false);
-              loadProjects();
-            }}
-          />
-        )}
 
         {loading ? (
           <p className="muted-text">Loading projects...</p>
@@ -116,6 +105,7 @@ function CreateProjectForm({
 }) {
   const [name, setName] = useState("");
   const [language, setLanguage] = useState("en");
+  const [researchObjective, setResearchObjective] = useState("");
   const [mode, setMode] = useState<"manual" | "csv">("manual");
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [questions, setQuestions] = useState<QuestionCreate[]>([
@@ -162,7 +152,7 @@ function CreateProjectForm({
         const validQuestions = questions.filter(
           (q) => q.main_question.trim() !== ""
         );
-        await createProject({ name, language, questions: validQuestions });
+        await createProject({ name, language, research_objective: researchObjective || undefined, questions: validQuestions });
       }
       onCreated();
     } catch (err: unknown) {
@@ -195,6 +185,17 @@ function CreateProjectForm({
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Customer Feedback Q1"
           required
+        />
+
+        <label className="field-label">
+          Research Objective <span className="muted-text">(optional)</span>
+        </label>
+        <textarea
+          className="field-input"
+          rows={3}
+          value={researchObjective}
+          onChange={(e) => setResearchObjective(e.target.value)}
+          placeholder="e.g. Understand why customers churn after the first month and what job they were trying to get done"
         />
 
         <label className="field-label">Language</label>

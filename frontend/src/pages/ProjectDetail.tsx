@@ -8,10 +8,13 @@ import {
   getTranscript,
   exportCSV,
   deleteProject,
+  getAnalysis,
+  triggerAnalysis,
   ProjectResponse,
   InterviewLink,
   ParticipantResponse,
   TranscriptTurn,
+  AnalysisResponse,
 } from "../api/projects";
 
 export default function ProjectDetail() {
@@ -25,6 +28,8 @@ export default function ProjectDetail() {
     useState<ParticipantResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [analysisPolling, setAnalysisPolling] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -34,19 +39,41 @@ export default function ProjectDetail() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [proj, lnks, parts] = await Promise.all([
+      const [proj, lnks, parts, ana] = await Promise.all([
         getProject(id!),
         getLinks(id!),
         getParticipants(id!),
+        getAnalysis(id!),
       ]);
       setProject(proj);
       setLinks(lnks);
       setParticipants(parts);
+      setAnalysis(ana);
+      if (ana.status === "generating") startPolling();
     } catch {
       // handled by interceptor
     } finally {
       setLoading(false);
     }
+  }
+
+  function startPolling() {
+    if (analysisPolling) return;
+    setAnalysisPolling(true);
+    const iv = setInterval(async () => {
+      const ana = await getAnalysis(id!);
+      setAnalysis(ana);
+      if (ana.status !== "generating") {
+        clearInterval(iv);
+        setAnalysisPolling(false);
+      }
+    }, 3000);
+  }
+
+  async function handleTriggerAnalysis() {
+    await triggerAnalysis(id!);
+    setAnalysis((prev) => prev ? { ...prev, status: "generating" } : null);
+    startPolling();
   }
 
   async function handleGenerateLink() {
@@ -138,6 +165,9 @@ export default function ProjectDetail() {
           <button className="btn btn-ghost" onClick={handleExportCSV}>
             Export CSV
           </button>
+          <button className="btn btn-ghost" onClick={() => navigate(`/projects/${id}/edit`)}>
+            Edit
+          </button>
           <button
             className="btn btn-ghost btn-danger-text"
             onClick={handleDelete}
@@ -158,13 +188,23 @@ export default function ProjectDetail() {
           </div>
         </section>
 
+        {/* Research Objective */}
+        {project.research_objective && (
+          <section className="detail-section">
+            <h2>Research Objective</h2>
+            <p>{project.research_objective}</p>
+          </section>
+        )}
+
         {/* Interview Links */}
         <section className="detail-section">
           <div className="section-header-row">
             <h2>Interview Links</h2>
-            <button className="btn btn-primary btn-sm" onClick={handleGenerateLink}>
-              Generate Link
-            </button>
+            {links.length === 0 && (
+              <button className="btn btn-primary btn-sm" onClick={handleGenerateLink}>
+                Generate Link
+              </button>
+            )}
           </div>
           {links.length === 0 ? (
             <p className="muted-text">
@@ -186,6 +226,131 @@ export default function ProjectDetail() {
             </div>
           )}
         </section>
+
+        {/* AI Analysis */}
+        {analysis && (
+          <section className="detail-section">
+            <div className="section-header-row">
+              <h2>AI Analysis</h2>
+              {analysis.completed_count > 0 && (
+                <button
+                  className="btn btn-ai btn-sm"
+                  onClick={handleTriggerAnalysis}
+                  disabled={analysis.status === "generating"}
+                >
+                  {analysis.status === "generating"
+                    ? "Analysing..."
+                    : analysis.status === "none"
+                    ? "✦ Generate Analysis"
+                    : "✦ Regenerate"}
+                </button>
+              )}
+            </div>
+
+            {analysis.status === "none" && analysis.completed_count === 0 && (
+              <p className="muted-text">Complete at least one interview to generate an analysis.</p>
+            )}
+
+            {analysis.status === "none" && analysis.completed_count > 0 && (
+              <p className="muted-text">{analysis.completed_count} completed interview{analysis.completed_count > 1 ? "s" : ""} ready to analyse.</p>
+            )}
+
+            {analysis.status === "generating" && (
+              <div className="analysis-generating">
+                <span className="spinner-sm" />
+                <span>Claude is reading {analysis.participant_count} interview{analysis.participant_count !== 1 ? "s" : ""}...</span>
+              </div>
+            )}
+
+            {analysis.status === "failed" && (
+              <p className="muted-text" style={{ color: "var(--danger)" }}>Analysis failed: {analysis.error}</p>
+            )}
+
+            {analysis.status === "ready" && analysis.report && (() => {
+              const r = analysis.report;
+              const isStale = analysis.completed_count > analysis.participant_count;
+              return (
+                <div className="analysis-report">
+                  {isStale && (
+                    <div className="analysis-stale-banner">
+                      {analysis.completed_count - analysis.participant_count} new response{analysis.completed_count - analysis.participant_count > 1 ? "s" : ""} since last analysis — regenerate to include them.
+                    </div>
+                  )}
+
+                  <div className="analysis-summary">{r.summary}</div>
+
+                  <div className="analysis-meta">
+                    <span className="badge">Based on {r.participant_count} interviews</span>
+                    <span className="badge">Confidence: {r.confidence}</span>
+                    {analysis.generated_at && (
+                      <span className="muted-text" style={{ fontSize: "0.8rem" }}>
+                        Generated {new Date(analysis.generated_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+
+                  {r.themes.length > 0 && (
+                    <div className="analysis-block">
+                      <h3>Key Themes</h3>
+                      {r.themes.map((t, i) => (
+                        <div key={i} className="analysis-theme">
+                          <div className="analysis-theme-header">
+                            <strong>{t.title}</strong>
+                            <span className="badge">{t.frequency}</span>
+                          </div>
+                          <p>{t.summary}</p>
+                          {t.quotes.length > 0 && (
+                            <div className="analysis-quotes">
+                              {t.quotes.map((q, j) => (
+                                <blockquote key={j} className="analysis-quote">"{q}"</blockquote>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {r.jobs_to_be_done.length > 0 && (
+                    <div className="analysis-block">
+                      <h3>Jobs to be Done</h3>
+                      {r.jobs_to_be_done.map((j, i) => (
+                        <div key={i} className="analysis-jtbd">
+                          <div className="analysis-jtbd-job">"{j.job}"</div>
+                          <p className="analysis-jtbd-insight">{j.insight}</p>
+                          <span className="badge">{j.frequency}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {r.tensions.length > 0 && (
+                    <div className="analysis-block">
+                      <h3>Tensions & Contradictions</h3>
+                      {r.tensions.map((t, i) => (
+                        <div key={i} className="analysis-tension">
+                          <strong>{t.tension}</strong>
+                          <p>{t.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {r.recommendations.length > 0 && (
+                    <div className="analysis-block">
+                      <h3>Recommendations</h3>
+                      <ol className="analysis-recommendations">
+                        {r.recommendations.map((rec, i) => (
+                          <li key={i}>{rec}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </section>
+        )}
 
         {/* Interview Guide */}
         <section className="detail-section">
@@ -268,7 +433,7 @@ export default function ProjectDetail() {
             ) : (
               <div className="transcript-list">
                 {transcript.map((t) => (
-                  <div key={t.id} className="transcript-turn">
+                  <div key={t.turn_index} className="transcript-turn">
                     <div className="transcript-q">
                       <strong>Q:</strong> {t.question_text}
                     </div>

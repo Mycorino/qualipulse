@@ -4,13 +4,13 @@
     {
       "name": "Backend (FastAPI)",
       "runtimeExecutable": "uvicorn",
-      "runtimeArgs": ["app.main:app", "--reload", "--port", "8000"],
+      "runtimeArgs": ["app.main:app", "--reload", "--port", "8000", "--app-dir", "backend"],
       "port": 8000
     },
     {
       "name": "Frontend (Vite)",
-      "runtimeExecutable": "/opt/homebrew/bin/npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd /Users/corinofontana/Desktop/auto-interview/frontend && /opt/homebrew/bin/npm run dev -- --port 5173"],
       "port": 5173
     }
   ]
