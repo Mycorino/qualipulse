@@ -473,6 +473,7 @@ export default function ProjectDetail() {
   function renderMemoSection(type: string, linkedKey: string): React.ReactNode {
     const sectionMemos = memos.filter((m) => m.linked_key === linkedKey);
     const isAdding = addingMemoKey === linkedKey;
+    if (!sectionMemos.length && !isAdding) return null;
     return (
       <div style={{ marginTop: 8 }}>
         {sectionMemos.map((m) => (
@@ -496,7 +497,7 @@ export default function ProjectDetail() {
             )}
           </div>
         ))}
-        {isAdding ? (
+        {isAdding && (
           <div style={{ marginTop: 4 }}>
             <textarea className="field-input" value={newMemoContent} onChange={(e) => setNewMemoContent(e.target.value)} placeholder="Research note..." rows={3} style={{ width: "100%", marginBottom: 6 }} autoFocus />
             <div style={{ display: "flex", gap: 6 }}>
@@ -504,10 +505,6 @@ export default function ProjectDetail() {
               <button className="btn btn-ghost btn-xs" onClick={() => { setAddingMemoKey(null); setNewMemoContent(""); }}>Cancel</button>
             </div>
           </div>
-        ) : (
-          <button className="btn btn-ghost btn-xs" style={{ marginTop: 4, color: "#d97706" }} onClick={() => { setAddingMemoKey(linkedKey); setNewMemoContent(""); }}>
-            + Add Memo
-          </button>
         )}
       </div>
     );
@@ -973,7 +970,13 @@ export default function ProjectDetail() {
                         <h3>Key Themes</h3>
                         {r.themes.map((t, i) => (
                           <div key={i} className="analysis-theme">
-                            <div className="analysis-theme-header"><strong>{t.title}</strong><span className="badge">{t.frequency}</span></div>
+                            <div className="analysis-theme-header">
+                              <strong>{t.title}</strong>
+                              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                <span className="badge">{t.frequency}</span>
+                                <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>
+                              </div>
+                            </div>
                             <p>{t.summary}</p>
                             {t.quotes.length > 0 && (
                               <div className="analysis-quotes">
@@ -994,7 +997,10 @@ export default function ProjectDetail() {
                           <div key={i} className="analysis-jtbd">
                             <div className="analysis-jtbd-job">"{j.job}"</div>
                             <p className="analysis-jtbd-insight">{j.insight}</p>
-                            <span className="badge">{j.frequency}</span>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              <span className="badge">{j.frequency}</span>
+                              <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(j.job); setNewMemoContent(""); }}>+ Note</button>
+                            </div>
                             {renderMemoSection("jtbd_note", j.job)}
                           </div>
                         ))}
@@ -1007,7 +1013,10 @@ export default function ProjectDetail() {
                         <h3>Tensions & Contradictions</h3>
                         {r.tensions.map((t, i) => (
                           <div key={i} className="analysis-tension">
-                            <strong>{t.tension}</strong>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                              <strong>{t.tension}</strong>
+                              <button className="btn btn-ghost btn-xs" style={{ color: "#d97706", flexShrink: 0 }} onClick={() => { setAddingMemoKey(t.tension); setNewMemoContent(""); }}>+ Note</button>
+                            </div>
                             <p>{t.detail}</p>
                             {renderMemoSection("tension_note", t.tension)}
                           </div>
