@@ -2,6 +2,7 @@ import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
@@ -15,6 +16,37 @@ from app.services.interview_engine import process_interview_turn, start_intervie
 from app.services.storage import upload_audio
 
 router = APIRouter(prefix="/interview", tags=["interview"])
+
+
+class ScreenRequest(BaseModel):
+    answers: dict[str, str]  # question_id → selected option
+
+
+@router.get("/{token}/screening-questions")
+def get_screening_questions(token: str, db: Session = Depends(get_db)):
+    """Return screening questions for this project (no auth required)."""
+    link = _get_active_link_or_404(token, db)
+    return [
+        {
+            "id": q.id,
+            "question": q.question,
+            "options": q.options_list,
+            "disqualifying_options": q.disqualifying_options_list,
+            "sort_order": q.sort_order,
+        }
+        for q in sorted(link.project.screening_questions, key=lambda q: q.sort_order)
+    ]
+
+
+@router.post("/{token}/screen")
+def screen_participant(token: str, body: ScreenRequest, db: Session = Depends(get_db)):
+    """Check answers against disqualifying options. Returns qualified status."""
+    link = _get_active_link_or_404(token, db)
+    for q in sorted(link.project.screening_questions, key=lambda q: q.sort_order):
+        answer = body.answers.get(q.id)
+        if answer and answer in q.disqualifying_options_list:
+            return {"qualified": False, "disqualified_on": q.question}
+    return {"qualified": True}
 
 
 @router.get("/{token}")

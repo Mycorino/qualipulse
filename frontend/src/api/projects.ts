@@ -9,6 +9,20 @@ export interface QuestionCreate {
   desired_learning?: string;
 }
 
+export interface ScreeningQuestionCreate {
+  question: string;
+  options: string[];
+  disqualifying_options: string[];
+}
+
+export interface ScreeningQuestionResponse {
+  id: string;
+  question: string;
+  options: string[];
+  disqualifying_options: string[];
+  sort_order: number;
+}
+
 export interface ProjectCreate {
   name: string;
   language: string;
@@ -16,6 +30,7 @@ export interface ProjectCreate {
   system_prompt?: string;
   research_objective?: string;
   questions: QuestionCreate[];
+  screening_questions?: ScreeningQuestionCreate[];
 }
 
 export interface QuestionResponse {
@@ -40,6 +55,7 @@ export interface ProjectResponse {
   research_objective?: string;
   created_at: string;
   questions: QuestionResponse[];
+  screening_questions: ScreeningQuestionResponse[];
 }
 
 export interface ProjectListItem {

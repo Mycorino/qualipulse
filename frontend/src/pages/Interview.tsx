@@ -2,13 +2,16 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import {
   getInterviewInfo,
+  getScreeningQuestions,
+  submitScreening,
   startInterview,
   submitAudio,
   InterviewInfo,
+  ScreeningQuestion,
 } from "../api/interviews";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
-type Phase = "landing" | "interview" | "complete";
+type Phase = "landing" | "screening" | "disqualified" | "interview" | "complete";
 
 export default function Interview() {
   const { token } = useParams<{ token: string }>();
@@ -23,6 +26,13 @@ export default function Interview() {
   const [muted, setMuted] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
   const [infoLoading, setInfoLoading] = useState(true);
+
+  // Screening state
+  const [screeningQuestions, setScreeningQuestions] = useState<ScreeningQuestion[]>([]);
+  const [screeningStep, setScreeningStep] = useState(0);
+  const [screeningAnswers, setScreeningAnswers] = useState<Record<string, string>>({});
+  const [screeningLoading, setScreeningLoading] = useState(false);
+  const [disqualifiedOn, setDisqualifiedOn] = useState("");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { isRecording, error: recError, startRecording, stopRecording } =
@@ -53,23 +63,57 @@ export default function Interview() {
     [muted]
   );
 
+  async function doStartInterview() {
+    const res = await startInterview(token!, displayName || undefined);
+    setParticipantId(res.participant_id);
+    setCurrentQuestion(res.first_question);
+    setTurnCount(1);
+    setPhase("interview");
+    if (res.tts_audio_url) playTTS(res.tts_audio_url);
+  }
+
   async function handleStart() {
     if (!token) return;
     setStarting(true);
     setError("");
     try {
-      const res = await startInterview(token, displayName || undefined);
-      setParticipantId(res.participant_id);
-      setCurrentQuestion(res.first_question);
-      setTurnCount(1);
-      setPhase("interview");
-      if (res.tts_audio_url) {
-        playTTS(res.tts_audio_url);
+      const questions = await getScreeningQuestions(token);
+      if (questions.length > 0) {
+        setScreeningQuestions(questions);
+        setScreeningStep(0);
+        setScreeningAnswers({});
+        setPhase("screening");
+      } else {
+        await doStartInterview();
       }
     } catch {
       setError("Failed to start interview. Please try again.");
     } finally {
       setStarting(false);
+    }
+  }
+
+  async function handleScreeningAnswer(questionId: string, answer: string) {
+    const updated = { ...screeningAnswers, [questionId]: answer };
+    setScreeningAnswers(updated);
+    if (screeningStep < screeningQuestions.length - 1) {
+      setScreeningStep((s) => s + 1);
+    } else {
+      setScreeningLoading(true);
+      try {
+        const result = await submitScreening(token!, updated);
+        if (result.qualified) {
+          await doStartInterview();
+        } else {
+          setDisqualifiedOn(result.disqualified_on ?? "");
+          setPhase("disqualified");
+        }
+      } catch {
+        setError("Something went wrong. Please try again.");
+        setPhase("landing");
+      } finally {
+        setScreeningLoading(false);
+      }
     }
   }
 
@@ -164,6 +208,68 @@ export default function Interview() {
           >
             {starting ? "Starting..." : "Start Interview"}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- Screening Phase ---- */
+  if (phase === "screening") {
+    const sq = screeningQuestions[screeningStep];
+    const progress = (screeningStep / screeningQuestions.length) * 100;
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-profiling">
+          <div className="profiling-header">
+            <p className="profiling-intro">A few quick questions before we begin</p>
+            <div className="profiling-progress-bar">
+              <div className="profiling-progress-fill" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="profiling-step-label">{screeningStep + 1} / {screeningQuestions.length}</p>
+          </div>
+          <div className="profiling-question">
+            <h2 className="profiling-label">{sq.question}</h2>
+            <div className="profiling-options">
+              {sq.options.map((opt) => (
+                <button
+                  key={opt}
+                  className="profiling-option-btn"
+                  onClick={() => !screeningLoading && handleScreeningAnswer(sq.id, opt)}
+                  disabled={screeningLoading}
+                >
+                  {screeningLoading && screeningAnswers[sq.id] === opt ? "Checking..." : opt}
+                </button>
+              ))}
+            </div>
+          </div>
+          {error && <div className="error-banner">{error}</div>}
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- Disqualified Phase ---- */
+  if (phase === "disqualified") {
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-complete">
+          <div className="complete-icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <h1 className="interview-complete-title">Thank you for your interest</h1>
+          <p className="interview-complete-text">
+            Based on your answers, you don't match the profile we're looking for in this study.
+            We appreciate your time!
+          </p>
+          {disqualifiedOn && (
+            <p className="muted-text" style={{ marginTop: 8, fontSize: 13 }}>
+              This study requires a specific audience profile.
+            </p>
+          )}
         </div>
       </div>
     );

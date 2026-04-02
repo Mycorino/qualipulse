@@ -7,6 +7,19 @@ export interface InterviewInfo {
   interview_duration_minutes?: number;
 }
 
+export interface ScreeningQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  disqualifying_options: string[];
+  sort_order: number;
+}
+
+export interface ScreenResult {
+  qualified: boolean;
+  disqualified_on?: string;
+}
+
 export interface StartInterviewResponse {
   participant_id: string;
   first_question: string;
@@ -36,6 +49,16 @@ export async function startInterview(
     `/interview/${token}/start`,
     { display_name: displayName || undefined }
   );
+  return data;
+}
+
+export async function getScreeningQuestions(token: string): Promise<ScreeningQuestion[]> {
+  const { data } = await client.get<ScreeningQuestion[]>(`/interview/${token}/screening-questions`);
+  return data;
+}
+
+export async function submitScreening(token: string, answers: Record<string, string>): Promise<ScreenResult> {
+  const { data } = await client.post<ScreenResult>(`/interview/${token}/screen`, { answers });
   return data;
 }
 

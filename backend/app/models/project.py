@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -60,6 +61,10 @@ class Project(Base):
     manual_codes = relationship(
         "ManualCode", back_populates="project", cascade="all, delete-orphan"
     )
+    screening_questions = relationship(
+        "ScreeningQuestion", back_populates="project", cascade="all, delete-orphan",
+        order_by="ScreeningQuestion.sort_order",
+    )
 
 
 class InterviewGuideQuestion(Base):
@@ -83,3 +88,28 @@ class InterviewGuideQuestion(Base):
 
     # Relationships
     project = relationship("Project", back_populates="guide_questions")
+
+
+class ScreeningQuestion(Base):
+    __tablename__ = "screening_questions"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    disqualifying_options: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
+    project = relationship("Project", back_populates="screening_questions")
+
+    @property
+    def options_list(self) -> list[str]:
+        return json.loads(self.options)
+
+    @property
+    def disqualifying_options_list(self) -> list[str]:
+        return json.loads(self.disqualifying_options)
