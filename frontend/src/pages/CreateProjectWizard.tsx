@@ -405,15 +405,15 @@ export default function CreateProjectWizard() {
             />
 
             <label className="field-label">Learning Goals</label>
-            {learningGoals.map((goal, i) => (
+            {learningGoals.map((goal: string, i: number) => (
               <input
                 key={i}
                 className="field-input"
                 style={{ marginBottom: 8 }}
                 value={goal}
                 onChange={(e) =>
-                  setLearningGoals((prev) =>
-                    prev.map((g, j) => (j === i ? e.target.value : g))
+                  setLearningGoals((prev: string[]) =>
+                    prev.map((g: string, j: number) => (j === i ? e.target.value : g))
                   )
                 }
                 placeholder={`Learning goal ${i + 1}`}

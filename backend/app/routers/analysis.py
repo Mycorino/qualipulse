@@ -1,8 +1,10 @@
 """Analysis endpoints — generate and retrieve AI synthesis for a project."""
 
+import json
 import threading
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
@@ -14,14 +16,23 @@ from app.services.analysis import run_analysis
 router = APIRouter(prefix="/projects", tags=["analysis"])
 
 
+class AnalysisTriggerRequest(BaseModel):
+    filter_by: str | None = None       # e.g. "profession"
+    filter_values: list[str] = []      # e.g. ["Engineer", "Designer"]
+
+
 @router.post("/{project_id}/analysis", status_code=status.HTTP_202_ACCEPTED)
 def trigger_analysis(
     project_id: str,
+    body: AnalysisTriggerRequest | None = None,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    """Kick off (or re-run) AI synthesis for all completed interviews."""
+    """Kick off (or re-run) AI synthesis. Optionally filter participants by an attribute."""
     project = _get_project_or_404(project_id, company.id, db)
+
+    filter_by = body.filter_by if body else None
+    filter_values = body.filter_values if body else []
 
     completed_count = (
         db.query(Participant)
@@ -34,10 +45,14 @@ def trigger_analysis(
             detail="No completed interviews to analyse yet.",
         )
 
+    filters_json = None
+    if filter_by and filter_values:
+        filters_json = json.dumps({"filter_by": filter_by, "filter_values": filter_values})
+
     # Run in background thread so the response returns immediately
     thread = threading.Thread(
         target=run_analysis,
-        args=(project_id, db),
+        args=(project_id, db, filter_by, filter_values),
         daemon=True,
     )
     thread.start()
@@ -74,17 +89,105 @@ def get_analysis(
             "participant_count": 0,
             "generated_at": None,
             "report": None,
+            "filters": None,
             "error": None,
         }
 
-    import json
+    active_filters = None
+    if analysis.filters:
+        try:
+            active_filters = json.loads(analysis.filters)
+        except Exception:
+            pass
+
     return {
         "status": analysis.status,
         "completed_count": completed_count,
         "participant_count": analysis.participant_count,
         "generated_at": analysis.generated_at.isoformat() if analysis.generated_at else None,
         "report": json.loads(analysis.report) if analysis.report else None,
+        "filters": active_filters,
         "error": analysis.error,
+    }
+
+
+@router.get("/{project_id}/analysis/heatmap")
+def get_heatmap(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Build a demographic × theme heatmap from the latest analysis report."""
+    _get_project_or_404(project_id, company.id, db)
+
+    analysis = (
+        db.query(ProjectAnalysis)
+        .filter(ProjectAnalysis.project_id == project_id, ProjectAnalysis.status == "ready")
+        .first()
+    )
+    if analysis is None or not analysis.report:
+        raise HTTPException(status_code=404, detail="No ready analysis found")
+
+    report = json.loads(analysis.report)
+    themes = report.get("themes", [])
+
+    # Build participant map: id → {display_name, profession, age_range, country}
+    participants = (
+        db.query(Participant)
+        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .all()
+    )
+
+    # Collect all unique segments
+    segments: list[str] = []
+    seg_participants: dict[str, list[str]] = {}  # segment → list of display names
+
+    for p in participants:
+        for attr, val in [
+            ("profession", p.profession),
+            ("age_range", p.age_range),
+            ("country", p.country),
+        ]:
+            if val:
+                seg = f"{attr}:{val}"
+                if seg not in seg_participants:
+                    seg_participants[seg] = []
+                    segments.append(seg)
+                seg_participants[seg].append(p.display_name or f"Participant")
+
+    # For each theme, count how many quotes mention a participant in each segment.
+    # If the quotes are attributed objects, match by participant_display_name.
+    # Fall back to counting unique segment members if quotes are plain strings.
+    theme_rows = []
+    for theme in themes:
+        raw_quotes = theme.get("quotes", [])
+        seg_counts: dict[str, int] = {}
+
+        # Extract participant names mentioned in quotes
+        mentioned_names: set[str] = set()
+        for q in raw_quotes:
+            if isinstance(q, dict):
+                pname = q.get("participant_display_name", "")
+                if pname:
+                    mentioned_names.add(pname)
+
+        for seg, names in seg_participants.items():
+            if mentioned_names:
+                # Count segment participants whose name appears in attributed quotes
+                seg_counts[seg] = sum(1 for n in names if n in mentioned_names)
+            else:
+                # No attribution available — heuristic: flag all segments with any data
+                seg_counts[seg] = 0
+
+        theme_rows.append({
+            "title": theme.get("title", ""),
+            "segment_counts": seg_counts,
+        })
+
+    return {
+        "segments": segments,
+        "segment_participants": seg_participants,
+        "themes": theme_rows,
     }
 
 

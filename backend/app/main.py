@@ -39,7 +39,10 @@ app.add_middleware(
 )
 
 # Import and register routers
-from app.routers import auth, projects, links, interview, export, audio, research_assistant, analysis
+from app.routers import (
+    auth, projects, links, interview, export, audio,
+    research_assistant, analysis, responses, coding, memos,
+)
 
 app.include_router(auth.router)
 app.include_router(projects.router)
@@ -49,6 +52,9 @@ app.include_router(export.router)
 app.include_router(audio.router)
 app.include_router(research_assistant.router)
 app.include_router(analysis.router)
+app.include_router(responses.router)
+app.include_router(coding.router)
+app.include_router(memos.router)
 
 
 @app.get("/", tags=["health"])

@@ -12,6 +12,11 @@ class QuestionCreate(BaseModel):
     desired_learning: str | None = None
 
 
+class QuestionPatch(BaseModel):
+    researcher_notes: str | None = None
+    deprecated_at: datetime | None = None
+
+
 class ProjectCreate(BaseModel):
     name: str
     language: str = "en"
@@ -29,6 +34,8 @@ class QuestionResponse(BaseModel):
     main_question: str
     interview_notes: str | None = None
     desired_learning: str | None = None
+    researcher_notes: str | None = None
+    deprecated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
