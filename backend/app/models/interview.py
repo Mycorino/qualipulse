@@ -44,6 +44,9 @@ class Participant(Base):
         String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    age_range: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    profession: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), default="in_progress", nullable=False
     )
@@ -74,6 +77,7 @@ class ProjectAnalysis(Base):
     )  # "generating" | "ready" | "failed"
     participant_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     report: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
+    filters: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: {filter_by, filter_values}
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -100,9 +104,12 @@ class InterviewTurn(Base):
     response_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
     audio_recording_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     tts_audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    manually_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     # Relationships
     participant = relationship("Participant", back_populates="turns")
+    quote_tags = relationship("QuoteTag", back_populates="turn", cascade="all, delete-orphan")

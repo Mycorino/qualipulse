@@ -54,6 +54,12 @@ class Project(Base):
     analysis = relationship(
         "ProjectAnalysis", back_populates="project", uselist=False, cascade="all, delete-orphan"
     )
+    memos = relationship(
+        "ProjectMemo", back_populates="project", cascade="all, delete-orphan"
+    )
+    manual_codes = relationship(
+        "ManualCode", back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class InterviewGuideQuestion(Base):
@@ -72,6 +78,8 @@ class InterviewGuideQuestion(Base):
     interview_notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
     desired_learning: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    researcher_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deprecated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Relationships
     project = relationship("Project", back_populates="guide_questions")

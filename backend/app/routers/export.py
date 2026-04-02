@@ -42,6 +42,9 @@ def list_participants(
             started_at=p.started_at,
             completed_at=p.completed_at,
             turn_count=len(p.turns),
+            age_range=p.age_range,
+            profession=p.profession,
+            country=p.country,
         )
         for p in participants
     ]
@@ -82,13 +85,19 @@ def get_transcript(
             started_at=participant.started_at,
             completed_at=participant.completed_at,
             turn_count=len(turns),
+            age_range=participant.age_range,
+            profession=participant.profession,
+            country=participant.country,
         ),
         turns=[
             TranscriptTurnResponse(
+                id=t.id,
                 turn_index=t.turn_index,
                 question_text=t.question_text,
                 response_transcript=t.response_transcript,
                 is_follow_up=t.is_follow_up,
+                manually_edited=t.manually_edited,
+                edited_at=t.edited_at,
                 created_at=t.created_at,
             )
             for t in turns

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 
@@ -8,6 +10,7 @@ from app.schemas.project import (
     ProjectCreate,
     ProjectListResponse,
     ProjectResponse,
+    QuestionPatch,
     QuestionResponse,
 )
 from app.services.guide_parser import parse_guide_csv
@@ -174,6 +177,50 @@ def delete_project(
     db.commit()
 
 
+@router.patch("/{project_id}/questions/{question_id}", response_model=QuestionResponse)
+def patch_question(
+    project_id: str,
+    question_id: str,
+    body: QuestionPatch,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> QuestionResponse:
+    """Update researcher_notes and/or deprecated_at for a guide question."""
+    project = _get_project_or_404(project_id, company.id, db)
+
+    question = (
+        db.query(InterviewGuideQuestion)
+        .filter(
+            InterviewGuideQuestion.id == question_id,
+            InterviewGuideQuestion.project_id == project.id,
+        )
+        .first()
+    )
+    if question is None:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    if body.researcher_notes is not None:
+        question.researcher_notes = body.researcher_notes
+    # Allow setting deprecated_at to a value or clearing it (None = un-deprecate)
+    if "deprecated_at" in body.model_fields_set:
+        question.deprecated_at = body.deprecated_at
+
+    db.commit()
+    db.refresh(question)
+
+    return QuestionResponse(
+        id=question.id,
+        section_index=question.section_index,
+        section_title=question.section_title,
+        question_index=question.question_index,
+        main_question=question.main_question,
+        interview_notes=question.interview_notes,
+        desired_learning=question.desired_learning,
+        researcher_notes=question.researcher_notes,
+        deprecated_at=question.deprecated_at,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -199,6 +246,8 @@ def _project_to_response(project: Project) -> ProjectResponse:
             main_question=q.main_question,
             interview_notes=q.interview_notes,
             desired_learning=q.desired_learning,
+            researcher_notes=q.researcher_notes,
+            deprecated_at=q.deprecated_at,
         )
         for q in sorted(project.guide_questions, key=lambda q: (q.section_index, q.question_index))
     ]

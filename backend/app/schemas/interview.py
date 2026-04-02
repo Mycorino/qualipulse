@@ -19,6 +19,9 @@ class LinkResponse(BaseModel):
 
 class StartInterviewRequest(BaseModel):
     display_name: str | None = None
+    age_range: str | None = None
+    profession: str | None = None
+    country: str | None = None
 
 
 class StartInterviewResponse(BaseModel):
@@ -40,15 +43,21 @@ class ParticipantResponse(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     turn_count: int
+    age_range: str | None = None
+    profession: str | None = None
+    country: str | None = None
 
     model_config = {"from_attributes": True}
 
 
 class TranscriptTurnResponse(BaseModel):
+    id: str
     turn_index: int
     question_text: str
     response_transcript: str | None = None
     is_follow_up: bool
+    manually_edited: bool = False
+    edited_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

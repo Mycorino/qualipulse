@@ -26,6 +26,8 @@ export interface QuestionResponse {
   main_question: string;
   interview_notes?: string;
   desired_learning?: string;
+  researcher_notes?: string | null;
+  deprecated_at?: string | null;
 }
 
 export interface ProjectResponse {
@@ -62,103 +64,36 @@ export interface ParticipantResponse {
   status: string;
   started_at: string;
   completed_at: string | null;
+  age_range?: string | null;
+  profession?: string | null;
+  country?: string | null;
 }
 
 export interface TranscriptTurn {
+  id: string;
   turn_index: number;
   question_text: string;
   response_transcript: string | null;
   is_follow_up: boolean;
+  manually_edited: boolean;
+  edited_at: string | null;
   created_at: string;
 }
 
-export async function listProjects(): Promise<ProjectListItem[]> {
-  const { data } = await client.get<ProjectListItem[]>("/projects/");
-  return data;
-}
+// ── Analysis types ─────────────────────────────────────────────────────────
 
-export async function getProject(id: string): Promise<ProjectResponse> {
-  const { data } = await client.get<ProjectResponse>(`/projects/${id}`);
-  return data;
-}
-
-export async function createProject(
-  body: ProjectCreate
-): Promise<ProjectResponse> {
-  const { data } = await client.post<ProjectResponse>("/projects/", body);
-  return data;
-}
-
-export async function updateProject(
-  id: string,
-  body: ProjectCreate
-): Promise<ProjectResponse> {
-  const { data } = await client.put<ProjectResponse>(`/projects/${id}`, body);
-  return data;
-}
-
-export async function importProjectCSV(
-  name: string,
-  language: string,
-  csvFile: File
-): Promise<ProjectResponse> {
-  const form = new FormData();
-  form.append("name", name);
-  form.append("language", language);
-  form.append("csv_file", csvFile);
-  const { data } = await client.post<ProjectResponse>(
-    "/projects/import",
-    form,
-    { headers: { "Content-Type": "multipart/form-data" } }
-  );
-  return data;
-}
-
-export async function deleteProject(id: string): Promise<void> {
-  await client.delete(`/projects/${id}`);
-}
-
-export async function createLink(
-  projectId: string
-): Promise<InterviewLink> {
-  const { data } = await client.post<InterviewLink>(
-    `/projects/${projectId}/links`
-  );
-  return data;
-}
-
-export async function getLinks(
-  projectId: string
-): Promise<InterviewLink[]> {
-  const { data } = await client.get<InterviewLink[]>(
-    `/projects/${projectId}/links`
-  );
-  return data;
-}
-
-export async function getParticipants(
-  projectId: string
-): Promise<ParticipantResponse[]> {
-  const { data } = await client.get<ParticipantResponse[]>(
-    `/projects/${projectId}/participants`
-  );
-  return data;
-}
-
-export async function getTranscript(
-  projectId: string,
-  participantId: string
-): Promise<TranscriptTurn[]> {
-  const { data } = await client.get<{ participant: ParticipantResponse; turns: TranscriptTurn[] }>(
-    `/projects/${projectId}/participants/${participantId}/transcript`
-  );
-  return data.turns;
+export interface AttributedQuote {
+  text: string;
+  participant_identifier?: string;
+  participant_display_name?: string;
+  turn_index?: number;
+  question_text?: string;
 }
 
 export interface AnalysisTheme {
   title: string;
   summary: string;
-  quotes: string[];
+  quotes: (AttributedQuote | string)[];
   frequency: string;
 }
 export interface AnalysisJTBD {
@@ -185,7 +120,146 @@ export interface AnalysisResponse {
   participant_count: number;
   generated_at: string | null;
   report: AnalysisReport | null;
+  filters: { filter_by: string; filter_values: string[] } | null;
   error: string | null;
+}
+
+// ── Coding types ────────────────────────────────────────────────────────────
+
+export interface ManualCode {
+  id: string;
+  project_id: string;
+  name: string;
+  color: string;
+  sort_order: number;
+  tag_count: number;
+  created_at: string;
+}
+
+export interface QuoteTag {
+  id: string;
+  turn_id: string;
+  manual_code_id: string;
+  code_name: string | null;
+  code_color: string | null;
+  selected_text: string;
+  start_index: number;
+  end_index: number;
+  participant_id?: string | null;
+  participant_display_name?: string | null;
+  created_at: string;
+}
+
+// ── Memo types ──────────────────────────────────────────────────────────────
+
+export interface ProjectMemo {
+  id: string;
+  project_id: string;
+  type: "general" | "theme_note" | "tension_note" | "jtbd_note";
+  linked_key: string | null;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Heatmap types ───────────────────────────────────────────────────────────
+
+export interface HeatmapTheme {
+  title: string;
+  segment_counts: Record<string, number>;
+}
+
+export interface HeatmapResponse {
+  segments: string[];
+  segment_participants: Record<string, string[]>;
+  themes: HeatmapTheme[];
+}
+
+// ── API functions ───────────────────────────────────────────────────────────
+
+export async function listProjects(): Promise<ProjectListItem[]> {
+  const { data } = await client.get<ProjectListItem[]>("/projects/");
+  return data;
+}
+
+export async function getProject(id: string): Promise<ProjectResponse> {
+  const { data } = await client.get<ProjectResponse>(`/projects/${id}`);
+  return data;
+}
+
+export async function createProject(body: ProjectCreate): Promise<ProjectResponse> {
+  const { data } = await client.post<ProjectResponse>("/projects/", body);
+  return data;
+}
+
+export async function updateProject(id: string, body: ProjectCreate): Promise<ProjectResponse> {
+  const { data } = await client.put<ProjectResponse>(`/projects/${id}`, body);
+  return data;
+}
+
+export async function importProjectCSV(name: string, language: string, csvFile: File): Promise<ProjectResponse> {
+  const form = new FormData();
+  form.append("name", name);
+  form.append("language", language);
+  form.append("csv_file", csvFile);
+  const { data } = await client.post<ProjectResponse>("/projects/import", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await client.delete(`/projects/${id}`);
+}
+
+export async function patchQuestion(
+  projectId: string,
+  questionId: string,
+  body: { researcher_notes?: string | null; deprecated_at?: string | null }
+): Promise<QuestionResponse> {
+  const { data } = await client.patch<QuestionResponse>(
+    `/projects/${projectId}/questions/${questionId}`,
+    body
+  );
+  return data;
+}
+
+export async function createLink(projectId: string): Promise<InterviewLink> {
+  const { data } = await client.post<InterviewLink>(`/projects/${projectId}/links`);
+  return data;
+}
+
+export async function getLinks(projectId: string): Promise<InterviewLink[]> {
+  const { data } = await client.get<InterviewLink[]>(`/projects/${projectId}/links`);
+  return data;
+}
+
+export async function getParticipants(projectId: string): Promise<ParticipantResponse[]> {
+  const { data } = await client.get<ParticipantResponse[]>(`/projects/${projectId}/participants`);
+  return data;
+}
+
+export async function getTranscript(
+  projectId: string,
+  participantId: string
+): Promise<{ participant: ParticipantResponse; turns: TranscriptTurn[] }> {
+  const { data } = await client.get<{ participant: ParticipantResponse; turns: TranscriptTurn[] }>(
+    `/projects/${projectId}/participants/${participantId}/transcript`
+  );
+  return data;
+}
+
+export async function updateTurn(
+  projectId: string,
+  participantId: string,
+  turnId: string,
+  responseTranscript: string
+): Promise<{ id: string; turn_index: number; response_transcript: string; manually_edited: boolean; edited_at: string | null }> {
+  const { data } = await client.put(
+    `/projects/${projectId}/participants/${participantId}/turns/${turnId}`,
+    { response_transcript: responseTranscript }
+  );
+  return data;
 }
 
 export async function getAnalysis(projectId: string): Promise<AnalysisResponse> {
@@ -193,13 +267,77 @@ export async function getAnalysis(projectId: string): Promise<AnalysisResponse> 
   return data;
 }
 
-export async function triggerAnalysis(projectId: string): Promise<void> {
-  await client.post(`/projects/${projectId}/analysis`);
+export async function triggerAnalysis(
+  projectId: string,
+  filters?: { filter_by: string; filter_values: string[] }
+): Promise<void> {
+  await client.post(`/projects/${projectId}/analysis`, filters ?? {});
+}
+
+export async function getHeatmap(projectId: string): Promise<HeatmapResponse> {
+  const { data } = await client.get<HeatmapResponse>(`/projects/${projectId}/analysis/heatmap`);
+  return data;
 }
 
 export async function exportCSV(projectId: string): Promise<Blob> {
-  const { data } = await client.get(`/projects/${projectId}/export`, {
-    responseType: "blob",
-  });
+  const { data } = await client.get(`/projects/${projectId}/export`, { responseType: "blob" });
   return data;
+}
+
+// ── Coding API ──────────────────────────────────────────────────────────────
+
+export async function getCodes(projectId: string): Promise<ManualCode[]> {
+  const { data } = await client.get<ManualCode[]>(`/projects/${projectId}/codes`);
+  return data;
+}
+
+export async function createCode(projectId: string, name: string, color: string): Promise<ManualCode> {
+  const { data } = await client.post<ManualCode>(`/projects/${projectId}/codes`, { name, color });
+  return data;
+}
+
+export async function deleteCode(projectId: string, codeId: string): Promise<void> {
+  await client.delete(`/projects/${projectId}/codes/${codeId}`);
+}
+
+export async function getTags(projectId: string): Promise<QuoteTag[]> {
+  const { data } = await client.get<QuoteTag[]>(`/projects/${projectId}/tags`);
+  return data;
+}
+
+export async function createTag(
+  projectId: string,
+  turnId: string,
+  body: { manual_code_id: string; selected_text: string; start_index: number; end_index: number }
+): Promise<QuoteTag> {
+  const { data } = await client.post<QuoteTag>(`/projects/${projectId}/turns/${turnId}/tags`, body);
+  return data;
+}
+
+export async function deleteTag(projectId: string, tagId: string): Promise<void> {
+  await client.delete(`/projects/${projectId}/tags/${tagId}`);
+}
+
+// ── Memos API ───────────────────────────────────────────────────────────────
+
+export async function getMemos(projectId: string): Promise<ProjectMemo[]> {
+  const { data } = await client.get<ProjectMemo[]>(`/projects/${projectId}/memos`);
+  return data;
+}
+
+export async function createMemo(
+  projectId: string,
+  body: { type: string; linked_key?: string | null; content: string }
+): Promise<ProjectMemo> {
+  const { data } = await client.post<ProjectMemo>(`/projects/${projectId}/memos`, body);
+  return data;
+}
+
+export async function updateMemo(projectId: string, memoId: string, content: string): Promise<ProjectMemo> {
+  const { data } = await client.put<ProjectMemo>(`/projects/${projectId}/memos/${memoId}`, { content });
+  return data;
+}
+
+export async function deleteMemo(projectId: string, memoId: string): Promise<void> {
+  await client.delete(`/projects/${projectId}/memos/${memoId}`);
 }

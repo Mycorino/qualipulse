@@ -34,9 +34,12 @@ You must respond in JSON format: {"action": "follow_up" or "next_question" or "c
 
 
 def _build_interview_guide_str(project: Project) -> str:
-    """Build a formatted string representation of the interview guide."""
+    """Build a formatted string representation of the interview guide.
+
+    Skips questions that have been deprecated by the researcher.
+    """
     guide_questions: list[InterviewGuideQuestion] = sorted(
-        project.guide_questions,
+        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
         key=lambda q: (q.section_index, q.question_index),
     )
     if not guide_questions:
@@ -86,7 +89,7 @@ def get_interview_context(
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
 
     guide_questions = sorted(
-        project.guide_questions,
+        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
         key=lambda q: (q.section_index, q.question_index),
     )
     total_questions = len(guide_questions)
@@ -200,9 +203,9 @@ Return ONLY a JSON object: {{"action": "follow_up" or "next_question" or "close"
 
 
 def _get_first_question(project: Project) -> tuple[str, int]:
-    """Get the first question from the interview guide, rephrased as an opener."""
+    """Get the first non-deprecated question from the interview guide, rephrased as an opener."""
     guide_questions = sorted(
-        project.guide_questions,
+        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
         key=lambda q: (q.section_index, q.question_index),
     )
     if not guide_questions:

@@ -1,6 +1,7 @@
 """AI-powered synthesis of all completed interview transcripts for a project."""
 
 import json
+from datetime import datetime
 
 import anthropic
 from sqlalchemy.orm import Session
@@ -14,38 +15,88 @@ You are a senior qualitative researcher with deep expertise in Jobs-to-be-Done, 
 behavioural psychology, and product research. You analyse interview transcripts and \
 produce sharp, actionable insight reports.
 
-Be concrete: name specific patterns, use direct quotes, flag surprises. \
+Be concrete: name specific patterns, use direct quotes with attribution, flag surprises. \
 Avoid generic observations. The report should help a product team make decisions.
+
+Each quote MUST include the participant identifier (e.g. [P1]) as provided in the transcript headers.
 
 Return ONLY valid JSON — no markdown, no preamble."""
 
 
-def _build_transcripts_block(participants: list[Participant]) -> str:
+def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict[str, dict]]:
+    """Build transcript block and a participant metadata map keyed by identifier.
+
+    Returns: (transcript_text, participant_map)
+    participant_map: {identifier → {display_name, profession, age_range, country}}
+    """
     blocks = []
+    participant_map: dict[str, dict] = {}
+
     for i, p in enumerate(participants, 1):
+        identifier = f"P{i}"
         name = p.display_name or f"Participant {i}"
+        attrs = []
+        if getattr(p, "profession", None):
+            attrs.append(f"profession: {p.profession}")
+        if getattr(p, "age_range", None):
+            attrs.append(f"age: {p.age_range}")
+        if getattr(p, "country", None):
+            attrs.append(f"country: {p.country}")
+
+        attr_str = f" ({', '.join(attrs)})" if attrs else ""
+        header = f"--- [{identifier}] {name}{attr_str} ---"
+
+        participant_map[identifier] = {
+            "display_name": name,
+            "profession": getattr(p, "profession", None),
+            "age_range": getattr(p, "age_range", None),
+            "country": getattr(p, "country", None),
+        }
+
         turns = sorted(p.turns, key=lambda t: t.turn_index)
-        lines = [f"--- {name} ---"]
+        lines = [header]
         for t in turns:
-            lines.append(f"Q: {t.question_text}")
+            lines.append(f"Q (turn {t.turn_index}): {t.question_text}")
             if t.response_transcript:
                 lines.append(f"A: {t.response_transcript}")
         blocks.append("\n".join(lines))
-    return "\n\n".join(blocks)
+
+    return "\n\n".join(blocks), participant_map
 
 
-def run_analysis(project_id: str, db: Session) -> None:
-    """Run full synthesis for all completed interviews.
+def _filter_participants(
+    participants: list[Participant],
+    filter_by: str | None,
+    filter_values: list[str],
+) -> list[Participant]:
+    if not filter_by or not filter_values:
+        return participants
+    result = []
+    for p in participants:
+        val = getattr(p, filter_by, None)
+        if val and val in filter_values:
+            result.append(p)
+    return result
+
+
+def run_analysis(
+    project_id: str,
+    db: Session,
+    filter_by: str | None = None,
+    filter_values: list[str] | None = None,
+) -> None:
+    """Run full synthesis for completed interviews.
 
     Upserts a ProjectAnalysis row. Meant to be called in a background thread.
     """
+    filter_values = filter_values or []
+
     project: Project | None = db.query(Project).filter(Project.id == project_id).first()
     if project is None:
         return
 
-    completed = [
-        p for p in project.participants if p.status == "completed" and p.turns
-    ]
+    all_completed = [p for p in project.participants if p.status == "completed" and p.turns]
+    completed = _filter_participants(all_completed, filter_by, filter_values)
 
     # Upsert analysis row with "generating" status
     analysis = db.query(ProjectAnalysis).filter(
@@ -59,17 +110,25 @@ def run_analysis(project_id: str, db: Session) -> None:
     analysis.participant_count = len(completed)
     analysis.report = None
     analysis.error = None
+    if filter_by and filter_values:
+        analysis.filters = json.dumps({"filter_by": filter_by, "filter_values": filter_values})
+    else:
+        analysis.filters = None
     db.commit()
 
     try:
-        transcripts_block = _build_transcripts_block(completed)
+        transcripts_block, participant_map = _build_transcripts_block(completed)
         objective_block = (
             f"RESEARCH OBJECTIVE:\n{project.research_objective}\n\n"
             if project.research_objective
             else ""
         )
 
-        prompt = f"""{objective_block}TRANSCRIPTS ({len(completed)} completed interviews):
+        filter_note = ""
+        if filter_by and filter_values:
+            filter_note = f"NOTE: This analysis covers only participants filtered by {filter_by} = {', '.join(filter_values)}.\n\n"
+
+        prompt = f"""{objective_block}{filter_note}TRANSCRIPTS ({len(completed)} completed interviews):
 
 {transcripts_block}
 
@@ -80,7 +139,15 @@ Analyse these interviews and return a JSON object with this exact structure:
     {{
       "title": "short theme name",
       "summary": "1-2 sentence description",
-      "quotes": ["exact quote from transcript", "another quote"],
+      "quotes": [
+        {{
+          "text": "exact verbatim quote from transcript",
+          "participant_identifier": "[P1]",
+          "participant_display_name": "participant name",
+          "turn_index": 3,
+          "question_text": "the question that prompted this response"
+        }}
+      ],
       "frequency": "all / most / some / few"
     }}
   ],
@@ -121,7 +188,6 @@ Analyse these interviews and return a JSON object with this exact structure:
         # Validate JSON
         json.loads(raw)
 
-        from datetime import datetime
         analysis.report = raw
         analysis.status = "ready"
         analysis.generated_at = datetime.utcnow()
