@@ -5,6 +5,7 @@ import {
   getLinks,
   getParticipants,
   createLink,
+  updateProject,
   exportCSV,
   deleteProject,
   getAnalysis,
@@ -32,6 +33,7 @@ import {
   ProjectMemo,
   HeatmapResponse,
   AttributedQuote,
+  ScreeningQuestionCreate,
 } from "../api/projects";
 import { getTranscript } from "../api/projects";
 
@@ -57,6 +59,12 @@ export default function ProjectDetail() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
+
+  // ── Screening editor ───────────────────────────────────────────────────────
+  const [editingScreening, setEditingScreening] = useState(false);
+  const [screeningDraft, setScreeningDraft] = useState<ScreeningQuestionCreate[]>([]);
+  const [screeningSaving, setScreeningSaving] = useState(false);
+  const [expandedSQ, setExpandedSQ] = useState<number | null>(null);
 
   // ── P1: Transcript editing ─────────────────────────────────────────────────
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null);
@@ -525,6 +533,68 @@ export default function ProjectDetail() {
     return acc;
   }, {} as Record<string, typeof project.questions>);
 
+  // ── Screening helpers ──────────────────────────────────────────────────────
+
+  function startEditScreening() {
+    setScreeningDraft((project?.screening_questions ?? []).map((sq) => ({
+      question: sq.question, options: sq.options, disqualifying_options: sq.disqualifying_options,
+    })));
+    setExpandedSQ(null);
+    setEditingScreening(true);
+  }
+
+  async function saveScreening() {
+    if (!project) return;
+    setScreeningSaving(true);
+    try {
+      const updated = await updateProject(id!, {
+        name: project.name,
+        language: project.language,
+        interview_duration_minutes: project.interview_duration_minutes,
+        research_objective: project.research_objective,
+        questions: project.questions.map((q) => ({
+          section_index: q.section_index, section_title: q.section_title,
+          question_index: q.question_index, main_question: q.main_question,
+          interview_notes: q.interview_notes, desired_learning: q.desired_learning,
+        })),
+        screening_questions: screeningDraft.filter((sq) => sq.question.trim()),
+      });
+      setProject(updated);
+      setEditingScreening(false);
+      setExpandedSQ(null);
+    } catch { alert("Failed to save screening questions"); }
+    finally { setScreeningSaving(false); }
+  }
+
+  function sqAddQuestion() {
+    setScreeningDraft((prev) => [...prev, { question: "", options: ["", ""], disqualifying_options: [] }]);
+    setExpandedSQ(screeningDraft.length);
+  }
+  function sqRemove(i: number) { setScreeningDraft((prev) => prev.filter((_, idx) => idx !== i)); setExpandedSQ(null); }
+  function sqSetQuestion(i: number, v: string) { setScreeningDraft((prev) => prev.map((sq, idx) => idx === i ? { ...sq, question: v } : sq)); }
+  function sqSetOption(sqIdx: number, optIdx: number, v: string) {
+    setScreeningDraft((prev) => prev.map((sq, idx) => {
+      if (idx !== sqIdx) return sq;
+      const old = sq.options[optIdx];
+      return { ...sq, options: sq.options.map((o, oi) => oi === optIdx ? v : o), disqualifying_options: sq.disqualifying_options.map((d) => d === old ? v : d) };
+    }));
+  }
+  function sqAddOption(sqIdx: number) { setScreeningDraft((prev) => prev.map((sq, idx) => idx === sqIdx ? { ...sq, options: [...sq.options, ""] } : sq)); }
+  function sqRemoveOption(sqIdx: number, optIdx: number) {
+    setScreeningDraft((prev) => prev.map((sq, idx) => {
+      if (idx !== sqIdx) return sq;
+      const removed = sq.options[optIdx];
+      return { ...sq, options: sq.options.filter((_, oi) => oi !== optIdx), disqualifying_options: sq.disqualifying_options.filter((d) => d !== removed) };
+    }));
+  }
+  function sqToggleDisq(sqIdx: number, option: string) {
+    setScreeningDraft((prev) => prev.map((sq, idx) => {
+      if (idx !== sqIdx) return sq;
+      const isDisq = sq.disqualifying_options.includes(option);
+      return { ...sq, disqualifying_options: isDisq ? sq.disqualifying_options.filter((d) => d !== option) : [...sq.disqualifying_options, option] };
+    }));
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -606,6 +676,91 @@ export default function ProjectDetail() {
         {/* ══ SETUP ══ */}
         {tab === "setup" && (
           <div className="tab-content">
+
+            {/* Screening Questions */}
+            <section className="detail-section">
+              <div className="section-header-row">
+                <div>
+                  <h2>Screening Questions</h2>
+                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>Asked before the interview — disqualifying answers block access.</p>
+                </div>
+                {!editingScreening && <button className="btn btn-ghost btn-sm" onClick={startEditScreening}>Edit</button>}
+              </div>
+
+              {!editingScreening && (
+                (project.screening_questions ?? []).length === 0 ? (
+                  <div className="empty-state-inline">
+                    <span>No screening questions.</span>
+                    <button className="btn btn-ghost btn-sm" onClick={startEditScreening}>Add one →</button>
+                  </div>
+                ) : (
+                  <div className="screening-list">
+                    {(project.screening_questions ?? []).map((sq, i) => (
+                      <div key={sq.id} className="screening-card">
+                        <div className="screening-card-header">
+                          <span className="screening-num">Q{i + 1}</span>
+                          <span className="screening-question">{sq.question}</span>
+                        </div>
+                        <div className="screening-options">
+                          {sq.options.map((opt) => (
+                            <span key={opt} className={`screening-option ${sq.disqualifying_options.includes(opt) ? "disqualifying" : "allowed"}`}>
+                              {sq.disqualifying_options.includes(opt) ? "✕" : "✓"} {opt}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {editingScreening && (
+                <div className="screening-editor">
+                  {screeningDraft.map((sq, sqIdx) => (
+                    <div key={sqIdx} className="guide-editor-question">
+                      <div className="guide-editor-header" onClick={() => setExpandedSQ(expandedSQ === sqIdx ? null : sqIdx)}>
+                        <span className="guide-editor-num">Q{sqIdx + 1}</span>
+                        <span className="guide-editor-preview" style={{ flex: 1, marginLeft: 8 }}>
+                          {sq.question || <em className="muted-text">Empty question</em>}
+                        </span>
+                        {sq.disqualifying_options.length > 0 && (
+                          <span className="badge" style={{ marginRight: 8, background: "#fef2f2", color: "#dc2626", fontSize: 11 }}>
+                            {sq.disqualifying_options.length} disqualifying
+                          </span>
+                        )}
+                        <span className="guide-editor-chevron">{expandedSQ === sqIdx ? "▲" : "▼"}</span>
+                      </div>
+                      {expandedSQ === sqIdx && (
+                        <div className="guide-editor-body">
+                          <label className="field-label">Question</label>
+                          <input className="field-input" value={sq.question} onChange={(e) => sqSetQuestion(sqIdx, e.target.value)} placeholder="e.g. Do you shop online at least once a month?" />
+                          <label className="field-label" style={{ marginTop: 12 }}>Options <span className="optional-tag">— click ✕/✓ to mark disqualifying</span></label>
+                          {sq.options.map((opt, optIdx) => (
+                            <div key={optIdx} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                              <button style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: "1.5px solid", borderColor: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#d1d5db", background: sq.disqualifying_options.includes(opt) ? "#fef2f2" : "#fff", color: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#9ca3af", cursor: "pointer", fontWeight: 700, fontSize: 14 }} onClick={() => opt.trim() && sqToggleDisq(sqIdx, opt)}>
+                                {sq.disqualifying_options.includes(opt) ? "✕" : "✓"}
+                              </button>
+                              <input className="field-input" style={{ flex: 1, marginBottom: 0 }} value={opt} onChange={(e) => sqSetOption(sqIdx, optIdx, e.target.value)} placeholder={`Option ${optIdx + 1}`} />
+                              {sq.options.length > 1 && <button style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 18, padding: "0 4px" }} onClick={() => sqRemoveOption(sqIdx, optIdx)}>×</button>}
+                            </div>
+                          ))}
+                          <button className="btn btn-ghost btn-sm" onClick={() => sqAddOption(sqIdx)}>+ Add option</button>
+                          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                            <button className="btn btn-ghost btn-sm btn-danger-text" onClick={() => sqRemove(sqIdx)}>Remove question</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <button className="btn btn-ghost btn-sm" onClick={sqAddQuestion} style={{ marginBottom: 16 }}>+ Add screening question</button>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingScreening(false)}>Cancel</button>
+                    <button className="btn btn-primary btn-sm" onClick={saveScreening} disabled={screeningSaving}>{screeningSaving ? "Saving..." : "Save"}</button>
+                  </div>
+                </div>
+              )}
+            </section>
+
             <section className="detail-section">
               <div className="section-header-row">
                 <div>
