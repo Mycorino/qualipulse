@@ -166,6 +166,12 @@ export default function CreateProjectWizard() {
   }
 
   async function handleSuggestQuestions() {
+    if (questions.length > 0) {
+      const ok = window.confirm(
+        `This will replace your ${questions.length} existing question${questions.length > 1 ? "s" : ""}. Any edits you've made will be lost. Continue?`
+      );
+      if (!ok) return;
+    }
     setLoading(true);
     setLoadingMsg("Writing your interview guide...");
     setError("");

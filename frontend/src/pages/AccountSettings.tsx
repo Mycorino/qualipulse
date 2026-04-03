@@ -180,7 +180,7 @@ export default function AccountSettings() {
               <h2 className="settings-section-title">Current plan</h2>
               <div className="billing-current-plan">
                 <div>
-                  <span className="plan-badge plan-badge--{billing.tier}">{billing.tier_name}</span>
+                  <span className={`plan-badge plan-badge--${billing.tier}`}>{billing.tier_name}</span>
                   <span className="billing-status-badge" style={{ marginLeft: 8 }}>{billing.status}</span>
                 </div>
                 <div className="billing-limits">
@@ -194,11 +194,11 @@ export default function AccountSettings() {
                   </div>
                   <div className="billing-limit-row">
                     <span>AI analysis</span>
-                    <span>{billing.limits.ai_analysis ? "✓" : "✗"}</span>
+                    <span style={{ color: billing.limits.ai_analysis ? "var(--success)" : "var(--text-tertiary)" }}>{billing.limits.ai_analysis ? "✓ Included" : "— Upgrade to unlock"}</span>
                   </div>
                   <div className="billing-limit-row">
                     <span>CSV export</span>
-                    <span>{billing.limits.export_csv ? "✓" : "✗"}</span>
+                    <span style={{ color: billing.limits.export_csv ? "var(--success)" : "var(--text-tertiary)" }}>{billing.limits.export_csv ? "✓ Included" : "— Upgrade to unlock"}</span>
                   </div>
                   <div className="billing-limit-row">
                     <span>Team members</span>

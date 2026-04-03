@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { SkeletonTable } from "../components/Skeleton";
 import {
   getProject,
+  listProjects,
   getLinks,
   getParticipants,
   createLink,
@@ -64,6 +65,8 @@ export default function ProjectDetail() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
+  const [advancedPromptOpen, setAdvancedPromptOpen] = useState(false);
+  const [projects, setProjects] = useState<import("../api/projects").ProjectListItem[]>([]);
 
   // ── Overview inline editors ────────────────────────────────────────────────
   const [editingObjective, setEditingObjective] = useState(false);
@@ -149,6 +152,19 @@ export default function ProjectDetail() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [editingTurnId, editingText, editingOriginalText]);
 
+  // Escape key dismisses the tag popup
+  useEffect(() => {
+    if (!selectionInfo) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectionInfo(null);
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectionInfo]);
+
   async function loadAll() {
     setLoading(true);
     try {
@@ -162,6 +178,7 @@ export default function ProjectDetail() {
       setLinks(lnks);
       setParticipants(parts);
       setAnalysis(ana);
+      if (parts.length > 0) setTab("responses");
       if (ana.filters) {
         setActiveFilterBy(ana.filters.filter_by);
         setActiveFilterValues(ana.filters.filter_values);
@@ -176,6 +193,7 @@ export default function ProjectDetail() {
       getCodes(id!).then(setCodes).catch(() => {}),
       getTags(id!).then(setTags).catch(() => {}),
       getMemos(id!).then(setMemos).catch(() => {}),
+      listProjects().then(setProjects).catch(() => {}),
     ]);
   }
 
@@ -193,6 +211,12 @@ export default function ProjectDetail() {
   }
 
   async function handleTriggerAnalysis() {
+    if (analysis?.report) {
+      const ok = window.confirm(
+        "This will replace your current analysis report. The previous version will not be saved.\n\nDownload it first (Export JSON) if you want to keep it. Continue?"
+      );
+      if (!ok) return;
+    }
     const filters =
       activeFilterBy && activeFilterValues.length > 0
         ? { filter_by: activeFilterBy, filter_values: activeFilterValues }
@@ -387,7 +411,10 @@ export default function ProjectDetail() {
     const start = fullText.indexOf(text);
     if (start === -1) { setSelectionInfo(null); return; }
 
-    setSelectionInfo({ turnId, text, start, end: start + text.length, x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 40 });
+    // Viewport-safe x position: clamp so popup (180px wide) stays on screen
+    const popupWidth = 200;
+    const safeX = Math.min(Math.max(rect.left + rect.width / 2, popupWidth / 2 + 8), window.innerWidth - popupWidth / 2 - 8);
+    setSelectionInfo({ turnId, text, start, end: start + text.length, x: safeX, y: rect.top + window.scrollY - 44 });
     setShowNewCode(false);
   }
 
@@ -816,31 +843,43 @@ export default function ProjectDetail() {
       {/* ── Header ── */}
       <header className="detail-header">
         <div className="detail-header-left">
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate("/dashboard")}>← Back</button>
-          <div>
-            <h1 className="detail-title">{project.name}</h1>
-            <div className="detail-meta">
-              <span className="badge">{project.language.toUpperCase()}</span>
-              <span>{project.interview_duration_minutes} min</span>
-              <span>{project.questions.length} questions</span>
-            </div>
+          <div className="detail-breadcrumb">
+            <a href="/dashboard">Projects</a>
+            <span className="detail-breadcrumb-sep">/</span>
+            <span>{project.name}</span>
+            {projects.length > 1 && (
+              <select
+                style={{ marginLeft: 8, fontSize: "0.8rem", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer" }}
+                value={id}
+                onChange={(e) => navigate(`/projects/${e.target.value}`)}
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
         <div className="detail-header-actions">
           <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>Export CSV</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>Edit Guide</button>
           <button className="btn btn-ghost btn-sm btn-danger-text" onClick={handleDelete}>Delete</button>
         </div>
       </header>
 
-      {/* ── Tabs ── */}
-      <div className="detail-tabs">
-        {(["overview", "setup", "responses", "analysis"] as Tab[]).map((t) => (
-          <button key={t} className={`detail-tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
-            {t === "overview" && "Overview"}
-            {t === "setup" && "Setup"}
+      {/* ── Tabs — ordered by researcher workflow ── */}
+      <div className="detail-tabs" role="tablist">
+        {(["responses", "analysis", "overview", "setup"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            className={`detail-tab ${tab === t ? "active" : ""}`}
+            onClick={() => setTab(t)}
+          >
             {t === "responses" && (<>Responses {participants.length > 0 && <span className="tab-count">{completedCount}/{participants.length}</span>}</>)}
             {t === "analysis" && (<>Analysis {analysis?.status === "generating" && <span className="tab-dot tab-dot-pulse" />}</>)}
+            {t === "overview" && "Overview"}
+            {t === "setup" && "Setup"}
           </button>
         ))}
       </div>
@@ -1044,36 +1083,6 @@ export default function ProjectDetail() {
               )}
             </section>
 
-            {/* System Prompt */}
-            <section className="detail-section">
-              <div className="section-header-row">
-                <div>
-                  <h2>AI Interviewer Prompt</h2>
-                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>Customize how the AI interviewer behaves.</p>
-                </div>
-                {!editingSystemPrompt && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setSystemPromptDraft(project.system_prompt ?? ""); setEditingSystemPrompt(true); }}>Edit</button>
-                )}
-              </div>
-              {editingSystemPrompt ? (
-                <>
-                  <textarea
-                    className="field-input"
-                    value={systemPromptDraft}
-                    onChange={(e) => setSystemPromptDraft(e.target.value)}
-                    rows={8}
-                    style={{ width: "100%", fontFamily: "monospace", fontSize: 13, marginBottom: 8 }}
-                  />
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-primary btn-sm" onClick={saveSystemPrompt} disabled={savingSystemPrompt}>{savingSystemPrompt ? "Saving…" : "Save"}</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingSystemPrompt(false)}>Cancel</button>
-                  </div>
-                </>
-              ) : (
-                <pre className="system-prompt-preview">{project.system_prompt || <em className="muted-text">No custom prompt — using default.</em>}</pre>
-              )}
-            </section>
-
             <section className="detail-section">
               <div className="section-header-row">
                 <div>
@@ -1213,6 +1222,55 @@ export default function ProjectDetail() {
                 ))
               )}
             </section>
+
+            {/* System Prompt — Advanced accordion */}
+            <section className="detail-section">
+              <div className="advanced-accordion">
+                <button
+                  className="advanced-accordion-toggle"
+                  onClick={() => setAdvancedPromptOpen((o) => !o)}
+                  aria-expanded={advancedPromptOpen}
+                >
+                  <span>⚙ Advanced — AI Interviewer Prompt</span>
+                  <span style={{ fontSize: "0.8rem" }}>{advancedPromptOpen ? "▲" : "▼"}</span>
+                </button>
+                {advancedPromptOpen && (
+                  <div className="advanced-accordion-body">
+                    <div className="advanced-warning">
+                      ⚠ Changes here affect all future interviews on this project and cannot be applied retroactively to completed sessions.
+                    </div>
+                    <p className="muted-text" style={{ fontSize: 13, marginBottom: 8 }}>
+                      Customize how the AI interviewer behaves. Leave blank to use the default prompt.{" "}
+                      {!editingSystemPrompt && !project.system_prompt && (
+                        <span style={{ color: "var(--text-tertiary)" }}>Currently using default.</span>
+                      )}
+                    </p>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                      {!editingSystemPrompt && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => { setSystemPromptDraft(project.system_prompt ?? ""); setEditingSystemPrompt(true); }}>Edit</button>
+                      )}
+                    </div>
+                    {editingSystemPrompt ? (
+                      <>
+                        <textarea
+                          className="field-input"
+                          value={systemPromptDraft}
+                          onChange={(e) => setSystemPromptDraft(e.target.value)}
+                          rows={8}
+                          style={{ width: "100%", fontFamily: "monospace", fontSize: 13, marginBottom: 8 }}
+                        />
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="btn btn-primary btn-sm" onClick={saveSystemPrompt} disabled={savingSystemPrompt}>{savingSystemPrompt ? "Saving…" : "Save"}</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setEditingSystemPrompt(false)}>Cancel</button>
+                        </div>
+                      </>
+                    ) : (
+                      <pre className="system-prompt-preview">{project.system_prompt || <em className="muted-text">No custom prompt — using default.</em>}</pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
         )}
 
@@ -1309,6 +1367,10 @@ export default function ProjectDetail() {
             {/* Transcript panel */}
             {transcript !== null && selectedParticipant && (
               <section className="detail-section transcript-section">
+                <div className="quote-tag-instruction">
+                  <span>💬</span>
+                  <span>Select any text in an answer to tag it with a code from your codebook.</span>
+                </div>
                 <div className="section-header-row">
                   <div>
                     <h2>Transcript — {selectedParticipant.display_name || "Anonymous"}</h2>
@@ -1388,7 +1450,7 @@ export default function ProjectDetail() {
                           <div className="transcript-q">
                             <strong>Q:</strong> {t.question_text}
                             {t.tts_audio_url && (
-                              <audio controls src={t.tts_audio_url} className="transcript-audio" title="AI question audio" />
+                              <audio controls src={t.tts_audio_url} className="transcript-audio" aria-label={`AI question audio — turn ${t.turn_index}`} />
                             )}
                           </div>
                           {t.response_transcript && editingTurnId === t.id ? (
@@ -1415,7 +1477,7 @@ export default function ProjectDetail() {
                                 )}
                               </span>
                               {t.audio_recording_url && (
-                                <audio controls src={t.audio_recording_url} className="transcript-audio" title="Participant recording" />
+                                <audio controls src={t.audio_recording_url} className="transcript-audio" aria-label={`Participant recording — turn ${t.turn_index}`} />
                               )}
                             </div>
                           ) : null}
@@ -1486,6 +1548,12 @@ export default function ProjectDetail() {
         {tab === "analysis" && analysis && (
           <div className="tab-content">
             <section className="detail-section">
+              {/* Stale banner — above actions so it's seen before clicking Regenerate */}
+              {analysis.report && analysis.completed_count > analysis.participant_count && (
+                <div className="analysis-stale-banner">
+                  ⚠ {analysis.completed_count - analysis.participant_count} new response{analysis.completed_count - analysis.participant_count > 1 ? "s" : ""} since last analysis — regenerate to include them.
+                </div>
+              )}
               <div className="section-header-row">
                 <h2>AI Analysis</h2>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -1569,11 +1637,6 @@ export default function ProjectDetail() {
                 const isStale = analysis.completed_count > analysis.participant_count;
                 return (
                   <div className="analysis-report">
-                    {isStale && (
-                      <div className="analysis-stale-banner">
-                        {analysis.completed_count - analysis.participant_count} new response{analysis.completed_count - analysis.participant_count > 1 ? "s" : ""} since last analysis — regenerate to include them.
-                      </div>
-                    )}
                     <div className="analysis-summary">{r.summary}</div>
                     <div className="analysis-meta">
                       <span className="badge analysis-ai-badge">✦ AI-generated</span>
