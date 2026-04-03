@@ -67,6 +67,7 @@ export default function Interview() {
   const micAnimRef = useRef<number | null>(null);
   const [lastTranscript, setLastTranscript] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [micPermissionRequested, setMicPermissionRequested] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { isRecording, error: recError, startRecording, stopRecording } =
@@ -124,9 +125,9 @@ export default function Interview() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording]);
 
-  // Mic level meter effect (only active during mic test)
+  // Mic level meter effect (only active during mic test, after permission requested)
   useEffect(() => {
-    if (micTestDone || phase !== "interview") return;
+    if (micTestDone || phase !== "interview" || !micPermissionRequested) return;
     // Start mic level monitoring
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       micStreamRef.current = stream;
@@ -150,7 +151,7 @@ export default function Interview() {
       if (micAnimRef.current) cancelAnimationFrame(micAnimRef.current);
       micStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [phase, micTestDone]);
+  }, [phase, micTestDone, micPermissionRequested]);
 
   const sessionKey = token ? `interview_${token}` : null;
 
@@ -429,8 +430,19 @@ export default function Interview() {
       return (
         <div className="interview-page">
           <div className="interview-container consent-card">
+            {info.researcher_logo_url && (
+              <div className="consent-researcher-logo">
+                <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher logo"} />
+              </div>
+            )}
+            {info.researcher_name && (
+              <p className="consent-researcher-name">{info.researcher_name}</p>
+            )}
             <h1 className="consent-title">Before you begin</h1>
             <p className="consent-project">{info.project_name}</p>
+            {info.research_context && (
+              <p className="consent-research-context">{info.research_context}</p>
+            )}
             <div className="consent-body">
               <p>By participating in this study you agree to the following:</p>
               <ul className="consent-list">
@@ -439,8 +451,22 @@ export default function Interview() {
                 <li>Participation is <strong>voluntary</strong> — you may stop at any time.</li>
                 <li>Your data will be stored securely and used only for research purposes.</li>
               </ul>
-              {info.interview_duration_minutes && (
-                <p className="consent-duration">This interview takes approximately <strong>{info.interview_duration_minutes} minutes</strong>.</p>
+              <p className="consent-duration">
+                {info.interview_duration_minutes ? (
+                  <>This interview takes approximately <strong>{info.interview_duration_minutes} minutes</strong></>
+                ) : null}
+                {info.interview_duration_minutes && info.question_count ? " · " : null}
+                {info.question_count ? (
+                  <><strong>{info.question_count} topic{info.question_count !== 1 ? "s" : ""}</strong> to cover</>
+                ) : null}
+                {(info.interview_duration_minutes || info.question_count) ? "." : null}
+              </p>
+              {info.privacy_policy_url && (
+                <p className="consent-privacy-link">
+                  <a href={info.privacy_policy_url} target="_blank" rel="noopener noreferrer">
+                    Read our privacy policy →
+                  </a>
+                </p>
               )}
             </div>
             <div className="consent-actions">
@@ -459,6 +485,14 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container interview-landing">
+          {info.researcher_logo_url && (
+            <div className="landing-researcher-logo">
+              <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher logo"} />
+            </div>
+          )}
+          {info.researcher_name && (
+            <p className="landing-researcher-name">{info.researcher_name}</p>
+          )}
           <h1 className="interview-project-name">{info.project_name}</h1>
           {info.welcome_message && (
             <p className="interview-welcome">{info.welcome_message}</p>
@@ -619,23 +653,25 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container interview-complete">
-          <div className="complete-icon">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-          </div>
-          <h1 className="interview-complete-title">Thank you for your interest</h1>
+          <div className="complete-icon disqualified-icon">🙏</div>
+          <h1 className="interview-complete-title">Thank you for your time</h1>
           <p className="interview-complete-text">
-            Based on your answers, you don't match the profile we're looking for in this study.
-            We appreciate your time!
+            This particular study is looking for a specific audience profile —
+            you're not the right fit for <strong>{info?.project_name}</strong> right now.
           </p>
-          {disqualifiedOn && (
-            <p className="muted-text" style={{ marginTop: 8, fontSize: 13 }}>
-              This study requires a specific audience profile.
+          <p className="interview-complete-text" style={{ marginTop: 12 }}>
+            That's completely okay. Your answers helped us confirm we're reaching
+            the right participants.
+          </p>
+          {email && (
+            <p className="disqualified-email-note">
+              If other studies open up that match your profile, we may reach out to{" "}
+              <strong>{email}</strong>.
             </p>
           )}
+          <p className="muted-text" style={{ marginTop: 24 }}>
+            You can safely close this page.
+          </p>
         </div>
       </div>
     );
@@ -708,6 +744,45 @@ export default function Interview() {
               Start a new interview
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- Mic Permission Pre-prompt ---- */
+  if (phase === "interview" && !micTestDone && !micPermissionRequested) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container mic-test-card">
+          <div className="mic-prompt-icon">🎙️</div>
+          <h2 className="mic-test-title">This interview uses your microphone</h2>
+          <p className="mic-test-subtitle">
+            When you click below, your browser will ask for microphone permission.
+            Click <strong>Allow</strong> — this is required to record your answers.
+          </p>
+          <div className="mic-prompt-steps">
+            <div className="mic-prompt-step">
+              <span className="mic-prompt-num">1</span>
+              <span>Click "Enable microphone" below</span>
+            </div>
+            <div className="mic-prompt-step">
+              <span className="mic-prompt-num">2</span>
+              <span>Click <strong>Allow</strong> in your browser's permission prompt</span>
+            </div>
+            <div className="mic-prompt-step">
+              <span className="mic-prompt-num">3</span>
+              <span>Say something to confirm your mic is working</span>
+            </div>
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => setMicPermissionRequested(true)}
+          >
+            Enable microphone →
+          </button>
+          <p className="mic-prompt-note">
+            Your audio is only recorded when you actively press the record button.
+          </p>
         </div>
       </div>
     );

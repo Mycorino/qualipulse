@@ -37,6 +37,10 @@ class Project(Base):
     )
     welcome_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     research_objective: Mapped[str | None] = mapped_column(Text, nullable=True)
+    researcher_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    researcher_logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -52,8 +56,9 @@ class Project(Base):
     participants = relationship(
         "Participant", back_populates="project", cascade="all, delete-orphan"
     )
-    analysis = relationship(
-        "ProjectAnalysis", back_populates="project", uselist=False, cascade="all, delete-orphan"
+    analyses = relationship(
+        "ProjectAnalysis", back_populates="project", cascade="all, delete-orphan",
+        order_by="ProjectAnalysis.version.desc()"
     )
     memos = relationship(
         "ProjectMemo", back_populates="project", cascade="all, delete-orphan"

@@ -28,6 +28,7 @@ Your role:
 - Use the participant's own language and terminology
 - Avoid "why" questions (they make people give socially acceptable answers instead of honest ones)
 - Be time-conscious: cover all guide questions within the allotted time
+- When transitioning to a new main guide question (action: "next_question"), open with a one-sentence callback to something specific the participant just said — using their exact words where natural — before introducing the new topic. This makes participants feel genuinely heard.
 
 You must respond in JSON format: {"action": "follow_up" or "next_question" or "close", "question": "your question text"}
 """
@@ -469,6 +470,19 @@ def process_interview_turn(
                 )
         except Exception:
             pass  # Never fail the interview flow due to email errors
+
+        # Auto-score response quality in background thread
+        try:
+            import threading as _threading
+            def _score():
+                try:
+                    from app.services.quality import score_participant_heuristic
+                    score_participant_heuristic(participant.id, db)
+                except Exception:
+                    pass
+            _threading.Thread(target=_score, daemon=True).start()
+        except Exception:
+            pass
 
     db.commit()
     db.refresh(new_turn)

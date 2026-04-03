@@ -82,5 +82,8 @@ class ProjectListResponse(BaseModel):
     language: str
     created_at: datetime
     question_count: int
+    completed_count: int = 0
+    in_progress_count: int = 0
+    analysis_status: str | None = None
 
     model_config = {"from_attributes": True}

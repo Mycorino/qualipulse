@@ -74,6 +74,7 @@ def trigger_analysis(
                 analysis = (
                     db.query(ProjectAnalysis)
                     .filter(ProjectAnalysis.project_id == project_id)
+                    .order_by(ProjectAnalysis.version.desc())
                     .first()
                 )
                 if analysis:
@@ -100,6 +101,7 @@ def trigger_analysis(
                 analysis = (
                     db.query(ProjectAnalysis)
                     .filter(ProjectAnalysis.project_id == project_id)
+                    .order_by(ProjectAnalysis.version.desc())
                     .first()
                 )
                 if analysis and analysis.status == "generating":
@@ -127,6 +129,7 @@ def get_analysis(
     analysis = (
         db.query(ProjectAnalysis)
         .filter(ProjectAnalysis.project_id == project_id)
+        .order_by(ProjectAnalysis.version.desc())
         .first()
     )
 
@@ -178,6 +181,7 @@ def get_heatmap(
     analysis = (
         db.query(ProjectAnalysis)
         .filter(ProjectAnalysis.project_id == project_id, ProjectAnalysis.status == "ready")
+        .order_by(ProjectAnalysis.version.desc())
         .first()
     )
     if analysis is None or not analysis.report:
@@ -255,3 +259,48 @@ def _get_project_or_404(project_id: str, company_id: str, db: Session) -> Projec
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+# ── Shareable report endpoints ────────────────────────────────────────────────
+
+@router.post("/{project_id}/analysis/share")
+def create_share_link(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Generate (or return existing) a public share token for the latest ready analysis."""
+    import secrets
+    _get_project_or_404(project_id, company.id, db)
+    analysis = (
+        db.query(ProjectAnalysis)
+        .filter(ProjectAnalysis.project_id == project_id, ProjectAnalysis.status == "ready")
+        .order_by(ProjectAnalysis.version.desc())
+        .first()
+    )
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="No ready analysis to share.")
+    if not analysis.share_token:
+        analysis.share_token = secrets.token_urlsafe(32)
+        db.commit()
+    return {"share_token": analysis.share_token}
+
+
+@router.delete("/{project_id}/analysis/share")
+def revoke_share_link(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Revoke the public share link for the latest analysis."""
+    _get_project_or_404(project_id, company.id, db)
+    analysis = (
+        db.query(ProjectAnalysis)
+        .filter(ProjectAnalysis.project_id == project_id, ProjectAnalysis.status == "ready")
+        .order_by(ProjectAnalysis.version.desc())
+        .first()
+    )
+    if analysis and analysis.share_token:
+        analysis.share_token = None
+        db.commit()
+    return {"message": "Share link revoked."}

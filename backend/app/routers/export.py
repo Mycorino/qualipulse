@@ -92,7 +92,11 @@ def list_participants(
 
     result = []
     for p in participants:
-        q_score, q_label = _compute_quality(p.turns)
+        # Use persisted quality score if available, otherwise compute heuristic
+        if p.quality_score is not None and p.quality_label is not None:
+            q_score, q_label = p.quality_score, p.quality_label
+        else:
+            q_score, q_label = _compute_quality(p.turns)
         result.append(
             ParticipantResponse(
                 id=p.id,
@@ -163,6 +167,8 @@ def get_transcript(
                 manually_edited=t.manually_edited,
                 edited_at=t.edited_at,
                 created_at=t.created_at,
+                audio_recording_url=t.audio_recording_url,
+                tts_audio_url=t.tts_audio_url,
             )
             for t in turns
         ],

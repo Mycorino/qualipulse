@@ -27,6 +27,7 @@ import {
   deleteMemo,
   getHeatmap,
   assessQuality,
+  shareAnalysis,
   ProjectResponse,
   InterviewLink,
   ParticipantResponse,
@@ -254,6 +255,17 @@ export default function ProjectDetail() {
     a.download = `${project?.name ?? "analysis"}-report.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleShareAnalysis() {
+    try {
+      const res = await shareAnalysis(id!);
+      const url = `${window.location.origin}/reports/${res.share_token}`;
+      await navigator.clipboard.writeText(url);
+      alert(`Share link copied!\n\n${url}`);
+    } catch {
+      alert("Could not generate share link. Make sure analysis is ready.");
+    }
   }
 
   async function handleGenerateLink() {
@@ -1373,7 +1385,12 @@ export default function ProjectDetail() {
                       const turnTags = tags.filter((tg) => tg.turn_id === t.id);
                       return (
                         <div key={t.turn_index} className="transcript-turn">
-                          <div className="transcript-q"><strong>Q:</strong> {t.question_text}</div>
+                          <div className="transcript-q">
+                            <strong>Q:</strong> {t.question_text}
+                            {t.tts_audio_url && (
+                              <audio controls src={t.tts_audio_url} className="transcript-audio" title="AI question audio" />
+                            )}
+                          </div>
                           {t.response_transcript && editingTurnId === t.id ? (
                             <div style={{ marginTop: 6 }}>
                               <textarea className="field-input" value={editingText} onChange={(e) => setEditingText(e.target.value)} rows={4} style={{ width: "100%", marginBottom: 6 }} autoFocus />
@@ -1397,6 +1414,9 @@ export default function ProjectDetail() {
                                   <span className="badge" style={{ fontSize: 10, background: "#fef9c3", color: "#854d0e" }}>edited</span>
                                 )}
                               </span>
+                              {t.audio_recording_url && (
+                                <audio controls src={t.audio_recording_url} className="transcript-audio" title="Participant recording" />
+                              )}
                             </div>
                           ) : null}
 
@@ -1477,6 +1497,9 @@ export default function ProjectDetail() {
                       <button className="btn btn-ghost btn-sm" onClick={handleDownloadJSON}>
                         ↓ JSON
                       </button>
+                      <button className="btn btn-ghost btn-sm" onClick={handleShareAnalysis}>
+                        🔗 Share
+                      </button>
                     </>
                   )}
                   {analysis.completed_count > 0 && (
@@ -1553,8 +1576,14 @@ export default function ProjectDetail() {
                     )}
                     <div className="analysis-summary">{r.summary}</div>
                     <div className="analysis-meta">
-                      <span className="badge">Based on {r.participant_count} interviews</span>
+                      <span className="badge analysis-ai-badge">✦ AI-generated</span>
+                      <span className="badge">n={r.participant_count} interview{r.participant_count !== 1 ? "s" : ""}</span>
                       <span className="badge">Confidence: {r.confidence}</span>
+                      {analysis.filters && (
+                        <span className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>
+                          Filtered: {analysis.filters.filter_by} ({analysis.filters.filter_values.join(", ")})
+                        </span>
+                      )}
                       {analysis.generated_at && (
                         <span className="muted-text" style={{ fontSize: "0.8rem" }}>Generated {new Date(analysis.generated_at).toLocaleString()}</span>
                       )}
