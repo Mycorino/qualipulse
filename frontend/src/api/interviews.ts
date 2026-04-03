@@ -7,6 +7,19 @@ export interface InterviewInfo {
   interview_duration_minutes?: number;
 }
 
+export interface ScreeningQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  disqualifying_options: string[];
+  sort_order: number;
+}
+
+export interface ScreenResult {
+  qualified: boolean;
+  disqualified_on?: string;
+}
+
 export interface StartInterviewResponse {
   participant_id: string;
   first_question: string;
@@ -28,14 +41,36 @@ export async function getInterviewInfo(
   return data;
 }
 
+export interface StartInterviewParams {
+  displayName?: string;
+  profession?: string;
+  ageRange?: string;
+  country?: string;
+}
+
 export async function startInterview(
   token: string,
-  displayName?: string
+  params: StartInterviewParams = {}
 ): Promise<StartInterviewResponse> {
   const { data } = await client.post<StartInterviewResponse>(
     `/interview/${token}/start`,
-    { display_name: displayName || undefined }
+    {
+      display_name: params.displayName || undefined,
+      profession: params.profession || undefined,
+      age_range: params.ageRange || undefined,
+      country: params.country || undefined,
+    }
   );
+  return data;
+}
+
+export async function getScreeningQuestions(token: string): Promise<ScreeningQuestion[]> {
+  const { data } = await client.get<ScreeningQuestion[]>(`/interview/${token}/screening-questions`);
+  return data;
+}
+
+export async function submitScreening(token: string, answers: Record<string, string>): Promise<ScreenResult> {
+  const { data } = await client.post<ScreenResult>(`/interview/${token}/screen`, { answers });
   return data;
 }
 

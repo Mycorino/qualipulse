@@ -17,6 +17,22 @@ class QuestionPatch(BaseModel):
     deprecated_at: datetime | None = None
 
 
+class ScreeningQuestionCreate(BaseModel):
+    question: str
+    options: list[str] = []
+    disqualifying_options: list[str] = []
+
+
+class ScreeningQuestionResponse(BaseModel):
+    id: str
+    question: str
+    options: list[str]
+    disqualifying_options: list[str]
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
+
 class ProjectCreate(BaseModel):
     name: str
     language: str = "en"
@@ -24,6 +40,7 @@ class ProjectCreate(BaseModel):
     system_prompt: str | None = None
     research_objective: str | None = None
     questions: list[QuestionCreate] = []
+    screening_questions: list[ScreeningQuestionCreate] = []
 
 
 class QuestionResponse(BaseModel):
@@ -50,6 +67,7 @@ class ProjectResponse(BaseModel):
     research_objective: str | None = None
     created_at: datetime
     questions: list[QuestionResponse] = []
+    screening_questions: list[ScreeningQuestionResponse] = []
 
     model_config = {"from_attributes": True}
 

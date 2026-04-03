@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
@@ -5,13 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
-from app.models.project import InterviewGuideQuestion, Project
+from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.schemas.project import (
     ProjectCreate,
     ProjectListResponse,
     ProjectResponse,
     QuestionPatch,
     QuestionResponse,
+    ScreeningQuestionResponse,
 )
 from app.services.guide_parser import parse_guide_csv
 
@@ -47,6 +49,15 @@ def create_project(
             sort_order=idx,
         )
         db.add(question)
+
+    for idx, sq in enumerate(body.screening_questions):
+        db.add(ScreeningQuestion(
+            project_id=project.id,
+            sort_order=idx,
+            question=sq.question,
+            options=json.dumps(sq.options),
+            disqualifying_options=json.dumps(sq.disqualifying_options),
+        ))
 
     db.commit()
     db.refresh(project)
@@ -143,9 +154,11 @@ def update_project(
     if body.system_prompt is not None:
         project.system_prompt = body.system_prompt
 
-    # Replace all questions
+    # Replace all questions and screening questions
     for q in list(project.guide_questions):
         db.delete(q)
+    for sq in list(project.screening_questions):
+        db.delete(sq)
     db.flush()
 
     for idx, q in enumerate(body.questions):
@@ -160,6 +173,15 @@ def update_project(
             sort_order=idx,
         )
         db.add(question)
+
+    for idx, sq in enumerate(body.screening_questions):
+        db.add(ScreeningQuestion(
+            project_id=project.id,
+            sort_order=idx,
+            question=sq.question,
+            options=json.dumps(sq.options),
+            disqualifying_options=json.dumps(sq.disqualifying_options),
+        ))
 
     db.commit()
     db.refresh(project)
@@ -251,6 +273,16 @@ def _project_to_response(project: Project) -> ProjectResponse:
         )
         for q in sorted(project.guide_questions, key=lambda q: (q.section_index, q.question_index))
     ]
+    screening = [
+        ScreeningQuestionResponse(
+            id=sq.id,
+            question=sq.question,
+            options=sq.options_list,
+            disqualifying_options=sq.disqualifying_options_list,
+            sort_order=sq.sort_order,
+        )
+        for sq in sorted(project.screening_questions, key=lambda sq: sq.sort_order)
+    ]
     return ProjectResponse(
         id=project.id,
         company_id=project.company_id,
@@ -261,4 +293,5 @@ def _project_to_response(project: Project) -> ProjectResponse:
         research_objective=project.research_objective,
         created_at=project.created_at,
         questions=questions,
+        screening_questions=screening,
     )

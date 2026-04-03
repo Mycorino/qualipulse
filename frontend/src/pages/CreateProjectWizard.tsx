@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createProject, updateProject, getProject } from "../api/projects";
-import type { QuestionCreate } from "../api/projects";
+import type { QuestionCreate, ScreeningQuestionCreate } from "../api/projects";
 import {
   parseBrief,
   suggestObjective,
@@ -63,6 +63,8 @@ export default function CreateProjectWizard() {
   const [audience, setAudience] = useState(draft?.audience ?? "");
   const [durationMinutes, setDurationMinutes] = useState(draft?.durationMinutes ?? 20);
   const [language, setLanguage] = useState(draft?.language ?? "en");
+  const [screeningQuestions, setScreeningQuestions] = useState<ScreeningQuestionCreate[]>(draft?.screeningQuestions ?? []);
+  const [expandedSQ, setExpandedSQ] = useState<number | null>(null);
 
   // Step 4
   const [questions, setQuestions] = useState<QuestionCreate[]>(draft?.questions ?? []);
@@ -81,9 +83,9 @@ export default function CreateProjectWizard() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       step, name, context, briefSummary,
       objective, learningGoals, studyType, rationale,
-      audience, durationMinutes, language, questions,
+      audience, durationMinutes, language, questions, screeningQuestions,
     }));
-  }, [isEditMode, step, name, context, briefSummary, objective, learningGoals, studyType, rationale, audience, durationMinutes, language, questions]);
+  }, [isEditMode, step, name, context, briefSummary, objective, learningGoals, studyType, rationale, audience, durationMinutes, language, questions, screeningQuestions]);
 
   // Load existing project in edit mode
   useEffect(() => {
@@ -101,7 +103,12 @@ export default function CreateProjectWizard() {
         interview_notes: q.interview_notes ?? "",
         desired_learning: q.desired_learning ?? "",
       })));
-      setStep(4); // jump straight to the questionnaire
+      setScreeningQuestions(p.screening_questions.map((sq) => ({
+        question: sq.question,
+        options: sq.options,
+        disqualifying_options: sq.disqualifying_options,
+      })));
+      setStep(4);
     }).catch(() => navigate("/dashboard"));
   }, [editId]);
 
@@ -194,6 +201,7 @@ export default function CreateProjectWizard() {
         interview_duration_minutes: durationMinutes,
         research_objective: objective || undefined,
         questions: questions.filter((q) => q.main_question.trim()),
+        screening_questions: screeningQuestions.filter((sq) => sq.question.trim()),
       };
       const project = isEditMode
         ? await updateProject(editId!, body)
@@ -205,6 +213,71 @@ export default function CreateProjectWizard() {
       setLoading(false);
       setLoadingMsg("");
     }
+  }
+
+  // ── Screening question editing ──────────────────────────────────────────
+
+  function addSQ() {
+    setScreeningQuestions((prev) => [...prev, { question: "", options: ["", ""], disqualifying_options: [] }]);
+    setExpandedSQ(screeningQuestions.length);
+  }
+
+  function removeSQ(i: number) {
+    setScreeningQuestions((prev) => prev.filter((_, idx) => idx !== i));
+    setExpandedSQ(null);
+  }
+
+  function updateSQField(i: number, value: string) {
+    setScreeningQuestions((prev) => prev.map((sq, idx) => idx === i ? { ...sq, question: value } : sq));
+  }
+
+  function updateSQOption(sqIdx: number, optIdx: number, value: string) {
+    setScreeningQuestions((prev) =>
+      prev.map((sq, idx) => {
+        if (idx !== sqIdx) return sq;
+        const oldVal = sq.options[optIdx];
+        return {
+          ...sq,
+          options: sq.options.map((o, oi) => oi === optIdx ? value : o),
+          disqualifying_options: sq.disqualifying_options.map((d) => d === oldVal ? value : d),
+        };
+      })
+    );
+  }
+
+  function addSQOption(sqIdx: number) {
+    setScreeningQuestions((prev) =>
+      prev.map((sq, idx) => idx === sqIdx ? { ...sq, options: [...sq.options, ""] } : sq)
+    );
+  }
+
+  function removeSQOption(sqIdx: number, optIdx: number) {
+    setScreeningQuestions((prev) =>
+      prev.map((sq, idx) => {
+        if (idx !== sqIdx) return sq;
+        const removed = sq.options[optIdx];
+        return {
+          ...sq,
+          options: sq.options.filter((_, oi) => oi !== optIdx),
+          disqualifying_options: sq.disqualifying_options.filter((d) => d !== removed),
+        };
+      })
+    );
+  }
+
+  function toggleDisqualifying(sqIdx: number, option: string) {
+    setScreeningQuestions((prev) =>
+      prev.map((sq, idx) => {
+        if (idx !== sqIdx) return sq;
+        const isDisq = sq.disqualifying_options.includes(option);
+        return {
+          ...sq,
+          disqualifying_options: isDisq
+            ? sq.disqualifying_options.filter((d) => d !== option)
+            : [...sq.disqualifying_options, option],
+        };
+      })
+    );
   }
 
   // ── Question editing ────────────────────────────────────────────────────
@@ -479,6 +552,57 @@ export default function CreateProjectWizard() {
                 <option key={l.code} value={l.code}>{l.label}</option>
               ))}
             </select>
+
+            <div style={{ marginTop: 24 }}>
+              <label className="field-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>Screening Questions <span className="optional-tag">(optional)</span></span>
+                <button className="btn btn-ghost btn-sm" onClick={addSQ}>+ Add</button>
+              </label>
+              <p className="muted-text" style={{ marginBottom: 12, fontSize: 13 }}>
+                Asked before the interview. Mark answers that disqualify the participant.
+              </p>
+              {screeningQuestions.map((sq, sqIdx) => (
+                <div key={sqIdx} className="guide-editor-question" style={{ marginBottom: 8 }}>
+                  <div className="guide-editor-header" onClick={() => setExpandedSQ(expandedSQ === sqIdx ? null : sqIdx)}>
+                    <span className="guide-editor-num">Q{sqIdx + 1}</span>
+                    <span className="guide-editor-preview" style={{ flex: 1, marginLeft: 8 }}>
+                      {sq.question || <em className="muted-text">Empty screening question</em>}
+                    </span>
+                    {sq.disqualifying_options.length > 0 && (
+                      <span className="badge" style={{ marginRight: 8, background: "#fef2f2", color: "#dc2626", fontSize: 11 }}>
+                        {sq.disqualifying_options.length} disqualifying
+                      </span>
+                    )}
+                    <span className="guide-editor-chevron">{expandedSQ === sqIdx ? "▲" : "▼"}</span>
+                  </div>
+                  {expandedSQ === sqIdx && (
+                    <div className="guide-editor-body">
+                      <label className="field-label">Question</label>
+                      <input className="field-input" value={sq.question} onChange={(e) => updateSQField(sqIdx, e.target.value)} placeholder="e.g. Do you shop online at least once a month?" />
+                      <label className="field-label" style={{ marginTop: 12 }}>
+                        Options <span className="optional-tag">— click ✕/✓ to mark disqualifying</span>
+                      </label>
+                      {sq.options.map((opt, optIdx) => (
+                        <div key={optIdx} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                          <button
+                            style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: "1.5px solid", borderColor: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#d1d5db", background: sq.disqualifying_options.includes(opt) ? "#fef2f2" : "#fff", color: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#9ca3af", cursor: "pointer", fontWeight: 700, fontSize: 14 }}
+                            onClick={() => opt.trim() && toggleDisqualifying(sqIdx, opt)}
+                          >{sq.disqualifying_options.includes(opt) ? "✕" : "✓"}</button>
+                          <input className="field-input" style={{ flex: 1, marginBottom: 0 }} value={opt} onChange={(e) => updateSQOption(sqIdx, optIdx, e.target.value)} placeholder={`Option ${optIdx + 1}`} />
+                          {sq.options.length > 1 && (
+                            <button style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 18, padding: "0 4px" }} onClick={() => removeSQOption(sqIdx, optIdx)}>×</button>
+                          )}
+                        </div>
+                      ))}
+                      <button className="btn btn-ghost btn-sm" onClick={() => addSQOption(sqIdx)}>+ Add option</button>
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                        <button className="btn btn-ghost btn-sm btn-danger-text" onClick={() => removeSQ(sqIdx)}>Remove question</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
 
             <div className="wizard-nav">
               <button className="btn btn-ghost" onClick={() => setStep(2)}>← Back</button>
