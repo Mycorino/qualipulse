@@ -11,19 +11,63 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Core
     DATABASE_URL: str = "sqlite:///./auto_interview.db"
+    SECRET_KEY: str = "change-me-to-a-random-string"
+    ENVIRONMENT: str = "development"  # "development" | "staging" | "production"
+    DEBUG: bool = True
+
+    # Auth
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+
+    # AI
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
-    SECRET_KEY: str = "change-me-to-a-random-string"
+
+    # Storage
     UPLOAD_DIR: str = "./uploads"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    MAX_AUDIO_SIZE_MB: int = 50
+    MAX_TEXT_LENGTH: int = 10000
+
+    # CORS — comma-separated origins, e.g. "https://app.yoursite.com,https://yoursite.com"
+    ALLOWED_ORIGINS: str = "*"
+
+    # Email (SendGrid)
+    SENDGRID_API_KEY: str = ""
+    EMAIL_FROM: str = "noreply@autointerview.com"
+    EMAIL_FROM_NAME: str = "AutoInterview"
+
+    # Stripe (billing)
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_STARTER: str = ""
+    STRIPE_PRICE_PRO: str = ""
+
+    # Sentry
+    SENTRY_DSN: str = ""
 
     # Cloudflare R2 (optional — local disk used when not set)
     R2_ACCOUNT_ID: str = ""
     R2_ACCESS_KEY_ID: str = ""
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET: str = ""
-    R2_PUBLIC_URL: str = ""  # e.g. https://pub-xxx.r2.dev or https://audio.yourapp.com
+    R2_PUBLIC_URL: str = ""
+
+    # Rate limits (requests per minute)
+    RATE_LIMIT_PUBLIC: str = "60/minute"     # Interview public endpoints
+    RATE_LIMIT_AUTH: str = "10/minute"       # Login/signup
+    RATE_LIMIT_DEFAULT: str = "120/minute"   # Authenticated API calls
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        if self.ALLOWED_ORIGINS == "*":
+            return ["*"]
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT == "production"
 
 
 settings = Settings()

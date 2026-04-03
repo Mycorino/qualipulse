@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { SkeletonCard } from "../components/Skeleton";
 import {
   listProjects,
   createProject,
@@ -47,9 +48,14 @@ export default function Dashboard() {
     <div className="dashboard-layout">
       <header className="dashboard-header">
         <h1 className="logo">Auto Interview</h1>
-        <button className="btn btn-ghost" onClick={logout}>
-          Sign out
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button className="btn btn-ghost" onClick={() => navigate("/account")}>
+            Account & Billing
+          </button>
+          <button className="btn btn-ghost" onClick={logout}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       <main className="dashboard-main">
@@ -64,7 +70,11 @@ export default function Dashboard() {
         </div>
 
         {loading ? (
-          <p className="muted-text">Loading projects...</p>
+          <div className="project-grid">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
         ) : projects.length === 0 ? (
           <div className="empty-state">
             <p>No projects yet. Create your first interview project to get started.</p>

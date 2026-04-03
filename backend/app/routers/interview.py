@@ -2,11 +2,12 @@ import os
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
+from app.limiter import limiter
 from app.models.interview import InterviewLink, InterviewTurn, Participant
 from app.schemas.interview import (
     StartInterviewRequest,
@@ -26,7 +27,8 @@ class ScreenRequest(BaseModel):
 
 
 @router.get("/{token}/screening-questions")
-def get_screening_questions(token: str, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_screening_questions(request: Request, token: str, db: Session = Depends(get_db)):
     """Return screening questions for this project (no auth required)."""
     link = _get_active_link_or_404(token, db)
     return [
@@ -42,7 +44,8 @@ def get_screening_questions(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{token}/screen")
-def screen_participant(token: str, body: ScreenRequest, db: Session = Depends(get_db)):
+@limiter.limit("30/minute")
+def screen_participant(request: Request, token: str, body: ScreenRequest, db: Session = Depends(get_db)):
     """Check answers against disqualifying options. Returns qualified status."""
     link = _get_active_link_or_404(token, db)
     for q in sorted(link.project.screening_questions, key=lambda q: q.sort_order):
@@ -53,7 +56,9 @@ def screen_participant(token: str, body: ScreenRequest, db: Session = Depends(ge
 
 
 @router.get("/{token}")
+@limiter.limit("60/minute")
 def validate_link(
+    request: Request,
     token: str,
     db: Session = Depends(get_db),
 ):
@@ -71,7 +76,9 @@ def validate_link(
 
 
 @router.get("/{token}/resume", response_model=ResumeCheckResponse)
+@limiter.limit("60/minute")
 def check_resume_by_email(
+    request: Request,
     token: str,
     email: str,
     db: Session = Depends(get_db),
@@ -141,7 +148,9 @@ def get_resume_summary(
 
 
 @router.post("/{token}/start", response_model=StartInterviewResponse)
+@limiter.limit("30/minute")
 def start_interview_session(
+    request: Request,
     token: str,
     body: StartInterviewRequest | None = None,
     db: Session = Depends(get_db),
@@ -173,7 +182,9 @@ def start_interview_session(
 
 
 @router.post("/{token}/{participant_id}/respond", response_model=TurnResponse)
+@limiter.limit("30/minute")
 async def respond_to_question(
+    request: Request,
     token: str,
     participant_id: str,
     audio: UploadFile = File(...),
@@ -188,6 +199,22 @@ async def respond_to_question(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Interview is already completed",
         )
+
+    # Deduplication: if the most recent turn already has a response, return it
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    if turns:
+        last_turn = turns[-1]
+        if last_turn.response_transcript:
+            # This turn was already processed — return the existing next question
+            return TurnResponse(
+                question_text=last_turn.question_text,
+                tts_audio_url=last_turn.tts_audio_url or "",
+                is_complete=participant.status == "completed",
+                is_follow_up=last_turn.is_follow_up or False,
+                question_index=last_turn.question_index or 0,
+                elapsed_seconds=0,
+                total_seconds=0,
+            )
 
     # Upload audio and process the turn
     audio_data = await audio.read()

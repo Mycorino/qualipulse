@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { SkeletonTable } from "../components/Skeleton";
 import {
   getProject,
   getLinks,
@@ -1259,7 +1260,9 @@ export default function ProjectDetail() {
                 <h2>Participants ({participants.length})</h2>
                 <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>Export CSV</button>
               </div>
-              {participants.length === 0 ? (
+              {loading ? (
+                <SkeletonTable rows={4} />
+              ) : participants.length === 0 ? (
                 <div className="empty-state">
                   <p>No responses yet.</p>
                   <p className="muted-text">Share an interview link from the Overview tab to get started.</p>

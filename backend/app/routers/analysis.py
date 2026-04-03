@@ -1,6 +1,7 @@
 """Analysis endpoints — generate and retrieve AI synthesis for a project."""
 
 import json
+import logging
 import threading
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,7 +14,10 @@ from app.models.interview import Participant, ProjectAnalysis
 from app.models.project import Project
 from app.services.analysis import run_analysis
 
+logger = logging.getLogger("auto_interview.analysis")
 router = APIRouter(prefix="/projects", tags=["analysis"])
+
+ANALYSIS_TIMEOUT_SECONDS = 300  # 5 minutes
 
 
 class AnalysisTriggerRequest(BaseModel):
@@ -49,13 +53,54 @@ def trigger_analysis(
     if filter_by and filter_values:
         filters_json = json.dumps({"filter_by": filter_by, "filter_values": filter_values})
 
+    def _run_with_timeout(project_id: str, db: Session, filter_by, filter_values):
+        try:
+            logger.info("Analysis started for project %s", project_id)
+            run_analysis(project_id, db, filter_by, filter_values)
+            logger.info("Analysis completed for project %s", project_id)
+        except Exception as exc:
+            logger.error("Analysis failed for project %s: %s", project_id, exc, exc_info=True)
+            try:
+                analysis = (
+                    db.query(ProjectAnalysis)
+                    .filter(ProjectAnalysis.project_id == project_id)
+                    .first()
+                )
+                if analysis:
+                    analysis.status = "failed"
+                    analysis.error = str(exc)
+                    db.commit()
+            except Exception:
+                pass
+
     # Run in background thread so the response returns immediately
     thread = threading.Thread(
-        target=run_analysis,
+        target=_run_with_timeout,
         args=(project_id, db, filter_by, filter_values),
         daemon=True,
     )
     thread.start()
+
+    # Monitor timeout in a watchdog thread
+    def _watchdog(t: threading.Thread, project_id: str, db: Session):
+        t.join(timeout=ANALYSIS_TIMEOUT_SECONDS)
+        if t.is_alive():
+            logger.error("Analysis timed out after 5 minutes for project %s", project_id)
+            try:
+                analysis = (
+                    db.query(ProjectAnalysis)
+                    .filter(ProjectAnalysis.project_id == project_id)
+                    .first()
+                )
+                if analysis and analysis.status == "generating":
+                    analysis.status = "failed"
+                    analysis.error = "Analysis timed out after 5 minutes"
+                    db.commit()
+            except Exception:
+                pass
+
+    watchdog = threading.Thread(target=_watchdog, args=(thread, project_id, db), daemon=True)
+    watchdog.start()
 
     return {"status": "generating", "message": "Analysis started"}
 
