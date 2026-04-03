@@ -434,6 +434,28 @@
   justify-content: center;
 }
 
+.mkt-plans-enterprise {
+  margin-top: 28px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ---- Proof strip ---- */
+.mkt-proof-strip {
+  background: #0f172a;
+  color: #94a3b8;
+  text-align: center;
+  padding: 14px 24px;
+  font-size: 0.9rem;
+  font-style: italic;
+  letter-spacing: 0.1px;
+}
+
+.mkt-proof-strip span {
+  color: #e2e8f0;
+}
+
 /* ---- Footer ---- */
 .mkt-footer {
   border-top: 1px solid var(--border);

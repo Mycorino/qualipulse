@@ -5,46 +5,46 @@ const HOW_IT_WORKS = [
   {
     step: "01",
     title: "Build your interview guide",
-    desc: "Define your research objective, add questions, and set screening criteria. Our AI suggests questions based on your brief.",
+    desc: "Paste your research brief and let AI draft your guide — objectives, screening criteria, and questions tailored to what you need to learn. Edit anything, then you're ready.",
   },
   {
     step: "02",
-    title: "Share a link",
-    desc: "Generate a shareable link and send it to participants. They complete the voice interview in their browser — no app needed.",
+    title: "Share a link, participants speak",
+    desc: "Send one link. Participants complete the voice interview in their own time, on any device. The AI conducts the conversation, asks follow-ups, and keeps things on track.",
   },
   {
     step: "03",
-    title: "Get AI-powered insights",
-    desc: "Transcripts, themes, JTBDs, tensions, and quotes are automatically synthesised into a research memo ready to share.",
+    title: "Get a memo, not a pile of transcripts",
+    desc: "Within hours of your first response, you'll have a structured research memo: key themes, supporting quotes, tensions worth investigating, and clear recommendations — formatted to share with stakeholders immediately.",
   },
 ];
 
 const PLANS = [
   {
-    name: "Free",
+    name: "Solo",
     price: "$0",
     period: "",
-    desc: "Try it out",
-    features: ["3 projects", "10 interviews/mo", "Basic analysis"],
-    cta: "Get started",
+    desc: "Explore the product",
+    features: ["3 projects", "25 interviews/mo", "AI themes & quotes"],
+    cta: "Get started free",
     highlight: false,
   },
   {
-    name: "Starter",
+    name: "Team",
     price: "$49",
     period: "/mo",
-    desc: "For solo researchers",
-    features: ["10 projects", "100 interviews/mo", "Full AI analysis", "CSV export"],
-    cta: "Start free trial",
+    desc: "For in-house researchers",
+    features: ["10 projects", "100 interviews/mo", "Full synthesis memo", "Demographic segments", "CSV export"],
+    cta: "Start 14-day trial",
     highlight: true,
   },
   {
-    name: "Pro",
+    name: "Lab",
     price: "$149",
     period: "/mo",
-    desc: "For research teams",
-    features: ["Unlimited projects", "Unlimited interviews", "Segment heatmaps", "Priority support"],
-    cta: "Start free trial",
+    desc: "For research programs",
+    features: ["Unlimited projects", "Unlimited interviews", "Cross-study segment heatmaps", "Shared team workspace", "Priority support"],
+    cta: "Start 14-day trial",
     highlight: false,
   },
 ];
@@ -66,20 +66,21 @@ export default function Marketing() {
       {/* Hero */}
       <section className="mkt-hero">
         <div className="mkt-hero-inner">
-          <div className="mkt-badge">AI-powered qualitative research</div>
+          <div className="mkt-badge">Built for UX researchers</div>
           <h1 className="mkt-h1">
-            Run voice interviews<br />at scale — without the busywork
+            From screener to synthesis —<br />in hours, not weeks
           </h1>
           <p className="mkt-sub">
-            QualiPulse lets you create an AI-driven interview guide, share a link,
-            and get back fully analysed transcripts with themes, quotes, and insights.
-            No scheduling. No transcription. No manual coding.
+            QualiPulse runs your qualitative interviews for you. Build a guide, share
+            a link, and participants complete a voice interview in their own time.
+            You get back structured transcripts, emergent themes, and a
+            stakeholder-ready research memo. Automatically.
           </p>
           <div className="mkt-hero-ctas">
-            <Link to="/signup" className="btn btn-primary mkt-btn-lg">Start for free</Link>
+            <Link to="/signup" className="btn btn-primary mkt-btn-lg">Run your first study free</Link>
             <Link to="/login" className="mkt-link-secondary">Already have an account →</Link>
           </div>
-          <p className="mkt-hero-note">14-day trial · No credit card required</p>
+          <p className="mkt-hero-note">14-day trial · No credit card · GDPR-compliant</p>
         </div>
 
         {/* Fake UI preview */}
@@ -111,15 +112,20 @@ export default function Marketing() {
           </div>
           <div className="mkt-preview-stat mkt-stat-count">
             <span className="mkt-stat-num">24</span>
-            <span className="mkt-stat-label">interviews analysed</span>
+            <span className="mkt-stat-label">interviews synthesised</span>
           </div>
         </div>
       </section>
 
+      {/* Social proof strip */}
+      <div className="mkt-proof-strip">
+        <span>Research that used to take two weeks now takes two days.</span>
+      </div>
+
       {/* How it works */}
       <section className="mkt-section" id="how">
         <h2 className="mkt-section-title">How it works</h2>
-        <p className="mkt-section-sub">From research question to insight memo in three steps.</p>
+        <p className="mkt-section-sub">Three steps from research question to insight memo.</p>
         <div className="mkt-steps">
           {HOW_IT_WORKS.map((s) => (
             <div key={s.step} className="mkt-step">
@@ -137,7 +143,7 @@ export default function Marketing() {
           <div className="mkt-participant-icon">🎙️</div>
           <div>
             <h3>Got a link to an interview?</h3>
-            <p>You don't need an account. Just open the link you received and complete the voice interview right in your browser.</p>
+            <p>No account needed. Open the link, speak naturally, and you're done — right in your browser, on any device.</p>
           </div>
         </div>
       </section>
@@ -145,7 +151,7 @@ export default function Marketing() {
       {/* Pricing */}
       <section className="mkt-section" id="pricing">
         <h2 className="mkt-section-title">Simple pricing</h2>
-        <p className="mkt-section-sub">Start free. Upgrade when you need more.</p>
+        <p className="mkt-section-sub">Start free. No credit card. Upgrade when your research program grows.</p>
         <div className="mkt-plans">
           {PLANS.map((p) => (
             <div key={p.name} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
@@ -171,6 +177,10 @@ export default function Marketing() {
             </div>
           ))}
         </div>
+        <p className="mkt-plans-enterprise">
+          Running a large research program?{" "}
+          <a href="mailto:hello@qualipulse.com">Talk to us about Enterprise →</a>
+        </p>
       </section>
 
       {/* Footer */}
@@ -180,7 +190,7 @@ export default function Marketing() {
           <Link to="/login">Log in</Link>
           <Link to="/signup">Sign up</Link>
         </div>
-        <span className="mkt-footer-copy">© 2026 QualiPulse</span>
+        <span className="mkt-footer-copy">© 2026 QualiPulse · GDPR-compliant</span>
       </footer>
     </div>
   );
