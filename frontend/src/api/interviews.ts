@@ -5,6 +5,7 @@ export interface InterviewInfo {
   language: string;
   welcome_message?: string;
   interview_duration_minutes?: number;
+  question_count?: number;
 }
 
 export interface ScreeningQuestion {

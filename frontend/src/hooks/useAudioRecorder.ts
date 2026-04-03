@@ -73,8 +73,18 @@ export function useAudioRecorder() {
       recorder.start(250); // timeslice: fire ondataavailable every 250ms
       setIsRecording(true);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Could not access microphone";
+      let message = "Could not access microphone. Please try again.";
+      if (err instanceof Error) {
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          message = "PERMISSION_DENIED";
+        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+          message = "No microphone found. Please connect a microphone and try again.";
+        } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+          message = "Microphone is in use by another application. Please close other apps and try again.";
+        } else if (err.name === "OverconstrainedError") {
+          message = "Microphone does not meet the required constraints. Please try a different device.";
+        }
+      }
       setError(message);
     }
   }, []);

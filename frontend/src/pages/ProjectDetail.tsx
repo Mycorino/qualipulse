@@ -5,6 +5,7 @@ import {
   getLinks,
   getParticipants,
   createLink,
+  toggleLink,
   updateProject,
   exportCSV,
   deleteProject,
@@ -14,6 +15,7 @@ import {
   patchQuestion,
   getCodes,
   createCode,
+  updateCode,
   deleteCode,
   getTags,
   createTag,
@@ -60,6 +62,18 @@ export default function ProjectDetail() {
   const [analysisPolling, setAnalysisPolling] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
 
+  // ── Overview inline editors ────────────────────────────────────────────────
+  const [editingObjective, setEditingObjective] = useState(false);
+  const [objectiveDraft, setObjectiveDraft] = useState("");
+  const [editingWelcome, setEditingWelcome] = useState(false);
+  const [welcomeDraft, setWelcomeDraft] = useState("");
+  const [savingMeta, setSavingMeta] = useState(false);
+
+  // ── System prompt editor ────────────────────────────────────────────────────
+  const [editingSystemPrompt, setEditingSystemPrompt] = useState(false);
+  const [systemPromptDraft, setSystemPromptDraft] = useState("");
+  const [savingSystemPrompt, setSavingSystemPrompt] = useState(false);
+
   // ── Screening editor ───────────────────────────────────────────────────────
   const [editingScreening, setEditingScreening] = useState(false);
   const [screeningDraft, setScreeningDraft] = useState<ScreeningQuestionCreate[]>([]);
@@ -70,6 +84,7 @@ export default function ProjectDetail() {
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [savingTurnId, setSavingTurnId] = useState<string | null>(null);
+  const [editingOriginalText, setEditingOriginalText] = useState("");
 
   // ── P2: Analysis filters ───────────────────────────────────────────────────
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -87,10 +102,15 @@ export default function ProjectDetail() {
   const [showNewCode, setShowNewCode] = useState(false);
   const [showCodebook, setShowCodebook] = useState(false);
   const [creatingCode, setCreatingCode] = useState(false);
+  const [renamingCodeId, setRenamingCodeId] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState("");
 
   // ── P5: Guide annotation ───────────────────────────────────────────────────
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
+  const [editingInterviewNotes, setEditingInterviewNotes] = useState<{ id: string; field: "interview_notes" | "desired_learning" } | null>(null);
+  const [interviewNotesText, setInterviewNotesText] = useState("");
 
   // ── P6: Memos ──────────────────────────────────────────────────────────────
   const [memos, setMemos] = useState<ProjectMemo[]>([]);
@@ -108,6 +128,19 @@ export default function ProjectDetail() {
     if (!id) return;
     loadAll();
   }, [id]);
+
+  // Warn on browser close/refresh when a transcript edit is in progress
+  useEffect(() => {
+    if (!editingTurnId) return;
+    const hasChanges = editingText !== editingOriginalText;
+    if (!hasChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [editingTurnId, editingText, editingOriginalText]);
 
   async function loadAll() {
     setLoading(true);
@@ -162,12 +195,76 @@ export default function ProjectDetail() {
     startPolling();
   }
 
+  function analysisToMarkdown(): string {
+    if (!analysis?.report) return "";
+    const r = analysis.report;
+    const lines: string[] = [];
+    lines.push(`# Analysis Report — ${project?.name ?? "Project"}`);
+    lines.push(`\n*Based on ${r.participant_count} participant(s) · ${r.confidence} confidence*\n`);
+    lines.push(`## Summary\n${r.summary}\n`);
+    if (r.themes?.length) {
+      lines.push("## Key Themes");
+      r.themes.forEach((t, i) => {
+        lines.push(`\n### ${i + 1}. ${t.title}`);
+        lines.push(t.summary);
+        if (t.quotes?.length) {
+          t.quotes.slice(0, 2).forEach((q) => {
+            const text = typeof q === "string" ? q : q.text;
+            lines.push(`> "${text}"`);
+          });
+        }
+      });
+    }
+    if (r.jobs_to_be_done?.length) {
+      lines.push("\n## Jobs to Be Done");
+      r.jobs_to_be_done.forEach((j) => lines.push(`- **${j.job}**: ${j.insight}`));
+    }
+    if (r.tensions?.length) {
+      lines.push("\n## Tensions");
+      r.tensions.forEach((t) => lines.push(`- **${t.tension}**: ${t.detail}`));
+    }
+    if (r.recommendations?.length) {
+      lines.push("\n## Recommendations");
+      r.recommendations.forEach((rec) => lines.push(`- ${rec}`));
+    }
+    return lines.join("\n");
+  }
+
+  const [exportCopied, setExportCopied] = useState(false);
+
+  async function handleCopyMarkdown() {
+    const md = analysisToMarkdown();
+    await navigator.clipboard.writeText(md);
+    setExportCopied(true);
+    setTimeout(() => setExportCopied(false), 2000);
+  }
+
+  function handleDownloadJSON() {
+    if (!analysis?.report) return;
+    const blob = new Blob([JSON.stringify(analysis.report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project?.name ?? "analysis"}-report.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleGenerateLink() {
     try {
       const link = await createLink(id!);
       setLinks((prev) => [...prev, link]);
     } catch {
       alert("Failed to generate link");
+    }
+  }
+
+  async function handleToggleLink(linkId: string) {
+    try {
+      const updated = await toggleLink(linkId);
+      setLinks((prev) => prev.map((l) => (l.id === linkId ? updated : l)));
+    } catch {
+      alert("Failed to update link");
     }
   }
 
@@ -182,6 +279,9 @@ export default function ProjectDetail() {
   }
 
   async function handleViewTranscript(p: ParticipantResponse) {
+    if (editingTurnId && editingText !== editingOriginalText) {
+      if (!confirm("You have unsaved transcript changes. Discard them?")) return;
+    }
     setSelectedParticipant(p);
     setTranscript(null);
     setEditingTurnId(null);
@@ -224,6 +324,7 @@ export default function ProjectDetail() {
   function startEditTurn(turn: TranscriptTurn) {
     setEditingTurnId(turn.id);
     setEditingText(turn.response_transcript ?? "");
+    setEditingOriginalText(turn.response_transcript ?? "");
     setSelectionInfo(null);
   }
 
@@ -323,7 +424,32 @@ export default function ProjectDetail() {
     setTags((prev) => prev.filter((t) => t.manual_code_id !== codeId));
   }
 
+  async function handleRenameCode(codeId: string) {
+    const trimmed = renameText.trim();
+    if (!trimmed) return;
+    try {
+      const updated = await updateCode(id!, codeId, { name: trimmed });
+      setCodes((prev) => prev.map((c) => (c.id === codeId ? { ...c, name: updated.name } : c)));
+      setTags((prev) => prev.map((t) => (t.manual_code_id === codeId ? { ...t, code_name: updated.name } : t)));
+      setRenamingCodeId(null);
+    } catch {
+      alert("Failed to rename code");
+    }
+  }
+
   // ── P5: Guide annotation ───────────────────────────────────────────────────
+
+  async function saveInterviewNotes(questionId: string, field: "interview_notes" | "desired_learning") {
+    try {
+      const updated = await patchQuestion(id!, questionId, { [field]: interviewNotesText });
+      setProject((prev) =>
+        prev ? { ...prev, questions: prev.questions.map((q) => q.id === questionId ? { ...q, [field]: (updated as Record<string, unknown>)[field] as string } : q) } : prev
+      );
+      setEditingInterviewNotes(null);
+    } catch {
+      alert("Failed to save notes");
+    }
+  }
 
   async function saveQuestionNote(questionId: string) {
     try {
@@ -535,6 +661,60 @@ export default function ProjectDetail() {
 
   // ── Screening helpers ──────────────────────────────────────────────────────
 
+  async function saveProjectMeta(fields: { research_objective?: string; welcome_message?: string }) {
+    if (!project) return;
+    setSavingMeta(true);
+    try {
+      const updated = await updateProject(id!, {
+        name: project.name,
+        language: project.language,
+        interview_duration_minutes: project.interview_duration_minutes,
+        research_objective: fields.research_objective ?? project.research_objective,
+        welcome_message: fields.welcome_message ?? project.welcome_message,
+        questions: project.questions.map((q) => ({
+          section_index: q.section_index, section_title: q.section_title,
+          question_index: q.question_index, main_question: q.main_question,
+          interview_notes: q.interview_notes, desired_learning: q.desired_learning,
+        })),
+        screening_questions: (project.screening_questions ?? []).map((sq) => ({
+          question: sq.question, options: sq.options, disqualifying_options: sq.disqualifying_options,
+        })),
+      });
+      setProject(updated);
+      setEditingObjective(false);
+      setEditingWelcome(false);
+    } finally {
+      setSavingMeta(false);
+    }
+  }
+
+  async function saveSystemPrompt() {
+    if (!project) return;
+    setSavingSystemPrompt(true);
+    try {
+      const updated = await updateProject(id!, {
+        name: project.name,
+        language: project.language,
+        interview_duration_minutes: project.interview_duration_minutes,
+        research_objective: project.research_objective,
+        welcome_message: project.welcome_message,
+        system_prompt: systemPromptDraft,
+        questions: project.questions.map((q) => ({
+          section_index: q.section_index, section_title: q.section_title,
+          question_index: q.question_index, main_question: q.main_question,
+          interview_notes: q.interview_notes, desired_learning: q.desired_learning,
+        })),
+        screening_questions: (project.screening_questions ?? []).map((sq) => ({
+          question: sq.question, options: sq.options, disqualifying_options: sq.disqualifying_options,
+        })),
+      });
+      setProject(updated);
+      setEditingSystemPrompt(false);
+    } finally {
+      setSavingSystemPrompt(false);
+    }
+  }
+
   function startEditScreening() {
     setScreeningDraft((project?.screening_questions ?? []).map((sq) => ({
       question: sq.question, options: sq.options, disqualifying_options: sq.disqualifying_options,
@@ -646,12 +826,65 @@ export default function ProjectDetail() {
               </div>
               <div className="stat-card"><div className="stat-value">{project.questions.length}</div><div className="stat-label">Guide questions</div></div>
             </div>
-            {project.research_objective && (
-              <section className="detail-section">
+            {/* Research Objective — inline edit */}
+            <section className="detail-section">
+              <div className="section-header-row">
                 <h2>Research Objective</h2>
-                <p className="objective-text">{project.research_objective}</p>
-              </section>
-            )}
+                {!editingObjective && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setObjectiveDraft(project.research_objective ?? ""); setEditingObjective(true); }}>Edit</button>
+                )}
+              </div>
+              {editingObjective ? (
+                <div>
+                  <textarea
+                    className="field-input"
+                    rows={3}
+                    value={objectiveDraft}
+                    onChange={(e) => setObjectiveDraft(e.target.value)}
+                    placeholder="What are you trying to learn from this research?"
+                    style={{ resize: "vertical" }}
+                  />
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => saveProjectMeta({ research_objective: objectiveDraft })} disabled={savingMeta}>{savingMeta ? "Saving…" : "Save"}</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingObjective(false)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <p className="objective-text" style={{ color: project.research_objective ? undefined : "var(--text-muted)", fontStyle: project.research_objective ? undefined : "italic" }}>
+                  {project.research_objective || "No objective set — click Edit to add one."}
+                </p>
+              )}
+            </section>
+
+            {/* Welcome Message — inline edit */}
+            <section className="detail-section">
+              <div className="section-header-row">
+                <h2>Welcome Message <span className="optional-tag">(shown to participants)</span></h2>
+                {!editingWelcome && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setWelcomeDraft(project.welcome_message ?? ""); setEditingWelcome(true); }}>Edit</button>
+                )}
+              </div>
+              {editingWelcome ? (
+                <div>
+                  <textarea
+                    className="field-input"
+                    rows={3}
+                    value={welcomeDraft}
+                    onChange={(e) => setWelcomeDraft(e.target.value)}
+                    placeholder="e.g. Thank you for taking part in this study. Your answers will help us improve our product."
+                    style={{ resize: "vertical" }}
+                  />
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => saveProjectMeta({ welcome_message: welcomeDraft })} disabled={savingMeta}>{savingMeta ? "Saving…" : "Save"}</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingWelcome(false)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <p className="objective-text" style={{ color: project.welcome_message ? undefined : "var(--text-muted)", fontStyle: project.welcome_message ? undefined : "italic" }}>
+                  {project.welcome_message || "No welcome message — click Edit to add one."}
+                </p>
+              )}
+            </section>
             <section className="detail-section">
               <div className="section-header-row">
                 <h2>Interview Link</h2>
@@ -662,9 +895,26 @@ export default function ProjectDetail() {
               ) : (
                 <div className="links-list">
                   {links.map((l) => (
-                    <div key={l.id} className="link-row">
-                      <code className="link-url">{interviewUrl(l.token)}</code>
-                      <button className="btn btn-ghost btn-sm" onClick={() => copyLink(l.token)}>{linkCopied ? "✓ Copied" : "Copy"}</button>
+                    <div key={l.id} className={`link-row${l.is_active ? "" : " link-row--inactive"}`}>
+                      <div className="link-row-main">
+                        <span className={`link-status-badge ${l.is_active ? "link-status-badge--active" : "link-status-badge--inactive"}`}>
+                          {l.is_active ? "Active" : "Inactive"}
+                        </span>
+                        <code className="link-url">{interviewUrl(l.token)}</code>
+                      </div>
+                      <div className="link-row-actions">
+                        {l.is_active && (
+                          <button className="btn btn-ghost btn-sm" onClick={() => copyLink(l.token)}>
+                            {linkCopied ? "✓ Copied" : "Copy"}
+                          </button>
+                        )}
+                        <button
+                          className={`btn btn-sm ${l.is_active ? "btn-ghost" : "btn-secondary"}`}
+                          onClick={() => handleToggleLink(l.id)}
+                        >
+                          {l.is_active ? "Deactivate" : "Activate"}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -761,6 +1011,36 @@ export default function ProjectDetail() {
               )}
             </section>
 
+            {/* System Prompt */}
+            <section className="detail-section">
+              <div className="section-header-row">
+                <div>
+                  <h2>AI Interviewer Prompt</h2>
+                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>Customize how the AI interviewer behaves.</p>
+                </div>
+                {!editingSystemPrompt && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setSystemPromptDraft(project.system_prompt ?? ""); setEditingSystemPrompt(true); }}>Edit</button>
+                )}
+              </div>
+              {editingSystemPrompt ? (
+                <>
+                  <textarea
+                    className="field-input"
+                    value={systemPromptDraft}
+                    onChange={(e) => setSystemPromptDraft(e.target.value)}
+                    rows={8}
+                    style={{ width: "100%", fontFamily: "monospace", fontSize: 13, marginBottom: 8 }}
+                  />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn btn-primary btn-sm" onClick={saveSystemPrompt} disabled={savingSystemPrompt}>{savingSystemPrompt ? "Saving…" : "Save"}</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingSystemPrompt(false)}>Cancel</button>
+                  </div>
+                </>
+              ) : (
+                <pre className="system-prompt-preview">{project.system_prompt || <em className="muted-text">No custom prompt — using default.</em>}</pre>
+              )}
+            </section>
+
             <section className="detail-section">
               <div className="section-header-row">
                 <div>
@@ -853,6 +1133,46 @@ export default function ProjectDetail() {
                               📝 {q.researcher_notes}
                             </div>
                           )}
+
+                          {/* Expandable interview notes */}
+                          {(q.interview_notes || q.desired_learning) && (
+                            <button
+                              className="btn btn-ghost btn-xs"
+                              style={{ fontSize: 11, marginTop: 4, color: "#6b7280" }}
+                              onClick={() => setExpandedQuestionId(expandedQuestionId === q.id ? null : q.id)}
+                            >
+                              {expandedQuestionId === q.id ? "▲ Hide notes" : "▼ Interview notes"}
+                            </button>
+                          )}
+                          {expandedQuestionId === q.id && (
+                            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
+                              {(["interview_notes", "desired_learning"] as const).map((field) => {
+                                const label = field === "interview_notes" ? "Interview Notes" : "Desired Learning";
+                                const isEditing = editingInterviewNotes?.id === q.id && editingInterviewNotes?.field === field;
+                                return (
+                                  <div key={field} style={{ background: "#f9fafb", borderRadius: 6, padding: "8px 10px", border: "1px solid #e5e7eb" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                      <span style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>{label}</span>
+                                      {!isEditing && (
+                                        <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => { setEditingInterviewNotes({ id: q.id, field }); setInterviewNotesText(q[field] ?? ""); }}>Edit</button>
+                                      )}
+                                    </div>
+                                    {isEditing ? (
+                                      <>
+                                        <textarea className="field-input" value={interviewNotesText} onChange={(e) => setInterviewNotesText(e.target.value)} rows={3} style={{ width: "100%", fontSize: 12, marginBottom: 4 }} autoFocus />
+                                        <div style={{ display: "flex", gap: 4 }}>
+                                          <button className="btn btn-primary btn-xs" onClick={() => saveInterviewNotes(q.id, field)}>Save</button>
+                                          <button className="btn btn-ghost btn-xs" onClick={() => setEditingInterviewNotes(null)}>Cancel</button>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <p style={{ fontSize: 12, color: "#374151", margin: 0 }}>{q[field] || <em className="muted-text">None</em>}</p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -882,10 +1202,31 @@ export default function ProjectDetail() {
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {codes.map((c) => (
                       <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: `${c.color}22`, border: `1.5px solid ${c.color}`, fontSize: 13 }}>
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, display: "inline-block" }} />
-                        <span>{c.name}</span>
-                        <span className="muted-text" style={{ fontSize: 11 }}>({c.tag_count})</span>
-                        <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 14 }} onClick={() => handleDeleteCode(c.id)} title="Delete code">×</button>
+                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, display: "inline-block", flexShrink: 0 }} />
+                        {renamingCodeId === c.id ? (
+                          <>
+                            <input
+                              autoFocus
+                              value={renameText}
+                              onChange={(e) => setRenameText(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") handleRenameCode(c.id); if (e.key === "Escape") setRenamingCodeId(null); }}
+                              style={{ border: "none", background: "transparent", outline: "none", fontSize: 13, width: Math.max(60, renameText.length * 8) }}
+                            />
+                            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#6366f1", padding: 0, fontSize: 12 }} onClick={() => handleRenameCode(c.id)} title="Save">✓</button>
+                            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 12 }} onClick={() => setRenamingCodeId(null)} title="Cancel">✕</button>
+                          </>
+                        ) : (
+                          <>
+                            <span
+                              title="Double-click to rename"
+                              onDoubleClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }}
+                              style={{ cursor: "text" }}
+                            >{c.name}</span>
+                            <span className="muted-text" style={{ fontSize: 11 }}>({c.tag_count})</span>
+                            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 11 }} onClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} title="Rename">✎</button>
+                            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 14 }} onClick={() => handleDeleteCode(c.id)} title="Delete code">×</button>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -955,7 +1296,10 @@ export default function ProjectDetail() {
                                 <button className="btn btn-primary btn-xs" disabled={savingTurnId === t.id} onClick={() => saveEditTurn(t)}>
                                   {savingTurnId === t.id ? "Saving..." : "Save"}
                                 </button>
-                                <button className="btn btn-ghost btn-xs" onClick={() => setEditingTurnId(null)}>Cancel</button>
+                                <button className="btn btn-ghost btn-xs" onClick={() => {
+                                  if (editingText !== editingOriginalText && !confirm("Discard changes?")) return;
+                                  setEditingTurnId(null);
+                                }}>Cancel</button>
                               </div>
                             </div>
                           ) : t.response_transcript ? (
@@ -1039,11 +1383,23 @@ export default function ProjectDetail() {
             <section className="detail-section">
               <div className="section-header-row">
                 <h2>AI Analysis</h2>
-                {analysis.completed_count > 0 && (
-                  <button className="btn btn-ai btn-sm" onClick={handleTriggerAnalysis} disabled={analysis.status === "generating"}>
-                    {analysis.status === "generating" ? "Analysing..." : analysis.status === "none" ? "✦ Generate" : "✦ Regenerate"}
-                  </button>
-                )}
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {analysis.report && (
+                    <>
+                      <button className="btn btn-ghost btn-sm" onClick={handleCopyMarkdown}>
+                        {exportCopied ? "✓ Copied" : "Copy MD"}
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={handleDownloadJSON}>
+                        ↓ JSON
+                      </button>
+                    </>
+                  )}
+                  {analysis.completed_count > 0 && (
+                    <button className="btn btn-ai btn-sm" onClick={handleTriggerAnalysis} disabled={analysis.status === "generating"}>
+                      {analysis.status === "generating" ? "Analysing..." : analysis.status === "none" ? "✦ Generate" : "✦ Regenerate"}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* P2: Filter panel */}

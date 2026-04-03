@@ -29,6 +29,7 @@ export interface ProjectCreate {
   interview_duration_minutes?: number;
   system_prompt?: string;
   research_objective?: string;
+  welcome_message?: string;
   questions: QuestionCreate[];
   screening_questions?: ScreeningQuestionCreate[];
 }
@@ -53,6 +54,7 @@ export interface ProjectResponse {
   interview_duration_minutes: number;
   system_prompt?: string;
   research_objective?: string;
+  welcome_message?: string;
   created_at: string;
   questions: QuestionResponse[];
   screening_questions: ScreeningQuestionResponse[];
@@ -231,7 +233,7 @@ export async function deleteProject(id: string): Promise<void> {
 export async function patchQuestion(
   projectId: string,
   questionId: string,
-  body: { researcher_notes?: string | null; deprecated_at?: string | null }
+  body: { researcher_notes?: string | null; deprecated_at?: string | null; interview_notes?: string | null; desired_learning?: string | null }
 ): Promise<QuestionResponse> {
   const { data } = await client.patch<QuestionResponse>(
     `/projects/${projectId}/questions/${questionId}`,
@@ -247,6 +249,11 @@ export async function createLink(projectId: string): Promise<InterviewLink> {
 
 export async function getLinks(projectId: string): Promise<InterviewLink[]> {
   const { data } = await client.get<InterviewLink[]>(`/projects/${projectId}/links`);
+  return data;
+}
+
+export async function toggleLink(linkId: string): Promise<InterviewLink> {
+  const { data } = await client.patch<InterviewLink>(`/links/${linkId}`);
   return data;
 }
 
@@ -309,6 +316,11 @@ export async function getCodes(projectId: string): Promise<ManualCode[]> {
 
 export async function createCode(projectId: string, name: string, color: string): Promise<ManualCode> {
   const { data } = await client.post<ManualCode>(`/projects/${projectId}/codes`, { name, color });
+  return data;
+}
+
+export async function updateCode(projectId: string, codeId: string, body: { name?: string; color?: string }): Promise<ManualCode> {
+  const { data } = await client.patch<ManualCode>(`/projects/${projectId}/codes/${codeId}`, body);
   return data;
 }
 

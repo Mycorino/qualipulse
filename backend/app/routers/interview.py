@@ -63,6 +63,7 @@ def validate_link(
         "welcome_message": project.welcome_message,
         "language": project.language,
         "interview_duration_minutes": project.interview_duration_minutes,
+        "question_count": len([q for q in project.guide_questions if not q.deprecated_at]),
     }
 
 
