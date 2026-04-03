@@ -1067,6 +1067,81 @@ select.field-input {
 }
 
 /* ============================================
+   Setup Tab – Screening Question Display
+   ============================================ */
+
+.screening-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.screening-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  background: var(--bg);
+}
+
+.screening-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.screening-num {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: #eef2ff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.screening-question {
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.screening-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.screening-option {
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-weight: 500;
+}
+
+.screening-option.allowed {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.screening-option.disqualifying {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+/* Screening inline editor */
+.screening-editor {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ============================================
    Interview – Screening / Profiling Phase
    ============================================ */
 
