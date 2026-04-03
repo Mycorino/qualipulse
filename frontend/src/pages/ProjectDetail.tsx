@@ -25,6 +25,7 @@ import {
   updateMemo,
   deleteMemo,
   getHeatmap,
+  assessQuality,
   ProjectResponse,
   InterviewLink,
   ParticipantResponse,
@@ -123,6 +124,10 @@ export default function ProjectDetail() {
   const [heatmap, setHeatmap] = useState<HeatmapResponse | null>(null);
   const [heatmapExpanded, setHeatmapExpanded] = useState(false);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
+
+  // ── P8: AI Quality assessment ───────────────────────────────────────────────
+  const [qualityAssessment, setQualityAssessment] = useState<import("../api/projects").QualityAssessment | null>(null);
+  const [loadingQuality, setLoadingQuality] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -285,6 +290,7 @@ export default function ProjectDetail() {
     setSelectedParticipant(p);
     setTranscript(null);
     setEditingTurnId(null);
+    setQualityAssessment(null);
     setSelectionInfo(null);
     try {
       const result = await getTranscript(id!, p.id);
@@ -529,6 +535,20 @@ export default function ProjectDetail() {
     if (count === 1) return "#bfdbfe";
     if (count === 2) return "#60a5fa";
     return "#1d4ed8";
+  }
+
+  async function handleAssessQuality() {
+    if (!selectedParticipant) return;
+    setLoadingQuality(true);
+    setQualityAssessment(null);
+    try {
+      const result = await assessQuality(id!, selectedParticipant.id);
+      setQualityAssessment(result);
+    } catch {
+      alert("Failed to assess interview quality");
+    } finally {
+      setLoadingQuality(false);
+    }
   }
 
   // ── P2: Filter helpers ─────────────────────────────────────────────────────
@@ -1248,11 +1268,19 @@ export default function ProjectDetail() {
                 <div className="participants-list">
                   {participants.map((p) => (
                     <div key={p.id} className={`participant-row ${selectedParticipant?.id === p.id ? "active" : ""}`} onClick={() => handleViewTranscript(p)}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                         <span className="participant-name">{p.display_name || "Anonymous"}</span>
                         <span className={`status-badge ${p.status === "completed" ? "status-done" : "status-progress"}`}>
                           {p.status === "completed" ? "Completed" : "In progress"}
                         </span>
+                        {p.quality_label && (
+                          <span className={`quality-badge quality-badge--${p.quality_label}`} title={`Response quality: ${p.quality_label} (${p.quality_score !== null && p.quality_score !== undefined ? Math.round(p.quality_score * 100) : "?"}%)`}>
+                            {p.quality_label === "low" && "⚠ Low quality"}
+                            {p.quality_label === "fair" && "◑ Fair quality"}
+                            {p.quality_label === "good" && "● Good quality"}
+                            {p.quality_label === "strong" && "★ Strong quality"}
+                          </span>
+                        )}
                         {p.profession && <span className="badge" style={{ fontSize: 11 }}>{p.profession}</span>}
                         {p.age_range && <span className="badge" style={{ fontSize: 11 }}>{p.age_range}</span>}
                       </div>
@@ -1278,6 +1306,60 @@ export default function ProjectDetail() {
                     )}
                   </div>
                   <button className="btn btn-ghost btn-sm" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }}>Close</button>
+                </div>
+
+                {/* AI Quality Assessment */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: qualityAssessment ? 12 : 0 }}>
+                    {selectedParticipant.quality_label && (
+                      <span className={`quality-badge quality-badge--${selectedParticipant.quality_label}`}>
+                        {selectedParticipant.quality_label === "low" && "⚠ Low quality"}
+                        {selectedParticipant.quality_label === "fair" && "◑ Fair quality"}
+                        {selectedParticipant.quality_label === "good" && "● Good quality"}
+                        {selectedParticipant.quality_label === "strong" && "★ Strong quality"}
+                      </span>
+                    )}
+                    <button
+                      className="btn btn-ai btn-sm"
+                      onClick={handleAssessQuality}
+                      disabled={loadingQuality}
+                    >
+                      {loadingQuality ? "Assessing…" : qualityAssessment ? "✦ Re-assess" : "✦ AI Quality Check"}
+                    </button>
+                    {qualityAssessment && (
+                      <button className="btn btn-ghost btn-xs" onClick={() => setQualityAssessment(null)}>Hide</button>
+                    )}
+                  </div>
+
+                  {qualityAssessment && (
+                    <div className="quality-panel">
+                      <div className="quality-panel-header">
+                        <span className={`quality-badge quality-badge--${qualityAssessment.quality_label} quality-badge--lg`}>
+                          {qualityAssessment.quality_label === "low" && "⚠ Low quality"}
+                          {qualityAssessment.quality_label === "fair" && "◑ Fair quality"}
+                          {qualityAssessment.quality_label === "good" && "● Good quality"}
+                          {qualityAssessment.quality_label === "strong" && "★ Strong quality"}
+                        </span>
+                        <div className="quality-stats">
+                          <span>~{qualityAssessment.avg_response_words} words/answer</span>
+                          <span>{qualityAssessment.short_answer_pct}% short answers</span>
+                        </div>
+                      </div>
+                      <p className="quality-summary">{qualityAssessment.summary}</p>
+                      {qualityAssessment.strengths.length > 0 && (
+                        <div className="quality-points quality-points--good">
+                          <strong>Strengths</strong>
+                          <ul>{qualityAssessment.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                      )}
+                      {qualityAssessment.issues.length > 0 && (
+                        <div className="quality-points quality-points--warn">
+                          <strong>Issues</strong>
+                          <ul>{qualityAssessment.issues.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {transcript.length === 0 ? (

@@ -1862,3 +1862,131 @@ select.field-input {
   font-size: 12px;
   color: #92400e;
 }
+
+/* ── Quality badges ────────────────────────────────────────────────────────── */
+
+.quality-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.quality-badge--low {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.quality-badge--fair {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.quality-badge--good {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.quality-badge--strong {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.quality-badge--lg {
+  font-size: 0.82rem;
+  padding: 4px 12px;
+}
+
+/* ── Quality panel ─────────────────────────────────────────────────────────── */
+
+.quality-panel {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quality-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quality-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.quality-summary {
+  font-size: 0.875rem;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.quality-points {
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.quality-points strong {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.quality-points ul {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.quality-points li {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.quality-points--good {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.quality-points--good strong {
+  color: #15803d;
+}
+
+.quality-points--good li {
+  color: #166534;
+}
+
+.quality-points--warn {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.quality-points--warn strong {
+  color: #b91c1c;
+}
+
+.quality-points--warn li {
+  color: #991b1b;
+}

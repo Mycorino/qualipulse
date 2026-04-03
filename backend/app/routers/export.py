@@ -19,6 +19,62 @@ from app.schemas.interview import (
 router = APIRouter(prefix="/projects", tags=["export"])
 
 
+# Filler words/phrases that indicate disengaged or low-quality responses
+_FILLERS = {
+    "yes", "no", "maybe", "ok", "okay", "sure", "fine", "idk",
+    "i don't know", "i don't care", "i dunno", "not sure", "no idea",
+    "don't know", "can't say", "cant say", "nothing", "nope", "yep", "yeah",
+    "i guess", "i suppose", "not really", "kind of", "sort of",
+}
+
+def _compute_quality(turns) -> tuple[float | None, str | None]:
+    """Return (score 0.0-1.0, label) from participant turns. Returns (None, None) if no data."""
+    responses = [
+        t.response_transcript
+        for t in turns
+        if t.response_transcript and t.response_transcript.strip()
+    ]
+    if not responses:
+        return None, None
+
+    total = 0.0
+    for text in responses:
+        words = text.lower().split()
+        wc = len(words)
+        normalized = text.lower().strip().rstrip(".!?")
+
+        is_filler = (
+            normalized in _FILLERS
+            or (wc <= 3 and any(f in normalized for f in _FILLERS))
+        )
+
+        if is_filler or wc <= 2:
+            score = 0.0
+        elif wc <= 8:
+            score = 0.2
+        elif wc <= 20:
+            score = 0.5
+        elif wc <= 50:
+            score = 0.8
+        else:
+            score = 1.0
+
+        total += score
+
+    avg = total / len(responses)
+
+    if avg < 0.25:
+        label = "low"
+    elif avg < 0.5:
+        label = "fair"
+    elif avg < 0.75:
+        label = "good"
+    else:
+        label = "strong"
+
+    return round(avg, 2), label
+
+
 @router.get("/{project_id}/participants", response_model=list[ParticipantResponse])
 def list_participants(
     project_id: str,
@@ -34,20 +90,25 @@ def list_participants(
         .all()
     )
 
-    return [
-        ParticipantResponse(
-            id=p.id,
-            display_name=p.display_name,
-            status=p.status,
-            started_at=p.started_at,
-            completed_at=p.completed_at,
-            turn_count=len(p.turns),
-            age_range=p.age_range,
-            profession=p.profession,
-            country=p.country,
+    result = []
+    for p in participants:
+        q_score, q_label = _compute_quality(p.turns)
+        result.append(
+            ParticipantResponse(
+                id=p.id,
+                display_name=p.display_name,
+                status=p.status,
+                started_at=p.started_at,
+                completed_at=p.completed_at,
+                turn_count=len(p.turns),
+                age_range=p.age_range,
+                profession=p.profession,
+                country=p.country,
+                quality_score=q_score,
+                quality_label=q_label,
+            )
         )
-        for p in participants
-    ]
+    return result
 
 
 @router.get(
@@ -77,6 +138,7 @@ def get_transcript(
 
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
 
+    q_score, q_label = _compute_quality(turns)
     return TranscriptResponse(
         participant=ParticipantResponse(
             id=participant.id,
@@ -88,6 +150,8 @@ def get_transcript(
             age_range=participant.age_range,
             profession=participant.profession,
             country=participant.country,
+            quality_score=q_score,
+            quality_label=q_label,
         ),
         turns=[
             TranscriptTurnResponse(
@@ -173,6 +237,99 @@ def export_transcripts_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/{project_id}/participants/{participant_id}/quality")
+async def ai_quality_assessment(
+    project_id: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Use Claude to produce a structured quality assessment of an interview transcript."""
+    from app.config import settings
+    import anthropic
+    import json as _json
+
+    _get_project_or_404(project_id, company.id, db)
+
+    participant = (
+        db.query(Participant)
+        .filter(Participant.id == participant_id, Participant.project_id == project_id)
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    responses = [t for t in turns if t.response_transcript]
+    if not responses:
+        raise HTTPException(status_code=400, detail="No responses to assess")
+
+    # Build transcript text
+    transcript_lines = []
+    for t in turns:
+        transcript_lines.append(f"Interviewer: {t.question_text}")
+        if t.response_transcript:
+            transcript_lines.append(f"Participant: {t.response_transcript}")
+    transcript_text = "\n".join(transcript_lines)
+
+    # Compute basic stats
+    word_counts = [len((t.response_transcript or "").split()) for t in responses]
+    avg_words = sum(word_counts) / len(word_counts) if word_counts else 0
+    short_pct = (sum(1 for wc in word_counts if wc < 10) / len(word_counts) * 100) if word_counts else 0
+
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+    prompt = f"""You are a qualitative research expert. Assess the quality of the following interview transcript.
+
+TRANSCRIPT:
+{transcript_text}
+
+STATS:
+- Total responses: {len(responses)}
+- Average words per response: {avg_words:.1f}
+- % of short responses (<10 words): {short_pct:.0f}%
+
+Evaluate the participant's engagement and response quality. Consider:
+- Are responses substantive and detailed, or superficial/evasive?
+- Does the participant give genuine, honest answers or just say yes/no/I don't care?
+- Is there emotional authenticity and personal experience in the responses?
+- Are there any red flags: repeated one-word answers, obvious disengagement, incoherent responses?
+
+Return ONLY a JSON object with this structure:
+{{
+  "quality_score": <float 0.0-1.0>,
+  "quality_label": <"low"|"fair"|"good"|"strong">,
+  "summary": "<2-3 sentences overall assessment>",
+  "strengths": ["<strength 1>", "<strength 2>"],
+  "issues": ["<issue 1>", "<issue 2>"]
+}}
+
+quality_score guide: 0.0-0.25=low, 0.25-0.5=fair, 0.5-0.75=good, 0.75-1.0=strong"""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = response.content[0].text.strip()
+    # Strip markdown fences if present
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        raw = "\n".join(lines).strip()
+
+    try:
+        result = _json.loads(raw)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to parse quality assessment")
+
+    result["avg_response_words"] = round(avg_words, 1)
+    result["short_answer_pct"] = round(short_pct, 1)
+
+    return result
 
 
 # ---------------------------------------------------------------------------

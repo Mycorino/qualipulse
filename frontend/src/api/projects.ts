@@ -85,6 +85,18 @@ export interface ParticipantResponse {
   age_range?: string | null;
   profession?: string | null;
   country?: string | null;
+  quality_score?: number | null;
+  quality_label?: string | null;
+}
+
+export interface QualityAssessment {
+  quality_score: number;
+  quality_label: string;
+  summary: string;
+  strengths: string[];
+  issues: string[];
+  avg_response_words: number;
+  short_answer_pct: number;
 }
 
 export interface TranscriptTurn {
@@ -368,4 +380,9 @@ export async function updateMemo(projectId: string, memoId: string, content: str
 
 export async function deleteMemo(projectId: string, memoId: string): Promise<void> {
   await client.delete(`/projects/${projectId}/memos/${memoId}`);
+}
+
+export async function assessQuality(projectId: string, participantId: string): Promise<QualityAssessment> {
+  const { data } = await client.post<QualityAssessment>(`/projects/${projectId}/participants/${participantId}/quality`);
+  return data;
 }

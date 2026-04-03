@@ -46,6 +46,8 @@ class ParticipantResponse(BaseModel):
     age_range: str | None = None
     profession: str | None = None
     country: str | None = None
+    quality_score: float | None = None
+    quality_label: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -66,3 +68,13 @@ class TranscriptTurnResponse(BaseModel):
 class TranscriptResponse(BaseModel):
     participant: ParticipantResponse
     turns: list[TranscriptTurnResponse] = []
+
+
+class QualityAssessment(BaseModel):
+    quality_score: float          # 0.0 - 1.0
+    quality_label: str            # "low" | "fair" | "good" | "strong"
+    summary: str                  # 2-3 sentence overall assessment
+    strengths: list[str]          # What the participant did well
+    issues: list[str]             # Problems: too brief, evasive, off-topic, etc.
+    avg_response_words: float     # Average word count per answer
+    short_answer_pct: float       # % of answers that are very short (<10 words)
