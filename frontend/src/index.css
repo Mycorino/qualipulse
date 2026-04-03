@@ -1990,3 +1990,36 @@ select.field-input {
 .quality-points--warn li {
   color: #991b1b;
 }
+
+/* ── Time remaining ─────────────────────────────────────────────────────── */
+.interview-time-remaining {
+  font-size: 13px;
+  color: var(--color-muted, #6b7280);
+  font-variant-numeric: tabular-nums;
+}
+.interview-time-remaining .time-warning { color: #d97706; font-weight: 600; }
+.interview-time-remaining .time-critical { color: #dc2626; font-weight: 600; }
+
+/* ── Resume confirm card ─────────────────────────────────────────────────── */
+.resume-confirm-card { max-width: 560px; }
+.resume-confirm-subtitle { color: #374151; margin-bottom: 20px; }
+.resume-summary-panel {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+.resume-summary-label { font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+.resume-summary-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.resume-summary-item { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: #374151; }
+.resume-summary-check { color: #22c55e; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+.resume-last-question {
+  background: #eff6ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+}
+.resume-last-label { font-size: 12px; font-weight: 600; color: #3b82f6; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.resume-last-text { font-size: 14px; color: #1e40af; font-style: italic; }

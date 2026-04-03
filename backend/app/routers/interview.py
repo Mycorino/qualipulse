@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from pydantic import BaseModel
@@ -11,6 +12,8 @@ from app.schemas.interview import (
     StartInterviewRequest,
     StartInterviewResponse,
     TurnResponse,
+    ResumeCheckResponse,
+    ResumeSummaryResponse,
 )
 from app.services.interview_engine import process_interview_turn, start_interview
 from app.services.storage import upload_audio
@@ -67,6 +70,76 @@ def validate_link(
     }
 
 
+@router.get("/{token}/resume", response_model=ResumeCheckResponse)
+def check_resume_by_email(
+    token: str,
+    email: str,
+    db: Session = Depends(get_db),
+):
+    """Check if an in-progress interview exists for this email address."""
+    link = _get_active_link_or_404(token, db)
+    participant = (
+        db.query(Participant)
+        .filter(
+            Participant.link_id == link.id,
+            Participant.email == email,
+            Participant.status == "in_progress",
+        )
+        .order_by(Participant.started_at.desc())
+        .first()
+    )
+    if not participant:
+        return ResumeCheckResponse(found=False)
+
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    last_turn = turns[-1] if turns else None
+    return ResumeCheckResponse(
+        found=True,
+        participant_id=participant.id,
+        last_question=last_turn.question_text if last_turn else None,
+        turn_count=len(turns),
+        question_index=last_turn.question_index or 0 if last_turn else 0,
+    )
+
+
+@router.get("/{token}/{participant_id}/resume-summary", response_model=ResumeSummaryResponse)
+def get_resume_summary(
+    token: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+):
+    """Return a summary of what has been covered so far for a resume flow."""
+    link = _get_active_link_or_404(token, db)
+    participant = _get_participant_or_404(participant_id, link, db)
+
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+
+    # Collect main (non-follow-up) questions that have a participant response
+    covered: list[str] = []
+    seen_q: set[int] = set()
+    for t in turns:
+        if (
+            not t.is_follow_up
+            and t.question_index is not None
+            and t.question_index not in seen_q
+            and t.response_transcript
+        ):
+            seen_q.add(t.question_index)
+            covered.append(t.question_text)
+
+    now = datetime.utcnow()
+    started = participant.started_at.replace(tzinfo=None) if participant.started_at.tzinfo else participant.started_at
+    elapsed_minutes = (now - started).total_seconds() / 60.0
+
+    last_turn = turns[-1] if turns else None
+    return ResumeSummaryResponse(
+        questions_covered=covered,
+        last_question=last_turn.question_text if last_turn else None,
+        turn_count=len(turns),
+        elapsed_minutes=round(elapsed_minutes, 1),
+    )
+
+
 @router.post("/{token}/start", response_model=StartInterviewResponse)
 def start_interview_session(
     token: str,
@@ -83,6 +156,7 @@ def start_interview_session(
         profession=body.profession if body else None,
         age_range=body.age_range if body else None,
         country=body.country if body else None,
+        email=body.email if body else None,
         status="in_progress",
     )
     db.add(participant)
@@ -127,6 +201,10 @@ async def respond_to_question(
         question_text=result["question_text"],
         tts_audio_url=result["tts_audio_url"],
         is_complete=result["is_complete"],
+        is_follow_up=result.get("is_follow_up", False),
+        question_index=result.get("question_index", 0),
+        elapsed_seconds=result.get("elapsed_seconds", 0),
+        total_seconds=result.get("total_seconds", 0),
     )
 
 

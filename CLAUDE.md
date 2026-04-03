@@ -68,13 +68,33 @@ auto-interview/
     └── package.json
 ```
 
+## Test Credentials
+
+### Demo Account
+| Field | Value |
+|---|---|
+| **Email** | `demo@autointerview.com` |
+| **Password** | `Demo1234!` |
+| **Company name** | Test Company |
+
+### Seeded Test Data
+- **Project:** "Customer Discovery — Productivity Tools" (20 min, 5 questions across 3 sections)
+- **Interview link:** `http://localhost:5173/interview/356icX4dtvHTEgVc-33b0_B1C3clMFUNIKr7A8AyA9o`
+- **3 completed participants** with full transcripts:
+  - Alice M. — Product Manager, UK
+  - Ben K. — Software Engineer, Germany
+  - Sarah L. — Freelance Designer, France
+
+> **Note:** To reset the database, stop the backend, delete `backend/auto_interview.db` and `.claude/worktrees/sleepy-cerf/backend/auto_interview.db`, restart the backend (tables auto-recreate), then re-run the seed script or register a new account.
+
 ## Dev Server Commands
 
 ### Backend
 ```bash
-cd /Users/corinofontana/Desktop/auto-interview/backend
-source .venv/bin/activate
+# The live backend runs from the worktree (keeps main repo clean during dev)
+cd /Users/corinofontana/Desktop/auto-interview/.claude/worktrees/sleepy-cerf/backend
 uvicorn app.main:app --reload --port 8000
+# Python/uvicorn comes from the system Anaconda env (/opt/anaconda3/bin/uvicorn)
 ```
 
 ### Frontend

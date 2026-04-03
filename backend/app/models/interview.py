@@ -47,6 +47,7 @@ class Participant(Base):
     age_range: Mapped[str | None] = mapped_column(String(20), nullable=True)
     profession: Mapped[str | None] = mapped_column(String(100), nullable=True)
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     status: Mapped[str] = mapped_column(
         String(20), default="in_progress", nullable=False
     )

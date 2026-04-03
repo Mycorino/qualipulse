@@ -152,10 +152,43 @@ def decide_next_action(
     questions_answered = current_question_index + 1  # 1-based count of questions reached
     remaining_minutes = max(0.0, total_minutes - elapsed_minutes)
 
-    # Decide whether "close" should even be allowed as an option.
-    # Block it unless both conditions are met:
-    #   (a) all guide questions have been covered, OR time is genuinely exhausted (>=95%)
-    #   (b) at least 80% of the allotted time has elapsed
+    # ── Pacing budget ──────────────────────────────────────────────────────
+    # How far ahead/behind are we relative to an even spread of questions?
+    if total_questions > 0 and total_minutes > 0:
+        minutes_per_question = total_minutes / total_questions
+        expected_q_index = elapsed_minutes / minutes_per_question
+        pace_delta = current_question_index - expected_q_index  # positive = ahead
+        questions_remaining = max(0, total_questions - current_question_index - 1)
+        slack_minutes = remaining_minutes - (questions_remaining * minutes_per_question)
+    else:
+        pace_delta = 0.0
+        slack_minutes = remaining_minutes
+
+    if pace_delta < -1.5:
+        pacing_instruction = (
+            "⚠️ PACING ALERT: You are significantly behind schedule. "
+            "Move to the NEXT main guide question immediately. "
+            "Do NOT ask a follow-up under any circumstances."
+        )
+    elif pace_delta < -0.5:
+        pacing_instruction = (
+            "PACING: You are slightly behind schedule. "
+            "Only ask a follow-up if the participant's answer was genuinely too brief or unclear. "
+            "Otherwise move to the next main question now."
+        )
+    elif pace_delta > 1.0:
+        pacing_instruction = (
+            "PACING: You are ahead of schedule — you have time to explore. "
+            "Feel free to ask a follow-up question if it would surface deeper insight."
+        )
+    else:
+        fu_word = "may" if slack_minutes > 0 else "should not"
+        pacing_instruction = (
+            f"PACING: You are on schedule. "
+            f"You {fu_word} ask one follow-up if it genuinely adds value, then move to the next question."
+        )
+
+    # ── Close gate ─────────────────────────────────────────────────────────
     can_close = all_questions_done or time_used_pct >= 95.0
     can_close = can_close and (time_used_pct >= 80.0)
 
@@ -195,6 +228,8 @@ CURRENT STATE:
 - Questions reached: {questions_answered} of {total_questions}
 - Elapsed time: {elapsed_minutes:.1f} / {total_minutes} minutes ({time_used_pct:.0f}% used, {remaining_minutes:.1f} min remaining)
 - All main questions covered: {all_questions_done}
+
+{pacing_instruction}
 
 Based on the conversation so far and the interview guide, decide what to do next:
 1. "follow_up" — the current topic needs more depth; ask a probing follow-up question
@@ -362,6 +397,18 @@ def process_interview_turn(
             # Force a next_question instead
             decision["action"] = "next_question"
 
+    # Server-side pace guard: if significantly behind, override follow_up to next_question
+    if decision["action"] == "follow_up":
+        elapsed = context["elapsed_minutes"]
+        total = context["total_minutes"]
+        total_q = context["total_questions"]
+        cur_q = context["current_question_index"]
+        if total_q > 0 and total > 0:
+            minutes_per_q = total / total_q
+            expected_q = elapsed / minutes_per_q
+            if (cur_q - expected_q) < -1.5:
+                decision["action"] = "next_question"
+
     action = decision["action"]
     question_text = decision["question"]
     is_complete = action == "close"
@@ -414,4 +461,8 @@ def process_interview_turn(
         "question_text": question_text,
         "tts_audio_url": tts_audio_url,
         "is_complete": is_complete,
+        "is_follow_up": is_follow_up,
+        "question_index": new_q_index,
+        "elapsed_seconds": int(context["elapsed_minutes"] * 60),
+        "total_seconds": context["total_minutes"] * 60,
     }

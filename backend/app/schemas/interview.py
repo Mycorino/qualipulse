@@ -22,6 +22,7 @@ class StartInterviewRequest(BaseModel):
     age_range: str | None = None
     profession: str | None = None
     country: str | None = None
+    email: str | None = None
 
 
 class StartInterviewResponse(BaseModel):
@@ -34,6 +35,10 @@ class TurnResponse(BaseModel):
     question_text: str
     tts_audio_url: str | None = None
     is_complete: bool
+    is_follow_up: bool = False
+    question_index: int = 0
+    elapsed_seconds: int = 0
+    total_seconds: int = 0
 
 
 class ParticipantResponse(BaseModel):
@@ -68,6 +73,20 @@ class TranscriptTurnResponse(BaseModel):
 class TranscriptResponse(BaseModel):
     participant: ParticipantResponse
     turns: list[TranscriptTurnResponse] = []
+
+
+class ResumeCheckResponse(BaseModel):
+    found: bool
+    participant_id: str | None = None
+    last_question: str | None = None
+    turn_count: int = 0
+    question_index: int = 0
+
+class ResumeSummaryResponse(BaseModel):
+    questions_covered: list[str]
+    last_question: str | None = None
+    turn_count: int
+    elapsed_minutes: float
 
 
 class QualityAssessment(BaseModel):

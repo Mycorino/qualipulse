@@ -31,6 +31,10 @@ export interface SubmitAudioResponse {
   question_text: string | null;
   tts_audio_url?: string;
   is_complete: boolean;
+  is_follow_up?: boolean;
+  question_index?: number;
+  elapsed_seconds?: number;
+  total_seconds?: number;
 }
 
 export async function getInterviewInfo(
@@ -47,6 +51,7 @@ export interface StartInterviewParams {
   profession?: string;
   ageRange?: string;
   country?: string;
+  email?: string;
 }
 
 export async function startInterview(
@@ -60,6 +65,7 @@ export async function startInterview(
       profession: params.profession || undefined,
       age_range: params.ageRange || undefined,
       country: params.country || undefined,
+      email: params.email || undefined,
     }
   );
   return data;
@@ -88,5 +94,30 @@ export async function submitAudio(
     form,
     { headers: { "Content-Type": "multipart/form-data" } }
   );
+  return data;
+}
+
+export interface ResumeCheck {
+  found: boolean;
+  participant_id?: string;
+  last_question?: string;
+  turn_count?: number;
+  question_index?: number;
+}
+
+export interface ResumeSummary {
+  questions_covered: string[];
+  last_question?: string;
+  turn_count: number;
+  elapsed_minutes: number;
+}
+
+export async function checkResume(token: string, email: string): Promise<ResumeCheck> {
+  const { data } = await client.get<ResumeCheck>(`/interview/${token}/resume`, { params: { email } });
+  return data;
+}
+
+export async function getResumeSummary(token: string, participantId: string): Promise<ResumeSummary> {
+  const { data } = await client.get<ResumeSummary>(`/interview/${token}/${participantId}/resume-summary`);
   return data;
 }
