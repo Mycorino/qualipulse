@@ -151,6 +151,7 @@ def update_project(
     project.language = body.language
     project.interview_duration_minutes = body.interview_duration_minutes
     project.research_objective = body.research_objective or None
+    project.welcome_message = body.welcome_message or None
     if body.system_prompt is not None:
         project.system_prompt = body.system_prompt
 
@@ -223,6 +224,10 @@ def patch_question(
 
     if body.researcher_notes is not None:
         question.researcher_notes = body.researcher_notes
+    if body.interview_notes is not None:
+        question.interview_notes = body.interview_notes
+    if body.desired_learning is not None:
+        question.desired_learning = body.desired_learning
     # Allow setting deprecated_at to a value or clearing it (None = un-deprecate)
     if "deprecated_at" in body.model_fields_set:
         question.deprecated_at = body.deprecated_at
@@ -291,6 +296,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
         interview_duration_minutes=project.interview_duration_minutes,
         system_prompt=project.system_prompt,
         research_objective=project.research_objective,
+        welcome_message=project.welcome_message,
         created_at=project.created_at,
         questions=questions,
         screening_questions=screening,

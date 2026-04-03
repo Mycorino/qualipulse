@@ -22,6 +22,7 @@ class StartInterviewRequest(BaseModel):
     age_range: str | None = None
     profession: str | None = None
     country: str | None = None
+    email: str | None = None
 
 
 class StartInterviewResponse(BaseModel):
@@ -34,6 +35,10 @@ class TurnResponse(BaseModel):
     question_text: str
     tts_audio_url: str | None = None
     is_complete: bool
+    is_follow_up: bool = False
+    question_index: int = 0
+    elapsed_seconds: int = 0
+    total_seconds: int = 0
 
 
 class ParticipantResponse(BaseModel):
@@ -46,6 +51,8 @@ class ParticipantResponse(BaseModel):
     age_range: str | None = None
     profession: str | None = None
     country: str | None = None
+    quality_score: float | None = None
+    quality_label: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -66,3 +73,27 @@ class TranscriptTurnResponse(BaseModel):
 class TranscriptResponse(BaseModel):
     participant: ParticipantResponse
     turns: list[TranscriptTurnResponse] = []
+
+
+class ResumeCheckResponse(BaseModel):
+    found: bool
+    participant_id: str | None = None
+    last_question: str | None = None
+    turn_count: int = 0
+    question_index: int = 0
+
+class ResumeSummaryResponse(BaseModel):
+    questions_covered: list[str]
+    last_question: str | None = None
+    turn_count: int
+    elapsed_minutes: float
+
+
+class QualityAssessment(BaseModel):
+    quality_score: float          # 0.0 - 1.0
+    quality_label: str            # "low" | "fair" | "good" | "strong"
+    summary: str                  # 2-3 sentence overall assessment
+    strengths: list[str]          # What the participant did well
+    issues: list[str]             # Problems: too brief, evasive, off-topic, etc.
+    avg_response_words: float     # Average word count per answer
+    short_answer_pct: float       # % of answers that are very short (<10 words)

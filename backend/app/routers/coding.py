@@ -76,6 +76,36 @@ def create_code(
     return _code_to_dict(code, db)
 
 
+class CodePatch(BaseModel):
+    name: str | None = None
+    color: str | None = None
+
+
+@router.patch("/{project_id}/codes/{code_id}")
+def rename_code(
+    project_id: str,
+    code_id: str,
+    body: CodePatch,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    _get_project_or_404(project_id, company.id, db)
+    code = (
+        db.query(ManualCode)
+        .filter(ManualCode.id == code_id, ManualCode.project_id == project_id)
+        .first()
+    )
+    if code is None:
+        raise HTTPException(status_code=404, detail="Code not found")
+    if body.name is not None:
+        code.name = body.name.strip()
+    if body.color is not None:
+        code.color = body.color
+    db.commit()
+    db.refresh(code)
+    return _code_to_dict(code, db)
+
+
 @router.delete("/{project_id}/codes/{code_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_code(
     project_id: str,

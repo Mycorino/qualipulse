@@ -6,8 +6,12 @@ import {
   submitScreening,
   startInterview,
   submitAudio,
+  checkResume,
+  getResumeSummary,
   InterviewInfo,
   ScreeningQuestion,
+  ResumeCheck,
+  ResumeSummary,
 } from "../api/interviews";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
@@ -21,6 +25,7 @@ export default function Interview() {
   const [profession, setProfession] = useState("");
   const [ageRange, setAgeRange] = useState("");
   const [country, setCountry] = useState("");
+  const [email, setEmail] = useState("");
   const [participantId, setParticipantId] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -29,6 +34,15 @@ export default function Interview() {
   const [muted, setMuted] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
   const [infoLoading, setInfoLoading] = useState(true);
+  const [consentGiven, setConsentGiven] = useState(false);
+  const [consentDeclined, setConsentDeclined] = useState(false);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [isFollowUp, setIsFollowUp] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [totalSeconds, setTotalSeconds] = useState(0);
+  const [resumeCheck, setResumeCheck] = useState<ResumeCheck | null>(null);
+  const [resumeSummary, setResumeSummary] = useState<ResumeSummary | null>(null);
+  const [loadingResumeSummary, setLoadingResumeSummary] = useState(false);
 
   // Screening state
   const [screeningQuestions, setScreeningQuestions] = useState<ScreeningQuestion[]>([]);
@@ -50,6 +64,15 @@ export default function Interview() {
       .finally(() => setInfoLoading(false));
   }, [token]);
 
+  // Live countdown timer during interview
+  useEffect(() => {
+    if (phase !== "interview" || totalSeconds === 0) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds((s) => Math.min(s + 1, totalSeconds));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase, totalSeconds]);
+
   // Play TTS audio
   const playTTS = useCallback(
     (url: string) => {
@@ -66,18 +89,54 @@ export default function Interview() {
     [muted]
   );
 
+  const sessionKey = token ? `interview_${token}` : null;
+
+  function saveSession(pid: string, question: string, turn: number) {
+    if (!sessionKey) return;
+    sessionStorage.setItem(sessionKey, JSON.stringify({ participantId: pid, currentQuestion: question, turnCount: turn }));
+  }
+
+  function clearSession() {
+    if (sessionKey) sessionStorage.removeItem(sessionKey);
+  }
+
+  function getSavedSession(): { participantId: string; currentQuestion: string; turnCount: number } | null {
+    if (!sessionKey) return null;
+    try {
+      const raw = sessionStorage.getItem(sessionKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
   async function doStartInterview() {
     const res = await startInterview(token!, {
       displayName: displayName || undefined,
       profession: profession || undefined,
       ageRange: ageRange || undefined,
       country: country || undefined,
+      email: email || undefined,
     });
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
     setTurnCount(1);
+    setQuestionIndex(0);
+    setIsFollowUp(false);
+    // Init timing from info
+    const total = (info?.interview_duration_minutes ?? 0) * 60;
+    setTotalSeconds(total);
+    setElapsedSeconds(0);
+    saveSession(res.participant_id, res.first_question, 1);
     setPhase("interview");
     if (res.tts_audio_url) playTTS(res.tts_audio_url);
+  }
+
+  function handleResumeSession() {
+    const saved = getSavedSession();
+    if (!saved) return;
+    setParticipantId(saved.participantId);
+    setCurrentQuestion(saved.currentQuestion);
+    setTurnCount(saved.turnCount);
+    setPhase("interview");
   }
 
   async function handleStart() {
@@ -85,6 +144,23 @@ export default function Interview() {
     setStarting(true);
     setError("");
     try {
+      // Check for email-based resume first
+      if (email.trim()) {
+        const resume = await checkResume(token, email.trim());
+        if (resume.found && resume.participant_id) {
+          setResumeCheck(resume);
+          // Fetch summary
+          setLoadingResumeSummary(true);
+          try {
+            const summary = await getResumeSummary(token, resume.participant_id);
+            setResumeSummary(summary);
+          } catch { /* summary optional */ }
+          finally { setLoadingResumeSummary(false); }
+          setStarting(false);
+          return; // Show resume dialog instead of starting
+        }
+      }
+      // No resume found — proceed normally
       const questions = await getScreeningQuestions(token);
       if (questions.length > 0) {
         setScreeningQuestions(questions);
@@ -99,6 +175,22 @@ export default function Interview() {
     } finally {
       setStarting(false);
     }
+  }
+
+  async function handleConfirmResume() {
+    if (!resumeCheck?.participant_id) return;
+    setParticipantId(resumeCheck.participant_id);
+    setCurrentQuestion(resumeCheck.last_question ?? "");
+    setTurnCount(resumeCheck.turn_count ?? 1);
+    setQuestionIndex(resumeCheck.question_index ?? 0);
+    const total = (info?.interview_duration_minutes ?? 0) * 60;
+    setTotalSeconds(total);
+    const alreadyElapsed = (resumeSummary?.elapsed_minutes ?? 0) * 60;
+    setElapsedSeconds(Math.min(alreadyElapsed, total));
+    saveSession(resumeCheck.participant_id, resumeCheck.last_question ?? "", resumeCheck.turn_count ?? 1);
+    setResumeCheck(null);
+    setResumeSummary(null);
+    setPhase("interview");
   }
 
   async function handleScreeningAnswer(questionId: string, answer: string) {
@@ -132,14 +224,19 @@ export default function Interview() {
       const blob = await stopRecording();
       const res = await submitAudio(token, participantId, blob);
       if (res.is_complete) {
+        clearSession();
         setPhase("complete");
         if (audioRef.current) audioRef.current.pause();
       } else if (res.question_text) {
+        const nextTurn = turnCount + 1;
         setCurrentQuestion(res.question_text);
-        setTurnCount((c) => c + 1);
-        if (res.tts_audio_url) {
-          playTTS(res.tts_audio_url);
-        }
+        setTurnCount(nextTurn);
+        setQuestionIndex(res.question_index ?? questionIndex);
+        setIsFollowUp(res.is_follow_up ?? false);
+        if (res.elapsed_seconds !== undefined) setElapsedSeconds(res.elapsed_seconds);
+        if (res.total_seconds !== undefined && res.total_seconds > 0) setTotalSeconds(res.total_seconds);
+        saveSession(participantId, res.question_text, nextTurn);
+        if (res.tts_audio_url) playTTS(res.tts_audio_url);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong. Please try recording again.";
@@ -180,13 +277,77 @@ export default function Interview() {
     );
   }
 
+  /* ---- Consent declined ---- */
+  if (consentDeclined) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-complete">
+          <h1 className="interview-complete-title">No problem</h1>
+          <p className="interview-complete-text">
+            You can close this page. Your participation is entirely voluntary — thank you for your time.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (phase === "landing" && info) {
+    const savedSession = getSavedSession();
+    /* ---- Consent overlay ---- */
+    if (!consentGiven) {
+      return (
+        <div className="interview-page">
+          <div className="interview-container consent-card">
+            <h1 className="consent-title">Before you begin</h1>
+            <p className="consent-project">{info.project_name}</p>
+            <div className="consent-body">
+              <p>By participating in this study you agree to the following:</p>
+              <ul className="consent-list">
+                <li>Your voice will be <strong>recorded and transcribed</strong> by AI.</li>
+                <li>Your responses will be reviewed by the research team.</li>
+                <li>Participation is <strong>voluntary</strong> — you may stop at any time.</li>
+                <li>Your data will be stored securely and used only for research purposes.</li>
+              </ul>
+              {info.interview_duration_minutes && (
+                <p className="consent-duration">This interview takes approximately <strong>{info.interview_duration_minutes} minutes</strong>.</p>
+              )}
+            </div>
+            <div className="consent-actions">
+              <button className="btn btn-primary" onClick={() => setConsentGiven(true)}>
+                I agree — continue
+              </button>
+              <button className="btn btn-ghost" onClick={() => setConsentDeclined(true)}>
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="interview-page">
         <div className="interview-container interview-landing">
           <h1 className="interview-project-name">{info.project_name}</h1>
           {info.welcome_message && (
             <p className="interview-welcome">{info.welcome_message}</p>
+          )}
+          {info.interview_duration_minutes && (
+            <p className="interview-duration">
+              ⏱ Approximately {info.interview_duration_minutes} minutes
+            </p>
+          )}
+          {savedSession && (
+            <div className="resume-banner">
+              <div>
+                <strong>Resume your interview</strong>
+                <p>You have an interview in progress (question {savedSession.turnCount}).</p>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <button className="btn btn-primary btn-sm" onClick={handleResumeSession}>Resume →</button>
+                <button className="btn btn-ghost btn-sm" onClick={clearSession}>Start over</button>
+              </div>
+            </div>
           )}
           <p className="interview-instructions">
             You will be asked a series of questions. For each question, hold the
@@ -252,6 +413,19 @@ export default function Interview() {
             />
           </div>
 
+          <div className="interview-name-field">
+            <label className="field-label">
+              Your email <span className="optional-tag">(optional — to resume later)</span>
+            </label>
+            <input
+              type="email"
+              className="field-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
+          </div>
+
           {error && <div className="error-banner">{error}</div>}
 
           <button
@@ -269,7 +443,7 @@ export default function Interview() {
   /* ---- Screening Phase ---- */
   if (phase === "screening") {
     const sq = screeningQuestions[screeningStep];
-    const progress = (screeningStep / screeningQuestions.length) * 100;
+    const progress = ((screeningStep + 1) / screeningQuestions.length) * 100;
     return (
       <div className="interview-page">
         <div className="interview-container interview-profiling">
@@ -296,6 +470,14 @@ export default function Interview() {
             </div>
           </div>
           {error && <div className="error-banner">{error}</div>}
+          {screeningStep > 0 && !screeningLoading && (
+            <button
+              className="profiling-back-btn"
+              onClick={() => setScreeningStep((s) => s - 1)}
+            >
+              ← Back
+            </button>
+          )}
         </div>
       </div>
     );
@@ -328,36 +510,134 @@ export default function Interview() {
     );
   }
 
+  /* ---- Resume Confirm Phase ---- */
+  if (resumeCheck?.found && resumeCheck.participant_id) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container resume-confirm-card">
+          <h1 className="consent-title">Welcome back!</h1>
+          <p className="resume-confirm-subtitle">
+            You have an interview in progress for <strong>{info?.project_name}</strong>.
+          </p>
+
+          {loadingResumeSummary ? (
+            <p className="muted-text">Loading your progress...</p>
+          ) : resumeSummary && resumeSummary.questions_covered.length > 0 ? (
+            <div className="resume-summary-panel">
+              <p className="resume-summary-label">Topics you've covered so far:</p>
+              <ul className="resume-summary-list">
+                {resumeSummary.questions_covered.map((q, i) => (
+                  <li key={i} className="resume-summary-item">
+                    <span className="resume-summary-check">✓</span>
+                    <span>{q}</span>
+                  </li>
+                ))}
+              </ul>
+              {resumeSummary.elapsed_minutes > 0 && (
+                <p className="muted-text" style={{ marginTop: 8, fontSize: 13 }}>
+                  {Math.round(resumeSummary.elapsed_minutes)} minutes in
+                  {info?.interview_duration_minutes ? ` of ${info.interview_duration_minutes}` : ""}
+                </p>
+              )}
+            </div>
+          ) : null}
+
+          {resumeCheck.last_question && (
+            <div className="resume-last-question">
+              <p className="resume-last-label">Pick up where you left off:</p>
+              <p className="resume-last-text">"{resumeCheck.last_question}"</p>
+            </div>
+          )}
+
+          <div className="consent-actions">
+            <button className="btn btn-primary" onClick={handleConfirmResume}>
+              Continue my interview →
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={async () => {
+                setResumeCheck(null);
+                setResumeSummary(null);
+                // Start fresh
+                try {
+                  const questions = await getScreeningQuestions(token!);
+                  if (questions.length > 0) {
+                    setScreeningQuestions(questions);
+                    setScreeningStep(0);
+                    setScreeningAnswers({});
+                    setPhase("screening");
+                  } else {
+                    await doStartInterview();
+                  }
+                } catch {
+                  setError("Failed to start interview. Please try again.");
+                }
+              }}
+            >
+              Start a new interview
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   /* ---- Interview Phase ---- */
   if (phase === "interview") {
     return (
       <div className="interview-page">
         <div className="interview-container interview-active">
           {/* Progress */}
+          {info?.question_count && info.question_count > 0 && (
+            <div className="interview-progress-bar-wrap">
+              <div
+                className="interview-progress-bar-fill"
+                style={{ width: `${Math.min(((questionIndex) / info.question_count) * 100, 95)}%` }}
+              />
+            </div>
+          )}
           <div className="interview-progress">
-            <span className="interview-turn-count">Question {turnCount}</span>
-            <button
-              className={`mute-btn ${muted ? "muted" : ""}`}
-              onClick={toggleMute}
-              title={muted ? "Unmute" : "Mute"}
-            >
-              {muted ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                  <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                  <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.36 2.18" />
-                  <line x1="12" y1="19" x2="12" y2="23" />
-                  <line x1="8" y1="23" x2="16" y2="23" />
-                </svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="23" />
-                  <line x1="8" y1="23" x2="16" y2="23" />
-                </svg>
+            <span className="interview-turn-count">
+              {isFollowUp
+                ? `Follow-up · Q${questionIndex + 1} of ${info?.question_count ?? "?"}`
+                : `Q${questionIndex + 1} of ${info?.question_count ?? "?"}`}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {totalSeconds > 0 && (
+                <span className="interview-time-remaining">
+                  {(() => {
+                    const remaining = Math.max(0, totalSeconds - elapsedSeconds);
+                    const mins = Math.floor(remaining / 60);
+                    const secs = remaining % 60;
+                    const pct = elapsedSeconds / totalSeconds;
+                    const cls = pct > 0.9 ? "time-critical" : pct > 0.75 ? "time-warning" : "";
+                    return <span className={cls}>{mins > 0 ? `~${mins} min left` : `${secs}s left`}</span>;
+                  })()}
+                </span>
               )}
-            </button>
+              <button
+                className={`mute-btn ${muted ? "muted" : ""}`}
+                onClick={toggleMute}
+                title={muted ? "Unmute" : "Mute"}
+              >
+                {muted ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.36 2.18" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="8" y1="23" x2="16" y2="23" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="8" y1="23" x2="16" y2="23" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Question */}
@@ -366,9 +646,28 @@ export default function Interview() {
           </div>
 
           {/* Error */}
-          {(error || recError) && (
-            <div className="error-banner">{error || recError}</div>
-          )}
+          {error && <div className="error-banner">{error}</div>}
+          {recError === "PERMISSION_DENIED" ? (
+            <div className="mic-permission-error">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="1" y1="1" x2="23" y2="23" />
+                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.36 2.18" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+              <h3 className="mic-permission-title">Microphone access denied</h3>
+              <p className="mic-permission-text">
+                This interview requires microphone access to record your answers.
+                Please allow microphone access in your browser, then refresh the page.
+              </p>
+              <button className="btn btn-primary" onClick={() => window.location.reload()}>
+                Refresh &amp; try again
+              </button>
+            </div>
+          ) : recError ? (
+            <div className="error-banner">{recError}</div>
+          ) : null}
 
           {/* Recording UI */}
           <div className="interview-controls">

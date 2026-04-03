@@ -15,6 +15,8 @@ class QuestionCreate(BaseModel):
 class QuestionPatch(BaseModel):
     researcher_notes: str | None = None
     deprecated_at: datetime | None = None
+    interview_notes: str | None = None
+    desired_learning: str | None = None
 
 
 class ScreeningQuestionCreate(BaseModel):
@@ -39,6 +41,7 @@ class ProjectCreate(BaseModel):
     interview_duration_minutes: int = 20
     system_prompt: str | None = None
     research_objective: str | None = None
+    welcome_message: str | None = None
     questions: list[QuestionCreate] = []
     screening_questions: list[ScreeningQuestionCreate] = []
 
@@ -65,6 +68,7 @@ class ProjectResponse(BaseModel):
     interview_duration_minutes: int
     system_prompt: str | None = None
     research_objective: str | None = None
+    welcome_message: str | None = None
     created_at: datetime
     questions: list[QuestionResponse] = []
     screening_questions: list[ScreeningQuestionResponse] = []
