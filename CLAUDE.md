@@ -192,10 +192,10 @@ Claude decides after each response whether to:
 - [x] Subscription tier model with feature gates (free/starter/pro/enterprise)
 - [x] Stripe Checkout + Customer Portal + webhook handler (needs Stripe keys)
 - [x] Usage fields on Company model (`interview_count`, `storage_bytes`) — not yet incremented
+- [x] Profile save + change password in AccountSettings UI (PATCH /auth/me, POST /auth/change-password)
+- [x] Analysis-ready email (triggered after AI synthesis completes)
 - [ ] Usage limits enforcement (gate functions exist but not called on create endpoints)
-- [ ] Wire profile save + change password in AccountSettings UI
 - [ ] Email invitation sending (template exists, no send endpoint)
-- [ ] Analysis-ready email (template exists, trigger not wired)
 - [ ] Multi-language TTS voices (language field exists on projects)
 - [ ] Dashboard-level analytics across projects
 - [ ] Free trial period (14-day; `trial_ends_at` field exists on Company)
@@ -212,13 +212,13 @@ Claude decides after each response whether to:
 - [x] Live time remaining countdown with warning/critical colour states
 - [x] Mic permission error UI with refresh prompt
 - [x] Mute TTS button
-- [x] Skip question — backend endpoint done; UI button not yet wired in Interview.tsx
-- [x] Completion screen
-- [ ] Mic test (level meter) before first question
-- [ ] Re-record before submitting (preview state with Submit / Re-record)
-- [ ] Retry on network error (resubmit same blob)
-- [ ] TTS "done" signal before enabling record button
-- [ ] Processing step messages (Transcribing → Thinking…)
-- [ ] Recording time limit with countdown
-- [ ] Personalised completion screen (name, answer count, next steps)
+- [x] Skip question (backend + UI button)
+- [x] Mic test with AudioContext level meter (auto-pass on speech, manual skip)
+- [x] Re-record before submitting (preview state with Submit / ↺ Re-record)
+- [x] Retry on network error (blob preserved in lastBlobRef, resubmit without re-recording)
+- [x] TTS "done" signal gates record button (disabled during playback)
+- [x] Processing step messages (Transcribing → Thinking → Preparing next question)
+- [x] 3-minute recording time limit with countdown (last 30s in red, auto-stop)
+- [x] Personalised completion screen (name, answer count, "What happens next?" section)
+- [x] Transcript flash (4s display of transcribed answer after submit)
 - [ ] Participant completion email
