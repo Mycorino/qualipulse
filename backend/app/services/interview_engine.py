@@ -98,7 +98,17 @@ def get_interview_context(
     asked_indices = {t.question_index for t in turns if t.question_index is not None}
     current_question_index = max(asked_indices) if asked_indices else 0
 
-    all_questions_done = current_question_index >= total_questions - 1 if total_questions > 0 else True
+    # all_questions_done is True only when the last guide question has been both
+    # asked AND has a participant response (i.e. it's been answered, not just reached).
+    last_index = total_questions - 1
+    if total_questions == 0:
+        all_questions_done = True
+    elif current_question_index < last_index:
+        all_questions_done = False
+    else:
+        # We are on (or past) the last question — check it has a response
+        last_q_turns = [t for t in turns if t.question_index == last_index]
+        all_questions_done = any(t.response_transcript for t in last_q_turns)
 
     # Use naive UTC to match SQLite-stored timestamps (no tzinfo)
     now = datetime.utcnow()
@@ -128,6 +138,7 @@ def decide_next_action(
     elapsed_minutes: float,
     total_minutes: int,
     all_questions_done: bool,
+    total_questions: int = 0,
     research_objective: str | None = None,
 ) -> dict:
     """Call Claude to decide the next interview action.
@@ -135,6 +146,28 @@ def decide_next_action(
     Returns a dict with keys: action ("follow_up"|"next_question"|"close"), question (str)
     """
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+    # Compute how much of the allotted time has been used and questions answered
+    time_used_pct = (elapsed_minutes / total_minutes * 100) if total_minutes > 0 else 100
+    questions_answered = current_question_index + 1  # 1-based count of questions reached
+    remaining_minutes = max(0.0, total_minutes - elapsed_minutes)
+
+    # Decide whether "close" should even be allowed as an option.
+    # Block it unless both conditions are met:
+    #   (a) all guide questions have been covered, OR time is genuinely exhausted (>=95%)
+    #   (b) at least 80% of the allotted time has elapsed
+    can_close = all_questions_done or time_used_pct >= 95.0
+    can_close = can_close and (time_used_pct >= 80.0)
+
+    if can_close:
+        close_instruction = '3. "close" — the interview is complete (all questions covered and/or time is up); wrap up warmly'
+    else:
+        close_instruction = (
+            '3. "close" — NOT available yet. '
+            f'Only {elapsed_minutes:.1f} of {total_minutes} minutes have elapsed '
+            f'({questions_answered} of {total_questions} questions reached). '
+            'Keep the conversation going.'
+        )
 
     objective_block = ""
     if research_objective:
@@ -159,14 +192,14 @@ CONVERSATION SO FAR:
 {conversation_history}
 
 CURRENT STATE:
-- Current question index: {current_question_index}
-- Elapsed time: {elapsed_minutes:.1f} minutes out of {total_minutes} minutes total
+- Questions reached: {questions_answered} of {total_questions}
+- Elapsed time: {elapsed_minutes:.1f} / {total_minutes} minutes ({time_used_pct:.0f}% used, {remaining_minutes:.1f} min remaining)
 - All main questions covered: {all_questions_done}
 
 Based on the conversation so far and the interview guide, decide what to do next:
-1. "follow_up" — if the current topic needs more exploration, ask a follow-up question
-2. "next_question" — if the current topic is well-explored, move to the next main question (rephrase it naturally based on the conversation context)
-3. "close" — if all questions are explored and time is up (or nearly up), close the interview warmly
+1. "follow_up" — the current topic needs more depth; ask a probing follow-up question
+2. "next_question" — the current topic is well-explored; move to the next main guide question (rephrase naturally)
+{close_instruction}
 
 Return ONLY a JSON object: {{"action": "follow_up" or "next_question" or "close", "question": "your question text"}}"""
 
@@ -315,8 +348,19 @@ def process_interview_turn(
         elapsed_minutes=context["elapsed_minutes"],
         total_minutes=context["total_minutes"],
         all_questions_done=context["all_questions_done"],
+        total_questions=context["total_questions"],
         research_objective=context["project"].research_objective,
     )
+
+    # Server-side safety guard: override a premature "close" decision.
+    # Claude can only close if 80% of the time has elapsed OR all questions are done.
+    if decision["action"] == "close":
+        elapsed = context["elapsed_minutes"]
+        total = context["total_minutes"]
+        time_used_pct = (elapsed / total * 100) if total > 0 else 100
+        if not context["all_questions_done"] and time_used_pct < 80.0:
+            # Force a next_question instead
+            decision["action"] = "next_question"
 
     action = decision["action"]
     question_text = decision["question"]
