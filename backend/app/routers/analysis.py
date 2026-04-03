@@ -58,6 +58,16 @@ def trigger_analysis(
             logger.info("Analysis started for project %s", project_id)
             run_analysis(project_id, db, filter_by, filter_values)
             logger.info("Analysis completed for project %s", project_id)
+            # Notify company that analysis is ready
+            try:
+                from app.models.project import Project as ProjectModel
+                from app.services.email import send_analysis_ready
+                proj = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+                if proj and proj.company:
+                    project_url = f"https://app.autointerview.com/projects/{project_id}?tab=analysis"
+                    send_analysis_ready(proj.company.email, proj.name, project_url)
+            except Exception:
+                pass
         except Exception as exc:
             logger.error("Analysis failed for project %s: %s", project_id, exc, exc_info=True)
             try:

@@ -35,6 +35,7 @@ export interface SubmitAudioResponse {
   question_index?: number;
   elapsed_seconds?: number;
   total_seconds?: number;
+  transcript?: string;
 }
 
 export async function getInterviewInfo(
@@ -119,5 +120,15 @@ export async function checkResume(token: string, email: string): Promise<ResumeC
 
 export async function getResumeSummary(token: string, participantId: string): Promise<ResumeSummary> {
   const { data } = await client.get<ResumeSummary>(`/interview/${token}/${participantId}/resume-summary`);
+  return data;
+}
+
+export async function skipQuestion(
+  token: string,
+  participantId: string
+): Promise<SubmitAudioResponse> {
+  const { data } = await client.post<SubmitAudioResponse>(
+    `/interview/${token}/${participantId}/skip`
+  );
   return data;
 }

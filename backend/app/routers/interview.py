@@ -16,7 +16,7 @@ from app.schemas.interview import (
     ResumeCheckResponse,
     ResumeSummaryResponse,
 )
-from app.services.interview_engine import process_interview_turn, start_interview
+from app.services.interview_engine import process_interview_turn, start_interview, skip_question as engine_skip_question
 from app.services.storage import upload_audio
 
 router = APIRouter(prefix="/interview", tags=["interview"])
@@ -223,6 +223,33 @@ async def respond_to_question(
     upload_audio(audio_data, audio_key)
 
     result = process_interview_turn(participant_id, audio_key, db)
+
+    return TurnResponse(
+        question_text=result["question_text"],
+        tts_audio_url=result["tts_audio_url"],
+        is_complete=result["is_complete"],
+        is_follow_up=result.get("is_follow_up", False),
+        question_index=result.get("question_index", 0),
+        elapsed_seconds=result.get("elapsed_seconds", 0),
+        total_seconds=result.get("total_seconds", 0),
+    )
+
+
+@router.post("/{token}/{participant_id}/skip")
+async def skip_question(
+    request: Request,
+    token: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+):
+    """Skip the current question and advance to the next one."""
+    link = _get_active_link_or_404(token, db)
+    participant = _get_participant_or_404(participant_id, link, db)
+
+    if participant.status == "completed":
+        raise HTTPException(status_code=400, detail="Interview already completed")
+
+    result = engine_skip_question(participant_id, db)
 
     return TurnResponse(
         question_text=result["question_text"],

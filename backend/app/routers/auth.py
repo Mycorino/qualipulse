@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -134,3 +135,42 @@ def confirm_password_reset(body: PasswordResetConfirm, db: Session = Depends(get
 @router.get("/me", response_model=CompanyResponse)
 def get_me(company: Company = Depends(get_current_company)) -> CompanyResponse:
     return CompanyResponse.model_validate(company)
+
+
+class ProfileUpdate(BaseModel):
+    name: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.patch("/me")
+def update_profile(
+    body: ProfileUpdate,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Update the authenticated company's display name."""
+    company.name = body.name.strip()
+    db.commit()
+    return {"id": company.id, "name": company.name, "email": company.email}
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePasswordRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Change password — requires current password verification."""
+    if not verify_password(body.current_password, company.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+    company.password_hash = hash_password(body.new_password)
+    db.commit()
+    logger.info("Password changed for %s", company.email)
+    return {"message": "Password updated successfully"}

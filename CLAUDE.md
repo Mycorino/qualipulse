@@ -167,28 +167,58 @@ Claude decides after each response whether to:
 ## Feature Status
 
 ### Researcher (Company) Side
-- [x] Signup / login (JWT)
+- [x] Signup / login (JWT) with refresh token + auto-refresh on 401
+- [x] Password reset flow (ForgotPassword + ResetPassword pages; console email in dev)
 - [x] Project creation wizard (4 steps: Brief → Objective → Scope → Questionnaire)
-- [x] AI-assisted objective, scope, and question generation
+- [x] AI brief parsing from text and uploaded files (`/research/parse-brief`)
+- [x] AI-suggested research objective, learning goals, scope, and full interview guide
 - [x] CSV import/export for interview guides
-- [x] Shareable interview links (UUID tokens), multiple per project
-- [x] Screening questions with disqualifying options (Setup tab + wizard)
+- [x] Shareable interview links (UUID tokens), multiple per project, toggle active/inactive
+- [x] Screening questions with disqualifying options (Setup tab inline editor + wizard)
+- [x] Per-question notes, desired learning, deprecation (Setup tab)
+- [x] Welcome message and system prompt editing per project
 - [x] Overview tab: participant stats, completion rate, link management
-- [x] Setup tab: screening question editor, interview guide with Note/Deprecate per question
-- [x] Responses tab: participant list with status/demographics, transcript viewer
-- [x] Transcript editing (manual corrections, saved to DB)
-- [x] Quote tagging + codebook (select text → assign code → view in codebook panel)
-- [x] Analysis tab: AI-generated summary, key themes, JTBDs, tensions, recommendations
-- [x] Memos (+ Note inline on themes/JTBDs/tensions, general notes section)
-- [x] Segment heatmap (profession / age_range / country breakdowns)
-- [x] Export CSV (participants + transcript turns)
-- [ ] Email invitation sending
-- [ ] Multi-language TTS voices
+- [x] Responses tab: participant list with status, demographics, quality badges
+- [x] Transcript viewer with full turn-by-turn display
+- [x] Transcript editing (manual corrections, `manually_edited` flag, saved to DB)
+- [x] Quote tagging + codebook (select text → assign code → codebook panel)
+- [x] Analysis tab: AI-generated summary, key themes (with quotes), JTBDs, tensions, recommendations
+- [x] Analysis filtering by demographic segment (profession / age_range / country)
+- [x] Project memos (general, theme/JTBD/tension-linked) with full CRUD
+- [x] Segment heatmap (profession / age_range / country vs themes)
+- [x] AI quality assessment per participant (Claude-scored, structured result)
+- [x] Export CSV (participants + all transcript turns, streaming response)
+- [x] Account & billing settings page (Profile tab + Plan & Billing tab)
+- [x] Subscription tier model with feature gates (free/starter/pro/enterprise)
+- [x] Stripe Checkout + Customer Portal + webhook handler (needs Stripe keys)
+- [x] Usage fields on Company model (`interview_count`, `storage_bytes`) — not yet incremented
+- [x] Profile save + change password in AccountSettings UI (PATCH /auth/me, POST /auth/change-password)
+- [x] Analysis-ready email (triggered after AI synthesis completes)
+- [ ] Usage limits enforcement (gate functions exist but not called on create endpoints)
+- [ ] Email invitation sending (template exists, no send endpoint)
+- [ ] Multi-language TTS voices (language field exists on projects)
 - [ ] Dashboard-level analytics across projects
+- [ ] Free trial period (14-day; `trial_ends_at` field exists on Company)
 
 ### Participant Side
-- [x] Interview landing page (name + profession + age range + country)
-- [x] Screening questions phase (styled, progress bar, disqualification flow)
+- [x] Consent screen (decline → thank-you, no record created)
+- [x] Interview landing page (name, profession, age range, country, email — all optional)
+- [x] Email-based interview resume (cross-device, shows covered topics + elapsed time)
+- [x] Session-storage resume (same device/tab, survives page reload)
+- [x] Screening questions phase (one at a time, progress bar, back button, disqualification flow)
 - [x] Voice interview (record → STT → Claude → TTS)
-- [x] Adaptive follow-ups via Claude
-- [x] Completion screen
+- [x] Adaptive follow-ups via Claude (`follow_up` / `next_question` / `close`)
+- [x] Interview progress label (Q1 of 5 / Follow-up · Q2 of 5) + progress bar fill
+- [x] Live time remaining countdown with warning/critical colour states
+- [x] Mic permission error UI with refresh prompt
+- [x] Mute TTS button
+- [x] Skip question (backend + UI button)
+- [x] Mic test with AudioContext level meter (auto-pass on speech, manual skip)
+- [x] Re-record before submitting (preview state with Submit / ↺ Re-record)
+- [x] Retry on network error (blob preserved in lastBlobRef, resubmit without re-recording)
+- [x] TTS "done" signal gates record button (disabled during playback)
+- [x] Processing step messages (Transcribing → Thinking → Preparing next question)
+- [x] 3-minute recording time limit with countdown (last 30s in red, auto-stop)
+- [x] Personalised completion screen (name, answer count, "What happens next?" section)
+- [x] Transcript flash (4s display of transcribed answer after submit)
+- [ ] Participant completion email

@@ -8,7 +8,7 @@ from app.database import SessionLocal
 from app.models.company import Company
 from app.services.auth import decode_access_token
 
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -20,9 +20,15 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def get_current_company(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Company:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     payload = decode_access_token(credentials.credentials)
     company_id: str | None = payload.get("sub")
     if company_id is None:
