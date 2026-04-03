@@ -1067,6 +1067,97 @@ select.field-input {
 }
 
 /* ============================================
+   Interview – Screening / Profiling Phase
+   ============================================ */
+
+.interview-profiling {
+  background: var(--bg-white);
+  border-radius: var(--radius-lg);
+  padding: 48px 36px;
+  box-shadow: var(--shadow-md);
+  max-width: 480px;
+  width: 100%;
+}
+
+.profiling-header {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.profiling-intro {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+.profiling-progress-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.profiling-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.profiling-step-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.profiling-question {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profiling-label {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.profiling-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profiling-option-btn {
+  width: 100%;
+  padding: 14px 20px;
+  text-align: left;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-family: inherit;
+}
+
+.profiling-option-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: #f0f0ff;
+}
+
+.profiling-option-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================
    Project Creation Wizard
    ============================================ */
 

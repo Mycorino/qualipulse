@@ -79,6 +79,9 @@ def start_interview_session(
         link_id=link.id,
         project_id=link.project_id,
         display_name=body.display_name if body else None,
+        profession=body.profession if body else None,
+        age_range=body.age_range if body else None,
+        country=body.country if body else None,
         status="in_progress",
     )
     db.add(participant)

@@ -41,13 +41,25 @@ export async function getInterviewInfo(
   return data;
 }
 
+export interface StartInterviewParams {
+  displayName?: string;
+  profession?: string;
+  ageRange?: string;
+  country?: string;
+}
+
 export async function startInterview(
   token: string,
-  displayName?: string
+  params: StartInterviewParams = {}
 ): Promise<StartInterviewResponse> {
   const { data } = await client.post<StartInterviewResponse>(
     `/interview/${token}/start`,
-    { display_name: displayName || undefined }
+    {
+      display_name: params.displayName || undefined,
+      profession: params.profession || undefined,
+      age_range: params.ageRange || undefined,
+      country: params.country || undefined,
+    }
   );
   return data;
 }

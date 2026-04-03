@@ -18,6 +18,9 @@ export default function Interview() {
   const [phase, setPhase] = useState<Phase>("landing");
   const [info, setInfo] = useState<InterviewInfo | null>(null);
   const [displayName, setDisplayName] = useState("");
+  const [profession, setProfession] = useState("");
+  const [ageRange, setAgeRange] = useState("");
+  const [country, setCountry] = useState("");
   const [participantId, setParticipantId] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -64,7 +67,12 @@ export default function Interview() {
   );
 
   async function doStartInterview() {
-    const res = await startInterview(token!, displayName || undefined);
+    const res = await startInterview(token!, {
+      displayName: displayName || undefined,
+      profession: profession || undefined,
+      ageRange: ageRange || undefined,
+      country: country || undefined,
+    });
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
     setTurnCount(1);
@@ -196,6 +204,51 @@ export default function Interview() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="How you'd like to be identified"
+            />
+          </div>
+
+          <div className="interview-name-field">
+            <label className="field-label">
+              Your profession <span className="optional-tag">(optional)</span>
+            </label>
+            <input
+              type="text"
+              className="field-input"
+              value={profession}
+              onChange={(e) => setProfession(e.target.value)}
+              placeholder="e.g. Teacher, Engineer, Student…"
+            />
+          </div>
+
+          <div className="interview-name-field">
+            <label className="field-label">
+              Age range <span className="optional-tag">(optional)</span>
+            </label>
+            <select
+              className="field-input"
+              value={ageRange}
+              onChange={(e) => setAgeRange(e.target.value)}
+            >
+              <option value="">Prefer not to say</option>
+              <option value="18-24">18–24</option>
+              <option value="25-34">25–34</option>
+              <option value="35-44">35–44</option>
+              <option value="45-54">45–54</option>
+              <option value="55-64">55–64</option>
+              <option value="65+">65+</option>
+            </select>
+          </div>
+
+          <div className="interview-name-field">
+            <label className="field-label">
+              Country <span className="optional-tag">(optional)</span>
+            </label>
+            <input
+              type="text"
+              className="field-input"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="e.g. France, United States…"
             />
           </div>
 
