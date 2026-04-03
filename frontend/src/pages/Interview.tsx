@@ -8,6 +8,7 @@ import {
   submitAudio,
   checkResume,
   getResumeSummary,
+  skipQuestion,
   InterviewInfo,
   ScreeningQuestion,
   ResumeCheck,
@@ -51,6 +52,22 @@ export default function Interview() {
   const [screeningLoading, setScreeningLoading] = useState(false);
   const [disqualifiedOn, setDisqualifiedOn] = useState("");
 
+  // New state for UX improvements
+  const lastBlobRef = useRef<Blob | null>(null);
+  const [pendingBlob, setPendingBlob] = useState<Blob | null>(null);
+  const [ttsPlaying, setTtsPlaying] = useState(false);
+  const [ttsEnded, setTtsEnded] = useState(true); // true = can record
+  const [processingStep, setProcessingStep] = useState(0);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const MAX_RECORDING_SECONDS = 180;
+  const [micTestDone, setMicTestDone] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const micAnimRef = useRef<number | null>(null);
+  const [lastTranscript, setLastTranscript] = useState<string | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { isRecording, error: recError, startRecording, stopRecording } =
     useAudioRecorder();
@@ -76,18 +93,64 @@ export default function Interview() {
   // Play TTS audio
   const playTTS = useCallback(
     (url: string) => {
-      if (muted) return;
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      if (audioRef.current) audioRef.current.pause();
       const audio = new Audio(url);
       audioRef.current = audio;
-      audio.play().catch(() => {
-        // autoplay blocked -- user will read the question
-      });
+      if (!muted) {
+        setTtsPlaying(true);
+        setTtsEnded(false);
+        audio.onended = () => { setTtsPlaying(false); setTtsEnded(true); };
+        audio.onerror = () => { setTtsPlaying(false); setTtsEnded(true); };
+        audio.play().catch(() => { setTtsPlaying(false); setTtsEnded(true); });
+      }
+      // If muted, keep ttsEnded=true so they can record immediately
     },
     [muted]
   );
+
+  // Recording time limit
+  useEffect(() => {
+    if (!isRecording) { setRecordingSeconds(0); return; }
+    const interval = setInterval(() => {
+      setRecordingSeconds((s) => {
+        if (s + 1 >= MAX_RECORDING_SECONDS) {
+          handleStopAndPreview();
+          return MAX_RECORDING_SECONDS;
+        }
+        return s + 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRecording]);
+
+  // Mic level meter effect (only active during mic test)
+  useEffect(() => {
+    if (micTestDone || phase !== "interview") return;
+    // Start mic level monitoring
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+      micStreamRef.current = stream;
+      const ctx = new AudioContext();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        setMicLevel(Math.min(100, avg * 2));
+        if (avg > 15) setMicTestDone(true); // auto-pass when they speak
+        micAnimRef.current = requestAnimationFrame(tick);
+      };
+      micAnimRef.current = requestAnimationFrame(tick);
+    }).catch(() => setMicTestDone(true)); // if denied, skip test
+    return () => {
+      if (micAnimRef.current) cancelAnimationFrame(micAnimRef.current);
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, [phase, micTestDone]);
 
   const sessionKey = token ? `interview_${token}` : null;
 
@@ -128,6 +191,7 @@ export default function Interview() {
     saveSession(res.participant_id, res.first_question, 1);
     setPhase("interview");
     if (res.tts_audio_url) playTTS(res.tts_audio_url);
+    else setTtsEnded(true);
   }
 
   function handleResumeSession() {
@@ -217,12 +281,34 @@ export default function Interview() {
     }
   }
 
-  async function handleStopAndSubmit() {
-    if (!token) return;
-    setProcessing(true);
+  async function handleStopAndPreview() {
     try {
       const blob = await stopRecording();
-      const res = await submitAudio(token, participantId, blob);
+      lastBlobRef.current = blob;
+      setPendingBlob(blob);
+      setTtsEnded(false); // prevent immediate re-record
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Recording failed. Please try again.";
+      setError(msg);
+    }
+  }
+
+  async function handleSubmitPending() {
+    if (!pendingBlob) return;
+    setProcessing(true);
+    setProcessingStep(0);
+    setShowTranscript(false);
+    setLastTranscript(null);
+    const blob = pendingBlob;
+    setPendingBlob(null);
+
+    const stepInterval = setInterval(() => {
+      setProcessingStep((s) => Math.min(s + 1, 2));
+    }, 2500);
+
+    try {
+      const res = await submitAudio(token!, participantId, blob);
+      clearInterval(stepInterval);
       if (res.is_complete) {
         clearSession();
         setPhase("complete");
@@ -235,12 +321,57 @@ export default function Interview() {
         setIsFollowUp(res.is_follow_up ?? false);
         if (res.elapsed_seconds !== undefined) setElapsedSeconds(res.elapsed_seconds);
         if (res.total_seconds !== undefined && res.total_seconds > 0) setTotalSeconds(res.total_seconds);
+        // Show transcript briefly
+        if (res.transcript) {
+          setLastTranscript(res.transcript);
+          setShowTranscript(true);
+          setTimeout(() => setShowTranscript(false), 4000);
+        }
+        setTtsEnded(false);
         saveSession(participantId, res.question_text, nextTurn);
         if (res.tts_audio_url) playTTS(res.tts_audio_url);
+        else setTtsEnded(true); // no TTS — can record immediately
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Something went wrong. Please try recording again.";
+      clearInterval(stepInterval);
+      // Restore blob for retry
+      setPendingBlob(lastBlobRef.current);
+      const msg = err instanceof Error ? err.message : "Upload failed. Tap 'Try again' to resubmit.";
       setError(msg);
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  function handleReRecord() {
+    setPendingBlob(null);
+    lastBlobRef.current = null;
+    setError("");
+    setTtsEnded(true);
+  }
+
+  async function handleSkip() {
+    if (!token) return;
+    setProcessing(true);
+    setPendingBlob(null);
+    try {
+      const res = await skipQuestion(token, participantId);
+      if (res.is_complete) {
+        clearSession();
+        setPhase("complete");
+      } else if (res.question_text) {
+        const nextTurn = turnCount + 1;
+        setCurrentQuestion(res.question_text);
+        setTurnCount(nextTurn);
+        setQuestionIndex(res.question_index ?? questionIndex);
+        setIsFollowUp(false);
+        setTtsEnded(false);
+        saveSession(participantId, res.question_text, nextTurn);
+        if (res.tts_audio_url) playTTS(res.tts_audio_url);
+        else setTtsEnded(true);
+      }
+    } catch {
+      setError("Couldn't skip. Please try again.");
     } finally {
       setProcessing(false);
     }
@@ -582,6 +713,38 @@ export default function Interview() {
     );
   }
 
+  /* ---- Mic Test Phase ---- */
+  if (phase === "interview" && !micTestDone) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container mic-test-card">
+          <h2 className="mic-test-title">Quick mic check</h2>
+          <p className="mic-test-subtitle">Say anything to test your microphone before we begin.</p>
+          <div className="mic-level-wrap">
+            <div className="mic-level-bar" style={{ width: `${micLevel}%` }} />
+          </div>
+          {micLevel > 20 ? (
+            <p className="mic-test-status mic-test-ok">✓ Microphone detected — you're good to go!</p>
+          ) : (
+            <p className="mic-test-status">Speak to see your mic level…</p>
+          )}
+          <div className="mic-test-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (micAnimRef.current) cancelAnimationFrame(micAnimRef.current);
+                micStreamRef.current?.getTracks().forEach((t) => t.stop());
+                setMicTestDone(true);
+              }}
+            >
+              {micLevel > 20 ? "Start interview →" : "Skip mic test"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   /* ---- Interview Phase ---- */
   if (phase === "interview") {
     return (
@@ -669,32 +832,71 @@ export default function Interview() {
             <div className="error-banner">{recError}</div>
           ) : null}
 
+          {/* Transcript flash */}
+          {showTranscript && lastTranscript && (
+            <div className="transcript-flash">
+              <span className="transcript-flash-label">We heard:</span>
+              <span className="transcript-flash-text">"{lastTranscript}"</span>
+            </div>
+          )}
+
           {/* Recording UI */}
           <div className="interview-controls">
             {processing ? (
               <div className="processing-indicator">
                 <div className="spinner" />
-                <span>Processing your response...</span>
+                <span>{["Transcribing your answer…", "Thinking…", "Preparing next question…"][processingStep]}</span>
+              </div>
+            ) : pendingBlob ? (
+              /* Preview state — recorded but not yet submitted */
+              <div className="recording-preview">
+                <div className="recording-preview-icon">✓</div>
+                <p className="recording-preview-label">Recording captured</p>
+                <div className="recording-preview-actions">
+                  <button className="btn btn-primary" onClick={handleSubmitPending}>
+                    Submit answer →
+                  </button>
+                  <button className="btn btn-ghost" onClick={handleReRecord}>
+                    ↺ Re-record
+                  </button>
+                </div>
               </div>
             ) : isRecording ? (
               <>
-                <button
-                  className="record-btn recording"
-                  onClick={handleStopAndSubmit}
-                >
+                <button className="record-btn recording" onClick={handleStopAndPreview}>
                   <div className="record-btn-inner recording-pulse" />
                 </button>
                 <p className="record-label">Tap to stop recording</p>
+                {recordingSeconds > 0 && (
+                  <p className={`recording-timer ${recordingSeconds >= MAX_RECORDING_SECONDS - 30 ? "recording-timer--warning" : ""}`}>
+                    {Math.floor((MAX_RECORDING_SECONDS - recordingSeconds) / 60)}:
+                    {String((MAX_RECORDING_SECONDS - recordingSeconds) % 60).padStart(2, "0")} remaining
+                  </p>
+                )}
               </>
             ) : (
               <>
-                <button className="record-btn" onClick={startRecording}>
+                <button
+                  className={`record-btn ${ttsPlaying ? "record-btn--waiting" : ttsEnded ? "record-btn--ready" : ""}`}
+                  onClick={ttsPlaying ? undefined : startRecording}
+                  disabled={ttsPlaying}
+                  title={ttsPlaying ? "Wait for the question to finish" : "Tap to start recording"}
+                >
                   <div className="record-btn-inner" />
                 </button>
-                <p className="record-label">Tap to start recording</p>
+                <p className="record-label">
+                  {ttsPlaying ? "⏵ Listening to question…" : "Tap to start recording"}
+                </p>
               </>
             )}
           </div>
+
+          {/* Skip question */}
+          {!processing && !isRecording && !pendingBlob && (
+            <button className="skip-question-btn" onClick={handleSkip}>
+              Skip this question
+            </button>
+          )}
         </div>
       </div>
     );
@@ -710,11 +912,26 @@ export default function Interview() {
             <polyline points="22 4 12 14.01 9 11.01" />
           </svg>
         </div>
-        <h1 className="interview-complete-title">Thank you!</h1>
+        <h1 className="interview-complete-title">
+          {displayName ? `Thank you, ${displayName.split(" ")[0]}!` : "You're done — thank you!"}
+        </h1>
         <p className="interview-complete-text">
-          Your interview has been recorded successfully. You may now close this
-          page.
+          Your responses have been recorded and will help shape the research for{" "}
+          <strong>{info?.project_name}</strong>.
         </p>
+        {turnCount > 1 && (
+          <p className="interview-complete-meta">
+            You answered {turnCount - 1} question{turnCount - 1 !== 1 ? "s" : ""}.
+          </p>
+        )}
+        <div className="interview-complete-next">
+          <p className="interview-complete-next-label">What happens next?</p>
+          <ul className="interview-complete-next-list">
+            <li>The research team will review your responses.</li>
+            <li>Your answers may be used to improve products or services.</li>
+            <li>You can safely close this page.</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

@@ -450,7 +450,7 @@ export default function ProjectDetail() {
     try {
       const updated = await patchQuestion(id!, questionId, { [field]: interviewNotesText });
       setProject((prev) =>
-        prev ? { ...prev, questions: prev.questions.map((q) => q.id === questionId ? { ...q, [field]: (updated as Record<string, unknown>)[field] as string } : q) } : prev
+        prev ? { ...prev, questions: prev.questions.map((q) => q.id === questionId ? { ...q, [field]: (updated as unknown as Record<string, unknown>)[field] as string } : q) } : prev
       );
       setEditingInterviewNotes(null);
     } catch {

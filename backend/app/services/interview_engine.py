@@ -453,6 +453,22 @@ def process_interview_turn(
     if is_complete:
         participant.status = "completed"
         participant.completed_at = datetime.utcnow()
+        # Send completion email if participant provided one
+        try:
+            from app.services.email import send_email
+            if participant.email:
+                project_name = participant.project.name
+                send_email(
+                    to=participant.email,
+                    subject=f"Thank you for your interview — {project_name}",
+                    body_html=f"""
+                    <p>Hi{' ' + participant.display_name if participant.display_name else ''},</p>
+                    <p>Thank you for completing the <strong>{project_name}</strong> interview. Your responses have been recorded and will help shape the research.</p>
+                    <p>You can close this email — no further action is needed.</p>
+                    """,
+                )
+        except Exception:
+            pass  # Never fail the interview flow due to email errors
 
     db.commit()
     db.refresh(new_turn)
@@ -465,4 +481,86 @@ def process_interview_turn(
         "question_index": new_q_index,
         "elapsed_seconds": int(context["elapsed_minutes"] * 60),
         "total_seconds": context["total_minutes"] * 60,
+    }
+
+
+def skip_question(participant_id: str, db) -> dict:
+    """Advance past the current question without a response and return the next question."""
+    from app.services.tts import generate_speech
+    from app.services.storage import upload_audio as upload_audio_file
+
+    participant = db.query(Participant).filter(Participant.id == participant_id).first()
+    if not participant:
+        raise ValueError("Participant not found")
+
+    project = participant.project
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    context = get_interview_context(participant_id, db)
+
+    # Mark last unanswered turn as skipped
+    unanswered = [t for t in turns if not t.response_transcript]
+    if unanswered:
+        last = unanswered[-1]
+        last.response_transcript = "[Skipped]"
+        db.commit()
+
+    # Decide next action — force next_question
+    current_q_index = context["current_question_index"]
+    guide_questions = sorted(
+        [q for q in project.guide_questions if not q.deprecated_at],
+        key=lambda q: q.question_index,
+    )
+    next_questions = [q for q in guide_questions if q.question_index > current_q_index]
+
+    if not next_questions:
+        # No more questions — close
+        closing_text = "That wraps up our interview. Thank you so much for your time and thoughtful responses — it's been really helpful!"
+        tts_url = None
+        try:
+            audio_data = generate_speech(closing_text)
+            key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
+            upload_audio_file(audio_data, key)
+            tts_url = f"/audio/{key}"
+        except Exception:
+            pass
+        participant.status = "completed"
+        participant.completed_at = datetime.utcnow()
+        db.commit()
+        return {"question_text": closing_text, "tts_audio_url": tts_url, "is_complete": True, "is_follow_up": False, "question_index": current_q_index, "elapsed_seconds": 0, "total_seconds": 0}
+
+    next_q = next_questions[0]
+    question_text = next_q.main_question
+    new_turn = InterviewTurn(
+        participant_id=participant_id,
+        turn_index=len(turns),
+        question_index=next_q.question_index,
+        is_follow_up=False,
+        follow_up_index=0,
+        question_text=question_text,
+    )
+    db.add(new_turn)
+    db.commit()
+
+    tts_url = None
+    try:
+        audio_data = generate_speech(question_text)
+        key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
+        upload_audio_file(audio_data, key)
+        new_turn.tts_audio_url = key
+        db.commit()
+        tts_url = f"/audio/{key}"
+    except Exception:
+        pass
+
+    total_minutes = project.interview_duration_minutes or 30
+    elapsed = context["elapsed_minutes"]
+
+    return {
+        "question_text": question_text,
+        "tts_audio_url": tts_url,
+        "is_complete": False,
+        "is_follow_up": False,
+        "question_index": next_q.question_index,
+        "elapsed_seconds": int(elapsed * 60),
+        "total_seconds": total_minutes * 60,
     }

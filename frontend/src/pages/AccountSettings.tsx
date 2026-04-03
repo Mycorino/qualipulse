@@ -71,6 +71,41 @@ export default function AccountSettings() {
     }
   }
 
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingProfile(true);
+    setProfileSuccess(false);
+    try {
+      await client.patch("/auth/me", { name: name.trim() });
+      setProfileSuccess(true);
+      setTimeout(() => setProfileSuccess(false), 3000);
+    } catch {
+      // silently fail for now
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess(false);
+    if (newPassword.length < 8) { setPasswordError("New password must be at least 8 characters"); return; }
+    try {
+      await client.post("/auth/change-password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setPasswordSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setPasswordError(msg ?? "Failed to update password. Check your current password.");
+    }
+  }
+
   async function handleManageBilling() {
     try {
       const { data } = await client.post("/billing/portal", {
@@ -103,37 +138,37 @@ export default function AccountSettings() {
         <div className="settings-section">
           <div className="settings-card">
             <h2 className="settings-section-title">Profile</h2>
-            <div className="auth-form" style={{ maxWidth: 400 }}>
+            <form className="auth-form" style={{ maxWidth: 400 }} onSubmit={handleSaveProfile}>
               <div>
                 <label className="field-label">Name</label>
-                <input className="field-input" value={name} onChange={e => setName(e.target.value)} />
+                <input className="field-input" value={name} onChange={e => setName(e.target.value)} required />
               </div>
               <div>
                 <label className="field-label">Email</label>
                 <input className="field-input" value={me?.email ?? ""} disabled style={{ opacity: 0.6 }} />
               </div>
               {profileSuccess && <p style={{ color: "#16a34a", fontSize: 14 }}>✓ Profile updated</p>}
-              <button className="btn btn-primary" disabled={savingProfile} style={{ width: "fit-content" }}>
+              <button className="btn btn-primary" type="submit" disabled={savingProfile} style={{ width: "fit-content" }}>
                 {savingProfile ? "Saving..." : "Save changes"}
               </button>
-            </div>
+            </form>
           </div>
 
           <div className="settings-card" style={{ marginTop: 20 }}>
             <h2 className="settings-section-title">Change Password</h2>
-            <div className="auth-form" style={{ maxWidth: 400 }}>
+            <form className="auth-form" style={{ maxWidth: 400 }} onSubmit={handleChangePassword}>
               <div>
                 <label className="field-label">Current password</label>
-                <input type="password" className="field-input" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+                <input type="password" className="field-input" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required />
               </div>
               <div>
                 <label className="field-label">New password</label>
-                <input type="password" className="field-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" />
+                <input type="password" className="field-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" required minLength={8} />
               </div>
               {passwordError && <p className="error-text">{passwordError}</p>}
               {passwordSuccess && <p style={{ color: "#16a34a", fontSize: 14 }}>✓ Password updated</p>}
-              <button className="btn btn-primary" style={{ width: "fit-content" }}>Update password</button>
-            </div>
+              <button className="btn btn-primary" type="submit" style={{ width: "fit-content" }}>Update password</button>
+            </form>
           </div>
         </div>
       )}
