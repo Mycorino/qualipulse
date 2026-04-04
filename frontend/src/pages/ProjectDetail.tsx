@@ -31,7 +31,13 @@ import {
   assessQuality,
   shareAnalysis,
   getAnalysisHistory,
+  getAnalysisByVersion,
+  upsertThemeAnnotation,
+  getThemeAnnotations,
+  saveResearcherContext,
+  triggerRefinedAnalysis,
   AnalysisVersionMeta,
+  ThemeAnnotation,
   ProjectResponse,
   InterviewLink,
   ParticipantResponse,
@@ -79,6 +85,17 @@ export default function ProjectDetail() {
   // ── Analysis version history ───────────────────────────────────────────────
   const [analysisVersions, setAnalysisVersions] = useState<AnalysisVersionMeta[]>([]);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+
+  // ── Iterative analysis state ───────────────────────────────────────────────
+  const [themeAnnotations, setThemeAnnotations] = useState<Record<string, ThemeAnnotation>>({});
+  const [researcherContext, setResearcherContext] = useState("");
+  const [contextSaving, setContextSaving] = useState<false | "saving" | "saved">(false);
+  const contextDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activeVersionNumber, setActiveVersionNumber] = useState<number | null>(null);
+  const [activeVersionReport, setActiveVersionReport] = useState<AnalysisResponse | null>(null);
+  const [refineModalOpen, setRefineModalOpen] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [annotationPanelOpen, setAnnotationPanelOpen] = useState(false);
 
   // ── Codebook persistence ───────────────────────────────────────────────────
   const codebookPrefKey = "qp_codebook_open";
@@ -204,6 +221,14 @@ export default function ProjectDetail() {
         setActiveFilterValues(ana.filters.filter_values);
       }
       if (ana.status === "generating") startPolling();
+      // Load annotations and context for the current analysis
+      if (ana.analysis_id && ana.status === "ready") {
+        getThemeAnnotations(id!, ana.analysis_id).then((anns) => {
+          const map: Record<string, ThemeAnnotation> = {};
+          for (const a of anns) map[a.theme_title] = a;
+          setThemeAnnotations(map);
+        }).catch(() => {});
+      }
     } catch {
       // handled by interceptor
     } finally {
@@ -229,6 +254,18 @@ export default function ProjectDetail() {
         setAnalysisPolling(false);
         // Refresh version history now that a new version is ready
         getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {});
+        // Reset active version view and load annotations for new version
+        setActiveVersionNumber(null);
+        setActiveVersionReport(null);
+        if (ana.analysis_id && ana.status === "ready") {
+          getThemeAnnotations(id!, ana.analysis_id).then((anns) => {
+            const map: Record<string, ThemeAnnotation> = {};
+            for (const a of anns) map[a.theme_title] = a;
+            setThemeAnnotations(map);
+          }).catch(() => {});
+          setResearcherContext("");
+          setContextSaving(false);
+        }
       }
     }, 3000);
   }
@@ -312,6 +349,122 @@ export default function ProjectDetail() {
       toast("Share link copied to clipboard ✓", "success");
     } catch {
       toast("Could not generate share link — make sure analysis is ready.", "error");
+    }
+  }
+
+  // ── Annotation handlers ────────────────────────────────────────────────────
+
+  async function loadAnnotations(analysisId: string) {
+    try {
+      const annotations = await getThemeAnnotations(id!, analysisId);
+      const map: Record<string, ThemeAnnotation> = {};
+      for (const ann of annotations) {
+        map[ann.theme_title] = ann;
+      }
+      setThemeAnnotations(map);
+    } catch {
+      // non-critical
+    }
+  }
+
+  async function handleAnnotationClick(themeTitle: string, clickedStatus: "confirmed" | "disputed" | "needs_evidence") {
+    if (!analysis?.analysis_id) return;
+    const existing = themeAnnotations[themeTitle];
+    // Clicking the active annotation clears it (toggle off)
+    if (existing && existing.status === clickedStatus) {
+      // Delete by overriding with a no-op — since we don't have a delete endpoint exposed in the UI,
+      // we re-use upsert but the UI will hide cleared annotations. For a proper clear we'd need DELETE.
+      // Instead: call delete endpoint via direct API.
+      try {
+        if (existing.id) {
+          await fetch(`/api/projects/${id}/analysis/annotations/${existing.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } });
+        }
+        setThemeAnnotations((prev) => {
+          const next = { ...prev };
+          delete next[themeTitle];
+          return next;
+        });
+      } catch {
+        toast("Failed to remove annotation", "error");
+      }
+      return;
+    }
+    try {
+      const saved = await upsertThemeAnnotation(id!, {
+        analysis_id: analysis.analysis_id,
+        theme_title: themeTitle,
+        status: clickedStatus,
+        researcher_note: existing?.researcher_note ?? null,
+      });
+      setThemeAnnotations((prev) => ({ ...prev, [themeTitle]: saved }));
+    } catch {
+      toast("Failed to save annotation", "error");
+    }
+  }
+
+  async function handleAnnotationNoteBlur(themeTitle: string, note: string) {
+    if (!analysis?.analysis_id) return;
+    const existing = themeAnnotations[themeTitle];
+    if (!existing) return;
+    try {
+      const saved = await upsertThemeAnnotation(id!, {
+        analysis_id: analysis.analysis_id,
+        theme_title: themeTitle,
+        status: existing.status,
+        researcher_note: note || null,
+      });
+      setThemeAnnotations((prev) => ({ ...prev, [themeTitle]: saved }));
+    } catch {
+      toast("Failed to save note", "error");
+    }
+  }
+
+  function handleResearcherContextChange(value: string) {
+    setResearcherContext(value);
+    setContextSaving("saving");
+    if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current);
+    contextDebounceRef.current = setTimeout(async () => {
+      if (!analysis?.version) return;
+      try {
+        await saveResearcherContext(id!, analysis.version, value);
+        setContextSaving("saved");
+        setTimeout(() => setContextSaving(false), 2000);
+      } catch {
+        setContextSaving(false);
+        toast("Failed to save context", "error");
+      }
+    }, 1500);
+  }
+
+  async function handleTriggerRefine() {
+    setRefining(true);
+    try {
+      await triggerRefinedAnalysis(id!);
+      setRefineModalOpen(false);
+      setAnalysis((prev) => prev ? { ...prev, status: "generating" } : null);
+      startPolling();
+      // Refresh versions list
+      getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {});
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to start refined analysis";
+      toast(msg, "error");
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  async function handleViewVersion(versionNumber: number) {
+    if (versionNumber === (analysis?.version ?? null)) {
+      setActiveVersionNumber(null);
+      setActiveVersionReport(null);
+      return;
+    }
+    try {
+      const report = await getAnalysisByVersion(id!, versionNumber);
+      setActiveVersionReport(report);
+      setActiveVersionNumber(versionNumber);
+    } catch {
+      toast("Failed to load version", "error");
     }
   }
 
@@ -1750,13 +1903,29 @@ export default function ProjectDetail() {
               )}
 
               {analysis.status === "ready" && analysis.report && (() => {
-                const r = analysis.report;
-                const isStale = analysis.completed_count > analysis.participant_count;
+                // Determine which report to display — active past version or current
+                const isViewingPastVersion = activeVersionNumber !== null && activeVersionReport !== null;
+                const displayReport = isViewingPastVersion ? activeVersionReport!.report : analysis.report;
+                const r = displayReport!;
+                const currentVersionNum = analysis.version ?? (analysisVersions.length > 0 ? analysisVersions[0].version : 1);
+                const latestVersionNum = analysisVersions.length > 0 ? analysisVersions[0].version : currentVersionNum;
+
+                // Annotation helpers
+                const annotationCount = Object.keys(themeAnnotations).length;
+                const actionableAnnotationCount = Object.values(themeAnnotations).filter(
+                  (a) => a.status === "disputed" || a.status === "needs_evidence"
+                ).length;
+                const canRefine = actionableAnnotationCount > 0 || researcherContext.trim().length > 0;
+
                 return (
                   <div className="analysis-report">
                     <div className="analysis-summary">{r.summary}</div>
                     <div className="analysis-meta">
-                      <span className="badge analysis-ai-badge">✦ AI-generated</span>
+                      <span className="badge analysis-ai-badge">
+                        {isViewingPastVersion
+                          ? (activeVersionReport!.version_label === "researcher_refined" ? "✦ Researcher-refined" : "✦ AI-generated")
+                          : (analysis.version_label === "researcher_refined" ? "✦ Researcher-refined" : "✦ AI-generated")}
+                      </span>
                       <span className="badge">n={r.participant_count} interview{r.participant_count !== 1 ? "s" : ""}</span>
                       <span
                         className="badge"
@@ -1765,44 +1934,59 @@ export default function ProjectDetail() {
                       >
                         {r.confidence} confidence
                       </span>
-                      {analysis.filters && (
+                      {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters) && (
                         <span className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>
-                          Filtered: {analysis.filters.filter_by} ({analysis.filters.filter_values.join(", ")})
+                          Filtered: {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_by} ({(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_values.join(", ")})
                         </span>
-                      )}
-                      {analysis.generated_at && (
-                        <span className="muted-text" style={{ fontSize: "0.8rem" }}>v{analysisVersions.length > 0 ? analysisVersions[0].version : ""} · {new Date(analysis.generated_at).toLocaleString()}</span>
                       )}
                     </div>
 
-                    {/* Version history */}
+                    {/* Version tabs */}
                     {analysisVersions.length > 1 && (
-                      <div style={{ marginTop: 8 }}>
+                      <div className="version-tabs">
+                        {[...analysisVersions].reverse().map((v) => {
+                          const isCurrent = v.version === latestVersionNum;
+                          const isActive = isViewingPastVersion
+                            ? v.version === activeVersionNumber
+                            : isCurrent;
+                          const labelText = v.version_label === "researcher_refined"
+                            ? "Researcher-refined"
+                            : "AI Discovery";
+                          return (
+                            <button
+                              key={v.version}
+                              className={`version-tab${isActive ? " version-tab--active" : ""}`}
+                              onClick={() => {
+                                if (isCurrent) {
+                                  setActiveVersionNumber(null);
+                                  setActiveVersionReport(null);
+                                } else {
+                                  handleViewVersion(v.version);
+                                }
+                              }}
+                            >
+                              v{v.version} · {labelText}
+                              {isCurrent && <span style={{ marginLeft: 4, color: "var(--brand-500)" }}>●</span>}
+                              {v.annotation_count > 0 && !isCurrent && (
+                                <span style={{ marginLeft: 4, fontSize: 10, color: "var(--text-tertiary)" }}>{v.annotation_count} ann.</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Past version banner */}
+                    {isViewingPastVersion && (
+                      <div className="version-banner">
+                        Viewing v{activeVersionNumber} — {activeVersionReport!.version_label === "researcher_refined" ? "Researcher-refined" : "AI Discovery"}.{" "}
                         <button
                           className="btn btn-ghost btn-xs"
-                          onClick={() => setVersionHistoryOpen(!versionHistoryOpen)}
-                          style={{ color: "var(--text-tertiary)", fontSize: 11 }}
+                          onClick={() => { setActiveVersionNumber(null); setActiveVersionReport(null); }}
+                          style={{ color: "var(--brand-600)", padding: "0 4px" }}
                         >
-                          {versionHistoryOpen ? "▲" : "▼"} {analysisVersions.length - 1} previous version{analysisVersions.length > 2 ? "s" : ""}
+                          Switch to v{latestVersionNum} (latest)
                         </button>
-                        {versionHistoryOpen && (
-                          <div style={{ marginTop: 6, padding: "10px 12px", borderRadius: 6, background: "var(--bg-sunken)", border: "1px solid var(--border-subtle)", fontSize: 12 }}>
-                            <p style={{ fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)" }}>Analysis history (last 3)</p>
-                            {analysisVersions.map((v, i) => (
-                              <div key={v.version} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: i > 0 ? "1px solid var(--border-light)" : "none" }}>
-                                <span style={{ fontWeight: 600, color: i === 0 ? "var(--brand-600)" : "var(--text-tertiary)", minWidth: 40 }}>v{v.version}</span>
-                                <span style={{ color: "var(--text-tertiary)" }}>
-                                  {v.generated_at ? new Date(v.generated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
-                                </span>
-                                <span style={{ color: "var(--text-tertiary)" }}>·</span>
-                                <span style={{ color: "var(--text-tertiary)" }}>{v.participant_count} interview{v.participant_count !== 1 ? "s" : ""}</span>
-                                {v.filters && <span className="badge" style={{ fontSize: 10 }}>Filtered</span>}
-                                {i === 0 && <span className="badge" style={{ fontSize: 10, background: "var(--brand-50)", color: "var(--brand-700)" }}>Current</span>}
-                              </div>
-                            ))}
-                            <p style={{ color: "var(--text-tertiary)", fontSize: 11, marginTop: 8 }}>Previous versions are stored for reference. Regenerating creates a new version.</p>
-                          </div>
-                        )}
                       </div>
                     )}
 
@@ -1810,24 +1994,60 @@ export default function ProjectDetail() {
                     {r.themes.length > 0 && (
                       <div className="analysis-block">
                         <h3>Key Themes</h3>
-                        {r.themes.map((t, i) => (
-                          <div key={i} className="analysis-theme">
-                            <div className="analysis-theme-header">
-                              <strong>{t.title}</strong>
-                              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                <span className="badge">{t.frequency}</span>
-                                <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>
+                        {r.themes.map((t, i) => {
+                          const ann = themeAnnotations[t.title];
+                          const showNoteInput = !isViewingPastVersion && ann && (ann.status === "disputed" || ann.status === "needs_evidence");
+                          return (
+                            <div key={i} className="analysis-theme">
+                              <div className="analysis-theme-header">
+                                <strong>{t.title}</strong>
+                                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                  <span className="badge">{t.frequency}</span>
+                                  {!isViewingPastVersion && (
+                                    <>
+                                      <button
+                                        className={`annotation-btn annotation-btn--confirmed${ann?.status === "confirmed" ? " annotation-btn--active" : ""}`}
+                                        title="Confirm this theme"
+                                        onClick={() => handleAnnotationClick(t.title, "confirmed")}
+                                      >✓</button>
+                                      <button
+                                        className={`annotation-btn annotation-btn--needs-evidence${ann?.status === "needs_evidence" ? " annotation-btn--active" : ""}`}
+                                        title="Needs more evidence"
+                                        onClick={() => handleAnnotationClick(t.title, "needs_evidence")}
+                                      >~</button>
+                                      <button
+                                        className={`annotation-btn annotation-btn--disputed${ann?.status === "disputed" ? " annotation-btn--active" : ""}`}
+                                        title="Dispute this theme"
+                                        onClick={() => handleAnnotationClick(t.title, "disputed")}
+                                      >✗</button>
+                                    </>
+                                  )}
+                                  <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>
+                                </div>
                               </div>
+                              <p>{t.summary}</p>
+                              {t.researcher_note && (
+                                <p style={{ fontSize: 12, color: "var(--text-tertiary)", fontStyle: "italic", borderLeft: "3px solid var(--warning)", paddingLeft: 8, marginTop: 4 }}>
+                                  Researcher note: {t.researcher_note}
+                                </p>
+                              )}
+                              {showNoteInput && (
+                                <textarea
+                                  className="annotation-note-input"
+                                  placeholder="Add a note for Claude (optional)"
+                                  defaultValue={ann?.researcher_note ?? ""}
+                                  onBlur={(e) => handleAnnotationNoteBlur(t.title, e.target.value)}
+                                />
+                              )}
+                              {t.quotes.length > 0 && (
+                                <div className="analysis-quotes">
+                                  {t.quotes.map((q, j) => renderAttributedQuote(q, j))}
+                                </div>
+                              )}
+                              {renderMemoSection("theme_note", t.title)}
                             </div>
-                            <p>{t.summary}</p>
-                            {t.quotes.length > 0 && (
-                              <div className="analysis-quotes">
-                                {t.quotes.map((q, j) => renderAttributedQuote(q, j))}
-                              </div>
-                            )}
-                            {renderMemoSection("theme_note", t.title)}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -1914,6 +2134,63 @@ export default function ProjectDetail() {
                         </button>
                       )}
                     </div>
+
+                    {/* Researcher context + Refine */}
+                    {!isViewingPastVersion && (
+                      <div className="analysis-block">
+                        <div className="researcher-context-box">
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                            <h3 style={{ margin: 0 }}>Researcher Context</h3>
+                            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                              {contextSaving === "saving" ? "Saving…" : contextSaving === "saved" ? "Saved ✓" : ""}
+                            </span>
+                          </div>
+                          <textarea
+                            className="field-input"
+                            rows={4}
+                            value={researcherContext}
+                            onChange={(e) => handleResearcherContextChange(e.target.value)}
+                            placeholder="Add context Claude doesn't have from transcripts — industry norms, prior research, hypotheses, things to look for or avoid."
+                            style={{ width: "100%", fontSize: 13, resize: "vertical" }}
+                          />
+                        </div>
+
+                        <div style={{ marginTop: 12 }}>
+                          {!refineModalOpen ? (
+                            <button
+                              className="btn btn-ai btn-sm"
+                              disabled={!canRefine || refining}
+                              onClick={() => setRefineModalOpen(true)}
+                              title={!canRefine ? "Add disputed/needs-evidence annotations or researcher context first" : undefined}
+                            >
+                              ✦ Refine with my annotations
+                            </button>
+                          ) : (
+                            <div className="refine-confirm-inline">
+                              <p style={{ margin: "0 0 8px 0", fontSize: 13 }}>
+                                Generate v{latestVersionNum + 1} based on your {annotationCount} annotation{annotationCount !== 1 ? "s" : ""}?
+                                This won't overwrite v{latestVersionNum}.
+                              </p>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  disabled={refining}
+                                  onClick={handleTriggerRefine}
+                                >
+                                  {refining ? "Starting…" : "Confirm"}
+                                </button>
+                                <button
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => setRefineModalOpen(false)}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* P7: Heatmap */}
                     <div className="analysis-block">

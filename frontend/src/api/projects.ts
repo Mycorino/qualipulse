@@ -130,6 +130,17 @@ export interface AnalysisTheme {
   summary: string;
   quotes: (AttributedQuote | string)[];
   frequency: string;
+  researcher_note?: string;
+}
+
+export type ThemeAnnotationStatus = "confirmed" | "disputed" | "needs_evidence";
+
+export interface ThemeAnnotation {
+  id?: string;
+  analysis_id: string;
+  theme_title: string;
+  status: ThemeAnnotationStatus;
+  researcher_note: string | null;
 }
 export interface AnalysisJTBD {
   job: string;
@@ -157,6 +168,9 @@ export interface AnalysisResponse {
   report: AnalysisReport | null;
   filters: { filter_by: string; filter_values: string[] } | null;
   error: string | null;
+  analysis_id: string | null;
+  version: number | null;
+  version_label: string | null;
 }
 
 // ── Coding types ────────────────────────────────────────────────────────────
@@ -406,9 +420,39 @@ export interface AnalysisVersionMeta {
   generated_at: string | null;
   participant_count: number;
   filters: { filter_by: string; filter_values: string[] } | null;
+  version_label: string;
+  parent_version: number | null;
+  annotation_count: number;
 }
 
 export async function getAnalysisHistory(projectId: string): Promise<AnalysisVersionMeta[]> {
   const { data } = await client.get<AnalysisVersionMeta[]>(`/projects/${projectId}/analysis/versions`);
+  return data;
+}
+
+export async function getAnalysisByVersion(projectId: string, version: number): Promise<AnalysisResponse> {
+  const { data } = await client.get<AnalysisResponse>(`/projects/${projectId}/analysis/${version}`);
+  return data;
+}
+
+export async function upsertThemeAnnotation(
+  projectId: string,
+  body: { analysis_id: string; theme_title: string; status: ThemeAnnotationStatus; researcher_note: string | null }
+): Promise<ThemeAnnotation> {
+  const { data } = await client.post<ThemeAnnotation>(`/projects/${projectId}/analysis/annotations`, body);
+  return data;
+}
+
+export async function getThemeAnnotations(projectId: string, analysisId: string): Promise<ThemeAnnotation[]> {
+  const { data } = await client.get<ThemeAnnotation[]>(`/projects/${projectId}/analysis/annotations/${analysisId}`);
+  return data;
+}
+
+export async function saveResearcherContext(projectId: string, version: number, context: string): Promise<void> {
+  await client.patch(`/projects/${projectId}/analysis/${version}/context`, { researcher_context: context });
+}
+
+export async function triggerRefinedAnalysis(projectId: string): Promise<{ status: string; version: number }> {
+  const { data } = await client.post<{ status: string; version: number }>(`/projects/${projectId}/analysis/refine`);
   return data;
 }

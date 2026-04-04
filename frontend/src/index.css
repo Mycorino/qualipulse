@@ -2815,6 +2815,149 @@ select.field-input {
   letter-spacing: 0.02em;
 }
 
+/* ── Iterative analysis — version tabs ──────────────────────────────────────── */
+.version-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 10px 0 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 6px;
+}
+.version-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  border-radius: 6px 6px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.version-tab:hover {
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+}
+.version-tab--active {
+  background: var(--bg);
+  border-color: var(--border-subtle);
+  border-bottom-color: var(--bg);
+  color: var(--brand-600);
+  font-weight: 600;
+}
+
+/* ── Iterative analysis — past version banner ────────────────────────────────── */
+.version-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  background: #fef9c3;
+  border: 1px solid #fde047;
+  color: #713f12;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ── Iterative analysis — annotation buttons ─────────────────────────────────── */
+.annotation-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid;
+  background: transparent;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.annotation-btn--confirmed {
+  border-color: #16a34a;
+  color: #16a34a;
+}
+.annotation-btn--confirmed.annotation-btn--active {
+  background: #16a34a;
+  color: #fff;
+}
+.annotation-btn--needs-evidence {
+  border-color: #d97706;
+  color: #d97706;
+}
+.annotation-btn--needs-evidence.annotation-btn--active {
+  background: #d97706;
+  color: #fff;
+}
+.annotation-btn--disputed {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+.annotation-btn--disputed.annotation-btn--active {
+  background: #dc2626;
+  color: #fff;
+}
+.annotation-btn:hover {
+  opacity: 0.8;
+}
+
+/* ── Iterative analysis — annotation note textarea ───────────────────────────── */
+.annotation-note-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  border: 1px dashed #d1d5db;
+  border-radius: var(--radius);
+  background: #fffbeb;
+  color: var(--text);
+  resize: vertical;
+  min-height: 52px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+.annotation-note-input:focus {
+  outline: none;
+  border-color: #d97706;
+  background: #fff;
+}
+.annotation-note-input::placeholder {
+  color: #9ca3af;
+}
+
+/* ── Iterative analysis — researcher context box ─────────────────────────────── */
+.researcher-context-box {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+}
+.researcher-context-box h3 {
+  font-size: 0.733rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ── Iterative analysis — refine confirm inline ──────────────────────────────── */
+.refine-confirm-inline {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+}
+
 /* ── Transcript audio players ───────────────────────────────────────────────── */
 .transcript-audio {
   width: 100%;

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -84,12 +84,43 @@ class ProjectAnalysis(Base):
     report: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
     filters: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: {filter_by, filter_values}
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    researcher_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version_label: Mapped[str] = mapped_column(String(20), default="ai_discovery", nullable=False)
+    parent_version_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("project_analyses.id", ondelete="SET NULL"), nullable=True
+    )
     generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     project = relationship("Project", back_populates="analyses")
+    annotations = relationship(
+        "AnalysisThemeAnnotation", back_populates="analysis", cascade="all, delete-orphan"
+    )
+
+
+class AnalysisThemeAnnotation(Base):
+    __tablename__ = "analysis_theme_annotations"
+    __table_args__ = (UniqueConstraint("analysis_id", "theme_title", name="uq_annotation_analysis_theme"),)
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    analysis_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project_analyses.id", ondelete="CASCADE"), nullable=False
+    )
+    theme_title: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # confirmed | disputed | needs_evidence
+    researcher_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.utcnow(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.utcnow(), nullable=False
+    )
+
+    analysis = relationship("ProjectAnalysis", back_populates="annotations")
 
 
 class InterviewTurn(Base):

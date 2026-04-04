@@ -3,6 +3,7 @@
 import json
 import logging
 import threading
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -10,9 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
-from app.models.interview import Participant, ProjectAnalysis
+from app.models.interview import AnalysisThemeAnnotation, Participant, ProjectAnalysis
 from app.models.project import Project
-from app.services.analysis import run_analysis
+from app.services.analysis import run_analysis, run_refined_analysis
 
 logger = logging.getLogger("auto_interview.analysis")
 router = APIRouter(prefix="/projects", tags=["analysis"])
@@ -23,6 +24,17 @@ ANALYSIS_TIMEOUT_SECONDS = 300  # 5 minutes
 class AnalysisTriggerRequest(BaseModel):
     filter_by: str | None = None       # e.g. "profession"
     filter_values: list[str] = []      # e.g. ["Engineer", "Designer"]
+
+
+class AnnotationUpsertRequest(BaseModel):
+    analysis_id: str
+    theme_title: str
+    status: str  # confirmed | disputed | needs_evidence
+    researcher_note: str | None = None
+
+
+class ResearcherContextRequest(BaseModel):
+    researcher_context: str
 
 
 @router.post("/{project_id}/analysis", status_code=status.HTTP_202_ACCEPTED)
@@ -149,6 +161,9 @@ def get_analysis(
             "report": None,
             "filters": None,
             "error": None,
+            "analysis_id": None,
+            "version": None,
+            "version_label": None,
         }
 
     active_filters = None
@@ -166,6 +181,9 @@ def get_analysis(
         "report": json.loads(analysis.report) if analysis.report else None,
         "filters": active_filters,
         "error": analysis.error,
+        "analysis_id": analysis.id,
+        "version": analysis.version,
+        "version_label": analysis.version_label,
     }
 
 
@@ -256,7 +274,7 @@ def list_analysis_versions(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    """Return metadata for all saved analysis versions (up to 3), newest first."""
+    """Return metadata for all saved analysis versions (up to 5), newest first."""
     _get_project_or_404(project_id, company.id, db)
     versions = (
         db.query(ProjectAnalysis)
@@ -272,13 +290,361 @@ def list_analysis_versions(
                 active_filters = json.loads(v.filters)
             except Exception:
                 pass
+
+        # Resolve parent_version number if parent_version_id set
+        parent_version_num = None
+        if v.parent_version_id:
+            parent_row = db.query(ProjectAnalysis).filter(ProjectAnalysis.id == v.parent_version_id).first()
+            if parent_row:
+                parent_version_num = parent_row.version
+
+        # Count annotations for this version
+        annotation_count = (
+            db.query(AnalysisThemeAnnotation)
+            .filter(AnalysisThemeAnnotation.analysis_id == v.id)
+            .count()
+        )
+
         result.append({
             "version": v.version,
             "generated_at": v.generated_at.isoformat() if v.generated_at else None,
             "participant_count": v.participant_count,
             "filters": active_filters,
+            "version_label": v.version_label,
+            "parent_version": parent_version_num,
+            "annotation_count": annotation_count,
         })
     return result
+
+
+@router.get("/{project_id}/analysis/{version_number}")
+def get_analysis_by_version(
+    project_id: str,
+    version_number: int,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Return full AnalysisResponse for a specific version number."""
+    _get_project_or_404(project_id, company.id, db)
+
+    analysis = (
+        db.query(ProjectAnalysis)
+        .filter(
+            ProjectAnalysis.project_id == project_id,
+            ProjectAnalysis.version == version_number,
+        )
+        .first()
+    )
+    if analysis is None:
+        raise HTTPException(status_code=404, detail=f"Version {version_number} not found")
+
+    active_filters = None
+    if analysis.filters:
+        try:
+            active_filters = json.loads(analysis.filters)
+        except Exception:
+            pass
+
+    completed_count = (
+        db.query(Participant)
+        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .count()
+    )
+
+    return {
+        "status": analysis.status,
+        "completed_count": completed_count,
+        "participant_count": analysis.participant_count,
+        "generated_at": analysis.generated_at.isoformat() if analysis.generated_at else None,
+        "report": json.loads(analysis.report) if analysis.report else None,
+        "filters": active_filters,
+        "error": analysis.error,
+        "analysis_id": analysis.id,
+        "version": analysis.version,
+        "version_label": analysis.version_label,
+    }
+
+
+@router.post("/{project_id}/analysis/annotations")
+def upsert_theme_annotation(
+    project_id: str,
+    body: AnnotationUpsertRequest,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Upsert a theme annotation for a given analysis. Creates if not exists, updates if exists."""
+    _get_project_or_404(project_id, company.id, db)
+
+    # Validate the analysis belongs to this project
+    analysis = db.query(ProjectAnalysis).filter(
+        ProjectAnalysis.id == body.analysis_id,
+        ProjectAnalysis.project_id == project_id,
+    ).first()
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    if body.status not in ("confirmed", "disputed", "needs_evidence"):
+        raise HTTPException(status_code=400, detail="Invalid status value")
+
+    existing = (
+        db.query(AnalysisThemeAnnotation)
+        .filter(
+            AnalysisThemeAnnotation.analysis_id == body.analysis_id,
+            AnalysisThemeAnnotation.theme_title == body.theme_title,
+        )
+        .first()
+    )
+
+    now = datetime.utcnow()
+    if existing:
+        existing.status = body.status
+        existing.researcher_note = body.researcher_note
+        existing.updated_at = now
+        annotation = existing
+    else:
+        annotation = AnalysisThemeAnnotation(
+            analysis_id=body.analysis_id,
+            theme_title=body.theme_title,
+            status=body.status,
+            researcher_note=body.researcher_note,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(annotation)
+
+    db.commit()
+    db.refresh(annotation)
+
+    return {
+        "id": annotation.id,
+        "analysis_id": annotation.analysis_id,
+        "theme_title": annotation.theme_title,
+        "status": annotation.status,
+        "researcher_note": annotation.researcher_note,
+        "created_at": annotation.created_at.isoformat(),
+        "updated_at": annotation.updated_at.isoformat(),
+    }
+
+
+@router.delete("/{project_id}/analysis/annotations/{annotation_id}")
+def delete_theme_annotation(
+    project_id: str,
+    annotation_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Delete a theme annotation."""
+    _get_project_or_404(project_id, company.id, db)
+
+    annotation = db.query(AnalysisThemeAnnotation).filter(
+        AnalysisThemeAnnotation.id == annotation_id,
+    ).first()
+    if annotation is None:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+
+    # Verify the analysis belongs to this project
+    analysis = db.query(ProjectAnalysis).filter(
+        ProjectAnalysis.id == annotation.analysis_id,
+        ProjectAnalysis.project_id == project_id,
+    ).first()
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    db.delete(annotation)
+    db.commit()
+    return {"message": "Annotation deleted"}
+
+
+@router.get("/{project_id}/analysis/annotations/{analysis_id}")
+def get_theme_annotations(
+    project_id: str,
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Return all theme annotations for a given analysis_id."""
+    _get_project_or_404(project_id, company.id, db)
+
+    # Verify the analysis belongs to this project
+    analysis = db.query(ProjectAnalysis).filter(
+        ProjectAnalysis.id == analysis_id,
+        ProjectAnalysis.project_id == project_id,
+    ).first()
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    annotations = (
+        db.query(AnalysisThemeAnnotation)
+        .filter(AnalysisThemeAnnotation.analysis_id == analysis_id)
+        .all()
+    )
+
+    return [
+        {
+            "id": a.id,
+            "analysis_id": a.analysis_id,
+            "theme_title": a.theme_title,
+            "status": a.status,
+            "researcher_note": a.researcher_note,
+            "created_at": a.created_at.isoformat(),
+            "updated_at": a.updated_at.isoformat(),
+        }
+        for a in annotations
+    ]
+
+
+@router.patch("/{project_id}/analysis/{version_number}/context")
+def save_researcher_context(
+    project_id: str,
+    version_number: int,
+    body: ResearcherContextRequest,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Save researcher context to a specific analysis version."""
+    _get_project_or_404(project_id, company.id, db)
+
+    analysis = (
+        db.query(ProjectAnalysis)
+        .filter(
+            ProjectAnalysis.project_id == project_id,
+            ProjectAnalysis.version == version_number,
+        )
+        .first()
+    )
+    if analysis is None:
+        raise HTTPException(status_code=404, detail=f"Version {version_number} not found")
+
+    analysis.researcher_context = body.researcher_context
+    db.commit()
+
+    return {"message": "Context saved", "version": version_number}
+
+
+@router.post("/{project_id}/analysis/refine", status_code=status.HTTP_202_ACCEPTED)
+def trigger_refined_analysis(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Create a refined analysis based on researcher annotations and context from the latest ready version."""
+    _get_project_or_404(project_id, company.id, db)
+
+    # Check for existing generating analysis
+    generating = (
+        db.query(ProjectAnalysis)
+        .filter(
+            ProjectAnalysis.project_id == project_id,
+            ProjectAnalysis.status == "generating",
+        )
+        .first()
+    )
+    if generating:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An analysis is already being generated.",
+        )
+
+    # Get the latest ready analysis
+    parent_analysis = (
+        db.query(ProjectAnalysis)
+        .filter(ProjectAnalysis.project_id == project_id, ProjectAnalysis.status == "ready")
+        .order_by(ProjectAnalysis.version.desc())
+        .first()
+    )
+    if parent_analysis is None:
+        raise HTTPException(status_code=400, detail="No ready analysis to refine.")
+
+    # Validate: at least one disputed/needs_evidence annotation OR non-empty researcher_context
+    actionable_annotations = (
+        db.query(AnalysisThemeAnnotation)
+        .filter(
+            AnalysisThemeAnnotation.analysis_id == parent_analysis.id,
+            AnalysisThemeAnnotation.status.in_(["disputed", "needs_evidence"]),
+        )
+        .count()
+    )
+    has_context = bool(parent_analysis.researcher_context and parent_analysis.researcher_context.strip())
+
+    if actionable_annotations == 0 and not has_context:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Add at least one disputed or needs-evidence annotation, "
+                "or a researcher context note, before refining."
+            ),
+        )
+
+    # Create the new analysis row
+    last = (
+        db.query(ProjectAnalysis)
+        .filter(ProjectAnalysis.project_id == project_id)
+        .order_by(ProjectAnalysis.version.desc())
+        .first()
+    )
+    next_version = (last.version + 1) if last else 1
+
+    completed_count = (
+        db.query(Participant)
+        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .count()
+    )
+
+    new_analysis = ProjectAnalysis(
+        project_id=project_id,
+        version=next_version,
+        status="generating",
+        version_label="researcher_refined",
+        parent_version_id=parent_analysis.id,
+        participant_count=completed_count,
+    )
+    db.add(new_analysis)
+    db.commit()
+    db.refresh(new_analysis)
+
+    new_analysis_id = new_analysis.id
+    parent_analysis_id = parent_analysis.id
+
+    def _run_refined(project_id: str, new_analysis_id: str, parent_analysis_id: str, db: Session):
+        try:
+            logger.info("Refined analysis started for project %s (new version %s)", project_id, next_version)
+            run_refined_analysis(project_id, new_analysis_id, parent_analysis_id, db)
+            logger.info("Refined analysis completed for project %s", project_id)
+        except Exception as exc:
+            logger.error("Refined analysis failed for project %s: %s", project_id, exc, exc_info=True)
+            try:
+                row = db.query(ProjectAnalysis).filter(ProjectAnalysis.id == new_analysis_id).first()
+                if row:
+                    row.status = "failed"
+                    row.error = str(exc)
+                    db.commit()
+            except Exception:
+                pass
+
+    thread = threading.Thread(
+        target=_run_refined,
+        args=(project_id, new_analysis_id, parent_analysis_id, db),
+        daemon=True,
+    )
+    thread.start()
+
+    def _watchdog(t: threading.Thread, project_id: str, analysis_id: str, db: Session):
+        t.join(timeout=ANALYSIS_TIMEOUT_SECONDS)
+        if t.is_alive():
+            logger.error("Refined analysis timed out for project %s", project_id)
+            try:
+                row = db.query(ProjectAnalysis).filter(ProjectAnalysis.id == analysis_id).first()
+                if row and row.status == "generating":
+                    row.status = "failed"
+                    row.error = "Analysis timed out after 5 minutes"
+                    db.commit()
+            except Exception:
+                pass
+
+    watchdog = threading.Thread(target=_watchdog, args=(thread, project_id, new_analysis_id, db), daemon=True)
+    watchdog.start()
+
+    return {"status": "generating", "message": "Refined analysis started", "version": next_version}
 
 
 def _get_project_or_404(project_id: str, company_id: str, db: Session) -> Project:
