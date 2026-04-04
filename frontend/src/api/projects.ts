@@ -65,6 +65,7 @@ export interface ProjectListItem {
   name: string;
   language: string;
   created_at: string;
+  archived_at: string | null;
   question_count: number;
   completed_count: number;
   in_progress_count: number;
@@ -226,8 +227,20 @@ export interface HeatmapResponse {
 
 // ── API functions ───────────────────────────────────────────────────────────
 
-export async function listProjects(): Promise<ProjectListItem[]> {
-  const { data } = await client.get<ProjectListItem[]>("/projects/");
+export async function listProjects(archived = false): Promise<ProjectListItem[]> {
+  const { data } = await client.get<ProjectListItem[]>("/projects/", {
+    params: archived ? { archived: true } : {},
+  });
+  return data;
+}
+
+export async function archiveProject(id: string): Promise<{ id: string; archived_at: string }> {
+  const { data } = await client.patch<{ id: string; archived_at: string }>(`/projects/${id}/archive`);
+  return data;
+}
+
+export async function unarchiveProject(id: string): Promise<{ id: string; archived_at: null }> {
+  const { data } = await client.patch<{ id: string; archived_at: null }>(`/projects/${id}/unarchive`);
   return data;
 }
 

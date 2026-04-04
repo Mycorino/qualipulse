@@ -44,6 +44,7 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Relationships
     company = relationship("Company", back_populates="projects")

@@ -11,7 +11,7 @@ import {
   toggleLink,
   updateProject,
   exportCSV,
-  deleteProject,
+  archiveProject,
   getAnalysis,
   triggerAnalysis,
   updateTurn,
@@ -85,6 +85,10 @@ export default function ProjectDetail() {
   // ── Analysis version history ───────────────────────────────────────────────
   const [analysisVersions, setAnalysisVersions] = useState<AnalysisVersionMeta[]>([]);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+
+  // ── Transcript highlight target (from "View transcript →" in analysis) ───────
+  const [highlightTarget, setHighlightTarget] = useState<{ turnIndex: number; quoteText: string } | null>(null);
+  const transcriptListRef = useRef<HTMLDivElement>(null);
 
   // ── Iterative analysis state ───────────────────────────────────────────────
   const [themeAnnotations, setThemeAnnotations] = useState<Record<string, ThemeAnnotation>>({});
@@ -188,6 +192,20 @@ export default function ProjectDetail() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [editingTurnId, editingText, editingOriginalText]);
+
+  // Scroll to highlighted turn after transcript loads, then auto-clear
+  useEffect(() => {
+    if (!transcript || !highlightTarget) return;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`turn-${highlightTarget.turnIndex}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+    // Auto-clear highlight after 4 s so it doesn't stay permanently
+    const timer = setTimeout(() => setHighlightTarget(null), 4000);
+    return () => clearTimeout(timer);
+  }, [transcript, highlightTarget]);
 
   // Escape key dismisses the tag popup
   useEffect(() => {
@@ -496,7 +514,10 @@ export default function ProjectDetail() {
     setTimeout(() => setLinkCopied(false), 2000);
   }
 
-  async function handleViewTranscript(p: ParticipantResponse) {
+  async function handleViewTranscript(
+    p: ParticipantResponse,
+    highlight?: { turnIndex: number; quoteText: string }
+  ) {
     if (editingTurnId && editingText !== editingOriginalText) {
       if (!confirm("You have unsaved transcript changes. Discard them?")) return;
     }
@@ -505,6 +526,8 @@ export default function ProjectDetail() {
     setEditingTurnId(null);
     setQualityAssessment(null);
     setSelectionInfo(null);
+    if (highlight) setHighlightTarget(highlight);
+    else setHighlightTarget(null);
     try {
       const result = await getTranscript(id!, p.id);
       setSelectedParticipant(result.participant);
@@ -528,13 +551,14 @@ export default function ProjectDetail() {
     }
   }
 
-  async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this project?")) return;
+  async function handleArchive() {
+    if (!confirm("Archive this project? You can restore it any time from the dashboard.")) return;
     try {
-      await deleteProject(id!);
+      await archiveProject(id!);
+      toast("Project archived", "success");
       navigate("/dashboard");
     } catch {
-      toast("Failed to delete project", "error");
+      toast("Failed to archive project", "error");
     }
   }
 
@@ -796,6 +820,26 @@ export default function ProjectDetail() {
 
   // ── Render helpers ─────────────────────────────────────────────────────────
 
+  /** Renders response text with a specific quoted substring highlighted in yellow,
+   *  falling back to code-tag rendering for the rest of the text. */
+  function renderWithQuoteHighlight(text: string, quoteText: string, turnId: string): React.ReactNode {
+    if (!quoteText) return renderTaggedText(text, turnId);
+    const lower = text.toLowerCase();
+    const quoteNorm = quoteText.toLowerCase().trim();
+    const idx = lower.indexOf(quoteNorm);
+    if (idx === -1) return renderTaggedText(text, turnId);
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + quoteNorm.length);
+    const after = text.slice(idx + quoteNorm.length);
+    return (
+      <span data-turn-text="">
+        {before}
+        <mark className="quote-highlight">{match}</mark>
+        {after}
+      </span>
+    );
+  }
+
   function renderTaggedText(text: string, turnId: string): React.ReactNode {
     const turnTags = tags.filter((t) => t.turn_id === turnId).sort((a, b) => a.start_index - b.start_index);
     if (!turnTags.length) return <span data-turn-text="">{text}</span>;
@@ -835,8 +879,14 @@ export default function ProjectDetail() {
             className="btn btn-ghost btn-xs"
             style={{ fontSize: 10, padding: "1px 4px" }}
             onClick={() => {
-              const p = participants.find((p) => p.display_name === q.participant_display_name);
-              if (p) { setTab("responses"); handleViewTranscript(p); }
+              const p = participants.find(
+                (p) => p.display_name === q.participant_display_name ||
+                       p.id === q.participant_identifier
+              );
+              if (p) {
+                setTab("responses");
+                handleViewTranscript(p, q.turn_index != null ? { turnIndex: q.turn_index, quoteText: q.text } : undefined);
+              }
             }}
           >
             View transcript →
@@ -1044,7 +1094,7 @@ export default function ProjectDetail() {
         </div>
         <div className="detail-header-actions">
           <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>Export CSV</button>
-          <button className="btn btn-ghost btn-sm btn-danger-text" onClick={handleDelete}>Delete</button>
+          <button className="btn btn-ghost btn-sm" onClick={handleArchive} title="Archive this project (recoverable from the dashboard)">Archive</button>
         </div>
       </header>
 
@@ -1696,11 +1746,16 @@ export default function ProjectDetail() {
                     {transcript.length === 0 ? (
                       <p className="muted-text">No transcript available.</p>
                     ) : (
-                      <div className="transcript-list">
+                      <div className="transcript-list" ref={transcriptListRef}>
                         {transcript.map((t) => {
                           const turnTags = tags.filter((tg) => tg.turn_id === t.id);
+                          const isHighlighted = highlightTarget?.turnIndex === t.turn_index;
                           return (
-                            <div key={t.turn_index} className="transcript-turn">
+                            <div
+                              key={t.turn_index}
+                              id={`turn-${t.turn_index}`}
+                              className={`transcript-turn${isHighlighted ? " transcript-turn--highlighted" : ""}`}
+                            >
                               <div className="transcript-q">
                                 <strong>Q:</strong> {t.question_text}
                                 {t.tts_audio_url && (
@@ -1723,7 +1778,9 @@ export default function ProjectDetail() {
                               ) : t.response_transcript ? (
                                 <div className="transcript-a" onMouseUp={() => handleTranscriptMouseUp(t.id)} style={{ userSelect: "text" }}>
                                   <strong>A:</strong>{" "}
-                                  {renderTaggedText(t.response_transcript, t.id)}
+                                  {isHighlighted && highlightTarget
+                                    ? renderWithQuoteHighlight(t.response_transcript, highlightTarget.quoteText, t.id)
+                                    : renderTaggedText(t.response_transcript, t.id)}
                                   <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
                                     <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>Edit</button>
                                     {t.manually_edited && (

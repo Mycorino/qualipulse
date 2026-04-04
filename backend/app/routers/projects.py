@@ -1,7 +1,7 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
@@ -108,16 +108,18 @@ async def import_project_from_csv(
 
 @router.get("/", response_model=list[ProjectListResponse])
 def list_projects(
+    archived: bool = Query(False, description="Return archived projects instead of active ones"),
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> list[ProjectListResponse]:
-    projects = (
-        db.query(Project)
-        .filter(Project.company_id == company.id)
-        .order_by(Project.created_at.desc())
-        .all()
-    )
-    from app.models.interview import Participant, ProjectAnalysis
+    query = db.query(Project).filter(Project.company_id == company.id)
+    if archived:
+        query = query.filter(Project.archived_at.isnot(None))
+    else:
+        query = query.filter(Project.archived_at.is_(None))
+    projects = query.order_by(Project.created_at.desc()).all()
+
+    from app.models.interview import ProjectAnalysis
     results = []
     for p in projects:
         completed = sum(1 for pt in p.participants if pt.status == "completed")
@@ -134,6 +136,7 @@ def list_projects(
                 name=p.name,
                 language=p.language,
                 created_at=p.created_at,
+                archived_at=p.archived_at,
                 question_count=len(p.guide_questions),
                 completed_count=completed,
                 in_progress_count=in_progress,
@@ -204,15 +207,28 @@ def update_project(
     return _project_to_response(project)
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(
+@router.patch("/{project_id}/archive", status_code=status.HTTP_200_OK)
+def archive_project(
     project_id: str,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
-) -> None:
+) -> dict:
     project = _get_project_or_404(project_id, company.id, db)
-    db.delete(project)
+    project.archived_at = datetime.now(timezone.utc)
     db.commit()
+    return {"id": project.id, "archived_at": project.archived_at.isoformat()}
+
+
+@router.patch("/{project_id}/unarchive", status_code=status.HTTP_200_OK)
+def unarchive_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> dict:
+    project = _get_project_or_404(project_id, company.id, db)
+    project.archived_at = None
+    db.commit()
+    return {"id": project.id, "archived_at": None}
 
 
 @router.patch("/{project_id}/questions/{question_id}", response_model=QuestionResponse)
