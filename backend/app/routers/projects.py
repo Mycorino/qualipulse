@@ -15,6 +15,7 @@ from app.schemas.project import (
     QuestionResponse,
     ScreeningQuestionResponse,
 )
+from app.services.feature_gates import require_project_limit
 from app.services.guide_parser import parse_guide_csv
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -26,6 +27,8 @@ def create_project(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ProjectResponse:
+    current_count = db.query(Project).filter(Project.company_id == company.id).count()
+    require_project_limit(company, current_count)
     project = Project(
         company_id=company.id,
         name=body.name,
@@ -114,8 +117,17 @@ def list_projects(
         .order_by(Project.created_at.desc())
         .all()
     )
+    from app.models.interview import Participant, ProjectAnalysis
     results = []
     for p in projects:
+        completed = sum(1 for pt in p.participants if pt.status == "completed")
+        in_progress = sum(1 for pt in p.participants if pt.status == "in_progress")
+        latest_analysis = (
+            db.query(ProjectAnalysis)
+            .filter(ProjectAnalysis.project_id == p.id)
+            .order_by(ProjectAnalysis.version.desc())
+            .first()
+        )
         results.append(
             ProjectListResponse(
                 id=p.id,
@@ -123,6 +135,9 @@ def list_projects(
                 language=p.language,
                 created_at=p.created_at,
                 question_count=len(p.guide_questions),
+                completed_count=completed,
+                in_progress_count=in_progress,
+                analysis_status=latest_analysis.status if latest_analysis else None,
             )
         )
     return results

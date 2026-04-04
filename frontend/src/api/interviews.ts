@@ -6,6 +6,10 @@ export interface InterviewInfo {
   welcome_message?: string;
   interview_duration_minutes?: number;
   question_count?: number;
+  researcher_name?: string;
+  researcher_logo_url?: string;
+  research_context?: string;
+  privacy_policy_url?: string;
 }
 
 export interface ScreeningQuestion {

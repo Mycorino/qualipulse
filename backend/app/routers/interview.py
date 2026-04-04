@@ -16,6 +16,7 @@ from app.schemas.interview import (
     ResumeCheckResponse,
     ResumeSummaryResponse,
 )
+from app.services.feature_gates import require_participant_limit
 from app.services.interview_engine import process_interview_turn, start_interview, skip_question as engine_skip_question
 from app.services.storage import upload_audio
 
@@ -72,6 +73,10 @@ def validate_link(
         "language": project.language,
         "interview_duration_minutes": project.interview_duration_minutes,
         "question_count": len([q for q in project.guide_questions if not q.deprecated_at]),
+        "researcher_name": project.researcher_name,
+        "researcher_logo_url": project.researcher_logo_url,
+        "research_context": project.research_context,
+        "privacy_policy_url": project.privacy_policy_url,
     }
 
 
@@ -157,6 +162,16 @@ def start_interview_session(
 ):
     """Create a new participant and generate the first interview question."""
     link = _get_active_link_or_404(token, db)
+
+    # Enforce participant limit for this project
+    current_count = db.query(Participant).filter(
+        Participant.project_id == link.project_id,
+        Participant.status == "completed",
+    ).count()
+    from app.models.project import Project as ProjectModel
+    project = db.query(ProjectModel).filter(ProjectModel.id == link.project_id).first()
+    if project and project.company:
+        require_participant_limit(project.company, project, current_count)
 
     participant = Participant(
         link_id=link.id,

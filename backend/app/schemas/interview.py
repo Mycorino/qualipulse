@@ -66,6 +66,8 @@ class TranscriptTurnResponse(BaseModel):
     manually_edited: bool = False
     edited_at: datetime | None = None
     created_at: datetime
+    audio_recording_url: str | None = None
+    tts_audio_url: str | None = None
 
     model_config = {"from_attributes": True}
 

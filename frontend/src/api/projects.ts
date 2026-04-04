@@ -66,6 +66,9 @@ export interface ProjectListItem {
   language: string;
   created_at: string;
   question_count: number;
+  completed_count: number;
+  in_progress_count: number;
+  analysis_status: string | null;
 }
 
 export interface InterviewLink {
@@ -108,6 +111,8 @@ export interface TranscriptTurn {
   manually_edited: boolean;
   edited_at: string | null;
   created_at: string;
+  audio_recording_url: string | null;
+  tts_audio_url: string | null;
 }
 
 // ── Analysis types ─────────────────────────────────────────────────────────
@@ -385,4 +390,13 @@ export async function deleteMemo(projectId: string, memoId: string): Promise<voi
 export async function assessQuality(projectId: string, participantId: string): Promise<QualityAssessment> {
   const { data } = await client.post<QualityAssessment>(`/projects/${projectId}/participants/${participantId}/quality`);
   return data;
+}
+
+export async function shareAnalysis(projectId: string): Promise<{ share_token: string }> {
+  const { data } = await client.post<{ share_token: string }>(`/projects/${projectId}/analysis/share`);
+  return data;
+}
+
+export async function revokeAnalysisShare(projectId: string): Promise<void> {
+  await client.delete(`/projects/${projectId}/analysis/share`);
 }

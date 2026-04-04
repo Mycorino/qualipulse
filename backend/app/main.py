@@ -124,3 +124,22 @@ app.include_router(billing.router)
 @app.get("/", tags=["health"])
 async def health_check():
     return {"status": "ok", "service": "auto-interview-api", "env": settings.ENVIRONMENT}
+
+
+@app.get("/reports/{share_token}", tags=["public"])
+def get_shared_report(share_token: str, db=Depends(get_db)):
+    """Public read-only view of a shared analysis report — no auth required."""
+    from app.models.interview import ProjectAnalysis
+    import json as _json
+    analysis = db.query(ProjectAnalysis).filter(
+        ProjectAnalysis.share_token == share_token,
+        ProjectAnalysis.status == "ready",
+    ).first()
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Report not found or link has been revoked.")
+    return {
+        "project_name": analysis.project.name if analysis.project else None,
+        "participant_count": analysis.participant_count,
+        "generated_at": analysis.generated_at.isoformat() if analysis.generated_at else None,
+        "report": _json.loads(analysis.report) if analysis.report else None,
+    }

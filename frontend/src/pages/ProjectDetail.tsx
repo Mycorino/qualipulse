@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { SkeletonTable } from "../components/Skeleton";
 import {
   getProject,
+  listProjects,
   getLinks,
   getParticipants,
   createLink,
@@ -27,6 +28,7 @@ import {
   deleteMemo,
   getHeatmap,
   assessQuality,
+  shareAnalysis,
   ProjectResponse,
   InterviewLink,
   ParticipantResponse,
@@ -63,6 +65,12 @@ export default function ProjectDetail() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
+  const [advancedPromptOpen, setAdvancedPromptOpen] = useState(false);
+  const [projects, setProjects] = useState<import("../api/projects").ProjectListItem[]>([]);
+
+  // ── Responses tab filters/sort ─────────────────────────────────────────────
+  const [responseStatusFilter, setResponseStatusFilter] = useState<"all" | "completed" | "in_progress">("all");
+  const [responseSortBy, setResponseSortBy] = useState<"date" | "quality" | "name">("date");
 
   // ── Overview inline editors ────────────────────────────────────────────────
   const [editingObjective, setEditingObjective] = useState(false);
@@ -148,6 +156,19 @@ export default function ProjectDetail() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [editingTurnId, editingText, editingOriginalText]);
 
+  // Escape key dismisses the tag popup
+  useEffect(() => {
+    if (!selectionInfo) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectionInfo(null);
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectionInfo]);
+
   async function loadAll() {
     setLoading(true);
     try {
@@ -161,6 +182,7 @@ export default function ProjectDetail() {
       setLinks(lnks);
       setParticipants(parts);
       setAnalysis(ana);
+      if (parts.length > 0) setTab("responses");
       if (ana.filters) {
         setActiveFilterBy(ana.filters.filter_by);
         setActiveFilterValues(ana.filters.filter_values);
@@ -175,6 +197,7 @@ export default function ProjectDetail() {
       getCodes(id!).then(setCodes).catch(() => {}),
       getTags(id!).then(setTags).catch(() => {}),
       getMemos(id!).then(setMemos).catch(() => {}),
+      listProjects().then(setProjects).catch(() => {}),
     ]);
   }
 
@@ -192,6 +215,12 @@ export default function ProjectDetail() {
   }
 
   async function handleTriggerAnalysis() {
+    if (analysis?.report) {
+      const ok = window.confirm(
+        "This will replace your current analysis report. The previous version will not be saved.\n\nDownload it first (Export JSON) if you want to keep it. Continue?"
+      );
+      if (!ok) return;
+    }
     const filters =
       activeFilterBy && activeFilterValues.length > 0
         ? { filter_by: activeFilterBy, filter_values: activeFilterValues }
@@ -254,6 +283,17 @@ export default function ProjectDetail() {
     a.download = `${project?.name ?? "analysis"}-report.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleShareAnalysis() {
+    try {
+      const res = await shareAnalysis(id!);
+      const url = `${window.location.origin}/reports/${res.share_token}`;
+      await navigator.clipboard.writeText(url);
+      alert(`Share link copied!\n\n${url}`);
+    } catch {
+      alert("Could not generate share link. Make sure analysis is ready.");
+    }
   }
 
   async function handleGenerateLink() {
@@ -375,7 +415,10 @@ export default function ProjectDetail() {
     const start = fullText.indexOf(text);
     if (start === -1) { setSelectionInfo(null); return; }
 
-    setSelectionInfo({ turnId, text, start, end: start + text.length, x: rect.left + rect.width / 2, y: rect.top + window.scrollY - 40 });
+    // Viewport-safe x position: clamp so popup (180px wide) stays on screen
+    const popupWidth = 200;
+    const safeX = Math.min(Math.max(rect.left + rect.width / 2, popupWidth / 2 + 8), window.innerWidth - popupWidth / 2 - 8);
+    setSelectionInfo({ turnId, text, start, end: start + text.length, x: safeX, y: rect.top + window.scrollY - 44 });
     setShowNewCode(false);
   }
 
@@ -804,31 +847,43 @@ export default function ProjectDetail() {
       {/* ── Header ── */}
       <header className="detail-header">
         <div className="detail-header-left">
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate("/dashboard")}>← Back</button>
-          <div>
-            <h1 className="detail-title">{project.name}</h1>
-            <div className="detail-meta">
-              <span className="badge">{project.language.toUpperCase()}</span>
-              <span>{project.interview_duration_minutes} min</span>
-              <span>{project.questions.length} questions</span>
-            </div>
+          <div className="detail-breadcrumb">
+            <a href="/dashboard">Projects</a>
+            <span className="detail-breadcrumb-sep">/</span>
+            <span>{project.name}</span>
+            {projects.length > 1 && (
+              <select
+                style={{ marginLeft: 8, fontSize: "0.8rem", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer" }}
+                value={id}
+                onChange={(e) => navigate(`/projects/${e.target.value}`)}
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
         <div className="detail-header-actions">
           <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>Export CSV</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>Edit Guide</button>
           <button className="btn btn-ghost btn-sm btn-danger-text" onClick={handleDelete}>Delete</button>
         </div>
       </header>
 
-      {/* ── Tabs ── */}
-      <div className="detail-tabs">
-        {(["overview", "setup", "responses", "analysis"] as Tab[]).map((t) => (
-          <button key={t} className={`detail-tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
-            {t === "overview" && "Overview"}
-            {t === "setup" && "Setup"}
+      {/* ── Tabs — ordered by researcher workflow ── */}
+      <div className="detail-tabs" role="tablist">
+        {(["responses", "analysis", "overview", "setup"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            className={`detail-tab ${tab === t ? "active" : ""}`}
+            onClick={() => setTab(t)}
+          >
             {t === "responses" && (<>Responses {participants.length > 0 && <span className="tab-count">{completedCount}/{participants.length}</span>}</>)}
             {t === "analysis" && (<>Analysis {analysis?.status === "generating" && <span className="tab-dot tab-dot-pulse" />}</>)}
+            {t === "overview" && "Overview"}
+            {t === "setup" && "Setup"}
           </button>
         ))}
       </div>
@@ -1032,36 +1087,6 @@ export default function ProjectDetail() {
               )}
             </section>
 
-            {/* System Prompt */}
-            <section className="detail-section">
-              <div className="section-header-row">
-                <div>
-                  <h2>AI Interviewer Prompt</h2>
-                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>Customize how the AI interviewer behaves.</p>
-                </div>
-                {!editingSystemPrompt && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setSystemPromptDraft(project.system_prompt ?? ""); setEditingSystemPrompt(true); }}>Edit</button>
-                )}
-              </div>
-              {editingSystemPrompt ? (
-                <>
-                  <textarea
-                    className="field-input"
-                    value={systemPromptDraft}
-                    onChange={(e) => setSystemPromptDraft(e.target.value)}
-                    rows={8}
-                    style={{ width: "100%", fontFamily: "monospace", fontSize: 13, marginBottom: 8 }}
-                  />
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className="btn btn-primary btn-sm" onClick={saveSystemPrompt} disabled={savingSystemPrompt}>{savingSystemPrompt ? "Saving…" : "Save"}</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingSystemPrompt(false)}>Cancel</button>
-                  </div>
-                </>
-              ) : (
-                <pre className="system-prompt-preview">{project.system_prompt || <em className="muted-text">No custom prompt — using default.</em>}</pre>
-              )}
-            </section>
-
             <section className="detail-section">
               <div className="section-header-row">
                 <div>
@@ -1201,228 +1226,356 @@ export default function ProjectDetail() {
                 ))
               )}
             </section>
+
+            {/* System Prompt — Advanced accordion */}
+            <section className="detail-section">
+              <div className="advanced-accordion">
+                <button
+                  className="advanced-accordion-toggle"
+                  onClick={() => setAdvancedPromptOpen((o) => !o)}
+                  aria-expanded={advancedPromptOpen}
+                >
+                  <span>⚙ Advanced — AI Interviewer Prompt</span>
+                  <span style={{ fontSize: "0.8rem" }}>{advancedPromptOpen ? "▲" : "▼"}</span>
+                </button>
+                {advancedPromptOpen && (
+                  <div className="advanced-accordion-body">
+                    <div className="advanced-warning">
+                      ⚠ Changes here affect all future interviews on this project and cannot be applied retroactively to completed sessions.
+                    </div>
+                    <p className="muted-text" style={{ fontSize: 13, marginBottom: 8 }}>
+                      Customize how the AI interviewer behaves. Leave blank to use the default prompt.{" "}
+                      {!editingSystemPrompt && !project.system_prompt && (
+                        <span style={{ color: "var(--text-tertiary)" }}>Currently using default.</span>
+                      )}
+                    </p>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                      {!editingSystemPrompt && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => { setSystemPromptDraft(project.system_prompt ?? ""); setEditingSystemPrompt(true); }}>Edit</button>
+                      )}
+                    </div>
+                    {editingSystemPrompt ? (
+                      <>
+                        <textarea
+                          className="field-input"
+                          value={systemPromptDraft}
+                          onChange={(e) => setSystemPromptDraft(e.target.value)}
+                          rows={8}
+                          style={{ width: "100%", fontFamily: "monospace", fontSize: 13, marginBottom: 8 }}
+                        />
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="btn btn-primary btn-sm" onClick={saveSystemPrompt} disabled={savingSystemPrompt}>{savingSystemPrompt ? "Saving…" : "Save"}</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setEditingSystemPrompt(false)}>Cancel</button>
+                        </div>
+                      </>
+                    ) : (
+                      <pre className="system-prompt-preview">{project.system_prompt || <em className="muted-text">No custom prompt — using default.</em>}</pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
         )}
 
         {/* ══ RESPONSES ══ */}
-        {tab === "responses" && (
-          <div className="tab-content">
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowCodebook(!showCodebook)}>
-                {showCodebook ? "Hide Codebook" : "Codebook"} ({codes.length})
-              </button>
-            </div>
+        {tab === "responses" && (() => {
+          const completedCount = participants.filter(p => p.status === "completed").length;
+          const inProgressCount = participants.filter(p => p.status !== "completed").length;
 
-            {/* Codebook */}
-            {showCodebook && (
-              <section className="detail-section" style={{ marginBottom: 16 }}>
-                <h3 style={{ marginBottom: 12 }}>Codebook</h3>
-                {codes.length === 0 ? (
-                  <p className="muted-text">No codes yet. Select text in a transcript to tag it.</p>
+          const qualityOrder: Record<string, number> = { strong: 0, good: 1, fair: 2, low: 3 };
+          const filtered = participants
+            .filter(p => {
+              if (responseStatusFilter === "completed") return p.status === "completed";
+              if (responseStatusFilter === "in_progress") return p.status !== "completed";
+              return true;
+            })
+            .sort((a, b) => {
+              if (responseSortBy === "name") return (a.display_name || "Anonymous").localeCompare(b.display_name || "Anonymous");
+              if (responseSortBy === "quality") {
+                const qa = qualityOrder[a.quality_label ?? ""] ?? 99;
+                const qb = qualityOrder[b.quality_label ?? ""] ?? 99;
+                return qa - qb;
+              }
+              // date: newest first
+              return new Date(b.started_at).getTime() - new Date(a.started_at).getTime();
+            });
+
+          function relativeDate(iso: string) {
+            const diff = Date.now() - new Date(iso).getTime();
+            const mins = Math.floor(diff / 60000);
+            if (mins < 60) return `${mins}m ago`;
+            const hours = Math.floor(mins / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            if (days < 7) return `${days}d ago`;
+            return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+          }
+
+          function avatarInitial(name: string | null | undefined) {
+            const n = name?.trim();
+            if (!n) return "?";
+            return n[0].toUpperCase();
+          }
+
+          return (
+          <div className="tab-content" style={{ padding: 0 }}>
+            <div className="responses-layout">
+              {/* ── Left column: filter + list ── */}
+              <div className="responses-list-col">
+                {/* Header row */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>Responses</span>
+                  <button className="btn btn-ghost btn-xs" onClick={handleExportCSV}>CSV</button>
+                </div>
+
+                {/* Status filter pills */}
+                <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                  {(["all", "completed", "in_progress"] as const).map(f => {
+                    const label = f === "all" ? `All (${participants.length})` : f === "completed" ? `Done (${completedCount})` : `In progress (${inProgressCount})`;
+                    return (
+                      <button
+                        key={f}
+                        className={`filter-pill ${responseStatusFilter === f ? "filter-pill--active" : ""}`}
+                        onClick={() => setResponseStatusFilter(f)}
+                      >{label}</button>
+                    );
+                  })}
+                </div>
+
+                {/* Sort */}
+                <div style={{ marginBottom: 14 }}>
+                  <select
+                    className="field-input"
+                    value={responseSortBy}
+                    onChange={e => setResponseSortBy(e.target.value as "date" | "quality" | "name")}
+                    style={{ fontSize: 12, padding: "4px 8px", height: 30 }}
+                  >
+                    <option value="date">Newest first</option>
+                    <option value="quality">By quality</option>
+                    <option value="name">By name</option>
+                  </select>
+                </div>
+
+                {loading ? (
+                  <SkeletonTable rows={4} />
+                ) : participants.length === 0 ? (
+                  <div className="empty-state" style={{ padding: "32px 16px" }}>
+                    <p style={{ fontWeight: 500 }}>No responses yet</p>
+                    <p className="muted-text" style={{ fontSize: 12, marginTop: 4 }}>Share an interview link to get started.</p>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div style={{ padding: "24px 0", textAlign: "center" }}>
+                    <p className="muted-text" style={{ fontSize: 13 }}>No {responseStatusFilter === "completed" ? "completed" : "in-progress"} responses.</p>
+                  </div>
                 ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {codes.map((c) => (
-                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: `${c.color}22`, border: `1.5px solid ${c.color}`, fontSize: 13 }}>
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, display: "inline-block", flexShrink: 0 }} />
-                        {renamingCodeId === c.id ? (
-                          <>
-                            <input
-                              autoFocus
-                              value={renameText}
-                              onChange={(e) => setRenameText(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleRenameCode(c.id); if (e.key === "Escape") setRenamingCodeId(null); }}
-                              style={{ border: "none", background: "transparent", outline: "none", fontSize: 13, width: Math.max(60, renameText.length * 8) }}
-                            />
-                            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#6366f1", padding: 0, fontSize: 12 }} onClick={() => handleRenameCode(c.id)} title="Save">✓</button>
-                            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 12 }} onClick={() => setRenamingCodeId(null)} title="Cancel">✕</button>
-                          </>
-                        ) : (
-                          <>
-                            <span
-                              title="Double-click to rename"
-                              onDoubleClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }}
-                              style={{ cursor: "text" }}
-                            >{c.name}</span>
-                            <span className="muted-text" style={{ fontSize: 11 }}>({c.tag_count})</span>
-                            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 11 }} onClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} title="Rename">✎</button>
-                            <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 14 }} onClick={() => handleDeleteCode(c.id)} title="Delete code">×</button>
-                          </>
-                        )}
+                  <div className="participants-list" style={{ gap: 2 }}>
+                    {filtered.map((p) => (
+                      <div
+                        key={p.id}
+                        className={`participant-row participant-row--compact ${selectedParticipant?.id === p.id ? "active" : ""}`}
+                        onClick={() => handleViewTranscript(p)}
+                      >
+                        <div className="participant-avatar">{avatarInitial(p.display_name)}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span className="participant-name" style={{ fontSize: 13, marginRight: 0 }}>{p.display_name || "Anonymous"}</span>
+                            {p.status !== "completed" && (
+                              <span className="status-badge status-progress" style={{ fontSize: 10 }}>Live</span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                            <span className="participant-date" style={{ fontSize: 11 }}>{relativeDate(p.started_at)}</span>
+                            {p.quality_label && (
+                              <span className={`quality-badge quality-badge--${p.quality_label}`} style={{ fontSize: 10, padding: "1px 6px" }}>
+                                {p.quality_label === "low" && "Low"}
+                                {p.quality_label === "fair" && "Fair"}
+                                {p.quality_label === "good" && "Good"}
+                                {p.quality_label === "strong" && "Strong"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </section>
-            )}
-
-            <section className="detail-section">
-              <div className="section-header-row">
-                <h2>Participants ({participants.length})</h2>
-                <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>Export CSV</button>
               </div>
-              {loading ? (
-                <SkeletonTable rows={4} />
-              ) : participants.length === 0 ? (
-                <div className="empty-state">
-                  <p>No responses yet.</p>
-                  <p className="muted-text">Share an interview link from the Overview tab to get started.</p>
-                </div>
-              ) : (
-                <div className="participants-list">
-                  {participants.map((p) => (
-                    <div key={p.id} className={`participant-row ${selectedParticipant?.id === p.id ? "active" : ""}`} onClick={() => handleViewTranscript(p)}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                        <span className="participant-name">{p.display_name || "Anonymous"}</span>
-                        <span className={`status-badge ${p.status === "completed" ? "status-done" : "status-progress"}`}>
-                          {p.status === "completed" ? "Completed" : "In progress"}
-                        </span>
-                        {p.quality_label && (
-                          <span className={`quality-badge quality-badge--${p.quality_label}`} title={`Response quality: ${p.quality_label} (${p.quality_score !== null && p.quality_score !== undefined ? Math.round(p.quality_score * 100) : "?"}%)`}>
-                            {p.quality_label === "low" && "⚠ Low quality"}
-                            {p.quality_label === "fair" && "◑ Fair quality"}
-                            {p.quality_label === "good" && "● Good quality"}
-                            {p.quality_label === "strong" && "★ Strong quality"}
+
+              {/* ── Right column: transcript or empty state ── */}
+              <div className="responses-transcript-col">
+                {transcript !== null && selectedParticipant ? (
+                  <>
+                    {/* Transcript header */}
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                      <div>
+                        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{selectedParticipant.display_name || "Anonymous"}</h2>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {selectedParticipant.profession && <span className="badge">{selectedParticipant.profession}</span>}
+                          {selectedParticipant.age_range && <span className="badge">{selectedParticipant.age_range}</span>}
+                          {selectedParticipant.country && <span className="badge">{selectedParticipant.country}</span>}
+                          <span className="participant-date" style={{ fontSize: 12 }}>{new Date(selectedParticipant.started_at).toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }}>Close</button>
+                    </div>
+
+                    {/* AI Quality Assessment */}
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: qualityAssessment ? 12 : 0 }}>
+                        {selectedParticipant.quality_label && (
+                          <span className={`quality-badge quality-badge--${selectedParticipant.quality_label}`}>
+                            {selectedParticipant.quality_label === "low" && "⚠ Low quality"}
+                            {selectedParticipant.quality_label === "fair" && "◑ Fair quality"}
+                            {selectedParticipant.quality_label === "good" && "● Good quality"}
+                            {selectedParticipant.quality_label === "strong" && "★ Strong quality"}
                           </span>
                         )}
-                        {p.profession && <span className="badge" style={{ fontSize: 11 }}>{p.profession}</span>}
-                        {p.age_range && <span className="badge" style={{ fontSize: 11 }}>{p.age_range}</span>}
+                        <button className="btn btn-ai btn-sm" onClick={handleAssessQuality} disabled={loadingQuality}>
+                          {loadingQuality ? "Assessing…" : qualityAssessment ? "✦ Re-assess" : "✦ AI Quality Check"}
+                        </button>
+                        {qualityAssessment && (
+                          <button className="btn btn-ghost btn-xs" onClick={() => setQualityAssessment(null)}>Hide</button>
+                        )}
                       </div>
-                      <span className="participant-date">{new Date(p.started_at).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* Transcript panel */}
-            {transcript !== null && selectedParticipant && (
-              <section className="detail-section transcript-section">
-                <div className="section-header-row">
-                  <div>
-                    <h2>Transcript — {selectedParticipant.display_name || "Anonymous"}</h2>
-                    {(selectedParticipant.profession || selectedParticipant.age_range || selectedParticipant.country) && (
-                      <div className="detail-meta" style={{ marginTop: 4 }}>
-                        {selectedParticipant.profession && <span className="badge">{selectedParticipant.profession}</span>}
-                        {selectedParticipant.age_range && <span className="badge">{selectedParticipant.age_range}</span>}
-                        {selectedParticipant.country && <span className="badge">{selectedParticipant.country}</span>}
-                      </div>
-                    )}
-                  </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }}>Close</button>
-                </div>
-
-                {/* AI Quality Assessment */}
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: qualityAssessment ? 12 : 0 }}>
-                    {selectedParticipant.quality_label && (
-                      <span className={`quality-badge quality-badge--${selectedParticipant.quality_label}`}>
-                        {selectedParticipant.quality_label === "low" && "⚠ Low quality"}
-                        {selectedParticipant.quality_label === "fair" && "◑ Fair quality"}
-                        {selectedParticipant.quality_label === "good" && "● Good quality"}
-                        {selectedParticipant.quality_label === "strong" && "★ Strong quality"}
-                      </span>
-                    )}
-                    <button
-                      className="btn btn-ai btn-sm"
-                      onClick={handleAssessQuality}
-                      disabled={loadingQuality}
-                    >
-                      {loadingQuality ? "Assessing…" : qualityAssessment ? "✦ Re-assess" : "✦ AI Quality Check"}
-                    </button>
-                    {qualityAssessment && (
-                      <button className="btn btn-ghost btn-xs" onClick={() => setQualityAssessment(null)}>Hide</button>
-                    )}
-                  </div>
-
-                  {qualityAssessment && (
-                    <div className="quality-panel">
-                      <div className="quality-panel-header">
-                        <span className={`quality-badge quality-badge--${qualityAssessment.quality_label} quality-badge--lg`}>
-                          {qualityAssessment.quality_label === "low" && "⚠ Low quality"}
-                          {qualityAssessment.quality_label === "fair" && "◑ Fair quality"}
-                          {qualityAssessment.quality_label === "good" && "● Good quality"}
-                          {qualityAssessment.quality_label === "strong" && "★ Strong quality"}
-                        </span>
-                        <div className="quality-stats">
-                          <span>~{qualityAssessment.avg_response_words} words/answer</span>
-                          <span>{qualityAssessment.short_answer_pct}% short answers</span>
-                        </div>
-                      </div>
-                      <p className="quality-summary">{qualityAssessment.summary}</p>
-                      {qualityAssessment.strengths.length > 0 && (
-                        <div className="quality-points quality-points--good">
-                          <strong>Strengths</strong>
-                          <ul>{qualityAssessment.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                        </div>
-                      )}
-                      {qualityAssessment.issues.length > 0 && (
-                        <div className="quality-points quality-points--warn">
-                          <strong>Issues</strong>
-                          <ul>{qualityAssessment.issues.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {transcript.length === 0 ? (
-                  <p className="muted-text">No transcript available.</p>
-                ) : (
-                  <div className="transcript-list">
-                    {transcript.map((t) => {
-                      const turnTags = tags.filter((tg) => tg.turn_id === t.id);
-                      return (
-                        <div key={t.turn_index} className="transcript-turn">
-                          <div className="transcript-q"><strong>Q:</strong> {t.question_text}</div>
-                          {t.response_transcript && editingTurnId === t.id ? (
-                            <div style={{ marginTop: 6 }}>
-                              <textarea className="field-input" value={editingText} onChange={(e) => setEditingText(e.target.value)} rows={4} style={{ width: "100%", marginBottom: 6 }} autoFocus />
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <button className="btn btn-primary btn-xs" disabled={savingTurnId === t.id} onClick={() => saveEditTurn(t)}>
-                                  {savingTurnId === t.id ? "Saving..." : "Save"}
-                                </button>
-                                <button className="btn btn-ghost btn-xs" onClick={() => {
-                                  if (editingText !== editingOriginalText && !confirm("Discard changes?")) return;
-                                  setEditingTurnId(null);
-                                }}>Cancel</button>
-                              </div>
+                      {qualityAssessment && (
+                        <div className="quality-panel">
+                          <div className="quality-panel-header">
+                            <span className={`quality-badge quality-badge--${qualityAssessment.quality_label} quality-badge--lg`}>
+                              {qualityAssessment.quality_label === "low" && "⚠ Low quality"}
+                              {qualityAssessment.quality_label === "fair" && "◑ Fair quality"}
+                              {qualityAssessment.quality_label === "good" && "● Good quality"}
+                              {qualityAssessment.quality_label === "strong" && "★ Strong quality"}
+                            </span>
+                            <div className="quality-stats">
+                              <span>~{qualityAssessment.avg_response_words} words/answer</span>
+                              <span>{qualityAssessment.short_answer_pct}% short answers</span>
                             </div>
-                          ) : t.response_transcript ? (
-                            <div className="transcript-a" onMouseUp={() => handleTranscriptMouseUp(t.id)} style={{ userSelect: "text" }}>
-                              <strong>A:</strong>{" "}
-                              {renderTaggedText(t.response_transcript, t.id)}
-                              <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
-                                <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>Edit</button>
-                                {t.manually_edited && (
-                                  <span className="badge" style={{ fontSize: 10, background: "#fef9c3", color: "#854d0e" }}>edited</span>
-                                )}
-                              </span>
+                          </div>
+                          <p className="quality-summary">{qualityAssessment.summary}</p>
+                          {qualityAssessment.strengths.length > 0 && (
+                            <div className="quality-points quality-points--good">
+                              <strong>Strengths</strong>
+                              <ul>{qualityAssessment.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
                             </div>
-                          ) : null}
-
-                          {turnTags.length > 0 && (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                              {turnTags.map((tg) => (
-                                <span
-                                  key={tg.id}
-                                  style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, background: `${tg.code_color || "#6366f1"}22`, border: `1px solid ${tg.code_color || "#6366f1"}`, cursor: "pointer" }}
-                                  title="Click to remove tag"
-                                  onClick={() => handleDeleteTag(tg.id)}
-                                >
-                                  {tg.code_name}
-                                </span>
-                              ))}
+                          )}
+                          {qualityAssessment.issues.length > 0 && (
+                            <div className="quality-points quality-points--warn">
+                              <strong>Issues</strong>
+                              <ul>{qualityAssessment.issues.map((s, i) => <li key={i}>{s}</li>)}</ul>
                             </div>
                           )}
                         </div>
-                      );
-                    })}
+                      )}
+                    </div>
+
+                    {/* Codebook (inline, collapsible) */}
+                    <div style={{ marginBottom: 16 }}>
+                      <button className="btn btn-ghost btn-xs" onClick={() => setShowCodebook(!showCodebook)} style={{ marginBottom: showCodebook ? 8 : 0 }}>
+                        {showCodebook ? "▲" : "▼"} Codebook ({codes.length})
+                      </button>
+                      {showCodebook && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          {codes.length === 0 ? (
+                            <p className="muted-text" style={{ fontSize: 12 }}>No codes yet. Select text to create one.</p>
+                          ) : codes.map((c) => (
+                            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: `${c.color}22`, border: `1.5px solid ${c.color}`, fontSize: 12 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color, display: "inline-block", flexShrink: 0 }} />
+                              {renamingCodeId === c.id ? (
+                                <>
+                                  <input autoFocus value={renameText} onChange={(e) => setRenameText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRenameCode(c.id); if (e.key === "Escape") setRenamingCodeId(null); }} style={{ border: "none", background: "transparent", outline: "none", fontSize: 12, width: Math.max(60, renameText.length * 8) }} />
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#6366f1", padding: 0, fontSize: 11 }} onClick={() => handleRenameCode(c.id)} title="Save">✓</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 11 }} onClick={() => setRenamingCodeId(null)} title="Cancel">✕</button>
+                                </>
+                              ) : (
+                                <>
+                                  <span title="Double-click to rename" onDoubleClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} style={{ cursor: "text" }}>{c.name}</span>
+                                  <span className="muted-text" style={{ fontSize: 10 }}>({c.tag_count})</span>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 10 }} onClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} title="Rename">✎</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 13 }} onClick={() => handleDeleteCode(c.id)} title="Delete code">×</button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quote tagging instruction */}
+                    <div className="quote-tag-instruction" style={{ marginBottom: 16 }}>
+                      <span>💬</span>
+                      <span>Select any text in an answer to tag it with a code.</span>
+                    </div>
+
+                    {/* Transcript turns */}
+                    {transcript.length === 0 ? (
+                      <p className="muted-text">No transcript available.</p>
+                    ) : (
+                      <div className="transcript-list">
+                        {transcript.map((t) => {
+                          const turnTags = tags.filter((tg) => tg.turn_id === t.id);
+                          return (
+                            <div key={t.turn_index} className="transcript-turn">
+                              <div className="transcript-q">
+                                <strong>Q:</strong> {t.question_text}
+                                {t.tts_audio_url && (
+                                  <audio controls src={t.tts_audio_url} className="transcript-audio" aria-label={`AI question audio — turn ${t.turn_index}`} />
+                                )}
+                              </div>
+                              {t.response_transcript && editingTurnId === t.id ? (
+                                <div style={{ marginTop: 6 }}>
+                                  <textarea className="field-input" value={editingText} onChange={(e) => setEditingText(e.target.value)} rows={4} style={{ width: "100%", marginBottom: 6 }} autoFocus />
+                                  <div style={{ display: "flex", gap: 6 }}>
+                                    <button className="btn btn-primary btn-xs" disabled={savingTurnId === t.id} onClick={() => saveEditTurn(t)}>
+                                      {savingTurnId === t.id ? "Saving..." : "Save"}
+                                    </button>
+                                    <button className="btn btn-ghost btn-xs" onClick={() => {
+                                      if (editingText !== editingOriginalText && !confirm("Discard changes?")) return;
+                                      setEditingTurnId(null);
+                                    }}>Cancel</button>
+                                  </div>
+                                </div>
+                              ) : t.response_transcript ? (
+                                <div className="transcript-a" onMouseUp={() => handleTranscriptMouseUp(t.id)} style={{ userSelect: "text" }}>
+                                  <strong>A:</strong>{" "}
+                                  {renderTaggedText(t.response_transcript, t.id)}
+                                  <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
+                                    <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>Edit</button>
+                                    {t.manually_edited && (
+                                      <span className="badge" style={{ fontSize: 10, background: "#fef9c3", color: "#854d0e" }}>edited</span>
+                                    )}
+                                  </span>
+                                  {t.audio_recording_url && (
+                                    <audio controls src={t.audio_recording_url} className="transcript-audio" aria-label={`Participant recording — turn ${t.turn_index}`} />
+                                  )}
+                                </div>
+                              ) : null}
+                              {turnTags.length > 0 && (
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                                  {turnTags.map((tg) => (
+                                    <span key={tg.id} style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, background: `${tg.code_color || "#6366f1"}22`, border: `1px solid ${tg.code_color || "#6366f1"}`, cursor: "pointer" }} title="Click to remove tag" onClick={() => handleDeleteTag(tg.id)}>
+                                      {tg.code_name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 300, color: "var(--text-tertiary)" }}>
+                    <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>←</div>
+                    <p style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Select a response</p>
+                    <p style={{ fontSize: 13 }}>Click a participant to view their transcript</p>
                   </div>
                 )}
-              </section>
-            )}
+              </div>
+            </div>
 
-            {/* Floating tag button */}
+            {/* Floating tag popup */}
             {selectionInfo && (
               <div style={{ position: "fixed", left: selectionInfo.x - 90, top: selectionInfo.y, zIndex: 1000, background: "white", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.15)", padding: 8, minWidth: 180 }}>
                 {!showNewCode ? (
@@ -1460,12 +1613,19 @@ export default function ProjectDetail() {
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ══ ANALYSIS ══ */}
         {tab === "analysis" && analysis && (
           <div className="tab-content">
             <section className="detail-section">
+              {/* Stale banner — above actions so it's seen before clicking Regenerate */}
+              {analysis.report && analysis.completed_count > analysis.participant_count && (
+                <div className="analysis-stale-banner">
+                  ⚠ {analysis.completed_count - analysis.participant_count} new response{analysis.completed_count - analysis.participant_count > 1 ? "s" : ""} since last analysis — regenerate to include them.
+                </div>
+              )}
               <div className="section-header-row">
                 <h2>AI Analysis</h2>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -1476,6 +1636,9 @@ export default function ProjectDetail() {
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={handleDownloadJSON}>
                         ↓ JSON
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={handleShareAnalysis}>
+                        🔗 Share
                       </button>
                     </>
                   )}
@@ -1546,15 +1709,16 @@ export default function ProjectDetail() {
                 const isStale = analysis.completed_count > analysis.participant_count;
                 return (
                   <div className="analysis-report">
-                    {isStale && (
-                      <div className="analysis-stale-banner">
-                        {analysis.completed_count - analysis.participant_count} new response{analysis.completed_count - analysis.participant_count > 1 ? "s" : ""} since last analysis — regenerate to include them.
-                      </div>
-                    )}
                     <div className="analysis-summary">{r.summary}</div>
                     <div className="analysis-meta">
-                      <span className="badge">Based on {r.participant_count} interviews</span>
+                      <span className="badge analysis-ai-badge">✦ AI-generated</span>
+                      <span className="badge">n={r.participant_count} interview{r.participant_count !== 1 ? "s" : ""}</span>
                       <span className="badge">Confidence: {r.confidence}</span>
+                      {analysis.filters && (
+                        <span className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>
+                          Filtered: {analysis.filters.filter_by} ({analysis.filters.filter_values.join(", ")})
+                        </span>
+                      )}
                       {analysis.generated_at && (
                         <span className="muted-text" style={{ fontSize: "0.8rem" }}>Generated {new Date(analysis.generated_at).toLocaleString()}</span>
                       )}

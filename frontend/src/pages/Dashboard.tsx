@@ -92,6 +92,27 @@ export default function Dashboard() {
                   <span className="badge">{p.language.toUpperCase()}</span>
                   <span>{p.question_count} questions</span>
                 </div>
+                <div className="project-card-stats">
+                  {p.completed_count > 0 && (
+                    <span className="project-stat project-stat-completed">
+                      ✓ {p.completed_count} completed
+                    </span>
+                  )}
+                  {p.in_progress_count > 0 && (
+                    <span className="project-stat project-stat-inprogress">
+                      ● {p.in_progress_count} in progress
+                    </span>
+                  )}
+                  {p.completed_count === 0 && p.in_progress_count === 0 && (
+                    <span className="project-stat project-stat-empty">No responses yet</span>
+                  )}
+                  {p.analysis_status === "ready" && (
+                    <span className="project-stat project-stat-analysis">✦ Analysis ready</span>
+                  )}
+                  {p.analysis_status === "generating" && (
+                    <span className="project-stat project-stat-generating">✦ Analysing…</span>
+                  )}
+                </div>
                 <p className="project-card-date">
                   {new Date(p.created_at).toLocaleDateString()}
                 </p>

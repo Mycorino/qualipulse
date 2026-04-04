@@ -98,13 +98,16 @@ def run_analysis(
     all_completed = [p for p in project.participants if p.status == "completed" and p.turns]
     completed = _filter_participants(all_completed, filter_by, filter_values)
 
-    # Upsert analysis row with "generating" status
-    analysis = db.query(ProjectAnalysis).filter(
-        ProjectAnalysis.project_id == project_id
-    ).first()
-    if analysis is None:
-        analysis = ProjectAnalysis(project_id=project_id)
-        db.add(analysis)
+    # Create a new versioned analysis row (keep last 3 per project)
+    last = (
+        db.query(ProjectAnalysis)
+        .filter(ProjectAnalysis.project_id == project_id)
+        .order_by(ProjectAnalysis.version.desc())
+        .first()
+    )
+    next_version = (last.version + 1) if last else 1
+    analysis = ProjectAnalysis(project_id=project_id, version=next_version)
+    db.add(analysis)
 
     analysis.status = "generating"
     analysis.participant_count = len(completed)
@@ -114,6 +117,17 @@ def run_analysis(
         analysis.filters = json.dumps({"filter_by": filter_by, "filter_values": filter_values})
     else:
         analysis.filters = None
+    db.commit()
+
+    # Prune: keep only the 3 most recent versions
+    all_versions = (
+        db.query(ProjectAnalysis)
+        .filter(ProjectAnalysis.project_id == project_id)
+        .order_by(ProjectAnalysis.version.desc())
+        .all()
+    )
+    for old in all_versions[3:]:
+        db.delete(old)
     db.commit()
 
     try:

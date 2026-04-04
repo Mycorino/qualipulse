@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -55,6 +55,8 @@ class Participant(Base):
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    quality_label: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Relationships
     link = relationship("InterviewLink", back_populates="participants")
@@ -71,8 +73,10 @@ class ProjectAnalysis(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     project_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    share_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
     status: Mapped[str] = mapped_column(
         String(20), default="generating", nullable=False
     )  # "generating" | "ready" | "failed"
@@ -85,7 +89,7 @@ class ProjectAnalysis(Base):
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
-    project = relationship("Project", back_populates="analysis")
+    project = relationship("Project", back_populates="analyses")
 
 
 class InterviewTurn(Base):
