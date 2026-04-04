@@ -81,6 +81,7 @@ class ProjectListResponse(BaseModel):
     name: str
     language: str
     created_at: datetime
+    archived_at: datetime | None = None
     question_count: int
     completed_count: int = 0
     in_progress_count: int = 0

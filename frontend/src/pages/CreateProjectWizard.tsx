@@ -24,7 +24,7 @@ const LANGUAGES = [
 
 const DURATIONS = [15, 20, 30, 45];
 
-const STEPS = ["Brief", "Objective", "Scope", "Questionnaire"];
+const STEPS = ["Your brief", "What to learn", "Who & how long", "Your questions"];
 
 const DRAFT_KEY = "wizard_draft";
 

@@ -1081,6 +1081,111 @@ select.field-input {
   background: var(--primary-light);
 }
 
+/* ── Archive section (Dashboard) ───────────────────────────────────────── */
+.archive-section {
+  margin-top: 40px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+
+.archive-toggle:hover {
+  color: var(--text);
+}
+
+.archive-toggle-icon {
+  font-size: 11px;
+  width: 14px;
+}
+
+.archive-count {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.archive-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.archive-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 8px 0;
+  margin: 0;
+}
+
+.archive-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.archive-row:hover {
+  background: var(--surface-2);
+}
+
+.archive-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.archive-row-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archive-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.archive-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.badge--sm {
+  font-size: 10px;
+  padding: 1px 5px;
+}
+
 /* Compact sidebar variant */
 .participant-row--compact {
   padding: 8px 10px;
@@ -1166,12 +1271,37 @@ select.field-input {
 }
 
 .transcript-turn {
+  padding: 12px;
+  margin: 0 -12px;
+  border-radius: 8px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-light);
+  transition: background 0.3s, box-shadow 0.3s;
 }
 .transcript-turn:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+/* Highlighted turn — from "View transcript →" in analysis */
+.transcript-turn--highlighted {
+  background: rgba(250, 204, 21, 0.1);
+  box-shadow: inset 3px 0 0 #facc15;
+  animation: turn-highlight-pulse 0.5s ease-out;
+}
+
+@keyframes turn-highlight-pulse {
+  0%   { background: rgba(250, 204, 21, 0.35); }
+  100% { background: rgba(250, 204, 21, 0.10); }
+}
+
+/* Quoted text highlight within the transcript answer */
+.quote-highlight {
+  background: #fef08a;
+  color: #78350f;
+  border-radius: 3px;
+  padding: 1px 2px;
+  font-style: normal;
 }
 
 .transcript-q {
@@ -2815,6 +2945,149 @@ select.field-input {
   letter-spacing: 0.02em;
 }
 
+/* ── Iterative analysis — version tabs ──────────────────────────────────────── */
+.version-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 10px 0 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 6px;
+}
+.version-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  border-radius: 6px 6px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.version-tab:hover {
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+}
+.version-tab--active {
+  background: var(--bg);
+  border-color: var(--border-subtle);
+  border-bottom-color: var(--bg);
+  color: var(--brand-600);
+  font-weight: 600;
+}
+
+/* ── Iterative analysis — past version banner ────────────────────────────────── */
+.version-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  background: #fef9c3;
+  border: 1px solid #fde047;
+  color: #713f12;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ── Iterative analysis — annotation buttons ─────────────────────────────────── */
+.annotation-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid;
+  background: transparent;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.annotation-btn--confirmed {
+  border-color: #16a34a;
+  color: #16a34a;
+}
+.annotation-btn--confirmed.annotation-btn--active {
+  background: #16a34a;
+  color: #fff;
+}
+.annotation-btn--needs-evidence {
+  border-color: #d97706;
+  color: #d97706;
+}
+.annotation-btn--needs-evidence.annotation-btn--active {
+  background: #d97706;
+  color: #fff;
+}
+.annotation-btn--disputed {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+.annotation-btn--disputed.annotation-btn--active {
+  background: #dc2626;
+  color: #fff;
+}
+.annotation-btn:hover {
+  opacity: 0.8;
+}
+
+/* ── Iterative analysis — annotation note textarea ───────────────────────────── */
+.annotation-note-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  border: 1px dashed #d1d5db;
+  border-radius: var(--radius);
+  background: #fffbeb;
+  color: var(--text);
+  resize: vertical;
+  min-height: 52px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+.annotation-note-input:focus {
+  outline: none;
+  border-color: #d97706;
+  background: #fff;
+}
+.annotation-note-input::placeholder {
+  color: #9ca3af;
+}
+
+/* ── Iterative analysis — researcher context box ─────────────────────────────── */
+.researcher-context-box {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+}
+.researcher-context-box h3 {
+  font-size: 0.733rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ── Iterative analysis — refine confirm inline ──────────────────────────────── */
+.refine-confirm-inline {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+}
+
 /* ── Transcript audio players ───────────────────────────────────────────────── */
 .transcript-audio {
   width: 100%;
@@ -2824,6 +3097,109 @@ select.field-input {
 }
 .transcript-audio::-webkit-media-controls-panel {
   background: var(--bg-sunken);
+}
+
+/* ── Toast notifications ─────────────────────────────────────────────────────── */
+.toast-stack {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #fff;
+  max-width: 340px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.12);
+  animation: toast-in 0.22s var(--ease-out) both;
+  pointer-events: auto;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.toast--success { background: #16a34a; }
+.toast--error   { background: #dc2626; }
+.toast--info    { background: #1e293b; }
+.toast-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+/* ── Shared report page ───────────────────────────────────────────────────── */
+.shared-report-page {
+  min-height: 100vh;
+  background: var(--bg-base);
+}
+.shared-report-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.shared-report-header-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.shared-report-brand {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--brand-600);
+  letter-spacing: -0.02em;
+}
+.shared-report-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.shared-report-main {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+.shared-report-title-block {
+  margin-bottom: 40px;
+}
+.shared-report-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+.shared-report-section {
+  margin-bottom: 40px;
+}
+.shared-report-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: 16px;
+}
+.analysis-theme-card {
+  padding: 20px;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
 }
 
 /* ── Two-column transcript layout ───────────────────────────────────────────── */

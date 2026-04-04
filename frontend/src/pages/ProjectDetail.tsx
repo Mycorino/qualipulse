@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
 import {
   getProject,
@@ -10,7 +11,7 @@ import {
   toggleLink,
   updateProject,
   exportCSV,
-  deleteProject,
+  archiveProject,
   getAnalysis,
   triggerAnalysis,
   updateTurn,
@@ -29,6 +30,14 @@ import {
   getHeatmap,
   assessQuality,
   shareAnalysis,
+  getAnalysisHistory,
+  getAnalysisByVersion,
+  upsertThemeAnnotation,
+  getThemeAnnotations,
+  saveResearcherContext,
+  triggerRefinedAnalysis,
+  AnalysisVersionMeta,
+  ThemeAnnotation,
   ProjectResponse,
   InterviewLink,
   ParticipantResponse,
@@ -53,6 +62,7 @@ const PRESET_COLORS = [
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   // ── Core state ─────────────────────────────────────────────────────────────
   const [project, setProject] = useState<ProjectResponse | null>(null);
@@ -71,6 +81,34 @@ export default function ProjectDetail() {
   // ── Responses tab filters/sort ─────────────────────────────────────────────
   const [responseStatusFilter, setResponseStatusFilter] = useState<"all" | "completed" | "in_progress">("all");
   const [responseSortBy, setResponseSortBy] = useState<"date" | "quality" | "name">("date");
+
+  // ── Analysis version history ───────────────────────────────────────────────
+  const [analysisVersions, setAnalysisVersions] = useState<AnalysisVersionMeta[]>([]);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+
+  // ── Transcript highlight target (from "View transcript →" in analysis) ───────
+  const [highlightTarget, setHighlightTarget] = useState<{ turnIndex: number; quoteText: string } | null>(null);
+  const transcriptListRef = useRef<HTMLDivElement>(null);
+
+  // ── Iterative analysis state ───────────────────────────────────────────────
+  const [themeAnnotations, setThemeAnnotations] = useState<Record<string, ThemeAnnotation>>({});
+  const [researcherContext, setResearcherContext] = useState("");
+  const [contextSaving, setContextSaving] = useState<false | "saving" | "saved">(false);
+  const contextDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activeVersionNumber, setActiveVersionNumber] = useState<number | null>(null);
+  const [activeVersionReport, setActiveVersionReport] = useState<AnalysisResponse | null>(null);
+  const [refineModalOpen, setRefineModalOpen] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [annotationPanelOpen, setAnnotationPanelOpen] = useState(false);
+
+  // ── Codebook persistence ───────────────────────────────────────────────────
+  const codebookPrefKey = "qp_codebook_open";
+  const codebookInitial = localStorage.getItem(codebookPrefKey) === "true";
+  const [showCodebook, setShowCodebook] = useState(codebookInitial);
+  const setShowCodebookPersist = (val: boolean) => {
+    localStorage.setItem(codebookPrefKey, String(val));
+    setShowCodebook(val);
+  };
 
   // ── Overview inline editors ────────────────────────────────────────────────
   const [editingObjective, setEditingObjective] = useState(false);
@@ -110,7 +148,6 @@ export default function ProjectDetail() {
   const [newCodeName, setNewCodeName] = useState("");
   const [newCodeColor, setNewCodeColor] = useState(PRESET_COLORS[0]);
   const [showNewCode, setShowNewCode] = useState(false);
-  const [showCodebook, setShowCodebook] = useState(false);
   const [creatingCode, setCreatingCode] = useState(false);
   const [renamingCodeId, setRenamingCodeId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
@@ -131,7 +168,7 @@ export default function ProjectDetail() {
 
   // ── P7: Heatmap ────────────────────────────────────────────────────────────
   const [heatmap, setHeatmap] = useState<HeatmapResponse | null>(null);
-  const [heatmapExpanded, setHeatmapExpanded] = useState(false);
+  const [heatmapExpanded, setHeatmapExpanded] = useState(localStorage.getItem("qp_heatmap_open") === "true");
   const [heatmapLoading, setHeatmapLoading] = useState(false);
 
   // ── P8: AI Quality assessment ───────────────────────────────────────────────
@@ -155,6 +192,20 @@ export default function ProjectDetail() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [editingTurnId, editingText, editingOriginalText]);
+
+  // Scroll to highlighted turn after transcript loads, then auto-clear
+  useEffect(() => {
+    if (!transcript || !highlightTarget) return;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`turn-${highlightTarget.turnIndex}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+    // Auto-clear highlight after 4 s so it doesn't stay permanently
+    const timer = setTimeout(() => setHighlightTarget(null), 4000);
+    return () => clearTimeout(timer);
+  }, [transcript, highlightTarget]);
 
   // Escape key dismisses the tag popup
   useEffect(() => {
@@ -188,6 +239,14 @@ export default function ProjectDetail() {
         setActiveFilterValues(ana.filters.filter_values);
       }
       if (ana.status === "generating") startPolling();
+      // Load annotations and context for the current analysis
+      if (ana.analysis_id && ana.status === "ready") {
+        getThemeAnnotations(id!, ana.analysis_id).then((anns) => {
+          const map: Record<string, ThemeAnnotation> = {};
+          for (const a of anns) map[a.theme_title] = a;
+          setThemeAnnotations(map);
+        }).catch(() => {});
+      }
     } catch {
       // handled by interceptor
     } finally {
@@ -198,6 +257,7 @@ export default function ProjectDetail() {
       getTags(id!).then(setTags).catch(() => {}),
       getMemos(id!).then(setMemos).catch(() => {}),
       listProjects().then(setProjects).catch(() => {}),
+      getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {}),
     ]);
   }
 
@@ -210,6 +270,20 @@ export default function ProjectDetail() {
       if (ana.status !== "generating") {
         clearInterval(iv);
         setAnalysisPolling(false);
+        // Refresh version history now that a new version is ready
+        getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {});
+        // Reset active version view and load annotations for new version
+        setActiveVersionNumber(null);
+        setActiveVersionReport(null);
+        if (ana.analysis_id && ana.status === "ready") {
+          getThemeAnnotations(id!, ana.analysis_id).then((anns) => {
+            const map: Record<string, ThemeAnnotation> = {};
+            for (const a of anns) map[a.theme_title] = a;
+            setThemeAnnotations(map);
+          }).catch(() => {});
+          setResearcherContext("");
+          setContextSaving(false);
+        }
       }
     }, 3000);
   }
@@ -290,9 +364,125 @@ export default function ProjectDetail() {
       const res = await shareAnalysis(id!);
       const url = `${window.location.origin}/reports/${res.share_token}`;
       await navigator.clipboard.writeText(url);
-      alert(`Share link copied!\n\n${url}`);
+      toast("Share link copied to clipboard ✓", "success");
     } catch {
-      alert("Could not generate share link. Make sure analysis is ready.");
+      toast("Could not generate share link — make sure analysis is ready.", "error");
+    }
+  }
+
+  // ── Annotation handlers ────────────────────────────────────────────────────
+
+  async function loadAnnotations(analysisId: string) {
+    try {
+      const annotations = await getThemeAnnotations(id!, analysisId);
+      const map: Record<string, ThemeAnnotation> = {};
+      for (const ann of annotations) {
+        map[ann.theme_title] = ann;
+      }
+      setThemeAnnotations(map);
+    } catch {
+      // non-critical
+    }
+  }
+
+  async function handleAnnotationClick(themeTitle: string, clickedStatus: "confirmed" | "disputed" | "needs_evidence") {
+    if (!analysis?.analysis_id) return;
+    const existing = themeAnnotations[themeTitle];
+    // Clicking the active annotation clears it (toggle off)
+    if (existing && existing.status === clickedStatus) {
+      // Delete by overriding with a no-op — since we don't have a delete endpoint exposed in the UI,
+      // we re-use upsert but the UI will hide cleared annotations. For a proper clear we'd need DELETE.
+      // Instead: call delete endpoint via direct API.
+      try {
+        if (existing.id) {
+          await fetch(`/api/projects/${id}/analysis/annotations/${existing.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } });
+        }
+        setThemeAnnotations((prev) => {
+          const next = { ...prev };
+          delete next[themeTitle];
+          return next;
+        });
+      } catch {
+        toast("Failed to remove annotation", "error");
+      }
+      return;
+    }
+    try {
+      const saved = await upsertThemeAnnotation(id!, {
+        analysis_id: analysis.analysis_id,
+        theme_title: themeTitle,
+        status: clickedStatus,
+        researcher_note: existing?.researcher_note ?? null,
+      });
+      setThemeAnnotations((prev) => ({ ...prev, [themeTitle]: saved }));
+    } catch {
+      toast("Failed to save annotation", "error");
+    }
+  }
+
+  async function handleAnnotationNoteBlur(themeTitle: string, note: string) {
+    if (!analysis?.analysis_id) return;
+    const existing = themeAnnotations[themeTitle];
+    if (!existing) return;
+    try {
+      const saved = await upsertThemeAnnotation(id!, {
+        analysis_id: analysis.analysis_id,
+        theme_title: themeTitle,
+        status: existing.status,
+        researcher_note: note || null,
+      });
+      setThemeAnnotations((prev) => ({ ...prev, [themeTitle]: saved }));
+    } catch {
+      toast("Failed to save note", "error");
+    }
+  }
+
+  function handleResearcherContextChange(value: string) {
+    setResearcherContext(value);
+    setContextSaving("saving");
+    if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current);
+    contextDebounceRef.current = setTimeout(async () => {
+      if (!analysis?.version) return;
+      try {
+        await saveResearcherContext(id!, analysis.version, value);
+        setContextSaving("saved");
+        setTimeout(() => setContextSaving(false), 2000);
+      } catch {
+        setContextSaving(false);
+        toast("Failed to save context", "error");
+      }
+    }, 1500);
+  }
+
+  async function handleTriggerRefine() {
+    setRefining(true);
+    try {
+      await triggerRefinedAnalysis(id!);
+      setRefineModalOpen(false);
+      setAnalysis((prev) => prev ? { ...prev, status: "generating" } : null);
+      startPolling();
+      // Refresh versions list
+      getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {});
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to start refined analysis";
+      toast(msg, "error");
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  async function handleViewVersion(versionNumber: number) {
+    if (versionNumber === (analysis?.version ?? null)) {
+      setActiveVersionNumber(null);
+      setActiveVersionReport(null);
+      return;
+    }
+    try {
+      const report = await getAnalysisByVersion(id!, versionNumber);
+      setActiveVersionReport(report);
+      setActiveVersionNumber(versionNumber);
+    } catch {
+      toast("Failed to load version", "error");
     }
   }
 
@@ -301,7 +491,7 @@ export default function ProjectDetail() {
       const link = await createLink(id!);
       setLinks((prev) => [...prev, link]);
     } catch {
-      alert("Failed to generate link");
+      toast("Failed to generate link", "error");
     }
   }
 
@@ -310,7 +500,7 @@ export default function ProjectDetail() {
       const updated = await toggleLink(linkId);
       setLinks((prev) => prev.map((l) => (l.id === linkId ? updated : l)));
     } catch {
-      alert("Failed to update link");
+      toast("Failed to update link", "error");
     }
   }
 
@@ -324,7 +514,10 @@ export default function ProjectDetail() {
     setTimeout(() => setLinkCopied(false), 2000);
   }
 
-  async function handleViewTranscript(p: ParticipantResponse) {
+  async function handleViewTranscript(
+    p: ParticipantResponse,
+    highlight?: { turnIndex: number; quoteText: string }
+  ) {
     if (editingTurnId && editingText !== editingOriginalText) {
       if (!confirm("You have unsaved transcript changes. Discard them?")) return;
     }
@@ -333,6 +526,8 @@ export default function ProjectDetail() {
     setEditingTurnId(null);
     setQualityAssessment(null);
     setSelectionInfo(null);
+    if (highlight) setHighlightTarget(highlight);
+    else setHighlightTarget(null);
     try {
       const result = await getTranscript(id!, p.id);
       setSelectedParticipant(result.participant);
@@ -352,17 +547,18 @@ export default function ProjectDetail() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Failed to export CSV");
+      toast("Failed to export CSV", "error");
     }
   }
 
-  async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this project?")) return;
+  async function handleArchive() {
+    if (!confirm("Archive this project? You can restore it any time from the dashboard.")) return;
     try {
-      await deleteProject(id!);
+      await archiveProject(id!);
+      toast("Project archived", "success");
       navigate("/dashboard");
     } catch {
-      alert("Failed to delete project");
+      toast("Failed to archive project", "error");
     }
   }
 
@@ -391,7 +587,7 @@ export default function ProjectDetail() {
       );
       setEditingTurnId(null);
     } catch {
-      alert("Failed to save transcript edit");
+      toast("Failed to save transcript edit", "error");
     } finally {
       setSavingTurnId(null);
     }
@@ -434,7 +630,7 @@ export default function ProjectDetail() {
       setTags((prev) => [...prev, tag]);
       setCodes((prev) => prev.map((c) => c.id === code.id ? { ...c, tag_count: c.tag_count + 1 } : c));
     } catch {
-      alert("Failed to tag quote");
+      toast("Failed to tag quote", "error");
     } finally {
       setSelectionInfo(null);
       window.getSelection()?.removeAllRanges();
@@ -452,7 +648,7 @@ export default function ProjectDetail() {
       setNewCodeColor(PRESET_COLORS[0]);
       setShowNewCode(false);
     } catch {
-      alert("Failed to create code");
+      toast("Failed to create code", "error");
     } finally {
       setCreatingCode(false);
     }
@@ -483,7 +679,7 @@ export default function ProjectDetail() {
       setTags((prev) => prev.map((t) => (t.manual_code_id === codeId ? { ...t, code_name: updated.name } : t)));
       setRenamingCodeId(null);
     } catch {
-      alert("Failed to rename code");
+      toast("Failed to rename code", "error");
     }
   }
 
@@ -497,7 +693,7 @@ export default function ProjectDetail() {
       );
       setEditingInterviewNotes(null);
     } catch {
-      alert("Failed to save notes");
+      toast("Failed to save notes", "error");
     }
   }
 
@@ -509,7 +705,7 @@ export default function ProjectDetail() {
       );
       setEditingNoteId(null);
     } catch {
-      alert("Failed to save note");
+      toast("Failed to save note", "error");
     }
   }
 
@@ -525,7 +721,7 @@ export default function ProjectDetail() {
         prev ? { ...prev, questions: prev.questions.map((q) => q.id === questionId ? { ...q, deprecated_at: updated.deprecated_at } : q) } : prev
       );
     } catch {
-      alert("Failed to update question");
+      toast("Failed to update question", "error");
     }
   }
 
@@ -539,7 +735,7 @@ export default function ProjectDetail() {
       setNewMemoContent("");
       setAddingMemoKey(null);
     } catch {
-      alert("Failed to save memo");
+      toast("Failed to save memo", "error");
     }
   }
 
@@ -549,7 +745,7 @@ export default function ProjectDetail() {
       setMemos((prev) => prev.map((m) => m.id === memoId ? updated : m));
       setEditingMemoId(null);
     } catch {
-      alert("Failed to update memo");
+      toast("Failed to update memo", "error");
     }
   }
 
@@ -561,14 +757,20 @@ export default function ProjectDetail() {
   // ── P7: Heatmap ────────────────────────────────────────────────────────────
 
   async function loadHeatmap() {
-    if (heatmap) { setHeatmapExpanded(true); return; }
+    if (heatmap) {
+      const next = !heatmapExpanded;
+      setHeatmapExpanded(next);
+      localStorage.setItem("qp_heatmap_open", String(next));
+      return;
+    }
     setHeatmapLoading(true);
     try {
       const data = await getHeatmap(id!);
       setHeatmap(data);
       setHeatmapExpanded(true);
+      localStorage.setItem("qp_heatmap_open", "true");
     } catch {
-      alert("No ready analysis available for heatmap.");
+      toast("No ready analysis available — generate one first.", "error");
     } finally {
       setHeatmapLoading(false);
     }
@@ -589,7 +791,7 @@ export default function ProjectDetail() {
       const result = await assessQuality(id!, selectedParticipant.id);
       setQualityAssessment(result);
     } catch {
-      alert("Failed to assess interview quality");
+      toast("Failed to assess quality", "error");
     } finally {
       setLoadingQuality(false);
     }
@@ -617,6 +819,26 @@ export default function ProjectDetail() {
   }
 
   // ── Render helpers ─────────────────────────────────────────────────────────
+
+  /** Renders response text with a specific quoted substring highlighted in yellow,
+   *  falling back to code-tag rendering for the rest of the text. */
+  function renderWithQuoteHighlight(text: string, quoteText: string, turnId: string): React.ReactNode {
+    if (!quoteText) return renderTaggedText(text, turnId);
+    const lower = text.toLowerCase();
+    const quoteNorm = quoteText.toLowerCase().trim();
+    const idx = lower.indexOf(quoteNorm);
+    if (idx === -1) return renderTaggedText(text, turnId);
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + quoteNorm.length);
+    const after = text.slice(idx + quoteNorm.length);
+    return (
+      <span data-turn-text="">
+        {before}
+        <mark className="quote-highlight">{match}</mark>
+        {after}
+      </span>
+    );
+  }
 
   function renderTaggedText(text: string, turnId: string): React.ReactNode {
     const turnTags = tags.filter((t) => t.turn_id === turnId).sort((a, b) => a.start_index - b.start_index);
@@ -657,8 +879,14 @@ export default function ProjectDetail() {
             className="btn btn-ghost btn-xs"
             style={{ fontSize: 10, padding: "1px 4px" }}
             onClick={() => {
-              const p = participants.find((p) => p.display_name === q.participant_display_name);
-              if (p) { setTab("responses"); handleViewTranscript(p); }
+              const p = participants.find(
+                (p) => p.display_name === q.participant_display_name ||
+                       p.id === q.participant_identifier
+              );
+              if (p) {
+                setTab("responses");
+                handleViewTranscript(p, q.turn_index != null ? { turnIndex: q.turn_index, quoteText: q.text } : undefined);
+              }
             }}
           >
             View transcript →
@@ -806,7 +1034,7 @@ export default function ProjectDetail() {
       setProject(updated);
       setEditingScreening(false);
       setExpandedSQ(null);
-    } catch { alert("Failed to save screening questions"); }
+    } catch { toast("Failed to save screening questions", "error"); }
     finally { setScreeningSaving(false); }
   }
 
@@ -866,7 +1094,7 @@ export default function ProjectDetail() {
         </div>
         <div className="detail-header-actions">
           <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>Export CSV</button>
-          <button className="btn btn-ghost btn-sm btn-danger-text" onClick={handleDelete}>Delete</button>
+          <button className="btn btn-ghost btn-sm" onClick={handleArchive} title="Archive this project (recoverable from the dashboard)">Archive</button>
         </div>
       </header>
 
@@ -1326,7 +1554,7 @@ export default function ProjectDetail() {
                 {/* Header row */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>Responses</span>
-                  <button className="btn btn-ghost btn-xs" onClick={handleExportCSV}>CSV</button>
+                  <button className="btn btn-ghost btn-xs" onClick={handleExportCSV} title="Export all participants and transcripts as CSV">↓ CSV</button>
                 </div>
 
                 {/* Status filter pills */}
@@ -1380,9 +1608,16 @@ export default function ProjectDetail() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <span className="participant-name" style={{ fontSize: 13, marginRight: 0 }}>{p.display_name || "Anonymous"}</span>
-                            {p.status !== "completed" && (
-                              <span className="status-badge status-progress" style={{ fontSize: 10 }}>Live</span>
-                            )}
+                            {p.status !== "completed" && (() => {
+                              const ageMs = Date.now() - new Date(p.started_at).getTime();
+                              const isRecent = ageMs < 2 * 60 * 60 * 1000; // < 2 hours
+                              return (
+                                <span className={`status-badge ${isRecent ? "status-progress" : ""}`}
+                                  style={{ fontSize: 10, background: isRecent ? undefined : "var(--border-subtle)", color: isRecent ? undefined : "var(--text-tertiary)" }}>
+                                  {isRecent ? "Live" : "Incomplete"}
+                                </span>
+                              );
+                            })()}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
                             <span className="participant-date" style={{ fontSize: 11 }}>{relativeDate(p.started_at)}</span>
@@ -1471,7 +1706,7 @@ export default function ProjectDetail() {
 
                     {/* Codebook (inline, collapsible) */}
                     <div style={{ marginBottom: 16 }}>
-                      <button className="btn btn-ghost btn-xs" onClick={() => setShowCodebook(!showCodebook)} style={{ marginBottom: showCodebook ? 8 : 0 }}>
+                      <button className="btn btn-ghost btn-xs" onClick={() => setShowCodebookPersist(!showCodebook)} style={{ marginBottom: showCodebook ? 8 : 0 }}>
                         {showCodebook ? "▲" : "▼"} Codebook ({codes.length})
                       </button>
                       {showCodebook && (
@@ -1511,11 +1746,16 @@ export default function ProjectDetail() {
                     {transcript.length === 0 ? (
                       <p className="muted-text">No transcript available.</p>
                     ) : (
-                      <div className="transcript-list">
+                      <div className="transcript-list" ref={transcriptListRef}>
                         {transcript.map((t) => {
                           const turnTags = tags.filter((tg) => tg.turn_id === t.id);
+                          const isHighlighted = highlightTarget?.turnIndex === t.turn_index;
                           return (
-                            <div key={t.turn_index} className="transcript-turn">
+                            <div
+                              key={t.turn_index}
+                              id={`turn-${t.turn_index}`}
+                              className={`transcript-turn${isHighlighted ? " transcript-turn--highlighted" : ""}`}
+                            >
                               <div className="transcript-q">
                                 <strong>Q:</strong> {t.question_text}
                                 {t.tts_audio_url && (
@@ -1538,7 +1778,9 @@ export default function ProjectDetail() {
                               ) : t.response_transcript ? (
                                 <div className="transcript-a" onMouseUp={() => handleTranscriptMouseUp(t.id)} style={{ userSelect: "text" }}>
                                   <strong>A:</strong>{" "}
-                                  {renderTaggedText(t.response_transcript, t.id)}
+                                  {isHighlighted && highlightTarget
+                                    ? renderWithQuoteHighlight(t.response_transcript, highlightTarget.quoteText, t.id)
+                                    : renderTaggedText(t.response_transcript, t.id)}
                                   <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
                                     <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>Edit</button>
                                     {t.manually_edited && (
@@ -1701,51 +1943,168 @@ export default function ProjectDetail() {
                 <div className="analysis-generating"><span className="spinner-sm" /><span>Claude is reading {analysis.participant_count} interview{analysis.participant_count !== 1 ? "s" : ""}...</span></div>
               )}
               {analysis.status === "failed" && (
-                <p style={{ color: "var(--danger)" }}>Analysis failed: {analysis.error}</p>
+                <div style={{ padding: "16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <span style={{ fontSize: 18 }}>⚠</span>
+                  <div>
+                    <p style={{ fontWeight: 600, color: "#991b1b", marginBottom: 4 }}>Analysis couldn't complete</p>
+                    <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: 10 }}>
+                      {analysis.error?.includes("timed out") ? "The analysis timed out — your dataset may be too large. Try filtering to a smaller group first." :
+                       analysis.error?.includes("No completed") ? "No completed interviews to analyse yet." :
+                       "Something went wrong on our end. Please try again."}
+                    </p>
+                    <button className="btn btn-sm" style={{ background: "#991b1b", color: "#fff" }} onClick={handleTriggerAnalysis}>
+                      Retry analysis
+                    </button>
+                  </div>
+                </div>
               )}
 
               {analysis.status === "ready" && analysis.report && (() => {
-                const r = analysis.report;
-                const isStale = analysis.completed_count > analysis.participant_count;
+                // Determine which report to display — active past version or current
+                const isViewingPastVersion = activeVersionNumber !== null && activeVersionReport !== null;
+                const displayReport = isViewingPastVersion ? activeVersionReport!.report : analysis.report;
+                const r = displayReport!;
+                const currentVersionNum = analysis.version ?? (analysisVersions.length > 0 ? analysisVersions[0].version : 1);
+                const latestVersionNum = analysisVersions.length > 0 ? analysisVersions[0].version : currentVersionNum;
+
+                // Annotation helpers
+                const annotationCount = Object.keys(themeAnnotations).length;
+                const actionableAnnotationCount = Object.values(themeAnnotations).filter(
+                  (a) => a.status === "disputed" || a.status === "needs_evidence"
+                ).length;
+                const canRefine = actionableAnnotationCount > 0 || researcherContext.trim().length > 0;
+
                 return (
                   <div className="analysis-report">
                     <div className="analysis-summary">{r.summary}</div>
                     <div className="analysis-meta">
-                      <span className="badge analysis-ai-badge">✦ AI-generated</span>
+                      <span className="badge analysis-ai-badge">
+                        {isViewingPastVersion
+                          ? (activeVersionReport!.version_label === "researcher_refined" ? "✦ Researcher-refined" : "✦ AI-generated")
+                          : (analysis.version_label === "researcher_refined" ? "✦ Researcher-refined" : "✦ AI-generated")}
+                      </span>
                       <span className="badge">n={r.participant_count} interview{r.participant_count !== 1 ? "s" : ""}</span>
-                      <span className="badge">Confidence: {r.confidence}</span>
-                      {analysis.filters && (
+                      <span
+                        className="badge"
+                        title="Confidence reflects sample size, response depth, and thematic saturation. Low = &lt;5 interviews or very short responses. High = 10+ rich interviews with consistent themes."
+                        style={{ cursor: "help", textDecoration: "underline dotted" }}
+                      >
+                        {r.confidence} confidence
+                      </span>
+                      {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters) && (
                         <span className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>
-                          Filtered: {analysis.filters.filter_by} ({analysis.filters.filter_values.join(", ")})
+                          Filtered: {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_by} ({(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_values.join(", ")})
                         </span>
                       )}
-                      {analysis.generated_at && (
-                        <span className="muted-text" style={{ fontSize: "0.8rem" }}>Generated {new Date(analysis.generated_at).toLocaleString()}</span>
-                      )}
                     </div>
+
+                    {/* Version tabs */}
+                    {analysisVersions.length > 1 && (
+                      <div className="version-tabs">
+                        {[...analysisVersions].reverse().map((v) => {
+                          const isCurrent = v.version === latestVersionNum;
+                          const isActive = isViewingPastVersion
+                            ? v.version === activeVersionNumber
+                            : isCurrent;
+                          const labelText = v.version_label === "researcher_refined"
+                            ? "Researcher-refined"
+                            : "AI Discovery";
+                          return (
+                            <button
+                              key={v.version}
+                              className={`version-tab${isActive ? " version-tab--active" : ""}`}
+                              onClick={() => {
+                                if (isCurrent) {
+                                  setActiveVersionNumber(null);
+                                  setActiveVersionReport(null);
+                                } else {
+                                  handleViewVersion(v.version);
+                                }
+                              }}
+                            >
+                              v{v.version} · {labelText}
+                              {isCurrent && <span style={{ marginLeft: 4, color: "var(--brand-500)" }}>●</span>}
+                              {v.annotation_count > 0 && !isCurrent && (
+                                <span style={{ marginLeft: 4, fontSize: 10, color: "var(--text-tertiary)" }}>{v.annotation_count} ann.</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Past version banner */}
+                    {isViewingPastVersion && (
+                      <div className="version-banner">
+                        Viewing v{activeVersionNumber} — {activeVersionReport!.version_label === "researcher_refined" ? "Researcher-refined" : "AI Discovery"}.{" "}
+                        <button
+                          className="btn btn-ghost btn-xs"
+                          onClick={() => { setActiveVersionNumber(null); setActiveVersionReport(null); }}
+                          style={{ color: "var(--brand-600)", padding: "0 4px" }}
+                        >
+                          Switch to v{latestVersionNum} (latest)
+                        </button>
+                      </div>
+                    )}
 
                     {/* Themes */}
                     {r.themes.length > 0 && (
                       <div className="analysis-block">
                         <h3>Key Themes</h3>
-                        {r.themes.map((t, i) => (
-                          <div key={i} className="analysis-theme">
-                            <div className="analysis-theme-header">
-                              <strong>{t.title}</strong>
-                              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                <span className="badge">{t.frequency}</span>
-                                <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>
+                        {r.themes.map((t, i) => {
+                          const ann = themeAnnotations[t.title];
+                          const showNoteInput = !isViewingPastVersion && ann && (ann.status === "disputed" || ann.status === "needs_evidence");
+                          return (
+                            <div key={i} className="analysis-theme">
+                              <div className="analysis-theme-header">
+                                <strong>{t.title}</strong>
+                                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                  <span className="badge">{t.frequency}</span>
+                                  {!isViewingPastVersion && (
+                                    <>
+                                      <button
+                                        className={`annotation-btn annotation-btn--confirmed${ann?.status === "confirmed" ? " annotation-btn--active" : ""}`}
+                                        title="Confirm this theme"
+                                        onClick={() => handleAnnotationClick(t.title, "confirmed")}
+                                      >✓</button>
+                                      <button
+                                        className={`annotation-btn annotation-btn--needs-evidence${ann?.status === "needs_evidence" ? " annotation-btn--active" : ""}`}
+                                        title="Needs more evidence"
+                                        onClick={() => handleAnnotationClick(t.title, "needs_evidence")}
+                                      >~</button>
+                                      <button
+                                        className={`annotation-btn annotation-btn--disputed${ann?.status === "disputed" ? " annotation-btn--active" : ""}`}
+                                        title="Dispute this theme"
+                                        onClick={() => handleAnnotationClick(t.title, "disputed")}
+                                      >✗</button>
+                                    </>
+                                  )}
+                                  <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>
+                                </div>
                               </div>
+                              <p>{t.summary}</p>
+                              {t.researcher_note && (
+                                <p style={{ fontSize: 12, color: "var(--text-tertiary)", fontStyle: "italic", borderLeft: "3px solid var(--warning)", paddingLeft: 8, marginTop: 4 }}>
+                                  Researcher note: {t.researcher_note}
+                                </p>
+                              )}
+                              {showNoteInput && (
+                                <textarea
+                                  className="annotation-note-input"
+                                  placeholder="Add a note for Claude (optional)"
+                                  defaultValue={ann?.researcher_note ?? ""}
+                                  onBlur={(e) => handleAnnotationNoteBlur(t.title, e.target.value)}
+                                />
+                              )}
+                              {t.quotes.length > 0 && (
+                                <div className="analysis-quotes">
+                                  {t.quotes.map((q, j) => renderAttributedQuote(q, j))}
+                                </div>
+                              )}
+                              {renderMemoSection("theme_note", t.title)}
                             </div>
-                            <p>{t.summary}</p>
-                            {t.quotes.length > 0 && (
-                              <div className="analysis-quotes">
-                                {t.quotes.map((q, j) => renderAttributedQuote(q, j))}
-                              </div>
-                            )}
-                            {renderMemoSection("theme_note", t.title)}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 
@@ -1832,6 +2191,63 @@ export default function ProjectDetail() {
                         </button>
                       )}
                     </div>
+
+                    {/* Researcher context + Refine */}
+                    {!isViewingPastVersion && (
+                      <div className="analysis-block">
+                        <div className="researcher-context-box">
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                            <h3 style={{ margin: 0 }}>Researcher Context</h3>
+                            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                              {contextSaving === "saving" ? "Saving…" : contextSaving === "saved" ? "Saved ✓" : ""}
+                            </span>
+                          </div>
+                          <textarea
+                            className="field-input"
+                            rows={4}
+                            value={researcherContext}
+                            onChange={(e) => handleResearcherContextChange(e.target.value)}
+                            placeholder="Add context Claude doesn't have from transcripts — industry norms, prior research, hypotheses, things to look for or avoid."
+                            style={{ width: "100%", fontSize: 13, resize: "vertical" }}
+                          />
+                        </div>
+
+                        <div style={{ marginTop: 12 }}>
+                          {!refineModalOpen ? (
+                            <button
+                              className="btn btn-ai btn-sm"
+                              disabled={!canRefine || refining}
+                              onClick={() => setRefineModalOpen(true)}
+                              title={!canRefine ? "Add disputed/needs-evidence annotations or researcher context first" : undefined}
+                            >
+                              ✦ Refine with my annotations
+                            </button>
+                          ) : (
+                            <div className="refine-confirm-inline">
+                              <p style={{ margin: "0 0 8px 0", fontSize: 13 }}>
+                                Generate v{latestVersionNum + 1} based on your {annotationCount} annotation{annotationCount !== 1 ? "s" : ""}?
+                                This won't overwrite v{latestVersionNum}.
+                              </p>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  disabled={refining}
+                                  onClick={handleTriggerRefine}
+                                >
+                                  {refining ? "Starting…" : "Confirm"}
+                                </button>
+                                <button
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => setRefineModalOpen(false)}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* P7: Heatmap */}
                     <div className="analysis-block">
