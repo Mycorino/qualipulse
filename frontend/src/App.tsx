@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
+import { ToastProvider } from "./components/Toast";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
@@ -10,6 +11,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AccountSettings from "./pages/AccountSettings";
 import Marketing from "./pages/Marketing";
+import SharedReport from "./pages/SharedReport";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -26,6 +28,7 @@ function HomeRoute() {
 
 export default function App() {
   return (
+    <ToastProvider>
     <Routes>
       <Route path="/" element={<HomeRoute />} />
       <Route path="/login" element={<Login />} />
@@ -65,6 +68,7 @@ export default function App() {
         }
       />
       <Route path="/i/:token" element={<Interview />} />
+      <Route path="/reports/:token" element={<SharedReport />} />
       <Route
         path="/account"
         element={
@@ -74,5 +78,6 @@ export default function App() {
         }
       />
     </Routes>
+    </ToastProvider>
   );
 }

@@ -250,6 +250,37 @@ def get_heatmap(
     }
 
 
+@router.get("/{project_id}/analysis/versions")
+def list_analysis_versions(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Return metadata for all saved analysis versions (up to 3), newest first."""
+    _get_project_or_404(project_id, company.id, db)
+    versions = (
+        db.query(ProjectAnalysis)
+        .filter(ProjectAnalysis.project_id == project_id, ProjectAnalysis.status == "ready")
+        .order_by(ProjectAnalysis.version.desc())
+        .all()
+    )
+    result = []
+    for v in versions:
+        active_filters = None
+        if v.filters:
+            try:
+                active_filters = json.loads(v.filters)
+            except Exception:
+                pass
+        result.append({
+            "version": v.version,
+            "generated_at": v.generated_at.isoformat() if v.generated_at else None,
+            "participant_count": v.participant_count,
+            "filters": active_filters,
+        })
+    return result
+
+
 def _get_project_or_404(project_id: str, company_id: str, db: Session) -> Project:
     project = (
         db.query(Project)

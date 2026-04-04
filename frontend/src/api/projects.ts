@@ -400,3 +400,15 @@ export async function shareAnalysis(projectId: string): Promise<{ share_token: s
 export async function revokeAnalysisShare(projectId: string): Promise<void> {
   await client.delete(`/projects/${projectId}/analysis/share`);
 }
+
+export interface AnalysisVersionMeta {
+  version: number;
+  generated_at: string | null;
+  participant_count: number;
+  filters: { filter_by: string; filter_values: string[] } | null;
+}
+
+export async function getAnalysisHistory(projectId: string): Promise<AnalysisVersionMeta[]> {
+  const { data } = await client.get<AnalysisVersionMeta[]>(`/projects/${projectId}/analysis/versions`);
+  return data;
+}

@@ -2826,6 +2826,109 @@ select.field-input {
   background: var(--bg-sunken);
 }
 
+/* ── Toast notifications ─────────────────────────────────────────────────────── */
+.toast-stack {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #fff;
+  max-width: 340px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.12);
+  animation: toast-in 0.22s var(--ease-out) both;
+  pointer-events: auto;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.toast--success { background: #16a34a; }
+.toast--error   { background: #dc2626; }
+.toast--info    { background: #1e293b; }
+.toast-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+/* ── Shared report page ───────────────────────────────────────────────────── */
+.shared-report-page {
+  min-height: 100vh;
+  background: var(--bg-base);
+}
+.shared-report-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.shared-report-header-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.shared-report-brand {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--brand-600);
+  letter-spacing: -0.02em;
+}
+.shared-report-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.shared-report-main {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+.shared-report-title-block {
+  margin-bottom: 40px;
+}
+.shared-report-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+.shared-report-section {
+  margin-bottom: 40px;
+}
+.shared-report-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: 16px;
+}
+.analysis-theme-card {
+  padding: 20px;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
 /* ── Two-column transcript layout ───────────────────────────────────────────── */
 .responses-layout {
   display: grid;

@@ -10,8 +10,10 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from fastapi import Depends, HTTPException
 from app.config import settings
 from app.database import Base, engine
+from app.dependencies import get_db
 from app.limiter import limiter
 from app.logging_config import setup_logging, logger
 import app.models  # noqa: F401 — register all models with Base metadata

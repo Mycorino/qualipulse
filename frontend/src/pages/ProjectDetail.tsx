@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
 import {
   getProject,
@@ -29,6 +30,8 @@ import {
   getHeatmap,
   assessQuality,
   shareAnalysis,
+  getAnalysisHistory,
+  AnalysisVersionMeta,
   ProjectResponse,
   InterviewLink,
   ParticipantResponse,
@@ -53,6 +56,7 @@ const PRESET_COLORS = [
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   // ── Core state ─────────────────────────────────────────────────────────────
   const [project, setProject] = useState<ProjectResponse | null>(null);
@@ -71,6 +75,19 @@ export default function ProjectDetail() {
   // ── Responses tab filters/sort ─────────────────────────────────────────────
   const [responseStatusFilter, setResponseStatusFilter] = useState<"all" | "completed" | "in_progress">("all");
   const [responseSortBy, setResponseSortBy] = useState<"date" | "quality" | "name">("date");
+
+  // ── Analysis version history ───────────────────────────────────────────────
+  const [analysisVersions, setAnalysisVersions] = useState<AnalysisVersionMeta[]>([]);
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+
+  // ── Codebook persistence ───────────────────────────────────────────────────
+  const codebookPrefKey = "qp_codebook_open";
+  const codebookInitial = localStorage.getItem(codebookPrefKey) === "true";
+  const [showCodebook, setShowCodebook] = useState(codebookInitial);
+  const setShowCodebookPersist = (val: boolean) => {
+    localStorage.setItem(codebookPrefKey, String(val));
+    setShowCodebook(val);
+  };
 
   // ── Overview inline editors ────────────────────────────────────────────────
   const [editingObjective, setEditingObjective] = useState(false);
@@ -110,7 +127,6 @@ export default function ProjectDetail() {
   const [newCodeName, setNewCodeName] = useState("");
   const [newCodeColor, setNewCodeColor] = useState(PRESET_COLORS[0]);
   const [showNewCode, setShowNewCode] = useState(false);
-  const [showCodebook, setShowCodebook] = useState(false);
   const [creatingCode, setCreatingCode] = useState(false);
   const [renamingCodeId, setRenamingCodeId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
@@ -131,7 +147,7 @@ export default function ProjectDetail() {
 
   // ── P7: Heatmap ────────────────────────────────────────────────────────────
   const [heatmap, setHeatmap] = useState<HeatmapResponse | null>(null);
-  const [heatmapExpanded, setHeatmapExpanded] = useState(false);
+  const [heatmapExpanded, setHeatmapExpanded] = useState(localStorage.getItem("qp_heatmap_open") === "true");
   const [heatmapLoading, setHeatmapLoading] = useState(false);
 
   // ── P8: AI Quality assessment ───────────────────────────────────────────────
@@ -198,6 +214,7 @@ export default function ProjectDetail() {
       getTags(id!).then(setTags).catch(() => {}),
       getMemos(id!).then(setMemos).catch(() => {}),
       listProjects().then(setProjects).catch(() => {}),
+      getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {}),
     ]);
   }
 
@@ -210,6 +227,8 @@ export default function ProjectDetail() {
       if (ana.status !== "generating") {
         clearInterval(iv);
         setAnalysisPolling(false);
+        // Refresh version history now that a new version is ready
+        getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {});
       }
     }, 3000);
   }
@@ -290,9 +309,9 @@ export default function ProjectDetail() {
       const res = await shareAnalysis(id!);
       const url = `${window.location.origin}/reports/${res.share_token}`;
       await navigator.clipboard.writeText(url);
-      alert(`Share link copied!\n\n${url}`);
+      toast("Share link copied to clipboard ✓", "success");
     } catch {
-      alert("Could not generate share link. Make sure analysis is ready.");
+      toast("Could not generate share link — make sure analysis is ready.", "error");
     }
   }
 
@@ -301,7 +320,7 @@ export default function ProjectDetail() {
       const link = await createLink(id!);
       setLinks((prev) => [...prev, link]);
     } catch {
-      alert("Failed to generate link");
+      toast("Failed to generate link", "error");
     }
   }
 
@@ -310,7 +329,7 @@ export default function ProjectDetail() {
       const updated = await toggleLink(linkId);
       setLinks((prev) => prev.map((l) => (l.id === linkId ? updated : l)));
     } catch {
-      alert("Failed to update link");
+      toast("Failed to update link", "error");
     }
   }
 
@@ -352,7 +371,7 @@ export default function ProjectDetail() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Failed to export CSV");
+      toast("Failed to export CSV", "error");
     }
   }
 
@@ -362,7 +381,7 @@ export default function ProjectDetail() {
       await deleteProject(id!);
       navigate("/dashboard");
     } catch {
-      alert("Failed to delete project");
+      toast("Failed to delete project", "error");
     }
   }
 
@@ -391,7 +410,7 @@ export default function ProjectDetail() {
       );
       setEditingTurnId(null);
     } catch {
-      alert("Failed to save transcript edit");
+      toast("Failed to save transcript edit", "error");
     } finally {
       setSavingTurnId(null);
     }
@@ -434,7 +453,7 @@ export default function ProjectDetail() {
       setTags((prev) => [...prev, tag]);
       setCodes((prev) => prev.map((c) => c.id === code.id ? { ...c, tag_count: c.tag_count + 1 } : c));
     } catch {
-      alert("Failed to tag quote");
+      toast("Failed to tag quote", "error");
     } finally {
       setSelectionInfo(null);
       window.getSelection()?.removeAllRanges();
@@ -452,7 +471,7 @@ export default function ProjectDetail() {
       setNewCodeColor(PRESET_COLORS[0]);
       setShowNewCode(false);
     } catch {
-      alert("Failed to create code");
+      toast("Failed to create code", "error");
     } finally {
       setCreatingCode(false);
     }
@@ -483,7 +502,7 @@ export default function ProjectDetail() {
       setTags((prev) => prev.map((t) => (t.manual_code_id === codeId ? { ...t, code_name: updated.name } : t)));
       setRenamingCodeId(null);
     } catch {
-      alert("Failed to rename code");
+      toast("Failed to rename code", "error");
     }
   }
 
@@ -497,7 +516,7 @@ export default function ProjectDetail() {
       );
       setEditingInterviewNotes(null);
     } catch {
-      alert("Failed to save notes");
+      toast("Failed to save notes", "error");
     }
   }
 
@@ -509,7 +528,7 @@ export default function ProjectDetail() {
       );
       setEditingNoteId(null);
     } catch {
-      alert("Failed to save note");
+      toast("Failed to save note", "error");
     }
   }
 
@@ -525,7 +544,7 @@ export default function ProjectDetail() {
         prev ? { ...prev, questions: prev.questions.map((q) => q.id === questionId ? { ...q, deprecated_at: updated.deprecated_at } : q) } : prev
       );
     } catch {
-      alert("Failed to update question");
+      toast("Failed to update question", "error");
     }
   }
 
@@ -539,7 +558,7 @@ export default function ProjectDetail() {
       setNewMemoContent("");
       setAddingMemoKey(null);
     } catch {
-      alert("Failed to save memo");
+      toast("Failed to save memo", "error");
     }
   }
 
@@ -549,7 +568,7 @@ export default function ProjectDetail() {
       setMemos((prev) => prev.map((m) => m.id === memoId ? updated : m));
       setEditingMemoId(null);
     } catch {
-      alert("Failed to update memo");
+      toast("Failed to update memo", "error");
     }
   }
 
@@ -561,14 +580,20 @@ export default function ProjectDetail() {
   // ── P7: Heatmap ────────────────────────────────────────────────────────────
 
   async function loadHeatmap() {
-    if (heatmap) { setHeatmapExpanded(true); return; }
+    if (heatmap) {
+      const next = !heatmapExpanded;
+      setHeatmapExpanded(next);
+      localStorage.setItem("qp_heatmap_open", String(next));
+      return;
+    }
     setHeatmapLoading(true);
     try {
       const data = await getHeatmap(id!);
       setHeatmap(data);
       setHeatmapExpanded(true);
+      localStorage.setItem("qp_heatmap_open", "true");
     } catch {
-      alert("No ready analysis available for heatmap.");
+      toast("No ready analysis available — generate one first.", "error");
     } finally {
       setHeatmapLoading(false);
     }
@@ -589,7 +614,7 @@ export default function ProjectDetail() {
       const result = await assessQuality(id!, selectedParticipant.id);
       setQualityAssessment(result);
     } catch {
-      alert("Failed to assess interview quality");
+      toast("Failed to assess quality", "error");
     } finally {
       setLoadingQuality(false);
     }
@@ -806,7 +831,7 @@ export default function ProjectDetail() {
       setProject(updated);
       setEditingScreening(false);
       setExpandedSQ(null);
-    } catch { alert("Failed to save screening questions"); }
+    } catch { toast("Failed to save screening questions", "error"); }
     finally { setScreeningSaving(false); }
   }
 
@@ -1326,7 +1351,7 @@ export default function ProjectDetail() {
                 {/* Header row */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>Responses</span>
-                  <button className="btn btn-ghost btn-xs" onClick={handleExportCSV}>CSV</button>
+                  <button className="btn btn-ghost btn-xs" onClick={handleExportCSV} title="Export all participants and transcripts as CSV">↓ CSV</button>
                 </div>
 
                 {/* Status filter pills */}
@@ -1380,9 +1405,16 @@ export default function ProjectDetail() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <span className="participant-name" style={{ fontSize: 13, marginRight: 0 }}>{p.display_name || "Anonymous"}</span>
-                            {p.status !== "completed" && (
-                              <span className="status-badge status-progress" style={{ fontSize: 10 }}>Live</span>
-                            )}
+                            {p.status !== "completed" && (() => {
+                              const ageMs = Date.now() - new Date(p.started_at).getTime();
+                              const isRecent = ageMs < 2 * 60 * 60 * 1000; // < 2 hours
+                              return (
+                                <span className={`status-badge ${isRecent ? "status-progress" : ""}`}
+                                  style={{ fontSize: 10, background: isRecent ? undefined : "var(--border-subtle)", color: isRecent ? undefined : "var(--text-tertiary)" }}>
+                                  {isRecent ? "Live" : "Incomplete"}
+                                </span>
+                              );
+                            })()}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
                             <span className="participant-date" style={{ fontSize: 11 }}>{relativeDate(p.started_at)}</span>
@@ -1471,7 +1503,7 @@ export default function ProjectDetail() {
 
                     {/* Codebook (inline, collapsible) */}
                     <div style={{ marginBottom: 16 }}>
-                      <button className="btn btn-ghost btn-xs" onClick={() => setShowCodebook(!showCodebook)} style={{ marginBottom: showCodebook ? 8 : 0 }}>
+                      <button className="btn btn-ghost btn-xs" onClick={() => setShowCodebookPersist(!showCodebook)} style={{ marginBottom: showCodebook ? 8 : 0 }}>
                         {showCodebook ? "▲" : "▼"} Codebook ({codes.length})
                       </button>
                       {showCodebook && (
@@ -1701,7 +1733,20 @@ export default function ProjectDetail() {
                 <div className="analysis-generating"><span className="spinner-sm" /><span>Claude is reading {analysis.participant_count} interview{analysis.participant_count !== 1 ? "s" : ""}...</span></div>
               )}
               {analysis.status === "failed" && (
-                <p style={{ color: "var(--danger)" }}>Analysis failed: {analysis.error}</p>
+                <div style={{ padding: "16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <span style={{ fontSize: 18 }}>⚠</span>
+                  <div>
+                    <p style={{ fontWeight: 600, color: "#991b1b", marginBottom: 4 }}>Analysis couldn't complete</p>
+                    <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: 10 }}>
+                      {analysis.error?.includes("timed out") ? "The analysis timed out — your dataset may be too large. Try filtering to a smaller group first." :
+                       analysis.error?.includes("No completed") ? "No completed interviews to analyse yet." :
+                       "Something went wrong on our end. Please try again."}
+                    </p>
+                    <button className="btn btn-sm" style={{ background: "#991b1b", color: "#fff" }} onClick={handleTriggerAnalysis}>
+                      Retry analysis
+                    </button>
+                  </div>
+                </div>
               )}
 
               {analysis.status === "ready" && analysis.report && (() => {
@@ -1713,16 +1758,53 @@ export default function ProjectDetail() {
                     <div className="analysis-meta">
                       <span className="badge analysis-ai-badge">✦ AI-generated</span>
                       <span className="badge">n={r.participant_count} interview{r.participant_count !== 1 ? "s" : ""}</span>
-                      <span className="badge">Confidence: {r.confidence}</span>
+                      <span
+                        className="badge"
+                        title="Confidence reflects sample size, response depth, and thematic saturation. Low = &lt;5 interviews or very short responses. High = 10+ rich interviews with consistent themes."
+                        style={{ cursor: "help", textDecoration: "underline dotted" }}
+                      >
+                        {r.confidence} confidence
+                      </span>
                       {analysis.filters && (
                         <span className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>
                           Filtered: {analysis.filters.filter_by} ({analysis.filters.filter_values.join(", ")})
                         </span>
                       )}
                       {analysis.generated_at && (
-                        <span className="muted-text" style={{ fontSize: "0.8rem" }}>Generated {new Date(analysis.generated_at).toLocaleString()}</span>
+                        <span className="muted-text" style={{ fontSize: "0.8rem" }}>v{analysisVersions.length > 0 ? analysisVersions[0].version : ""} · {new Date(analysis.generated_at).toLocaleString()}</span>
                       )}
                     </div>
+
+                    {/* Version history */}
+                    {analysisVersions.length > 1 && (
+                      <div style={{ marginTop: 8 }}>
+                        <button
+                          className="btn btn-ghost btn-xs"
+                          onClick={() => setVersionHistoryOpen(!versionHistoryOpen)}
+                          style={{ color: "var(--text-tertiary)", fontSize: 11 }}
+                        >
+                          {versionHistoryOpen ? "▲" : "▼"} {analysisVersions.length - 1} previous version{analysisVersions.length > 2 ? "s" : ""}
+                        </button>
+                        {versionHistoryOpen && (
+                          <div style={{ marginTop: 6, padding: "10px 12px", borderRadius: 6, background: "var(--bg-sunken)", border: "1px solid var(--border-subtle)", fontSize: 12 }}>
+                            <p style={{ fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)" }}>Analysis history (last 3)</p>
+                            {analysisVersions.map((v, i) => (
+                              <div key={v.version} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: i > 0 ? "1px solid var(--border-light)" : "none" }}>
+                                <span style={{ fontWeight: 600, color: i === 0 ? "var(--brand-600)" : "var(--text-tertiary)", minWidth: 40 }}>v{v.version}</span>
+                                <span style={{ color: "var(--text-tertiary)" }}>
+                                  {v.generated_at ? new Date(v.generated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                                </span>
+                                <span style={{ color: "var(--text-tertiary)" }}>·</span>
+                                <span style={{ color: "var(--text-tertiary)" }}>{v.participant_count} interview{v.participant_count !== 1 ? "s" : ""}</span>
+                                {v.filters && <span className="badge" style={{ fontSize: 10 }}>Filtered</span>}
+                                {i === 0 && <span className="badge" style={{ fontSize: 10, background: "var(--brand-50)", color: "var(--brand-700)" }}>Current</span>}
+                              </div>
+                            ))}
+                            <p style={{ color: "var(--text-tertiary)", fontSize: 11, marginTop: 8 }}>Previous versions are stored for reference. Regenerating creates a new version.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Themes */}
                     {r.themes.length > 0 && (
