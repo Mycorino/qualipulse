@@ -1,5 +1,5 @@
 import { useState, FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { login } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
 
@@ -10,6 +10,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { saveToken } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const resetSuccess = searchParams.get("reset") === "success";
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -32,9 +34,13 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div className="auth-logo">QualiPulse</div>
         <h1 className="auth-title">Welcome back</h1>
         <p className="auth-subtitle">Sign in to your account</p>
 
+        {resetSuccess && (
+          <div className="success-banner">Password updated successfully. Sign in with your new password.</div>
+        )}
         {error && <div className="error-banner">{error}</div>}
 
         <form onSubmit={handleSubmit}>
@@ -44,6 +50,7 @@ export default function Login() {
             className="field-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
             required
             autoFocus
           />
@@ -62,12 +69,12 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="auth-footer">
-          Don't have an account? <Link to="/signup">Sign up</Link>
-        </p>
         <div className="auth-footer" style={{ marginTop: 12 }}>
           <Link to="/forgot-password" className="auth-link">Forgot your password?</Link>
         </div>
+        <p className="auth-footer">
+          Don't have an account? <Link to="/signup">Sign up free</Link>
+        </p>
       </div>
     </div>
   );

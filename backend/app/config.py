@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./auto_interview.db"
     SECRET_KEY: str = "change-me-to-a-random-string"
     ENVIRONMENT: str = "development"  # "development" | "staging" | "production"
+    APP_BASE_URL: str = "http://localhost:5173"
     DEBUG: bool = True
 
     # Auth
@@ -35,8 +36,8 @@ class Settings(BaseSettings):
 
     # Email (SendGrid)
     SENDGRID_API_KEY: str = ""
-    EMAIL_FROM: str = "noreply@autointerview.com"
-    EMAIL_FROM_NAME: str = "AutoInterview"
+    EMAIL_FROM: str = "noreply@qualipulse.com"
+    EMAIL_FROM_NAME: str = "QualiPulse"
 
     # Stripe (billing)
     STRIPE_SECRET_KEY: str = ""
