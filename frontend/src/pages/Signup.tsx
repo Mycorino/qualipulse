@@ -15,6 +15,10 @@ export default function Signup() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
     setLoading(true);
     try {
       const res = await signup(name, email, password);
@@ -33,28 +37,31 @@ export default function Signup() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">Create account</h1>
-        <p className="auth-subtitle">Get started with Auto Interview</p>
+        <div className="auth-logo">QualiPulse</div>
+        <h1 className="auth-title">Create your account</h1>
+        <p className="auth-subtitle">Start running AI-powered research interviews in minutes.</p>
 
         {error && <div className="error-banner">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label">Company / Name</label>
+          <label className="field-label">Company or your name</label>
           <input
             type="text"
             className="field-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Acme Research"
             required
             autoFocus
           />
 
-          <label className="field-label">Email</label>
+          <label className="field-label">Work email</label>
           <input
             type="email"
             className="field-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
             required
           />
 
@@ -64,17 +71,22 @@ export default function Signup() {
             className="field-input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
             required
-            minLength={6}
+            minLength={8}
           />
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? "Creating account..." : "Create account"}
+            {loading ? "Creating account..." : "Get started free"}
           </button>
         </form>
 
+        <p className="auth-terms">
+          By signing up, you agree to our terms of service and privacy policy.
+        </p>
+
         <p className="auth-footer">
-          Already have an account? <Link to="/">Sign in</Link>
+          Already have an account? <Link to="/login">Sign in</Link>
         </p>
       </div>
     </div>

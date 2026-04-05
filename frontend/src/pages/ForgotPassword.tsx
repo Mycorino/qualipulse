@@ -25,13 +25,14 @@ export default function ForgotPassword() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div className="auth-logo">QualiPulse</div>
         <h1 className="auth-title">Reset your password</h1>
         <p className="auth-subtitle">
           Enter your email and we'll send you a reset link.
         </p>
         {sent ? (
-          <div className="auth-success">
-            ✓ If that email is registered, you'll receive a reset link shortly. Check your inbox.
+          <div className="success-banner">
+            Check your inbox — if that email is registered, you'll receive a reset link shortly.
           </div>
         ) : (
           <form className="auth-form" onSubmit={handleSubmit}>
@@ -43,17 +44,17 @@ export default function ForgotPassword() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="you@example.com"
+                placeholder="you@company.com"
               />
             </div>
             {error && <p className="error-text">{error}</p>}
-            <button className="btn btn-primary" type="submit" disabled={loading}>
+            <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
               {loading ? "Sending..." : "Send reset link"}
             </button>
           </form>
         )}
         <div className="auth-footer">
-          <Link to="/login" className="auth-link">← Back to login</Link>
+          <Link to="/login" className="auth-link">Back to login</Link>
         </div>
       </div>
     </div>

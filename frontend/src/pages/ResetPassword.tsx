@@ -31,9 +31,10 @@ export default function ResetPassword() {
     return (
       <div className="auth-page">
         <div className="auth-card">
+          <div className="auth-logo">QualiPulse</div>
           <h1 className="auth-title">Invalid link</h1>
           <p className="auth-subtitle">This reset link is missing or malformed.</p>
-          <Link to="/forgot-password" className="auth-link">Request a new one →</Link>
+          <Link to="/forgot-password" className="btn btn-primary btn-block" style={{ textAlign: "center", textDecoration: "none" }}>Request a new one</Link>
         </div>
       </div>
     );
@@ -42,6 +43,7 @@ export default function ResetPassword() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div className="auth-logo">QualiPulse</div>
         <h1 className="auth-title">Set new password</h1>
         <p className="auth-subtitle">Choose a strong password for your account.</p>
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -69,7 +71,7 @@ export default function ResetPassword() {
             />
           </div>
           {error && <p className="error-text">{error}</p>}
-          <button className="btn btn-primary" type="submit" disabled={loading}>
+          <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
             {loading ? "Updating..." : "Set new password"}
           </button>
         </form>

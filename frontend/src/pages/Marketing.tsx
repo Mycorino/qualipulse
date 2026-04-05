@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import "./Marketing.css";
+import client from "../api/client";
 
 const HOW_IT_WORKS = [
   {
@@ -50,6 +52,26 @@ const PLANS = [
 ];
 
 export default function Marketing() {
+  const [nlEmail, setNlEmail] = useState("");
+  const [nlLoading, setNlLoading] = useState(false);
+  const [nlDone, setNlDone] = useState(false);
+  const [nlError, setNlError] = useState("");
+
+  async function handleNewsletter(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nlEmail) return;
+    setNlLoading(true);
+    setNlError("");
+    try {
+      await client.post("/auth/newsletter", { email: nlEmail });
+      setNlDone(true);
+    } catch {
+      setNlError("Something went wrong. Please try again.");
+    } finally {
+      setNlLoading(false);
+    }
+  }
+
   return (
     <div className="mkt">
       {/* Nav */}
@@ -78,7 +100,7 @@ export default function Marketing() {
           </p>
           <div className="mkt-hero-ctas">
             <Link to="/signup" className="btn btn-primary mkt-btn-lg">Run your first study free</Link>
-            <Link to="/login" className="mkt-link-secondary">Already have an account →</Link>
+            <Link to="/login" className="mkt-link-secondary">Already have an account?</Link>
           </div>
           <p className="mkt-hero-note">14-day trial · No credit card · GDPR-compliant</p>
         </div>
@@ -179,8 +201,39 @@ export default function Marketing() {
         </div>
         <p className="mkt-plans-enterprise">
           Running a large research program?{" "}
-          <a href="mailto:hello@qualipulse.com">Talk to us about Enterprise →</a>
+          <a href="mailto:hello@qualipulse.com">Talk to us about Enterprise</a>
         </p>
+      </section>
+
+      {/* Newsletter */}
+      <section className="mkt-newsletter" id="newsletter">
+        <div className="mkt-newsletter-inner">
+          <h2 className="mkt-newsletter-title">Stay in the loop</h2>
+          <p className="mkt-newsletter-desc">
+            Get occasional updates on qualitative research best practices, product news, and tips for better insights.
+          </p>
+          {nlDone ? (
+            <div className="mkt-newsletter-success">
+              You're subscribed! Check your inbox for a welcome email.
+            </div>
+          ) : (
+            <form className="mkt-newsletter-form" onSubmit={handleNewsletter}>
+              <input
+                type="email"
+                className="mkt-newsletter-input"
+                placeholder="you@company.com"
+                value={nlEmail}
+                onChange={(e) => setNlEmail(e.target.value)}
+                required
+              />
+              <button type="submit" className="btn btn-primary" disabled={nlLoading}>
+                {nlLoading ? "..." : "Subscribe"}
+              </button>
+            </form>
+          )}
+          {nlError && <p className="mkt-newsletter-error">{nlError}</p>}
+          <p className="mkt-newsletter-note">No spam, ever. Unsubscribe anytime.</p>
+        </div>
       </section>
 
       {/* Footer */}
@@ -189,8 +242,9 @@ export default function Marketing() {
         <div className="mkt-footer-links">
           <Link to="/login">Log in</Link>
           <Link to="/signup">Sign up</Link>
+          <a href="mailto:hello@qualipulse.com">Contact</a>
         </div>
-        <span className="mkt-footer-copy">© 2026 QualiPulse · GDPR-compliant</span>
+        <span className="mkt-footer-copy">&copy; 2026 QualiPulse &middot; GDPR-compliant</span>
       </footer>
     </div>
   );

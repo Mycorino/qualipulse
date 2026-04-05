@@ -25,7 +25,7 @@ from app.services.auth import (
     hash_password,
     verify_password,
 )
-from app.services.email import send_password_reset, send_welcome
+from app.services.email import send_newsletter_welcome, send_password_reset, send_welcome
 
 logger = logging.getLogger("auto_interview.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -108,7 +108,7 @@ def request_password_reset(request: Request, body: PasswordResetRequest, db: Ses
         )
         db.add(token)
         db.commit()
-        reset_url = f"https://app.autointerview.com/reset-password?token={token.token}"
+        reset_url = f"{settings.APP_BASE_URL}/reset-password?token={token.token}"
         send_password_reset(company.email, reset_url)
         logger.info("Password reset requested for %s", company.email)
     return {"message": "If that email exists, a reset link has been sent."}
@@ -174,3 +174,16 @@ def change_password(
     db.commit()
     logger.info("Password changed for %s", company.email)
     return {"message": "Password updated successfully"}
+
+
+class NewsletterSubscribe(BaseModel):
+    email: str
+
+
+@router.post("/newsletter")
+@limiter.limit("5/minute")
+def subscribe_newsletter(request: Request, body: NewsletterSubscribe):
+    """Subscribe to newsletter — just sends a welcome email for now."""
+    send_newsletter_welcome(body.email.lower().strip())
+    logger.info("Newsletter subscription: %s", body.email)
+    return {"message": "Subscribed successfully"}
