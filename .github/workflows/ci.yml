@@ -11,23 +11,8 @@ jobs:
     name: Backend (Python)
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: test_auto_interview
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
     env:
-      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_auto_interview
+      DATABASE_URL: "sqlite:///:memory:"
       SECRET_KEY: ci-test-secret-key-32-chars-min
       ANTHROPIC_API_KEY: ""
       OPENAI_API_KEY: ""
@@ -47,10 +32,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pytest pytest-asyncio httpx
-
-      - name: Run migrations
-        run: alembic upgrade head
+        run: pip install -r requirements.txt pytest
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
