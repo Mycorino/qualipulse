@@ -1,0 +1,111 @@
+# Google Cloud Build — triggered on push to main
+# Builds and deploys backend + frontend to Cloud Run
+#
+# Required substitutions (set in Cloud Build trigger):
+#   _REGION:        e.g. europe-west1
+#   _DB_URL:        postgresql://... (from Secret Manager)
+#   _BACKEND_TAG:   auto-interview-backend
+#   _FRONTEND_TAG:  auto-interview-frontend
+
+substitutions:
+  _REGION: europe-west1
+  _BACKEND_TAG: auto-interview-backend
+  _FRONTEND_TAG: auto-interview-frontend
+
+steps:
+  # ── Build backend image ──────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-backend
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_BACKEND_TAG}:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_BACKEND_TAG}:latest
+      - ./backend
+
+  # ── Build frontend image ─────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-frontend
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_FRONTEND_TAG}:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_FRONTEND_TAG}:latest
+      - ./frontend
+
+  # ── Push images to Artifact Registry ─────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: push-backend
+    waitFor: [build-backend]
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_BACKEND_TAG}
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-frontend
+    waitFor: [build-frontend]
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_FRONTEND_TAG}
+
+  # ── Deploy backend to Cloud Run ──────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-backend
+    waitFor: [push-backend]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - auto-interview-api
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_BACKEND_TAG}:${SHORT_SHA}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --cpu=1
+      - --memory=512Mi
+      - --min-instances=0
+      - --max-instances=10
+      - --timeout=300s
+      - --concurrency=80
+      - --set-secrets=SECRET_KEY=secret-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,DATABASE_URL=database-url:latest,SENDGRID_API_KEY=sendgrid-api-key:latest
+      - --set-env-vars=ENVIRONMENT=production,UPLOAD_DIR=/tmp/uploads,ALLOWED_ORIGINS=https://app.qualipulse.com
+
+  # ── Deploy frontend to Cloud Run ─────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-frontend
+    waitFor: [push-frontend, deploy-backend]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        # Get the backend service URL
+        BACKEND_URL=$(gcloud run services describe auto-interview-api \
+          --region=${_REGION} --format='value(status.url)')
+        # Extract host from URL for proxy_set_header
+        BACKEND_HOST=$(echo "$BACKEND_URL" | sed 's|https://||')
+
+        gcloud run deploy auto-interview-web \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_FRONTEND_TAG}:${SHORT_SHA} \
+          --region=${_REGION} \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --cpu=1 \
+          --memory=256Mi \
+          --min-instances=0 \
+          --max-instances=5 \
+          --concurrency=200 \
+          --set-env-vars="BACKEND_URL=$BACKEND_URL,BACKEND_HOST=$BACKEND_HOST"
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_BACKEND_TAG}:${SHORT_SHA}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_FRONTEND_TAG}:${SHORT_SHA}
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
