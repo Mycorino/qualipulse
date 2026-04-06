@@ -84,10 +84,10 @@ steps:
       - -c
       - |
         # Get the backend service URL
-        BACKEND_URL=$(gcloud run services describe auto-interview-api \
+        BURL=$$(gcloud run services describe auto-interview-api \
           --region=${_REGION} --format='value(status.url)')
         # Extract host from URL for proxy_set_header
-        BACKEND_HOST=$(echo "$BACKEND_URL" | sed 's|https://||')
+        BHOST=$$(echo "$$BURL" | sed 's|https://||')
 
         gcloud run deploy auto-interview-web \
           --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_FRONTEND_TAG}:${SHORT_SHA} \
@@ -100,7 +100,7 @@ steps:
           --min-instances=0 \
           --max-instances=5 \
           --concurrency=200 \
-          --set-env-vars="BACKEND_URL=$BACKEND_URL,BACKEND_HOST=$BACKEND_HOST"
+          --set-env-vars="BACKEND_URL=$$BURL,BACKEND_HOST=$$BHOST"
 
 images:
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/auto-interview/${_BACKEND_TAG}:${SHORT_SHA}
