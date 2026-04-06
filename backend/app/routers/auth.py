@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.limiter import limiter
-from app.models.company import Company, PasswordResetToken
+from app.models.company import Company, EmailVerificationToken, PasswordResetToken
 from app.schemas.auth import (
     CompanyResponse,
     LoginRequest,
+    OnboardingProfileRequest,
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
@@ -25,7 +26,12 @@ from app.services.auth import (
     hash_password,
     verify_password,
 )
-from app.services.email import send_newsletter_welcome, send_password_reset, send_welcome
+from app.services.email import (
+    send_newsletter_welcome,
+    send_password_reset,
+    send_verification_email,
+    send_welcome,
+)
 
 logger = logging.getLogger("auto_interview.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -34,23 +40,44 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("10/minute")
 def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    existing = db.query(Company).filter(Company.email == body.email).first()
+    existing = db.query(Company).filter(Company.email == body.email.lower().strip()).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A company with this email already exists",
+            detail="An account with this email already exists. Try signing in instead.",
+        )
+
+    if len(body.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters.",
         )
 
     company = Company(
         name=body.name.strip(),
         email=body.email.lower().strip(),
         password_hash=hash_password(body.password),
+        trial_ends_at=datetime.utcnow() + timedelta(days=14),
     )
     db.add(company)
     db.commit()
     db.refresh(company)
 
     logger.info("New company signup: %s", company.email)
+
+    # Create email verification token
+    verification_token = EmailVerificationToken(
+        company_id=company.id,
+        expires_at=datetime.utcnow() + timedelta(hours=24),
+    )
+    db.add(verification_token)
+    db.commit()
+
+    # Send verification email
+    verify_url = f"{settings.APP_BASE_URL}/verify-email?token={verification_token.token}"
+    send_verification_email(company.email, company.name, verify_url)
+
+    # Also send welcome
     send_welcome(company.email, company.name)
 
     return TokenResponse(
@@ -90,6 +117,68 @@ def refresh_token(body: RefreshRequest, db: Session = Depends(get_db)) -> TokenR
         refresh_token=create_refresh_token({"sub": company.id}),
     )
 
+
+# ── Email Verification ────────────────────────────────────────────────
+
+@router.post("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    """Verify email address using the token from the verification email."""
+    token_row = db.query(EmailVerificationToken).filter(
+        EmailVerificationToken.token == token,
+        EmailVerificationToken.used.is_(False),
+    ).first()
+
+    if not token_row or token_row.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This verification link is invalid or has expired.",
+        )
+
+    company = db.query(Company).filter(Company.id == token_row.company_id).first()
+    if not company:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+
+    company.email_verified = True
+    token_row.used = True
+    db.commit()
+
+    logger.info("Email verified for %s", company.email)
+    return {"message": "Email verified successfully"}
+
+
+@router.post("/resend-verification")
+@limiter.limit("3/minute")
+def resend_verification(
+    request: Request,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Resend the verification email. Requires authentication."""
+    if company.email_verified:
+        return {"message": "Email is already verified"}
+
+    # Expire existing tokens
+    db.query(EmailVerificationToken).filter(
+        EmailVerificationToken.company_id == company.id,
+        EmailVerificationToken.used.is_(False),
+    ).delete()
+
+    # Create new token
+    verification_token = EmailVerificationToken(
+        company_id=company.id,
+        expires_at=datetime.utcnow() + timedelta(hours=24),
+    )
+    db.add(verification_token)
+    db.commit()
+
+    verify_url = f"{settings.APP_BASE_URL}/verify-email?token={verification_token.token}"
+    send_verification_email(company.email, company.name, verify_url)
+
+    logger.info("Verification email resent to %s", company.email)
+    return {"message": "Verification email sent"}
+
+
+# ── Password Reset ────────────────────────────────────────────────────
 
 @router.post("/password-reset/request")
 @limiter.limit("5/minute")
@@ -132,6 +221,8 @@ def confirm_password_reset(body: PasswordResetConfirm, db: Session = Depends(get
     return {"message": "Password updated successfully"}
 
 
+# ── Profile & Onboarding ────────────────────────────────────────────────
+
 @router.get("/me", response_model=CompanyResponse)
 def get_me(company: Company = Depends(get_current_company)) -> CompanyResponse:
     return CompanyResponse.model_validate(company)
@@ -156,6 +247,51 @@ def update_profile(
     company.name = body.name.strip()
     db.commit()
     return {"id": company.id, "name": company.name, "email": company.email}
+
+
+@router.patch("/onboarding")
+def save_onboarding_profile(
+    body: OnboardingProfileRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Save company profile details during onboarding (intermediate save, doesn't mark complete)."""
+    if body.name:
+        company.name = body.name.strip()
+    if body.company_size:
+        company.company_size = body.company_size
+    if body.role:
+        company.role = body.role
+    if body.industry:
+        company.industry = body.industry
+    if body.use_case:
+        company.use_case = body.use_case
+    db.commit()
+    logger.info("Onboarding profile saved for %s", company.email)
+    return CompanyResponse.model_validate(company)
+
+
+@router.post("/onboarding")
+def complete_onboarding(
+    body: OnboardingProfileRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Save company profile details and mark onboarding as complete."""
+    if body.name:
+        company.name = body.name.strip()
+    if body.company_size:
+        company.company_size = body.company_size
+    if body.role:
+        company.role = body.role
+    if body.industry:
+        company.industry = body.industry
+    if body.use_case:
+        company.use_case = body.use_case
+    company.onboarding_completed = True
+    db.commit()
+    logger.info("Onboarding completed for %s", company.email)
+    return CompanyResponse.model_validate(company)
 
 
 @router.post("/change-password")

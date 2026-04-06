@@ -322,7 +322,8 @@ export default function CreateProjectWizard() {
           ← Back
         </button>
         <h2 className="wizard-title">{isEditMode ? "Edit Project" : "New Research Project"}</h2>
-        <div style={{ width: 80 }} />
+        {!isEditMode && <span className="wizard-autosave">Draft auto-saved</span>}
+        {isEditMode && <div style={{ width: 80 }} />}
       </header>
 
       {/* Progress */}

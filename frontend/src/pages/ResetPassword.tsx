@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import client from "../api/client";
+import { getErrorMessage } from "../utils/errorMessages";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -13,15 +14,21 @@ export default function ResetPassword() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password !== confirm) { setError("Passwords don't match"); return; }
-    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (password !== confirm) { setError("Passwords don't match."); return; }
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
     setLoading(true);
     setError("");
     try {
       await client.post("/auth/password-reset/confirm", { token, new_password: password });
       navigate("/login?reset=success");
-    } catch {
-      setError("This reset link is invalid or has expired. Please request a new one.");
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, "");
+      // If it's a token issue, show a specific message
+      if (msg.toLowerCase().includes("token") || msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("invalid")) {
+        setError("This reset link is invalid or has expired. Please request a new one.");
+      } else {
+        setError(msg || "Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -70,7 +77,7 @@ export default function ResetPassword() {
               placeholder="Repeat your password"
             />
           </div>
-          {error && <p className="error-text">{error}</p>}
+          {error && <div className="error-banner">{error}</div>}
           <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
             {loading ? "Updating..." : "Set new password"}
           </button>

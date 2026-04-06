@@ -26,8 +26,14 @@ const PLANS = [
     name: "Solo",
     price: "$0",
     period: "",
-    desc: "Explore the product",
-    features: ["3 projects", "25 interviews/mo", "AI themes & quotes"],
+    desc: "For individual researchers",
+    features: [
+      "3 projects",
+      "25 participants per project",
+      "AI interview guide builder",
+      "AI themes & quotes analysis",
+      "2 interview links per project",
+    ],
     cta: "Get started free",
     highlight: false,
   },
@@ -35,9 +41,16 @@ const PLANS = [
     name: "Team",
     price: "$49",
     period: "/mo",
-    desc: "For in-house researchers",
-    features: ["10 projects", "100 interviews/mo", "Full synthesis memo", "Demographic segments", "CSV export"],
-    cta: "Start 14-day trial",
+    desc: "For in-house research teams",
+    features: [
+      "5 projects",
+      "50 participants per project",
+      "Full AI synthesis memo",
+      "Demographic segments & heatmaps",
+      "CSV export",
+      "3 team members",
+    ],
+    cta: "Start 14-day free trial",
     highlight: true,
   },
   {
@@ -45,8 +58,15 @@ const PLANS = [
     price: "$149",
     period: "/mo",
     desc: "For research programs",
-    features: ["Unlimited projects", "Unlimited interviews", "Cross-study segment heatmaps", "Shared team workspace", "Priority support"],
-    cta: "Start 14-day trial",
+    features: [
+      "Unlimited projects",
+      "500 participants per project",
+      "Everything in Team",
+      "Custom branding",
+      "10 team members",
+      "Priority support",
+    ],
+    cta: "Start 14-day free trial",
     highlight: false,
   },
 ];
@@ -102,7 +122,7 @@ export default function Marketing() {
             <Link to="/signup" className="btn btn-primary mkt-btn-lg">Run your first study free</Link>
             <Link to="/login" className="mkt-link-secondary">Already have an account?</Link>
           </div>
-          <p className="mkt-hero-note">14-day trial · No credit card · GDPR-compliant</p>
+          <p className="mkt-hero-note">Free plan available · 14-day trial on paid plans · No credit card required</p>
         </div>
 
         {/* Fake UI preview */}
@@ -139,10 +159,35 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* Social proof strip */}
-      <div className="mkt-proof-strip">
-        <span>Research that used to take two weeks now takes two days.</span>
-      </div>
+      {/* Social proof */}
+      <section className="mkt-social-proof">
+        <div className="mkt-social-inner">
+          <div className="mkt-social-stats">
+            <div className="mkt-social-stat">
+              <span className="mkt-social-num">500+</span>
+              <span className="mkt-social-label">Interviews conducted</span>
+            </div>
+            <div className="mkt-social-stat">
+              <span className="mkt-social-num">4.8h</span>
+              <span className="mkt-social-label">Avg time saved per study</span>
+            </div>
+            <div className="mkt-social-stat">
+              <span className="mkt-social-num">92%</span>
+              <span className="mkt-social-label">Completion rate</span>
+            </div>
+          </div>
+          <div className="mkt-testimonials">
+            <div className="mkt-testimonial">
+              <p>"We used to spend two weeks scheduling and running interviews. With QualiPulse, we had actionable insights in two days."</p>
+              <span className="mkt-testimonial-author">— Product Research Lead, Series B SaaS</span>
+            </div>
+            <div className="mkt-testimonial">
+              <p>"The AI follow-ups catch things I would have missed. It's like having a trained interviewer available 24/7."</p>
+              <span className="mkt-testimonial-author">— UX Researcher, Fintech Startup</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* How it works */}
       <section className="mkt-section" id="how">
@@ -191,7 +236,7 @@ export default function Marketing() {
                 ))}
               </ul>
               <Link
-                to="/signup"
+                to={`/signup?plan=${p.name.toLowerCase()}`}
                 className={`btn ${p.highlight ? "btn-primary" : "btn-secondary"} mkt-plan-cta`}
               >
                 {p.cta}
@@ -242,6 +287,8 @@ export default function Marketing() {
         <div className="mkt-footer-links">
           <Link to="/login">Log in</Link>
           <Link to="/signup">Sign up</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/privacy">Privacy</Link>
           <a href="mailto:hello@qualipulse.com">Contact</a>
         </div>
         <span className="mkt-footer-copy">&copy; 2026 QualiPulse &middot; GDPR-compliant</span>

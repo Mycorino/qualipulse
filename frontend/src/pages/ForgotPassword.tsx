@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
+import { getErrorMessage } from "../utils/errorMessages";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -13,10 +14,10 @@ export default function ForgotPassword() {
     setLoading(true);
     setError("");
     try {
-      await client.post("/auth/password-reset/request", { email });
+      await client.post("/auth/password-reset/request", { email: email.trim().toLowerCase() });
       setSent(true);
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Something went wrong. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -47,7 +48,7 @@ export default function ForgotPassword() {
                 placeholder="you@company.com"
               />
             </div>
-            {error && <p className="error-text">{error}</p>}
+            {error && <div className="error-banner">{error}</div>}
             <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
               {loading ? "Sending..." : "Send reset link"}
             </button>

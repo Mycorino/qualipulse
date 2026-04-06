@@ -1,7 +1,8 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { login } from "../api/auth";
+import { login, getMe } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
+import { getErrorMessage } from "../utils/errorMessages";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -16,16 +17,36 @@ export default function Login() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      setError("Please enter your email address.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await login(email, password);
-      saveToken(res.access_token);
-      navigate("/dashboard");
+      const res = await login(trimmedEmail, password);
+      saveToken(res.access_token, res.refresh_token);
+
+      // Check if onboarding is completed — route accordingly
+      try {
+        const me = await getMe();
+        if (!me.onboarding_completed) {
+          navigate("/welcome");
+        } else {
+          navigate("/dashboard");
+        }
+      } catch {
+        // If getMe fails, just go to dashboard
+        navigate("/dashboard");
+      }
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || "Login failed";
-      setError(msg);
+      setError(getErrorMessage(err, "Login failed. Please try again."));
     } finally {
       setLoading(false);
     }

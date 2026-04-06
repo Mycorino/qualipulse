@@ -31,18 +31,20 @@ class TestCreateProject:
         resp = client.post("/projects/", json=PROJECT_PAYLOAD)
         assert resp.status_code == 401
 
-    def test_free_tier_project_limit(self, client, auth_headers):
-        """Free tier allows 1 project; the second should be rejected."""
-        client.post("/projects/", json=PROJECT_PAYLOAD, headers=auth_headers)
-        resp = client.post("/projects/", json={**PROJECT_PAYLOAD, "name": "Second Project"}, headers=auth_headers)
+    def test_trial_project_limit(self, client, auth_headers):
+        """New signups get a 14-day trial with starter limits (5 projects)."""
+        for i in range(5):
+            resp = client.post("/projects/", json={**PROJECT_PAYLOAD, "name": f"Project {i}"}, headers=auth_headers)
+            assert resp.status_code == 201, f"Project {i} should succeed: {resp.text}"
+        resp = client.post("/projects/", json={**PROJECT_PAYLOAD, "name": "Over Limit"}, headers=auth_headers)
         assert resp.status_code == 403
         assert "limit" in resp.json()["detail"].lower()
 
-    def test_free_tier_question_limit(self, client, auth_headers):
-        """Free tier allows 5 questions; 6 should be rejected."""
+    def test_trial_question_limit(self, client, auth_headers):
+        """New signups get starter limits during trial (15 questions); 16 should be rejected."""
         questions = [
             {**QUESTION, "question_index": i, "main_question": f"Q{i}"}
-            for i in range(6)
+            for i in range(16)
         ]
         resp = client.post("/projects/", json={**PROJECT_PAYLOAD, "questions": questions}, headers=auth_headers)
         assert resp.status_code == 403
