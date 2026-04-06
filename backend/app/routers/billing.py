@@ -18,7 +18,7 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 
 class CheckoutRequest(BaseModel):
-    tier: str  # "starter" | "pro" | "enterprise"
+    tier: str  # "team" | "lab" | "enterprise"
     success_url: str
     cancel_url: str
 
@@ -92,6 +92,9 @@ def create_checkout_session(
 
         # Map tier to Stripe price ID (configure in settings)
         price_ids = {
+            "team": getattr(settings, "STRIPE_PRICE_STARTER", ""),
+            "lab": getattr(settings, "STRIPE_PRICE_PRO", ""),
+            # Legacy aliases
             "starter": getattr(settings, "STRIPE_PRICE_STARTER", ""),
             "pro": getattr(settings, "STRIPE_PRICE_PRO", ""),
         }
@@ -169,8 +172,8 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
             company = db.query(Company).filter(Company.id == company_id).first()
             if company:
                 tier_map = {
-                    getattr(settings, "STRIPE_PRICE_STARTER", ""): "starter",
-                    getattr(settings, "STRIPE_PRICE_PRO", ""): "pro",
+                    getattr(settings, "STRIPE_PRICE_STARTER", ""): "team",
+                    getattr(settings, "STRIPE_PRICE_PRO", ""): "lab",
                 }
                 price_id = sub["items"]["data"][0]["price"]["id"] if sub["items"]["data"] else ""
                 company.subscription_tier = tier_map.get(price_id, company.subscription_tier)
@@ -185,7 +188,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         if company_id:
             company = db.query(Company).filter(Company.id == company_id).first()
             if company:
-                company.subscription_tier = "free"
+                company.subscription_tier = "solo"
                 company.subscription_status = "canceled"
                 db.commit()
 

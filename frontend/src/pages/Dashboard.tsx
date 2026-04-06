@@ -7,6 +7,8 @@ import {
   unarchiveProject,
   ProjectListItem,
 } from "../api/projects";
+import { getMe } from "../api/auth";
+import type { CompanyResponse } from "../api/auth";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
@@ -15,11 +17,13 @@ export default function Dashboard() {
   const [showArchive, setShowArchive] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [me, setMe] = useState<CompanyResponse | null>(null);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
   useEffect(() => {
     loadProjects();
+    getMe().then(setMe).catch(() => {});
   }, []);
 
   async function loadProjects() {
@@ -95,6 +99,17 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {/* Global banners — always visible regardless of project count */}
+        {!loading && me?.trial_ends_at && (me?.subscription_tier === "solo" || me?.subscription_tier === "free") && (
+          <div className="gs-trial-banner" style={{ marginBottom: 16 }}>
+            <span>🎉</span>
+            <div>
+              <strong>14-day trial active</strong> — You have full Team features until {new Date(me.trial_ends_at).toLocaleDateString()}.
+              {" "}<button className="btn-inline" onClick={() => navigate("/account")}>View plans</button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="project-grid">
             <SkeletonCard />
@@ -102,10 +117,62 @@ export default function Dashboard() {
             <SkeletonCard />
           </div>
         ) : projects.length === 0 ? (
-          <div className="empty-state">
-            <p>No active projects. Create your first interview project to get started.</p>
+          <div className="getting-started">
+            <div className="getting-started-header">
+              <h2>Welcome{me?.name ? `, ${me.name}` : ""}! Let's set up your first study.</h2>
+              <p>Follow these steps to run your first AI-powered interview.</p>
+            </div>
+
+            <div className="getting-started-steps">
+              <div className="gs-step">
+                <div className="gs-step-icon gs-step-active">1</div>
+                <div className="gs-step-content">
+                  <h3>Create a project</h3>
+                  <p>Describe your research goals and let AI build your interview guide.</p>
+                  <button className="btn btn-primary btn-sm" onClick={() => navigate("/projects/new")}>
+                    Create project &rarr;
+                  </button>
+                </div>
+              </div>
+
+              <div className="gs-step">
+                <div className="gs-step-icon">2</div>
+                <div className="gs-step-content">
+                  <h3>Share your interview link</h3>
+                  <p>Generate a link and send it to participants. They'll complete the interview in their browser.</p>
+                </div>
+              </div>
+
+              <div className="gs-step">
+                <div className="gs-step-icon">3</div>
+                <div className="gs-step-content">
+                  <h3>Review AI analysis</h3>
+                  <p>Once you have responses, trigger an AI analysis to get themes, quotes, and recommendations.</p>
+                </div>
+              </div>
+            </div>
+
+            {me && !me.email_verified && (
+              <div className="gs-verify-banner">
+                <span>&#128231;</span>
+                <div>
+                  <strong>Verify your email</strong>
+                  <p>Check your inbox for a verification link to unlock all features.</p>
+                </div>
+              </div>
+            )}
+
           </div>
         ) : (
+          <>
+          {me && !me.email_verified && (
+            <div className="gs-verify-banner" style={{ marginBottom: 16 }}>
+              <span>&#128231;</span>
+              <div>
+                <strong>Verify your email</strong> — Check your inbox for a verification link.
+              </div>
+            </div>
+          )}
           <div className="project-grid">
             {projects.map((p) => (
               <div
@@ -145,6 +212,7 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+          </>
         )}
 
         {/* ── Archive section ─────────────────────────────────────── */}

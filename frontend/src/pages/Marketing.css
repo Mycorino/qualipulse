@@ -441,19 +441,69 @@
   text-align: center;
 }
 
-/* ---- Proof strip ---- */
-.mkt-proof-strip {
+/* ---- Social proof ---- */
+.mkt-social-proof {
   background: #0f172a;
-  color: #94a3b8;
-  text-align: center;
-  padding: 14px 24px;
-  font-size: 0.9rem;
-  font-style: italic;
-  letter-spacing: 0.1px;
+  padding: 56px 48px;
 }
 
-.mkt-proof-strip span {
+.mkt-social-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.mkt-social-stats {
+  display: flex;
+  justify-content: center;
+  gap: 64px;
+  margin-bottom: 40px;
+}
+
+.mkt-social-stat {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mkt-social-num {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.mkt-social-label {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.mkt-testimonials {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.mkt-testimonial {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.mkt-testimonial p {
   color: #e2e8f0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  font-style: italic;
+  margin-bottom: 12px;
+}
+
+.mkt-testimonial-author {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-style: normal;
 }
 
 /* ---- Footer ---- */
@@ -568,4 +618,7 @@
   .mkt-section { padding: 56px 24px; }
   .mkt-participant-inner { padding: 24px; flex-direction: column; text-align: center; }
   .mkt-footer { flex-direction: column; gap: 8px; text-align: center; padding: 20px 24px; }
+  .mkt-social-stats { gap: 32px; flex-wrap: wrap; }
+  .mkt-testimonials { grid-template-columns: 1fr; }
+  .mkt-social-proof { padding: 40px 24px; }
 }

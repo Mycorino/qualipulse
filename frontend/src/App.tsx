@@ -12,6 +12,10 @@ import ResetPassword from "./pages/ResetPassword";
 import AccountSettings from "./pages/AccountSettings";
 import Marketing from "./pages/Marketing";
 import SharedReport from "./pages/SharedReport";
+import Welcome from "./pages/Welcome";
+import VerifyEmail from "./pages/VerifyEmail";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -35,6 +39,17 @@ export default function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route
+        path="/welcome"
+        element={
+          <ProtectedRoute>
+            <Welcome />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard"
         element={

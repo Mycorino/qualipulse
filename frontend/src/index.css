@@ -1186,6 +1186,121 @@ select.field-input {
   padding: 1px 5px;
 }
 
+/* ── Getting Started (Dashboard empty state) ─────────── */
+.getting-started {
+  max-width: 600px;
+  margin: 40px auto 0;
+}
+
+.getting-started-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.getting-started-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.getting-started-header p {
+  font-size: 15px;
+  color: #6b7280;
+}
+
+.getting-started-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.gs-step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+}
+
+.gs-step-icon {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gs-step-icon.gs-step-active {
+  background: var(--primary, #4369f5);
+  color: #fff;
+}
+
+.gs-step-content h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.gs-step-content p {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.gs-step-content .btn {
+  margin-top: 4px;
+}
+
+.gs-verify-banner,
+.gs-trial-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.gs-verify-banner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.gs-verify-banner strong { color: #92400e; }
+.gs-verify-banner p { color: #a16207; margin: 2px 0 0; font-size: 13px; }
+
+.gs-trial-banner {
+  background: #f0f4ff;
+  border: 1px solid #c4d3ff;
+}
+
+.gs-trial-banner strong { color: #1e3a8a; }
+.gs-trial-banner p { color: #3b5998; margin: 2px 0 0; font-size: 13px; }
+.btn-inline {
+  background: none;
+  border: none;
+  color: #1e3a8a;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  font-weight: 600;
+}
+.btn-inline:hover { color: var(--primary); }
+
 /* Compact sidebar variant */
 .participant-row--compact {
   padding: 8px 10px;
@@ -1871,6 +1986,13 @@ select.field-input {
   font-size: 1rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.wizard-autosave {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  min-width: 80px;
+  text-align: right;
 }
 
 /* Progress bar */
@@ -2608,6 +2730,273 @@ select.field-input {
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* ============================================
+   Welcome / Onboarding Page
+   ============================================ */
+
+.welcome-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f9fafb 0%, #eef2ff 50%, #f9fafb 100%);
+  padding: 32px 24px;
+}
+
+.welcome-container {
+  max-width: 640px;
+  width: 100%;
+}
+
+.welcome-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.welcome-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.welcome-subtitle {
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.5;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.welcome-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.welcome-step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.welcome-step:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.welcome-step-number {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 10px;
+  background: var(--brand-50, #f0f4ff);
+  color: var(--primary, #4369f5);
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-step-content {
+  flex: 1;
+}
+
+.welcome-step-title {
+  font-size: 15px;
+  font-weight: 650;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.welcome-step-desc {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.welcome-usecase-section {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.welcome-usecase-title {
+  font-size: 17px;
+  font-weight: 650;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.welcome-usecase-subtitle {
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 16px;
+}
+
+.welcome-usecase-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.welcome-usecase-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.welcome-usecase-chip:hover {
+  border-color: var(--primary, #4369f5);
+  background: var(--brand-50, #f0f4ff);
+}
+
+.welcome-usecase-chip.selected {
+  border-color: var(--primary, #4369f5);
+  background: var(--brand-50, #f0f4ff);
+  color: var(--primary, #4369f5);
+  font-weight: 600;
+}
+
+.welcome-usecase-emoji {
+  font-size: 16px;
+}
+
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.welcome-actions .btn-lg {
+  padding: 14px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 12px;
+}
+
+.welcome-trust {
+  text-align: center;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* ── Onboarding steps ───────────────────── */
+
+.onboarding-progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.onboarding-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.onboarding-progress-dot.active {
+  background: var(--primary, #4369f5);
+}
+
+.onboarding-progress-dot.current {
+  width: 24px;
+  border-radius: 4px;
+}
+
+.onboarding-step {
+  text-align: center;
+}
+
+.onboarding-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.onboarding-form {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.onboarding-field .field-label {
+  margin-bottom: 8px;
+  display: block;
+}
+
+.onboarding-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.onboarding-chip {
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.onboarding-chip:hover {
+  border-color: var(--primary, #4369f5);
+  background: var(--brand-50, #f0f4ff);
+}
+
+.onboarding-chip.selected {
+  border-color: var(--primary, #4369f5);
+  background: var(--brand-50, #f0f4ff);
+  color: var(--primary, #4369f5);
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .welcome-title { font-size: 22px; }
+  .welcome-step { padding: 16px; }
+  .onboarding-chip { padding: 6px 12px; font-size: 12px; }
+}
+
+/* ── Legal pages (Terms, Privacy) ────────────────────────────────────────── */
+.legal-page { min-height: 100vh; background: #f9fafb; padding: 32px 24px; }
+.legal-container { max-width: 720px; margin: 0 auto; }
+.legal-header { text-align: center; margin-bottom: 32px; }
+.legal-content { background: #fff; border-radius: 16px; padding: 40px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+.legal-content h2 { font-size: 18px; font-weight: 700; color: #111827; margin: 28px 0 12px; }
+.legal-content h2:first-child { margin-top: 0; }
+.legal-content p { font-size: 14px; color: #4b5563; line-height: 1.7; margin-bottom: 12px; }
+.legal-content ul { font-size: 14px; color: #4b5563; line-height: 1.7; margin: 8px 0 12px 24px; }
+.legal-content li { margin-bottom: 6px; }
+.legal-updated { font-size: 13px; color: #9ca3af; text-align: center; margin-top: 16px; }
+.legal-back { text-align: center; margin-top: 24px; }
+.legal-back a { color: #4f46e5; font-size: 14px; text-decoration: none; }
 
 /* ── Settings page ───────────────────────────────────────────────────────── */
 .settings-tabs {

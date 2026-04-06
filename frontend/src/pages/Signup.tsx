@@ -2,12 +2,14 @@ import { useState, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signup } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
+import { getErrorMessage } from "../utils/errorMessages";
 
 export default function Signup() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showLoginHint, setShowLoginHint] = useState(false);
   const [loading, setLoading] = useState(false);
   const { saveToken } = useAuth();
   const navigate = useNavigate();
@@ -15,20 +17,38 @@ export default function Signup() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+
+    // Client-side validation
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedName) {
+      setError("Please enter your company or name.");
       return;
     }
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await signup(name, email, password);
-      saveToken(res.access_token);
-      navigate("/dashboard");
+      const res = await signup(trimmedName, trimmedEmail, password);
+      saveToken(res.access_token, res.refresh_token);
+      navigate("/welcome");
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || "Signup failed";
-      setError(msg);
+      const msg = getErrorMessage(err, "Signup failed. Please try again.");
+      // Check if account already exists — add helpful context
+      if (msg.toLowerCase().includes("already exists")) {
+        setError(msg);
+        setShowLoginHint(true);
+      } else {
+        setError(msg);
+        setShowLoginHint(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -41,7 +61,14 @@ export default function Signup() {
         <h1 className="auth-title">Create your account</h1>
         <p className="auth-subtitle">Start running AI-powered research interviews in minutes.</p>
 
-        {error && <div className="error-banner">{error}</div>}
+        {error && (
+          <div className="error-banner">
+            {error}
+            {showLoginHint && (
+              <> <Link to="/login" style={{ color: "var(--primary)", fontWeight: 600 }}>Sign in instead →</Link></>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <label className="field-label">Company or your name</label>
@@ -82,7 +109,7 @@ export default function Signup() {
         </form>
 
         <p className="auth-terms">
-          By signing up, you agree to our terms of service and privacy policy.
+          By signing up, you agree to our <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>.
         </p>
 
         <p className="auth-footer">

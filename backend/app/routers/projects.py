@@ -15,7 +15,7 @@ from app.schemas.project import (
     QuestionResponse,
     ScreeningQuestionResponse,
 )
-from app.services.feature_gates import require_project_limit
+from app.services.feature_gates import require_project_limit, require_question_limit
 from app.services.guide_parser import parse_guide_csv
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -29,6 +29,7 @@ def create_project(
 ) -> ProjectResponse:
     current_count = db.query(Project).filter(Project.company_id == company.id).count()
     require_project_limit(company, current_count)
+    require_question_limit(company, len(body.questions))
     project = Project(
         company_id=company.id,
         name=body.name,
@@ -76,8 +77,12 @@ async def import_project_from_csv(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ProjectResponse:
+    current_count = db.query(Project).filter(Project.company_id == company.id).count()
+    require_project_limit(company, current_count)
+
     content = await csv_file.read()
     questions = parse_guide_csv(content)
+    require_question_limit(company, len(questions))
 
     project = Project(
         company_id=company.id,
