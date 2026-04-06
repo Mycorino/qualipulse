@@ -1,4 +1,4 @@
-# Auto-Interview — Claude Code Project Guide
+# Auto-Interview (Qualipulse) — Claude Code Project Guide
 
 ## Working Directory
 All work for this project lives at: `/Users/corinofontana/Desktop/auto-interview`
@@ -7,65 +7,118 @@ All work for this project lives at: `/Users/corinofontana/Desktop/auto-interview
 A SaaS platform that lets companies create AI-driven voice interviews. Researchers build an interview guide, generate a shareable link, and participants complete the interview in-browser. Responses are transcribed, analysed, and stored. Researchers can then review transcripts, tag quotes, add memos, and generate AI analysis reports.
 
 **Stack:**
-- **Backend:** FastAPI (Python) + SQLAlchemy + SQLite, JWT auth
+- **Backend:** FastAPI (Python) + SQLAlchemy + PostgreSQL (prod) / SQLite (dev), JWT auth
 - **Frontend:** React 18 + Vite + TypeScript
 - **AI:** Claude (`claude-sonnet-4-20250514`) for adaptive interview orchestration + analysis
 - **STT:** OpenAI Whisper (`whisper-1`)
 - **TTS:** OpenAI TTS (`tts-1`, voice: `alloy`)
+- **Infra:** GCP Cloud Run (auto-scaling), Neon PostgreSQL, Cloudflare R2 (audio storage)
 
 ## Repository Layout
 ```
 auto-interview/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI app, CORS, static audio serving, create_all
-│   │   ├── config.py            # Settings (reads .env)
+│   │   ├── main.py              # FastAPI app, CORS, health checks, security headers
+│   │   ├── config.py            # Settings (reads .env), APP_BASE_URL
 │   │   ├── database.py          # SQLAlchemy engine + session
+│   │   ├── dependencies.py      # get_db, get_current_company (JWT)
+│   │   ├── limiter.py           # SlowAPI rate limiter instance
+│   │   ├── logging_config.py    # JSON structured logging
 │   │   ├── models/
 │   │   │   ├── __init__.py      # Registers all models for create_all
-│   │   │   ├── company.py       # Company (auth) model
+│   │   │   ├── company.py       # Company + EmailVerificationToken + PasswordResetToken
 │   │   │   ├── project.py       # Project + InterviewGuideQuestion + ScreeningQuestion
-│   │   │   ├── interview.py     # InterviewLink + Participant + InterviewTurn + ProjectAnalysis
+│   │   │   ├── interview.py     # InterviewLink + Participant + InterviewTurn + ProjectAnalysis + AnalysisThemeAnnotation
 │   │   │   ├── coding.py        # ManualCode + QuoteTag (researcher codebook)
 │   │   │   └── memo.py          # ProjectMemo
 │   │   ├── routers/
-│   │   │   ├── auth.py          # /auth/register, /auth/login
-│   │   │   ├── projects.py      # /projects CRUD, CSV import/export, analysis, codes, tags, memos
-│   │   │   └── interview.py     # /interview/{token} public endpoints + screening
+│   │   │   ├── auth.py          # /auth/signup, /auth/login, /auth/verify-email, /auth/resend-verification
+│   │   │   ├── projects.py      # /projects CRUD, CSV import (feature-gated)
+│   │   │   ├── links.py         # /projects/{id}/links (feature-gated per tier)
+│   │   │   ├── interview.py     # /interview/{token} public endpoints + screening
+│   │   │   ├── analysis.py      # AI synthesis, versioning, annotations, sharing (feature-gated)
+│   │   │   ├── export.py        # CSV export, AI quality assessment (feature-gated)
+│   │   │   ├── coding.py        # Manual codes + quote tags
+│   │   │   ├── memos.py         # Project memos CRUD
+│   │   │   ├── responses.py     # Transcript editing
+│   │   │   ├── billing.py       # Stripe webhook + subscription tiers
+│   │   │   ├── research_assistant.py  # AI brief parsing, suggestions
+│   │   │   └── audio.py         # Audio file serving
 │   │   ├── schemas/
+│   │   │   ├── auth.py          # SignupRequest, CompanyResponse (includes email_verified)
 │   │   │   ├── project.py       # Pydantic schemas for project + screening questions
 │   │   │   └── interview.py     # StartInterviewRequest (with demographics), responses
 │   │   └── services/
 │   │       ├── interview_engine.py  # Core AI orchestration (Claude)
+│   │       ├── analysis.py          # AI synthesis + refined analysis
+│   │       ├── quality.py           # Heuristic quality scoring
+│   │       ├── feature_gates.py     # Tier-based feature + limit enforcement
+│   │       ├── auth.py              # JWT + bcrypt helpers
+│   │       ├── email.py             # SendGrid + dev console fallback
 │   │       ├── stt.py               # Whisper transcription
 │   │       ├── tts.py               # OpenAI TTS generation
-│   │       └── storage.py           # Audio file path helpers
+│   │       ├── storage.py           # Audio: Cloudflare R2 or local disk
+│   │       └── guide_parser.py      # CSV import parser
 │   ├── alembic/
 │   │   └── versions/
-│   │       └── 0001_add_researcher_features.py  # manual_codes, quote_tags, project_memos + columns
+│   │       ├── 0001_add_researcher_features.py
+│   │       ├── 0002_iterative_analysis.py
+│   │       └── 0003_email_verification.py
+│   ├── tests/
+│   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
+│   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
+│   │   ├── test_projects.py     # CRUD, auth isolation, archive, tier limits
+│   │   └── test_feature_gates.py # All tier limits + feature gates
+│   ├── Dockerfile               # Python 3.11, runs alembic + uvicorn
+│   ├── pytest.ini
 │   ├── requirements.txt
 │   └── .env                     # NOT in git — contains API keys
-└── frontend/
-    ├── src/
-    │   ├── api/
-    │   │   ├── client.ts        # Axios instance (injects Authorization header)
-    │   │   ├── auth.ts          # login, register
-    │   │   ├── projects.ts      # projects CRUD, links, participants, analysis, codes, tags, memos, export
-    │   │   └── interviews.ts    # getInterviewInfo, getScreeningQuestions, submitScreening, startInterview, submitAudio
-    │   ├── hooks/
-    │   │   ├── useAuth.ts       # JWT auth state
-    │   │   └── useAudioRecorder.ts  # Safari-compatible MediaRecorder
-    │   ├── pages/
-    │   │   ├── Login.tsx
-    │   │   ├── Signup.tsx
-    │   │   ├── Dashboard.tsx         # Project list
-    │   │   ├── CreateProjectWizard.tsx  # 4-step wizard (Brief → Objective → Scope → Questionnaire)
-    │   │   ├── ProjectDetail.tsx     # 4-tab detail view (Overview / Setup / Responses / Analysis)
-    │   │   └── Interview.tsx         # Participant-facing interview (landing → screening → interview → complete)
-    │   ├── index.css            # All styles (no CSS framework)
-    │   └── main.tsx
-    ├── vite.config.ts           # Proxy: /api → localhost:8000 (strips /api prefix)
-    └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── client.ts        # Axios instance (injects Authorization, auto-refresh on 401)
+│   │   │   ├── auth.ts          # login, register, refreshToken
+│   │   │   ├── projects.ts      # projects CRUD, links, participants, analysis, codes, tags, memos, export
+│   │   │   ├── interviews.ts    # getInterviewInfo, getScreeningQuestions, submitScreening, startInterview, submitAudio
+│   │   │   └── research.ts      # AI brief parsing, objective/scope/question suggestions
+│   │   ├── hooks/
+│   │   │   ├── useAuth.ts       # JWT auth state
+│   │   │   └── useAudioRecorder.ts  # Safari-compatible MediaRecorder
+│   │   ├── pages/
+│   │   │   ├── Login.tsx
+│   │   │   ├── Signup.tsx
+│   │   │   ├── ForgotPassword.tsx
+│   │   │   ├── ResetPassword.tsx
+│   │   │   ├── Dashboard.tsx         # Project list + archive
+│   │   │   ├── CreateProjectWizard.tsx  # 4-step wizard (Brief → Objective → Scope → Questionnaire)
+│   │   │   ├── ProjectDetail.tsx     # 4-tab detail view (Overview / Setup / Responses / Analysis)
+│   │   │   ├── Interview.tsx         # Participant-facing interview (full flow)
+│   │   │   ├── AccountSettings.tsx   # Profile + billing
+│   │   │   ├── SharedReport.tsx      # Public read-only analysis
+│   │   │   └── Marketing.tsx         # Landing page + pricing
+│   │   ├── components/
+│   │   │   ├── Toast.tsx        # Toast notification system
+│   │   │   ├── Skeleton.tsx     # Loading placeholders
+│   │   │   └── ErrorBoundary.tsx
+│   │   ├── index.css            # Design system (CSS custom properties, no framework)
+│   │   ├── Marketing.css
+│   │   └── main.tsx
+│   ├── Dockerfile               # Multi-stage: Node build → nginx serve
+│   ├── nginx.conf               # Local docker-compose (proxy to backend:8000)
+│   ├── nginx.conf.template      # Cloud Run (envsubst injects BACKEND_URL at startup)
+│   ├── vite.config.ts           # Proxy: /api → localhost:8000 (strips /api prefix)
+│   └── package.json
+├── deploy/
+│   ├── gcp-setup.sh             # One-time GCP infrastructure setup
+│   └── deploy.sh                # Manual build + deploy to Cloud Run
+├── .github/
+│   └── workflows/
+│       └── ci.yml               # Backend tests (pytest + postgres) + frontend (tsc + build)
+├── cloudbuild.yaml              # GCP Cloud Build — auto-deploy on push to main
+├── docker-compose.yml           # Local dev: postgres + backend + frontend
+├── .env.example                 # All required env vars documented
+└── CLAUDE.md                    # This file
 ```
 
 ## Test Credentials
@@ -87,6 +140,8 @@ auto-interview/
 
 > **Note:** To reset the database, stop the backend, delete `backend/auto_interview.db` and `.claude/worktrees/sleepy-cerf/backend/auto_interview.db`, restart the backend (tables auto-recreate), then re-run the seed script or register a new account.
 
+---
+
 ## Dev Server Commands
 
 ### Backend
@@ -106,28 +161,130 @@ npm run dev -- --port 5173
 
 Open: http://localhost:5173
 
-## Environment Variables (`backend/.env`)
+### Running Tests
+```bash
+cd backend
+DATABASE_URL="sqlite:///:memory:" SECRET_KEY="test-secret" \
+  ANTHROPIC_API_KEY="" OPENAI_API_KEY="" \
+  python -m pytest tests/ -v
 ```
+- 46 tests covering auth, email verification, projects CRUD, and all feature gates
+- Rate limiter is disabled in tests (see `tests/conftest.py`)
+- Uses in-memory SQLite with `StaticPool` for full test isolation
+
+### Docker Compose (local)
+```bash
+# Full stack with PostgreSQL
+docker-compose up --build
+# Open: http://localhost
+```
+
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+```
+# Core (required)
+DATABASE_URL=sqlite:///./auto_interview.db    # PostgreSQL in production
+SECRET_KEY=change-me-to-a-random-string
+ENVIRONMENT=development                        # development | staging | production
+APP_BASE_URL=http://localhost:5173             # For email verification links
+
+# AI (required for interview + analysis)
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
-SECRET_KEY=<random-secret>
-DATABASE_URL=sqlite:///./auto_interview.db
-UPLOAD_DIR=uploads
+
+# Storage
+UPLOAD_DIR=./uploads
+MAX_AUDIO_SIZE_MB=50
+
+# CORS
+ALLOWED_ORIGINS=*                              # Comma-separated in production
+
+# Email (optional — falls back to console logging)
+SENDGRID_API_KEY=
+EMAIL_FROM=noreply@autointerview.com
+
+# Stripe (optional — billing disabled without these)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_STARTER=
+STRIPE_PRICE_PRO=
+
+# Sentry (optional)
+SENTRY_DSN=
+
+# Cloudflare R2 (optional — local disk used if not set)
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=
+R2_PUBLIC_URL=
+
+# Rate limits
+RATE_LIMIT_PUBLIC=60/minute
+RATE_LIMIT_AUTH=10/minute
+RATE_LIMIT_DEFAULT=120/minute
 ```
+
+See `.env.example` at repo root for Docker/production template.
+
+---
 
 ## Key Architectural Notes
 
 ### API Routing
 - Frontend calls `/api/...` → Vite proxy strips `/api` → FastAPI receives plain paths
-- Auth: `/auth/register`, `/auth/login`
+- In production: nginx in the frontend container proxies `/api/` → backend Cloud Run service
+- Auth: `/auth/signup`, `/auth/login`, `/auth/verify-email`, `/auth/resend-verification`
 - Projects: `/projects/` (trailing slash required — redirects drop auth header)
 - Interview (public, no auth): `/interview/{token}`, `/interview/{token}/screening-questions`, `/interview/{token}/screen`, `/interview/{token}/start`, `/interview/{token}/{participant_id}/respond`
 - Research: `/projects/{id}/codes`, `/projects/{id}/tags`, `/projects/{id}/memos`, `/projects/{id}/analysis`, `/projects/{id}/export`, `/projects/{id}/participants/{pid}/transcript`
+- Health checks: `GET /` (shallow), `GET /health` (deep — verifies DB connection)
 
 ### Database
-- SQLite, auto-created via `Base.metadata.create_all()` on startup — no migrations needed for new installs
-- Alembic migration `0001_add_researcher_features.py` handles upgrades from pre-researcher-feature installs
+- **Dev:** SQLite, auto-created via `Base.metadata.create_all()` on startup
+- **Production:** PostgreSQL (Neon or Cloud SQL). Set `DATABASE_URL` to `postgresql://...`
+- Alembic migrations run on startup in Docker (`alembic upgrade head`)
 - Datetime: use `datetime.utcnow()` (SQLite stores naive UTC — `datetime.now(timezone.utc)` causes issues)
+
+### Feature Gates (Subscription Tiers)
+Enforced on all create endpoints. Defined in `services/feature_gates.py`.
+
+| Gate | Free | Starter ($49) | Pro ($149) | Enterprise |
+|---|---|---|---|---|
+| Projects | 1 | 5 | Unlimited | Unlimited |
+| Participants/project | 10 | 50 | 500 | Unlimited |
+| Questions/guide | 5 | 15 | 30 | Unlimited |
+| Interview links/project | 1 | 3 | 10 | Unlimited |
+| AI Analysis | No | Yes | Yes | Yes |
+| CSV Export | No | Yes | Yes | Yes |
+| Custom Branding | No | No | Yes | Yes |
+| Team Members | 1 | 3 | 10 | Unlimited |
+
+**Where gates are enforced:**
+- `projects.py` → `create_project`, `import_project_from_csv` (project limit + question limit)
+- `links.py` → `create_link` (link limit per project)
+- `interview.py` → `start_interview_session` (participant limit)
+- `analysis.py` → `trigger_analysis`, `trigger_refined_analysis` (ai_analysis feature)
+- `export.py` → `export_transcripts_csv` (export_csv feature), `ai_quality_assessment` (ai_analysis)
+
+### Email Verification
+- On signup: `EmailVerificationToken` created (24h expiry), verification email sent
+- `POST /auth/verify-email?token=...` marks `email_verified = True`
+- `POST /auth/resend-verification` (rate-limited 3/min, requires auth)
+- `email_verified` exposed in `GET /auth/me` response (CompanyResponse)
+- Non-blocking: users can log in and use the app without verifying (frontend can show a banner)
+
+### Authentication & Security
+- JWT access tokens (24h expiry) + refresh tokens (30d expiry), HS256
+- Auto-refresh on 401 via Axios interceptor (`client.ts`)
+- Bcrypt password hashing (min 8 chars)
+- Rate limiting: 10/min on auth, 60/min on public, 120/min on authenticated
+- Security headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, HSTS (production)
+- CORS configurable via `ALLOWED_ORIGINS`
+- Audio endpoint: directory traversal protection
 
 ### Audio Recording (Safari Compatibility)
 - `MediaRecorder.start(250)` — timeslice fires `ondataavailable` every 250ms
@@ -136,22 +293,40 @@ UPLOAD_DIR=uploads
 
 ### Interview Flow (Participant)
 ```
-Landing (name + profession + age_range + country)
-  → Start Interview
+Landing (name + profession + age_range + country + email)
+  → Consent (decline → thank-you, no record)
+  → Mic test (AudioContext level meter)
   → fetch /screening-questions
-  → Has questions? → Screening phase (one question at a time, single select)
+  → Has questions? → Screening phase (one at a time, back button)
       → POST /screen → qualified? → create participant → Interview
                      → disqualified? → "Thank you" screen
   → No questions? → create participant → Interview starts immediately
+  → Interview: record → STT → Claude → TTS → repeat
+  → Completion screen (personalized)
 ```
 - Participant record is only created **after** passing screening (or if no screening)
-- Demographics (profession, age_range, country) are collected on landing and saved to the Participant row, powering the segment heatmap in Analysis
+- Demographics (profession, age_range, country) power the segment heatmap in Analysis
+- Session-storage resume (same device) + email-based resume (cross-device)
 
 ### Claude Interview Engine
 Claude decides after each response whether to:
 - `follow_up` — ask a follow-up on the current topic
 - `next_question` — move to the next guide question
 - `close` — wrap up warmly when all questions are covered or time is up
+
+Pacing safety guards:
+- Forces `next_question` if behind schedule
+- Close gate: requires 80% time elapsed + all questions covered
+- System prompt customizable per project
+
+### Analysis Pipeline
+1. Researcher triggers analysis (optional demographic filters)
+2. Background thread builds transcript blocks → calls Claude
+3. Claude returns structured JSON: themes, JTBDs, tensions, recommendations, confidence scores
+4. Versioned (keeps 5 most recent), can be filtered by segment
+5. Researcher can annotate themes (confirmed/disputed/needs_evidence) + add context
+6. Refined analysis incorporates annotations and re-analyzes with feedback
+7. Shareable via public token (read-only report page)
 
 ### Screening Questions
 - Stored in `screening_questions` table, linked to `projects`
@@ -164,10 +339,234 @@ Claude decides after each response whether to:
 - Older projects may not have `screening_questions` in the API response → always guard with `?? []`
 - Example: `(project.screening_questions ?? []).map(...)` — never access `.length` or `.map()` directly
 
+---
+
+## Production Deployment (GCP Cloud Run)
+
+### Live URLs
+- **Frontend:** https://app.qualipulse.com
+- **Backend API:** https://api.qualipulse.com
+- **Direct Cloud Run (frontend):** https://auto-interview-web-488573636859.europe-west1.run.app
+- **Direct Cloud Run (backend):** https://auto-interview-api-488573636859.europe-west1.run.app
+
+### Architecture
+```
+               Namecheap DNS (CNAME → ghs.googlehosted.com)
+                         │
+               ┌─────────┴─────────┐
+               │                   │
+         app.qualipulse.com  api.qualipulse.com
+               │                   │
+       ┌───────┴───────┐   ┌───────┴───────┐
+       │  Cloud Run    │   │  Cloud Run    │
+       │  (frontend)   │──▶│  (backend)    │
+       │  nginx + SPA  │   │  FastAPI      │
+       │  0-5 instances│   │  0-10 inst.   │
+       └───────────────┘   └───────┬───────┘
+                                   │
+                   ┌───────────────┼───────────────┐
+                   │               │               │
+              ┌────┴────┐   ┌─────┴──────┐  ┌─────┴─────┐
+              │  Neon   │   │ Cloudflare │  │  Secret   │
+              │ Postgres│   │    R2      │  │  Manager  │
+              │ AWS     │   │  (audio)   │  │  (keys)   │
+              │Frankfurt│   │            │  │           │
+              └─────────┘   └────────────┘  └───────────┘
+```
+
+### GCP Project & Region
+- **Project ID:** `qualipulse-prod`
+- **Project Number:** `488573636859`
+- **Region:** `europe-west1` (Belgium)
+- **Domain registrar:** Namecheap (`qualipulse.com`)
+- **Domain verified via:** Google Search Console (TXT record)
+
+### Why This Stack
+- **Cloud Run**: True auto-scaling (0→N instances per demand), scale-to-zero = $0 idle cost. Each interview turn is request-response — Cloud Run's sweet spot.
+- **Neon PostgreSQL**: Serverless Postgres, free tier, auto-scales, point-in-time recovery. Standard Postgres — code works unchanged. Hosted on AWS Frankfurt (eu-central-1) — 5-10ms cross-cloud latency, negligible vs 2-4s AI API calls.
+- **Cloudflare R2**: S3-compatible (existing boto3 code works), no egress fees, encrypted at rest. 5x cheaper than S3.
+- **Secret Manager**: No .env files in production. Secrets injected at deploy time.
+
+### GCP Services Enabled
+- `run.googleapis.com` — Cloud Run
+- `cloudbuild.googleapis.com` — Cloud Build
+- `artifactregistry.googleapis.com` — Artifact Registry (Docker images)
+- `secretmanager.googleapis.com` — Secret Manager
+
+### Artifact Registry
+- **Repository:** `europe-west1-docker.pkg.dev/qualipulse-prod/auto-interview`
+- Backend image: `auto-interview-backend:{tag}`
+- Frontend image: `auto-interview-frontend:{tag}`
+
+### Secrets in Secret Manager
+| Secret Name | Description |
+|---|---|
+| `secret-key` | JWT signing key (64-char random) |
+| `database-url` | Neon PostgreSQL connection string |
+| `anthropic-api-key` | Anthropic API key for Claude |
+| `openai-api-key` | OpenAI API key for Whisper + TTS |
+| `sendgrid-api-key` | SendGrid API key (placeholder — email logs to console) |
+
+### IAM Service Accounts
+| Service Account | Roles |
+|---|---|
+| `488573636859-compute@developer.gserviceaccount.com` | `secretmanager.secretAccessor`, `cloudbuild.builds.builder`, `artifactregistry.writer`, `run.admin`, `logging.logWriter` |
+| `488573636859@cloudbuild.gserviceaccount.com` | `run.admin`, `iam.serviceAccountUser` |
+| `service-488573636859@gcp-sa-cloudbuild.iam.gserviceaccount.com` | `secretmanager.admin` (for GitHub connection) |
+
+### DNS Records (Namecheap → Advanced DNS)
+| Type | Host | Value | Purpose |
+|---|---|---|---|
+| TXT | `@` | `google-site-verification=tYJKv4GNO3cuAYHv...` | Domain verification |
+| CNAME | `app` | `ghs.googlehosted.com.` | Frontend → Cloud Run |
+| CNAME | `api` | `ghs.googlehosted.com.` | Backend → Cloud Run |
+
+SSL certificates are auto-provisioned by Google after DNS propagation.
+
+### Deploy Commands
+```bash
+# One-time setup (enables APIs, creates Artifact Registry, configures secrets)
+./deploy/gcp-setup.sh qualipulse-prod europe-west1
+
+# Manual deploy — build locally and push to Cloud Run
+# (requires Docker installed locally)
+./deploy/deploy.sh qualipulse-prod europe-west1
+
+# Manual deploy without local Docker — build on Cloud Build
+REGION="europe-west1"
+REGISTRY="${REGION}-docker.pkg.dev/qualipulse-prod/auto-interview"
+TAG=$(git rev-parse --short HEAD)
+
+# Build images remotely
+gcloud builds submit --tag="${REGISTRY}/auto-interview-backend:${TAG}" ./backend --region=${REGION}
+gcloud builds submit --tag="${REGISTRY}/auto-interview-frontend:${TAG}" ./frontend --region=${REGION}
+
+# Deploy backend
+gcloud run deploy auto-interview-api \
+  --image="${REGISTRY}/auto-interview-backend:${TAG}" \
+  --region=${REGION} --platform=managed --allow-unauthenticated \
+  --port=8080 --cpu=1 --memory=512Mi --min-instances=0 --max-instances=10 \
+  --timeout=300s --concurrency=80 \
+  --set-secrets="SECRET_KEY=secret-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,DATABASE_URL=database-url:latest,SENDGRID_API_KEY=sendgrid-api-key:latest" \
+  --set-env-vars="ENVIRONMENT=production,UPLOAD_DIR=/tmp/uploads,ALLOWED_ORIGINS=https://app.qualipulse.com,APP_BASE_URL=https://app.qualipulse.com"
+
+# Deploy frontend (get backend URL first)
+BACKEND_URL=$(gcloud run services describe auto-interview-api --region=${REGION} --format='value(status.url)')
+BACKEND_HOST=$(echo "${BACKEND_URL}" | sed 's|https://||')
+gcloud run deploy auto-interview-web \
+  --image="${REGISTRY}/auto-interview-frontend:${TAG}" \
+  --region=${REGION} --platform=managed --allow-unauthenticated \
+  --port=8080 --cpu=1 --memory=256Mi --min-instances=0 --max-instances=5 \
+  --concurrency=200 \
+  --set-env-vars="BACKEND_URL=${BACKEND_URL},BACKEND_HOST=${BACKEND_HOST}"
+```
+
+### CI/CD Pipeline
+- **GitHub Actions** (`ci.yml`): runs on every PR to `main` — pytest (with postgres service), TypeScript check, build
+- **Cloud Build** (`cloudbuild.yaml`): auto-triggered on push to `main` — builds Docker images, pushes to Artifact Registry, deploys to Cloud Run
+- **GitHub connection:** `qualipulse-github` (2nd gen, via Cloud Build connections)
+- **Repository link:** `qualipulse-repo` → `github.com/Mycorino/qualipulse`
+- **Trigger:** `deploy-on-push-to-main` — branch pattern `^main$`, uses `cloudbuild.yaml`
+- **Monitor builds:** https://console.cloud.google.com/cloud-build/builds?project=qualipulse-prod
+- Frontend nginx.conf.template uses `envsubst` to inject `BACKEND_URL` at container startup
+
+### Backend Startup (start.sh)
+The backend container uses `start.sh` which handles both fresh and existing databases:
+1. Tries `alembic upgrade head` first (for existing databases with migration history)
+2. If migrations fail (fresh database), falls back to `Base.metadata.create_all()` to build all tables from SQLAlchemy models
+3. Stamps Alembic version at `head` so future migrations work correctly
+4. Starts uvicorn
+
+### Cloud Run Service Config
+| Setting | Backend | Frontend |
+|---|---|---|
+| Service name | `auto-interview-api` | `auto-interview-web` |
+| CPU | 1 | 1 |
+| Memory | 512Mi | 256Mi |
+| Min instances | 0 | 0 |
+| Max instances | 10 | 5 |
+| Timeout | 300s (for Claude/TTS) | 60s |
+| Concurrency | 80 | 200 |
+| Port | 8080 | 8080 |
+| CORS | `https://app.qualipulse.com` | — |
+
+### Environment Variables (Production)
+**Backend (auto-interview-api):**
+| Variable | Value | Source |
+|---|---|---|
+| `ENVIRONMENT` | `production` | env var |
+| `UPLOAD_DIR` | `/tmp/uploads` | env var |
+| `ALLOWED_ORIGINS` | `https://app.qualipulse.com` | env var |
+| `APP_BASE_URL` | `https://app.qualipulse.com` | env var |
+| `SECRET_KEY` | (from secret) | Secret Manager |
+| `DATABASE_URL` | (from secret) | Secret Manager |
+| `ANTHROPIC_API_KEY` | (from secret) | Secret Manager |
+| `OPENAI_API_KEY` | (from secret) | Secret Manager |
+| `SENDGRID_API_KEY` | (from secret) | Secret Manager |
+
+**Frontend (auto-interview-web):**
+| Variable | Value |
+|---|---|
+| `BACKEND_URL` | `https://auto-interview-api-488573636859.europe-west1.run.app` |
+| `BACKEND_HOST` | `auto-interview-api-488573636859.europe-west1.run.app` |
+
+### Estimated Monthly Cost
+| Component | Idle | 50 interviews/mo | 500 interviews/mo |
+|---|---|---|---|
+| Cloud Run | $0 | ~$7 | ~$50 |
+| Neon Postgres | $0 | $0 | ~$19 |
+| Cloudflare R2 | $0 | ~$1 | ~$5 |
+| SendGrid | $0 | $0 | $0 |
+| Sentry | $0 | $0 | $0 |
+| **AI APIs** | $0 | **~$25** | **~$250** |
+| **Total** | **$0** | **~$33** | **~$324** |
+
+### Custom Domain Setup (Already Done)
+```bash
+# 1. Verify domain in Google Search Console (add TXT record on Namecheap)
+# 2. Create domain mappings
+gcloud beta run domain-mappings create --service=auto-interview-web --domain=app.qualipulse.com --region=europe-west1
+gcloud beta run domain-mappings create --service=auto-interview-api --domain=api.qualipulse.com --region=europe-west1
+# 3. Add CNAME records on Namecheap: app → ghs.googlehosted.com, api → ghs.googlehosted.com
+# 4. SSL certificates auto-provisioned by Google (5-15 min)
+```
+
+### Updating Secrets
+```bash
+# Example: update the database URL
+echo -n 'postgresql://new-connection-string' | \
+  gcloud secrets versions add database-url --data-file=-
+
+# Redeploy to pick up new secret version (or use :latest which auto-updates)
+gcloud run services update auto-interview-api --region=europe-west1 \
+  --set-secrets="DATABASE_URL=database-url:latest"
+```
+
+### Useful Commands
+```bash
+# Check service status
+gcloud run services list --region=europe-west1
+
+# View logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=auto-interview-api" --limit=50 --project=qualipulse-prod
+
+# Check domain mapping status
+gcloud beta run domain-mappings describe --domain=app.qualipulse.com --region=europe-west1
+
+# List Cloud Build triggers
+gcloud builds triggers list --region=europe-west1
+
+# View recent builds
+gcloud builds list --region=europe-west1 --limit=5
+```
+
+---
+
 ## Feature Status
 
 ### Researcher (Company) Side
 - [x] Signup / login (JWT) with refresh token + auto-refresh on 401
+- [x] Email verification on signup (token-based, 24h expiry, resend endpoint)
 - [x] Password reset flow (ForgotPassword + ResetPassword pages; console email in dev)
 - [x] Project creation wizard (4 steps: Brief → Objective → Scope → Questionnaire)
 - [x] AI brief parsing from text and uploaded files (`/research/parse-brief`)
@@ -184,21 +583,25 @@ Claude decides after each response whether to:
 - [x] Quote tagging + codebook (select text → assign code → codebook panel)
 - [x] Analysis tab: AI-generated summary, key themes (with quotes), JTBDs, tensions, recommendations
 - [x] Analysis filtering by demographic segment (profession / age_range / country)
+- [x] Iterative analysis (annotate themes as confirmed/disputed/needs_evidence → refine)
+- [x] Analysis versioning (keeps 5 most recent, version lineage tracking)
+- [x] Shareable analysis reports (public token, read-only page)
 - [x] Project memos (general, theme/JTBD/tension-linked) with full CRUD
 - [x] Segment heatmap (profession / age_range / country vs themes)
 - [x] AI quality assessment per participant (Claude-scored, structured result)
 - [x] Export CSV (participants + all transcript turns, streaming response)
 - [x] Account & billing settings page (Profile tab + Plan & Billing tab)
-- [x] Subscription tier model with feature gates (free/starter/pro/enterprise)
+- [x] Subscription tier model with **enforced** feature gates (free/starter/pro/enterprise)
 - [x] Stripe Checkout + Customer Portal + webhook handler (needs Stripe keys)
-- [x] Usage fields on Company model (`interview_count`, `storage_bytes`) — not yet incremented
 - [x] Profile save + change password in AccountSettings UI (PATCH /auth/me, POST /auth/change-password)
 - [x] Analysis-ready email (triggered after AI synthesis completes)
-- [ ] Usage limits enforcement (gate functions exist but not called on create endpoints)
+- [x] Feature gates enforced on: projects, questions, links, analysis, export
+- [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented)
 - [ ] Email invitation sending (template exists, no send endpoint)
 - [ ] Multi-language TTS voices (language field exists on projects)
 - [ ] Dashboard-level analytics across projects
 - [ ] Free trial period (14-day; `trial_ends_at` field exists on Company)
+- [ ] Team collaboration (multi-user, invitations, roles, audit trail)
 
 ### Participant Side
 - [x] Consent screen (decline → thank-you, no record created)
@@ -222,3 +625,177 @@ Claude decides after each response whether to:
 - [x] Personalised completion screen (name, answer count, "What happens next?" section)
 - [x] Transcript flash (4s display of transcribed answer after submit)
 - [ ] Participant completion email
+- [ ] Text input fallback (accessibility)
+- [ ] Multi-language support
+
+### Infrastructure & DevOps
+- [x] Docker: backend + frontend Dockerfiles, docker-compose.yml with PostgreSQL
+- [x] GCP Cloud Run: cloudbuild.yaml, deploy scripts, nginx envsubst for backend URL
+- [x] CI/CD: GitHub Actions (pytest + tsc + build), Cloud Build (auto-deploy on push)
+- [x] Health checks: `GET /` (shallow) + `GET /health` (deep, DB-aware)
+- [x] Secret Manager integration (secrets injected at deploy, not in .env)
+- [x] Test suite: 46 tests (auth, email verification, feature gates, project CRUD)
+- [x] Rate limiting (SlowAPI): public/auth/default tiers
+- [x] Security headers middleware
+- [x] JSON structured logging (python-json-logger)
+- [x] Sentry integration (optional, configurable via SENTRY_DSN)
+- [x] Alembic migrations (3 versions)
+- [ ] GDPR tooling (data export, participant deletion)
+- [ ] Prometheus metrics / APM dashboards
+- [ ] Automated DB backups (Neon handles this for production)
+
+---
+
+## Data Models Summary
+
+### Company (auth)
+`id`, `name`, `email`, `password_hash`, `email_verified`, `subscription_tier` (free/starter/pro/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `created_at`
+
+### Project
+`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `created_at`, `archived_at`
+
+### InterviewGuideQuestion
+`id`, `project_id`, `section_index`, `section_title`, `question_index`, `main_question`, `interview_notes`, `desired_learning`, `researcher_notes`, `deprecated_at`, `sort_order`
+
+### ScreeningQuestion
+`id`, `project_id`, `question`, `options` (JSON), `disqualifying_options` (JSON), `sort_order`
+
+### InterviewLink
+`id`, `project_id`, `token` (unique, urlsafe), `is_active`, `created_at`
+
+### Participant
+`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `started_at`, `completed_at`
+
+### InterviewTurn
+`id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `created_at`
+
+### ProjectAnalysis
+`id`, `project_id`, `version`, `status` (generating/ready/failed), `participant_count`, `report` (JSON), `filters` (JSON), `researcher_context`, `version_label` (ai_discovery/researcher_refined), `parent_version_id`, `share_token`, `generated_at`, `error`
+
+### AnalysisThemeAnnotation
+`id`, `analysis_id`, `theme_title`, `status` (confirmed/disputed/needs_evidence), `researcher_note`, unique on (analysis_id, theme_title)
+
+### ManualCode
+`id`, `project_id`, `name`, `color` (hex), `sort_order`, `created_at`
+
+### QuoteTag
+`id`, `turn_id`, `code_id`, `selected_text`, `start_index`, `end_index`, `created_by`, `created_at`
+
+### ProjectMemo
+`id`, `project_id`, `type` (general/theme_note/tension_note/jtbd_note), `linked_key`, `content`, `created_by`, `created_at`, `updated_at`
+
+### EmailVerificationToken
+`id`, `company_id`, `token` (unique, urlsafe), `used`, `expires_at`, `created_at`
+
+### PasswordResetToken
+`id`, `company_id`, `token` (unique, urlsafe), `used`, `expires_at`, `created_at`
+
+---
+
+## API Endpoints Reference
+
+### Auth (`/auth`)
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/signup` | No | Create account, send verification email |
+| POST | `/auth/login` | No | Login, get access + refresh tokens |
+| POST | `/auth/refresh` | No | Refresh access token |
+| POST | `/auth/verify-email?token=` | No | Verify email address |
+| POST | `/auth/resend-verification` | Yes | Resend verification email |
+| POST | `/auth/password-reset/request` | No | Request password reset (always 200) |
+| POST | `/auth/password-reset/confirm` | No | Confirm reset with token |
+| GET | `/auth/me` | Yes | Get current company profile |
+| PATCH | `/auth/me` | Yes | Update profile (name) |
+| POST | `/auth/change-password` | Yes | Change password |
+
+### Projects (`/projects`)
+| Method | Path | Auth | Gate | Description |
+|---|---|---|---|---|
+| POST | `/projects/` | Yes | project_limit + question_limit | Create project |
+| POST | `/projects/import` | Yes | project_limit + question_limit | Import from CSV |
+| GET | `/projects/` | Yes | — | List projects |
+| GET | `/projects/{id}` | Yes | — | Get project details |
+| PUT | `/projects/{id}` | Yes | — | Update project + questions |
+| PATCH | `/projects/{id}/archive` | Yes | — | Archive project |
+| PATCH | `/projects/{id}/unarchive` | Yes | — | Unarchive project |
+| PATCH | `/projects/{id}/questions/{qid}` | Yes | — | Edit question metadata |
+
+### Links (`/projects/{id}/links`)
+| Method | Path | Auth | Gate | Description |
+|---|---|---|---|---|
+| POST | `/projects/{id}/links` | Yes | link_limit | Create interview link |
+| GET | `/projects/{id}/links` | Yes | — | List links |
+| PATCH | `/links/{id}` | Yes | — | Toggle active/inactive |
+
+### Interview (`/interview` — public, no auth)
+| Method | Path | Rate Limit | Description |
+|---|---|---|---|
+| GET | `/interview/{token}` | 60/min | Validate link, get project info |
+| GET | `/interview/{token}/screening-questions` | 60/min | Get screening questions |
+| POST | `/interview/{token}/screen` | 30/min | Check disqualification |
+| GET | `/interview/{token}/resume?email=` | 60/min | Check for in-progress interview |
+| GET | `/interview/{token}/{pid}/resume-summary` | — | Covered topics + elapsed time |
+| POST | `/interview/{token}/start` | 30/min | Create participant + first question |
+| POST | `/interview/{token}/{pid}/respond` | 30/min | Submit audio, get next question |
+| POST | `/interview/{token}/{pid}/skip` | — | Skip current question |
+| GET | `/interview/{token}/{pid}/status` | — | Interview status |
+
+### Analysis (`/projects/{id}/analysis`)
+| Method | Path | Gate | Description |
+|---|---|---|---|
+| POST | `/projects/{id}/analysis` | ai_analysis | Trigger AI synthesis |
+| GET | `/projects/{id}/analysis` | — | Get latest analysis |
+| GET | `/projects/{id}/analysis/heatmap` | — | Demographic heatmap |
+| GET | `/projects/{id}/analysis/versions` | — | List versions |
+| GET | `/projects/{id}/analysis/{version}` | — | Get specific version |
+| POST | `/projects/{id}/analysis/annotations` | — | Upsert theme annotation |
+| DELETE | `/projects/{id}/analysis/annotations/{id}` | — | Delete annotation |
+| GET | `/projects/{id}/analysis/annotations/{id}` | — | List annotations for version |
+| PATCH | `/projects/{id}/analysis/{v}/context` | — | Save researcher context |
+| POST | `/projects/{id}/analysis/refine` | ai_analysis | Trigger refined analysis |
+| POST | `/projects/{id}/analysis/share` | — | Generate share token |
+| DELETE | `/projects/{id}/analysis/share` | — | Revoke share token |
+| GET | `/reports/{share_token}` | No auth | Public shared report |
+
+### Export & Responses (`/projects/{id}/participants`)
+| Method | Path | Gate | Description |
+|---|---|---|---|
+| GET | `/projects/{id}/participants` | — | List participants |
+| GET | `/projects/{id}/participants/{pid}/transcript` | — | Full transcript |
+| GET | `/projects/{id}/export` | export_csv | CSV export |
+| POST | `/projects/{id}/participants/{pid}/quality` | ai_analysis | AI quality assessment |
+| PUT | `/projects/{id}/participants/{pid}/turns/{tid}` | — | Edit transcript turn |
+
+### Coding & Memos
+| Method | Path | Description |
+|---|---|---|
+| GET/POST | `/projects/{id}/codes` | List/create codes |
+| PATCH/DELETE | `/projects/{id}/codes/{cid}` | Edit/delete code |
+| GET | `/projects/{id}/tags` | List all tags |
+| POST | `/projects/{id}/turns/{tid}/tags` | Tag a quote |
+| DELETE | `/projects/{id}/tags/{tid}` | Delete tag |
+| GET/POST | `/projects/{id}/memos` | List/create memos |
+| PUT/DELETE | `/projects/{id}/memos/{mid}` | Update/delete memo |
+
+### Research Assistant (`/research`)
+| Method | Path | Description |
+|---|---|---|
+| POST | `/research/parse-brief` | Parse brief from text + files |
+| POST | `/research/suggest-objective` | Generate research objective |
+| POST | `/research/suggest-scope` | Recommend audience, duration |
+| POST | `/research/suggest-questions` | Generate interview guide |
+
+### Billing (`/billing`)
+| Method | Path | Description |
+|---|---|---|
+| GET | `/billing/plans` | List subscription tiers |
+| GET | `/billing/status` | Current subscription |
+| POST | `/billing/checkout` | Create Stripe Checkout session |
+| POST | `/billing/portal` | Open Stripe Customer Portal |
+| POST | `/billing/webhook` | Stripe webhook handler |
+
+### Health
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | Shallow health check (status + env) |
+| GET | `/health` | Deep health check (verifies DB connection) |
