@@ -30,20 +30,21 @@ class PortalRequest(BaseModel):
 @router.get("/plans")
 def list_plans():
     """Return all available subscription tiers and their limits."""
+    # Only return canonical tiers, not legacy aliases (free/starter/pro)
+    canonical_tiers = ("solo", "team", "lab", "enterprise")
     return [
         {
             "id": tier_id,
-            "name": limits.name,
-            "price_monthly_usd": limits.price_monthly_usd,
-            "max_projects": limits.max_projects,
-            "max_participants_per_project": limits.max_participants_per_project,
-            "ai_analysis": limits.ai_analysis,
-            "export_csv": limits.export_csv,
-            "custom_branding": limits.custom_branding,
-            "team_members": limits.team_members,
+            "name": TIER_LIMITS[tier_id].name,
+            "price_monthly_usd": TIER_LIMITS[tier_id].price_monthly_usd,
+            "max_projects": TIER_LIMITS[tier_id].max_projects,
+            "max_participants_per_project": TIER_LIMITS[tier_id].max_participants_per_project,
+            "ai_analysis": TIER_LIMITS[tier_id].ai_analysis,
+            "export_csv": TIER_LIMITS[tier_id].export_csv,
+            "custom_branding": TIER_LIMITS[tier_id].custom_branding,
+            "team_members": TIER_LIMITS[tier_id].team_members,
         }
-        for tier_id, limits in TIER_LIMITS.items()
-        if tier_id != "enterprise" or True  # include all
+        for tier_id in canonical_tiers
     ]
 
 
