@@ -107,6 +107,10 @@ export default function Welcome() {
   }
 
   async function handleSaveAndContinue() {
+    if (!role) {
+      setError("Please select your role to continue.");
+      return;
+    }
     // Intermediate save — persist Step 2 data without marking onboarding complete
     setSaving(true);
     setError("");
@@ -161,14 +165,23 @@ export default function Welcome() {
         <div className="auth-logo" style={{ textAlign: "center", marginBottom: 8 }}>QualiPulse</div>
 
         {/* Progress indicator */}
-        <div className="onboarding-progress">
-          {[1, 2, 3, 4].map((s) => (
-            <div
-              key={s}
-              className={`onboarding-progress-dot ${s <= step ? "active" : ""} ${s === step ? "current" : ""}`}
-            />
-          ))}
-        </div>
+        {(() => {
+          const stepLabels = ["Verify email", "Your profile", "Use case", "All set"];
+          return (
+            <div className="onboarding-progress">
+              {[1, 2, 3, 4].map((s) => (
+                <div key={s} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <div
+                    className={`onboarding-progress-dot ${s <= step ? "active" : ""} ${s === step ? "current" : ""}`}
+                  />
+                  <span style={{ fontSize: 10, color: s <= step ? "var(--primary, #6366f1)" : "var(--text-tertiary, #9ca3af)", whiteSpace: "nowrap" }}>
+                    {stepLabels[s - 1]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {error && <div className="error-banner" style={{ marginBottom: 20 }}>{error}</div>}
 

@@ -71,7 +71,7 @@ export default function ProjectDetail() {
   const [transcript, setTranscript] = useState<TranscriptTurn[] | null>(null);
   const [selectedParticipant, setSelectedParticipant] = useState<ParticipantResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
@@ -510,8 +510,8 @@ export default function ProjectDetail() {
 
   async function copyLink(token: string) {
     await navigator.clipboard.writeText(interviewUrl(token));
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
+    setCopiedToken(token);
+    setTimeout(() => setCopiedToken(null), 2000);
   }
 
   async function handleViewTranscript(
@@ -1100,7 +1100,7 @@ export default function ProjectDetail() {
 
       {/* ── Tabs — ordered by researcher workflow ── */}
       <div className="detail-tabs" role="tablist">
-        {(["responses", "analysis", "overview", "setup"] as Tab[]).map((t) => (
+        {(["overview", "setup", "responses", "analysis"] as Tab[]).map((t) => (
           <button
             key={t}
             role="tab"
@@ -1204,12 +1204,12 @@ export default function ProjectDetail() {
                         <span className={`link-status-badge ${l.is_active ? "link-status-badge--active" : "link-status-badge--inactive"}`}>
                           {l.is_active ? "Active" : "Inactive"}
                         </span>
-                        <code className="link-url">{interviewUrl(l.token)}</code>
+                        <code className="link-url" style={{ wordBreak: "break-all" }}>{interviewUrl(l.token)}</code>
                       </div>
                       <div className="link-row-actions">
                         {l.is_active && (
                           <button className="btn btn-ghost btn-sm" onClick={() => copyLink(l.token)}>
-                            {linkCopied ? "✓ Copied" : "Copy"}
+                            {copiedToken === l.token ? "✓ Copied!" : "Copy"}
                           </button>
                         )}
                         <button
@@ -1323,7 +1323,7 @@ export default function ProjectDetail() {
                     {project.questions.length} questions across {Object.keys(sections).length} section{Object.keys(sections).length !== 1 ? "s" : ""}
                     {project.questions.some((q) => q.deprecated_at) && (
                       <span className="badge" style={{ marginLeft: 8, background: "#fef2f2", color: "#dc2626" }}>
-                        {project.questions.filter((q) => q.deprecated_at).length} deprecated
+                        {project.questions.filter((q) => q.deprecated_at).length} disabled
                       </span>
                     )}
                   </p>
@@ -1355,10 +1355,10 @@ export default function ProjectDetail() {
                               {q.deprecated_at ? (
                                 <s style={{ color: "#9ca3af" }}>{q.main_question}</s>
                               ) : (
-                                q.main_question
+                                <span style={{ color: "var(--text, #111827)" }}>{q.main_question}</span>
                               )}
                               {q.deprecated_at && (
-                                <span className="badge" style={{ marginLeft: 6, background: "#fef2f2", color: "#dc2626", fontSize: 10 }}>Deprecated</span>
+                                <span className="badge" style={{ marginLeft: 6, background: "#fef2f2", color: "#dc2626", fontSize: 10 }}>Disabled</span>
                               )}
                             </span>
                             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
@@ -1375,11 +1375,12 @@ export default function ProjectDetail() {
                               </button>
                               <button
                                 className="btn btn-ghost btn-xs"
-                                title={q.deprecated_at ? "Un-deprecate" : "Deprecate question"}
+                                title={q.deprecated_at ? "Re-enable question" : "Disable question"}
+                                aria-label={q.deprecated_at ? "Re-enable question" : "Disable question"}
                                 style={{ color: q.deprecated_at ? "#dc2626" : "#9ca3af" }}
                                 onClick={() => toggleDeprecateQuestion(q.id, q.deprecated_at)}
                               >
-                                {q.deprecated_at ? "Restore" : "Deprecate"}
+                                {q.deprecated_at ? "Re-enable question" : "Disable question"}
                               </button>
                             </div>
                           </div>
@@ -1591,6 +1592,7 @@ export default function ProjectDetail() {
                   <div className="empty-state" style={{ padding: "32px 16px" }}>
                     <p style={{ fontWeight: 500 }}>No responses yet</p>
                     <p className="muted-text" style={{ fontSize: 12, marginTop: 4 }}>Share an interview link to get started.</p>
+                    <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setTab("overview")}>Create interview link →</button>
                   </div>
                 ) : filtered.length === 0 ? (
                   <div style={{ padding: "24px 0", textAlign: "center" }}>
@@ -1934,7 +1936,11 @@ export default function ProjectDetail() {
               )}
 
               {analysis.status === "none" && analysis.completed_count === 0 && (
-                <div className="empty-state"><p>No completed interviews yet.</p><p className="muted-text">Complete at least one interview to generate an analysis.</p></div>
+                <div className="empty-state">
+                  <p style={{ fontWeight: 500 }}>Collect responses first</p>
+                  <p className="muted-text" style={{ fontSize: 13 }}>Complete at least one interview to generate an analysis.</p>
+                  <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setTab("responses")}>Go to Responses →</button>
+                </div>
               )}
               {analysis.status === "none" && analysis.completed_count > 0 && (
                 <p className="muted-text">{analysis.completed_count} completed interview{analysis.completed_count > 1 ? "s" : ""} ready to analyse.</p>

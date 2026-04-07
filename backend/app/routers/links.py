@@ -24,7 +24,8 @@ def create_link(
 ) -> LinkResponse:
     project = _get_project_or_404(project_id, company.id, db)
 
-    token = secrets.token_urlsafe(32)
+    _BASE58 = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+    token = "".join(secrets.choice(_BASE58) for _ in range(43))
     link = InterviewLink(
         project_id=project.id,
         token=token,

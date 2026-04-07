@@ -119,7 +119,7 @@ export default function Dashboard() {
         ) : projects.length === 0 ? (
           <div className="getting-started">
             <div className="getting-started-header">
-              <h2>Welcome{me?.name ? `, ${me.name}` : ""}! Let's set up your first study.</h2>
+              <h2 style={{ color: "#ffffff" }}>Welcome{me?.name ? `, ${me.name}` : ""}! Let's set up your first study.</h2>
               <p>Follow these steps to run your first AI-powered interview.</p>
             </div>
 

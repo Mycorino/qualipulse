@@ -40,14 +40,19 @@ export default function Signup() {
       saveToken(res.access_token, res.refresh_token);
       navigate("/welcome");
     } catch (err: unknown) {
-      const msg = getErrorMessage(err, "Signup failed. Please try again.");
-      // Check if account already exists — add helpful context
-      if (msg.toLowerCase().includes("already exists")) {
-        setError(msg);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 409) {
+        setError("An account with this email already exists. Try logging in instead.");
         setShowLoginHint(true);
       } else {
-        setError(msg);
-        setShowLoginHint(false);
+        const msg = getErrorMessage(err, "Signup failed. Please try again.");
+        if (msg.toLowerCase().includes("already")) {
+          setError(msg);
+          setShowLoginHint(true);
+        } else {
+          setError(msg);
+          setShowLoginHint(false);
+        }
       }
     } finally {
       setLoading(false);

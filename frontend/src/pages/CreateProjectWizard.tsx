@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useToast } from "../components/Toast";
 import { createProject, updateProject, getProject } from "../api/projects";
 import type { QuestionCreate, ScreeningQuestionCreate } from "../api/projects";
 import {
@@ -50,6 +51,7 @@ export default function CreateProjectWizard() {
   // Step 1
   const [name, setName] = useState(draft?.name ?? "");
   const [context, setContext] = useState(draft?.context ?? "");
+  const [originalContext, setOriginalContext] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [briefSummary, setBriefSummary] = useState(draft?.briefSummary ?? "");
 
@@ -74,6 +76,7 @@ export default function CreateProjectWizard() {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
   const [hasDraft, setHasDraft] = useState(!!draft);
+  const { toast } = useToast();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +122,7 @@ export default function CreateProjectWizard() {
     setLoading(true);
     setLoadingMsg("Reading your brief...");
     setError("");
+    if (!originalContext) setOriginalContext(context);
     try {
       const res = await parseBrief(context, files);
       setBriefSummary(res.summary);
@@ -212,7 +216,10 @@ export default function CreateProjectWizard() {
       const project = isEditMode
         ? await updateProject(editId!, body)
         : await createProject(body);
-      if (!isEditMode) localStorage.removeItem(DRAFT_KEY);
+      if (!isEditMode) {
+        localStorage.removeItem(DRAFT_KEY);
+        toast("Project created!", "success");
+      }
       navigate(`/projects/${project.id}`);
     } catch {
       setError("Failed to create project. Please try again.");
@@ -429,7 +436,18 @@ export default function CreateProjectWizard() {
 
             {briefSummary && (
               <div className="ai-output-box">
-                <div className="ai-output-label">AI understood your brief as:</div>
+                <div className="ai-output-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>AI understood your brief as:</span>
+                  {originalContext && (
+                    <button
+                      className="btn btn-ghost btn-xs"
+                      style={{ fontSize: 11 }}
+                      onClick={() => { setContext(originalContext); setBriefSummary(""); setOriginalContext(""); }}
+                    >
+                      Revert to original
+                    </button>
+                  )}
+                </div>
                 <p>{briefSummary}</p>
               </div>
             )}
@@ -486,10 +504,11 @@ export default function CreateProjectWizard() {
 
             <label className="field-label">Learning Goals</label>
             {learningGoals.map((goal: string, i: number) => (
-              <input
+              <textarea
                 key={i}
                 className="field-input"
-                style={{ marginBottom: 8 }}
+                rows={2}
+                style={{ marginBottom: 8, resize: "vertical", whiteSpace: "normal" }}
                 value={goal}
                 onChange={(e) =>
                   setLearningGoals((prev: string[]) =>
@@ -535,7 +554,7 @@ export default function CreateProjectWizard() {
               rows={3}
               value={audience}
               onChange={(e) => setAudience(e.target.value)}
-              placeholder="e.g. Adults 25–45 who have purchased online at least once in the past 3 months"
+              placeholder="e.g. remote workers, product managers, students..."
             />
 
             <label className="field-label">Interview Duration</label>
@@ -660,8 +679,8 @@ export default function CreateProjectWizard() {
                       <span className="guide-editor-preview">
                         {q.main_question || <em className="muted-text">Empty question</em>}
                       </span>
-                      <span className="guide-editor-chevron">
-                        {expandedQ === i ? "▲" : "▼"}
+                      <span className="guide-editor-chevron" title="Edit question">
+                        {expandedQ === i ? "▲" : "✏"}
                       </span>
                     </div>
 
@@ -705,7 +724,7 @@ export default function CreateProjectWizard() {
                         <button
                           className="btn btn-ghost btn-sm btn-danger-text"
                           style={{ marginTop: 8 }}
-                          onClick={() => removeQuestion(i)}
+                          onClick={() => { if (window.confirm("Remove this question?")) removeQuestion(i); }}
                         >
                           Remove question
                         </button>
@@ -714,7 +733,7 @@ export default function CreateProjectWizard() {
                   </div>
                 ))}
 
-                <button className="btn btn-ghost btn-sm" onClick={addQuestion}>
+                <button className="btn btn-ghost btn-sm" onClick={addQuestion} style={{ border: "1.5px solid #d1d5db", borderRadius: 6, padding: "6px 16px" }}>
                   + Add question
                 </button>
               </div>
@@ -722,13 +741,18 @@ export default function CreateProjectWizard() {
 
             <div className="wizard-nav" style={{ marginTop: 24 }}>
               <button className="btn btn-ghost" onClick={() => setStep(3)}>← Back</button>
-              <button
-                className="btn btn-primary btn-lg"
-                disabled={loading || !name.trim()}
-                onClick={handleCreate}
-              >
-                {loading ? <><span className="spinner-sm" />{loadingMsg}</> : isEditMode ? "Save Changes" : "Create Project"}
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                {!isEditMode && questions.length === 0 && (
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Generate your interview guide first</p>
+                )}
+                <button
+                  className="btn btn-primary btn-lg"
+                  disabled={loading || !name.trim() || (!isEditMode && questions.length === 0)}
+                  onClick={handleCreate}
+                >
+                  {loading ? <><span className="spinner-sm" />{loadingMsg}</> : isEditMode ? "Save Changes" : "Create Project"}
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -402,8 +402,13 @@ export default function Interview() {
   if (error && phase === "landing" && !info) {
     return (
       <div className="interview-page">
-        <div className="interview-container">
-          <p className="interview-error">{error}</p>
+        <div className="interview-container" style={{ textAlign: "center", paddingTop: 60 }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #6366f1)", marginBottom: 32 }}>QualiPulse</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔗</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>This interview link isn't active</h1>
+          <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 15, maxWidth: 380, margin: "0 auto" }}>
+            The link may have expired or been deactivated. Please contact the researcher for a new link.
+          </p>
         </div>
       </div>
     );
@@ -490,10 +495,12 @@ export default function Interview() {
               <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher logo"} />
             </div>
           )}
-          {info.researcher_name && (
-            <p className="landing-researcher-name">{info.researcher_name}</p>
-          )}
           <h1 className="interview-project-name">{info.project_name}</h1>
+          {info.researcher_name && (
+            <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginTop: 4, marginBottom: 8 }}>
+              A research study by <strong>{info.researcher_name}</strong>
+            </p>
+          )}
           {info.welcome_message && (
             <p className="interview-welcome">{info.welcome_message}</p>
           )}
