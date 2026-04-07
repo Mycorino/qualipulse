@@ -35,7 +35,7 @@ jobs:
         run: pip install -r requirements.txt pytest
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short
+        run: PYTHONPATH=. pytest tests/ -v --tb=short
 
   frontend:
     name: Frontend (TypeScript)
