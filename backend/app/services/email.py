@@ -22,7 +22,7 @@ def _send_sendgrid(to: str, subject: str, body_html: str) -> None:
     """Send via SendGrid. Requires SENDGRID_API_KEY."""
     try:
         import sendgrid  # type: ignore
-        from sendgrid.helpers.mail import Mail  # type: ignore
+        from sendgrid.helpers.mail import Mail, ReplyTo  # type: ignore
 
         sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
         message = Mail(
@@ -31,6 +31,7 @@ def _send_sendgrid(to: str, subject: str, body_html: str) -> None:
             subject=subject,
             html_content=body_html,
         )
+        message.reply_to = ReplyTo("support@qualipulse.com", "QualiPulse Support")
         sg.send(message)
         logger.info("Email sent to %s: %s", to, subject)
     except Exception as exc:
