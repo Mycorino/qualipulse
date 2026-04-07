@@ -1,32 +1,82 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import "./Marketing.css";
-import client from "../api/client";
+
+const PAIN_POINTS = [
+  {
+    title: "Scheduling is the bottleneck",
+    desc: "You have a research question. You don't have 2 weeks to coordinate calendars with 15 participants across time zones.",
+  },
+  {
+    title: "Synthesis eats your time",
+    desc: "You're spending more hours tagging and re-reading transcripts than actually thinking about what the data means.",
+  },
+  {
+    title: "Stakeholders won't wait",
+    desc: "Product decisions are moving forward before your research is ready. Speed matters, but depth shouldn't be sacrificed.",
+  },
+  {
+    title: "No dedicated researcher on the team",
+    desc: "You know you should talk to users. You just don't have the bandwidth to recruit, schedule, moderate, transcribe, and synthesise.",
+  },
+];
 
 const HOW_IT_WORKS = [
   {
     step: "01",
-    title: "Build your interview guide",
-    desc: "Paste your research brief and let AI draft your guide — objectives, screening criteria, and questions tailored to what you need to learn. Edit anything, then you're ready.",
+    title: "Paste your research brief",
+    desc: "Describe what you want to learn. The AI drafts your interview guide — objectives, screener criteria, and questions. You review and refine. Five minutes, not five hours.",
   },
   {
     step: "02",
-    title: "Share a link, participants speak",
-    desc: "Send one link. Participants complete the voice interview in their own time, on any device. The AI conducts the conversation, asks follow-ups, and keeps things on track.",
+    title: "Participants interview on their own time",
+    desc: "Share one link. Participants complete a voice interview in their browser — any device, any timezone. The AI asks follow-ups like a trained interviewer would. No scheduling, no no-shows.",
   },
   {
     step: "03",
-    title: "Get a memo, not a pile of transcripts",
-    desc: "Within hours of your first response, you'll have a structured research memo: key themes, supporting quotes, tensions worth investigating, and clear recommendations — formatted to share with stakeholders immediately.",
+    title: "Read the memo, skip the transcripts",
+    desc: "Once responses are in, trigger an AI synthesis. You'll get structured themes with supporting quotes, tensions, jobs-to-be-done, and recommendations — formatted to share with stakeholders immediately.",
+  },
+];
+
+const USE_CASES = [
+  {
+    title: "UX Researchers",
+    desc: "Run more studies in less time. Offload the logistics, keep the analytical rigor. AI handles moderation and initial synthesis — you steer the interpretation.",
+    examples: "Discovery research, evaluative studies, continuous research programs",
+  },
+  {
+    title: "Product Managers",
+    desc: "Get user insights without waiting for the research team's backlog. Set up a study in minutes, send the link to beta users, get a synthesis you can act on.",
+    examples: "Feature validation, churn investigation, onboarding feedback",
+  },
+  {
+    title: "Consultants & Agencies",
+    desc: "Run qualitative research for clients at scale. Custom branding, shareable reports, multiple projects running in parallel.",
+    examples: "Client research engagements, market research, stakeholder interviews",
+  },
+];
+
+const COMPARISONS = [
+  {
+    vs: "UserTesting / dscout",
+    point: "Those platforms help you recruit and run moderated sessions. QualiPulse replaces the moderator with AI, runs interviews asynchronously, and synthesises the results. No scheduling, no session fees.",
+  },
+  {
+    vs: "Dovetail / EnjoyHQ",
+    point: "Those are analysis-and-repository tools for research you've already done. QualiPulse handles the full workflow: guide creation, interview collection, and synthesis in one place.",
+  },
+  {
+    vs: "Google Forms / Typeform",
+    point: "Surveys give you structured data. QualiPulse gives you qualitative depth — follow-up questions, probing, voice responses — without the overhead of live interviews.",
   },
 ];
 
 const PLANS = [
   {
     name: "Solo",
-    price: "$0",
+    price: "Free",
     period: "",
-    desc: "For individual researchers",
+    desc: "For individual researchers exploring the tool",
     features: [
       "3 projects",
       "25 participants per project",
@@ -41,7 +91,7 @@ const PLANS = [
     name: "Team",
     price: "$49",
     period: "/mo",
-    desc: "For in-house research teams",
+    desc: "For in-house research teams running regular studies",
     features: [
       "5 projects",
       "50 participants per project",
@@ -57,12 +107,12 @@ const PLANS = [
     name: "Lab",
     price: "$149",
     period: "/mo",
-    desc: "For research programs",
+    desc: "For research programs and agencies",
     features: [
       "Unlimited projects",
       "500 participants per project",
       "Everything in Team",
-      "Custom branding",
+      "Custom branding on interviews",
       "10 team members",
       "Priority support",
     ],
@@ -72,26 +122,6 @@ const PLANS = [
 ];
 
 export default function Marketing() {
-  const [nlEmail, setNlEmail] = useState("");
-  const [nlLoading, setNlLoading] = useState(false);
-  const [nlDone, setNlDone] = useState(false);
-  const [nlError, setNlError] = useState("");
-
-  async function handleNewsletter(e: React.FormEvent) {
-    e.preventDefault();
-    if (!nlEmail) return;
-    setNlLoading(true);
-    setNlError("");
-    try {
-      await client.post("/auth/newsletter", { email: nlEmail });
-      setNlDone(true);
-    } catch {
-      setNlError("Something went wrong. Please try again.");
-    } finally {
-      setNlLoading(false);
-    }
-  }
-
   return (
     <div className="mkt">
       {/* Nav */}
@@ -99,6 +129,7 @@ export default function Marketing() {
         <span className="mkt-logo">QualiPulse</span>
         <div className="mkt-nav-links">
           <a href="#how">How it works</a>
+          <a href="#who">Who it's for</a>
           <a href="#pricing">Pricing</a>
           <Link to="/login" className="mkt-nav-login">Log in</Link>
           <Link to="/signup" className="btn btn-primary mkt-nav-cta">Get started free</Link>
@@ -108,19 +139,18 @@ export default function Marketing() {
       {/* Hero */}
       <section className="mkt-hero">
         <div className="mkt-hero-inner">
-          <div className="mkt-badge">Built for UX researchers</div>
+          <div className="mkt-badge">Async qualitative research</div>
           <h1 className="mkt-h1">
-            From screener to synthesis —<br />in hours, not weeks
+            Qualitative insights<br />without the calendar Tetris
           </h1>
           <p className="mkt-sub">
-            QualiPulse runs your qualitative interviews for you. Build a guide, share
-            a link, and participants complete a voice interview in their own time.
-            You get back structured transcripts, emergent themes, and a
-            stakeholder-ready research memo. Automatically.
+            You know the research needs to happen. But scheduling 12 interviews,
+            running them, transcribing, and synthesising takes weeks you don't have.
+            QualiPulse runs AI-moderated voice interviews asynchronously and delivers
+            a structured research memo — automatically.
           </p>
           <div className="mkt-hero-ctas">
             <Link to="/signup" className="btn btn-primary mkt-btn-lg">Run your first study free</Link>
-            <Link to="/login" className="mkt-link-secondary">Already have an account?</Link>
           </div>
           <p className="mkt-hero-note">Free plan available · 14-day trial on paid plans · No credit card required</p>
         </div>
@@ -147,44 +177,26 @@ export default function Marketing() {
             </div>
           </div>
           <div className="mkt-preview-stat mkt-stat-themes">
-            <span className="mkt-stat-label">Top themes</span>
+            <span className="mkt-stat-label">Emerging themes</span>
             <span className="mkt-stat-tag">Onboarding friction</span>
             <span className="mkt-stat-tag">Trust building</span>
             <span className="mkt-stat-tag">Time to value</span>
           </div>
-          <div className="mkt-preview-stat mkt-stat-count">
-            <span className="mkt-stat-num">24</span>
-            <span className="mkt-stat-label">interviews synthesised</span>
-          </div>
         </div>
       </section>
 
-      {/* Social proof */}
-      <section className="mkt-social-proof">
-        <div className="mkt-social-inner">
-          <div className="mkt-social-stats">
-            <div className="mkt-social-stat">
-              <span className="mkt-social-num">500+</span>
-              <span className="mkt-social-label">Interviews conducted</span>
-            </div>
-            <div className="mkt-social-stat">
-              <span className="mkt-social-num">4.8h</span>
-              <span className="mkt-social-label">Avg time saved per study</span>
-            </div>
-            <div className="mkt-social-stat">
-              <span className="mkt-social-num">92%</span>
-              <span className="mkt-social-label">Completion rate</span>
-            </div>
-          </div>
-          <div className="mkt-testimonials">
-            <div className="mkt-testimonial">
-              <p>"We used to spend two weeks scheduling and running interviews. With QualiPulse, we had actionable insights in two days."</p>
-              <span className="mkt-testimonial-author">— Product Research Lead, Series B SaaS</span>
-            </div>
-            <div className="mkt-testimonial">
-              <p>"The AI follow-ups catch things I would have missed. It's like having a trained interviewer available 24/7."</p>
-              <span className="mkt-testimonial-author">— UX Researcher, Fintech Startup</span>
-            </div>
+      {/* Pain points */}
+      <section className="mkt-pain">
+        <div className="mkt-pain-inner">
+          <h2 className="mkt-section-title">Sound familiar?</h2>
+          <p className="mkt-section-sub">Most teams know qualitative research is essential. The problem is everything around it.</p>
+          <div className="mkt-pain-grid">
+            {PAIN_POINTS.map((p) => (
+              <div key={p.title} className="mkt-pain-card">
+                <h3>{p.title}</h3>
+                <p>{p.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -192,7 +204,7 @@ export default function Marketing() {
       {/* How it works */}
       <section className="mkt-section" id="how">
         <h2 className="mkt-section-title">How it works</h2>
-        <p className="mkt-section-sub">Three steps from research question to insight memo.</p>
+        <p className="mkt-section-sub">Three steps from research question to stakeholder-ready memo.</p>
         <div className="mkt-steps">
           {HOW_IT_WORKS.map((s) => (
             <div key={s.step} className="mkt-step">
@@ -204,25 +216,106 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* For participants callout */}
-      <section className="mkt-participant-banner">
-        <div className="mkt-participant-inner">
-          <div className="mkt-participant-icon">🎙️</div>
-          <div>
-            <h3>Got a link to an interview?</h3>
-            <p>No account needed. Open the link, speak naturally, and you're done — right in your browser, on any device.</p>
+      {/* Output preview */}
+      <section className="mkt-output">
+        <div className="mkt-output-inner">
+          <h2 className="mkt-section-title">From 12 interviews to this — automatically</h2>
+          <p className="mkt-section-sub">This is what your AI-generated research memo looks like. Themes, quotes, tensions, and recommendations — ready to share.</p>
+          <div className="mkt-output-card">
+            <div className="mkt-output-header">
+              <span className="mkt-output-project">SaaS Onboarding Experience Study</span>
+              <span className="mkt-output-meta">12 participants · Generated in 45 seconds</span>
+            </div>
+            <div className="mkt-output-summary">
+              <h4>Summary</h4>
+              <p>Participants consistently reported that initial setup complexity is the primary barrier to adoption. Most valued a guided onboarding experience but found current implementations overly generic. Three key themes emerged around time-to-value expectations, the role of social proof in building confidence, and frustrations with feature discovery.</p>
+            </div>
+            <div className="mkt-output-themes">
+              <h4>Key Themes</h4>
+              <div className="mkt-output-theme">
+                <div className="mkt-output-theme-header">
+                  <span className="mkt-output-theme-title">Time-to-value anxiety</span>
+                  <span className="mkt-output-theme-count">Mentioned by 9 of 12 participants</span>
+                </div>
+                <blockquote>"I need to see value in the first 10 minutes or I'm gone. I don't have time to watch tutorials."</blockquote>
+                <span className="mkt-output-theme-attr">— Product Manager, Series A startup</span>
+              </div>
+              <div className="mkt-output-theme">
+                <div className="mkt-output-theme-header">
+                  <span className="mkt-output-theme-title">Feature discovery friction</span>
+                  <span className="mkt-output-theme-count">Mentioned by 7 of 12 participants</span>
+                </div>
+                <blockquote>"I only found out about the export feature after three months. I'd been doing it manually."</blockquote>
+                <span className="mkt-output-theme-attr">— UX Designer, Fintech</span>
+              </div>
+            </div>
+            <div className="mkt-output-recs">
+              <h4>Recommendations</h4>
+              <ul>
+                <li>Implement a task-based onboarding flow that delivers value within the first session</li>
+                <li>Add contextual feature hints triggered by user behaviour patterns</li>
+                <li>Create role-specific setup paths (researcher vs. PM vs. designer)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Who it's for */}
+      <section className="mkt-section" id="who">
+        <h2 className="mkt-section-title">Built for people who need insights, not busywork</h2>
+        <p className="mkt-section-sub">Whether you run research full-time or fit it in between product decisions.</p>
+        <div className="mkt-use-cases">
+          {USE_CASES.map((uc) => (
+            <div key={uc.title} className="mkt-use-case">
+              <h3 className="mkt-use-case-title">{uc.title}</h3>
+              <p className="mkt-use-case-desc">{uc.desc}</p>
+              <span className="mkt-use-case-examples">{uc.examples}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Differentiator */}
+      <section className="mkt-diff">
+        <div className="mkt-diff-inner">
+          <h2 className="mkt-section-title">You might be wondering...</h2>
+          <p className="mkt-section-sub">How does QualiPulse compare to tools you may already know?</p>
+          <div className="mkt-diff-list">
+            {COMPARISONS.map((c) => (
+              <div key={c.vs} className="mkt-diff-row">
+                <span className="mkt-diff-vs">vs. {c.vs}</span>
+                <p className="mkt-diff-point">{c.point}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Trust / Early access */}
+      <section className="mkt-trust">
+        <div className="mkt-trust-inner">
+          <h3>"We built QualiPulse because we were tired of spending 80% of our research time on logistics and 20% on thinking. We wanted to flip that ratio."</h3>
+          <div className="mkt-trust-meta">
+            <span className="mkt-trust-name">Corino Fontana</span>
+            <span className="mkt-trust-role">Founder, QualiPulse</span>
+          </div>
+          <div className="mkt-trust-badges">
+            <span>GDPR compliant</span>
+            <span>Data encrypted at rest</span>
+            <span>EU-hosted infrastructure</span>
           </div>
         </div>
       </section>
 
       {/* Pricing */}
       <section className="mkt-section" id="pricing">
-        <h2 className="mkt-section-title">Simple pricing</h2>
-        <p className="mkt-section-sub">Start free. No credit card. Upgrade when your research program grows.</p>
+        <h2 className="mkt-section-title">Simple, transparent pricing</h2>
+        <p className="mkt-section-sub">Start free. Upgrade when your research program grows. No credit card required.</p>
         <div className="mkt-plans">
           {PLANS.map((p) => (
             <div key={p.name} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
-              {p.highlight && <div className="mkt-plan-badge">Most popular</div>}
+              {p.highlight && <div className="mkt-plan-badge">Recommended</div>}
               <div className="mkt-plan-name">{p.name}</div>
               <div className="mkt-plan-price">
                 {p.price}<span className="mkt-plan-period">{p.period}</span>
@@ -231,7 +324,7 @@ export default function Marketing() {
               <ul className="mkt-plan-features">
                 {p.features.map((f) => (
                   <li key={f}>
-                    <span className="mkt-check">✓</span> {f}
+                    <span className="mkt-check">&#10003;</span> {f}
                   </li>
                 ))}
               </ul>
@@ -250,34 +343,12 @@ export default function Marketing() {
         </p>
       </section>
 
-      {/* Newsletter */}
-      <section className="mkt-newsletter" id="newsletter">
-        <div className="mkt-newsletter-inner">
-          <h2 className="mkt-newsletter-title">Stay in the loop</h2>
-          <p className="mkt-newsletter-desc">
-            Get occasional updates on qualitative research best practices, product news, and tips for better insights.
-          </p>
-          {nlDone ? (
-            <div className="mkt-newsletter-success">
-              You're subscribed! Check your inbox for a welcome email.
-            </div>
-          ) : (
-            <form className="mkt-newsletter-form" onSubmit={handleNewsletter}>
-              <input
-                type="email"
-                className="mkt-newsletter-input"
-                placeholder="you@company.com"
-                value={nlEmail}
-                onChange={(e) => setNlEmail(e.target.value)}
-                required
-              />
-              <button type="submit" className="btn btn-primary" disabled={nlLoading}>
-                {nlLoading ? "..." : "Subscribe"}
-              </button>
-            </form>
-          )}
-          {nlError && <p className="mkt-newsletter-error">{nlError}</p>}
-          <p className="mkt-newsletter-note">No spam, ever. Unsubscribe anytime.</p>
+      {/* Final CTA */}
+      <section className="mkt-final-cta">
+        <div className="mkt-final-cta-inner">
+          <h2>Your next research study could be done by Friday</h2>
+          <p>Set up a study in 5 minutes. Get your first insights in hours.</p>
+          <Link to="/signup" className="btn btn-primary mkt-btn-lg">Run your first study free</Link>
         </div>
       </section>
 
@@ -291,7 +362,7 @@ export default function Marketing() {
           <Link to="/privacy">Privacy</Link>
           <a href="mailto:hello@qualipulse.com">Contact</a>
         </div>
-        <span className="mkt-footer-copy">&copy; 2026 QualiPulse &middot; GDPR-compliant</span>
+        <span className="mkt-footer-copy">&copy; 2026 QualiPulse &middot; GDPR-compliant &middot; <Link to="/interview/demo" style={{color: "inherit"}}>Got an interview link?</Link></span>
       </footer>
     </div>
   );

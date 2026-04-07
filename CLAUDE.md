@@ -33,7 +33,7 @@ auto-interview/
 │   │   │   ├── coding.py        # ManualCode + QuoteTag (researcher codebook)
 │   │   │   └── memo.py          # ProjectMemo
 │   │   ├── routers/
-│   │   │   ├── auth.py          # /auth/signup, /auth/login, /auth/verify-email, /auth/resend-verification
+│   │   │   ├── auth.py          # /auth/signup, login, verify-email, resend, onboarding, password reset
 │   │   │   ├── projects.py      # /projects CRUD, CSV import (feature-gated)
 │   │   │   ├── links.py         # /projects/{id}/links (feature-gated per tier)
 │   │   │   ├── interview.py     # /interview/{token} public endpoints + screening
@@ -46,7 +46,7 @@ auto-interview/
 │   │   │   ├── research_assistant.py  # AI brief parsing, suggestions
 │   │   │   └── audio.py         # Audio file serving
 │   │   ├── schemas/
-│   │   │   ├── auth.py          # SignupRequest, CompanyResponse (includes email_verified)
+│   │   │   ├── auth.py          # SignupRequest, CompanyResponse, OnboardingProfileRequest
 │   │   │   ├── project.py       # Pydantic schemas for project + screening questions
 │   │   │   └── interview.py     # StartInterviewRequest (with demographics), responses
 │   │   └── services/
@@ -64,7 +64,8 @@ auto-interview/
 │   │   └── versions/
 │   │       ├── 0001_add_researcher_features.py
 │   │       ├── 0002_iterative_analysis.py
-│   │       └── 0003_email_verification.py
+│   │       ├── 0003_email_verification.py
+│   │       └── 0004_company_onboarding_fields.py
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
@@ -78,19 +79,25 @@ auto-interview/
 │   ├── src/
 │   │   ├── api/
 │   │   │   ├── client.ts        # Axios instance (injects Authorization, auto-refresh on 401)
-│   │   │   ├── auth.ts          # login, register, refreshToken
+│   │   │   ├── auth.ts          # login, register, refreshToken, onboarding, email verification
 │   │   │   ├── projects.ts      # projects CRUD, links, participants, analysis, codes, tags, memos, export
 │   │   │   ├── interviews.ts    # getInterviewInfo, getScreeningQuestions, submitScreening, startInterview, submitAudio
 │   │   │   └── research.ts      # AI brief parsing, objective/scope/question suggestions
 │   │   ├── hooks/
 │   │   │   ├── useAuth.ts       # JWT auth state
 │   │   │   └── useAudioRecorder.ts  # Safari-compatible MediaRecorder
+│   │   ├── utils/
+│   │   │   └── errorMessages.ts # Centralized Axios error extraction
 │   │   ├── pages/
 │   │   │   ├── Login.tsx
 │   │   │   ├── Signup.tsx
 │   │   │   ├── ForgotPassword.tsx
 │   │   │   ├── ResetPassword.tsx
-│   │   │   ├── Dashboard.tsx         # Project list + archive
+│   │   │   ├── Welcome.tsx           # 4-step onboarding (verify email → profile → use case → ready)
+│   │   │   ├── VerifyEmail.tsx       # Token-based email verification page
+│   │   │   ├── Terms.tsx             # Terms of Service
+│   │   │   ├── Privacy.tsx           # Privacy Policy (GDPR-compliant)
+│   │   │   ├── Dashboard.tsx         # Project list + archive + getting-started + trial banner
 │   │   │   ├── CreateProjectWizard.tsx  # 4-step wizard (Brief → Objective → Scope → Questionnaire)
 │   │   │   ├── ProjectDetail.tsx     # 4-tab detail view (Overview / Setup / Responses / Analysis)
 │   │   │   ├── Interview.tsx         # Participant-facing interview (full flow)
@@ -168,7 +175,7 @@ DATABASE_URL="sqlite:///:memory:" SECRET_KEY="test-secret" \
   ANTHROPIC_API_KEY="" OPENAI_API_KEY="" \
   python -m pytest tests/ -v
 ```
-- 46 tests covering auth, email verification, projects CRUD, and all feature gates
+- 57 tests covering auth, email verification, projects CRUD, and all feature gates
 - Rate limiter is disabled in tests (see `tests/conftest.py`)
 - Uses in-memory SQLite with `StaticPool` for full test isolation
 
@@ -202,9 +209,9 @@ MAX_AUDIO_SIZE_MB=50
 # CORS
 ALLOWED_ORIGINS=*                              # Comma-separated in production
 
-# Email (optional — falls back to console logging)
+# Email (SendGrid — falls back to console logging if not set)
 SENDGRID_API_KEY=
-EMAIL_FROM=noreply@autointerview.com
+EMAIL_FROM=noreply@qualipulse.com
 
 # Stripe (optional — billing disabled without these)
 STRIPE_SECRET_KEY=
@@ -252,16 +259,23 @@ See `.env.example` at repo root for Docker/production template.
 ### Feature Gates (Subscription Tiers)
 Enforced on all create endpoints. Defined in `services/feature_gates.py`.
 
-| Gate | Free | Starter ($49) | Pro ($149) | Enterprise |
+Canonical tier names: `solo`, `team`, `lab`, `enterprise`.
+Legacy aliases still work in DB: `free` → solo, `starter` → team, `pro` → lab.
+
+| Gate | Solo ($0) | Team ($49) | Lab ($149) | Enterprise |
 |---|---|---|---|---|
-| Projects | 1 | 5 | Unlimited | Unlimited |
-| Participants/project | 10 | 50 | 500 | Unlimited |
-| Questions/guide | 5 | 15 | 30 | Unlimited |
-| Interview links/project | 1 | 3 | 10 | Unlimited |
-| AI Analysis | No | Yes | Yes | Yes |
+| Projects | 3 | 5 | Unlimited | Unlimited |
+| Participants/project | 25 | 50 | 500 | Unlimited |
+| Questions/guide | 10 | 15 | 30 | Unlimited |
+| Interview links/project | 2 | 3 | 10 | Unlimited |
+| AI Analysis | Yes | Yes | Yes | Yes |
 | CSV Export | No | Yes | Yes | Yes |
 | Custom Branding | No | No | Yes | Yes |
 | Team Members | 1 | 3 | 10 | Unlimited |
+
+**14-day trial:** New signups on Solo tier get `trial_ends_at` set 14 days ahead.
+While trial is active, `get_effective_limits()` returns Team-level limits.
+After trial expires, limits revert to Solo.
 
 **Where gates are enforced:**
 - `projects.py` → `create_project`, `import_project_from_csv` (project limit + question limit)
@@ -270,12 +284,34 @@ Enforced on all create endpoints. Defined in `services/feature_gates.py`.
 - `analysis.py` → `trigger_analysis`, `trigger_refined_analysis` (ai_analysis feature)
 - `export.py` → `export_transcripts_csv` (export_csv feature), `ai_quality_assessment` (ai_analysis)
 
+### Onboarding Flow
+After signup, users are redirected to `/welcome` (4-step onboarding):
+1. **Email verification** — click link in email (auto-skipped if already verified)
+2. **Company profile** — team size, role, industry (intermediate save via `PATCH /auth/onboarding`)
+3. **Use case** — what they'll use the platform for (completes via `POST /auth/onboarding`, sets `onboarding_completed = true`)
+4. **Ready** — trial info, CTA to dashboard
+
+Login checks `onboarding_completed` — if false, redirects to `/welcome` instead of `/dashboard`.
+
 ### Email Verification
-- On signup: `EmailVerificationToken` created (24h expiry), verification email sent
+- On signup: `EmailVerificationToken` created (24h expiry), verification + welcome emails sent
 - `POST /auth/verify-email?token=...` marks `email_verified = True`
 - `POST /auth/resend-verification` (rate-limited 3/min, requires auth)
 - `email_verified` exposed in `GET /auth/me` response (CompanyResponse)
-- Non-blocking: users can log in and use the app without verifying (frontend can show a banner)
+- Non-blocking: users can log in and use the app without verifying (frontend shows yellow banner)
+
+### Email Service
+- **Provider:** SendGrid (domain-authenticated for `qualipulse.com`)
+- **Fallback:** Console logging when `SENDGRID_API_KEY` is not set
+- **From:** `noreply@qualipulse.com` (QualiPulse)
+- **Templates** (all in `services/email.py` with branded HTML wrapper):
+  - `send_welcome` — after signup
+  - `send_verification_email` — email verification link (24h)
+  - `send_password_reset` — password reset link (1h)
+  - `send_analysis_ready` — when AI analysis completes
+  - `send_interview_invite` — (template exists, not yet wired to an endpoint)
+  - `send_newsletter_welcome` — newsletter subscription
+- **DNS records** (Namecheap): em9375 CNAME, s1/s2._domainkey CNAME, _dmarc TXT
 
 ### Authentication & Security
 - JWT access tokens (24h expiry) + refresh tokens (30d expiry), HS256
@@ -405,7 +441,7 @@ Pacing safety guards:
 | `database-url` | Neon PostgreSQL connection string |
 | `anthropic-api-key` | Anthropic API key for Claude |
 | `openai-api-key` | OpenAI API key for Whisper + TTS |
-| `sendgrid-api-key` | SendGrid API key (placeholder — email logs to console) |
+| `sendgrid-api-key` | SendGrid API key (domain-authenticated for qualipulse.com) |
 
 ### IAM Service Accounts
 | Service Account | Roles |
@@ -420,6 +456,10 @@ Pacing safety guards:
 | TXT | `@` | `google-site-verification=tYJKv4GNO3cuAYHv...` | Domain verification |
 | CNAME | `app` | `ghs.googlehosted.com.` | Frontend → Cloud Run |
 | CNAME | `api` | `ghs.googlehosted.com.` | Backend → Cloud Run |
+| CNAME | `em9375` | `u77457076.wl077.sendgrid.net.` | SendGrid domain auth |
+| CNAME | `s1._domainkey` | `s1.domainkey.u77457076.wl077.sendgrid.net.` | DKIM signing |
+| CNAME | `s2._domainkey` | `s2.domainkey.u77457076.wl077.sendgrid.net.` | DKIM signing |
+| TXT | `_dmarc` | `v=DMARC1; p=none;` | DMARC policy |
 
 SSL certificates are auto-provisioned by Google after DNS propagation.
 
@@ -591,16 +631,23 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] AI quality assessment per participant (Claude-scored, structured result)
 - [x] Export CSV (participants + all transcript turns, streaming response)
 - [x] Account & billing settings page (Profile tab + Plan & Billing tab)
-- [x] Subscription tier model with **enforced** feature gates (free/starter/pro/enterprise)
+- [x] Subscription tier model with **enforced** feature gates (solo/team/lab/enterprise)
+- [x] 14-day trial: solo users get team-level limits, auto-set on signup
 - [x] Stripe Checkout + Customer Portal + webhook handler (needs Stripe keys)
 - [x] Profile save + change password in AccountSettings UI (PATCH /auth/me, POST /auth/change-password)
 - [x] Analysis-ready email (triggered after AI synthesis completes)
 - [x] Feature gates enforced on: projects, questions, links, analysis, export
+- [x] Multi-step onboarding flow (Welcome page: verify email → profile → use case → ready)
+- [x] Centralized error messages (frontend `utils/errorMessages.ts`)
+- [x] Terms of Service + Privacy Policy pages
+- [x] SendGrid email integration (domain-authenticated, branded HTML templates)
+- [x] Getting-started checklist on empty dashboard
+- [x] Trial banner on dashboard (visible to solo/free users with active trial)
+- [x] Email verification banner (yellow) when unverified
 - [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented)
 - [ ] Email invitation sending (template exists, no send endpoint)
 - [ ] Multi-language TTS voices (language field exists on projects)
 - [ ] Dashboard-level analytics across projects
-- [ ] Free trial period (14-day; `trial_ends_at` field exists on Company)
 - [ ] Team collaboration (multi-user, invitations, roles, audit trail)
 
 ### Participant Side
@@ -639,7 +686,8 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Security headers middleware
 - [x] JSON structured logging (python-json-logger)
 - [x] Sentry integration (optional, configurable via SENTRY_DSN)
-- [x] Alembic migrations (3 versions)
+- [x] Alembic migrations (4 versions)
+- [x] SendGrid email delivery (domain-authenticated, 6 email templates)
 - [ ] GDPR tooling (data export, participant deletion)
 - [ ] Prometheus metrics / APM dashboards
 - [ ] Automated DB backups (Neon handles this for production)
@@ -649,7 +697,7 @@ gcloud builds list --region=europe-west1 --limit=5
 ## Data Models Summary
 
 ### Company (auth)
-`id`, `name`, `email`, `password_hash`, `email_verified`, `subscription_tier` (free/starter/pro/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `created_at`
+`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `created_at`
 
 ### Project
 `id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `created_at`, `archived_at`
@@ -697,16 +745,19 @@ gcloud builds list --region=europe-west1 --limit=5
 ### Auth (`/auth`)
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/auth/signup` | No | Create account, send verification email |
+| POST | `/auth/signup` | No | Create account, send verification + welcome emails, set 14-day trial |
 | POST | `/auth/login` | No | Login, get access + refresh tokens |
 | POST | `/auth/refresh` | No | Refresh access token |
 | POST | `/auth/verify-email?token=` | No | Verify email address |
-| POST | `/auth/resend-verification` | Yes | Resend verification email |
+| POST | `/auth/resend-verification` | Yes | Resend verification email (3/min) |
 | POST | `/auth/password-reset/request` | No | Request password reset (always 200) |
 | POST | `/auth/password-reset/confirm` | No | Confirm reset with token |
-| GET | `/auth/me` | Yes | Get current company profile |
+| GET | `/auth/me` | Yes | Get current company profile (includes onboarding fields) |
 | PATCH | `/auth/me` | Yes | Update profile (name) |
 | POST | `/auth/change-password` | Yes | Change password |
+| PATCH | `/auth/onboarding` | Yes | Intermediate onboarding save (profile fields) |
+| POST | `/auth/onboarding` | Yes | Complete onboarding (sets `onboarding_completed = true`) |
+| POST | `/auth/newsletter` | No | Newsletter subscription (5/min) |
 
 ### Projects (`/projects`)
 | Method | Path | Auth | Gate | Description |
