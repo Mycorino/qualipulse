@@ -133,7 +133,7 @@ auto-interview/
 ### Demo Account
 | Field | Value |
 |---|---|
-| **Email** | `demo@autointerview.com` |
+| **Email** | `demo@qualipulse.com` |
 | **Password** | `Demo1234!` |
 | **Company name** | Test Company |
 
@@ -145,7 +145,7 @@ auto-interview/
   - Ben K. — Software Engineer, Germany
   - Sarah L. — Freelance Designer, France
 
-> **Note:** To reset the database, stop the backend, delete `backend/auto_interview.db` and `.claude/worktrees/sleepy-cerf/backend/auto_interview.db`, restart the backend (tables auto-recreate), then re-run the seed script or register a new account.
+> **Note:** To reset the database, stop the backend, delete `backend/auto_interview.db`, restart the backend (tables auto-recreate), then re-run the seed script or register a new account.
 
 ---
 
@@ -153,8 +153,7 @@ auto-interview/
 
 ### Backend
 ```bash
-# The live backend runs from the worktree (keeps main repo clean during dev)
-cd /Users/corinofontana/Desktop/auto-interview/.claude/worktrees/sleepy-cerf/backend
+cd /Users/corinofontana/Desktop/auto-interview/backend
 uvicorn app.main:app --reload --port 8000
 # Python/uvicorn comes from the system Anaconda env (/opt/anaconda3/bin/uvicorn)
 ```
@@ -681,7 +680,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] CI/CD: GitHub Actions (pytest + tsc + build), Cloud Build (auto-deploy on push)
 - [x] Health checks: `GET /` (shallow) + `GET /health` (deep, DB-aware)
 - [x] Secret Manager integration (secrets injected at deploy, not in .env)
-- [x] Test suite: 46 tests (auth, email verification, feature gates, project CRUD)
+- [x] Test suite: 57 tests (auth, email verification, feature gates, project CRUD)
 - [x] Rate limiting (SlowAPI): public/auth/default tiers
 - [x] Security headers middleware
 - [x] JSON structured logging (python-json-logger)
