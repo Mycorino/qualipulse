@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     R2_BUCKET: str = ""
     R2_PUBLIC_URL: str = ""
 
+    # Admin
+    ADMIN_SECRET_KEY: str = ""  # If empty, admin routes return 403
+
     # Rate limits (requests per minute)
     RATE_LIMIT_PUBLIC: str = "60/minute"     # Interview public endpoints
     RATE_LIMIT_AUTH: str = "10/minute"       # Login/signup

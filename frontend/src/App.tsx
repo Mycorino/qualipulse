@@ -16,6 +16,7 @@ import Welcome from "./pages/Welcome";
 import VerifyEmail from "./pages/VerifyEmail";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import Admin from "./pages/Admin";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -84,6 +85,7 @@ export default function App() {
       />
       <Route path="/i/:token" element={<Interview />} />
       <Route path="/reports/:token" element={<SharedReport />} />
+      <Route path="/admin" element={<Admin />} />
       <Route
         path="/account"
         element={

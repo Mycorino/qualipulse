@@ -1,0 +1,837 @@
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface AdminProject {
+  id: string;
+  name: string;
+  created_at: string;
+  participant_count: number;
+}
+
+interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  subscription_tier: string;
+  subscription_status: string;
+  trial_ends_at: string | null;
+  email_verified: boolean;
+  onboarding_completed: boolean;
+  created_at: string;
+  last_active: string | null;
+  project_count: number;
+  interview_count: number;
+  projects?: AdminProject[];
+}
+
+interface AdminStats {
+  total_users: number;
+  users_by_tier: Record<string, number>;
+  active_trials: number;
+  total_projects: number;
+  total_interviews_completed: number;
+  signups_last_7_days: number;
+  signups_last_30_days: number;
+}
+
+// ── API helpers ────────────────────────────────────────────────────────────
+
+function adminClient(key: string) {
+  return axios.create({
+    baseURL: "/api",
+    headers: { Authorization: `Bearer ${key}` },
+  });
+}
+
+// ── Tier badge ─────────────────────────────────────────────────────────────
+
+const TIER_COLORS: Record<string, { bg: string; color: string }> = {
+  solo:       { bg: "#f1f2f6", color: "#5a6076" },
+  team:       { bg: "#e0e9ff", color: "#2d53e8" },
+  lab:        { bg: "#f3e8ff", color: "#7c3aed" },
+  enterprise: { bg: "#fef3c7", color: "#92400e" },
+};
+
+function TierBadge({ tier }: { tier: string }) {
+  const style = TIER_COLORS[tier] ?? { bg: "#f1f2f6", color: "#5a6076" };
+  return (
+    <span
+      style={{
+        background: style.bg,
+        color: style.color,
+        padding: "2px 10px",
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: 600,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+      }}
+    >
+      {tier}
+    </span>
+  );
+}
+
+// ── Trial status ───────────────────────────────────────────────────────────
+
+function trialLabel(trial_ends_at: string | null): string {
+  if (!trial_ends_at) return "—";
+  const end = new Date(trial_ends_at);
+  const now = new Date();
+  if (end <= now) return "Expired";
+  const days = Math.ceil((end.getTime() - now.getTime()) / 86400000);
+  return `${days}d left`;
+}
+
+function trialColor(trial_ends_at: string | null): string {
+  if (!trial_ends_at) return "var(--text-muted)";
+  const end = new Date(trial_ends_at);
+  const now = new Date();
+  if (end <= now) return "var(--danger)";
+  const days = Math.ceil((end.getTime() - now.getTime()) / 86400000);
+  if (days <= 3) return "var(--warning)";
+  return "var(--success)";
+}
+
+// ── Stat card ──────────────────────────────────────────────────────────────
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        padding: "16px 20px",
+        minWidth: 140,
+      }}
+    >
+      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+// ── Confirm dialog ─────────────────────────────────────────────────────────
+
+function ConfirmDialog({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(13,15,26,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-lg)",
+          padding: 28,
+          maxWidth: 380,
+          width: "90%",
+          boxShadow: "var(--shadow-xl)",
+        }}
+      >
+        <p style={{ marginBottom: 20, color: "var(--text-primary)", lineHeight: 1.5 }}>
+          {message}
+        </p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button className="btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            style={{
+              background: "var(--danger)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "var(--radius-sm)",
+              padding: "8px 16px",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+            onClick={onConfirm}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+
+export default function Admin() {
+  const [adminKey, setAdminKey] = useState<string>(
+    () => sessionStorage.getItem("admin_key") ?? ""
+  );
+  const [keyInput, setKeyInput] = useState("");
+  const [keyError, setKeyError] = useState("");
+  const [authed, setAuthed] = useState(false);
+
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [search, setSearch] = useState("");
+  const [tierFilter, setTierFilter] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedProjects, setExpandedProjects] = useState<AdminProject[]>([]);
+  const [expandLoading, setExpandLoading] = useState(false);
+
+  const [confirmDelete, setConfirmDelete] = useState<AdminUser | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const client = useCallback(
+    () => adminClient(adminKey),
+    [adminKey]
+  );
+
+  // Verify key and load data
+  const login = useCallback(async (key: string) => {
+    setKeyError("");
+    try {
+      const res = await adminClient(key).get<AdminStats>("/admin/stats");
+      setStats(res.data);
+      sessionStorage.setItem("admin_key", key);
+      setAdminKey(key);
+      setAuthed(true);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 403) {
+        setKeyError("Invalid admin key");
+      } else {
+        setKeyError("Could not connect to backend");
+      }
+    }
+  }, []);
+
+  // Auto-login if key already in sessionStorage
+  useEffect(() => {
+    if (adminKey) {
+      login(adminKey);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const params: Record<string, string> = {};
+      if (search) params.search = search;
+      if (tierFilter) params.tier = tierFilter;
+      const res = await client().get<AdminUser[]>("/admin/users", { params });
+      setUsers(res.data);
+    } catch {
+      setError("Failed to load users");
+    } finally {
+      setLoading(false);
+    }
+  }, [client, search, tierFilter]);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await client().get<AdminStats>("/admin/stats");
+      setStats(res.data);
+    } catch {
+      // non-critical
+    }
+  }, [client]);
+
+  useEffect(() => {
+    if (authed) {
+      loadUsers();
+    }
+  }, [authed, search, tierFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleExpand(user: AdminUser) {
+    if (expandedId === user.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(user.id);
+    setExpandLoading(true);
+    try {
+      const res = await client().get<AdminUser>(`/admin/users/${user.id}`);
+      setExpandedProjects(res.data.projects ?? []);
+    } catch {
+      setExpandedProjects([]);
+    } finally {
+      setExpandLoading(false);
+    }
+  }
+
+  async function handleTierChange(user: AdminUser, tier: string) {
+    setActionLoading(`tier-${user.id}`);
+    try {
+      await client().patch(`/admin/users/${user.id}/tier`, { tier });
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id
+            ? { ...u, subscription_tier: tier, subscription_status: "active" }
+            : u
+        )
+      );
+      showSuccess("Tier updated");
+    } catch {
+      setError("Failed to update tier");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleTrialAction(user: AdminUser, action: string) {
+    setActionLoading(`trial-${user.id}`);
+    try {
+      const res = await client().patch<AdminUser>(`/admin/users/${user.id}/trial`, {
+        action,
+      });
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id ? { ...u, trial_ends_at: res.data.trial_ends_at } : u
+        )
+      );
+      showSuccess("Trial updated");
+    } catch {
+      setError("Failed to update trial");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDelete(user: AdminUser) {
+    setConfirmDelete(null);
+    setActionLoading(`delete-${user.id}`);
+    try {
+      await client().delete(`/admin/users/${user.id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      await loadStats();
+      showSuccess("User deleted");
+    } catch {
+      setError("Failed to delete user");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function showSuccess(msg: string) {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(""), 2500);
+  }
+
+  // ── Login gate ────────────────────────────────────────────────────────────
+
+  if (!authed) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--bg-base)",
+        }}
+      >
+        <div
+          style={{
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
+            padding: 40,
+            width: 360,
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
+          <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Admin Panel</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 24 }}>
+            QualiPulse internal
+          </p>
+          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
+            Admin key
+          </label>
+          <input
+            type="password"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && login(keyInput)}
+            placeholder="Enter admin secret key"
+            style={{
+              display: "block",
+              width: "100%",
+              marginTop: 6,
+              marginBottom: 16,
+              padding: "10px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: `1px solid ${keyError ? "var(--danger)" : "var(--border)"}`,
+              fontSize: 14,
+              outline: "none",
+            }}
+          />
+          {keyError && (
+            <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>
+              {keyError}
+            </p>
+          )}
+          <button
+            onClick={() => login(keyInput)}
+            style={{
+              width: "100%",
+              background: "var(--primary)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "var(--radius-sm)",
+              padding: "10px 0",
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main admin UI ─────────────────────────────────────────────────────────
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg-base)",
+        padding: "0 0 60px",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          background: "var(--bg-surface)",
+          borderBottom: "1px solid var(--border)",
+          padding: "0 32px",
+          height: 56,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontWeight: 700, fontSize: 16, color: "var(--text-primary)" }}>
+            QualiPulse Admin
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              background: "var(--danger-bg)",
+              color: "var(--danger)",
+              border: "1px solid var(--danger-border)",
+              borderRadius: 4,
+              padding: "2px 8px",
+              fontWeight: 600,
+            }}
+          >
+            INTERNAL
+          </span>
+        </div>
+        <button
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+          onClick={() => {
+            sessionStorage.removeItem("admin_key");
+            setAuthed(false);
+            setAdminKey("");
+          }}
+        >
+          Sign out
+        </button>
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 0" }}>
+
+        {/* Stats bar */}
+        {stats && (
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 28,
+            }}
+          >
+            <StatCard label="Total users" value={stats.total_users} />
+            <StatCard label="Total projects" value={stats.total_projects} />
+            <StatCard label="Completed interviews" value={stats.total_interviews_completed} />
+            <StatCard label="Active trials" value={stats.active_trials} />
+            <StatCard label="Signups (7d)" value={stats.signups_last_7_days} />
+            <StatCard label="Signups (30d)" value={stats.signups_last_30_days} />
+            {Object.entries(stats.users_by_tier).map(([tier, count]) => (
+              <StatCard key={tier} label={`${tier} users`} value={count} />
+            ))}
+          </div>
+        )}
+
+        {/* Toolbar */}
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            marginBottom: 16,
+            alignItems: "center",
+          }}
+        >
+          <input
+            type="search"
+            placeholder="Search by name or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              flex: 1,
+              maxWidth: 340,
+              padding: "8px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border)",
+              fontSize: 14,
+              outline: "none",
+            }}
+          />
+          <select
+            value={tierFilter}
+            onChange={(e) => setTierFilter(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border)",
+              fontSize: 13,
+              background: "var(--bg-surface)",
+              cursor: "pointer",
+              outline: "none",
+            }}
+          >
+            <option value="">All tiers</option>
+            <option value="solo">Solo</option>
+            <option value="team">Team</option>
+            <option value="lab">Lab</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+          <button
+            onClick={loadUsers}
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              padding: "8px 14px",
+              fontSize: 13,
+              cursor: "pointer",
+              color: "var(--text-secondary)",
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {/* Messages */}
+        {error && (
+          <div
+            style={{
+              background: "var(--danger-bg)",
+              border: "1px solid var(--danger-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--danger)",
+              padding: "10px 14px",
+              marginBottom: 12,
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        )}
+        {successMsg && (
+          <div
+            style={{
+              background: "var(--success-bg)",
+              border: "1px solid var(--success-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--success)",
+              padding: "10px 14px",
+              marginBottom: 12,
+              fontSize: 13,
+            }}
+          >
+            {successMsg}
+          </div>
+        )}
+
+        {/* Users table */}
+        <div
+          style={{
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Table header */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr 2fr",
+              padding: "10px 16px",
+              borderBottom: "1px solid var(--border)",
+              background: "var(--bg-sunken)",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            <span>Name</span>
+            <span>Email</span>
+            <span>Tier</span>
+            <span>Trial</span>
+            <span>Projects</span>
+            <span>Signed up</span>
+            <span>Actions</span>
+          </div>
+
+          {loading && (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+              Loading…
+            </div>
+          )}
+          {!loading && users.length === 0 && (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+              No users found
+            </div>
+          )}
+
+          {users.map((user) => (
+            <div key={user.id}>
+              {/* Row */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr 2fr",
+                  padding: "12px 16px",
+                  borderBottom: "1px solid var(--border-subtle)",
+                  alignItems: "center",
+                  cursor: "pointer",
+                  background: expandedId === user.id ? "var(--bg-overlay)" : undefined,
+                  transition: "background 0.1s",
+                }}
+                onClick={() => handleExpand(user)}
+              >
+                {/* Name */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
+                    {user.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>
+                    {user.email_verified ? "✓ verified" : "unverified"}
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div
+                  style={{ fontSize: 12, color: "var(--text-secondary)", wordBreak: "break-all" }}
+                >
+                  {user.email}
+                </div>
+
+                {/* Tier */}
+                <div>
+                  <TierBadge tier={user.subscription_tier} />
+                </div>
+
+                {/* Trial */}
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: trialColor(user.trial_ends_at),
+                    fontWeight: 500,
+                  }}
+                >
+                  {trialLabel(user.trial_ends_at)}
+                </div>
+
+                {/* Projects */}
+                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                  {user.project_count}
+                </div>
+
+                {/* Signed up */}
+                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                  {new Date(user.created_at).toLocaleDateString()}
+                </div>
+
+                {/* Actions */}
+                <div
+                  style={{ display: "flex", gap: 6, alignItems: "center" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Tier selector */}
+                  <select
+                    value={user.subscription_tier}
+                    disabled={actionLoading === `tier-${user.id}`}
+                    onChange={(e) => handleTierChange(user, e.target.value)}
+                    style={{
+                      fontSize: 12,
+                      padding: "4px 6px",
+                      borderRadius: "var(--radius-xs)",
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-surface)",
+                      cursor: "pointer",
+                      outline: "none",
+                    }}
+                  >
+                    <option value="solo">Solo</option>
+                    <option value="team">Team</option>
+                    <option value="lab">Lab</option>
+                    <option value="enterprise">Enterprise</option>
+                  </select>
+
+                  {/* Trial selector */}
+                  <select
+                    value=""
+                    disabled={actionLoading === `trial-${user.id}`}
+                    onChange={(e) => {
+                      if (e.target.value) handleTrialAction(user, e.target.value);
+                    }}
+                    style={{
+                      fontSize: 12,
+                      padding: "4px 6px",
+                      borderRadius: "var(--radius-xs)",
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-surface)",
+                      cursor: "pointer",
+                      outline: "none",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    <option value="" disabled>
+                      Trial…
+                    </option>
+                    <option value="extend_7">+7 days</option>
+                    <option value="extend_14">+14 days</option>
+                    <option value="extend_30">+30 days</option>
+                    <option value="reset">Reset (14d)</option>
+                    <option value="expire">Expire now</option>
+                  </select>
+
+                  {/* Delete */}
+                  <button
+                    disabled={actionLoading === `delete-${user.id}`}
+                    onClick={() => setConfirmDelete(user)}
+                    style={{
+                      background: "none",
+                      border: "1px solid var(--danger-border)",
+                      color: "var(--danger)",
+                      borderRadius: "var(--radius-xs)",
+                      padding: "4px 8px",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      fontWeight: 500,
+                      opacity: actionLoading === `delete-${user.id}` ? 0.5 : 1,
+                    }}
+                  >
+                    {actionLoading === `delete-${user.id}` ? "…" : "Delete"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded projects */}
+              {expandedId === user.id && (
+                <div
+                  style={{
+                    background: "var(--bg-sunken)",
+                    borderBottom: "1px solid var(--border-subtle)",
+                    padding: "12px 32px 16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "var(--text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      marginBottom: 10,
+                    }}
+                  >
+                    Projects ({expandLoading ? "…" : expandedProjects.length})
+                  </div>
+                  {expandLoading && (
+                    <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading…</div>
+                  )}
+                  {!expandLoading && expandedProjects.length === 0 && (
+                    <div style={{ color: "var(--text-muted)", fontSize: 13 }}>No projects</div>
+                  )}
+                  {!expandLoading &&
+                    expandedProjects.map((p) => (
+                      <div
+                        key={p.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "7px 12px",
+                          background: "var(--bg-surface)",
+                          borderRadius: "var(--radius-sm)",
+                          marginBottom: 6,
+                          border: "1px solid var(--border-subtle)",
+                          fontSize: 13,
+                        }}
+                      >
+                        <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>
+                          {p.name}
+                        </span>
+                        <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                          {p.participant_count} participant{p.participant_count !== 1 ? "s" : ""}{" "}
+                          · {new Date(p.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Confirm delete dialog */}
+      {confirmDelete && (
+        <ConfirmDialog
+          message={`Delete account for "${confirmDelete.name}" (${confirmDelete.email})? This permanently removes all their data and cannot be undone.`}
+          onConfirm={() => handleDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+    </div>
+  );
+}
