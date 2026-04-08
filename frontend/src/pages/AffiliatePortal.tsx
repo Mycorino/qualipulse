@@ -316,7 +316,7 @@ function AffiliateDashboard() {
   }
 
   function handleCopyLink() {
-    navigator.clipboard.writeText(stats.referral_link);
+    navigator.clipboard.writeText(stats!.referral_link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
