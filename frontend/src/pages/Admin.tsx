@@ -230,6 +230,11 @@ export default function Admin() {
 
   const [costs, setCosts] = useState<CostsReport | null>(null);
 
+  // Affiliates management
+  const [tab, setTab] = useState<"users" | "affiliates">("users");
+  const [affiliates, setAffiliates] = useState<any[]>([]);
+  const [affiliatesLoading, setAffiliatesLoading] = useState(false);
+
   const client = useCallback(
     () => adminClient(adminKey),
     [adminKey]
@@ -294,12 +299,29 @@ export default function Admin() {
     }
   }, [client]);
 
+  const loadAffiliates = useCallback(async () => {
+    setAffiliatesLoading(true);
+    try {
+      const res = await client().get("/affiliates/admin/list");
+      setAffiliates(res.data.affiliates || []);
+    } catch {
+      setError("Failed to load affiliates");
+    } finally {
+      setAffiliatesLoading(false);
+    }
+  }, [client]);
+
   useEffect(() => {
     if (authed) {
-      loadUsers();
-      loadCosts();
+      if (tab === "users") {
+        loadUsers();
+        loadCosts();
+      } else if (tab === "affiliates") {
+        loadAffiliates();
+      }
+      loadStats();
     }
-  }, [authed, search, tierFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authed, search, tierFilter, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleExpand(user: AdminUser) {
     if (expandedId === user.id) {
@@ -643,64 +665,100 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Toolbar */}
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            marginBottom: 16,
-            alignItems: "center",
-          }}
-        >
-          <input
-            type="search"
-            placeholder="Search by name or email…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              flex: 1,
-              maxWidth: 340,
-              padding: "8px 12px",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--border)",
-              fontSize: 14,
-              outline: "none",
-            }}
-          />
-          <select
-            value={tierFilter}
-            onChange={(e) => setTierFilter(e.target.value)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--border)",
-              fontSize: 13,
-              background: "var(--bg-surface)",
-              cursor: "pointer",
-              outline: "none",
-            }}
-          >
-            <option value="">All tiers</option>
-            <option value="solo">Solo</option>
-            <option value="team">Team</option>
-            <option value="lab">Lab</option>
-            <option value="enterprise">Enterprise</option>
-          </select>
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 24, borderBottom: "1px solid var(--border)" }}>
           <button
-            onClick={loadUsers}
+            onClick={() => setTab("users")}
             style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "8px 14px",
-              fontSize: 13,
+              padding: "12px 0",
+              border: "none",
+              background: "none",
+              borderBottom: tab === "users" ? "2px solid var(--primary)" : "none",
+              color: tab === "users" ? "var(--primary)" : "var(--text-secondary)",
               cursor: "pointer",
-              color: "var(--text-secondary)",
+              fontSize: 14,
+              fontWeight: tab === "users" ? 600 : 500,
             }}
           >
-            Refresh
+            Users
+          </button>
+          <button
+            onClick={() => setTab("affiliates")}
+            style={{
+              padding: "12px 0",
+              border: "none",
+              background: "none",
+              borderBottom: tab === "affiliates" ? "2px solid var(--primary)" : "none",
+              color: tab === "affiliates" ? "var(--primary)" : "var(--text-secondary)",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: tab === "affiliates" ? 600 : 500,
+            }}
+          >
+            Affiliates
           </button>
         </div>
+
+        {/* Toolbar - Users only */}
+        {tab === "users" && (
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              marginBottom: 16,
+              alignItems: "center",
+            }}
+          >
+            <input
+              type="search"
+              placeholder="Search by name or email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{
+                flex: 1,
+                maxWidth: 340,
+                padding: "8px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                fontSize: 14,
+                outline: "none",
+              }}
+            />
+            <select
+              value={tierFilter}
+              onChange={(e) => setTierFilter(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                fontSize: 13,
+                background: "var(--bg-surface)",
+                cursor: "pointer",
+                outline: "none",
+              }}
+            >
+              <option value="">All tiers</option>
+              <option value="solo">Solo</option>
+              <option value="team">Team</option>
+              <option value="lab">Lab</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+            <button
+              onClick={loadUsers}
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "8px 14px",
+                fontSize: 13,
+                cursor: "pointer",
+                color: "var(--text-secondary)",
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        )}
 
         {/* Messages */}
         {error && (
@@ -734,7 +792,90 @@ export default function Admin() {
           </div>
         )}
 
+        {/* Affiliates table */}
+        {tab === "affiliates" && (
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Affiliate Program</h2>
+                <button
+                  onClick={loadAffiliates}
+                  style={{
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "8px 14px",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+            {affiliatesLoading && <div style={{ padding: "24px", textAlign: "center" }}>Loading...</div>}
+            {!affiliatesLoading && affiliates.length === 0 && (
+              <div style={{ padding: "24px", textAlign: "center", color: "var(--text-secondary)" }}>
+                No affiliates yet.
+              </div>
+            )}
+            {!affiliatesLoading && affiliates.length > 0 && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "var(--bg-sunken)", borderBottom: "1px solid var(--border)" }}>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Name</th>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Email</th>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Code</th>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Status</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Commission %</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Signups</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Conversions</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Earned</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {affiliates.map((aff: any) => (
+                      <tr key={aff.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "12px", fontSize: 13 }}>{aff.name}</td>
+                        <td style={{ padding: "12px", fontSize: 13 }}>{aff.email}</td>
+                        <td style={{ padding: "12px", fontSize: 13, fontFamily: "monospace" }}>{aff.code}</td>
+                        <td style={{ padding: "12px", fontSize: 12 }}>
+                          <span
+                            style={{
+                              background: aff.status === "active" ? "var(--success-bg)" : aff.status === "pending" ? "var(--warning-bg)" : "var(--danger-bg)",
+                              color: aff.status === "active" ? "var(--success)" : aff.status === "pending" ? "var(--warning)" : "var(--danger)",
+                              padding: "4px 8px",
+                              borderRadius: 4,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {aff.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px", textAlign: "right", fontSize: 13 }}>{aff.commission_pct.toFixed(1)}%</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontSize: 13 }}>{aff.signups}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontSize: 13 }}>{aff.conversions}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontSize: 13, fontWeight: 600 }}>${aff.total_earned.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Users table */}
+        {tab === "users" && (
         <div
           style={{
             background: "var(--bg-surface)",
@@ -997,6 +1138,7 @@ export default function Admin() {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {/* Confirm delete dialog */}
