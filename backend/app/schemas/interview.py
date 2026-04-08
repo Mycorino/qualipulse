@@ -23,6 +23,7 @@ class StartInterviewRequest(BaseModel):
     profession: str | None = None
     country: str | None = None
     email: str | None = None
+    session_token: str | None = None  # JWT from email verification
 
 
 class StartInterviewResponse(BaseModel):

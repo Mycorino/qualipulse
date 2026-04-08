@@ -148,6 +148,25 @@ def send_interview_invite(to: str, project_name: str, interview_url: str, sender
     )
 
 
+def send_interview_magic_link(email: str, magic_url: str, expiry_minutes: int = 30) -> None:
+    send_email(
+        to=email,
+        subject="Your interview access link",
+        body_html=_wrap_email(f"""
+          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">You're one click away</h2>
+          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">Click the button below to verify your email and start your interview.</p>
+          <div style="text-align:center;margin:32px 0;">
+            <a href="{magic_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
+              Start my interview →
+            </a>
+          </div>
+          <p style="color:#94a3b8;font-size:0.8rem;margin:0;">
+            This link expires in {expiry_minutes} minutes. If you didn't request this, you can ignore this email.
+          </p>
+        """),
+    )
+
+
 def send_newsletter_welcome(to: str) -> None:
     send_email(
         to=to,

@@ -4,6 +4,7 @@ from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestio
 from app.models.coding import ManualCode, QuoteTag
 from app.models.memo import ProjectMemo
 from app.models.usage import AIUsageLog
+from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 
 __all__ = [
     "AIUsageLog",
@@ -13,6 +14,9 @@ __all__ = [
     "InterviewTurn",
     "ManualCode",
     "Participant",
+    "PanelProfile",
+    "PanelTag",
+    "ParticipantMagicToken",
     "PasswordResetToken",
     "Project",
     "ProjectAnalysis",

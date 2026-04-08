@@ -42,8 +42,13 @@ class ProjectCreate(BaseModel):
     system_prompt: str | None = None
     research_objective: str | None = None
     welcome_message: str | None = None
+    panel_collection_enabled: bool = True
     questions: list[QuestionCreate] = []
     screening_questions: list[ScreeningQuestionCreate] = []
+
+
+class ProjectSettingsPatch(BaseModel):
+    panel_collection_enabled: bool | None = None
 
 
 class QuestionResponse(BaseModel):
@@ -69,6 +74,7 @@ class ProjectResponse(BaseModel):
     system_prompt: str | None = None
     research_objective: str | None = None
     welcome_message: str | None = None
+    panel_collection_enabled: bool = True
     created_at: datetime
     questions: list[QuestionResponse] = []
     screening_questions: list[ScreeningQuestionResponse] = []

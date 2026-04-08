@@ -10,6 +10,7 @@ export interface InterviewInfo {
   researcher_logo_url?: string;
   research_context?: string;
   privacy_policy_url?: string;
+  panel_collection_enabled?: boolean;
 }
 
 export interface ScreeningQuestion {
@@ -42,12 +43,52 @@ export interface SubmitAudioResponse {
   transcript?: string;
 }
 
-export async function getInterviewInfo(
-  token: string
-): Promise<InterviewInfo> {
-  const { data } = await client.get<InterviewInfo>(
-    `/interview/${token}`
-  );
+export interface ResumeCheck {
+  found: boolean;
+  participant_id?: string;
+  last_question?: string;
+  turn_count?: number;
+  question_index?: number;
+}
+
+export interface ResumeSummary {
+  questions_covered: string[];
+  last_question?: string;
+  turn_count: number;
+  elapsed_minutes: number;
+}
+
+export interface PanelTag {
+  id: number;
+  name: string;
+  category: string;
+}
+
+export interface PanelProfileData {
+  email: string;
+  first_name?: string;
+  age_range?: string;
+  gender?: string;
+  country?: string;
+  city?: string;
+  education?: string;
+  employment_status?: string;
+  job_function?: string;
+  seniority?: string;
+  industry?: string;
+  company_size?: string;
+  panel_consent: boolean;
+  tag_ids: number[];
+}
+
+export interface VerifyTokenResponse {
+  session_token: string;
+  link_token: string;
+  email: string;
+}
+
+export async function getInterviewInfo(token: string): Promise<InterviewInfo> {
+  const { data } = await client.get<InterviewInfo>(`/interview/${token}`);
   return data;
 }
 
@@ -57,6 +98,7 @@ export interface StartInterviewParams {
   ageRange?: string;
   country?: string;
   email?: string;
+  sessionToken?: string;
 }
 
 export async function startInterview(
@@ -71,6 +113,7 @@ export async function startInterview(
       age_range: params.ageRange || undefined,
       country: params.country || undefined,
       email: params.email || undefined,
+      session_token: params.sessionToken || undefined,
     }
   );
   return data;
@@ -102,21 +145,6 @@ export async function submitAudio(
   return data;
 }
 
-export interface ResumeCheck {
-  found: boolean;
-  participant_id?: string;
-  last_question?: string;
-  turn_count?: number;
-  question_index?: number;
-}
-
-export interface ResumeSummary {
-  questions_covered: string[];
-  last_question?: string;
-  turn_count: number;
-  elapsed_minutes: number;
-}
-
 export async function checkResume(token: string, email: string): Promise<ResumeCheck> {
   const { data } = await client.get<ResumeCheck>(`/interview/${token}/resume`, { params: { email } });
   return data;
@@ -133,6 +161,31 @@ export async function skipQuestion(
 ): Promise<SubmitAudioResponse> {
   const { data } = await client.post<SubmitAudioResponse>(
     `/interview/${token}/${participantId}/skip`
+  );
+  return data;
+}
+
+export async function requestVerification(linkToken: string, email: string): Promise<void> {
+  await client.post(`/interview/${linkToken}/request-verification`, { email });
+}
+
+export async function verifyInterviewToken(magicToken: string): Promise<VerifyTokenResponse> {
+  const { data } = await client.get<VerifyTokenResponse>(`/interview/verify/${magicToken}`);
+  return data;
+}
+
+export async function getPanelTags(): Promise<PanelTag[]> {
+  const { data } = await client.get<PanelTag[]>("/interview/panel-tags");
+  return data;
+}
+
+export async function savePanelProfile(
+  linkToken: string,
+  profile: PanelProfileData
+): Promise<{ saved: boolean }> {
+  const { data } = await client.post<{ saved: boolean }>(
+    `/interview/${linkToken}/panel-profile`,
+    profile
   );
   return data;
 }

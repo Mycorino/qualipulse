@@ -50,7 +50,7 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript } from "../api/projects";
+import { getTranscript, patchProjectSettings } from "../api/projects";
 
 type Tab = "overview" | "setup" | "responses" | "analysis";
 
@@ -121,6 +121,23 @@ export default function ProjectDetail() {
   const [editingSystemPrompt, setEditingSystemPrompt] = useState(false);
   const [systemPromptDraft, setSystemPromptDraft] = useState("");
   const [savingSystemPrompt, setSavingSystemPrompt] = useState(false);
+
+  // ── Panel settings ─────────────────────────────────────────────────────────
+  const [savingPanelToggle, setSavingPanelToggle] = useState(false);
+
+  async function handlePanelToggle(enabled: boolean) {
+    if (!id || !project) return;
+    setSavingPanelToggle(true);
+    try {
+      const updated = await patchProjectSettings(id, { panel_collection_enabled: enabled });
+      setProject(updated);
+      toast(enabled ? "Panel collection enabled" : "Panel collection disabled", "success");
+    } catch {
+      toast("Failed to update setting", "error");
+    } finally {
+      setSavingPanelToggle(false);
+    }
+  }
 
   // ── Screening editor ───────────────────────────────────────────────────────
   const [editingScreening, setEditingScreening] = useState(false);
@@ -1313,6 +1330,57 @@ export default function ProjectDetail() {
                   </div>
                 </div>
               )}
+            </section>
+
+            {/* Panel Collection */}
+            <section className="detail-section">
+              <div className="section-header-row" style={{ alignItems: "center" }}>
+                <div>
+                  <h2>Participant panel collection</h2>
+                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>
+                    When enabled, verified participants are invited to join the QualiPulse research community after their interview.
+                  </p>
+                </div>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: savingPanelToggle ? "not-allowed" : "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "relative",
+                      width: 40,
+                      height: 22,
+                      borderRadius: 11,
+                      background: (project?.panel_collection_enabled ?? true) ? "#4f46e5" : "#d1d5db",
+                      transition: "background 0.2s",
+                      opacity: savingPanelToggle ? 0.6 : 1,
+                    }}
+                    onClick={() => !savingPanelToggle && handlePanelToggle(!(project?.panel_collection_enabled ?? true))}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 3,
+                        left: (project?.panel_collection_enabled ?? true) ? 21 : 3,
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        background: "#fff",
+                        transition: "left 0.2s",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: 13, color: "var(--text-secondary, #6b7280)" }}>
+                    {(project?.panel_collection_enabled ?? true) ? "On" : "Off"}
+                  </span>
+                </label>
+              </div>
             </section>
 
             <section className="detail-section">

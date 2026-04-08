@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   getInterviewInfo,
   getScreeningQuestions,
@@ -9,34 +9,103 @@ import {
   checkResume,
   getResumeSummary,
   skipQuestion,
+  requestVerification,
+  getPanelTags,
+  savePanelProfile,
   InterviewInfo,
   ScreeningQuestion,
   ResumeCheck,
   ResumeSummary,
+  PanelTag,
+  PanelProfileData,
 } from "../api/interviews";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
-type Phase = "landing" | "screening" | "disqualified" | "interview" | "complete";
+type Phase =
+  | "email_entry"
+  | "email_sent"
+  | "consent"
+  | "profile"
+  | "screening"
+  | "disqualified"
+  | "interview"
+  | "complete";
+
+interface ProfileState {
+  firstName: string;
+  ageRange: string;
+  gender: string;
+  employment: string;
+  jobFunction: string;
+  industry: string;
+  companySize: string;
+  seniority: string;
+  city: string;
+  selectedTagIds: number[];
+}
+
+const EMPTY_PROFILE: ProfileState = {
+  firstName: "",
+  ageRange: "",
+  gender: "",
+  employment: "",
+  jobFunction: "",
+  industry: "",
+  companySize: "",
+  seniority: "",
+  city: "",
+  selectedTagIds: [],
+};
+
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
 
 export default function Interview() {
   const { token } = useParams<{ token: string }>();
-  const [phase, setPhase] = useState<Phase>("landing");
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [phase, setPhase] = useState<Phase>("email_entry");
   const [info, setInfo] = useState<InterviewInfo | null>(null);
+  const [infoLoading, setInfoLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Verification / session
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [sendingVerification, setSendingVerification] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [email, setEmail] = useState(""); // from verified session
+
+  // Consent
+  const [consentGiven, setConsentGiven] = useState(false);
+  const [consentDeclined, setConsentDeclined] = useState(false);
+  const [panelConsent, setPanelConsent] = useState(false);
+
+  // Panel profile
+  const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
+  const [panelTags, setPanelTags] = useState<PanelTag[]>([]);
+  const [panelProfileSaving, setPanelProfileSaving] = useState(false);
+
+  // Interview state
   const [displayName, setDisplayName] = useState("");
   const [profession, setProfession] = useState("");
   const [ageRange, setAgeRange] = useState("");
   const [country, setCountry] = useState("");
-  const [email, setEmail] = useState("");
   const [participantId, setParticipantId] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [processing, setProcessing] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
-  const [infoLoading, setInfoLoading] = useState(true);
-  const [consentGiven, setConsentGiven] = useState(false);
-  const [consentDeclined, setConsentDeclined] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -45,18 +114,18 @@ export default function Interview() {
   const [resumeSummary, setResumeSummary] = useState<ResumeSummary | null>(null);
   const [loadingResumeSummary, setLoadingResumeSummary] = useState(false);
 
-  // Screening state
+  // Screening
   const [screeningQuestions, setScreeningQuestions] = useState<ScreeningQuestion[]>([]);
   const [screeningStep, setScreeningStep] = useState(0);
   const [screeningAnswers, setScreeningAnswers] = useState<Record<string, string>>({});
   const [screeningLoading, setScreeningLoading] = useState(false);
   const [disqualifiedOn, setDisqualifiedOn] = useState("");
 
-  // New state for UX improvements
+  // Recording UX
   const lastBlobRef = useRef<Blob | null>(null);
   const [pendingBlob, setPendingBlob] = useState<Blob | null>(null);
   const [ttsPlaying, setTtsPlaying] = useState(false);
-  const [ttsEnded, setTtsEnded] = useState(true); // true = can record
+  const [ttsEnded, setTtsEnded] = useState(true);
   const [processingStep, setProcessingStep] = useState(0);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const MAX_RECORDING_SECONDS = 180;
@@ -73,7 +142,48 @@ export default function Interview() {
   const { isRecording, error: recError, startRecording, stopRecording } =
     useAudioRecorder();
 
-  // Load interview info
+  // ── Session / URL handling on load ──────────────────────────────────────
+
+  useEffect(() => {
+    if (!token) return;
+
+    // Check URL for ?session param (from InterviewVerify redirect)
+    const params = new URLSearchParams(location.search);
+    const sessionParam = params.get("session");
+
+    if (sessionParam) {
+      const payload = parseJwtPayload(sessionParam);
+      if (payload?.email) {
+        const emailVal = String(payload.email);
+        setEmail(emailVal);
+        setSessionToken(sessionParam);
+        sessionStorage.setItem(`interview_session_${token}`, sessionParam);
+        navigate(`/i/${token}`, { replace: true });
+        setPhase("consent");
+        return;
+      }
+    }
+
+    // Check sessionStorage for existing session
+    const saved = sessionStorage.getItem(`interview_session_${token}`);
+    if (saved) {
+      const payload = parseJwtPayload(saved);
+      if (payload?.email) {
+        setEmail(String(payload.email));
+        setSessionToken(saved);
+        setPhase("consent");
+        return;
+      }
+      // Stale/invalid session — clear it
+      sessionStorage.removeItem(`interview_session_${token}`);
+    }
+
+    setPhase("email_entry");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // ── Load interview info ──────────────────────────────────────────────────
+
   useEffect(() => {
     if (!token) return;
     getInterviewInfo(token)
@@ -82,7 +192,22 @@ export default function Interview() {
       .finally(() => setInfoLoading(false));
   }, [token]);
 
-  // Live countdown timer during interview
+  // Load panel tags when entering profile phase
+  useEffect(() => {
+    if (phase === "profile" && panelTags.length === 0) {
+      getPanelTags().then(setPanelTags).catch(() => {});
+    }
+  }, [phase]);
+
+  // Resend countdown
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const t = setTimeout(() => setResendCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCountdown]);
+
+  // ── Live countdown during interview ──────────────────────────────────────
+
   useEffect(() => {
     if (phase !== "interview" || totalSeconds === 0) return;
     const interval = setInterval(() => {
@@ -91,7 +216,8 @@ export default function Interview() {
     return () => clearInterval(interval);
   }, [phase, totalSeconds]);
 
-  // Play TTS audio
+  // ── TTS ────────────────────────────────────────────────────────────────
+
   const playTTS = useCallback(
     (url: string) => {
       if (audioRef.current) audioRef.current.pause();
@@ -104,12 +230,12 @@ export default function Interview() {
         audio.onerror = () => { setTtsPlaying(false); setTtsEnded(true); };
         audio.play().catch(() => { setTtsPlaying(false); setTtsEnded(true); });
       }
-      // If muted, keep ttsEnded=true so they can record immediately
     },
     [muted]
   );
 
-  // Recording time limit
+  // ── Recording time limit ─────────────────────────────────────────────────
+
   useEffect(() => {
     if (!isRecording) { setRecordingSeconds(0); return; }
     const interval = setInterval(() => {
@@ -125,10 +251,10 @@ export default function Interview() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording]);
 
-  // Mic level meter effect (only active during mic test, after permission requested)
+  // ── Mic level meter ───────────────────────────────────────────────────
+
   useEffect(() => {
     if (micTestDone || phase !== "interview" || !micPermissionRequested) return;
-    // Start mic level monitoring
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       micStreamRef.current = stream;
       const ctx = new AudioContext();
@@ -142,18 +268,20 @@ export default function Interview() {
         analyser.getByteFrequencyData(data);
         const avg = data.reduce((a, b) => a + b, 0) / data.length;
         setMicLevel(Math.min(100, avg * 2));
-        if (avg > 15) setMicTestDone(true); // auto-pass when they speak
+        if (avg > 15) setMicTestDone(true);
         micAnimRef.current = requestAnimationFrame(tick);
       };
       micAnimRef.current = requestAnimationFrame(tick);
-    }).catch(() => setMicTestDone(true)); // if denied, skip test
+    }).catch(() => setMicTestDone(true));
     return () => {
       if (micAnimRef.current) cancelAnimationFrame(micAnimRef.current);
       micStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [phase, micTestDone, micPermissionRequested]);
 
-  const sessionKey = token ? `interview_${token}` : null;
+  // ── Session storage for in-progress interview ────────────────────────────
+
+  const sessionKey = token ? `interview_progress_${token}` : null;
 
   function saveSession(pid: string, question: string, turn: number) {
     if (!sessionKey) return;
@@ -172,20 +300,130 @@ export default function Interview() {
     } catch { return null; }
   }
 
+  // ── Verification ─────────────────────────────────────────────────────────
+
+  async function handleSendVerification() {
+    if (!token || !verificationEmail.trim()) return;
+    setSendingVerification(true);
+    setError("");
+    try {
+      await requestVerification(token, verificationEmail.trim());
+      setResendCountdown(60);
+      setPhase("email_sent");
+    } catch {
+      setError("Failed to send verification link. Please try again.");
+    } finally {
+      setSendingVerification(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!token || resendCountdown > 0) return;
+    try {
+      await requestVerification(token, verificationEmail.trim());
+      setResendCountdown(60);
+    } catch {
+      setError("Failed to resend. Please try again.");
+    }
+  }
+
+  // ── Consent ──────────────────────────────────────────────────────────────
+
+  function handleConsentAccept() {
+    setConsentGiven(true);
+    const panelEnabled = info?.panel_collection_enabled !== false;
+    if (panelEnabled && panelConsent) {
+      setPhase("profile");
+    } else {
+      proceedFromConsent();
+    }
+  }
+
+  async function proceedFromConsent() {
+    if (!token) return;
+    setStarting(true);
+    setError("");
+    try {
+      // Check for email-based resume
+      if (email.trim()) {
+        const resume = await checkResume(token, email.trim());
+        if (resume.found && resume.participant_id) {
+          setResumeCheck(resume);
+          setLoadingResumeSummary(true);
+          try {
+            const summary = await getResumeSummary(token, resume.participant_id);
+            setResumeSummary(summary);
+          } catch { /* summary optional */ }
+          finally { setLoadingResumeSummary(false); }
+          setStarting(false);
+          return;
+        }
+      }
+      // Check for session-storage resume
+      const saved = getSavedSession();
+      if (saved) {
+        setParticipantId(saved.participantId);
+        setCurrentQuestion(saved.currentQuestion);
+        setTurnCount(saved.turnCount);
+        setPhase("interview");
+        setStarting(false);
+        return;
+      }
+      // Proceed to screening or interview
+      const questions = await getScreeningQuestions(token);
+      if (questions.length > 0) {
+        setScreeningQuestions(questions);
+        setScreeningStep(0);
+        setScreeningAnswers({});
+        setPhase("screening");
+      } else {
+        await doStartInterview();
+      }
+    } catch {
+      setError("Failed to start interview. Please try again.");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  // ── Profile ───────────────────────────────────────────────────────────────
+
+  async function handleProfileContinue() {
+    await proceedFromConsent();
+  }
+
+  function handleSkipProfile() {
+    proceedFromConsent();
+  }
+
+  function toggleTag(id: number) {
+    setProfile((p) => {
+      const has = p.selectedTagIds.includes(id);
+      if (has) {
+        return { ...p, selectedTagIds: p.selectedTagIds.filter((t) => t !== id) };
+      }
+      if (p.selectedTagIds.length >= 5) return p; // max 5
+      return { ...p, selectedTagIds: [...p.selectedTagIds, id] };
+    });
+  }
+
+  // ── Interview start ────────────────────────────────────────────────────
+
   async function doStartInterview() {
-    const res = await startInterview(token!, {
-      displayName: displayName || undefined,
-      profession: profession || undefined,
-      ageRange: ageRange || undefined,
-      country: country || undefined,
+    if (!token || !sessionToken) return;
+    const res = await startInterview(token, {
+      displayName: profile.firstName || displayName || undefined,
+      profession: profile.jobFunction || profession || undefined,
+      ageRange: profile.ageRange || ageRange || undefined,
+      country: profile.city || country || undefined,
       email: email || undefined,
+      sessionToken,
     });
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
     setTurnCount(1);
     setQuestionIndex(0);
     setIsFollowUp(false);
-    // Init timing from info
     const total = (info?.interview_duration_minutes ?? 0) * 60;
     setTotalSeconds(total);
     setElapsedSeconds(0);
@@ -202,44 +440,6 @@ export default function Interview() {
     setCurrentQuestion(saved.currentQuestion);
     setTurnCount(saved.turnCount);
     setPhase("interview");
-  }
-
-  async function handleStart() {
-    if (!token) return;
-    setStarting(true);
-    setError("");
-    try {
-      // Check for email-based resume first
-      if (email.trim()) {
-        const resume = await checkResume(token, email.trim());
-        if (resume.found && resume.participant_id) {
-          setResumeCheck(resume);
-          // Fetch summary
-          setLoadingResumeSummary(true);
-          try {
-            const summary = await getResumeSummary(token, resume.participant_id);
-            setResumeSummary(summary);
-          } catch { /* summary optional */ }
-          finally { setLoadingResumeSummary(false); }
-          setStarting(false);
-          return; // Show resume dialog instead of starting
-        }
-      }
-      // No resume found — proceed normally
-      const questions = await getScreeningQuestions(token);
-      if (questions.length > 0) {
-        setScreeningQuestions(questions);
-        setScreeningStep(0);
-        setScreeningAnswers({});
-        setPhase("screening");
-      } else {
-        await doStartInterview();
-      }
-    } catch {
-      setError("Failed to start interview. Please try again.");
-    } finally {
-      setStarting(false);
-    }
   }
 
   async function handleConfirmResume() {
@@ -275,7 +475,7 @@ export default function Interview() {
         }
       } catch {
         setError("Something went wrong. Please try again.");
-        setPhase("landing");
+        setPhase("consent");
       } finally {
         setScreeningLoading(false);
       }
@@ -287,7 +487,7 @@ export default function Interview() {
       const blob = await stopRecording();
       lastBlobRef.current = blob;
       setPendingBlob(blob);
-      setTtsEnded(false); // prevent immediate re-record
+      setTtsEnded(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Recording failed. Please try again.";
       setError(msg);
@@ -314,6 +514,10 @@ export default function Interview() {
         clearSession();
         setPhase("complete");
         if (audioRef.current) audioRef.current.pause();
+        // Save panel profile if consent given
+        if (panelConsent && email) {
+          savePanelProfile(token!, buildPanelProfileData()).catch(() => {});
+        }
       } else if (res.question_text) {
         const nextTurn = turnCount + 1;
         setCurrentQuestion(res.question_text);
@@ -322,7 +526,6 @@ export default function Interview() {
         setIsFollowUp(res.is_follow_up ?? false);
         if (res.elapsed_seconds !== undefined) setElapsedSeconds(res.elapsed_seconds);
         if (res.total_seconds !== undefined && res.total_seconds > 0) setTotalSeconds(res.total_seconds);
-        // Show transcript briefly
         if (res.transcript) {
           setLastTranscript(res.transcript);
           setShowTranscript(true);
@@ -331,17 +534,34 @@ export default function Interview() {
         setTtsEnded(false);
         saveSession(participantId, res.question_text, nextTurn);
         if (res.tts_audio_url) playTTS(res.tts_audio_url);
-        else setTtsEnded(true); // no TTS — can record immediately
+        else setTtsEnded(true);
       }
     } catch (err: unknown) {
       clearInterval(stepInterval);
-      // Restore blob for retry
       setPendingBlob(lastBlobRef.current);
       const msg = err instanceof Error ? err.message : "Upload failed. Tap 'Try again' to resubmit.";
       setError(msg);
     } finally {
       setProcessing(false);
     }
+  }
+
+  function buildPanelProfileData(): PanelProfileData {
+    return {
+      email,
+      first_name: profile.firstName || undefined,
+      age_range: profile.ageRange || undefined,
+      gender: profile.gender || undefined,
+      country: country || profile.city || undefined,
+      city: profile.city || undefined,
+      employment_status: profile.employment || undefined,
+      job_function: profile.jobFunction || undefined,
+      seniority: profile.seniority || undefined,
+      industry: profile.industry || undefined,
+      company_size: profile.companySize || undefined,
+      panel_consent: true,
+      tag_ids: profile.selectedTagIds,
+    };
   }
 
   function handleReRecord() {
@@ -360,6 +580,9 @@ export default function Interview() {
       if (res.is_complete) {
         clearSession();
         setPhase("complete");
+        if (panelConsent && email) {
+          savePanelProfile(token!, buildPanelProfileData()).catch(() => {});
+        }
       } else if (res.question_text) {
         const nextTurn = turnCount + 1;
         setCurrentQuestion(res.question_text);
@@ -381,25 +604,31 @@ export default function Interview() {
   function toggleMute() {
     setMuted((m) => {
       const next = !m;
-      if (next && audioRef.current) {
-        audioRef.current.pause();
-      }
+      if (next && audioRef.current) audioRef.current.pause();
       return next;
     });
   }
 
-  /* ---- Landing Phase ---- */
+  // ── Render helpers ─────────────────────────────────────────────────────
+
+  const panelEnabled = info?.panel_collection_enabled !== false;
+
+  const interestTags = panelTags.filter((t) => t.category === "interest");
+  const behaviorTags = panelTags.filter((t) => t.category === "behavior");
+
+  // ── Loading / error states ──────────────────────────────────────────────
+
   if (infoLoading) {
     return (
       <div className="interview-page">
         <div className="interview-container">
-          <p className="muted-text">Loading...</p>
+          <p className="muted-text">Loading…</p>
         </div>
       </div>
     );
   }
 
-  if (error && phase === "landing" && !info) {
+  if (error && !info) {
     return (
       <div className="interview-page">
         <div className="interview-container" style={{ textAlign: "center", paddingTop: 60 }}>
@@ -414,7 +643,6 @@ export default function Interview() {
     );
   }
 
-  /* ---- Consent declined ---- */
   if (consentDeclined) {
     return (
       <div className="interview-page">
@@ -428,263 +656,434 @@ export default function Interview() {
     );
   }
 
-  if (phase === "landing" && info) {
-    const savedSession = getSavedSession();
-    /* ---- Consent overlay ---- */
-    if (!consentGiven) {
-      return (
-        <div className="interview-page">
-          <div className="interview-container consent-card">
-            {info.researcher_logo_url && (
-              <div className="consent-researcher-logo">
-                <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher logo"} />
-              </div>
-            )}
-            {info.researcher_name && (
-              <p className="consent-researcher-name">{info.researcher_name}</p>
-            )}
-            <h1 className="consent-title">Before you begin</h1>
-            <p className="consent-project">{info.project_name}</p>
-            {info.research_context && (
-              <p className="consent-research-context">{info.research_context}</p>
-            )}
-            <div className="consent-body">
-              <p>By participating in this study you agree to the following:</p>
-              <ul className="consent-list">
-                <li>Your voice will be <strong>recorded and transcribed</strong> by AI.</li>
-                <li>Your responses will be reviewed by the research team.</li>
-                <li>Participation is <strong>voluntary</strong> — you may stop at any time.</li>
-                <li>Your data will be stored securely and used only for research purposes.</li>
-              </ul>
-              <p className="consent-duration">
-                {info.interview_duration_minutes ? (
-                  <>This interview takes approximately <strong>{info.interview_duration_minutes} minutes</strong></>
-                ) : null}
-                {info.interview_duration_minutes && info.question_count ? " · " : null}
-                {info.question_count ? (
-                  <><strong>{info.question_count} topic{info.question_count !== 1 ? "s" : ""}</strong> to cover</>
-                ) : null}
-                {(info.interview_duration_minutes || info.question_count) ? "." : null}
-              </p>
-              {info.privacy_policy_url && (
-                <p className="consent-privacy-link">
-                  <a href={info.privacy_policy_url} target="_blank" rel="noopener noreferrer">
-                    Read our privacy policy →
-                  </a>
-                </p>
-              )}
-            </div>
-            <div className="consent-actions">
-              <button className="btn btn-primary" onClick={() => setConsentGiven(true)}>
-                I agree — continue
-              </button>
-              <button className="btn btn-ghost" onClick={() => setConsentDeclined(true)}>
-                Decline
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
+  // ── Email entry phase ─────────────────────────────────────────────────
 
+  if (phase === "email_entry") {
     return (
       <div className="interview-page">
-        <div className="interview-container interview-landing">
-          {info.researcher_logo_url && (
+        <div className="interview-container" style={{ maxWidth: 480 }}>
+          {info?.researcher_logo_url && (
             <div className="landing-researcher-logo">
-              <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher logo"} />
+              <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher"} />
             </div>
           )}
-          <h1 className="interview-project-name">{info.project_name}</h1>
-          {info.researcher_name && (
-            <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginTop: 4, marginBottom: 8 }}>
+          <h1 className="interview-project-name" style={{ marginBottom: 8 }}>{info?.project_name}</h1>
+          {info?.researcher_name && (
+            <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24 }}>
               A research study by <strong>{info.researcher_name}</strong>
             </p>
           )}
-          {info.welcome_message && (
-            <p className="interview-welcome">{info.welcome_message}</p>
+          {info?.interview_duration_minutes && (
+            <p className="interview-duration">⏱ Approximately {info.interview_duration_minutes} minutes</p>
           )}
-          {info.interview_duration_minutes && (
-            <p className="interview-duration">
-              ⏱ Approximately {info.interview_duration_minutes} minutes
-            </p>
-          )}
-          {savedSession && (
-            <div className="resume-banner">
-              <div>
-                <strong>Resume your interview</strong>
-                <p>You have an interview in progress (question {savedSession.turnCount}).</p>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button className="btn btn-primary btn-sm" onClick={handleResumeSession}>Resume →</button>
-                <button className="btn btn-ghost btn-sm" onClick={clearSession}>Start over</button>
-              </div>
-            </div>
-          )}
-          <p className="interview-instructions">
-            You will be asked a series of questions. For each question, hold the
-            record button and speak your answer. Take your time — there are no
-            wrong answers.
+          <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6 }}>
+            Enter your email to receive a secure link to start your interview. No password needed.
           </p>
-
           <div className="interview-name-field">
-            <label className="field-label">
-              Your name <span className="optional-tag">(optional)</span>
-            </label>
-            <input
-              type="text"
-              className="field-input"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="How you'd like to be identified"
-            />
-          </div>
-
-          <div className="interview-name-field">
-            <label className="field-label">
-              Your profession <span className="optional-tag">(optional)</span>
-            </label>
-            <input
-              type="text"
-              className="field-input"
-              value={profession}
-              onChange={(e) => setProfession(e.target.value)}
-              placeholder="e.g. Teacher, Engineer, Student…"
-            />
-          </div>
-
-          <div className="interview-name-field">
-            <label className="field-label">
-              Age range <span className="optional-tag">(optional)</span>
-            </label>
-            <select
-              className="field-input"
-              value={ageRange}
-              onChange={(e) => setAgeRange(e.target.value)}
-            >
-              <option value="">Prefer not to say</option>
-              <option value="18-24">18–24</option>
-              <option value="25-34">25–34</option>
-              <option value="35-44">35–44</option>
-              <option value="45-54">45–54</option>
-              <option value="55-64">55–64</option>
-              <option value="65+">65+</option>
-            </select>
-          </div>
-
-          <div className="interview-name-field">
-            <label className="field-label">
-              Country <span className="optional-tag">(optional)</span>
-            </label>
-            <input
-              type="text"
-              className="field-input"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              placeholder="e.g. France, United States…"
-            />
-          </div>
-
-          <div className="interview-name-field">
-            <label className="field-label">
-              Your email <span className="optional-tag">(optional — to resume later)</span>
-            </label>
+            <label className="field-label">Your email address</label>
             <input
               type="email"
               className="field-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={verificationEmail}
+              onChange={(e) => setVerificationEmail(e.target.value)}
               placeholder="you@example.com"
+              onKeyDown={(e) => e.key === "Enter" && handleSendVerification()}
+              autoFocus
             />
           </div>
-
           {error && <div className="error-banner">{error}</div>}
-
           <button
             className="btn btn-primary btn-lg"
-            onClick={handleStart}
-            disabled={starting}
+            onClick={handleSendVerification}
+            disabled={sendingVerification || !verificationEmail.trim()}
+            style={{ width: "100%", marginTop: 8 }}
           >
-            {starting ? "Starting..." : "Start Interview"}
+            {sendingVerification ? "Sending…" : "Send my interview link →"}
           </button>
         </div>
       </div>
     );
   }
 
-  /* ---- Screening Phase ---- */
-  if (phase === "screening") {
-    const sq = screeningQuestions[screeningStep];
-    const progress = ((screeningStep + 1) / screeningQuestions.length) * 100;
+  // ── Email sent (check inbox) phase ───────────────────────────────────────
+
+  if (phase === "email_sent") {
     return (
       <div className="interview-page">
-        <div className="interview-container interview-profiling">
-          <div className="profiling-header">
-            <p className="profiling-intro">A few quick questions before we begin</p>
-            <div className="profiling-progress-bar">
-              <div className="profiling-progress-fill" style={{ width: `${progress}%` }} />
+        <div className="interview-container" style={{ textAlign: "center", maxWidth: 440 }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>📬</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Check your inbox</h1>
+          <p style={{ color: "var(--text-secondary, #6b7280)", lineHeight: 1.6, marginBottom: 8 }}>
+            We sent a secure link to <strong>{verificationEmail}</strong>.
+            Click the link in the email to start your interview.
+          </p>
+          <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 13, marginBottom: 24 }}>
+            The link expires in 30 minutes. Check your spam folder if you don't see it.
+          </p>
+          {error && <div className="error-banner">{error}</div>}
+          <button
+            className="btn btn-ghost"
+            onClick={handleResendVerification}
+            disabled={resendCountdown > 0}
+            style={{ marginBottom: 12 }}
+          >
+            {resendCountdown > 0 ? `Resend in ${resendCountdown}s` : "Resend link"}
+          </button>
+          <br />
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => { setPhase("email_entry"); setError(""); }}
+          >
+            ← Use a different email
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Consent phase ────────────────────────────────────────────────────────
+
+  if (phase === "consent" && info) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container consent-card">
+          {info.researcher_logo_url && (
+            <div className="consent-researcher-logo">
+              <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher logo"} />
             </div>
-            <p className="profiling-step-label">{screeningStep + 1} / {screeningQuestions.length}</p>
+          )}
+          {info.researcher_name && (
+            <p className="consent-researcher-name">{info.researcher_name}</p>
+          )}
+          <h1 className="consent-title">Before you begin</h1>
+          <p className="consent-project">{info.project_name}</p>
+          {info.research_context && (
+            <p className="consent-research-context">{info.research_context}</p>
+          )}
+          <div className="consent-body">
+            <p>By participating in this study you agree to the following:</p>
+            <ul className="consent-list">
+              <li>Your voice will be <strong>recorded and transcribed</strong> by AI.</li>
+              <li>Your responses will be reviewed by the research team.</li>
+              <li>Participation is <strong>voluntary</strong> — you may stop at any time.</li>
+              <li>Your data will be stored securely and used only for research purposes.</li>
+            </ul>
+            <p className="consent-duration">
+              {info.interview_duration_minutes ? (
+                <>This interview takes approximately <strong>{info.interview_duration_minutes} minutes</strong></>
+              ) : null}
+              {info.interview_duration_minutes && info.question_count ? " · " : null}
+              {info.question_count ? (
+                <><strong>{info.question_count} topic{info.question_count !== 1 ? "s" : ""}</strong> to cover</>
+              ) : null}
+              {(info.interview_duration_minutes || info.question_count) ? "." : null}
+            </p>
+            {info.privacy_policy_url && (
+              <p className="consent-privacy-link">
+                <a href={info.privacy_policy_url} target="_blank" rel="noopener noreferrer">
+                  Read our privacy policy →
+                </a>
+              </p>
+            )}
           </div>
-          <div className="profiling-question">
-            <h2 className="profiling-label">{sq.question}</h2>
-            <div className="profiling-options">
-              {sq.options.map((opt) => (
+
+          {panelEnabled && (
+            <div
+              style={{
+                borderTop: "1px solid var(--border, #e2e8f0)",
+                marginTop: 20,
+                paddingTop: 20,
+              }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={panelConsent}
+                  onChange={(e) => setPanelConsent(e.target.checked)}
+                  style={{ marginTop: 3, flexShrink: 0 }}
+                />
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>
+                    Join the QualiPulse Research Community
+                  </span>
+                  <span style={{ color: "var(--text-secondary, #6b7280)", fontSize: 13 }}>
+                    {" "}— get invited to future paid studies matching your profile
+                  </span>
+                  <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 12, margin: "4px 0 0" }}>
+                    We'll save your profile securely. You can opt out any time.
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
+
+          {starting && <p className="muted-text" style={{ marginTop: 12 }}>Starting…</p>}
+          {error && <div className="error-banner">{error}</div>}
+
+          <div className="consent-actions">
+            <button
+              className="btn btn-primary"
+              onClick={handleConsentAccept}
+              disabled={starting}
+            >
+              I agree — continue
+            </button>
+            <button className="btn btn-ghost" onClick={() => setConsentDeclined(true)}>
+              Decline
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Profile collection phase ──────────────────────────────────────────────
+
+  if (phase === "profile") {
+    return (
+      <div className="interview-page">
+        <div className="interview-container" style={{ maxWidth: 540 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Tell us a bit about yourself</h1>
+          <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6 }}>
+            This helps us match you with relevant future studies. All fields are optional.
+          </p>
+
+          {/* First name */}
+          <div className="interview-name-field">
+            <label className="field-label">First name <span className="optional-tag">(optional)</span></label>
+            <input
+              type="text"
+              className="field-input"
+              value={profile.firstName}
+              onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))}
+              placeholder="e.g. Alex"
+            />
+          </div>
+
+          {/* Age range */}
+          <div className="interview-name-field">
+            <label className="field-label">Age range</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+              {["18-24", "25-34", "35-44", "45-54", "55+"].map((opt) => (
                 <button
                   key={opt}
-                  className="profiling-option-btn"
-                  onClick={() => !screeningLoading && handleScreeningAnswer(sq.id, opt)}
-                  disabled={screeningLoading}
+                  className={`profiling-option-btn${profile.ageRange === opt ? " selected" : ""}`}
+                  style={{ padding: "6px 14px", fontSize: 13 }}
+                  onClick={() => setProfile((p) => ({ ...p, ageRange: p.ageRange === opt ? "" : opt }))}
                 >
-                  {screeningLoading && screeningAnswers[sq.id] === opt ? "Checking..." : opt}
+                  {opt}
                 </button>
               ))}
             </div>
           </div>
-          {error && <div className="error-banner">{error}</div>}
-          {screeningStep > 0 && !screeningLoading && (
-            <button
-              className="profiling-back-btn"
-              onClick={() => setScreeningStep((s) => s - 1)}
+
+          {/* Gender */}
+          <div className="interview-name-field">
+            <label className="field-label">Gender</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+              {[
+                { value: "male", label: "Man" },
+                { value: "female", label: "Woman" },
+                { value: "non_binary", label: "Non-binary" },
+                { value: "prefer_not", label: "Prefer not to say" },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  className={`profiling-option-btn${profile.gender === value ? " selected" : ""}`}
+                  style={{ padding: "6px 14px", fontSize: 13 }}
+                  onClick={() => setProfile((p) => ({ ...p, gender: p.gender === value ? "" : value }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Employment */}
+          <div className="interview-name-field">
+            <label className="field-label">Employment</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+              {[
+                { value: "full_time", label: "Full-time" },
+                { value: "part_time", label: "Part-time" },
+                { value: "freelance", label: "Freelance" },
+                { value: "student", label: "Student" },
+                { value: "retired", label: "Retired" },
+                { value: "other", label: "Other" },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  className={`profiling-option-btn${profile.employment === value ? " selected" : ""}`}
+                  style={{ padding: "6px 14px", fontSize: 13 }}
+                  onClick={() => setProfile((p) => ({ ...p, employment: p.employment === value ? "" : value }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Job function */}
+          <div className="interview-name-field">
+            <label className="field-label">Job function <span className="optional-tag">(optional)</span></label>
+            <select
+              className="field-input"
+              value={profile.jobFunction}
+              onChange={(e) => setProfile((p) => ({ ...p, jobFunction: e.target.value }))}
             >
-              ← Back
+              <option value="">Select…</option>
+              {["Engineering", "Product", "Marketing", "Design", "Finance", "Operations", "HR", "Executive", "Other"].map((f) => (
+                <option key={f} value={f.toLowerCase()}>{f}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Industry */}
+          <div className="interview-name-field">
+            <label className="field-label">Industry <span className="optional-tag">(optional)</span></label>
+            <input
+              type="text"
+              className="field-input"
+              value={profile.industry}
+              onChange={(e) => setProfile((p) => ({ ...p, industry: e.target.value }))}
+              placeholder="e.g. Technology, Healthcare, Finance…"
+            />
+          </div>
+
+          {/* Company size */}
+          <div className="interview-name-field">
+            <label className="field-label">Company size</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+              {[
+                { value: "1", label: "Just me" },
+                { value: "2-10", label: "2–10" },
+                { value: "11-50", label: "11–50" },
+                { value: "51-200", label: "51–200" },
+                { value: "201+", label: "200+" },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  className={`profiling-option-btn${profile.companySize === value ? " selected" : ""}`}
+                  style={{ padding: "6px 14px", fontSize: 13 }}
+                  onClick={() => setProfile((p) => ({ ...p, companySize: p.companySize === value ? "" : value }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Seniority */}
+          <div className="interview-name-field">
+            <label className="field-label">Seniority</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+              {[
+                { value: "junior", label: "Junior" },
+                { value: "mid", label: "Mid" },
+                { value: "senior", label: "Senior" },
+                { value: "manager", label: "Manager" },
+                { value: "director", label: "Director" },
+                { value: "c_suite", label: "C-Suite" },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  className={`profiling-option-btn${profile.seniority === value ? " selected" : ""}`}
+                  style={{ padding: "6px 14px", fontSize: 13 }}
+                  onClick={() => setProfile((p) => ({ ...p, seniority: p.seniority === value ? "" : value }))}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Interests & behaviors */}
+          {panelTags.length > 0 && (
+            <div className="interview-name-field">
+              <label className="field-label">
+                Interests & behaviors{" "}
+                <span className="optional-tag">(pick up to 5)</span>
+              </label>
+              {interestTags.length > 0 && (
+                <>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary, #6b7280)", margin: "8px 0 6px" }}>Interests</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {interestTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        className={`profiling-option-btn${profile.selectedTagIds.includes(tag.id) ? " selected" : ""}`}
+                        style={{ padding: "5px 12px", fontSize: 12 }}
+                        onClick={() => toggleTag(tag.id)}
+                        disabled={!profile.selectedTagIds.includes(tag.id) && profile.selectedTagIds.length >= 5}
+                      >
+                        {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {behaviorTags.length > 0 && (
+                <>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary, #6b7280)", margin: "10px 0 6px" }}>Behaviors</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {behaviorTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        className={`profiling-option-btn${profile.selectedTagIds.includes(tag.id) ? " selected" : ""}`}
+                        style={{ padding: "5px 12px", fontSize: 12 }}
+                        onClick={() => toggleTag(tag.id)}
+                        disabled={!profile.selectedTagIds.includes(tag.id) && profile.selectedTagIds.length >= 5}
+                      >
+                        {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* City */}
+          <div className="interview-name-field">
+            <label className="field-label">City <span className="optional-tag">(optional)</span></label>
+            <input
+              type="text"
+              className="field-input"
+              value={profile.city}
+              onChange={(e) => setProfile((p) => ({ ...p, city: e.target.value }))}
+              placeholder="e.g. London, New York…"
+            />
+          </div>
+
+          {error && <div className="error-banner">{error}</div>}
+
+          <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+            <button
+              className="btn btn-primary"
+              onClick={handleProfileContinue}
+              disabled={starting}
+              style={{ flex: 1 }}
+            >
+              {starting ? "Starting…" : "Continue to interview →"}
             </button>
-          )}
+            <button className="btn btn-ghost" onClick={handleSkipProfile} disabled={starting}>
+              Skip
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  /* ---- Disqualified Phase ---- */
-  if (phase === "disqualified") {
-    return (
-      <div className="interview-page">
-        <div className="interview-container interview-complete">
-          <div className="complete-icon disqualified-icon">🙏</div>
-          <h1 className="interview-complete-title">Thank you for your time</h1>
-          <p className="interview-complete-text">
-            This particular study is looking for a specific audience profile —
-            you're not the right fit for <strong>{info?.project_name}</strong> right now.
-          </p>
-          <p className="interview-complete-text" style={{ marginTop: 12 }}>
-            That's completely okay. Your answers helped us confirm we're reaching
-            the right participants.
-          </p>
-          {email && (
-            <p className="disqualified-email-note">
-              If other studies open up that match your profile, we may reach out to{" "}
-              <strong>{email}</strong>.
-            </p>
-          )}
-          <p className="muted-text" style={{ marginTop: 24 }}>
-            You can safely close this page.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // ── Resume confirm ───────────────────────────────────────────────────────
 
-  /* ---- Resume Confirm Phase ---- */
   if (resumeCheck?.found && resumeCheck.participant_id) {
     return (
       <div className="interview-page">
@@ -693,9 +1092,8 @@ export default function Interview() {
           <p className="resume-confirm-subtitle">
             You have an interview in progress for <strong>{info?.project_name}</strong>.
           </p>
-
           {loadingResumeSummary ? (
-            <p className="muted-text">Loading your progress...</p>
+            <p className="muted-text">Loading your progress…</p>
           ) : resumeSummary && resumeSummary.questions_covered.length > 0 ? (
             <div className="resume-summary-panel">
               <p className="resume-summary-label">Topics you've covered so far:</p>
@@ -715,14 +1113,12 @@ export default function Interview() {
               )}
             </div>
           ) : null}
-
           {resumeCheck.last_question && (
             <div className="resume-last-question">
               <p className="resume-last-label">Pick up where you left off:</p>
               <p className="resume-last-text">"{resumeCheck.last_question}"</p>
             </div>
           )}
-
           <div className="consent-actions">
             <button className="btn btn-primary" onClick={handleConfirmResume}>
               Continue my interview →
@@ -732,7 +1128,6 @@ export default function Interview() {
               onClick={async () => {
                 setResumeCheck(null);
                 setResumeSummary(null);
-                // Start fresh
                 try {
                   const questions = await getScreeningQuestions(token!);
                   if (questions.length > 0) {
@@ -756,7 +1151,79 @@ export default function Interview() {
     );
   }
 
-  /* ---- Mic Permission Pre-prompt ---- */
+  // ── Screening phase ──────────────────────────────────────────────────────
+
+  if (phase === "screening") {
+    const sq = screeningQuestions[screeningStep];
+    const progress = ((screeningStep + 1) / screeningQuestions.length) * 100;
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-profiling">
+          <div className="profiling-header">
+            <p className="profiling-intro">A few quick questions before we begin</p>
+            <div className="profiling-progress-bar">
+              <div className="profiling-progress-fill" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="profiling-step-label">{screeningStep + 1} / {screeningQuestions.length}</p>
+          </div>
+          <div className="profiling-question">
+            <h2 className="profiling-label">{sq.question}</h2>
+            <div className="profiling-options">
+              {sq.options.map((opt) => (
+                <button
+                  key={opt}
+                  className="profiling-option-btn"
+                  onClick={() => !screeningLoading && handleScreeningAnswer(sq.id, opt)}
+                  disabled={screeningLoading}
+                >
+                  {screeningLoading && screeningAnswers[sq.id] === opt ? "Checking…" : opt}
+                </button>
+              ))}
+            </div>
+          </div>
+          {error && <div className="error-banner">{error}</div>}
+          {screeningStep > 0 && !screeningLoading && (
+            <button
+              className="profiling-back-btn"
+              onClick={() => setScreeningStep((s) => s - 1)}
+            >
+              ← Back
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Disqualified phase ───────────────────────────────────────────────────
+
+  if (phase === "disqualified") {
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-complete">
+          <div className="complete-icon disqualified-icon">🙏</div>
+          <h1 className="interview-complete-title">Thank you for your time</h1>
+          <p className="interview-complete-text">
+            This particular study is looking for a specific audience profile —
+            you're not the right fit for <strong>{info?.project_name}</strong> right now.
+          </p>
+          <p className="interview-complete-text" style={{ marginTop: 12 }}>
+            That's completely okay. Your answers helped us confirm we're reaching the right participants.
+          </p>
+          {email && (
+            <p className="disqualified-email-note">
+              If other studies open up that match your profile, we may reach out to{" "}
+              <strong>{email}</strong>.
+            </p>
+          )}
+          <p className="muted-text" style={{ marginTop: 24 }}>You can safely close this page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Mic permission prompt ────────────────────────────────────────────────
+
   if (phase === "interview" && !micTestDone && !micPermissionRequested) {
     return (
       <div className="interview-page">
@@ -795,7 +1262,8 @@ export default function Interview() {
     );
   }
 
-  /* ---- Mic Test Phase ---- */
+  // ── Mic test phase ────────────────────────────────────────────────────────
+
   if (phase === "interview" && !micTestDone) {
     return (
       <div className="interview-page">
@@ -827,12 +1295,12 @@ export default function Interview() {
     );
   }
 
-  /* ---- Interview Phase ---- */
+  // ── Interview phase ───────────────────────────────────────────────────────
+
   if (phase === "interview") {
     return (
       <div className="interview-page">
         <div className="interview-container interview-active">
-          {/* Progress */}
           {info?.question_count && info.question_count > 0 && (
             <div className="interview-progress-bar-wrap">
               <div
@@ -885,12 +1353,10 @@ export default function Interview() {
             </div>
           </div>
 
-          {/* Question */}
           <div className="interview-question-area">
             <p className="interview-question-text">{currentQuestion}</p>
           </div>
 
-          {/* Error */}
           {error && <div className="error-banner">{error}</div>}
           {recError === "PERMISSION_DENIED" ? (
             <div className="mic-permission-error">
@@ -903,8 +1369,7 @@ export default function Interview() {
               </svg>
               <h3 className="mic-permission-title">Microphone access denied</h3>
               <p className="mic-permission-text">
-                This interview requires microphone access to record your answers.
-                Please allow microphone access in your browser, then refresh the page.
+                This interview requires microphone access. Please allow it in your browser settings, then refresh.
               </p>
               <button className="btn btn-primary" onClick={() => window.location.reload()}>
                 Refresh &amp; try again
@@ -914,7 +1379,6 @@ export default function Interview() {
             <div className="error-banner">{recError}</div>
           ) : null}
 
-          {/* Transcript flash */}
           {showTranscript && lastTranscript && (
             <div className="transcript-flash">
               <span className="transcript-flash-label">We heard:</span>
@@ -922,7 +1386,6 @@ export default function Interview() {
             </div>
           )}
 
-          {/* Recording UI */}
           <div className="interview-controls">
             {processing ? (
               <div className="processing-indicator">
@@ -930,7 +1393,6 @@ export default function Interview() {
                 <span>{["Transcribing your answer…", "Thinking…", "Preparing next question…"][processingStep]}</span>
               </div>
             ) : pendingBlob ? (
-              /* Preview state — recorded but not yet submitted */
               <div className="recording-preview">
                 <div className="recording-preview-icon">✓</div>
                 <p className="recording-preview-label">Recording captured</p>
@@ -973,7 +1435,6 @@ export default function Interview() {
             )}
           </div>
 
-          {/* Skip question */}
           {!processing && !isRecording && !pendingBlob && (
             <button className="skip-question-btn" onClick={handleSkip}>
               Skip this question
@@ -984,7 +1445,10 @@ export default function Interview() {
     );
   }
 
-  /* ---- Complete Phase ---- */
+  // ── Complete phase ────────────────────────────────────────────────────────
+
+  const completeName = profile.firstName || email?.split("@")[0] || null;
+
   return (
     <div className="interview-page">
       <div className="interview-container interview-complete">
@@ -995,7 +1459,7 @@ export default function Interview() {
           </svg>
         </div>
         <h1 className="interview-complete-title">
-          {displayName ? `Thank you, ${displayName.split(" ")[0]}!` : "You're done — thank you!"}
+          {completeName ? `Thank you, ${completeName.charAt(0).toUpperCase() + completeName.slice(1)}!` : "You're done — thank you!"}
         </h1>
         <p className="interview-complete-text">
           Your responses have been recorded and will help shape the research for{" "}
@@ -1006,6 +1470,27 @@ export default function Interview() {
             You answered {turnCount - 1} question{turnCount - 1 !== 1 ? "s" : ""}.
           </p>
         )}
+
+        {panelConsent && (
+          <div
+            style={{
+              background: "linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%)",
+              borderRadius: 12,
+              padding: "20px 24px",
+              margin: "24px 0",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 28, marginBottom: 8 }}>🎉</div>
+            <p style={{ fontWeight: 700, color: "#4f46e5", marginBottom: 4 }}>
+              You're now part of the QualiPulse Research Community
+            </p>
+            <p style={{ color: "#6b7280", fontSize: 13 }}>
+              We'll match you with relevant future studies based on your profile.
+            </p>
+          </div>
+        )}
+
         <div className="interview-complete-next">
           <p className="interview-complete-next-label">What happens next?</p>
           <ul className="interview-complete-next-list">

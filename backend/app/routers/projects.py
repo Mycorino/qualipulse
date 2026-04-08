@@ -11,6 +11,7 @@ from app.schemas.project import (
     ProjectCreate,
     ProjectListResponse,
     ProjectResponse,
+    ProjectSettingsPatch,
     QuestionPatch,
     QuestionResponse,
     ScreeningQuestionResponse,
@@ -37,6 +38,7 @@ def create_project(
         interview_duration_minutes=body.interview_duration_minutes,
         system_prompt=body.system_prompt or Project.__table__.columns["system_prompt"].default.arg,
         research_objective=body.research_objective or None,
+        panel_collection_enabled=body.panel_collection_enabled,
     )
     db.add(project)
     db.flush()
@@ -175,6 +177,7 @@ def update_project(
     project.interview_duration_minutes = body.interview_duration_minutes
     project.research_objective = body.research_objective or None
     project.welcome_message = body.welcome_message or None
+    project.panel_collection_enabled = body.panel_collection_enabled
     if body.system_prompt is not None:
         project.system_prompt = body.system_prompt
 
@@ -207,6 +210,22 @@ def update_project(
             disqualifying_options=json.dumps(sq.disqualifying_options),
         ))
 
+    db.commit()
+    db.refresh(project)
+    return _project_to_response(project)
+
+
+@router.patch("/{project_id}/settings", response_model=ProjectResponse)
+def patch_project_settings(
+    project_id: str,
+    body: ProjectSettingsPatch,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ProjectResponse:
+    """Update individual project settings (e.g. panel_collection_enabled)."""
+    project = _get_project_or_404(project_id, company.id, db)
+    if body.panel_collection_enabled is not None:
+        project.panel_collection_enabled = body.panel_collection_enabled
     db.commit()
     db.refresh(project)
     return _project_to_response(project)
@@ -333,6 +352,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
         system_prompt=project.system_prompt,
         research_objective=project.research_objective,
         welcome_message=project.welcome_message,
+        panel_collection_enabled=getattr(project, "panel_collection_enabled", True),
         created_at=project.created_at,
         questions=questions,
         screening_questions=screening,

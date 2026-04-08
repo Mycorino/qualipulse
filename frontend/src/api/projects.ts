@@ -55,6 +55,7 @@ export interface ProjectResponse {
   system_prompt?: string;
   research_objective?: string;
   welcome_message?: string;
+  panel_collection_enabled?: boolean;
   created_at: string;
   questions: QuestionResponse[];
   screening_questions: ScreeningQuestionResponse[];
@@ -256,6 +257,14 @@ export async function createProject(body: ProjectCreate): Promise<ProjectRespons
 
 export async function updateProject(id: string, body: ProjectCreate): Promise<ProjectResponse> {
   const { data } = await client.put<ProjectResponse>(`/projects/${id}`, body);
+  return data;
+}
+
+export async function patchProjectSettings(
+  id: string,
+  settings: { panel_collection_enabled?: boolean }
+): Promise<ProjectResponse> {
+  const { data } = await client.patch<ProjectResponse>(`/projects/${id}/settings`, settings);
   return data;
 }
 

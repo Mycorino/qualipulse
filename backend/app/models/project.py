@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -41,6 +41,7 @@ class Project(Base):
     researcher_logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    panel_collection_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

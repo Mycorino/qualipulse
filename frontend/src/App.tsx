@@ -6,6 +6,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import ProjectDetail from "./pages/ProjectDetail";
 import Interview from "./pages/Interview";
+import InterviewVerify from "./pages/InterviewVerify";
 import CreateProjectWizard from "./pages/CreateProjectWizard";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -84,6 +85,7 @@ export default function App() {
         }
       />
       <Route path="/i/:token" element={<Interview />} />
+      <Route path="/interview/verify/:token" element={<InterviewVerify />} />
       <Route path="/reports/:token" element={<SharedReport />} />
       <Route path="/admin" element={<Admin />} />
       <Route

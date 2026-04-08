@@ -1,14 +1,17 @@
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
+from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.dependencies import get_db
 from app.limiter import limiter
 from app.models.interview import InterviewLink, InterviewTurn, Participant
+from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 from app.schemas.interview import (
     StartInterviewRequest,
     StartInterviewResponse,
@@ -19,13 +22,185 @@ from app.schemas.interview import (
 from app.services.feature_gates import require_participant_limit
 from app.services.interview_engine import process_interview_turn, start_interview, skip_question as engine_skip_question
 from app.services.storage import upload_audio
+from app.services.verification import generate_magic_token, verify_magic_token
 
 router = APIRouter(prefix="/interview", tags=["interview"])
+
+ALGORITHM = "HS256"
+SESSION_TOKEN_EXPIRE_HOURS = 2
 
 
 class ScreenRequest(BaseModel):
     answers: dict[str, str]  # question_id → selected option
 
+
+class VerificationRequest(BaseModel):
+    email: str
+
+
+class PanelProfileRequest(BaseModel):
+    email: str
+    first_name: str | None = None
+    age_range: str | None = None
+    gender: str | None = None
+    country: str | None = None
+    city: str | None = None
+    education: str | None = None
+    employment_status: str | None = None
+    job_function: str | None = None
+    seniority: str | None = None
+    industry: str | None = None
+    company_size: str | None = None
+    panel_consent: bool = False
+    tag_ids: list[int] = []
+
+
+def _create_session_token(email: str, link_token: str) -> str:
+    """Create a short-lived JWT for a verified participant session."""
+    expire = datetime.now(timezone.utc) + timedelta(hours=SESSION_TOKEN_EXPIRE_HOURS)
+    payload = {
+        "email": email,
+        "link_token": link_token,
+        "verified": True,
+        "exp": expire,
+        "type": "participant_session",
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _decode_session_token(token: str) -> dict | None:
+    """Decode and validate a participant session JWT. Returns payload or None."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "participant_session" or not payload.get("verified"):
+            return None
+        return payload
+    except JWTError:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# New endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/panel-tags")
+def get_panel_tags(db: Session = Depends(get_db)):
+    """Return all available panel tags for profile collection."""
+    tags = db.query(PanelTag).all()
+    return [{"id": t.id, "name": t.name, "category": t.category} for t in tags]
+
+
+@router.post("/{token}/request-verification")
+@limiter.limit("5/minute")
+def request_verification(
+    request: Request,
+    token: str,
+    body: VerificationRequest,
+    db: Session = Depends(get_db),
+):
+    """Send a magic link to the participant's email to verify and start the interview."""
+    link = _get_active_link_or_404(token, db)
+
+    # Dedup: don't send another token within 60 seconds
+    from datetime import datetime as dt
+    recent_cutoff = dt.utcnow() - timedelta(seconds=60)
+    existing = (
+        db.query(ParticipantMagicToken)
+        .filter(
+            ParticipantMagicToken.email == body.email,
+            ParticipantMagicToken.interview_link_token == token,
+            ParticipantMagicToken.used.is_(False),
+            ParticipantMagicToken.created_at >= recent_cutoff,
+        )
+        .first()
+    )
+    if existing:
+        return {"message": "Magic link already sent", "email": body.email}
+
+    generate_magic_token(db, body.email, token)
+    return {"message": "Magic link sent", "email": body.email}
+
+
+@router.get("/verify/{magic_token}")
+def verify_participant_token(
+    magic_token: str,
+    db: Session = Depends(get_db),
+):
+    """Validate a magic token and return a session JWT for the participant."""
+    record = verify_magic_token(db, magic_token)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This verification link has expired or has already been used. Please request a new one.",
+        )
+
+    session_token = _create_session_token(record.email, record.interview_link_token)
+    return {
+        "session_token": session_token,
+        "link_token": record.interview_link_token,
+        "email": record.email,
+    }
+
+
+@router.post("/{token}/panel-profile")
+@limiter.limit("10/minute")
+def save_panel_profile(
+    request: Request,
+    token: str,
+    body: PanelProfileRequest,
+    db: Session = Depends(get_db),
+):
+    """Upsert a panel profile for a participant who consented."""
+    _get_active_link_or_404(token, db)
+
+    profile = db.query(PanelProfile).filter(PanelProfile.email == body.email).first()
+    if profile is None:
+        profile = PanelProfile(email=body.email)
+        db.add(profile)
+
+    # Update fields
+    if body.first_name is not None:
+        profile.first_name = body.first_name
+    if body.age_range is not None:
+        profile.age_range = body.age_range
+    if body.gender is not None:
+        profile.gender = body.gender
+    if body.country is not None:
+        profile.country = body.country
+    if body.city is not None:
+        profile.city = body.city
+    if body.education is not None:
+        profile.education = body.education
+    if body.employment_status is not None:
+        profile.employment_status = body.employment_status
+    if body.job_function is not None:
+        profile.job_function = body.job_function
+    if body.seniority is not None:
+        profile.seniority = body.seniority
+    if body.industry is not None:
+        profile.industry = body.industry
+    if body.company_size is not None:
+        profile.company_size = body.company_size
+
+    if body.panel_consent:
+        profile.panel_consent = True
+        profile.consent_at = datetime.utcnow()
+        profile.consent_interview_token = token
+
+    # Replace tags
+    if body.tag_ids:
+        tags = db.query(PanelTag).filter(PanelTag.id.in_(body.tag_ids)).all()
+        profile.tags = tags
+
+    profile.last_active = datetime.utcnow()
+    db.commit()
+
+    return {"saved": True}
+
+
+# ---------------------------------------------------------------------------
+# Existing endpoints
+# ---------------------------------------------------------------------------
 
 @router.get("/{token}/screening-questions")
 @limiter.limit("60/minute")
@@ -77,6 +252,7 @@ def validate_link(
         "researcher_logo_url": project.researcher_logo_url,
         "research_context": project.research_context,
         "privacy_policy_url": project.privacy_policy_url,
+        "panel_collection_enabled": getattr(project, "panel_collection_enabled", True),
     }
 
 
@@ -126,7 +302,6 @@ def get_resume_summary(
 
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
 
-    # Collect main (non-follow-up) questions that have a participant response
     covered: list[str] = []
     seen_q: set[int] = set()
     for t in turns:
@@ -160,8 +335,32 @@ def start_interview_session(
     body: StartInterviewRequest | None = None,
     db: Session = Depends(get_db),
 ):
-    """Create a new participant and generate the first interview question."""
+    """Create a new participant and generate the first interview question.
+
+    Requires a valid session_token (from email verification magic link).
+    """
     link = _get_active_link_or_404(token, db)
+
+    # Validate session token (email verification)
+    session_payload = None
+    if body and body.session_token:
+        session_payload = _decode_session_token(body.session_token)
+        if session_payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email verification required",
+            )
+        # Ensure the session is for this link
+        if session_payload.get("link_token") != token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session token does not match this interview link",
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email verification required",
+        )
 
     # Enforce participant limit for this project
     current_count = db.query(Participant).filter(
@@ -173,6 +372,9 @@ def start_interview_session(
     if project and project.company:
         require_participant_limit(project.company, project, current_count)
 
+    # Use email from session token
+    verified_email = session_payload.get("email")
+
     participant = Participant(
         link_id=link.id,
         project_id=link.project_id,
@@ -180,7 +382,8 @@ def start_interview_session(
         profession=body.profession if body else None,
         age_range=body.age_range if body else None,
         country=body.country if body else None,
-        email=body.email if body else None,
+        email=verified_email,
+        email_verified=True,
         status="in_progress",
     )
     db.add(participant)
@@ -220,7 +423,6 @@ async def respond_to_question(
     if turns:
         last_turn = turns[-1]
         if last_turn.response_transcript:
-            # This turn was already processed — return the existing next question
             return TurnResponse(
                 question_text=last_turn.question_text,
                 tts_audio_url=last_turn.tts_audio_url or "",
@@ -231,7 +433,6 @@ async def respond_to_question(
                 total_seconds=0,
             )
 
-    # Upload audio and process the turn
     audio_data = await audio.read()
     ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
     audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
