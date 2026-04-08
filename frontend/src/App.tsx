@@ -18,6 +18,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Admin from "./pages/Admin";
+import AffiliatePortal from "./pages/AffiliatePortal";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -87,6 +88,8 @@ export default function App() {
       <Route path="/i/:token" element={<Interview />} />
       <Route path="/interview/verify/:token" element={<InterviewVerify />} />
       <Route path="/reports/:token" element={<SharedReport />} />
+      <Route path="/affiliate/:section" element={<AffiliatePortal />} />
+      <Route path="/affiliate" element={<Navigate to="/affiliate/apply" replace />} />
       <Route path="/admin" element={<Admin />} />
       <Route
         path="/account"
