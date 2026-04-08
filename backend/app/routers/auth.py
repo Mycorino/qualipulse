@@ -263,7 +263,7 @@ async def website_intel(
     if not url:
         raise HTTPException(status_code=400, detail="website_url is required")
 
-    summary = await fetch_website_summary(url)
+    summary = await fetch_website_summary(url, db=db, company_id=company.id)
 
     company.website_url = url
     company.business_summary = summary

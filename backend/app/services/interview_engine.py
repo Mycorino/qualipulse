@@ -14,6 +14,7 @@ from app.models.project import InterviewGuideQuestion, Project
 from app.services.stt import transcribe_audio
 from app.services.storage import upload_audio, download_audio
 from app.services.tts import generate_speech
+from app.services.usage_logger import log_claude_usage, log_stt_usage, log_tts_usage
 
 INTERVIEWER_SYSTEM_PROMPT = """\
 You are an expert qualitative interviewer conducting a research interview on behalf of a company.
@@ -141,6 +142,10 @@ def decide_next_action(
     all_questions_done: bool,
     total_questions: int = 0,
     research_objective: str | None = None,
+    db=None,
+    company_id=None,
+    project_id=None,
+    participant_id=None,
 ) -> dict:
     """Call Claude to decide the next interview action.
 
@@ -246,6 +251,12 @@ Return ONLY a JSON object: {{"action": "follow_up" or "next_question" or "close"
         messages=[{"role": "user", "content": user_message}],
     )
 
+    if db is not None:
+        log_claude_usage(
+            db, response, "interview_turn",
+            company_id=company_id, project_id=project_id, participant_id=participant_id,
+        )
+
     raw_text = response.content[0].text.strip()
 
     # Try to parse JSON from the response, handling potential markdown wrapping
@@ -271,7 +282,11 @@ Return ONLY a JSON object: {{"action": "follow_up" or "next_question" or "close"
     return result
 
 
-def _get_first_question(project: Project) -> tuple[str, int]:
+def _get_first_question(
+    project: Project,
+    db=None,
+    participant_id=None,
+) -> tuple[str, int]:
     """Get the first non-deprecated question from the interview guide, rephrased as an opener."""
     guide_questions = sorted(
         [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
@@ -303,6 +318,15 @@ def _get_first_question(project: Project) -> tuple[str, int]:
     )
 
     question_text = response.content[0].text.strip()
+
+    if db is not None:
+        log_claude_usage(
+            db, response, "interview_turn",
+            company_id=getattr(project, "company_id", None),
+            project_id=getattr(project, "id", None),
+            participant_id=participant_id,
+        )
+
     return question_text, 0
 
 
@@ -316,12 +340,15 @@ def start_interview(participant_id: str, db: Session) -> dict:
         raise ValueError(f"Participant {participant_id} not found")
 
     project = participant.project
+    company_id = project.company_id
+    proj_id = project.id
 
-    question_text, q_index = _get_first_question(project)
+    question_text, q_index = _get_first_question(project, db=db, participant_id=participant_id)
 
     # Generate TTS audio and upload
     tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
     tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
+    log_tts_usage(db, question_text, company_id=company_id, project_id=proj_id, participant_id=participant_id)
 
     # Save the interviewer turn
     turn = InterviewTurn(
@@ -356,7 +383,7 @@ def process_interview_turn(
     # 1. Transcribe the participant's audio
     audio_data = download_audio(audio_path)
     filename = os.path.basename(audio_path)
-    transcript = transcribe_audio(audio_data, filename)
+    transcript, audio_duration = transcribe_audio(audio_data, filename)
 
     # 2. Find the last interviewer turn to update with the participant's response
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
@@ -374,6 +401,15 @@ def process_interview_turn(
 
     # 3. Get context for Claude
     context = get_interview_context(participant_id, db)
+    _proj = context["project"]
+    _company_id = _proj.company_id
+    _project_id = _proj.id
+
+    # Log STT usage now that we have project/company context
+    log_stt_usage(
+        db, audio_duration,
+        company_id=_company_id, project_id=_project_id, participant_id=participant_id,
+    )
 
     # 4. Ask Claude for the next action
     decision = decide_next_action(
@@ -385,7 +421,11 @@ def process_interview_turn(
         total_minutes=context["total_minutes"],
         all_questions_done=context["all_questions_done"],
         total_questions=context["total_questions"],
-        research_objective=context["project"].research_objective,
+        research_objective=_proj.research_objective,
+        db=db,
+        company_id=_company_id,
+        project_id=_project_id,
+        participant_id=participant_id,
     )
 
     # Server-side safety guard: override a premature "close" decision.
@@ -417,6 +457,7 @@ def process_interview_turn(
     # 5. Generate TTS for the next question / closing and upload
     tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
     tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
+    log_tts_usage(db, question_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
 
     # 6. Determine the new turn metadata
     next_turn_index = (turns[-1].turn_index + 1) if turns else 0

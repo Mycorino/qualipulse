@@ -7,7 +7,7 @@ from anthropic import Anthropic
 from app.config import settings
 
 
-async def fetch_website_summary(url: str) -> str:
+async def fetch_website_summary(url: str, db=None, company_id=None) -> str:
     """Fetch a website and use Claude to generate a 2-3 sentence business summary."""
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
@@ -50,4 +50,12 @@ async def fetch_website_summary(url: str) -> str:
             ),
         }],
     )
+
+    if db is not None:
+        try:
+            from app.services.usage_logger import log_claude_usage
+            log_claude_usage(db, message, "website_intel", company_id=company_id)
+        except Exception:
+            pass
+
     return message.content[0].text.strip()

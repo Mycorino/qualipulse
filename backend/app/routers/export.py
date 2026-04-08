@@ -285,6 +285,8 @@ async def ai_quality_assessment(
     avg_words = sum(word_counts) / len(word_counts) if word_counts else 0
     short_pct = (sum(1 for wc in word_counts if wc < 10) / len(word_counts) * 100) if word_counts else 0
 
+    from app.services.usage_logger import log_claude_usage
+
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
     prompt = f"""You are a qualitative research expert. Assess the quality of the following interview transcript.
@@ -318,6 +320,11 @@ quality_score guide: 0.0-0.25=low, 0.25-0.5=fair, 0.5-0.75=good, 0.75-1.0=strong
         model="claude-sonnet-4-20250514",
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
+    )
+
+    log_claude_usage(
+        db, response, "quality",
+        company_id=company.id, project_id=project_id, participant_id=participant_id,
     )
 
     raw = response.content[0].text.strip()

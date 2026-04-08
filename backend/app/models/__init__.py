@@ -3,8 +3,10 @@ from app.models.interview import InterviewLink, InterviewTurn, Participant, Proj
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.models.coding import ManualCode, QuoteTag
 from app.models.memo import ProjectMemo
+from app.models.usage import AIUsageLog
 
 __all__ = [
+    "AIUsageLog",
     "Company",
     "InterviewGuideQuestion",
     "InterviewLink",

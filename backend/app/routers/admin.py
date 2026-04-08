@@ -19,6 +19,7 @@ from app.models.interview import (
 )
 from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
+from app.models.usage import AIUsageLog
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -326,6 +327,175 @@ def delete_user(
     )
     db.execute(sql_delete(Company).where(Company.id == company_id))
     db.commit()
+
+
+# ── Cost reporting ────────────────────────────────────────────────────────────
+
+def _costs_report(db: Session, company_id: str | None = None) -> dict:
+    """Build the cost report dict, optionally filtered to a single company."""
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    base_q = db.query(AIUsageLog)
+    if company_id is not None:
+        base_q = base_q.filter(AIUsageLog.company_id == company_id)
+
+    # Total and monthly spend
+    total_cost = db.query(func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0))
+    if company_id is not None:
+        total_cost = total_cost.filter(AIUsageLog.company_id == company_id)
+    total_cost_usd = float(total_cost.scalar() or 0.0)
+
+    month_cost = db.query(func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0)).filter(
+        AIUsageLog.created_at >= month_start
+    )
+    if company_id is not None:
+        month_cost = month_cost.filter(AIUsageLog.company_id == company_id)
+    this_month_usd = float(month_cost.scalar() or 0.0)
+
+    # By operation
+    op_rows = (
+        db.query(
+            AIUsageLog.operation,
+            func.count(AIUsageLog.id).label("count"),
+            func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0).label("cost"),
+        )
+        .filter(*([AIUsageLog.company_id == company_id] if company_id else []))
+        .group_by(AIUsageLog.operation)
+        .all()
+    )
+    by_operation = {
+        row.operation: {"cost_usd": round(float(row.cost), 6), "count": row.count}
+        for row in op_rows
+    }
+
+    # Interview-level cost and count (STT + TTS + interview_turn)
+    interview_ops = ("interview_turn", "tts", "stt")
+    interview_cost_q = db.query(
+        func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0)
+    ).filter(AIUsageLog.operation.in_(interview_ops))
+    if company_id is not None:
+        interview_cost_q = interview_cost_q.filter(AIUsageLog.company_id == company_id)
+    interview_cost = float(interview_cost_q.scalar() or 0.0)
+
+    interview_count_q = db.query(
+        func.count(func.distinct(AIUsageLog.participant_id))
+    ).filter(
+        AIUsageLog.operation.in_(interview_ops),
+        AIUsageLog.participant_id.isnot(None),
+    )
+    if company_id is not None:
+        interview_count_q = interview_count_q.filter(AIUsageLog.company_id == company_id)
+    total_interviews = int(interview_count_q.scalar() or 0)
+
+    avg_cost = (interview_cost / total_interviews) if total_interviews > 0 else 0.0
+
+    # By company (only for platform-wide report)
+    by_company = []
+    if company_id is None:
+        company_rows = (
+            db.query(
+                AIUsageLog.company_id,
+                Company.name,
+                Company.email,
+                func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0).label("total_cost"),
+                func.coalesce(
+                    func.sum(
+                        func.case(
+                            (AIUsageLog.created_at >= month_start, AIUsageLog.cost_usd),
+                            else_=0.0,
+                        )
+                    ),
+                    0.0,
+                ).label("month_cost"),
+                func.count(
+                    func.distinct(
+                        func.case(
+                            (AIUsageLog.operation.in_(interview_ops), AIUsageLog.participant_id),
+                            else_=None,
+                        )
+                    )
+                ).label("interview_count"),
+            )
+            .join(Company, AIUsageLog.company_id == Company.id)
+            .filter(AIUsageLog.company_id.isnot(None))
+            .group_by(AIUsageLog.company_id, Company.name, Company.email)
+            .order_by(func.sum(AIUsageLog.cost_usd).desc())
+            .all()
+        )
+        by_company = [
+            {
+                "company_id": row.company_id,
+                "name": row.name,
+                "email": row.email,
+                "total_cost_usd": round(float(row.total_cost), 6),
+                "this_month_usd": round(float(row.month_cost), 6),
+                "interview_count": row.interview_count or 0,
+            }
+            for row in company_rows
+        ]
+
+    result = {
+        "total_cost_usd": round(total_cost_usd, 6),
+        "this_month_usd": round(this_month_usd, 6),
+        "by_operation": by_operation,
+        "avg_cost_per_interview_usd": round(avg_cost, 6),
+        "total_interviews": total_interviews,
+    }
+    if company_id is None:
+        result["by_company"] = by_company
+    return result
+
+
+@router.get("/costs")
+def get_costs(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+) -> dict:
+    """Platform-wide AI cost report."""
+    return _costs_report(db)
+
+
+@router.get("/costs/company/{company_id}")
+def get_company_costs(
+    company_id: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+) -> dict:
+    """AI cost report for a single company, with per-project breakdown."""
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    report = _costs_report(db, company_id=company_id)
+
+    # Add per-project breakdown
+    project_rows = (
+        db.query(
+            AIUsageLog.project_id,
+            Project.name,
+            func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0).label("total_cost"),
+            func.count(AIUsageLog.id).label("count"),
+        )
+        .join(Project, AIUsageLog.project_id == Project.id)
+        .filter(
+            AIUsageLog.company_id == company_id,
+            AIUsageLog.project_id.isnot(None),
+        )
+        .group_by(AIUsageLog.project_id, Project.name)
+        .order_by(func.sum(AIUsageLog.cost_usd).desc())
+        .all()
+    )
+    report["by_project"] = [
+        {
+            "project_id": row.project_id,
+            "name": row.name,
+            "total_cost_usd": round(float(row.total_cost), 6),
+            "count": row.count,
+        }
+        for row in project_rows
+    ]
+    return report
 
 
 @router.get("/stats", response_model=AdminStats)

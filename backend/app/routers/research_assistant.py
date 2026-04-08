@@ -4,10 +4,12 @@ import json
 
 import anthropic
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.dependencies import get_current_company
+from app.dependencies import get_current_company, get_db
 from app.models.company import Company
+from app.services.usage_logger import log_claude_usage
 
 router = APIRouter(prefix="/research", tags=["research"])
 
@@ -51,6 +53,7 @@ async def parse_brief(
     context: str = Form(""),
     files: list[UploadFile] = File(default=[]),
     company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
 ):
     """Extract text from uploaded files and return a structured brief summary."""
     file_contents: list[str] = []
@@ -85,6 +88,7 @@ async def parse_brief(
             ),
         }],
     )
+    log_claude_usage(db, response, "research", company_id=company.id)
     return {"summary": response.content[0].text.strip()}
 
 
@@ -96,6 +100,7 @@ async def parse_brief(
 def suggest_objective(
     body: dict,
     company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
 ):
     """Generate a sharp research objective and learning goals from project context."""
     context = body.get("context", "")
@@ -135,6 +140,7 @@ def suggest_objective(
         }],
     )
 
+    log_claude_usage(db, response, "research", company_id=company.id)
     return json.loads(_strip_fences(response.content[0].text.strip()))
 
 
@@ -146,6 +152,7 @@ def suggest_objective(
 def suggest_scope(
     body: dict,
     company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
 ):
     """Recommend audience, duration, language, and participant count from the objective."""
     objective = body.get("objective", "")
@@ -180,6 +187,7 @@ def suggest_scope(
         }],
     )
 
+    log_claude_usage(db, response, "research", company_id=company.id)
     return json.loads(_strip_fences(response.content[0].text.strip()))
 
 
@@ -191,6 +199,7 @@ def suggest_scope(
 def suggest_questions(
     body: dict,
     company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
 ):
     """Generate a full structured interview guide from objective and scope."""
     objective = body.get("objective", "")
@@ -237,5 +246,6 @@ def suggest_questions(
         }],
     )
 
+    log_claude_usage(db, response, "research", company_id=company.id)
     questions = json.loads(_strip_fences(response.content[0].text.strip()))
     return {"questions": questions}

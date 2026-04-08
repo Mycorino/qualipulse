@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.interview import AnalysisThemeAnnotation, Participant, ProjectAnalysis
 from app.models.project import Project
+from app.services.usage_logger import log_claude_usage
 
 ANALYSIS_SYSTEM_PROMPT = """\
 You are a senior qualitative researcher with deep expertise in Jobs-to-be-Done, \
@@ -193,6 +194,8 @@ Analyse these interviews and return a JSON object with this exact structure:
             messages=[{"role": "user", "content": prompt}],
         )
 
+        log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
+
         raw = response.content[0].text.strip()
         # Strip markdown fences if present
         if raw.startswith("```"):
@@ -362,6 +365,8 @@ For any theme that was disputed and you have reframed, add a "researcher_note" k
             system=ANALYSIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
+
+        log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
 
         raw = response.content[0].text.strip()
         if raw.startswith("```"):

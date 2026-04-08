@@ -37,6 +37,28 @@ interface AdminStats {
   signups_last_30_days: number;
 }
 
+interface CostsByOperation {
+  [op: string]: { cost_usd: number; count: number };
+}
+
+interface CompanyCost {
+  company_id: string;
+  name: string;
+  email: string;
+  total_cost_usd: number;
+  this_month_usd: number;
+  interview_count: number;
+}
+
+interface CostsReport {
+  total_cost_usd: number;
+  this_month_usd: number;
+  by_operation: CostsByOperation;
+  avg_cost_per_interview_usd: number;
+  total_interviews: number;
+  by_company: CompanyCost[];
+}
+
 // ── API helpers ────────────────────────────────────────────────────────────
 
 function adminClient(key: string) {
@@ -206,6 +228,8 @@ export default function Admin() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
 
+  const [costs, setCosts] = useState<CostsReport | null>(null);
+
   const client = useCallback(
     () => adminClient(adminKey),
     [adminKey]
@@ -261,9 +285,19 @@ export default function Admin() {
     }
   }, [client]);
 
+  const loadCosts = useCallback(async () => {
+    try {
+      const res = await client().get<CostsReport>("/admin/costs");
+      setCosts(res.data);
+    } catch {
+      // non-critical
+    }
+  }, [client]);
+
   useEffect(() => {
     if (authed) {
       loadUsers();
+      loadCosts();
     }
   }, [authed, search, tierFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -495,6 +529,117 @@ export default function Admin() {
             {Object.entries(stats.users_by_tier).map(([tier, count]) => (
               <StatCard key={tier} label={`${tier} users`} value={count} />
             ))}
+          </div>
+        )}
+
+        {/* AI Costs card */}
+        {costs && (
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: "20px 24px",
+              marginBottom: 24,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: 16,
+              }}
+            >
+              AI Spend
+            </div>
+
+            {/* Top-line numbers */}
+            <div style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)" }}>
+                  ${costs.total_cost_usd.toFixed(2)}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                  All time
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)" }}>
+                  ${costs.this_month_usd.toFixed(2)}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                  This month
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)" }}>
+                  ${costs.avg_cost_per_interview_usd.toFixed(3)}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                  Avg / interview ({costs.total_interviews} total)
+                </div>
+              </div>
+            </div>
+
+            {/* By-operation table */}
+            {Object.keys(costs.by_operation).length > 0 && (
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: 13,
+                }}
+              >
+                <thead>
+                  <tr>
+                    {["Operation", "Calls", "Total cost"].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          textAlign: "left",
+                          padding: "4px 12px 8px 0",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "var(--text-muted)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                          borderBottom: "1px solid var(--border-subtle)",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(costs.by_operation)
+                    .sort((a, b) => b[1].cost_usd - a[1].cost_usd)
+                    .map(([op, data]) => (
+                      <tr key={op}>
+                        <td
+                          style={{
+                            padding: "6px 12px 6px 0",
+                            color: "var(--text-secondary)",
+                            fontFamily: "monospace",
+                            fontSize: 12,
+                          }}
+                        >
+                          {op}
+                        </td>
+                        <td style={{ padding: "6px 12px 6px 0", color: "var(--text-secondary)" }}>
+                          {data.count.toLocaleString()}
+                        </td>
+                        <td style={{ padding: "6px 0", color: "var(--text-primary)", fontWeight: 500 }}>
+                          ${data.cost_usd.toFixed(4)}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 
@@ -776,6 +921,25 @@ export default function Admin() {
                     padding: "12px 32px 16px",
                   }}
                 >
+                  {/* AI spend for this user */}
+                  {costs?.by_company && (() => {
+                    const co = costs.by_company.find((c) => c.company_id === user.id);
+                    if (!co) return null;
+                    return (
+                      <div style={{ marginBottom: 12, fontSize: 12, color: "var(--text-muted)" }}>
+                        AI spend:{" "}
+                        <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                          ${co.total_cost_usd.toFixed(4)}
+                        </span>{" "}
+                        total ·{" "}
+                        <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                          ${co.this_month_usd.toFixed(4)}
+                        </span>{" "}
+                        this month
+                      </div>
+                    );
+                  })()}
+
                   {users.find((u) => u.id === expandedId)?.business_summary && (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
