@@ -57,6 +57,7 @@ class AdminUserSummary(BaseModel):
     last_active: Optional[datetime]
     project_count: int
     interview_count: int
+    business_summary: Optional[str] = None
 
 
 class AdminUserDetail(AdminUserSummary):
@@ -112,6 +113,7 @@ def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
         last_active=last_project_at,
         project_count=project_count,
         interview_count=completed_count,
+        business_summary=company.business_summary,
     )
 
 

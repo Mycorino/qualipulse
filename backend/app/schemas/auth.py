@@ -41,6 +41,11 @@ class OnboardingProfileRequest(BaseModel):
     role: Optional[str] = None
     industry: Optional[str] = None
     use_case: Optional[str] = None
+    website_url: Optional[str] = None
+    business_summary: Optional[str] = None
+    research_experience: Optional[str] = None
+    primary_region: Optional[str] = None
+    goals_freeform: Optional[str] = None
 
 
 class CompanyResponse(BaseModel):
@@ -56,5 +61,10 @@ class CompanyResponse(BaseModel):
     subscription_tier: str = "free"
     trial_ends_at: Optional[datetime] = None
     created_at: datetime
+    website_url: Optional[str] = None
+    business_summary: Optional[str] = None
+    research_experience: Optional[str] = None
+    primary_region: Optional[str] = None
+    goals_freeform: Optional[str] = None
 
     model_config = {"from_attributes": True}

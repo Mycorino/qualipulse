@@ -32,6 +32,7 @@ from app.services.email import (
     send_verification_email,
     send_welcome,
 )
+from app.services.website_intelligence import fetch_website_summary
 
 logger = logging.getLogger("auto_interview.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -249,6 +250,29 @@ def update_profile(
     return {"id": company.id, "name": company.name, "email": company.email}
 
 
+@router.post("/website-intel")
+@limiter.limit("5/minute")
+async def website_intel(
+    request: Request,
+    body: dict,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Fetch a website and generate a business summary using Claude. Saves to company record."""
+    url = (body.get("website_url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="website_url is required")
+
+    summary = await fetch_website_summary(url)
+
+    company.website_url = url
+    company.business_summary = summary
+    db.commit()
+
+    logger.info("Website intel generated for %s: %s", company.email, url)
+    return {"business_summary": summary}
+
+
 @router.patch("/onboarding")
 def save_onboarding_profile(
     body: OnboardingProfileRequest,
@@ -266,6 +290,14 @@ def save_onboarding_profile(
         company.industry = body.industry
     if body.use_case:
         company.use_case = body.use_case
+    if body.website_url is not None:
+        company.website_url = body.website_url
+    if body.business_summary is not None:
+        company.business_summary = body.business_summary
+    if body.research_experience is not None:
+        company.research_experience = body.research_experience
+    if body.primary_region is not None:
+        company.primary_region = body.primary_region
     db.commit()
     logger.info("Onboarding profile saved for %s", company.email)
     return CompanyResponse.model_validate(company)
@@ -288,6 +320,16 @@ def complete_onboarding(
         company.industry = body.industry
     if body.use_case:
         company.use_case = body.use_case
+    if body.website_url is not None:
+        company.website_url = body.website_url
+    if body.business_summary is not None:
+        company.business_summary = body.business_summary
+    if body.research_experience is not None:
+        company.research_experience = body.research_experience
+    if body.primary_region is not None:
+        company.primary_region = body.primary_region
+    if body.goals_freeform is not None:
+        company.goals_freeform = body.goals_freeform
     company.onboarding_completed = True
     db.commit()
     logger.info("Onboarding completed for %s", company.email)

@@ -23,6 +23,7 @@ interface AdminUser {
   last_active: string | null;
   project_count: number;
   interview_count: number;
+  business_summary?: string | null;
   projects?: AdminProject[];
 }
 
@@ -775,6 +776,16 @@ export default function Admin() {
                     padding: "12px 32px 16px",
                   }}
                 >
+                  {users.find((u) => u.id === expandedId)?.business_summary && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                        Business summary
+                      </div>
+                      <p style={{ fontSize: 12, color: "var(--text-secondary)", fontStyle: "italic", margin: 0, lineHeight: 1.5 }}>
+                        {users.find((u) => u.id === expandedId)?.business_summary}
+                      </p>
+                    </div>
+                  )}
                   <div
                     style={{
                       fontSize: 11,

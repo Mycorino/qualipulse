@@ -29,6 +29,19 @@ def _strip_fences(text: str) -> str:
     return text
 
 
+def _business_context(company: Company) -> str:
+    """Build a business context prefix to personalise AI suggestions."""
+    parts = []
+    if company.business_summary:
+        parts.append(f"Context about this researcher's business: {company.business_summary}")
+    if company.primary_region:
+        parts.append(f"Their primary market: {company.primary_region}")
+    if not parts:
+        return ""
+    parts.append("Use this context to make suggestions more specific and relevant to their business.")
+    return "\n".join(parts) + "\n\n"
+
+
 # ---------------------------------------------------------------------------
 # POST /research/parse-brief
 # ---------------------------------------------------------------------------
@@ -37,7 +50,7 @@ def _strip_fences(text: str) -> str:
 async def parse_brief(
     context: str = Form(""),
     files: list[UploadFile] = File(default=[]),
-    _company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_company),
 ):
     """Extract text from uploaded files and return a structured brief summary."""
     file_contents: list[str] = []
@@ -55,12 +68,14 @@ async def parse_brief(
     if file_contents:
         combined += "\n\nUPLOADED DOCUMENTS:\n" + "\n\n".join(file_contents)
 
+    biz_ctx = _business_context(company)
     response = _claude(512).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
         messages=[{
             "role": "user",
             "content": (
+                f"{biz_ctx}"
                 "You are a senior UX researcher. Read the following project brief and "
                 "summarise the key business context in 2-3 sentences. Focus on: what "
                 "the business does, what problem they want to understand, and what "
@@ -80,7 +95,7 @@ async def parse_brief(
 @router.post("/suggest-objective")
 def suggest_objective(
     body: dict,
-    _company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_company),
 ):
     """Generate a sharp research objective and learning goals from project context."""
     context = body.get("context", "")
@@ -95,12 +110,14 @@ def suggest_objective(
             "rationale": "",
         }
 
+    biz_ctx = _business_context(company)
     response = _claude(1024).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
         messages=[{
             "role": "user",
             "content": (
+                f"{biz_ctx}"
                 "You are a senior product researcher with expertise in Jobs-to-be-Done "
                 "and qualitative research design.\n\n"
                 "Based on the following project context, propose a sharp research "
@@ -128,7 +145,7 @@ def suggest_objective(
 @router.post("/suggest-scope")
 def suggest_scope(
     body: dict,
-    _company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_company),
 ):
     """Recommend audience, duration, language, and participant count from the objective."""
     objective = body.get("objective", "")
@@ -140,12 +157,14 @@ def suggest_scope(
 
     goals_str = "\n".join(f"- {g}" for g in learning_goals if g)
 
+    biz_ctx = _business_context(company)
     response = _claude(512).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
         messages=[{
             "role": "user",
             "content": (
+                f"{biz_ctx}"
                 "You are a senior UX researcher. Given this research objective, recommend "
                 "the ideal study scope.\n\n"
                 f"OBJECTIVE: {objective}\n"
@@ -171,7 +190,7 @@ def suggest_scope(
 @router.post("/suggest-questions")
 def suggest_questions(
     body: dict,
-    _company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_company),
 ):
     """Generate a full structured interview guide from objective and scope."""
     objective = body.get("objective", "")
@@ -185,12 +204,14 @@ def suggest_questions(
     goals_str = "\n".join(f"- {g}" for g in learning_goals if g)
     lang_instruction = f"Write ALL question text in {lang_name}." if language != "en" else ""
 
+    biz_ctx = _business_context(company)
     response = _claude(2048).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=2048,
         messages=[{
             "role": "user",
             "content": (
+                f"{biz_ctx}"
                 "You are a senior qualitative researcher. Design a voice interview guide "
                 "following best product research practices.\n\n"
                 f"RESEARCH OBJECTIVE: {objective}\n"

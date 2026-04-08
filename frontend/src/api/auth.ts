@@ -19,6 +19,11 @@ export interface CompanyResponse {
   subscription_tier: string;
   trial_ends_at: string | null;
   created_at: string;
+  website_url: string | null;
+  business_summary: string | null;
+  research_experience: string | null;
+  primary_region: string | null;
+  goals_freeform: string | null;
 }
 
 export interface OnboardingProfile {
@@ -27,6 +32,11 @@ export interface OnboardingProfile {
   role?: string;
   industry?: string;
   use_case?: string;
+  website_url?: string;
+  business_summary?: string;
+  research_experience?: string;
+  primary_region?: string;
+  goals_freeform?: string;
 }
 
 export async function signup(
@@ -86,5 +96,12 @@ export async function saveOnboardingProfile(profile: OnboardingProfile): Promise
 
 export async function completeOnboarding(profile: OnboardingProfile): Promise<CompanyResponse> {
   const { data } = await client.post<CompanyResponse>("/auth/onboarding", profile);
+  return data;
+}
+
+export async function analyseWebsite(websiteUrl: string): Promise<{ business_summary: string }> {
+  const { data } = await client.post<{ business_summary: string }>("/auth/website-intel", {
+    website_url: websiteUrl,
+  });
   return data;
 }

@@ -2,7 +2,7 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -32,6 +32,15 @@ class Company(Base):
     industry: Mapped[str | None] = mapped_column(String(100), nullable=True)
     use_case: Mapped[str | None] = mapped_column(String(100), nullable=True)
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Enhanced onboarding
+    website_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    business_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    research_experience: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # "new" | "some" | "professional"
+    primary_region: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # "europe" | "north_america" | "apac" | "global" | "other"
+    goals_freeform: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Subscription
     subscription_tier: Mapped[str] = mapped_column(String(20), default="solo", nullable=False)
