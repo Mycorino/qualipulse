@@ -140,7 +140,7 @@ def refresh_token(body: RefreshRequest, db: Session = Depends(get_db)) -> TokenR
     )
 
 
-# ── Email Verification ────────────────────────────────────────────────
+# ââ Email Verification ââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @router.post("/verify-email")
 def verify_email(token: str, db: Session = Depends(get_db)):
@@ -200,7 +200,7 @@ def resend_verification(
     return {"message": "Verification email sent"}
 
 
-# ── Password Reset ────────────────────────────────────────────────────
+# ââ Password Reset ââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @router.post("/password-reset/request")
 @limiter.limit("5/minute")
@@ -243,7 +243,7 @@ def confirm_password_reset(body: PasswordResetConfirm, db: Session = Depends(get
     return {"message": "Password updated successfully"}
 
 
-# ── Profile & Onboarding ────────────────────────────────────────────────
+# ââ Profile & Onboarding ââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @router.get("/me", response_model=CompanyResponse)
 def get_me(company: Company = Depends(get_current_company)) -> CompanyResponse:
@@ -363,7 +363,7 @@ def change_password(
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
 ):
-    """Change password — requires current password verification."""
+    """Change password â requires current password verification."""
     if not verify_password(body.current_password, company.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -382,7 +382,7 @@ class NewsletterSubscribe(BaseModel):
 @router.post("/newsletter")
 @limiter.limit("5/minute")
 def subscribe_newsletter(request: Request, body: NewsletterSubscribe):
-    """Subscribe to newsletter — just sends a welcome email for now."""
+    """Subscribe to newsletter â just sends a welcome email for now."""
     send_newsletter_welcome(body.email.lower().strip())
     logger.info("Newsletter subscription: %s", body.email)
     return {"message": "Subscribed successfully"}
