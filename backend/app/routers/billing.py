@@ -3,6 +3,7 @@ Billing routes — Stripe integration scaffold.
 Set STRIPE_SECRET_KEY in .env to enable payments.
 """
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
+from app.models.affiliate import AffiliateReferral, Affiliate
 from app.services.feature_gates import TIER_LIMITS, get_limits
 
 logger = logging.getLogger("auto_interview.billing")
@@ -182,6 +184,38 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 company.stripe_subscription_id = sub["id"]
                 db.commit()
                 logger.info("Updated subscription for company %s: %s / %s", company_id, company.subscription_tier, company.subscription_status)
+
+                # Track affiliate conversion if this is a new subscription
+                if event_type == "customer.subscription.created":
+                    referral = db.query(AffiliateReferral).filter(
+                        AffiliateReferral.referred_company_id == company_id
+                    ).first()
+                    if referral:
+                        referral.status = "converted"
+                        referral.converted_at = datetime.utcnow()
+
+                        # Calculate commission (default 20% if not specified)
+                        affiliate = referral.affiliate
+                        if affiliate:
+                            # Get the subscription amount from Stripe event
+                            subscription_amount = 0.0
+                            if "items" in sub and sub["items"]["data"]:
+                                item = sub["items"]["data"][0]
+                                if "price" in item and "unit_amount_decimal" in item["price"]:
+                                    # Stripe returns amount in cents
+                                    subscription_amount = float(item["price"]["unit_amount_decimal"]) / 100.0
+
+                            commission = (affiliate.commission_pct / 100.0) * subscription_amount
+                            referral.commission_amount = commission
+                            affiliate.total_earned += commission
+
+                            logger.info(
+                                "Affiliate conversion: %s earned $%.2f from %s",
+                                affiliate.code,
+                                commission,
+                               company_id,
+                            )
+                        db.commit()
 
     elif event_type == "customer.subscription.deleted":
         sub = event["data"]["object"]
