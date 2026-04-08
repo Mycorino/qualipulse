@@ -19,6 +19,8 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Admin from "./pages/Admin";
 import AffiliatePortal from "./pages/AffiliatePortal";
+import Blog from "./pages/Blog";
+import BlogPostPage from "./pages/BlogPost";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -90,6 +92,8 @@ export default function App() {
       <Route path="/reports/:token" element={<SharedReport />} />
       <Route path="/affiliate/:section" element={<AffiliatePortal />} />
       <Route path="/affiliate" element={<Navigate to="/affiliate/apply" replace />} />
+      <Route path="/blog" element={<Blog />} />
+      <Route path="/blog/:slug" element={<BlogPostPage />} />
       <Route path="/admin" element={<Admin />} />
       <Route
         path="/account"

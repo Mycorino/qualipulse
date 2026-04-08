@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "Backend (FastAPI)",
-      "runtimeExecutable": "uvicorn",
-      "runtimeArgs": ["app.main:app", "--reload", "--port", "8000", "--app-dir", "backend"],
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd /Users/corinofontana/Desktop/auto-interview/.claude/worktrees/sleepy-cerf/backend && /opt/anaconda3/bin/uvicorn app.main:app --reload --port 8000"],
       "port": 8000
     },
     {

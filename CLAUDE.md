@@ -31,7 +31,11 @@ auto-interview/
 │   │   │   ├── project.py       # Project + InterviewGuideQuestion + ScreeningQuestion
 │   │   │   ├── interview.py     # InterviewLink + Participant + InterviewTurn + ProjectAnalysis + AnalysisThemeAnnotation
 │   │   │   ├── coding.py        # ManualCode + QuoteTag (researcher codebook)
-│   │   │   └── memo.py          # ProjectMemo
+│   │   │   ├── memo.py          # ProjectMemo
+│   │   │   ├── affiliate.py     # Affiliate + AffiliateReferral + AffiliatePayout
+│   │   │   ├── usage.py         # AIUsageLog (cost tracking for Claude, Whisper, TTS)
+│   │   │   ├── panel.py         # PanelProfile + PanelTag + ParticipantMagicToken
+│   │   │   └── blog.py          # BlogPost (CMS for /blog)
 │   │   ├── routers/
 │   │   │   ├── auth.py          # /auth/signup, login, verify-email, resend, onboarding, password reset
 │   │   │   ├── projects.py      # /projects CRUD, CSV import (feature-gated)
@@ -44,6 +48,9 @@ auto-interview/
 │   │   │   ├── responses.py     # Transcript editing
 │   │   │   ├── billing.py       # Stripe webhook + subscription tiers
 │   │   │   ├── research_assistant.py  # AI brief parsing, suggestions
+│   │   │   ├── affiliate.py     # Affiliate program (apply, login, dashboard, admin)
+│   │   │   ├── admin.py         # Admin panel (users, stats, costs, tier management)
+│   │   │   ├── blog.py          # Blog public + admin CRUD (TipTap HTML content)
 │   │   │   └── audio.py         # Audio file serving
 │   │   ├── schemas/
 │   │   │   ├── auth.py          # SignupRequest, CompanyResponse, OnboardingProfileRequest
@@ -59,13 +66,19 @@ auto-interview/
 │   │       ├── stt.py               # Whisper transcription
 │   │       ├── tts.py               # OpenAI TTS generation
 │   │       ├── storage.py           # Audio: Cloudflare R2 or local disk
-│   │       └── guide_parser.py      # CSV import parser
+│   │       ├── guide_parser.py      # CSV import parser
+│   │       └── usage_logger.py      # Fire-and-forget AI cost logging (Claude/Whisper/TTS)
 │   ├── alembic/
 │   │   └── versions/
 │   │       ├── 0001_add_researcher_features.py
 │   │       ├── 0002_iterative_analysis.py
 │   │       ├── 0003_email_verification.py
-│   │       └── 0004_company_onboarding_fields.py
+│   │       ├── 0004_company_onboarding_fields.py
+│   │       ├── 0005_enhanced_onboarding.py
+│   │       ├── 0006_ai_usage_log.py
+│   │       ├── 0007_participant_panel.py
+│   │       ├── 0008_affiliate_program.py
+│   │       └── 0009_blog_posts.py
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
@@ -82,7 +95,8 @@ auto-interview/
 │   │   │   ├── auth.ts          # login, register, refreshToken, onboarding, email verification
 │   │   │   ├── projects.ts      # projects CRUD, links, participants, analysis, codes, tags, memos, export
 │   │   │   ├── interviews.ts    # getInterviewInfo, getScreeningQuestions, submitScreening, startInterview, submitAudio
-│   │   │   └── research.ts      # AI brief parsing, objective/scope/question suggestions
+│   │   │   ├── research.ts      # AI brief parsing, objective/scope/question suggestions
+│   │   │   └── blog.ts          # Blog API (public listing + admin CRUD)
 │   │   ├── hooks/
 │   │   │   ├── useAuth.ts       # JWT auth state
 │   │   │   └── useAudioRecorder.ts  # Safari-compatible MediaRecorder
@@ -103,7 +117,12 @@ auto-interview/
 │   │   │   ├── Interview.tsx         # Participant-facing interview (full flow)
 │   │   │   ├── AccountSettings.tsx   # Profile + billing
 │   │   │   ├── SharedReport.tsx      # Public read-only analysis
-│   │   │   └── Marketing.tsx         # Landing page + pricing
+│   │   │   ├── Marketing.tsx         # Landing page + pricing
+│   │   │   ├── Admin.tsx            # Admin panel (users, affiliates, stats, costs)
+│   │   │   ├── AffiliatePortal.tsx  # Affiliate apply / login / dashboard
+│   │   │   ├── Blog.tsx            # Public blog listing (/blog)
+│   │   │   ├── BlogPost.tsx        # Public article page (/blog/:slug) with SEO
+│   │   │   └── AdminBlog.tsx       # Blog editor tab in admin (TipTap + live preview)
 │   │   ├── components/
 │   │   │   ├── Toast.tsx        # Toast notification system
 │   │   │   ├── Skeleton.tsx     # Loading placeholders
@@ -233,6 +252,9 @@ R2_PUBLIC_URL=
 RATE_LIMIT_PUBLIC=60/minute
 RATE_LIMIT_AUTH=10/minute
 RATE_LIMIT_DEFAULT=120/minute
+
+# Admin
+ADMIN_SECRET_KEY=                              # Required for /admin and /affiliates/admin endpoints
 ```
 
 See `.env.example` at repo root for Docker/production template.
@@ -248,6 +270,9 @@ See `.env.example` at repo root for Docker/production template.
 - Projects: `/projects/` (trailing slash required — redirects drop auth header)
 - Interview (public, no auth): `/interview/{token}`, `/interview/{token}/screening-questions`, `/interview/{token}/screen`, `/interview/{token}/start`, `/interview/{token}/{participant_id}/respond`
 - Research: `/projects/{id}/codes`, `/projects/{id}/tags`, `/projects/{id}/memos`, `/projects/{id}/analysis`, `/projects/{id}/export`, `/projects/{id}/participants/{pid}/transcript`
+- Affiliate (public + affiliate JWT): `/affiliates/apply`, `/affiliates/login`, `/affiliates/me`, `/affiliates/admin/*`
+- Admin (X-Admin-Key header): `/admin/users`, `/admin/stats`, `/admin/costs`, `/admin/blog`
+- Blog (public): `/blog/posts`, `/blog/posts/:slug`
 - Health checks: `GET /` (shallow), `GET /health` (deep — verifies DB connection)
 
 ### Database
@@ -644,6 +669,17 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Getting-started checklist on empty dashboard
 - [x] Trial banner on dashboard (visible to solo/free users with active trial)
 - [x] Email verification banner (yellow) when unverified
+- [x] Admin panel (user management, tier changes, trial management, user deletion)
+- [x] Admin stats dashboard (users, tiers, interviews, signups over 7/30 days)
+- [x] Admin AI cost reporting (platform-wide + per-company breakdown)
+- [x] Affiliate program (apply, login, dashboard, referral tracking, commission calculation)
+- [x] Affiliate admin management (approve/reject, commission %, payout recording)
+- [x] Stripe webhook affiliate conversion tracking (commission on subscription)
+- [x] AI usage tracking (Claude tokens, Whisper seconds, TTS characters → cost_usd)
+- [x] Research participant panel (PanelProfile, PanelTag, magic link auth)
+- [x] Blog CMS (TipTap WYSIWYG editor, live preview, draft/publish, SEO meta + OG tags)
+- [x] Public blog listing (/blog) + article pages (/blog/:slug) with newsletter CTA
+- [x] Blog admin tab (create, edit, delete posts, status filter)
 - [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented)
 - [ ] Email invitation sending (template exists, no send endpoint)
 - [ ] Multi-language TTS voices (language field exists on projects)
@@ -681,12 +717,12 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] CI/CD: GitHub Actions (pytest + tsc + build), Cloud Build (auto-deploy on push)
 - [x] Health checks: `GET /` (shallow) + `GET /health` (deep, DB-aware)
 - [x] Secret Manager integration (secrets injected at deploy, not in .env)
-- [x] Test suite: 46 tests (auth, email verification, feature gates, project CRUD)
+- [x] Test suite: 57 tests (auth, email verification, feature gates, project CRUD)
 - [x] Rate limiting (SlowAPI): public/auth/default tiers
 - [x] Security headers middleware
 - [x] JSON structured logging (python-json-logger)
 - [x] Sentry integration (optional, configurable via SENTRY_DSN)
-- [x] Alembic migrations (4 versions)
+- [x] Alembic migrations (9 versions)
 - [x] SendGrid email delivery (domain-authenticated, 6 email templates)
 - [ ] GDPR tooling (data export, participant deletion)
 - [ ] Prometheus metrics / APM dashboards
@@ -737,6 +773,30 @@ gcloud builds list --region=europe-west1 --limit=5
 
 ### PasswordResetToken
 `id`, `company_id`, `token` (unique, urlsafe), `used`, `expires_at`, `created_at`
+
+### Affiliate
+`id` (str), `company_id` (FK), `name`, `email` (unique), `code` (unique), `website`, `how_they_found_us`, `commission_pct` (default 20%), `status` (pending/active/rejected), `payout_threshold` (default $50), `total_earned`, `total_paid`, `created_at`, `approved_at`, `notes`
+
+### AffiliateReferral
+`id` (str), `affiliate_id` (FK), `referred_company_id` (FK, unique), `signed_up_at`, `converted_at`, `commission_amount`, `status` (signed_up/converted/paid)
+
+### AffiliatePayout
+`id` (str), `affiliate_id` (FK), `amount`, `paid_at`, `notes`
+
+### AIUsageLog
+`id` (int), `company_id` (FK), `project_id` (FK), `participant_id` (FK), `operation` (indexed), `model`, `input_tokens`, `output_tokens`, `characters` (TTS), `audio_seconds` (STT), `cost_usd`, `created_at` (indexed)
+
+### PanelProfile
+`id` (int), `email` (unique), `first_name`, `age_range`, `gender`, `country`, `city`, `education`, `employment_status`, `job_function`, `seniority`, `industry`, `company_size`, `panel_consent`, `consent_at`, `consent_interview_token`, `interviews_completed`, `last_active`, `created_at`
+
+### PanelTag
+`id`, `name` (unique), `category` (interest/behavior/consumer)
+
+### ParticipantMagicToken
+`id`, `email` (indexed), `token` (unique, indexed), `interview_link_token`, `used`, `expires_at`, `created_at`
+
+### BlogPost
+`id` (str), `slug` (unique, indexed), `title`, `subtitle`, `content` (HTML from TipTap), `excerpt`, `cover_image_url`, `meta_title`, `meta_description`, `og_image_url`, `author_name`, `tags` (JSON text), `status` (draft/published, indexed), `published_at`, `created_at`, `updated_at`
 
 ---
 
@@ -844,6 +904,41 @@ gcloud builds list --region=europe-west1 --limit=5
 | POST | `/billing/checkout` | Create Stripe Checkout session |
 | POST | `/billing/portal` | Open Stripe Customer Portal |
 | POST | `/billing/webhook` | Stripe webhook handler |
+
+### Affiliate (`/affiliates`)
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/affiliates/apply` | No (5/min) | Apply to become affiliate |
+| POST | `/affiliates/login` | No (10/min) | Login with email + code |
+| GET | `/affiliates/me` | Affiliate JWT | Get affiliate stats & earnings |
+| GET | `/affiliates/me/link` | Affiliate JWT | Get shareable referral link |
+| GET | `/affiliates/me/referrals` | Affiliate JWT | List referred companies |
+| GET | `/affiliates/admin/list` | X-Admin-Key | List all affiliates |
+| PATCH | `/affiliates/admin/{id}` | X-Admin-Key | Update status/commission |
+| POST | `/affiliates/admin/{id}/payout` | X-Admin-Key | Record payout |
+
+### Blog (`/blog` + `/admin/blog`)
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/blog/posts` | No | List published posts (paginated, tag filter) |
+| GET | `/blog/posts/:slug` | No | Get published post by slug |
+| GET | `/admin/blog` | X-Admin-Key | List all posts (draft + published) |
+| GET | `/admin/blog/:id` | X-Admin-Key | Get post by ID |
+| POST | `/admin/blog` | X-Admin-Key | Create post |
+| PUT | `/admin/blog/:id` | X-Admin-Key | Update post |
+| DELETE | `/admin/blog/:id` | X-Admin-Key | Delete post |
+
+### Admin (`/admin`)
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/admin/users` | X-Admin-Key | List users (search, tier filter, pagination) |
+| GET | `/admin/users/{company_id}` | X-Admin-Key | Get user detail with projects |
+| PATCH | `/admin/users/{company_id}/tier` | X-Admin-Key | Change subscription tier |
+| PATCH | `/admin/users/{company_id}/trial` | X-Admin-Key | Extend/reset/expire trial |
+| DELETE | `/admin/users/{company_id}` | X-Admin-Key | Delete user & cascade all data |
+| GET | `/admin/stats` | X-Admin-Key | Platform stats (users, tiers, interviews, signups) |
+| GET | `/admin/costs` | X-Admin-Key | Platform-wide AI cost report |
+| GET | `/admin/costs/company/{company_id}` | X-Admin-Key | Per-company cost breakdown |
 
 ### Health
 | Method | Path | Description |

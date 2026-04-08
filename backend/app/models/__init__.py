@@ -6,12 +6,14 @@ from app.models.memo import ProjectMemo
 from app.models.usage import AIUsageLog
 from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
+from app.models.blog import BlogPost
 
 __all__ = [
     "AIUsageLog",
     "Affiliate",
     "AffiliateReferral",
     "AffiliatePayout",
+    "BlogPost",
     "Company",
     "InterviewGuideQuestion",
     "InterviewLink",

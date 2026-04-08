@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import AdminBlog from "./AdminBlog";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -231,7 +232,7 @@ export default function Admin() {
   const [costs, setCosts] = useState<CostsReport | null>(null);
 
   // Affiliates management
-  const [tab, setTab] = useState<"users" | "affiliates">("users");
+  const [tab, setTab] = useState<"users" | "affiliates" | "blog">("users");
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [affiliatesLoading, setAffiliatesLoading] = useState(false);
 
@@ -697,6 +698,21 @@ export default function Admin() {
           >
             Affiliates
           </button>
+          <button
+            onClick={() => setTab("blog")}
+            style={{
+              padding: "12px 0",
+              border: "none",
+              background: "none",
+              borderBottom: tab === "blog" ? "2px solid var(--primary)" : "none",
+              color: tab === "blog" ? "var(--primary)" : "var(--text-secondary)",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: tab === "blog" ? 600 : 500,
+            }}
+          >
+            Blog
+          </button>
         </div>
 
         {/* Toolbar - Users only */}
@@ -1140,6 +1156,9 @@ export default function Admin() {
         </div>
         )}
       </div>
+
+        {/* Blog management tab */}
+        {tab === "blog" && <AdminBlog adminKey={adminKey} />}
 
       {/* Confirm delete dialog */}
       {confirmDelete && (
