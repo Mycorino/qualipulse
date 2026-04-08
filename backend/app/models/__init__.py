@@ -5,9 +5,13 @@ from app.models.coding import ManualCode, QuoteTag
 from app.models.memo import ProjectMemo
 from app.models.usage import AIUsageLog
 from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
+from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 
 __all__ = [
     "AIUsageLog",
+    "Affiliate",
+    "AffiliateReferral",
+    "AffiliatePayout",
     "Company",
     "InterviewGuideQuestion",
     "InterviewLink",
