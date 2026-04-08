@@ -10,13 +10,13 @@ class AIUsageLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(
-        Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=True, index=True
+        String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=True, index=True
     )
     project_id = Column(
-        Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+        String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
     )
     participant_id = Column(
-        Integer, ForeignKey("participants.id", ondelete="SET NULL"), nullable=True, index=True
+        String(36), ForeignKey("participants.id", ondelete="SET NULL"), nullable=True, index=True
     )
     operation = Column(String, nullable=False, index=True)
     model = Column(String, nullable=False)
