@@ -9,6 +9,7 @@ from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.limiter import limiter
 from app.models.company import Company, EmailVerificationToken, PasswordResetToken
+from app.models.affiliate import Affiliate, AffiliateReferral
 from app.schemas.auth import (
     CompanyResponse,
     LoginRequest,
@@ -65,6 +66,26 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     db.refresh(company)
 
     logger.info("New company signup: %s", company.email)
+
+    # Check for affiliate referral code (from query params or body)
+    ref_code = None
+    if hasattr(body, "ref_code") and body.ref_code:
+        ref_code = body.ref_code
+    else:
+        # Try to get from query params
+        ref_code = request.query_params.get("ref") if hasattr(request, "query_params") else None
+
+    if ref_code:
+        affiliate = db.query(Affiliate).filter(Affiliate.code == ref_code.lower()).first()
+        if affiliate and affiliate.status == "active":
+            # Create affiliate referral
+            referral = AffiliateReferral(
+                affiliate_id=affiliate.id,
+                referred_company_id=company.id,
+            )
+            db.add(referral)
+            db.commit()
+            logger.info("Affiliate referral tracked: %s -> %s", affiliate.code, company.email)
 
     # Create email verification token
     verification_token = EmailVerificationToken(
