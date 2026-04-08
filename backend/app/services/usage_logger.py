@@ -15,9 +15,9 @@ def log_claude_usage(
     db: Session,
     response,  # Anthropic Message response object
     operation: str,
-    company_id: int | None = None,
-    project_id: int | None = None,
-    participant_id: int | None = None,
+    company_id: str | None = None,
+    project_id: str | None = None,
+    participant_id: str | None = None,
 ) -> None:
     """Log Claude API usage from an Anthropic response object."""
     try:
@@ -46,9 +46,9 @@ def log_claude_usage(
 def log_tts_usage(
     db: Session,
     text: str,
-    company_id: int | None = None,
-    project_id: int | None = None,
-    participant_id: int | None = None,
+    company_id: str | None = None,
+    project_id: str | None = None,
+    participant_id: str | None = None,
 ) -> None:
     """Log OpenAI TTS usage based on character count."""
     try:
@@ -73,9 +73,9 @@ def log_tts_usage(
 def log_stt_usage(
     db: Session,
     audio_duration_seconds: float,
-    company_id: int | None = None,
-    project_id: int | None = None,
-    participant_id: int | None = None,
+    company_id: str | None = None,
+    project_id: str | None = None,
+    participant_id: str | None = None,
 ) -> None:
     """Log OpenAI Whisper STT usage based on audio duration."""
     try:
