@@ -6,7 +6,7 @@ Create Date: 2026-04-08
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.engine import reflection
+from sqlalchemy import inspect as sa_inspect
 
 revision = "0007_participant_panel"
 down_revision = "0006_ai_usage_log"
@@ -27,12 +27,12 @@ BEHAVIOR_TAGS = [
 
 
 def _table_exists(conn, table_name: str) -> bool:
-    insp = reflection.Inspector.from_engine(conn)
+    insp = sa_inspect(conn)
     return table_name in insp.get_table_names()
 
 
 def _column_exists(conn, table_name: str, column_name: str) -> bool:
-    insp = reflection.Inspector.from_engine(conn)
+    insp = sa_inspect(conn)
     return any(c["name"] == column_name for c in insp.get_columns(table_name))
 
 
