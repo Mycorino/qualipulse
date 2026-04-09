@@ -1,95 +1,29 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import "./Marketing.css";
-
-const PAIN_POINTS = [
-  {
-    title: "Scheduling is the bottleneck",
-    desc: "You have a research question. You don't have 2 weeks to coordinate calendars with 15 participants across time zones.",
-  },
-  {
-    title: "Synthesis eats your time",
-    desc: "You're spending more hours tagging and re-reading transcripts than actually thinking about what the data means.",
-  },
-  {
-    title: "Stakeholders won't wait",
-    desc: "Product decisions are moving forward before your research is ready. Speed matters, but depth shouldn't be sacrificed.",
-  },
-  {
-    title: "No dedicated researcher on the team",
-    desc: "You know you should talk to users. You just don't have the bandwidth to recruit, schedule, moderate, transcribe, and synthesise.",
-  },
-];
-
-const HOW_IT_WORKS = [
-  {
-    step: "01",
-    title: "Paste your research brief",
-    desc: "Describe what you want to learn. The AI drafts your interview guide — objectives, screener criteria, and questions. You review and refine. Five minutes, not five hours.",
-  },
-  {
-    step: "02",
-    title: "Participants interview on their own time",
-    desc: "Share one link. Participants complete a voice interview in their browser — any device, any timezone. The AI asks follow-ups like a trained interviewer would. No scheduling, no no-shows.",
-  },
-  {
-    step: "03",
-    title: "Read the memo, skip the transcripts",
-    desc: "Once responses are in, trigger an AI synthesis. You'll get structured themes with supporting quotes, tensions, jobs-to-be-done, and recommendations — formatted to share with stakeholders immediately.",
-  },
-];
-
-const USE_CASES = [
-  {
-    title: "UX Researchers",
-    desc: "Run more studies in less time. Offload the logistics, keep the analytical rigor. AI handles moderation and initial synthesis — you steer the interpretation.",
-    examples: "Discovery research, evaluative studies, continuous research programs",
-  },
-  {
-    title: "Product Managers",
-    desc: "Get user insights without waiting for the research team's backlog. Set up a study in minutes, send the link to beta users, get a synthesis you can act on.",
-    examples: "Feature validation, churn investigation, onboarding feedback",
-  },
-  {
-    title: "Consultants & Agencies",
-    desc: "Run qualitative research for clients at scale. Custom branding, shareable reports, multiple projects running in parallel.",
-    examples: "Client research engagements, market research, stakeholder interviews",
-  },
-];
-
-const COMPARISONS = [
-  {
-    vs: "UserTesting / dscout",
-    point: "Those platforms help you recruit and run moderated sessions. QualiPulse replaces the moderator with AI, runs interviews asynchronously, and synthesises the results. No scheduling, no session fees.",
-  },
-  {
-    vs: "Dovetail / EnjoyHQ",
-    point: "Those are analysis-and-repository tools for research you've already done. QualiPulse handles the full workflow: guide creation, interview collection, and synthesis in one place.",
-  },
-  {
-    vs: "Google Forms / Typeform",
-    point: "Surveys give you structured data. QualiPulse gives you qualitative depth — follow-up questions, probing, voice responses — without the overhead of live interviews.",
-  },
-];
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 const PLANS = [
   {
-    name: "Solo",
-    price: "Free",
-    period: "",
-    desc: "For individual researchers exploring the tool",
+    id: "starter",
+    name: "Starter",
+    price: "€49",
+    period: "/mo",
+    desc: "For individual researchers starting out",
     features: [
-      "3 projects",
-      "25 participants per project",
+      "1 project",
+      "10 participants per project",
       "AI interview guide builder",
       "AI themes & quotes analysis",
       "2 interview links per project",
     ],
-    cta: "Get started free",
+    cta: "Start 14-day free trial",
     highlight: false,
   },
   {
+    id: "team",
     name: "Team",
-    price: "$49",
+    price: "€99",
     period: "/mo",
     desc: "For in-house research teams running regular studies",
     features: [
@@ -104,8 +38,9 @@ const PLANS = [
     highlight: true,
   },
   {
+    id: "lab",
     name: "Lab",
-    price: "$149",
+    price: "€199",
     period: "/mo",
     desc: "For research programs and agencies",
     features: [
@@ -122,37 +57,37 @@ const PLANS = [
 ];
 
 export default function Marketing() {
+  const { t } = useTranslation("marketing");
+
   return (
     <div className="mkt">
       {/* Nav */}
       <nav className="mkt-nav">
         <span className="mkt-logo">QualiPulse</span>
         <div className="mkt-nav-links">
-          <a href="#how">How it works</a>
-          <a href="#who">Who it's for</a>
-          <a href="#pricing">Pricing</a>
-          <Link to="/login" className="mkt-nav-login">Log in</Link>
-          <Link to="/signup" className="btn btn-primary mkt-nav-cta">Get started free</Link>
+          <a href="#how">{t("nav.howItWorks")}</a>
+          <a href="#who">{t("nav.whoItsFor")}</a>
+          <a href="#pricing">{t("nav.pricing")}</a>
+          <LanguageSwitcher style={{ marginRight: 4 }} />
+          <Link to="/login" className="mkt-nav-login">{t("nav.login")}</Link>
+          <Link to="/signup" className="btn btn-primary mkt-nav-cta">{t("nav.startTrial")}</Link>
         </div>
       </nav>
 
       {/* Hero */}
       <section className="mkt-hero">
         <div className="mkt-hero-inner">
-          <div className="mkt-badge">Async qualitative research</div>
+          <div className="mkt-badge">{t("hero.badge")}</div>
           <h1 className="mkt-h1">
-            Qualitative insights<br />without the calendar Tetris
+            {t("hero.title").split("\n").map((line, i) => (
+              <span key={i}>{line}{i === 0 && <br />}</span>
+            ))}
           </h1>
-          <p className="mkt-sub">
-            You know the research needs to happen. But scheduling 12 interviews,
-            running them, transcribing, and synthesising takes weeks you don't have.
-            QualiPulse runs AI-moderated voice interviews asynchronously and delivers
-            a structured research memo — automatically.
-          </p>
+          <p className="mkt-sub">{t("hero.subtitle")}</p>
           <div className="mkt-hero-ctas">
-            <Link to="/signup" className="btn btn-primary mkt-btn-lg">Run your first study free</Link>
+            <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("hero.cta")}</Link>
           </div>
-          <p className="mkt-hero-note">Free plan available · 14-day trial on paid plans · No credit card required</p>
+          <p className="mkt-hero-note">{t("hero.note")}</p>
         </div>
 
         {/* Fake UI preview */}
@@ -188,10 +123,10 @@ export default function Marketing() {
       {/* Pain points */}
       <section className="mkt-pain">
         <div className="mkt-pain-inner">
-          <h2 className="mkt-section-title">Sound familiar?</h2>
-          <p className="mkt-section-sub">Most teams know qualitative research is essential. The problem is everything around it.</p>
+          <h2 className="mkt-section-title">{t("painPoints.title")}</h2>
+          <p className="mkt-section-sub">{t("painPoints.subtitle")}</p>
           <div className="mkt-pain-grid">
-            {PAIN_POINTS.map((p) => (
+            {(t("painPoints.items", { returnObjects: true }) as Array<{ title: string; desc: string }>).map((p) => (
               <div key={p.title} className="mkt-pain-card">
                 <h3>{p.title}</h3>
                 <p>{p.desc}</p>
@@ -203,12 +138,12 @@ export default function Marketing() {
 
       {/* How it works */}
       <section className="mkt-section" id="how">
-        <h2 className="mkt-section-title">How it works</h2>
-        <p className="mkt-section-sub">Three steps from research question to stakeholder-ready memo.</p>
+        <h2 className="mkt-section-title">{t("howItWorks.title")}</h2>
+        <p className="mkt-section-sub">{t("howItWorks.subtitle")}</p>
         <div className="mkt-steps">
-          {HOW_IT_WORKS.map((s) => (
-            <div key={s.step} className="mkt-step">
-              <div className="mkt-step-num">{s.step}</div>
+          {(t("howItWorks.steps", { returnObjects: true }) as Array<{ title: string; desc: string }>).map((s, i) => (
+            <div key={i} className="mkt-step">
+              <div className="mkt-step-num">0{i + 1}</div>
               <h3 className="mkt-step-title">{s.title}</h3>
               <p className="mkt-step-desc">{s.desc}</p>
             </div>
@@ -266,7 +201,11 @@ export default function Marketing() {
         <h2 className="mkt-section-title">Built for people who need insights, not busywork</h2>
         <p className="mkt-section-sub">Whether you run research full-time or fit it in between product decisions.</p>
         <div className="mkt-use-cases">
-          {USE_CASES.map((uc) => (
+          {[
+            { title: "UX Researchers", desc: "Run more studies in less time. Offload the logistics, keep the analytical rigor. AI handles moderation and initial synthesis — you steer the interpretation.", examples: "Discovery research, evaluative studies, continuous research programs" },
+            { title: "Product Managers", desc: "Get user insights without waiting for the research team's backlog. Set up a study in minutes, send the link to beta users, get a synthesis you can act on.", examples: "Feature validation, churn investigation, onboarding feedback" },
+            { title: "Consultants & Agencies", desc: "Run qualitative research for clients at scale. Custom branding, shareable reports, multiple projects running in parallel.", examples: "Client research engagements, market research, stakeholder interviews" },
+          ].map((uc) => (
             <div key={uc.title} className="mkt-use-case">
               <h3 className="mkt-use-case-title">{uc.title}</h3>
               <p className="mkt-use-case-desc">{uc.desc}</p>
@@ -282,7 +221,11 @@ export default function Marketing() {
           <h2 className="mkt-section-title">You might be wondering...</h2>
           <p className="mkt-section-sub">How does QualiPulse compare to tools you may already know?</p>
           <div className="mkt-diff-list">
-            {COMPARISONS.map((c) => (
+            {[
+              { vs: "UserTesting / dscout", point: "Those platforms help you recruit and run moderated sessions. QualiPulse replaces the moderator with AI, runs interviews asynchronously, and synthesises the results. No scheduling, no session fees." },
+              { vs: "Dovetail / EnjoyHQ", point: "Those are analysis-and-repository tools for research you've already done. QualiPulse handles the full workflow: guide creation, interview collection, and synthesis in one place." },
+              { vs: "Google Forms / Typeform", point: "Surveys give you structured data. QualiPulse gives you qualitative depth — follow-up questions, probing, voice responses — without the overhead of live interviews." },
+            ].map((c) => (
               <div key={c.vs} className="mkt-diff-row">
                 <span className="mkt-diff-vs">vs. {c.vs}</span>
                 <p className="mkt-diff-point">{c.point}</p>
@@ -292,7 +235,7 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* Trust / Early access */}
+      {/* Trust */}
       <section className="mkt-trust">
         <div className="mkt-trust-inner">
           <h3>"We built QualiPulse because we were tired of spending 80% of our research time on logistics and 20% on thinking. We wanted to flip that ratio."</h3>
@@ -310,12 +253,12 @@ export default function Marketing() {
 
       {/* Pricing */}
       <section className="mkt-section" id="pricing">
-        <h2 className="mkt-section-title">Simple, transparent pricing</h2>
-        <p className="mkt-section-sub">Start free. Upgrade when your research program grows. No credit card required.</p>
+        <h2 className="mkt-section-title">{t("pricing.title")}</h2>
+        <p className="mkt-section-sub">{t("pricing.subtitle")}</p>
         <div className="mkt-plans">
           {PLANS.map((p) => (
-            <div key={p.name} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
-              {p.highlight && <div className="mkt-plan-badge">Recommended</div>}
+            <div key={p.id} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
+              {p.highlight && <div className="mkt-plan-badge">{t("pricing.recommended")}</div>}
               <div className="mkt-plan-name">{p.name}</div>
               <div className="mkt-plan-price">
                 {p.price}<span className="mkt-plan-period">{p.period}</span>
@@ -329,7 +272,7 @@ export default function Marketing() {
                 ))}
               </ul>
               <Link
-                to={`/signup?plan=${p.name.toLowerCase()}`}
+                to={`/signup?plan=${p.id}`}
                 className={`btn ${p.highlight ? "btn-primary" : "btn-secondary"} mkt-plan-cta`}
               >
                 {p.cta}
@@ -338,17 +281,17 @@ export default function Marketing() {
           ))}
         </div>
         <p className="mkt-plans-enterprise">
-          Running a large research program?{" "}
-          <a href="mailto:hello@qualipulse.com">Talk to us about Enterprise</a>
+          {t("pricing.enterprise")}{" "}
+          <a href="mailto:hello@qualipulse.com">{t("pricing.enterpriseCta")}</a>
         </p>
       </section>
 
       {/* Final CTA */}
       <section className="mkt-final-cta">
         <div className="mkt-final-cta-inner">
-          <h2>Your next research study could be done by Friday</h2>
-          <p>Set up a study in 5 minutes. Get your first insights in hours.</p>
-          <Link to="/signup" className="btn btn-primary mkt-btn-lg">Run your first study free</Link>
+          <h2>{t("finalCta.title")}</h2>
+          <p>{t("finalCta.subtitle")}</p>
+          <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("finalCta.cta")}</Link>
         </div>
       </section>
 
@@ -356,13 +299,13 @@ export default function Marketing() {
       <footer className="mkt-footer">
         <span className="mkt-logo">QualiPulse</span>
         <div className="mkt-footer-links">
-          <Link to="/login">Log in</Link>
-          <Link to="/signup">Sign up</Link>
-          <Link to="/terms">Terms</Link>
-          <Link to="/privacy">Privacy</Link>
-          <a href="mailto:hello@qualipulse.com">Contact</a>
+          <Link to="/login">{t("footer.login")}</Link>
+          <Link to="/signup">{t("footer.signup")}</Link>
+          <Link to="/terms">{t("footer.terms")}</Link>
+          <Link to="/privacy">{t("footer.privacy")}</Link>
+          <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
         </div>
-        <span className="mkt-footer-copy">&copy; 2026 QualiPulse &middot; GDPR-compliant &middot; <Link to="/interview/demo" style={{color: "inherit"}}>Got an interview link?</Link></span>
+        <span className="mkt-footer-copy">{t("footer.copy")} &middot; <Link to="/interview/demo" style={{color: "inherit"}}>{t("footer.interviewLink")}</Link></span>
       </footer>
     </div>
   );

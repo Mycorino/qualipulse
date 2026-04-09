@@ -1,0 +1,69 @@
+{
+  "title": "Analysis",
+  "noAnalysis": "No analysis yet. Run an AI synthesis to get themes, JTBDs, tensions, and recommendations.",
+  "runAnalysis": "Run AI analysis",
+  "running": "Generating analysis...",
+  "analysisReady": "Analysis ready",
+  "analysisFailed": "Analysis failed. Please try again.",
+  "lastUpdated": "Last updated {{date}}",
+  "participantCount": "{{count}} participants",
+  "version": "Version {{number}}",
+  "versions": "Versions",
+  "viewVersion": "View this version",
+  "filters": {
+    "title": "Filter by segment",
+    "all": "All participants",
+    "profession": "By profession",
+    "ageRange": "By age range",
+    "country": "By country"
+  },
+  "summary": "Summary",
+  "themes": "Key themes",
+  "jtbd": "Jobs-to-be-done",
+  "tensions": "Tensions",
+  "recommendations": "Recommendations",
+  "themeAnnotation": {
+    "confirm": "Confirmed",
+    "dispute": "Disputed",
+    "needsEvidence": "Needs evidence",
+    "addNote": "Add researcher note...",
+    "saveNote": "Save note"
+  },
+  "refine": {
+    "title": "Refine analysis",
+    "desc": "Add context and annotate themes to get a more tailored synthesis.",
+    "contextLabel": "Additional context",
+    "contextPlaceholder": "Share anything you know that the AI should factor in...",
+    "runRefinement": "Run refined analysis",
+    "running": "Refining..."
+  },
+  "share": {
+    "title": "Share report",
+    "desc": "Generate a public link to share this analysis with stakeholders.",
+    "generateLink": "Generate share link",
+    "copyLink": "Copy link",
+    "copied": "Copied!",
+    "revokeLink": "Revoke link",
+    "active": "Report is publicly accessible"
+  },
+  "heatmap": {
+    "title": "Segment heatmap",
+    "noData": "Not enough data to show a heatmap.",
+    "rowLabel": "Theme",
+    "columnLabel": "Segment"
+  },
+  "memos": {
+    "title": "Memos",
+    "addMemo": "+ Add memo",
+    "memoPlaceholder": "Write a memo...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "types": {
+      "general": "General",
+      "theme_note": "Theme note",
+      "tension_note": "Tension note",
+      "jtbd_note": "JTBD note"
+    }
+  }
+}

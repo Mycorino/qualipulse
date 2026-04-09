@@ -1,0 +1,36 @@
+{
+  "title": "Projects",
+  "createProject": "+ Create Project",
+  "projectCount": "{{count}} of {{max}} projects",
+  "trialBanner": {
+    "title": "14-day trial active",
+    "desc": "You have full Team features until {{date}}.",
+    "viewPlans": "View plans"
+  },
+  "gettingStarted": {
+    "welcome": "Welcome{{name}}! Let's set up your first study.",
+    "subtitle": "Follow these steps to run your first AI-powered interview.",
+    "step1Title": "Create a project",
+    "step1Desc": "Describe your research goals and let AI build your interview guide.",
+    "step1Cta": "Create project →",
+    "step2Title": "Share your interview link",
+    "step2Desc": "Generate a link and send it to participants. They'll complete the interview in their browser.",
+    "step3Title": "Review AI analysis",
+    "step3Desc": "Once you have responses, trigger an AI analysis to get themes, quotes, and recommendations."
+  },
+  "projectCard": {
+    "completed": "{{count}} completed",
+    "inProgress": "{{count}} in progress",
+    "noResponses": "No responses yet",
+    "analysisReady": "Analysis ready",
+    "analysing": "Analysing…"
+  },
+  "archive": {
+    "title": "Archived projects",
+    "loading": "Loading…",
+    "empty": "No archived projects.",
+    "archived": "Archived {{date}}",
+    "restore": "↩ Restore",
+    "view": "View"
+  }
+}

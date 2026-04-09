@@ -1,10 +1,13 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { login, getMe } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function Login() {
+  const { t } = useTranslation("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -21,11 +24,11 @@ export default function Login() {
 
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) {
-      setError("Please enter your email address.");
+      setError(t("login.emailPlaceholder"));
       return;
     }
     if (!password) {
-      setError("Please enter your password.");
+      setError(t("login.passwordLabel"));
       return;
     }
 
@@ -43,11 +46,10 @@ export default function Login() {
           navigate("/dashboard");
         }
       } catch {
-        // If getMe fails, just go to dashboard
         navigate("/dashboard");
       }
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Login failed. Please try again."));
+      setError(getErrorMessage(err, t("login.signIn")));
     } finally {
       setLoading(false);
     }
@@ -56,30 +58,33 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <LanguageSwitcher />
+        </div>
         <div className="auth-logo">QualiPulse</div>
-        <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-subtitle">Sign in to your account</p>
+        <h1 className="auth-title">{t("login.title")}</h1>
+        <p className="auth-subtitle">{t("login.subtitle")}</p>
 
         {resetSuccess && (
-          <div className="success-banner">Password updated successfully. Sign in with your new password.</div>
+          <div className="success-banner">{t("login.resetSuccess")}</div>
         )}
         {error && <div className="error-banner">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label" htmlFor="login-email">Email</label>
+          <label className="field-label" htmlFor="login-email">{t("login.emailLabel")}</label>
           <input
             id="login-email"
             type="email"
             className="field-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
+            placeholder={t("login.emailPlaceholder")}
             required
             autoFocus
             autoComplete="email"
           />
 
-          <label className="field-label" htmlFor="login-password">Password</label>
+          <label className="field-label" htmlFor="login-password">{t("login.passwordLabel")}</label>
           <div style={{ position: "relative" }}>
             <input
               id="login-password"
@@ -108,20 +113,20 @@ export default function Login() {
               }}
               tabIndex={-1}
             >
-              {showPassword ? "Hide" : "Show"}
+              {showPassword ? t("login.hidePassword") : t("login.showPassword")}
             </button>
           </div>
 
           <div style={{ textAlign: "right", marginTop: "4px" }}>
-            <Link to="/forgot-password" className="auth-link">Forgot your password?</Link>
+            <Link to="/forgot-password" className="auth-link">{t("login.forgotPassword")}</Link>
           </div>
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? t("login.signingIn") : t("login.signIn")}
           </button>
         </form>
         <p className="auth-footer" style={{ marginTop: 12 }}>
-          Don't have an account? <Link to="/signup">Sign up free</Link>
+          {t("login.noAccount")} <Link to="/signup">{t("login.signUpFree")}</Link>
         </p>
       </div>
     </div>

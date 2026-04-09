@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import {
   getInterviewInfo,
   getScreeningQuestions,
@@ -69,6 +71,7 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
 }
 
 export default function Interview() {
+  const { t, i18n } = useTranslation("interview");
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -187,7 +190,13 @@ export default function Interview() {
   useEffect(() => {
     if (!token) return;
     getInterviewInfo(token)
-      .then(setInfo)
+      .then((data) => {
+        setInfo(data);
+        // Participant-facing interview uses the project's language, not the researcher's UI language
+        if (data.language && (data.language === "fr" || data.language === "en")) {
+          i18n.changeLanguage(data.language);
+        }
+      })
       .catch(() => setError("This interview link is invalid or has expired."))
       .finally(() => setInfoLoading(false));
   }, [token]);

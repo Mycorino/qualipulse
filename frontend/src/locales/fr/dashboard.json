@@ -1,0 +1,36 @@
+{
+  "title": "Projets",
+  "createProject": "+ Créer un projet",
+  "projectCount": "{{count}} sur {{max}} projets",
+  "trialBanner": {
+    "title": "Essai de 14 jours actif",
+    "desc": "Vous bénéficiez de toutes les fonctionnalités Team jusqu'au {{date}}.",
+    "viewPlans": "Voir les plans"
+  },
+  "gettingStarted": {
+    "welcome": "Bienvenue{{name}} ! Configurons votre première étude.",
+    "subtitle": "Suivez ces étapes pour lancer votre premier entretien IA.",
+    "step1Title": "Créer un projet",
+    "step1Desc": "Décrivez vos objectifs de recherche et laissez l'IA construire votre guide d'entretien.",
+    "step1Cta": "Créer un projet →",
+    "step2Title": "Partager votre lien d'entretien",
+    "step2Desc": "Générez un lien et envoyez-le aux participants. Ils complèteront l'entretien dans leur navigateur.",
+    "step3Title": "Consulter l'analyse IA",
+    "step3Desc": "Une fois les réponses reçues, déclenchez une analyse IA pour obtenir des thèmes, des citations et des recommandations."
+  },
+  "projectCard": {
+    "completed": "{{count}} complété(s)",
+    "inProgress": "{{count}} en cours",
+    "noResponses": "Aucune réponse pour l'instant",
+    "analysisReady": "Analyse disponible",
+    "analysing": "Analyse en cours…"
+  },
+  "archive": {
+    "title": "Projets archivés",
+    "loading": "Chargement…",
+    "empty": "Aucun projet archivé.",
+    "archived": "Archivé le {{date}}",
+    "restore": "↩ Restaurer",
+    "view": "Voir"
+  }
+}

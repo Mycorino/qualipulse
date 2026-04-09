@@ -250,25 +250,25 @@ def get_me(company: Company = Depends(get_current_company)) -> CompanyResponse:
     return CompanyResponse.model_validate(company)
 
 
-class ProfileUpdate(BaseModel):
-    name: str
-
-
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
 
-@router.patch("/me")
+@router.patch("/me", response_model=CompanyResponse)
 def update_profile(
-    body: ProfileUpdate,
+    body: dict,
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
 ):
-    """Update the authenticated company's display name."""
-    company.name = body.name.strip()
+    """Update the authenticated company's profile (name, preferred_language)."""
+    if "name" in body and body["name"]:
+        company.name = str(body["name"]).strip()
+    if "preferred_language" in body and body["preferred_language"] in ("en", "fr"):
+        company.preferred_language = body["preferred_language"]
     db.commit()
-    return {"id": company.id, "name": company.name, "email": company.email}
+    db.refresh(company)
+    return CompanyResponse.model_validate(company)
 
 
 @router.post("/website-intel")

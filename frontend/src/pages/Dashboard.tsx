@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../hooks/useAuth";
 import { SkeletonCard } from "../components/Skeleton";
 import {
@@ -9,8 +10,10 @@ import {
 } from "../api/projects";
 import { getMe, resendVerification } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function Dashboard() {
+  const { t } = useTranslation(["dashboard", "common"]);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,45 +91,55 @@ export default function Dashboard() {
     }
   }
 
+  function getProjectMax(tier: string | undefined): string | number {
+    if (!tier) return 1;
+    if (tier === "starter" || tier === "solo" || tier === "free") return 1;
+    if (tier === "team") return 5;
+    return "∞";
+  }
+
   return (
     <div className="dashboard-layout">
       <header className="dashboard-header" style={{ flexWrap: "wrap" }}>
         <span className="logo">QualiPulse</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <LanguageSwitcher />
           <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
-            Account
+            {t("common:account")}
           </button>
           <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={logout}>
-            Sign out
+            {t("common:signOut")}
           </button>
         </div>
       </header>
 
       <main className="dashboard-main">
         <div className="dashboard-top-row">
-          <h1 style={{ fontSize: "inherit", fontWeight: "inherit", margin: 0 }}>Projects</h1>
+          <h1 style={{ fontSize: "inherit", fontWeight: "inherit", margin: 0 }}>{t("title")}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {!loading && me && (
               <span style={{ fontSize: 13, color: "var(--muted, #6b7280)" }}>
-                {projects.length} of {me.subscription_tier === "solo" || me.subscription_tier === "free" ? 3 : me.subscription_tier === "team" || me.subscription_tier === "starter" ? 5 : "∞"} projects
+                {t("projectCount", { count: projects.length, max: getProjectMax(me.subscription_tier) })}
               </span>
             )}
             <button
               className="btn btn-primary"
               onClick={() => navigate("/projects/new")}
             >
-              + Create Project
+              {t("createProject")}
             </button>
           </div>
         </div>
 
-        {/* Global banners — always visible regardless of project count */}
-        {!loading && me?.trial_ends_at && (me?.subscription_tier === "solo" || me?.subscription_tier === "free") && (
+        {/* Global banners */}
+        {!loading && me?.trial_ends_at && (me?.subscription_tier === "starter" || me?.subscription_tier === "solo" || me?.subscription_tier === "free") && (
           <div className="gs-trial-banner" style={{ marginBottom: 16 }}>
             <span>🎉</span>
             <div>
-              <strong>14-day trial active</strong> — You have full Team features until {new Date(me.trial_ends_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}.
-              {" "}<button className="btn-inline" onClick={() => navigate("/account")}>View plans</button>
+              <strong>{t("trialBanner.title")}</strong> — {t("trialBanner.desc", {
+                date: new Date(me.trial_ends_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+              })}
+              {" "}<button className="btn-inline" onClick={() => navigate("/account")}>{t("trialBanner.viewPlans")}</button>
             </div>
           </div>
         )}
@@ -140,18 +153,18 @@ export default function Dashboard() {
         ) : projects.length === 0 ? (
           <div className="getting-started">
             <div className="getting-started-header">
-              <h2 style={{ color: "#ffffff" }}>Welcome{me?.name ? `, ${me.name}` : ""}! Let's set up your first study.</h2>
-              <p>Follow these steps to run your first AI-powered interview.</p>
+              <h2 style={{ color: "#ffffff" }}>{t("gettingStarted.welcome", { name: me?.name ? `, ${me.name}` : "" })}</h2>
+              <p>{t("gettingStarted.subtitle")}</p>
             </div>
 
             <div className="getting-started-steps">
               <div className="gs-step">
                 <div className="gs-step-icon gs-step-active">1</div>
                 <div className="gs-step-content">
-                  <h3>Create a project</h3>
-                  <p>Describe your research goals and let AI build your interview guide.</p>
+                  <h3>{t("gettingStarted.step1Title")}</h3>
+                  <p>{t("gettingStarted.step1Desc")}</p>
                   <button className="btn btn-primary btn-sm" onClick={() => navigate("/projects/new")}>
-                    Create project &rarr;
+                    {t("gettingStarted.step1Cta")}
                   </button>
                 </div>
               </div>
@@ -159,16 +172,16 @@ export default function Dashboard() {
               <div className="gs-step">
                 <div className="gs-step-icon">2</div>
                 <div className="gs-step-content">
-                  <h3>Share your interview link</h3>
-                  <p>Generate a link and send it to participants. They'll complete the interview in their browser.</p>
+                  <h3>{t("gettingStarted.step2Title")}</h3>
+                  <p>{t("gettingStarted.step2Desc")}</p>
                 </div>
               </div>
 
               <div className="gs-step">
                 <div className="gs-step-icon">3</div>
                 <div className="gs-step-content">
-                  <h3>Review AI analysis</h3>
-                  <p>Once you have responses, trigger an AI analysis to get themes, quotes, and recommendations.</p>
+                  <h3>{t("gettingStarted.step3Title")}</h3>
+                  <p>{t("gettingStarted.step3Desc")}</p>
                 </div>
               </div>
             </div>
@@ -177,17 +190,17 @@ export default function Dashboard() {
               <div className="gs-verify-banner">
                 <span>&#128231;</span>
                 <div>
-                  <strong>Verify your email</strong>
-                  <p>Check your inbox for a verification link to unlock all features.</p>
+                  <strong>{t("common:verifyEmail")}</strong>
+                  <p>{t("common:verifyEmailDesc")}</p>
                   {verificationResent ? (
-                    <span style={{ fontSize: 13, color: "#16a34a" }}>Email sent! Check your inbox.</span>
+                    <span style={{ fontSize: 13, color: "#16a34a" }}>{t("common:emailSent")}</span>
                   ) : (
                     <button
                       className="btn-inline"
                       disabled={resendingVerification}
                       onClick={handleResendVerification}
                     >
-                      {resendingVerification ? "Sending…" : "Resend email"}
+                      {resendingVerification ? t("common:resending") : t("common:resendEmail")}
                     </button>
                   )}
                 </div>
@@ -201,16 +214,16 @@ export default function Dashboard() {
             <div className="gs-verify-banner" style={{ marginBottom: 16 }}>
               <span>&#128231;</span>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <span><strong>Verify your email</strong> — Check your inbox for a verification link.</span>
+                <span><strong>{t("common:verifyEmail")}</strong> — {t("common:verifyEmailDesc")}</span>
                 {verificationResent ? (
-                  <span style={{ fontSize: 13, color: "#16a34a" }}>Email sent!</span>
+                  <span style={{ fontSize: 13, color: "#16a34a" }}>{t("common:emailSent")}</span>
                 ) : (
                   <button
                     className="btn-inline"
                     disabled={resendingVerification}
                     onClick={handleResendVerification}
                   >
-                    {resendingVerification ? "Sending…" : "Resend email"}
+                    {resendingVerification ? t("common:resending") : t("common:resendEmail")}
                   </button>
                 )}
               </div>
@@ -235,26 +248,26 @@ export default function Dashboard() {
                 <div className="project-card-stats">
                   {p.completed_count > 0 && (
                     <span className="project-stat project-stat-completed">
-                      ✓ {p.completed_count} completed
+                      ✓ {t("projectCard.completed", { count: p.completed_count })}
                     </span>
                   )}
                   {p.in_progress_count > 0 && (
                     <span className="project-stat project-stat-inprogress">
-                      ● {p.in_progress_count} in progress
+                      ● {t("projectCard.inProgress", { count: p.in_progress_count })}
                     </span>
                   )}
                   {p.completed_count === 0 && p.in_progress_count === 0 && (
-                    <span className="project-stat project-stat-empty">No responses yet</span>
+                    <span className="project-stat project-stat-empty">{t("projectCard.noResponses")}</span>
                   )}
                   {p.analysis_status === "ready" && (
-                    <span className="project-stat project-stat-analysis">✦ Analysis ready</span>
+                    <span className="project-stat project-stat-analysis">✦ {t("projectCard.analysisReady")}</span>
                   )}
                   {p.analysis_status === "generating" && (
-                    <span className="project-stat project-stat-generating">✦ Analysing…</span>
+                    <span className="project-stat project-stat-generating">✦ {t("projectCard.analysing")}</span>
                   )}
                 </div>
                 <p className="project-card-date">
-                  {new Date(p.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {new Date(p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                 </p>
               </div>
             ))}
@@ -262,11 +275,11 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* ── Archive section ─────────────────────────────────────── */}
+        {/* Archive section */}
         <div className="archive-section">
           <button className="archive-toggle" onClick={handleToggleArchive}>
             <span className="archive-toggle-icon">{showArchive ? "▾" : "▸"}</span>
-            <span>Archived projects</span>
+            <span>{t("archive.title")}</span>
             {archivedProjects.length > 0 && (
               <span className="archive-count">{archivedProjects.length}</span>
             )}
@@ -275,9 +288,9 @@ export default function Dashboard() {
           {showArchive && (
             <div className="archive-list">
               {archiveLoading ? (
-                <p className="archive-empty">Loading…</p>
+                <p className="archive-empty">{t("archive.loading")}</p>
               ) : archivedProjects.length === 0 ? (
-                <p className="archive-empty">No archived projects.</p>
+                <p className="archive-empty">{t("archive.empty")}</p>
               ) : (
                 archivedProjects.map((p) => (
                   <div key={p.id} className="archive-row">
@@ -286,10 +299,12 @@ export default function Dashboard() {
                       <span className="archive-row-meta">
                         <span className="badge badge--sm">{p.language.toUpperCase()}</span>
                         <span>
-                          Archived {p.archived_at ? new Date(p.archived_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : ""}
+                          {p.archived_at
+                            ? t("archive.archived", { date: new Date(p.archived_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) })
+                            : ""}
                         </span>
                         {p.completed_count > 0 && (
-                          <span>· {p.completed_count} completed</span>
+                          <span>· {t("projectCard.completed", { count: p.completed_count })}</span>
                         )}
                       </span>
                     </div>
@@ -299,7 +314,7 @@ export default function Dashboard() {
                         onClick={(e) => handleRestore(e, p.id)}
                         disabled={restoringId === p.id}
                       >
-                        {restoringId === p.id ? "Restoring…" : "↩ Restore"}
+                        {restoringId === p.id ? t("common:restoring") : t("archive.restore")}
                       </button>
                       <button
                         className="btn btn-ghost btn-sm"
@@ -308,7 +323,7 @@ export default function Dashboard() {
                           navigate(`/projects/${p.id}`);
                         }}
                       >
-                        View
+                        {t("archive.view")}
                       </button>
                     </div>
                   </div>

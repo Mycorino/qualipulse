@@ -1,6 +1,9 @@
 """
 Feature gating based on subscription tier.
 Centralises all tier limit checks.
+
+Canonical tiers: starter (€49) | team (€99) | lab (€199) | enterprise (custom)
+Legacy DB aliases: free → starter, solo → starter, pro → lab
 """
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,29 +14,29 @@ from fastapi import HTTPException, status
 @dataclass
 class TierLimits:
     name: str
-    max_projects: int          # -1 = unlimited
+    max_projects: int                  # -1 = unlimited
     max_participants_per_project: int
     max_questions_per_guide: int
     ai_analysis: bool
     export_csv: bool
     custom_branding: bool
-    team_members: int          # max collaborators including owner
+    team_members: int                  # max collaborators including owner
     interview_links_per_project: int
-    price_monthly_usd: int
+    price_monthly_usd: int             # stored in EUR; field name kept for compat
 
 
 TIER_LIMITS: dict[str, TierLimits] = {
-    "solo": TierLimits(
-        name="Solo",
-        max_projects=3,
-        max_participants_per_project=25,
+    "starter": TierLimits(
+        name="Starter",
+        max_projects=1,
+        max_participants_per_project=10,
         max_questions_per_guide=10,
         ai_analysis=True,
         export_csv=False,
         custom_branding=False,
         team_members=1,
         interview_links_per_project=2,
-        price_monthly_usd=0,
+        price_monthly_usd=49,
     ),
     "team": TierLimits(
         name="Team",
@@ -45,7 +48,7 @@ TIER_LIMITS: dict[str, TierLimits] = {
         custom_branding=False,
         team_members=3,
         interview_links_per_project=3,
-        price_monthly_usd=49,
+        price_monthly_usd=99,
     ),
     "lab": TierLimits(
         name="Lab",
@@ -57,7 +60,7 @@ TIER_LIMITS: dict[str, TierLimits] = {
         custom_branding=True,
         team_members=10,
         interview_links_per_project=10,
-        price_monthly_usd=149,
+        price_monthly_usd=199,
     ),
     "enterprise": TierLimits(
         name="Enterprise",
@@ -71,18 +74,17 @@ TIER_LIMITS: dict[str, TierLimits] = {
         interview_links_per_project=-1,
         price_monthly_usd=0,  # custom pricing
     ),
-    # Legacy aliases — map old tier names to new ones
-    "free": None,     # filled below
-    "starter": None,  # filled below
-    "pro": None,      # filled below
 }
 
-# Legacy mappings so existing DB rows with old tier names still work
-TIER_LIMITS["free"] = TIER_LIMITS["solo"]
-TIER_LIMITS["starter"] = TIER_LIMITS["team"]
-TIER_LIMITS["pro"] = TIER_LIMITS["lab"]
+# Legacy aliases — keep existing DB rows working after rename
+TIER_LIMITS["free"] = TIER_LIMITS["starter"]    # old free tier → starter
+TIER_LIMITS["solo"] = TIER_LIMITS["starter"]    # old solo tier → starter
+TIER_LIMITS["pro"] = TIER_LIMITS["lab"]         # old pro tier → lab
 
-DEFAULT_TIER = "solo"
+DEFAULT_TIER = "starter"
+
+# Canonical tier IDs (no legacy aliases)
+CANONICAL_TIERS = ("starter", "team", "lab", "enterprise")
 
 
 def get_limits(tier: str) -> TierLimits:
@@ -93,14 +95,14 @@ def get_limits(tier: str) -> TierLimits:
 def get_effective_limits(company) -> TierLimits:
     """Get limits for a company, accounting for active trial.
 
-    If the company is on the solo (free) tier but has an active trial
+    If the company is on the starter tier but has an active trial
     (trial_ends_at is in the future), return team-level limits.
     """
     tier = company.subscription_tier or DEFAULT_TIER
     limits = TIER_LIMITS.get(tier, TIER_LIMITS[DEFAULT_TIER])
 
-    # If on solo/free tier with an active trial, upgrade to team limits
-    if tier in ("solo", "free") and getattr(company, "trial_ends_at", None):
+    # Starter/legacy-free/solo users with active trial get team-level limits
+    if tier in ("starter", "free", "solo") and getattr(company, "trial_ends_at", None):
         if company.trial_ends_at > datetime.utcnow():
             limits = TIER_LIMITS["team"]
 

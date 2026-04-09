@@ -1,0 +1,105 @@
+{
+  "emailEntry": {
+    "title": "Join the interview",
+    "subtitle": "Enter your email to receive a link and continue on any device.",
+    "emailLabel": "Email address",
+    "emailPlaceholder": "you@example.com",
+    "continue": "Continue",
+    "sending": "Sending...",
+    "orContinueWithout": "Or continue without email",
+    "skip": "Skip"
+  },
+  "emailSent": {
+    "title": "Check your email",
+    "desc": "We sent a link to {{email}}. Click it to continue on this device or any other.",
+    "continueHere": "Continue on this device",
+    "resend": "Resend",
+    "resendCooldown": "Resend in {{seconds}}s"
+  },
+  "consent": {
+    "title": "Before we begin",
+    "desc": "This interview is conducted by AI. Your responses will be recorded and analysed to help improve products and services.",
+    "dataUse": "Your data will be processed according to the",
+    "privacyPolicy": "privacy policy",
+    "consentLabel": "I agree to participate and have my responses recorded",
+    "panelConsentLabel": "I'd like to join the research panel to be invited to future studies",
+    "accept": "Continue to interview",
+    "decline": "No thanks",
+    "declinedTitle": "No problem",
+    "declinedDesc": "Your response has not been recorded. You can close this tab."
+  },
+  "profile": {
+    "title": "Tell us about yourself",
+    "subtitle": "This helps researchers understand the context of your answers.",
+    "firstNameLabel": "First name",
+    "firstNamePlaceholder": "Your first name",
+    "ageRangeLabel": "Age range",
+    "genderLabel": "Gender",
+    "employmentLabel": "Employment status",
+    "jobFunctionLabel": "Job function",
+    "industryLabel": "Industry",
+    "companySizeLabel": "Company size",
+    "seniorityLabel": "Seniority",
+    "cityLabel": "City",
+    "tagsLabel": "Interests / topics",
+    "continue": "Continue",
+    "skip": "Skip"
+  },
+  "micTest": {
+    "title": "Microphone check",
+    "desc": "Speak a few words to test your microphone. The indicator will turn green when we detect your voice.",
+    "autoPass": "Microphone detected",
+    "skip": "Skip mic test",
+    "permissionDenied": "Microphone access denied. Please allow microphone access in your browser and refresh the page.",
+    "refresh": "Refresh page"
+  },
+  "screening": {
+    "title": "A few quick questions",
+    "subtitle": "These help ensure the study is a good fit for you.",
+    "back": "← Back",
+    "next": "Next →",
+    "submit": "Submit",
+    "disqualified": {
+      "title": "Thank you for your interest",
+      "desc": "Based on your answers, this particular study isn't the right fit — but we appreciate your time.",
+      "close": "Close"
+    }
+  },
+  "interview": {
+    "progressLabel": "Q{{current}} of {{total}}",
+    "followUpLabel": "Follow-up · Q{{current}} of {{total}}",
+    "timeRemaining": "{{minutes}}:{{seconds}} remaining",
+    "timeWarning": "Less than 2 minutes remaining",
+    "timeCritical": "Less than 30 seconds remaining",
+    "recordButton": "Hold to record",
+    "stopButton": "Release to stop",
+    "submitButton": "Submit",
+    "reRecord": "↺ Re-record",
+    "muteAudio": "Mute",
+    "unmuteAudio": "Unmute",
+    "skipQuestion": "Skip question",
+    "processing": {
+      "transcribing": "Transcribing...",
+      "thinking": "Thinking...",
+      "preparing": "Preparing next question..."
+    },
+    "transcript": "Your answer:",
+    "networkError": "Network error. Your answer is saved — tap Submit to retry."
+  },
+  "completion": {
+    "title": "Thank you, {{name}}!",
+    "titleGeneric": "Thank you!",
+    "answeredCount": "You answered {{count}} questions",
+    "whatNext": "What happens next?",
+    "nextDesc": "The research team will review your responses along with others. Insights from this study will inform product decisions.",
+    "close": "Close"
+  },
+  "resume": {
+    "title": "Resume your interview",
+    "desc": "You've already started this interview. Here's where you left off:",
+    "coveredTopics": "Topics covered:",
+    "elapsed": "Time elapsed: {{time}}",
+    "resume": "Resume interview",
+    "startOver": "Start over"
+  }
+}

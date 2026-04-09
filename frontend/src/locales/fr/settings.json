@@ -1,0 +1,45 @@
+{
+  "title": "Paramètres du compte",
+  "tabs": {
+    "profile": "Profil",
+    "billing": "Plan & Facturation"
+  },
+  "profile": {
+    "title": "Profil",
+    "nameLabel": "Nom",
+    "emailLabel": "Email",
+    "saveChanges": "Enregistrer les modifications",
+    "saving": "Enregistrement...",
+    "saved": "✓ Profil mis à jour",
+    "changePassword": "Changer le mot de passe",
+    "currentPasswordLabel": "Mot de passe actuel",
+    "newPasswordLabel": "Nouveau mot de passe",
+    "newPasswordPlaceholder": "Au moins 8 caractères",
+    "updatePassword": "Mettre à jour le mot de passe",
+    "passwordUpdated": "✓ Mot de passe mis à jour",
+    "passwordError": "Échec de la mise à jour. Vérifiez votre mot de passe actuel."
+  },
+  "billing": {
+    "currentPlan": "Plan actuel",
+    "upgradePlan": "Changer de plan",
+    "manageBilling": "Gérer la facturation →",
+    "contactUs": "Nous contacter",
+    "currentPlanLabel": "Plan actuel",
+    "upgradeToLabel": "Passer au plan {{name}}",
+    "limits": {
+      "projects": "Projets",
+      "participants": "Participants par projet",
+      "aiAnalysis": "Analyse IA",
+      "csvExport": "Export CSV",
+      "teamMembers": "Membres de l'équipe",
+      "included": "✓ Inclus",
+      "upgrade": "— Mettez à niveau pour débloquer"
+    }
+  },
+  "language": {
+    "title": "Langue",
+    "subtitle": "Choisissez la langue de l'interface.",
+    "en": "English",
+    "fr": "Français"
+  }
+}

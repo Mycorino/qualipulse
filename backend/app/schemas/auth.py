@@ -58,7 +58,7 @@ class CompanyResponse(BaseModel):
     industry: Optional[str] = None
     use_case: Optional[str] = None
     onboarding_completed: bool = False
-    subscription_tier: str = "free"
+    subscription_tier: str = "starter"
     trial_ends_at: Optional[datetime] = None
     created_at: datetime
     website_url: Optional[str] = None
@@ -66,5 +66,11 @@ class CompanyResponse(BaseModel):
     research_experience: Optional[str] = None
     primary_region: Optional[str] = None
     goals_freeform: Optional[str] = None
+    preferred_language: str = "fr"
 
     model_config = {"from_attributes": True}
+
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    preferred_language: Optional[str] = None

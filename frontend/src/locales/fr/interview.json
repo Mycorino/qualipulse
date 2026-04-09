@@ -1,0 +1,105 @@
+{
+  "emailEntry": {
+    "title": "Rejoindre l'entretien",
+    "subtitle": "Entrez votre email pour recevoir un lien et continuer sur n'importe quel appareil.",
+    "emailLabel": "Adresse email",
+    "emailPlaceholder": "vous@exemple.com",
+    "continue": "Continuer",
+    "sending": "Envoi en cours...",
+    "orContinueWithout": "Ou continuer sans email",
+    "skip": "Passer"
+  },
+  "emailSent": {
+    "title": "Vérifiez votre email",
+    "desc": "Nous avons envoyé un lien à {{email}}. Cliquez dessus pour continuer sur cet appareil ou un autre.",
+    "continueHere": "Continuer sur cet appareil",
+    "resend": "Renvoyer",
+    "resendCooldown": "Renvoyer dans {{seconds}}s"
+  },
+  "consent": {
+    "title": "Avant de commencer",
+    "desc": "Cet entretien est conduit par une IA. Vos réponses seront enregistrées et analysées afin d'aider à améliorer des produits et services.",
+    "dataUse": "Vos données seront traitées conformément à la",
+    "privacyPolicy": "politique de confidentialité",
+    "consentLabel": "J'accepte de participer et que mes réponses soient enregistrées",
+    "panelConsentLabel": "Je souhaite rejoindre le panel de recherche pour être invité(e) à de futures études",
+    "accept": "Accéder à l'entretien",
+    "decline": "Non merci",
+    "declinedTitle": "Pas de problème",
+    "declinedDesc": "Votre réponse n'a pas été enregistrée. Vous pouvez fermer cet onglet."
+  },
+  "profile": {
+    "title": "Présentez-vous",
+    "subtitle": "Ces informations aident les chercheurs à contextualiser vos réponses.",
+    "firstNameLabel": "Prénom",
+    "firstNamePlaceholder": "Votre prénom",
+    "ageRangeLabel": "Tranche d'âge",
+    "genderLabel": "Genre",
+    "employmentLabel": "Situation professionnelle",
+    "jobFunctionLabel": "Fonction",
+    "industryLabel": "Secteur d'activité",
+    "companySizeLabel": "Taille de l'entreprise",
+    "seniorityLabel": "Niveau d'ancienneté",
+    "cityLabel": "Ville",
+    "tagsLabel": "Centres d'intérêt / thématiques",
+    "continue": "Continuer",
+    "skip": "Passer"
+  },
+  "micTest": {
+    "title": "Test du microphone",
+    "desc": "Prononcez quelques mots pour tester votre microphone. L'indicateur passera au vert lorsque votre voix sera détectée.",
+    "autoPass": "Microphone détecté",
+    "skip": "Passer le test",
+    "permissionDenied": "Accès au microphone refusé. Veuillez autoriser l'accès au microphone dans votre navigateur et actualiser la page.",
+    "refresh": "Actualiser la page"
+  },
+  "screening": {
+    "title": "Quelques questions rapides",
+    "subtitle": "Ces questions permettent de vérifier que cette étude vous correspond.",
+    "back": "← Précédent",
+    "next": "Suivant →",
+    "submit": "Valider",
+    "disqualified": {
+      "title": "Merci de votre intérêt",
+      "desc": "D'après vos réponses, cette étude n'est pas adaptée à votre profil — nous apprécions tout de même votre temps.",
+      "close": "Fermer"
+    }
+  },
+  "interview": {
+    "progressLabel": "Q{{current}} sur {{total}}",
+    "followUpLabel": "Question complémentaire · Q{{current}} sur {{total}}",
+    "timeRemaining": "{{minutes}}:{{seconds}} restant",
+    "timeWarning": "Moins de 2 minutes restantes",
+    "timeCritical": "Moins de 30 secondes restantes",
+    "recordButton": "Appuyez pour enregistrer",
+    "stopButton": "Relâchez pour arrêter",
+    "submitButton": "Soumettre",
+    "reRecord": "↺ Ré-enregistrer",
+    "muteAudio": "Couper le son",
+    "unmuteAudio": "Rétablir le son",
+    "skipQuestion": "Passer la question",
+    "processing": {
+      "transcribing": "Transcription en cours...",
+      "thinking": "Analyse en cours...",
+      "preparing": "Préparation de la prochaine question..."
+    },
+    "transcript": "Votre réponse :",
+    "networkError": "Erreur réseau. Votre réponse est sauvegardée — appuyez sur Soumettre pour réessayer."
+  },
+  "completion": {
+    "title": "Merci, {{name}} !",
+    "titleGeneric": "Merci !",
+    "answeredCount": "Vous avez répondu à {{count}} questions",
+    "whatNext": "Et maintenant ?",
+    "nextDesc": "L'équipe de recherche analysera vos réponses avec celles des autres participants. Les enseignements de cette étude orienteront les décisions produit.",
+    "close": "Fermer"
+  },
+  "resume": {
+    "title": "Reprendre votre entretien",
+    "desc": "Vous avez déjà commencé cet entretien. Voici où vous en étiez :",
+    "coveredTopics": "Sujets abordés :",
+    "elapsed": "Temps écoulé : {{time}}",
+    "resume": "Reprendre l'entretien",
+    "startOver": "Recommencer"
+  }
+}

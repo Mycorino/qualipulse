@@ -24,6 +24,7 @@ export interface CompanyResponse {
   research_experience: string | null;
   primary_region: string | null;
   goals_freeform: string | null;
+  preferred_language: string;
 }
 
 export interface OnboardingProfile {

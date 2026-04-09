@@ -43,8 +43,8 @@ class Company(Base):
     goals_freeform: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Subscription
-    subscription_tier: Mapped[str] = mapped_column(String(20), default="solo", nullable=False)
-    # "solo" | "team" | "lab" | "enterprise"
+    subscription_tier: Mapped[str] = mapped_column(String(20), default="starter", nullable=False)
+    # "starter" | "team" | "lab" | "enterprise"
     subscription_status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     # "active" | "past_due" | "canceled" | "trialing"
     stripe_customer_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -52,6 +52,7 @@ class Company(Base):
     trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     interview_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     storage_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    preferred_language: Mapped[str] = mapped_column(String(5), default="fr", nullable=False)
 
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")

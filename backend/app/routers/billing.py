@@ -13,7 +13,7 @@ from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.models.affiliate import AffiliateReferral, Affiliate
-from app.services.feature_gates import TIER_LIMITS, get_limits
+from app.services.feature_gates import TIER_LIMITS, CANONICAL_TIERS, get_limits
 
 logger = logging.getLogger("auto_interview.billing")
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -32,8 +32,6 @@ class PortalRequest(BaseModel):
 @router.get("/plans")
 def list_plans():
     """Return all available subscription tiers and their limits."""
-    # Only return canonical tiers, not legacy aliases (free/starter/pro)
-    canonical_tiers = ("solo", "team", "lab", "enterprise")
     return [
         {
             "id": tier_id,
@@ -46,7 +44,7 @@ def list_plans():
             "custom_branding": TIER_LIMITS[tier_id].custom_branding,
             "team_members": TIER_LIMITS[tier_id].team_members,
         }
-        for tier_id in canonical_tiers
+        for tier_id in CANONICAL_TIERS
     ]
 
 
@@ -223,7 +221,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         if company_id:
             company = db.query(Company).filter(Company.id == company_id).first()
             if company:
-                company.subscription_tier = "solo"
+                company.subscription_tier = "starter"
                 company.subscription_status = "canceled"
                 db.commit()
 

@@ -24,43 +24,43 @@ def make_company(tier: str, trial_ends_at=None):
 
 
 class TestGetLimits:
-    def test_returns_solo_limits_for_unknown_tier(self):
+    def test_returns_starter_limits_for_unknown_tier(self):
         limits = get_limits("unknown_tier")
-        assert limits == TIER_LIMITS["solo"]
+        assert limits == TIER_LIMITS["starter"]
 
     def test_all_tiers_present(self):
-        for tier in ("solo", "team", "lab", "enterprise"):
+        for tier in ("starter", "team", "lab", "enterprise"):
             limits = get_limits(tier)
             assert limits.name is not None
 
     def test_legacy_aliases(self):
-        """Old DB values ('free', 'starter', 'pro') still resolve."""
-        assert get_limits("free").name == "Solo"
-        assert get_limits("starter").name == "Team"
+        """Old DB values ('free', 'solo', 'pro') still resolve."""
+        assert get_limits("free").name == "Starter"
+        assert get_limits("solo").name == "Starter"
         assert get_limits("pro").name == "Lab"
 
-    def test_solo_tier_name(self):
-        limits = get_limits("solo")
-        assert limits.name == "Solo"
+    def test_starter_tier_name(self):
+        limits = get_limits("starter")
+        assert limits.name == "Starter"
 
 
 class TestGetEffectiveLimits:
-    def test_solo_tier_no_trial(self):
-        company = make_company("solo")
+    def test_starter_tier_no_trial(self):
+        company = make_company("starter")
         limits = get_effective_limits(company)
-        assert limits.name == "Solo"
+        assert limits.name == "Starter"
 
-    def test_solo_tier_with_active_trial_gets_team(self):
+    def test_starter_tier_with_active_trial_gets_team(self):
         future = datetime.utcnow() + timedelta(days=7)
-        company = make_company("solo", trial_ends_at=future)
+        company = make_company("starter", trial_ends_at=future)
         limits = get_effective_limits(company)
         assert limits.name == "Team"
 
-    def test_solo_tier_with_expired_trial_stays_solo(self):
+    def test_starter_tier_with_expired_trial_stays_starter(self):
         past = datetime.utcnow() - timedelta(days=1)
-        company = make_company("solo", trial_ends_at=past)
+        company = make_company("starter", trial_ends_at=past)
         limits = get_effective_limits(company)
-        assert limits.name == "Solo"
+        assert limits.name == "Starter"
 
     def test_legacy_free_with_trial_gets_team(self):
         """Old 'free' tier values still get trial upgrade."""
@@ -82,12 +82,12 @@ class TestGetEffectiveLimits:
 
 
 class TestRequireProjectLimit:
-    def test_solo_tier_allows_up_to_three_projects(self):
-        require_project_limit(make_company("solo"), 2)  # no exception
+    def test_starter_tier_allows_one_project(self):
+        require_project_limit(make_company("starter"), 0)  # no exception
 
-    def test_solo_tier_blocks_fourth_project(self):
+    def test_starter_tier_blocks_second_project(self):
         with pytest.raises(HTTPException) as exc_info:
-            require_project_limit(make_company("solo"), 3)
+            require_project_limit(make_company("starter"), 1)
         assert exc_info.value.status_code == 403
 
     def test_lab_tier_unlimited_projects(self):
@@ -98,21 +98,21 @@ class TestRequireProjectLimit:
         with pytest.raises(HTTPException):
             require_project_limit(make_company("team"), 5)  # at limit -> blocked
 
-    def test_solo_with_trial_gets_team_limit(self):
+    def test_starter_with_trial_gets_team_limit(self):
         future = datetime.utcnow() + timedelta(days=7)
-        company = make_company("solo", trial_ends_at=future)
+        company = make_company("starter", trial_ends_at=future)
         require_project_limit(company, 4)  # team allows 5
         with pytest.raises(HTTPException):
             require_project_limit(company, 5)
 
 
 class TestRequireQuestionLimit:
-    def test_solo_tier_allows_ten_questions(self):
-        require_question_limit(make_company("solo"), 10)  # exactly at limit
+    def test_starter_tier_allows_ten_questions(self):
+        require_question_limit(make_company("starter"), 10)  # exactly at limit
 
-    def test_solo_tier_blocks_eleven_questions(self):
+    def test_starter_tier_blocks_eleven_questions(self):
         with pytest.raises(HTTPException) as exc_info:
-            require_question_limit(make_company("solo"), 11)
+            require_question_limit(make_company("starter"), 11)
         assert exc_info.value.status_code == 403
 
     def test_enterprise_unlimited(self):
@@ -120,24 +120,24 @@ class TestRequireQuestionLimit:
 
 
 class TestRequireParticipantLimit:
-    def test_solo_tier_allows_up_to_limit(self):
+    def test_starter_tier_allows_up_to_limit(self):
         project = MagicMock()
-        require_participant_limit(make_company("solo"), project, 24)
+        require_participant_limit(make_company("starter"), project, 9)
 
-    def test_solo_tier_blocks_at_limit(self):
+    def test_starter_tier_blocks_at_limit(self):
         project = MagicMock()
         with pytest.raises(HTTPException) as exc_info:
-            require_participant_limit(make_company("solo"), project, 25)
+            require_participant_limit(make_company("starter"), project, 10)
         assert exc_info.value.status_code == 403
 
 
 class TestRequireLinkLimit:
-    def test_solo_tier_allows_up_to_two_links(self):
-        require_link_limit(make_company("solo"), 1)
+    def test_starter_tier_allows_up_to_two_links(self):
+        require_link_limit(make_company("starter"), 1)
 
-    def test_solo_tier_blocks_third_link(self):
+    def test_starter_tier_blocks_third_link(self):
         with pytest.raises(HTTPException) as exc_info:
-            require_link_limit(make_company("solo"), 2)
+            require_link_limit(make_company("starter"), 2)
         assert exc_info.value.status_code == 403
 
     def test_lab_tier_allows_up_to_limit(self):
@@ -148,33 +148,33 @@ class TestRequireLinkLimit:
 
 
 class TestRequireFeature:
-    def test_solo_tier_can_use_ai_analysis(self):
-        require_feature(make_company("solo"), "ai_analysis")  # no exception
+    def test_starter_tier_can_use_ai_analysis(self):
+        require_feature(make_company("starter"), "ai_analysis")  # no exception
 
     def test_team_tier_can_use_ai_analysis(self):
         require_feature(make_company("team"), "ai_analysis")  # no exception
 
-    def test_solo_tier_cannot_export_csv(self):
+    def test_starter_tier_cannot_export_csv(self):
         with pytest.raises(HTTPException):
-            require_feature(make_company("solo"), "export_csv")
+            require_feature(make_company("starter"), "export_csv")
 
     def test_team_can_export_csv(self):
         require_feature(make_company("team"), "export_csv")
 
-    def test_solo_tier_cannot_use_custom_branding(self):
+    def test_starter_tier_cannot_use_custom_branding(self):
         with pytest.raises(HTTPException):
-            require_feature(make_company("solo"), "custom_branding")
+            require_feature(make_company("starter"), "custom_branding")
 
     def test_lab_can_use_custom_branding(self):
         require_feature(make_company("lab"), "custom_branding")
 
-    def test_solo_with_trial_can_export_csv(self):
+    def test_starter_with_trial_can_export_csv(self):
         future = datetime.utcnow() + timedelta(days=7)
-        company = make_company("solo", trial_ends_at=future)
+        company = make_company("starter", trial_ends_at=future)
         require_feature(company, "export_csv")  # team allows this
 
-    def test_solo_with_expired_trial_cannot_export_csv(self):
+    def test_starter_with_expired_trial_cannot_export_csv(self):
         past = datetime.utcnow() - timedelta(days=1)
-        company = make_company("solo", trial_ends_at=past)
+        company = make_company("starter", trial_ends_at=past)
         with pytest.raises(HTTPException):
             require_feature(company, "export_csv")

@@ -1,0 +1,78 @@
+{
+  "nav": {
+    "howItWorks": "Comment ça marche",
+    "whoItsFor": "Pour qui",
+    "pricing": "Tarifs",
+    "login": "Se connecter",
+    "startTrial": "Essai gratuit"
+  },
+  "hero": {
+    "badge": "Recherche qualitative asynchrone",
+    "title": "Des insights qualitatifs\nsans le casse-tête des plannings",
+    "subtitle": "Vous savez que la recherche doit avoir lieu. Mais coordonner 12 entretiens, les conduire, transcrire et synthétiser prend des semaines que vous n'avez pas. QualiPulse mène des entretiens vocaux animés par l'IA de manière asynchrone et produit un mémo de recherche structuré — automatiquement.",
+    "cta": "Commencer votre essai de 14 jours",
+    "note": "Essai gratuit de 14 jours · Aucune carte de crédit requise · Annulable à tout moment"
+  },
+  "painPoints": {
+    "title": "Ça vous parle ?",
+    "subtitle": "La plupart des équipes savent que la recherche qualitative est essentielle. Le problème, c'est tout ce qui l'entoure.",
+    "items": [
+      {
+        "title": "La planification est le goulot d'étranglement",
+        "desc": "Vous avez une question de recherche. Mais vous n'avez pas 2 semaines pour coordonner les agendas de 15 participants à travers les fuseaux horaires."
+      },
+      {
+        "title": "La synthèse dévore votre temps",
+        "desc": "Vous passez plus de temps à annoter et relire des transcriptions qu'à réfléchir au sens des données."
+      },
+      {
+        "title": "Les parties prenantes n'attendent pas",
+        "desc": "Les décisions produit avancent avant que votre recherche soit prête. La rapidité compte, mais la profondeur ne doit pas être sacrifiée."
+      },
+      {
+        "title": "Pas de chercheur dédié dans l'équipe",
+        "desc": "Vous savez qu'il faudrait parler aux utilisateurs. Mais vous n'avez pas la bande passante pour recruter, planifier, animer, transcrire et synthétiser."
+      }
+    ]
+  },
+  "howItWorks": {
+    "title": "Comment ça marche",
+    "subtitle": "Trois étapes, de la question de recherche au mémo prêt à partager.",
+    "steps": [
+      {
+        "title": "Collez votre brief de recherche",
+        "desc": "Décrivez ce que vous voulez apprendre. L'IA rédige votre guide d'entretien — objectifs, critères de sélection et questions. Vous relisez et affinez. Cinq minutes, pas cinq heures."
+      },
+      {
+        "title": "Les participants répondent à leur rythme",
+        "desc": "Partagez un lien. Les participants réalisent un entretien vocal dans leur navigateur — sur n'importe quel appareil, dans n'importe quel fuseau horaire. L'IA pose des questions de suivi comme un interviewer expérimenté. Aucune planification, aucun absent."
+      },
+      {
+        "title": "Lisez le mémo, passez les transcriptions",
+        "desc": "Une fois les réponses collectées, déclenchez une synthèse IA. Vous obtenez des thèmes structurés avec des citations, des tensions, des jobs-to-be-done et des recommandations — prêts à partager avec vos parties prenantes."
+      }
+    ]
+  },
+  "pricing": {
+    "title": "Des tarifs simples et transparents",
+    "subtitle": "Essai gratuit de 14 jours sur tous les plans. Aucune carte de crédit requise pour commencer.",
+    "recommended": "Recommandé",
+    "enterprise": "Vous gérez un programme de recherche important ?",
+    "enterpriseCta": "Parlons Enterprise",
+    "perMonth": "/mois"
+  },
+  "finalCta": {
+    "title": "Votre prochaine étude pourrait être prête vendredi",
+    "subtitle": "Configurez une étude en 5 minutes. Obtenez vos premiers insights en quelques heures.",
+    "cta": "Commencer votre essai de 14 jours"
+  },
+  "footer": {
+    "login": "Se connecter",
+    "signup": "S'inscrire",
+    "terms": "CGU",
+    "privacy": "Confidentialité",
+    "contact": "Contact",
+    "copy": "© 2026 QualiPulse · Conforme RGPD",
+    "interviewLink": "Vous avez un lien d'entretien ?"
+  }
+}

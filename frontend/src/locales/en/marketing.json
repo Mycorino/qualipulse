@@ -1,0 +1,78 @@
+{
+  "nav": {
+    "howItWorks": "How it works",
+    "whoItsFor": "Who it's for",
+    "pricing": "Pricing",
+    "login": "Log in",
+    "startTrial": "Start free trial"
+  },
+  "hero": {
+    "badge": "Async qualitative research",
+    "title": "Qualitative insights\nwithout the calendar Tetris",
+    "subtitle": "You know the research needs to happen. But scheduling 12 interviews, running them, transcribing, and synthesising takes weeks you don't have. QualiPulse runs AI-moderated voice interviews asynchronously and delivers a structured research memo — automatically.",
+    "cta": "Start your 14-day free trial",
+    "note": "14-day free trial · No credit card required · Cancel anytime"
+  },
+  "painPoints": {
+    "title": "Sound familiar?",
+    "subtitle": "Most teams know qualitative research is essential. The problem is everything around it.",
+    "items": [
+      {
+        "title": "Scheduling is the bottleneck",
+        "desc": "You have a research question. You don't have 2 weeks to coordinate calendars with 15 participants across time zones."
+      },
+      {
+        "title": "Synthesis eats your time",
+        "desc": "You're spending more hours tagging and re-reading transcripts than actually thinking about what the data means."
+      },
+      {
+        "title": "Stakeholders won't wait",
+        "desc": "Product decisions are moving forward before your research is ready. Speed matters, but depth shouldn't be sacrificed."
+      },
+      {
+        "title": "No dedicated researcher on the team",
+        "desc": "You know you should talk to users. You just don't have the bandwidth to recruit, schedule, moderate, transcribe, and synthesise."
+      }
+    ]
+  },
+  "howItWorks": {
+    "title": "How it works",
+    "subtitle": "Three steps from research question to stakeholder-ready memo.",
+    "steps": [
+      {
+        "title": "Paste your research brief",
+        "desc": "Describe what you want to learn. The AI drafts your interview guide — objectives, screener criteria, and questions. You review and refine. Five minutes, not five hours."
+      },
+      {
+        "title": "Participants interview on their own time",
+        "desc": "Share one link. Participants complete a voice interview in their browser — any device, any timezone. The AI asks follow-ups like a trained interviewer would. No scheduling, no no-shows."
+      },
+      {
+        "title": "Read the memo, skip the transcripts",
+        "desc": "Once responses are in, trigger an AI synthesis. You'll get structured themes with supporting quotes, tensions, jobs-to-be-done, and recommendations — formatted to share with stakeholders immediately."
+      }
+    ]
+  },
+  "pricing": {
+    "title": "Simple, transparent pricing",
+    "subtitle": "14-day free trial on all plans. No credit card required to start.",
+    "recommended": "Recommended",
+    "enterprise": "Running a large research program?",
+    "enterpriseCta": "Talk to us about Enterprise",
+    "perMonth": "/mo"
+  },
+  "finalCta": {
+    "title": "Your next research study could be done by Friday",
+    "subtitle": "Set up a study in 5 minutes. Get your first insights in hours.",
+    "cta": "Start your 14-day free trial"
+  },
+  "footer": {
+    "login": "Log in",
+    "signup": "Sign up",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "contact": "Contact",
+    "copy": "© 2026 QualiPulse · GDPR-compliant",
+    "interviewLink": "Got an interview link?"
+  }
+}

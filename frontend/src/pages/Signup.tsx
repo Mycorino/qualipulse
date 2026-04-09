@@ -1,24 +1,27 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { signup } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
-function getPasswordStrength(pw: string): { label: string; color: string; width: string } {
+function getPasswordStrength(pw: string, t: (key: string) => string): { label: string; color: string; width: string } {
   if (pw.length === 0) return { label: "", color: "", width: "0%" };
-  if (pw.length < 8) return { label: "Too short", color: "var(--danger)", width: "25%" };
+  if (pw.length < 8) return { label: t("signup.passwordStrength.tooShort"), color: "var(--danger)", width: "25%" };
   const hasUpper = /[A-Z]/.test(pw);
   const hasLower = /[a-z]/.test(pw);
   const hasNum = /[0-9]/.test(pw);
   const hasSpecial = /[^A-Za-z0-9]/.test(pw);
   const score = [hasUpper, hasLower, hasNum, hasSpecial].filter(Boolean).length;
-  if (score <= 1) return { label: "Weak", color: "var(--danger)", width: "25%" };
-  if (score === 2) return { label: "Fair", color: "var(--warning)", width: "50%" };
-  if (score === 3) return { label: "Good", color: "var(--success)", width: "75%" };
-  return { label: "Strong", color: "var(--success)", width: "100%" };
+  if (score <= 1) return { label: t("signup.passwordStrength.weak"), color: "var(--danger)", width: "25%" };
+  if (score === 2) return { label: t("signup.passwordStrength.fair"), color: "var(--warning)", width: "50%" };
+  if (score === 3) return { label: t("signup.passwordStrength.good"), color: "var(--success)", width: "75%" };
+  return { label: t("signup.passwordStrength.strong"), color: "var(--success)", width: "100%" };
 }
 
 export default function Signup() {
+  const { t } = useTranslation("auth");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,19 +36,18 @@ export default function Signup() {
     e.preventDefault();
     setError("");
 
-    // Client-side validation
     const trimmedName = name.trim();
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedName) {
-      setError("Please enter your company or name.");
+      setError(t("signup.errors.nameRequired"));
       return;
     }
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setError("Please enter a valid email address.");
+      setError(t("signup.errors.emailInvalid"));
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("signup.errors.passwordTooShort"));
       return;
     }
 
@@ -57,10 +59,10 @@ export default function Signup() {
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       if (status === 409) {
-        setError("An account with this email already exists. Try logging in instead.");
+        setError(t("signup.errors.emailExists"));
         setShowLoginHint(true);
       } else {
-        const msg = getErrorMessage(err, "Signup failed. Please try again.");
+        const msg = getErrorMessage(err, t("signup.createAccount"));
         if (msg.toLowerCase().includes("already")) {
           setError(msg);
           setShowLoginHint(true);
@@ -77,34 +79,37 @@ export default function Signup() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <LanguageSwitcher />
+        </div>
         <div className="auth-logo">QualiPulse</div>
-        <h1 className="auth-title">Create your account</h1>
-        <p className="auth-subtitle">Start running AI-powered research interviews in minutes.</p>
+        <h1 className="auth-title">{t("signup.title")}</h1>
+        <p className="auth-subtitle">{t("signup.subtitle")}</p>
 
         {error && (
           <div className="error-banner">
             {error}
             {showLoginHint && (
-              <> <Link to="/login" style={{ color: "var(--primary)", fontWeight: 600 }}>Sign in instead →</Link></>
+              <> <Link to="/login" style={{ color: "var(--primary)", fontWeight: 600 }}>{t("signup.signInInstead")}</Link></>
             )}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label" htmlFor="signup-name">Company or your name</label>
+          <label className="field-label" htmlFor="signup-name">{t("signup.nameLabel")}</label>
           <input
             id="signup-name"
             type="text"
             className="field-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Acme Research"
+            placeholder={t("signup.namePlaceholder")}
             required
             autoFocus
             autoComplete="name"
           />
 
-          <label className="field-label" htmlFor="signup-email">Work email</label>
+          <label className="field-label" htmlFor="signup-email">{t("signup.emailLabel")}</label>
           <input
             id="signup-email"
             type="email"
@@ -116,7 +121,7 @@ export default function Signup() {
             autoComplete="email"
           />
 
-          <label className="field-label" htmlFor="signup-password">Password</label>
+          <label className="field-label" htmlFor="signup-password">{t("signup.passwordLabel")}</label>
           <div style={{ position: "relative" }}>
             <input
               id="signup-password"
@@ -124,7 +129,7 @@ export default function Signup() {
               className="field-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
+              placeholder={t("signup.passwordPlaceholder")}
               required
               minLength={8}
               autoComplete="new-password"
@@ -147,11 +152,11 @@ export default function Signup() {
               }}
               tabIndex={-1}
             >
-              {showPassword ? "Hide" : "Show"}
+              {showPassword ? t("login.hidePassword") : t("login.showPassword")}
             </button>
           </div>
           {password && (() => {
-            const strength = getPasswordStrength(password);
+            const strength = getPasswordStrength(password, t);
             return (
               <div style={{ marginTop: "6px" }}>
                 <div style={{ height: "3px", background: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
@@ -163,16 +168,16 @@ export default function Signup() {
           })()}
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? "Creating account..." : "Get started free"}
+            {loading ? t("signup.creatingAccount") : t("signup.createAccount")}
           </button>
         </form>
 
         <p className="auth-terms" style={{ fontSize: "0.813rem" }}>
-          By signing up, you agree to our <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>.
+          {t("signup.termsPrefix")} <Link to="/terms">{t("signup.termsLink")}</Link> {t("signup.termsAnd")} <Link to="/privacy">{t("signup.privacyLink")}</Link>.
         </p>
 
         <p className="auth-footer">
-          Already have an account? <Link to="/login">Sign in</Link>
+          {t("signup.alreadyHaveAccount")} <Link to="/login">{t("signup.signIn")}</Link>
         </p>
       </div>
     </div>

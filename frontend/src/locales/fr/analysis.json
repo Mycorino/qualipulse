@@ -1,0 +1,69 @@
+{
+  "title": "Analyse",
+  "noAnalysis": "Aucune analyse pour l'instant. Lancez une synthèse IA pour obtenir des thèmes, des JTBD, des tensions et des recommandations.",
+  "runAnalysis": "Lancer l'analyse IA",
+  "running": "Génération de l'analyse...",
+  "analysisReady": "Analyse disponible",
+  "analysisFailed": "L'analyse a échoué. Veuillez réessayer.",
+  "lastUpdated": "Dernière mise à jour le {{date}}",
+  "participantCount": "{{count}} participants",
+  "version": "Version {{number}}",
+  "versions": "Versions",
+  "viewVersion": "Voir cette version",
+  "filters": {
+    "title": "Filtrer par segment",
+    "all": "Tous les participants",
+    "profession": "Par profession",
+    "ageRange": "Par tranche d'âge",
+    "country": "Par pays"
+  },
+  "summary": "Résumé",
+  "themes": "Thèmes clés",
+  "jtbd": "Jobs-to-be-done",
+  "tensions": "Tensions",
+  "recommendations": "Recommandations",
+  "themeAnnotation": {
+    "confirm": "Confirmé",
+    "dispute": "Contesté",
+    "needsEvidence": "À étayer",
+    "addNote": "Ajouter une note de chercheur...",
+    "saveNote": "Enregistrer la note"
+  },
+  "refine": {
+    "title": "Affiner l'analyse",
+    "desc": "Ajoutez du contexte et annotez les thèmes pour obtenir une synthèse plus ciblée.",
+    "contextLabel": "Contexte supplémentaire",
+    "contextPlaceholder": "Partagez tout ce que vous savez et que l'IA devrait prendre en compte...",
+    "runRefinement": "Lancer l'analyse affinée",
+    "running": "Affinage en cours..."
+  },
+  "share": {
+    "title": "Partager le rapport",
+    "desc": "Générez un lien public pour partager cette analyse avec vos parties prenantes.",
+    "generateLink": "Générer un lien de partage",
+    "copyLink": "Copier le lien",
+    "copied": "Copié !",
+    "revokeLink": "Révoquer le lien",
+    "active": "Le rapport est accessible publiquement"
+  },
+  "heatmap": {
+    "title": "Carte de chaleur par segment",
+    "noData": "Pas assez de données pour afficher la carte.",
+    "rowLabel": "Thème",
+    "columnLabel": "Segment"
+  },
+  "memos": {
+    "title": "Mémos",
+    "addMemo": "+ Ajouter un mémo",
+    "memoPlaceholder": "Rédigez un mémo...",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "types": {
+      "general": "Général",
+      "theme_note": "Note de thème",
+      "tension_note": "Note de tension",
+      "jtbd_note": "Note JTBD"
+    }
+  }
+}

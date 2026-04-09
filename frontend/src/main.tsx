@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
 import "./index.css";
+import "./i18n"; // initialise i18next before rendering
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

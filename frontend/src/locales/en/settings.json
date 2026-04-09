@@ -1,0 +1,45 @@
+{
+  "title": "Account Settings",
+  "tabs": {
+    "profile": "Profile",
+    "billing": "Plan & Billing"
+  },
+  "profile": {
+    "title": "Profile",
+    "nameLabel": "Name",
+    "emailLabel": "Email",
+    "saveChanges": "Save changes",
+    "saving": "Saving...",
+    "saved": "✓ Profile updated",
+    "changePassword": "Change Password",
+    "currentPasswordLabel": "Current password",
+    "newPasswordLabel": "New password",
+    "newPasswordPlaceholder": "At least 8 characters",
+    "updatePassword": "Update password",
+    "passwordUpdated": "✓ Password updated",
+    "passwordError": "Failed to update password. Check your current password."
+  },
+  "billing": {
+    "currentPlan": "Current plan",
+    "upgradePlan": "Upgrade plan",
+    "manageBilling": "Manage billing →",
+    "contactUs": "Contact us",
+    "currentPlanLabel": "Current plan",
+    "upgradeToLabel": "Upgrade to {{name}}",
+    "limits": {
+      "projects": "Projects",
+      "participants": "Participants per project",
+      "aiAnalysis": "AI analysis",
+      "csvExport": "CSV export",
+      "teamMembers": "Team members",
+      "included": "✓ Included",
+      "upgrade": "— Upgrade to unlock"
+    }
+  },
+  "language": {
+    "title": "Language",
+    "subtitle": "Choose the interface language.",
+    "en": "English",
+    "fr": "Français"
+  }
+}

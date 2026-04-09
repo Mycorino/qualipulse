@@ -284,13 +284,13 @@ See `.env.example` at repo root for Docker/production template.
 ### Feature Gates (Subscription Tiers)
 Enforced on all create endpoints. Defined in `services/feature_gates.py`.
 
-Canonical tier names: `solo`, `team`, `lab`, `enterprise`.
-Legacy aliases still work in DB: `free` → solo, `starter` → team, `pro` → lab.
+Canonical tier names: `starter`, `team`, `lab`, `enterprise`.
+Legacy aliases still work in DB: `free` → starter, `solo` → starter, `pro` → lab.
 
-| Gate | Solo ($0) | Team ($49) | Lab ($149) | Enterprise |
+| Gate | Starter (€49) | Team (€99) | Lab (€199) | Enterprise |
 |---|---|---|---|---|
-| Projects | 3 | 5 | Unlimited | Unlimited |
-| Participants/project | 25 | 50 | 500 | Unlimited |
+| Projects | 1 | 5 | Unlimited | Unlimited |
+| Participants/project | 10 | 50 | 500 | Unlimited |
 | Questions/guide | 10 | 15 | 30 | Unlimited |
 | Interview links/project | 2 | 3 | 10 | Unlimited |
 | AI Analysis | Yes | Yes | Yes | Yes |
@@ -298,9 +298,9 @@ Legacy aliases still work in DB: `free` → solo, `starter` → team, `pro` → 
 | Custom Branding | No | No | Yes | Yes |
 | Team Members | 1 | 3 | 10 | Unlimited |
 
-**14-day trial:** New signups on Solo tier get `trial_ends_at` set 14 days ahead.
+**14-day trial:** New signups on Starter tier get `trial_ends_at` set 14 days ahead.
 While trial is active, `get_effective_limits()` returns Team-level limits.
-After trial expires, limits revert to Solo.
+After trial expires, limits revert to Starter.
 
 **Where gates are enforced:**
 - `projects.py` → `create_project`, `import_project_from_csv` (project limit + question limit)
