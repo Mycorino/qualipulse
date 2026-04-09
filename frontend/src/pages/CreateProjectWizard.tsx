@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { createProject, updateProject, getProject } from "../api/projects";
 import type { QuestionCreate, ScreeningQuestionCreate } from "../api/projects";
@@ -25,8 +26,6 @@ const LANGUAGES = [
 
 const DURATIONS = [15, 20, 30, 45];
 
-const STEPS = ["Your brief", "What to learn", "Who & how long", "Your questions"];
-
 const DRAFT_KEY = "wizard_draft";
 
 function loadDraft() {
@@ -42,6 +41,7 @@ export default function CreateProjectWizard() {
   const navigate = useNavigate();
   const { id: editId } = useParams<{ id?: string }>();
   const isEditMode = !!editId;
+  const { t } = useTranslation("project");
 
   // In edit mode, skip draft restore and load from API instead
   const draft = isEditMode ? null : loadDraft();
@@ -80,6 +80,13 @@ export default function CreateProjectWizard() {
   const { toast } = useToast();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const STEPS = [
+    t("wizard.step1"),
+    t("wizard.step2"),
+    t("wizard.step3"),
+    t("wizard.step4"),
+  ];
 
   // Auto-save draft (only in create mode)
   useEffect(() => {
@@ -121,14 +128,14 @@ export default function CreateProjectWizard() {
   async function handleParseBrief() {
     if (!context.trim() && files.length === 0) return;
     setLoading(true);
-    setLoadingMsg("Reading your brief...");
+    setLoadingMsg(t("wizard.loadingReadingBrief"));
     setError("");
     if (!originalContext) setOriginalContext(context);
     try {
       const res = await parseBrief(context, files);
       setBriefSummary(res.summary);
     } catch {
-      setError("Failed to parse brief. Please try again.");
+      setError(t("wizard.errorParseBrief"));
     } finally {
       setLoading(false);
       setLoadingMsg("");
@@ -137,7 +144,7 @@ export default function CreateProjectWizard() {
 
   async function handleSuggestObjective() {
     setLoading(true);
-    setLoadingMsg("Crafting your research objective...");
+    setLoadingMsg(t("wizard.loadingObjective"));
     setError("");
     try {
       const res = await suggestObjective(context, briefSummary);
@@ -146,7 +153,7 @@ export default function CreateProjectWizard() {
       setStudyType(res.study_type);
       setRationale(res.rationale);
     } catch {
-      setError("Failed to generate objective. Please try again.");
+      setError(t("wizard.errorObjective"));
     } finally {
       setLoading(false);
       setLoadingMsg("");
@@ -155,7 +162,7 @@ export default function CreateProjectWizard() {
 
   async function handleSuggestScope() {
     setLoading(true);
-    setLoadingMsg("Recommending study scope...");
+    setLoadingMsg(t("wizard.loadingScope"));
     setError("");
     try {
       const res = await suggestScope(objective, learningGoals, context);
@@ -163,7 +170,7 @@ export default function CreateProjectWizard() {
       setDurationMinutes(res.duration_minutes);
       setLanguage(res.language);
     } catch {
-      setError("Failed to recommend scope. Please try again.");
+      setError(t("wizard.errorScope"));
     } finally {
       setLoading(false);
       setLoadingMsg("");
@@ -177,7 +184,7 @@ export default function CreateProjectWizard() {
     }
     setConfirmRegenerate(false);
     setLoading(true);
-    setLoadingMsg("Writing your interview guide...");
+    setLoadingMsg(t("wizard.loadingQuestions"));
     setError("");
     try {
       const res = await suggestQuestions(
@@ -191,7 +198,7 @@ export default function CreateProjectWizard() {
       setQuestions(res.questions);
       setExpandedQ(null);
     } catch {
-      setError("Failed to generate questions. Please try again.");
+      setError(t("wizard.errorQuestions"));
     } finally {
       setLoading(false);
       setLoadingMsg("");
@@ -202,7 +209,7 @@ export default function CreateProjectWizard() {
 
   async function handleCreate() {
     setLoading(true);
-    setLoadingMsg("Creating project...");
+    setLoadingMsg(t("wizard.loadingCreating"));
     setError("");
     try {
       const body = {
@@ -218,11 +225,11 @@ export default function CreateProjectWizard() {
         : await createProject(body);
       if (!isEditMode) {
         localStorage.removeItem(DRAFT_KEY);
-        toast("Project created!", "success");
+        toast(t("wizard.projectCreated"), "success");
       }
       navigate(`/projects/${project.id}`);
     } catch {
-      setError("Failed to create project. Please try again.");
+      setError(t("wizard.errorCreate"));
       setLoading(false);
       setLoadingMsg("");
     }
@@ -236,6 +243,7 @@ export default function CreateProjectWizard() {
   }
 
   function removeSQ(i: number) {
+    if (!window.confirm(t("wizard.confirmRemoveScreening"))) return;
     setScreeningQuestions((prev) => prev.filter((_, idx) => idx !== i));
     setExpandedSQ(null);
   }
@@ -302,6 +310,7 @@ export default function CreateProjectWizard() {
   }
 
   function removeQuestion(i: number) {
+    if (!window.confirm(t("wizard.confirmRemoveQuestion"))) return;
     setQuestions((prev) => prev.filter((_, idx) => idx !== i));
   }
 
@@ -311,7 +320,7 @@ export default function CreateProjectWizard() {
       ...prev,
       {
         section_index: lastSection?.section_index ?? 0,
-        section_title: lastSection?.section_title ?? "General",
+        section_title: lastSection?.section_title ?? t("wizard.sectionGeneral"),
         question_index: prev.length,
         main_question: "",
         interview_notes: "",
@@ -326,10 +335,10 @@ export default function CreateProjectWizard() {
     <div className="wizard-layout">
       <header className="wizard-header">
         <button className="btn btn-ghost btn-sm" onClick={() => navigate("/dashboard")}>
-          ← Back
+          {t("wizard.backButton")}
         </button>
-        <h2 className="wizard-title">{isEditMode ? "Edit Project" : "New Research Project"}</h2>
-        {!isEditMode && <span className="wizard-autosave wizard-autosave--hide-mobile">Draft auto-saved</span>}
+        <h2 className="wizard-title">{isEditMode ? t("wizard.titleEdit") : t("wizard.title")}</h2>
+        {!isEditMode && <span className="wizard-autosave wizard-autosave--hide-mobile">{t("wizard.draftAutoSaved")}</span>}
         {isEditMode && <div style={{ width: 80 }} />}
       </header>
 
@@ -353,10 +362,11 @@ export default function CreateProjectWizard() {
       <main className="wizard-main">
         {hasDraft && (
         <div className="draft-banner" style={{ background: "var(--brand-50, #eff6ff)", color: "var(--brand-700, #1d4ed8)", borderColor: "var(--brand-200, #bfdbfe)" }}>
-          <span>Draft restored — pick up where you left off.</span>
+          <span>{t("wizard.draftRestored")}</span>
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => {
+              if (!window.confirm(t("wizard.confirmDiscardDraft"))) return;
               localStorage.removeItem(DRAFT_KEY);
               setHasDraft(false);
               setStep(1); setName(""); setContext(""); setBriefSummary("");
@@ -364,7 +374,7 @@ export default function CreateProjectWizard() {
               setAudience(""); setDurationMinutes(20); setLanguage("en"); setQuestions([]);
             }}
           >
-            Discard draft
+            {t("wizard.discardDraft")}
           </button>
         </div>
       )}
@@ -374,35 +384,35 @@ export default function CreateProjectWizard() {
         {step === 1 && (
           <div className="wizard-card">
             <div className="wizard-card-header">
-              <h2>Project Brief</h2>
-              <p className="muted-text">Tell us about your project so the AI can guide you through the rest.</p>
+              <h2>{t("wizard.briefTitle")}</h2>
+              <p className="muted-text">{t("wizard.briefSubtitle")}</p>
             </div>
 
-            <label className="field-label">Project Name *</label>
+            <label className="field-label">{t("wizard.projectNameLabel")}</label>
             <input
               className="field-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Customer Churn Research Q2"
+              placeholder={t("wizard.projectNamePlaceholder")}
             />
 
             <label className="field-label">
-              Context &amp; Business Situation
+              {t("wizard.contextLabel")}
             </label>
             <textarea
               className="field-input wizard-textarea"
               rows={5}
               value={context}
               onChange={(e) => setContext(e.target.value)}
-              placeholder="Describe your business, the problem you're trying to understand, and what decision this research will inform. The more detail you give, the sharper the AI guidance will be."
+              placeholder={t("wizard.contextPlaceholder")}
             />
 
             <label className="field-label">
-              Supporting Documents <span className="optional-tag">(optional)</span>
+              {t("wizard.supportingDocs")} <span className="optional-tag">({t("wizard.optional")})</span>
             </label>
             <div className="file-upload-area" onClick={() => fileInputRef.current?.click()}>
               {files.length === 0 ? (
-                <span className="muted-text">Click to upload .txt or .md files</span>
+                <span className="muted-text">{t("wizard.uploadPrompt")}</span>
               ) : (
                 <div className="file-chips">
                   {files.map((f, i) => (
@@ -434,21 +444,21 @@ export default function CreateProjectWizard() {
                 onClick={handleParseBrief}
                 disabled={loading}
               >
-                {loading ? <><span className="spinner-sm" />{loadingMsg}</> : "✦ Summarise with AI"}
+                {loading ? <><span className="spinner-sm" />{loadingMsg}</> : t("wizard.summariseWithAI")}
               </button>
             )}
 
             {briefSummary && (
               <div className="ai-output-box">
                 <div className="ai-output-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>AI understood your brief as:</span>
+                  <span>{t("wizard.aiBriefLabel")}</span>
                   {originalContext && (
                     <button
                       className="btn btn-ghost btn-xs"
                       style={{ fontSize: 11 }}
                       onClick={() => { setContext(originalContext); setBriefSummary(""); setOriginalContext(""); }}
                     >
-                      Revert to original
+                      {t("wizard.revertToOriginal")}
                     </button>
                   )}
                 </div>
@@ -460,15 +470,15 @@ export default function CreateProjectWizard() {
               <div />
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 {!name.trim() && (
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Enter a project name to continue</p>
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>{t("wizard.nameRequired")}</p>
                 )}
                 <button
                   className="btn btn-primary"
                   disabled={!name.trim()}
-                  title={!name.trim() ? "Please enter a project name to continue" : undefined}
+                  title={!name.trim() ? t("wizard.nameRequiredTooltip") : undefined}
                   onClick={() => { setError(""); setStep(2); }}
                 >
-                  Next →
+                  {t("wizard.nextButton")}
                 </button>
               </div>
             </div>
@@ -479,8 +489,8 @@ export default function CreateProjectWizard() {
         {step === 2 && (
           <div className="wizard-card">
             <div className="wizard-card-header">
-              <h2>Research Objective</h2>
-              <p className="muted-text">Define precisely what you want to learn. The AI will propose an objective based on your brief.</p>
+              <h2>{t("wizard.objectiveTitle")}</h2>
+              <p className="muted-text">{t("wizard.objectiveSubtitle")}</p>
             </div>
 
             <button
@@ -488,12 +498,12 @@ export default function CreateProjectWizard() {
               onClick={handleSuggestObjective}
               disabled={loading}
             >
-              {loading ? <><span className="spinner-sm" />{loadingMsg}</> : "✦ Generate Objective"}
+              {loading ? <><span className="spinner-sm" />{loadingMsg}</> : t("wizard.generateObjective")}
             </button>
 
             {rationale && (
               <div className="ai-output-box">
-                <div className="ai-output-label">Why this framing:</div>
+                <div className="ai-output-label">{t("wizard.whyThisFraming")}</div>
                 <p>{rationale}</p>
                 {studyType && (
                   <span className="badge" style={{ marginTop: 8, display: "inline-block" }}>
@@ -503,16 +513,16 @@ export default function CreateProjectWizard() {
               </div>
             )}
 
-            <label className="field-label">Primary Objective *</label>
+            <label className="field-label">{t("wizard.primaryObjectiveLabel")}</label>
             <textarea
               className="field-input wizard-textarea"
               rows={3}
               value={objective}
               onChange={(e) => setObjective(e.target.value)}
-              placeholder="e.g. Understand what leads first-time buyers to not return, and what would need to change for them to become regulars"
+              placeholder={t("wizard.objectivePlaceholder")}
             />
 
-            <label className="field-label">Learning Goals</label>
+            <label className="field-label">{t("wizard.learningGoalsLabel")}</label>
             {learningGoals.map((goal: string, i: number) => (
               <textarea
                 key={i}
@@ -525,18 +535,18 @@ export default function CreateProjectWizard() {
                     prev.map((g: string, j: number) => (j === i ? e.target.value : g))
                   )
                 }
-                placeholder={`Learning goal ${i + 1}`}
+                placeholder={t("wizard.learningGoalPlaceholder", { number: i + 1 })}
               />
             ))}
 
             <div className="wizard-nav">
-              <button className="btn btn-ghost" onClick={() => setStep(1)}>← Back</button>
+              <button className="btn btn-ghost" onClick={() => setStep(1)}>{t("wizard.backButton")}</button>
               <button
                 className="btn btn-primary"
                 disabled={!objective.trim()}
                 onClick={() => { setError(""); setStep(3); }}
               >
-                Next →
+                {t("wizard.nextButton")}
               </button>
             </div>
           </div>
@@ -546,8 +556,8 @@ export default function CreateProjectWizard() {
         {step === 3 && (
           <div className="wizard-card">
             <div className="wizard-card-header">
-              <h2>Study Scope</h2>
-              <p className="muted-text">Define who you're talking to and how long the interview should be.</p>
+              <h2>{t("wizard.scopeTitle")}</h2>
+              <p className="muted-text">{t("wizard.scopeSubtitle")}</p>
             </div>
 
             <button
@@ -555,30 +565,30 @@ export default function CreateProjectWizard() {
               onClick={handleSuggestScope}
               disabled={loading}
             >
-              {loading ? <><span className="spinner-sm" />{loadingMsg}</> : "✦ AI Recommend Scope"}
+              {loading ? <><span className="spinner-sm" />{loadingMsg}</> : t("wizard.generateScope")}
             </button>
 
-            <label className="field-label">Target Audience</label>
+            <label className="field-label">{t("wizard.audienceLabel")}</label>
             <textarea
               className="field-input wizard-textarea"
               rows={3}
               value={audience}
               onChange={(e) => setAudience(e.target.value)}
-              placeholder="e.g. remote workers, product managers, students..."
+              placeholder={t("wizard.audiencePlaceholder")}
             />
 
-            <label className="field-label">Interview Duration</label>
+            <label className="field-label">{t("wizard.durationLabel")}</label>
             <select
               className="field-input"
               value={durationMinutes}
               onChange={(e) => setDurationMinutes(Number(e.target.value))}
             >
               {DURATIONS.map((d) => (
-                <option key={d} value={d}>{d} minutes</option>
+                <option key={d} value={d}>{t("wizard.durationMinutes", { count: d })}</option>
               ))}
             </select>
 
-            <label className="field-label">Interview Language</label>
+            <label className="field-label">{t("wizard.languageLabel")}</label>
             <select
               className="field-input"
               value={language}
@@ -591,32 +601,32 @@ export default function CreateProjectWizard() {
 
             <div style={{ marginTop: 24 }}>
               <label className="field-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>Screening Questions <span className="optional-tag">(optional)</span></span>
-                <button className="btn btn-ghost btn-sm" onClick={addSQ}>+ Add</button>
+                <span>{t("wizard.screeningTitle")} <span className="optional-tag">({t("wizard.optional")})</span></span>
+                <button className="btn btn-ghost btn-sm" onClick={addSQ}>{t("wizard.addScreening")}</button>
               </label>
               <p className="muted-text" style={{ marginBottom: 12, fontSize: 13 }}>
-                Asked before the interview. Mark answers that disqualify the participant.
+                {t("wizard.screeningSubtitle")}
               </p>
               {screeningQuestions.map((sq, sqIdx) => (
                 <div key={sqIdx} className="guide-editor-question" style={{ marginBottom: 8 }}>
                   <div className="guide-editor-header" onClick={() => setExpandedSQ(expandedSQ === sqIdx ? null : sqIdx)}>
                     <span className="guide-editor-num">Q{sqIdx + 1}</span>
                     <span className="guide-editor-preview" style={{ flex: 1, marginLeft: 8 }}>
-                      {sq.question || <em className="muted-text">Empty screening question</em>}
+                      {sq.question || <em className="muted-text">{t("wizard.emptyScreeningQuestion")}</em>}
                     </span>
                     {sq.disqualifying_options.length > 0 && (
                       <span className="badge" style={{ marginRight: 8, background: "#fef2f2", color: "#dc2626", fontSize: 11 }}>
-                        {sq.disqualifying_options.length} disqualifying
+                        {t("wizard.disqualifyingCount", { count: sq.disqualifying_options.length })}
                       </span>
                     )}
                     <span className="guide-editor-chevron">{expandedSQ === sqIdx ? "▲" : "▼"}</span>
                   </div>
                   {expandedSQ === sqIdx && (
                     <div className="guide-editor-body">
-                      <label className="field-label">Question</label>
-                      <input className="field-input" value={sq.question} onChange={(e) => updateSQField(sqIdx, e.target.value)} placeholder="e.g. Do you shop online at least once a month?" />
+                      <label className="field-label">{t("wizard.screeningQuestionLabel")}</label>
+                      <input className="field-input" value={sq.question} onChange={(e) => updateSQField(sqIdx, e.target.value)} placeholder={t("wizard.screeningQuestionPlaceholder")} />
                       <label className="field-label" style={{ marginTop: 12 }}>
-                        Options <span className="optional-tag">— click ✕/✓ to mark disqualifying</span>
+                        {t("wizard.optionsLabel")} <span className="optional-tag">{t("wizard.optionsHint")}</span>
                       </label>
                       {sq.options.map((opt, optIdx) => (
                         <div key={optIdx} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
@@ -624,15 +634,15 @@ export default function CreateProjectWizard() {
                             style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: "1.5px solid", borderColor: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#d1d5db", background: sq.disqualifying_options.includes(opt) ? "#fef2f2" : "#fff", color: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#9ca3af", cursor: "pointer", fontWeight: 700, fontSize: 14 }}
                             onClick={() => opt.trim() && toggleDisqualifying(sqIdx, opt)}
                           >{sq.disqualifying_options.includes(opt) ? "✕" : "✓"}</button>
-                          <input className="field-input" style={{ flex: 1, marginBottom: 0 }} value={opt} onChange={(e) => updateSQOption(sqIdx, optIdx, e.target.value)} placeholder={`Option ${optIdx + 1}`} />
+                          <input className="field-input" style={{ flex: 1, marginBottom: 0 }} value={opt} onChange={(e) => updateSQOption(sqIdx, optIdx, e.target.value)} placeholder={t("wizard.optionPlaceholder", { number: optIdx + 1 })} />
                           {sq.options.length > 1 && (
                             <button style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 18, padding: "0 4px" }} onClick={() => removeSQOption(sqIdx, optIdx)}>×</button>
                           )}
                         </div>
                       ))}
-                      <button className="btn btn-ghost btn-sm" onClick={() => addSQOption(sqIdx)}>+ Add option</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => addSQOption(sqIdx)}>{t("wizard.addOption")}</button>
                       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-                        <button className="btn btn-ghost btn-sm btn-danger-text" onClick={() => removeSQ(sqIdx)}>Remove question</button>
+                        <button className="btn btn-ghost btn-sm btn-danger-text" onClick={() => removeSQ(sqIdx)}>{t("wizard.removeScreeningQuestion")}</button>
                       </div>
                     </div>
                   )}
@@ -641,12 +651,12 @@ export default function CreateProjectWizard() {
             </div>
 
             <div className="wizard-nav">
-              <button className="btn btn-ghost" onClick={() => setStep(2)}>← Back</button>
+              <button className="btn btn-ghost" onClick={() => setStep(2)}>{t("wizard.backButton")}</button>
               <button
                 className="btn btn-primary"
                 onClick={() => { setError(""); setStep(4); }}
               >
-                Next →
+                {t("wizard.nextButton")}
               </button>
             </div>
           </div>
@@ -656,23 +666,23 @@ export default function CreateProjectWizard() {
         {step === 4 && (
           <div className="wizard-card">
             <div className="wizard-card-header">
-              <h2>Interview Guide</h2>
+              <h2>{t("wizard.questionsTitle")}</h2>
               <p className="muted-text">
-                AI will write a full guide based on your objective. You can edit, reorder, or add questions.
+                {t("wizard.questionsSubtitle")}
               </p>
             </div>
 
             {confirmRegenerate ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 16px", background: "var(--warning-50, #fffbeb)", border: "1px solid var(--warning-200, #fde68a)", borderRadius: 8, marginBottom: 4 }}>
                 <p style={{ margin: 0, fontSize: 14, color: "var(--warning-800, #92400e)" }}>
-                  This will replace your {questions.length} existing question{questions.length > 1 ? "s" : ""}. Any edits you've made will be lost.
+                  {t("wizard.regenerateWarning", { count: questions.length })}
                 </p>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="btn btn-ai btn-sm" onClick={handleSuggestQuestions} disabled={loading}>
-                    Yes, regenerate
+                    {t("wizard.yesRegenerate")}
                   </button>
                   <button className="btn btn-ghost btn-sm" onClick={() => setConfirmRegenerate(false)}>
-                    Cancel
+                    {t("wizard.cancel")}
                   </button>
                 </div>
               </div>
@@ -685,8 +695,8 @@ export default function CreateProjectWizard() {
                 {loading
                   ? <><span className="spinner-sm" />{loadingMsg}</>
                   : questions.length > 0
-                  ? "✦ Regenerate Guide"
-                  : "✦ Generate Interview Guide"}
+                  ? t("wizard.regenerateGuide")
+                  : t("wizard.generateGuide")}
               </button>
             )}
 
@@ -705,23 +715,23 @@ export default function CreateProjectWizard() {
                         <span className="guide-editor-num">Q{sectionLocalIndex}</span>
                       </div>
                       <span className="guide-editor-preview">
-                        {q.main_question || <em className="muted-text">Empty question</em>}
+                        {q.main_question || <em className="muted-text">{t("wizard.emptyQuestion")}</em>}
                       </span>
-                      <span className="guide-editor-chevron" title="Edit question">
+                      <span className="guide-editor-chevron" title={t("wizard.questionLabel")}>
                         {expandedQ === i ? "▲" : "✏"}
                       </span>
                     </div>
 
                     {expandedQ === i && (
                       <div className="guide-editor-body">
-                        <label className="field-label">Section Title</label>
+                        <label className="field-label">{t("wizard.sectionTitleLabel")}</label>
                         <input
                           className="field-input"
                           value={q.section_title}
                           onChange={(e) => updateQuestion(i, "section_title", e.target.value)}
                         />
 
-                        <label className="field-label">Question</label>
+                        <label className="field-label">{t("wizard.questionLabel")}</label>
                         <textarea
                           className="field-input wizard-textarea"
                           rows={3}
@@ -729,8 +739,8 @@ export default function CreateProjectWizard() {
                           onChange={(e) => updateQuestion(i, "main_question", e.target.value)}
                         />
 
-                        <label className="field-label">Interview Notes
-                          <span className="optional-tag"> — probing tips for the interviewer</span>
+                        <label className="field-label">{t("wizard.interviewNotesLabel")}
+                          <span className="optional-tag"> {t("wizard.interviewNotesHint")}</span>
                         </label>
                         <textarea
                           className="field-input"
@@ -739,8 +749,8 @@ export default function CreateProjectWizard() {
                           onChange={(e) => updateQuestion(i, "interview_notes", e.target.value)}
                         />
 
-                        <label className="field-label">Desired Learning
-                          <span className="optional-tag"> — what insight this question aims to uncover</span>
+                        <label className="field-label">{t("wizard.desiredLearningLabel")}
+                          <span className="optional-tag"> {t("wizard.desiredLearningHint")}</span>
                         </label>
                         <textarea
                           className="field-input"
@@ -754,7 +764,7 @@ export default function CreateProjectWizard() {
                           style={{ marginTop: 8 }}
                           onClick={() => removeQuestion(i)}
                         >
-                          Remove question
+                          {t("wizard.removeQuestion")}
                         </button>
                       </div>
                     )}
@@ -763,23 +773,23 @@ export default function CreateProjectWizard() {
                 })}
 
                 <button className="btn btn-ghost btn-sm" onClick={addQuestion} style={{ border: "1.5px solid #d1d5db", borderRadius: 6, padding: "6px 16px" }}>
-                  + Add question
+                  {t("wizard.addQuestion")}
                 </button>
               </div>
             )}
 
             <div className="wizard-nav" style={{ marginTop: 24 }}>
-              <button className="btn btn-ghost" onClick={() => setStep(3)}>← Back</button>
+              <button className="btn btn-ghost" onClick={() => setStep(3)}>{t("wizard.backButton")}</button>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 {!isEditMode && questions.length === 0 && (
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Generate your interview guide first</p>
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>{t("wizard.generateGuideFirst")}</p>
                 )}
                 <button
                   className="btn btn-primary btn-lg"
                   disabled={loading || !name.trim() || (!isEditMode && questions.length === 0)}
                   onClick={handleCreate}
                 >
-                  {loading ? <><span className="spinner-sm" />{loadingMsg}</> : isEditMode ? "Save Changes" : "Create Project"}
+                  {loading ? <><span className="spinner-sm" />{loadingMsg}</> : isEditMode ? t("wizard.saveChanges") : t("wizard.createProject")}
                 </button>
               </div>
             </div>

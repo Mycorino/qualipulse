@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -21,11 +21,18 @@ router = APIRouter(prefix="/affiliates", tags=["affiliates"])
 
 
 class AffiliateApplyRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=2, max_length=255)
     email: EmailStr
     code: str
     website: str | None = None
-    how_they_found_us: str | None = None
+    how_they_found_us: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("website")
+    @classmethod
+    def validate_website(cls, v: str | None) -> str | None:
+        if v is not None and not v.startswith(("http://", "https://")):
+            raise ValueError("Website must start with http:// or https://")
+        return v
 
 
 class AffiliateLoginRequest(BaseModel):
@@ -75,6 +82,12 @@ class AdminAffiliateResponse(BaseModel):
     signups: int
     conversions: int
     created_at: str
+
+
+class AdminAffiliateUpdate(BaseModel):
+    commission_pct: float | None = None
+    status: str | None = None
+    notes: str | None = None
 
 
 class AdminPayoutRequest(BaseModel):
@@ -152,7 +165,7 @@ def apply_for_affiliate(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="An affiliate account with this email already exists.",
+            detail="An application with this email already exists.",
         )
 
     # Validate and normalize code
@@ -163,7 +176,7 @@ def apply_for_affiliate(
     if existing_code:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This affiliate code is already taken.",
+            detail="This affiliate code is already taken. Try a different name.",
         )
 
     # Create affiliate with pending status
@@ -263,7 +276,7 @@ def get_affiliate_stats(
         signups=signups,
         conversions=conversions,
         pending_earnings=pending_earnings,
-        referral_link=f"https://app.qualipulse.com/?ref={affiliate.code}",
+        referral_link=f"{settings.APP_BASE_URL}/?ref={affiliate.code}",
     )
 
 
@@ -271,7 +284,7 @@ def get_affiliate_stats(
 def get_affiliate_link(affiliate: Affiliate = Depends(get_current_affiliate)) -> dict:
     """Get shareable referral link."""
     return {
-        "referral_link": f"https://app.qualipulse.com/?ref={affiliate.code}",
+        "referral_link": f"{settings.APP_BASE_URL}/?ref={affiliate.code}",
         "code": affiliate.code,
     }
 
@@ -350,32 +363,38 @@ def list_affiliates(
 @router.patch("/admin/{affiliate_id}")
 def update_affiliate(
     affiliate_id: str,
-    commission_pct: float | None = None,
-    status: str | None = None,
-    notes: str | None = None,
+    body: AdminAffiliateUpdate,
     x_admin_key: str = Depends(_get_admin_key),
     db: Session = Depends(get_db),
 ) -> dict:
     """Admin: approve/reject/update affiliate."""
     affiliate = db.query(Affiliate).filter(Affiliate.id == affiliate_id).first()
     if not affiliate:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Affiliate not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Affiliate not found",
+        )
 
-    if status and status in ("active", "rejected"):
-        affiliate.status = status
-        if status == "active":
+    if body.status is not None:
+        if affiliate.status != "pending" or body.status not in ("active", "rejected"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot change status from {affiliate.status} to {body.status}. Only pending affiliates can be approved or rejected.",
+            )
+        affiliate.status = body.status
+        if body.status == "active":
             affiliate.approved_at = datetime.utcnow()
 
-    if commission_pct is not None and commission_pct > 0:
-        affiliate.commission_pct = commission_pct
+    if body.commission_pct is not None and body.commission_pct > 0:
+        affiliate.commission_pct = body.commission_pct
 
-    if notes is not None:
-        affiliate.notes = notes
+    if body.notes is not None:
+        affiliate.notes = body.notes
 
     db.commit()
     db.refresh(affiliate)
 
-    logger.info("Updated affiliate %s: status=%s, commission_pct=%s", affiliate_id, status, commission_pct)
+    logger.info("Updated affiliate %s: status=%s, commission_pct=%s", affiliate_id, body.status, body.commission_pct)
     return {"message": "Affiliate updated", "affiliate_id": affiliate.id}
 
 

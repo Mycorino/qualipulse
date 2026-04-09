@@ -239,7 +239,7 @@ a:hover {
 
 .btn-xs {
   padding: 2px 8px;
-  font-size: 0.733rem;
+  font-size: 0.8rem;
   border-radius: var(--radius-sm);
 }
 
@@ -282,7 +282,7 @@ textarea:focus-visible {
 .field-input {
   width: 100%;
   padding: 8px 12px;
-  font-size: 0.933rem;
+  font-size: 16px; /* Prevents iOS Safari auto-zoom on focus */
   font-family: inherit;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -301,6 +301,11 @@ textarea:focus-visible {
 .field-input::placeholder {
   color: var(--text-disabled);
   font-style: normal;
+}
+
+/* Prevent iOS Safari auto-zoom on focus for all form elements */
+select, textarea {
+  font-size: 16px;
 }
 
 select.field-input {
@@ -1584,8 +1589,8 @@ select.field-input {
 }
 
 .mute-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
   background: var(--bg-white);
@@ -2632,6 +2637,29 @@ select.field-input {
 }
 .skeleton-row > .skeleton { flex: 1; }
 
+/* ── Table scroll indicators ─────────────────────────────────────────────── */
+.table-scroll-container {
+  position: relative;
+}
+.table-scroll-container::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, var(--bg-primary, #fff));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+/* Show fade when container is scrollable (content wider than viewport) */
+@media (max-width: 768px) {
+  .table-scroll-container::after {
+    opacity: 1;
+  }
+}
+
 /* ── Mobile Responsiveness ───────────────────────────────────────────────── */
 @media (max-width: 768px) {
   /* Dashboard */
@@ -2698,6 +2726,10 @@ select.field-input {
   .record-btn { width: 80px; height: 80px; }
   .record-btn-inner { width: 32px; height: 32px; border-radius: 10px; }
 
+  /* Form inputs — better touch targets on mobile */
+  /* inputmode="email" / "tel" / "numeric" should be set in markup for mobile keyboards */
+  .field-input { padding: 10px 14px; min-height: 44px; }
+
   /* Modals / panels */
   .modal-content { margin: 12px; border-radius: 16px; max-height: calc(100vh - 24px); }
   .transcript-panel { width: 100% !important; }
@@ -2710,6 +2742,28 @@ select.field-input {
   .interview-container { padding: 20px 14px; margin: 12px; }
   .wizard-autosave--hide-mobile { display: none; }
   .wizard-dot-label--inactive { display: none; }
+
+  /* Fix 4: Modal sizing — tighter margins, full-height scrollable */
+  .modal-content {
+    margin: 8px;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  /* Fix 5: Interview page padding */
+  .interview-landing { padding: 28px 20px; }
+  .consent-card { padding: 36px 24px; }
+  .interview-profiling { padding: 36px 24px; }
+}
+
+@media (max-width: 375px) {
+  .interview-question-text { font-size: 1.05rem; }
+  .record-btn { width: 72px; height: 72px; }
+  .record-btn-inner { width: 28px; height: 28px; }
+  .consent-card { padding: 32px 20px; }
+  .interview-profiling { padding: 32px 20px; }
+  .interview-landing { padding: 24px 16px; }
 }
 
 /* ── Password Reset page ─────────────────────────────────────────────────── */

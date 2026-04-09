@@ -8,6 +8,7 @@
     "title": "Profile",
     "nameLabel": "Name",
     "emailLabel": "Email",
+    "emailReadOnly": "read-only",
     "saveChanges": "Save changes",
     "saving": "Saving...",
     "saved": "✓ Profile updated",

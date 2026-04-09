@@ -57,5 +57,45 @@
   "resending": "Envoi en cours…",
   "emailSent": "Email envoyé ! Consultez votre boîte mail.",
   "learnMore": "En savoir plus",
-  "contactSupport": "Contacter le support"
+  "contactSupport": "Contacter le support",
+  "legal": {
+    "backToHome": "Retour \u00e0 l\u2019accueil",
+    "contents": "Sommaire",
+    "lastUpdated": "Derni\u00e8re mise \u00e0 jour\u00a0: avril 2026",
+    "terms": {
+      "pageTitle": "Conditions G\u00e9n\u00e9rales d\u2019Utilisation",
+      "toc": {
+        "serviceDescription": "Description du Service",
+        "accounts": "Comptes",
+        "acceptableUse": "Utilisation acceptable",
+        "intellectualProperty": "Propri\u00e9t\u00e9 intellectuelle",
+        "dataAndPrivacy": "Donn\u00e9es et confidentialit\u00e9",
+        "paymentTerms": "Conditions de paiement",
+        "serviceAvailability": "Disponibilit\u00e9 du Service",
+        "limitationOfLiability": "Limitation de responsabilit\u00e9",
+        "termination": "R\u00e9siliation",
+        "changesToTerms": "Modification des conditions",
+        "governingLaw": "Droit applicable",
+        "contact": "Contact"
+      }
+    },
+    "privacy": {
+      "pageTitle": "Politique de Confidentialit\u00e9",
+      "toc": {
+        "introduction": "Introduction",
+        "dataController": "Responsable du traitement",
+        "dataWeCollect": "Donn\u00e9es que nous collectons",
+        "howWeUseYourData": "Utilisation de vos donn\u00e9es",
+        "legalBasis": "Base juridique du traitement",
+        "thirdPartyProcessors": "Sous-traitants tiers",
+        "dataStorageAndSecurity": "Stockage et s\u00e9curit\u00e9 des donn\u00e9es",
+        "dataRetention": "Conservation des donn\u00e9es",
+        "yourRights": "Vos droits",
+        "cookies": "Cookies",
+        "childrensPrivacy": "Protection des mineurs",
+        "changesToPolicy": "Modifications de cette politique",
+        "contactAndComplaints": "Contact et r\u00e9clamations"
+      }
+    }
+  }
 }

@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import "./Marketing.css";
@@ -58,6 +59,26 @@ const PLANS = [
 
 export default function Marketing() {
   const { t } = useTranslation("marketing");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        hamburgerRef.current && !hamburgerRef.current.contains(e.target as Node)
+      ) {
+        setMobileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [mobileMenuOpen]);
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
     <div className="mkt">
@@ -72,6 +93,27 @@ export default function Marketing() {
           <Link to="/login" className="mkt-nav-login">{t("nav.login")}</Link>
           <Link to="/signup" className="btn btn-primary mkt-nav-cta">{t("nav.startTrial")}</Link>
         </div>
+        <button
+          ref={hamburgerRef}
+          className={`mkt-hamburger${mobileMenuOpen ? " open" : ""}`}
+          onClick={() => setMobileMenuOpen((v) => !v)}
+          aria-label="Toggle menu"
+          aria-expanded={mobileMenuOpen}
+        >
+          <span className="mkt-hamburger-line" />
+          <span className="mkt-hamburger-line" />
+          <span className="mkt-hamburger-line" />
+        </button>
+        {mobileMenuOpen && (
+          <div className="mkt-mobile-menu" ref={menuRef}>
+            <a href="#how" onClick={closeMobileMenu}>{t("nav.howItWorks")}</a>
+            <a href="#who" onClick={closeMobileMenu}>{t("nav.whoItsFor")}</a>
+            <a href="#pricing" onClick={closeMobileMenu}>{t("nav.pricing")}</a>
+            <LanguageSwitcher style={{ marginRight: 4 }} />
+            <Link to="/login" onClick={closeMobileMenu}>{t("nav.login")}</Link>
+            <Link to="/signup" className="btn btn-primary mkt-mobile-cta" onClick={closeMobileMenu}>{t("nav.startTrial")}</Link>
+          </div>
+        )}
       </nav>
 
       {/* Hero */}

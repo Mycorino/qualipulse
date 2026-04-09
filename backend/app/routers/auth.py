@@ -227,6 +227,11 @@ def request_password_reset(request: Request, body: PasswordResetRequest, db: Ses
 
 @router.post("/password-reset/confirm")
 def confirm_password_reset(body: PasswordResetConfirm, db: Session = Depends(get_db)):
+    if len(body.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 8 characters",
+        )
     token_row = db.query(PasswordResetToken).filter(
         PasswordResetToken.token == body.token,
         PasswordResetToken.used.is_(False),

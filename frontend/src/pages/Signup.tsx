@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { signup } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
+import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
 function getPasswordStrength(pw: string, t: (key: string) => string): { label: string; color: string; width: string } {
@@ -29,7 +30,9 @@ export default function Signup() {
   const [error, setError] = useState("");
   const [showLoginHint, setShowLoginHint] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const { saveToken } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   async function handleSubmit(e: FormEvent) {
@@ -42,7 +45,7 @@ export default function Signup() {
       setError(t("signup.errors.nameRequired"));
       return;
     }
-    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(trimmedEmail)) {
       setError(t("signup.errors.emailInvalid"));
       return;
     }
@@ -50,11 +53,16 @@ export default function Signup() {
       setError(t("signup.errors.passwordTooShort"));
       return;
     }
+    if (!termsAccepted) {
+      setError(t("signup.errors.termsRequired"));
+      return;
+    }
 
     setLoading(true);
     try {
       const res = await signup(trimmedName, trimmedEmail, password);
       saveToken(res.access_token, res.refresh_token);
+      toast(t("signup.accountCreated"), "success");
       navigate("/welcome");
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
@@ -167,14 +175,23 @@ export default function Signup() {
             );
           })()}
 
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 8, marginBottom: 4 }}>
+            <input
+              id="signup-terms"
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              style={{ marginTop: 3, accentColor: "var(--primary)" }}
+            />
+            <label htmlFor="signup-terms" style={{ fontSize: "0.813rem", color: "var(--text-secondary)", cursor: "pointer" }}>
+              {t("signup.termsCheckboxPrefix")} <Link to="/terms">{t("signup.termsLink")}</Link> {t("signup.termsAnd")} <Link to="/privacy">{t("signup.privacyLink")}</Link>.
+            </label>
+          </div>
+
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? t("signup.creatingAccount") : t("signup.createAccount")}
           </button>
         </form>
-
-        <p className="auth-terms" style={{ fontSize: "0.813rem" }}>
-          {t("signup.termsPrefix")} <Link to="/terms">{t("signup.termsLink")}</Link> {t("signup.termsAnd")} <Link to="/privacy">{t("signup.privacyLink")}</Link>.
-        </p>
 
         <p className="auth-footer">
           {t("signup.alreadyHaveAccount")} <Link to="/login">{t("signup.signIn")}</Link>

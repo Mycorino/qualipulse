@@ -1,6 +1,7 @@
 {
   "title": "Projects",
   "createProject": "+ Create Project",
+  "loadError": "Failed to load projects. Please refresh the page.",
   "projectCount": "{{count}} of {{max}} projects",
   "trialBanner": {
     "title": "14-day trial active",
@@ -8,7 +9,7 @@
     "viewPlans": "View plans"
   },
   "gettingStarted": {
-    "welcome": "Welcome{{name}}! Let's set up your first study.",
+    "welcome": "Welcome, {{name}}! Let's set up your first study.",
     "subtitle": "Follow these steps to run your first AI-powered interview.",
     "step1Title": "Create a project",
     "step1Desc": "Describe your research goals and let AI build your interview guide.",

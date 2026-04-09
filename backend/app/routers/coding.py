@@ -153,11 +153,31 @@ def list_tags(
         .all()
     )
 
+    # Batch-load related objects to avoid N+1 queries
+    all_turn_ids = list({tag.turn_id for tag in tags})
+    all_code_ids = list({tag.manual_code_id for tag in tags})
+
+    turns_by_id = {}
+    if all_turn_ids:
+        turns_list = db.query(InterviewTurn).filter(InterviewTurn.id.in_(all_turn_ids)).all()
+        turns_by_id = {t.id: t for t in turns_list}
+
+    all_participant_ids = list({t.participant_id for t in turns_by_id.values()})
+    participants_by_id = {}
+    if all_participant_ids:
+        participants_list = db.query(Participant).filter(Participant.id.in_(all_participant_ids)).all()
+        participants_by_id = {p.id: p for p in participants_list}
+
+    codes_by_id = {}
+    if all_code_ids:
+        codes_list = db.query(ManualCode).filter(ManualCode.id.in_(all_code_ids)).all()
+        codes_by_id = {c.id: c for c in codes_list}
+
     result = []
     for tag in tags:
-        turn = db.query(InterviewTurn).filter(InterviewTurn.id == tag.turn_id).first()
-        participant = db.query(Participant).filter(Participant.id == turn.participant_id).first() if turn else None
-        code = db.query(ManualCode).filter(ManualCode.id == tag.manual_code_id).first()
+        turn = turns_by_id.get(tag.turn_id)
+        participant = participants_by_id.get(turn.participant_id) if turn else None
+        code = codes_by_id.get(tag.manual_code_id)
         result.append({
             "id": tag.id,
             "turn_id": tag.turn_id,

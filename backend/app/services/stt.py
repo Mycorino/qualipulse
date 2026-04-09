@@ -1,3 +1,4 @@
+import httpx
 import openai
 
 from app.config import settings
@@ -11,7 +12,7 @@ def transcribe_audio(
     Returns (transcript_text, duration_seconds).
     Uses verbose_json to obtain the audio duration for usage tracking.
     """
-    client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+    client = openai.OpenAI(api_key=settings.OPENAI_API_KEY, timeout=httpx.Timeout(60.0))
 
     transcript = client.audio.transcriptions.create(
         model="whisper-1",

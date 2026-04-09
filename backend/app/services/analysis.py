@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 
 import anthropic
+import httpx
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -186,7 +187,7 @@ Analyse these interviews and return a JSON object with this exact structure:
   "participant_count": {len(completed)}
 }}"""
 
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(120.0))
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
@@ -358,7 +359,7 @@ Analyse these interviews and return a JSON object with this exact structure:
 
 For any theme that was disputed and you have reframed, add a "researcher_note" key to that theme object (string, 1-2 sentences explaining what changed). In the summary field, add one sentence noting this is a researcher-refined synthesis."""
 
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(120.0))
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,

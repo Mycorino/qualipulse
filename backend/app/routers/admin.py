@@ -1,13 +1,17 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import delete as sql_delete, func
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.dependencies import get_db
+from app.limiter import limiter
+
+logger = logging.getLogger(__name__)
 from app.models.coding import ManualCode, QuoteTag
 from app.models.company import Company, EmailVerificationToken, PasswordResetToken
 from app.models.interview import (
@@ -121,7 +125,9 @@ def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/users", response_model=list[AdminUserSummary])
+@limiter.limit("30/minute")
 def list_users(
+    request: Request,
     search: Optional[str] = Query(default=None),
     tier: Optional[str] = Query(default=None),
     page: int = Query(default=1, ge=1),
@@ -144,7 +150,9 @@ def list_users(
 
 
 @router.get("/users/{company_id}", response_model=AdminUserDetail)
+@limiter.limit("30/minute")
 def get_user(
+    request: Request,
     company_id: str,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
@@ -177,7 +185,9 @@ def get_user(
 
 
 @router.patch("/users/{company_id}/tier", response_model=AdminUserSummary)
+@limiter.limit("30/minute")
 def update_tier(
+    request: Request,
     company_id: str,
     body: TierUpdate,
     db: Session = Depends(get_db),
@@ -199,7 +209,9 @@ def update_tier(
 
 
 @router.patch("/users/{company_id}/trial", response_model=AdminUserSummary)
+@limiter.limit("30/minute")
 def update_trial(
+    request: Request,
     company_id: str,
     body: TrialUpdate,
     db: Session = Depends(get_db),
@@ -234,7 +246,9 @@ def update_trial(
 
 
 @router.delete("/users/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("5/minute")
 def delete_user(
+    request: Request,
     company_id: str,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
@@ -242,6 +256,14 @@ def delete_user(
     company = db.query(Company).filter(Company.id == company_id).first()
     if company is None:
         raise HTTPException(status_code=404, detail="User not found")
+
+    logger.warning(
+        "ADMIN_USER_DELETION: company_id=%s email=%s name=%s timestamp=%s",
+        company.id,
+        company.email,
+        company.name,
+        datetime.utcnow().isoformat(),
+    )
 
     # Collect IDs for cascade deletes in correct FK order
     project_ids = [
@@ -448,7 +470,9 @@ def _costs_report(db: Session, company_id: str | None = None) -> dict:
 
 
 @router.get("/costs")
+@limiter.limit("30/minute")
 def get_costs(
+    request: Request,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ) -> dict:
@@ -457,7 +481,9 @@ def get_costs(
 
 
 @router.get("/costs/company/{company_id}")
+@limiter.limit("30/minute")
 def get_company_costs(
+    request: Request,
     company_id: str,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
@@ -499,7 +525,9 @@ def get_company_costs(
 
 
 @router.get("/stats", response_model=AdminStats)
+@limiter.limit("30/minute")
 def get_stats(
+    request: Request,
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ) -> AdminStats:
