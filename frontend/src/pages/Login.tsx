@@ -24,11 +24,11 @@ export default function Login() {
 
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) {
-      setError(t("login.emailPlaceholder"));
+      setError(t("login.errors.emailRequired"));
       return;
     }
     if (!password) {
-      setError(t("login.passwordLabel"));
+      setError(t("login.errors.passwordRequired"));
       return;
     }
 

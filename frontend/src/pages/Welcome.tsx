@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   getMe,
   completeOnboarding,
@@ -10,61 +11,21 @@ import {
 import type { CompanyResponse } from "../api/auth";
 import { getErrorMessage } from "../utils/errorMessages";
 
-const TEAM_SIZES = ["Just me", "2–10", "11–50", "50+"];
-
-const ROLES = [
-  "Researcher",
-  "Product Manager",
-  "Marketer",
-  "Consultant",
-  "Academic",
-  "Founder",
-  "Other",
+const TEAM_SIZE_VALUES = ["Just me", "2–10", "11–50", "50+"];
+const ROLE_VALUES = ["Researcher", "Product Manager", "Marketer", "Consultant", "Academic", "Founder", "Other"];
+const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Other"];
+const REGION_VALUES = [
+  { value: "europe" },
+  { value: "north_america" },
+  { value: "apac" },
+  { value: "global" },
+  { value: "other" },
 ];
-
-const INDUSTRIES = [
-  "Consumer Brands",
-  "SaaS / Tech",
-  "Agency",
-  "Healthcare",
-  "Academia",
-  "Government",
-  "Other",
-];
-
-const REGIONS = [
-  { label: "Europe", value: "europe" },
-  { label: "North America", value: "north_america" },
-  { label: "APAC", value: "apac" },
-  { label: "Global", value: "global" },
-  { label: "Other", value: "other" },
-];
-
-const EXPERIENCE_OPTIONS = [
-  {
-    emoji: "🌱",
-    title: "Brand new",
-    subtitle: "I've never run research interviews before",
-    value: "new",
-  },
-  {
-    emoji: "📊",
-    title: "Some experience",
-    subtitle: "I've done a few projects",
-    value: "some",
-  },
-  {
-    emoji: "🎓",
-    title: "Professional",
-    subtitle: "It's a core part of my work",
-    value: "professional",
-  },
-];
-
-const STEP_LABELS = ["Verify", "Profile", "Business", "Experience", "Goals", "Ready"];
+const EXPERIENCE_VALUES = ["new", "some", "professional"] as const;
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation("auth");
   const [step, setStep] = useState(1);
   const [me, setMe] = useState<CompanyResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,6 +47,27 @@ export default function Welcome() {
 
   // Step 5 — Goals
   const [goalsFreeform, setGoalsFreeform] = useState("");
+
+  // Translated option arrays (re-read on language change)
+  const teamSizeLabels = t("onboarding.teamSizes", { returnObjects: true }) as string[];
+  const roleLabels = t("onboarding.roles", { returnObjects: true }) as string[];
+  const industryLabels = t("onboarding.industries", { returnObjects: true }) as string[];
+  const regionLabels = t("onboarding.regions", { returnObjects: true }) as string[];
+
+  const STEP_LABELS = [
+    t("onboarding.stepVerify"),
+    t("onboarding.stepProfile"),
+    t("onboarding.stepBusiness"),
+    t("onboarding.stepExperience"),
+    t("onboarding.stepGoals"),
+    t("onboarding.stepReady"),
+  ];
+
+  const EXPERIENCE_OPTIONS = [
+    { emoji: "🌱", title: t("onboarding.expTitle_new"), subtitle: t("onboarding.expSub_new"), value: "new" as const },
+    { emoji: "📊", title: t("onboarding.expTitle_some"), subtitle: t("onboarding.expSub_some"), value: "some" as const },
+    { emoji: "🎓", title: t("onboarding.expTitle_professional"), subtitle: t("onboarding.expSub_professional"), value: "professional" as const },
+  ];
 
   // Auto-poll for email verification
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -135,8 +117,8 @@ export default function Welcome() {
   // Resend cooldown timer
   useEffect(() => {
     if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
   }, [resendCooldown]);
 
   async function handleResendVerification() {
@@ -145,7 +127,7 @@ export default function Welcome() {
       await resendVerification();
       setResendCooldown(60);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Failed to resend. Try again."));
+      setError(getErrorMessage(err, t("onboarding.failedResend")));
     }
   }
 
@@ -156,7 +138,7 @@ export default function Welcome() {
       if (data.email_verified) {
         setStep(2);
       } else {
-        setError("Email not yet verified. Please check your inbox.");
+        setError(t("onboarding.notYetVerified"));
       }
     } catch {
       // ignore
@@ -166,11 +148,11 @@ export default function Welcome() {
   // Step 2 → 3
   async function handleProfileContinue() {
     if (!role) {
-      setError("Please select your role to continue.");
+      setError(t("onboarding.profileRoleRequired"));
       return;
     }
     if (!companySize) {
-      setError("Please select your team size to continue.");
+      setError(t("onboarding.profileTeamRequired"));
       return;
     }
     setSaving(true);
@@ -183,7 +165,7 @@ export default function Welcome() {
       });
       setStep(3);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Failed to save. Please try again."));
+      setError(getErrorMessage(err, t("onboarding.failedSave")));
     } finally {
       setSaving(false);
     }
@@ -198,7 +180,7 @@ export default function Welcome() {
       const { business_summary } = await analyseWebsite(websiteUrl.trim());
       setBusinessSummary(business_summary);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Could not analyse website. Please try again."));
+      setError(getErrorMessage(err, t("onboarding.failedWebsite")));
     } finally {
       setWebsiteLoading(false);
     }
@@ -217,7 +199,7 @@ export default function Welcome() {
       });
       setStep(4);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Failed to save. Please try again."));
+      setError(getErrorMessage(err, t("onboarding.failedSave")));
     } finally {
       setSaving(false);
     }
@@ -243,7 +225,7 @@ export default function Welcome() {
       });
       setStep(6);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Failed to save. Please try again."));
+      setError(getErrorMessage(err, t("onboarding.failedSave")));
     } finally {
       setSaving(false);
     }
@@ -254,7 +236,7 @@ export default function Welcome() {
       <div className="welcome-page">
         <div className="welcome-container" style={{ textAlign: "center" }}>
           <div className="auth-logo">QualiPulse</div>
-          <p style={{ color: "#6b7280" }}>Loading...</p>
+          <p style={{ color: "#6b7280" }}>{t("onboarding.continue")}</p>
         </div>
       </div>
     );
@@ -288,27 +270,29 @@ export default function Welcome() {
         {step === 1 && (
           <div className="onboarding-step">
             <div className="onboarding-icon">📧</div>
-            <h1 className="welcome-title">Check your inbox</h1>
+            <h1 className="welcome-title">{t("onboarding.verifyTitle")}</h1>
             <p className="welcome-subtitle">
-              We sent a verification link to <strong>{me?.email}</strong>.
-              Click it to verify your email, then come back here.
+              {t("onboarding.verifyDesc")} <strong>{me?.email}</strong>.
+              {" "}{t("onboarding.verifyNote")}
             </p>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8, marginBottom: 0 }}>
-              Checking automatically...
+              {t("onboarding.checkingAutomatically")}
             </p>
             <div className="welcome-actions">
               <button className="btn btn-primary btn-lg" onClick={handleRefreshVerification}>
-                I've verified my email
+                {t("onboarding.alreadyVerifiedBtn")}
               </button>
               <button
                 className="btn btn-ghost"
                 onClick={handleResendVerification}
                 disabled={resendCooldown > 0}
               >
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend verification email"}
+                {resendCooldown > 0
+                  ? t("onboarding.resendCooldown", { seconds: resendCooldown })
+                  : t("onboarding.resendVerification")}
               </button>
               <button className="btn btn-ghost" onClick={() => setStep(2)} style={{ fontSize: 13, color: "#9ca3af" }}>
-                Skip for now
+                {t("onboarding.skip")}
               </button>
             </div>
           </div>
@@ -317,46 +301,50 @@ export default function Welcome() {
         {/* ── Step 2: About you ── */}
         {step === 2 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">Tell us about yourself</h1>
-            <p className="welcome-subtitle">This helps us tailor QualiPulse to your needs.</p>
+            <h1 className="welcome-title">{t("onboarding.profileTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.readyDesc")}</p>
 
             <div className="onboarding-form">
               <div className="onboarding-field">
-                <label className="field-label">Company or organization</label>
+                <label className="field-label">{t("onboarding.profileCompanyLabel")}</label>
                 <input
                   type="text"
                   className="field-input"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="e.g. Acme Research"
+                  placeholder={t("onboarding.profileCompanyPlaceholder")}
                 />
               </div>
 
               <div className="onboarding-field">
-                <label className="field-label">Your role <span style={{ color: "var(--danger)" }}>*</span></label>
+                <label className="field-label">
+                  {t("onboarding.profileRoleLabel")} <span style={{ color: "var(--danger)" }}>*</span>
+                </label>
                 <div className="onboarding-chip-grid">
-                  {ROLES.map((r) => (
+                  {ROLE_VALUES.map((value, idx) => (
                     <button
-                      key={r}
-                      className={`onboarding-chip ${role === r ? "selected" : ""}`}
-                      onClick={() => setRole(r)}
+                      key={value}
+                      className={`onboarding-chip ${role === value ? "selected" : ""}`}
+                      onClick={() => setRole(value)}
                     >
-                      {r}
+                      {roleLabels[idx] ?? value}
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="onboarding-field">
-                <label className="field-label">Team size <span style={{ color: "var(--danger)" }}>*</span></label>
+                <label className="field-label">
+                  {t("onboarding.teamSizeLabel")} <span style={{ color: "var(--danger)" }}>*</span>
+                </label>
                 <div className="onboarding-chip-grid">
-                  {TEAM_SIZES.map((size) => (
+                  {TEAM_SIZE_VALUES.map((value, idx) => (
                     <button
-                      key={size}
-                      className={`onboarding-chip ${companySize === size ? "selected" : ""}`}
-                      onClick={() => setCompanySize(size)}
+                      key={value}
+                      className={`onboarding-chip ${companySize === value ? "selected" : ""}`}
+                      onClick={() => setCompanySize(value)}
                     >
-                      {size}
+                      {teamSizeLabels[idx] ?? value}
                     </button>
                   ))}
                 </div>
@@ -369,7 +357,7 @@ export default function Welcome() {
                 onClick={handleProfileContinue}
                 disabled={saving}
               >
-                {saving ? "Saving..." : "Continue"}
+                {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
             </div>
           </div>
@@ -378,19 +366,24 @@ export default function Welcome() {
         {/* ── Step 3: Your business ── */}
         {step === 3 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">Your business</h1>
-            <p className="welcome-subtitle">Help us understand your company so we can personalise your experience.</p>
+            <h1 className="welcome-title">{t("onboarding.businessTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.experienceSubtitle")}</p>
 
             <div className="onboarding-form">
               <div className="onboarding-field">
-                <label className="field-label">Website URL <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+                <label className="field-label">
+                  {t("onboarding.websiteLabel")}{" "}
+                  <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
+                    {t("onboarding.websiteOptional")}
+                  </span>
+                </label>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
                     type="text"
                     className="field-input"
                     value={websiteUrl}
                     onChange={(e) => setWebsiteUrl(e.target.value)}
-                    placeholder="yourcompany.com"
+                    placeholder={t("onboarding.websitePlaceholder")}
                     style={{ flex: 1 }}
                     onKeyDown={(e) => { if (e.key === "Enter") handleAnalyseWebsite(); }}
                   />
@@ -403,16 +396,16 @@ export default function Welcome() {
                     {websiteLoading ? (
                       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span className="spinner" style={{ width: 14, height: 14, border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.6s linear infinite" }} />
-                        Analysing...
+                        {t("onboarding.websiteAnalysing")}
                       </span>
-                    ) : "Analyse with AI"}
+                    ) : t("onboarding.websiteAnalyse")}
                   </button>
                 </div>
               </div>
 
               {businessSummary && (
                 <div className="onboarding-field">
-                  <label className="field-label">What we understood about your business — edit if needed</label>
+                  <label className="field-label">{t("onboarding.businessSummaryLabel")}</label>
                   <textarea
                     className="field-input"
                     value={businessSummary}
@@ -424,30 +417,30 @@ export default function Welcome() {
               )}
 
               <div className="onboarding-field">
-                <label className="field-label">Industry</label>
+                <label className="field-label">{t("onboarding.industryLabel")}</label>
                 <div className="onboarding-chip-grid">
-                  {INDUSTRIES.map((ind) => (
+                  {INDUSTRY_VALUES.map((value, idx) => (
                     <button
-                      key={ind}
-                      className={`onboarding-chip ${industry === ind ? "selected" : ""}`}
-                      onClick={() => setIndustry(ind)}
+                      key={value}
+                      className={`onboarding-chip ${industry === value ? "selected" : ""}`}
+                      onClick={() => setIndustry(value)}
                     >
-                      {ind}
+                      {industryLabels[idx] ?? value}
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="onboarding-field">
-                <label className="field-label">Primary market</label>
+                <label className="field-label">{t("onboarding.primaryMarketLabel")}</label>
                 <div className="onboarding-chip-grid">
-                  {REGIONS.map((r) => (
+                  {REGION_VALUES.map((r, idx) => (
                     <button
                       key={r.value}
                       className={`onboarding-chip ${primaryRegion === r.value ? "selected" : ""}`}
                       onClick={() => setPrimaryRegion(r.value)}
                     >
-                      {r.label}
+                      {regionLabels[idx] ?? r.value}
                     </button>
                   ))}
                 </div>
@@ -460,10 +453,10 @@ export default function Welcome() {
                 onClick={handleBusinessContinue}
                 disabled={saving}
               >
-                {saving ? "Saving..." : "Continue"}
+                {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
               <button className="btn btn-ghost" onClick={() => setStep(2)}>
-                ← Back
+                ← {t("onboarding.stepProfile")}
               </button>
             </div>
           </div>
@@ -472,8 +465,8 @@ export default function Welcome() {
         {/* ── Step 4: Research experience ── */}
         {step === 4 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">How familiar are you with qualitative research?</h1>
-            <p className="welcome-subtitle">This helps us set the right defaults for you.</p>
+            <h1 className="welcome-title">{t("onboarding.experienceTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.experienceSubtitle")}</p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 28, marginBottom: 8 }}>
               {EXPERIENCE_OPTIONS.map((opt) => (
@@ -516,7 +509,7 @@ export default function Welcome() {
 
             <div style={{ marginTop: 16 }}>
               <button className="btn btn-ghost" onClick={() => setStep(3)}>
-                ← Back
+                ← {t("onboarding.stepBusiness")}
               </button>
             </div>
           </div>
@@ -525,8 +518,8 @@ export default function Welcome() {
         {/* ── Step 5: Goals ── */}
         {step === 5 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">What do you want to learn from your participants?</h1>
-            <p className="welcome-subtitle">Be as specific as you like — this helps us personalise your experience.</p>
+            <h1 className="welcome-title">{t("onboarding.goalsTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.readyDesc")}</p>
 
             <div className="onboarding-form" style={{ marginTop: 24 }}>
               <div className="onboarding-field">
@@ -536,10 +529,10 @@ export default function Welcome() {
                   onChange={(e) => setGoalsFreeform(e.target.value)}
                   rows={5}
                   style={{ minHeight: 120, resize: "vertical", lineHeight: 1.6 }}
-                  placeholder="e.g. We want to understand why users abandon checkout, what motivates B2B buyers to switch tools, or how remote workers manage their energy throughout the day..."
+                  placeholder={t("onboarding.goalsPlaceholder")}
                 />
                 <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "right", marginTop: 4 }}>
-                  {goalsFreeform.length} characters
+                  {t("onboarding.goalsCharCount", { count: goalsFreeform.length })}
                 </div>
               </div>
             </div>
@@ -550,7 +543,7 @@ export default function Welcome() {
                 onClick={() => handleGoalsContinue(false)}
                 disabled={saving}
               >
-                {saving ? "Saving..." : "Continue"}
+                {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
               <button
                 className="btn btn-ghost"
@@ -558,10 +551,10 @@ export default function Welcome() {
                 disabled={saving}
                 style={{ fontSize: 13, color: "var(--text-muted)" }}
               >
-                Skip for now
+                {t("onboarding.skip")}
               </button>
               <button className="btn btn-ghost" onClick={() => setStep(4)} style={{ fontSize: 13 }}>
-                ← Back
+                ← {t("onboarding.stepExperience")}
               </button>
             </div>
           </div>
@@ -571,7 +564,7 @@ export default function Welcome() {
         {step === 6 && (
           <div className="onboarding-step">
             <div className="onboarding-icon">🎉</div>
-            <h1 className="welcome-title">You're all set!</h1>
+            <h1 className="welcome-title">{t("onboarding.readyTitle")}</h1>
 
             {me?.trial_ends_at && (
               <div
@@ -585,20 +578,22 @@ export default function Welcome() {
                 }}
               >
                 <span style={{ fontWeight: 600, color: "var(--primary)" }}>
-                  14-day trial active
+                  {t("onboarding.trialActive")}
                 </span>
                 <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>
-                  {" "}— full Team features until {new Date(me.trial_ends_at).toLocaleDateString()}
+                  {" "}{t("onboarding.trialUntil", {
+                    date: new Date(me.trial_ends_at).toLocaleDateString(i18n.language),
+                  })}
                 </span>
               </div>
             )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-              {[
-                "AI-powered interview guide in minutes",
-                "Voice interviews with real participants",
-                "Instant analysis and insights",
-              ].map((benefit) => (
+              {([
+                t("onboarding.benefit1"),
+                t("onboarding.benefit2"),
+                t("onboarding.benefit3"),
+              ] as string[]).map((benefit) => (
                 <div key={benefit} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ color: "var(--success, #16a34a)", fontWeight: 700, fontSize: 16 }}>✓</span>
                   <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>{benefit}</span>
@@ -608,15 +603,15 @@ export default function Welcome() {
 
             <div className="welcome-actions">
               <button className="btn btn-primary btn-lg" onClick={() => navigate("/projects/new")}>
-                Create my first project →
+                {t("onboarding.createFirstProject")}
               </button>
               <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}>
-                Explore the dashboard first
+                {t("onboarding.exploreDashboard")}
               </button>
             </div>
 
             <div className="welcome-trust" style={{ marginTop: 16 }}>
-              <span>Solo plan · 3 projects · 25 participants · No credit card needed</span>
+              <span>{t("onboarding.trustNote")}</span>
             </div>
           </div>
         )}

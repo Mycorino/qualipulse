@@ -27,9 +27,11 @@ export default function LanguageSwitcher({ style }: LanguageSwitcherProps) {
         padding: "4px 10px",
         color: "var(--text-secondary, #6b7280)",
         lineHeight: 1.4,
-        minHeight: 30,
+        minHeight: 44,
+        minWidth: 44,
         display: "inline-flex",
         alignItems: "center",
+        justifyContent: "center",
         gap: 4,
         ...style,
       }}

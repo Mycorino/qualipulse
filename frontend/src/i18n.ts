@@ -11,6 +11,7 @@ import enInterview from "./locales/en/interview.json";
 import enAnalysis from "./locales/en/analysis.json";
 import enMarketing from "./locales/en/marketing.json";
 import enSettings from "./locales/en/settings.json";
+import enAffiliate from "./locales/en/affiliate.json";
 
 // FR namespaces
 import frCommon from "./locales/fr/common.json";
@@ -21,6 +22,7 @@ import frInterview from "./locales/fr/interview.json";
 import frAnalysis from "./locales/fr/analysis.json";
 import frMarketing from "./locales/fr/marketing.json";
 import frSettings from "./locales/fr/settings.json";
+import frAffiliate from "./locales/fr/affiliate.json";
 
 i18n
   .use(LanguageDetector)
@@ -36,6 +38,7 @@ i18n
         analysis: enAnalysis,
         marketing: enMarketing,
         settings: enSettings,
+        affiliate: enAffiliate,
       },
       fr: {
         common: frCommon,
@@ -46,12 +49,13 @@ i18n
         analysis: frAnalysis,
         marketing: frMarketing,
         settings: frSettings,
+        affiliate: frAffiliate,
       },
     },
     lng: undefined, // rely on detector
     fallbackLng: "en",
     defaultNS: "common",
-    ns: ["common", "auth", "dashboard", "project", "interview", "analysis", "marketing", "settings"],
+    ns: ["common", "auth", "dashboard", "project", "interview", "analysis", "marketing", "settings", "affiliate"],
     detection: {
       order: ["localStorage", "navigator"],
       lookupLocalStorage: "qp_language",

@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
@@ -29,9 +30,10 @@ interface Referral {
   converted_at: string | null;
 }
 
-// ââ Apply View ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── Apply View ─────────────────────────────────────────────────────────────
 
 function AffiliateApply() {
+  const { t } = useTranslation("affiliate");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -61,7 +63,7 @@ function AffiliateApply() {
     setLoading(true);
 
     try {
-      const res = await axios.post("/api/affiliates/apply", {
+      await axios.post("/api/affiliates/apply", {
         name: name.trim(),
         email: email.toLowerCase().trim(),
         code,
@@ -74,7 +76,7 @@ function AffiliateApply() {
         navigate("/affiliate/login");
       }, 3000);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Failed to submit application."));
+      setError(getErrorMessage(err, t("apply.failedSubmit")));
     } finally {
       setLoading(false);
     }
@@ -84,13 +86,11 @@ function AffiliateApply() {
     return (
       <div className="auth-page">
         <div className="auth-card" style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>â</div>
-          <h1 className="auth-title">Application Received</h1>
-          <p className="auth-subtitle">
-            Thank you! We'll review your application and get back to you within 2-3 business days.
-          </p>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>✅</div>
+          <h1 className="auth-title">{t("apply.successTitle")}</h1>
+          <p className="auth-subtitle">{t("apply.successSubtitle")}</p>
           <p style={{ marginTop: "16px", fontSize: "14px", color: "var(--text-secondary)" }}>
-            Redirecting to login in a moment...
+            {t("apply.successRedirect")}
           </p>
         </div>
       </div>
@@ -100,13 +100,15 @@ function AffiliateApply() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">Become a QualiPulse Affiliate</h1>
-        <p className="auth-subtitle">Earn up to 20% recurring commission on referrals</p>
+        <h1 className="auth-title">{t("apply.title")}</h1>
+        <p className="auth-subtitle">{t("apply.subtitle")}</p>
 
         {error && <div className="error-banner">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label">Your Name *</label>
+          <label className="field-label">
+            {t("apply.nameLabel")} {t("apply.required")}
+          </label>
           <input
             type="text"
             className="field-input"
@@ -115,9 +117,12 @@ function AffiliateApply() {
             placeholder="Jane Doe"
             required
             disabled={loading}
+            aria-label={t("apply.nameLabel")}
           />
 
-          <label className="field-label">Email *</label>
+          <label className="field-label">
+            {t("apply.emailLabel")} {t("apply.required")}
+          </label>
           <input
             type="email"
             className="field-input"
@@ -126,9 +131,12 @@ function AffiliateApply() {
             placeholder="jane@example.com"
             required
             disabled={loading}
+            aria-label={t("apply.emailLabel")}
           />
 
-          <label className="field-label">Affiliate Code *</label>
+          <label className="field-label">
+            {t("apply.codeLabel")} {t("apply.required")}
+          </label>
           <input
             type="text"
             className="field-input"
@@ -137,12 +145,15 @@ function AffiliateApply() {
             placeholder="jane-doe"
             required
             disabled={loading}
+            aria-label={t("apply.codeLabel")}
           />
           <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
-            Lowercase letters, numbers, hyphens only. Auto-generated from your name.
+            {t("apply.codeHint")}
           </p>
 
-          <label className="field-label">Website (optional)</label>
+          <label className="field-label">
+            {t("apply.websiteLabel")} <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>{t("apply.optional")}</span>
+          </label>
           <input
             type="url"
             className="field-input"
@@ -150,16 +161,20 @@ function AffiliateApply() {
             onChange={(e) => setWebsite(e.target.value)}
             placeholder="https://yourwebsite.com"
             disabled={loading}
+            aria-label={t("apply.websiteLabel")}
           />
 
-          <label className="field-label">How did you find us? (optional)</label>
+          <label className="field-label">
+            {t("apply.howFoundLabel")} <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>{t("apply.optional")}</span>
+          </label>
           <textarea
             className="field-input"
             value={howTheyFoundUs}
             onChange={(e) => setHowTheyFoundUs(e.target.value)}
-            placeholder="Tell us about your audience..."
+            placeholder={t("apply.howFoundPlaceholder")}
             style={{ minHeight: "80px", fontFamily: "inherit" }}
             disabled={loading}
+            aria-label={t("apply.howFoundLabel")}
           />
 
           <button
@@ -168,14 +183,14 @@ function AffiliateApply() {
             style={{ width: "100%", marginTop: "16px" }}
             disabled={loading}
           >
-            {loading ? "Submitting..." : "Submit Application"}
+            {loading ? t("apply.submitting") : t("apply.submit")}
           </button>
         </form>
 
         <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "16px", textAlign: "center" }}>
-          Already applied?{" "}
+          {t("apply.alreadyApplied")}{" "}
           <a href="/affiliate/login" style={{ color: "var(--primary)", textDecoration: "none" }}>
-            Sign in here
+            {t("apply.signInHere")}
           </a>
         </p>
       </div>
@@ -183,9 +198,10 @@ function AffiliateApply() {
   );
 }
 
-// ââ Login View ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── Login View ─────────────────────────────────────────────────────────────
 
 function AffiliateLogin() {
+  const { t } = useTranslation("affiliate");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -207,7 +223,7 @@ function AffiliateLogin() {
       saveToken(res.data.access_token, undefined);
       navigate("/affiliate/dashboard");
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Invalid email or code."));
+      setError(getErrorMessage(err, t("login.failedLogin")));
     } finally {
       setLoading(false);
     }
@@ -216,13 +232,13 @@ function AffiliateLogin() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">Affiliate Sign In</h1>
-        <p className="auth-subtitle">Access your affiliate dashboard</p>
+        <h1 className="auth-title">{t("login.title")}</h1>
+        <p className="auth-subtitle">{t("login.subtitle")}</p>
 
         {error && <div className="error-banner">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label">Email</label>
+          <label className="field-label">{t("login.emailLabel")}</label>
           <input
             type="email"
             className="field-input"
@@ -231,9 +247,10 @@ function AffiliateLogin() {
             placeholder="jane@example.com"
             required
             disabled={loading}
+            aria-label={t("login.emailLabel")}
           />
 
-          <label className="field-label">Affiliate Code</label>
+          <label className="field-label">{t("login.codeLabel")}</label>
           <input
             type="text"
             className="field-input"
@@ -242,6 +259,7 @@ function AffiliateLogin() {
             placeholder="jane-doe"
             required
             disabled={loading}
+            aria-label={t("login.codeLabel")}
           />
 
           <button
@@ -250,14 +268,14 @@ function AffiliateLogin() {
             style={{ width: "100%", marginTop: "16px" }}
             disabled={loading}
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? t("login.signingIn") : t("login.signIn")}
           </button>
         </form>
 
         <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "16px", textAlign: "center" }}>
-          Don't have an account?{" "}
+          {t("login.noAccount")}{" "}
           <a href="/affiliate/apply" style={{ color: "var(--primary)", textDecoration: "none" }}>
-            Apply here
+            {t("login.applyHere")}
           </a>
         </p>
       </div>
@@ -265,9 +283,10 @@ function AffiliateLogin() {
   );
 }
 
-// ââ Dashboard View ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── Dashboard View ─────────────────────────────────────────────────────────
 
 function AffiliateDashboard() {
+  const { t, i18n } = useTranslation("affiliate");
   const [stats, setStats] = useState<AffiliateStats | null>(null);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
@@ -291,7 +310,7 @@ function AffiliateDashboard() {
       setStats(statsRes.data);
       setReferrals(referralsRes.data.referrals);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Failed to load dashboard."));
+      setError(getErrorMessage(err, t("dashboard.failedDashboard")));
     } finally {
       setLoading(false);
     }
@@ -300,7 +319,7 @@ function AffiliateDashboard() {
   if (loading) {
     return (
       <div className="dashboard-page">
-        <div style={{ textAlign: "center", padding: "40px" }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: "40px" }}>{t("dashboard.loading")}</div>
       </div>
     );
   }
@@ -309,7 +328,7 @@ function AffiliateDashboard() {
     return (
       <div className="dashboard-page">
         <div style={{ textAlign: "center", padding: "40px", color: "var(--danger)" }}>
-          {error || "Failed to load affiliate data."}
+          {error || t("dashboard.failedLoad")}
         </div>
       </div>
     );
@@ -321,16 +340,22 @@ function AffiliateDashboard() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  const locale = i18n.language?.startsWith("fr") ? "fr-FR" : "en-GB";
+
   return (
     <div className="dashboard-page">
       <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "24px" }}>
         {/* Header */}
         <div style={{ marginBottom: "32px" }}>
-          <h1 style={{ fontSize: "28px", fontWeight: 600, marginBottom: "8px" }}>Affiliate Dashboard</h1>
-          <p style={{ color: "var(--text-secondary)" }}>Welcome back, {stats.name}!</p>
+          <h1 style={{ fontSize: "28px", fontWeight: 600, marginBottom: "8px" }}>
+            {t("dashboard.title")}
+          </h1>
+          <p style={{ color: "var(--text-secondary)" }}>
+            {t("dashboard.welcomeBack", { name: stats.name })}
+          </p>
           {stats.status !== "active" && (
             <div className="warning-banner" style={{ marginTop: "12px" }}>
-              Your account is {stats.status}. Contact support if you have questions.
+              {t("dashboard.statusWarning", { status: stats.status })}
             </div>
           )}
         </div>
@@ -345,12 +370,15 @@ function AffiliateDashboard() {
             marginBottom: "24px",
           }}
         >
-          <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "16px" }}>Your Referral Link</h2>
+          <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "16px" }}>
+            {t("dashboard.referralLinkTitle")}
+          </h2>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <input
               type="text"
               value={stats.referral_link}
               readOnly
+              aria-label={t("dashboard.referralLinkTitle")}
               style={{
                 flex: 1,
                 padding: "10px 12px",
@@ -364,22 +392,27 @@ function AffiliateDashboard() {
               className="btn btn-primary"
               onClick={handleCopyLink}
               style={{ whiteSpace: "nowrap" }}
+              aria-label={copied ? t("dashboard.copied") : t("dashboard.copy")}
             >
-              {copied ? "Copied!" : "Copy"}
+              {copied ? t("dashboard.copied") : t("dashboard.copy")}
             </button>
           </div>
           <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "8px" }}>
-            Share this link with your audience to earn {stats.commission_pct}% commission on their subscription.
+            {t("dashboard.commissionDesc", { commission: stats.commission_pct })}
           </p>
         </div>
 
         {/* Stats Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "24px" }}>
-          <StatCard label="Signups" value={stats.signups} />
-          <StatCard label="Conversions" value={stats.conversions} />
-          <StatCard label="Total Earned" value={`$${stats.total_earned.toFixed(2)}`} />
-          <StatCard label="Paid Out" value={`$${stats.total_paid.toFixed(2)}`} />
-          <StatCard label="Pending" value={`$${stats.pending_earnings.toFixed(2)}`} highlight={stats.pending_earnings >= stats.payout_threshold} />
+          <StatCard label={t("dashboard.statsSignups")} value={stats.signups} />
+          <StatCard label={t("dashboard.statsConversions")} value={stats.conversions} />
+          <StatCard label={t("dashboard.statsTotalEarned")} value={`$${stats.total_earned.toFixed(2)}`} />
+          <StatCard label={t("dashboard.statsPaidOut")} value={`$${stats.total_paid.toFixed(2)}`} />
+          <StatCard
+            label={t("dashboard.statsPending")}
+            value={`$${stats.pending_earnings.toFixed(2)}`}
+            highlight={stats.pending_earnings >= stats.payout_threshold}
+          />
         </div>
 
         {/* Payout Info */}
@@ -393,11 +426,17 @@ function AffiliateDashboard() {
           }}
         >
           <p style={{ fontSize: "13px", color: "var(--text-primary)" }}>
-            <strong>Payout Threshold:</strong> ${stats.payout_threshold.toFixed(2)}
+            <strong>{t("dashboard.payoutThresholdLabel")}:</strong> ${stats.payout_threshold.toFixed(2)}
             <br />
-            <strong>Status:</strong> {stats.pending_earnings >= stats.payout_threshold ? "Ready for payout" : `${(stats.payout_threshold - stats.pending_earnings).toFixed(2)} until eligible`}
+            <strong>{t("dashboard.payoutStatusLabel")}:</strong>{" "}
+            {stats.pending_earnings >= stats.payout_threshold
+              ? t("dashboard.payoutReady")
+              : t("dashboard.payoutUntil", { amount: (stats.payout_threshold - stats.pending_earnings).toFixed(2) })}
             <br />
-            <strong>Request payouts:</strong> <a href="mailto:affiliates@qualipulse.com" style={{ color: "var(--primary)" }}>affiliates@qualipulse.com</a>
+            <strong>{t("dashboard.payoutRequestLabel")}:</strong>{" "}
+            <a href="mailto:affiliates@qualipulse.com" style={{ color: "var(--primary)" }}>
+              affiliates@qualipulse.com
+            </a>
           </p>
         </div>
 
@@ -411,12 +450,14 @@ function AffiliateDashboard() {
             marginBottom: "24px",
           }}
         >
-          <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "16px" }}>How It Works</h2>
+          <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "16px" }}>
+            {t("dashboard.howItWorksTitle")}
+          </h2>
           <ol style={{ paddingLeft: "20px", color: "var(--text-secondary)", lineHeight: "1.6" }}>
-            <li>Share your referral link with your audience</li>
-            <li>When someone signs up using your link, you get credit</li>
-            <li>When they convert to a paid subscription, you earn {stats.commission_pct}% of the subscription value</li>
-            <li>Request payout once you reach ${stats.payout_threshold.toFixed(2)}</li>
+            <li>{t("dashboard.howItWorks1")}</li>
+            <li>{t("dashboard.howItWorks2")}</li>
+            <li>{t("dashboard.howItWorks3", { commission: stats.commission_pct })}</li>
+            <li>{t("dashboard.howItWorks4", { threshold: stats.payout_threshold.toFixed(2) })}</li>
           </ol>
         </div>
 
@@ -430,27 +471,37 @@ function AffiliateDashboard() {
           }}
         >
           <div style={{ padding: "24px", borderBottom: "1px solid var(--border-default)" }}>
-            <h2 style={{ fontSize: "16px", fontWeight: 600 }}>Recent Referrals</h2>
+            <h2 style={{ fontSize: "16px", fontWeight: 600 }}>{t("dashboard.recentReferrals")}</h2>
           </div>
           {referrals.length === 0 ? (
             <div style={{ padding: "24px", textAlign: "center", color: "var(--text-secondary)" }}>
-              No referrals yet. Share your link to get started!
+              {t("dashboard.noReferrals")}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "var(--bg-sunken)", borderBottom: "1px solid var(--border-default)" }}>
-                    <th style={{ padding: "12px", textAlign: "left", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>Email</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>Status</th>
-                    <th style={{ padding: "12px", textAlign: "right", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>Commission</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>Date</th>
+                    <th style={{ padding: "12px", textAlign: "left", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>
+                      {t("dashboard.tableEmail")}
+                    </th>
+                    <th style={{ padding: "12px", textAlign: "left", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>
+                      {t("dashboard.tableStatus")}
+                    </th>
+                    <th style={{ padding: "12px", textAlign: "right", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>
+                      {t("dashboard.tableCommission")}
+                    </th>
+                    <th style={{ padding: "12px", textAlign: "left", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>
+                      {t("dashboard.tableDate")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {referrals.map((ref) => (
                     <tr key={ref.id} style={{ borderBottom: "1px solid var(--border-default)" }}>
-                      <td style={{ padding: "12px", fontSize: "13px" }}>{ref.referred_company_email.split("@")[0]}***</td>
+                      <td style={{ padding: "12px", fontSize: "13px" }}>
+                        {ref.referred_company_email.split("@")[0]}***
+                      </td>
                       <td style={{ padding: "12px", fontSize: "13px" }}>
                         <span
                           style={{
@@ -466,10 +517,10 @@ function AffiliateDashboard() {
                         </span>
                       </td>
                       <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: 600 }}>
-                        {ref.commission_amount ? `$${ref.commission_amount.toFixed(2)}` : "â"}
+                        {ref.commission_amount ? `$${ref.commission_amount.toFixed(2)}` : "—"}
                       </td>
                       <td style={{ padding: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>
-                        {new Date(ref.signed_up_at).toLocaleDateString()}
+                        {new Date(ref.signed_up_at).toLocaleDateString(locale)}
                       </td>
                     </tr>
                   ))}
@@ -499,7 +550,7 @@ function StatCard({ label, value, highlight }: { label: string; value: string | 
   );
 }
 
-// ââ Router ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── Router ─────────────────────────────────────────────────────────────────
 
 export default function AffiliatePortal() {
   const { section } = useParams<{ section: string }>();
