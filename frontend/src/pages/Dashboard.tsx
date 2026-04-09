@@ -103,7 +103,7 @@ export default function Dashboard() {
       <header className="dashboard-header" style={{ flexWrap: "wrap" }}>
         <span className="logo">QualiPulse</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <LanguageSwitcher />
+          <LanguageSwitcher variant="light" />
           <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
             {t("common:account")}
           </button>

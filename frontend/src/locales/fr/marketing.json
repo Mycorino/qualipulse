@@ -35,6 +35,53 @@
       }
     ]
   },
+  "preview": {
+    "interviewInProgress": "Entretien en cours",
+    "recording": "Enregistrement",
+    "emergingThemes": "Thèmes émergents"
+  },
+  "output": {
+    "title": "De 12 entretiens à ceci — automatiquement",
+    "subtitle": "Voici à quoi ressemble votre mémo de recherche généré par IA. Thèmes, citations, tensions et recommandations — prêt à partager.",
+    "projectName": "Étude d'expérience d'intégration SaaS",
+    "meta": "12 participants · Généré en 45 secondes",
+    "summaryTitle": "Résumé",
+    "summaryText": "Les participants ont systématiquement signalé que la complexité de la configuration initiale est le principal frein à l'adoption. La plupart appréciaient une expérience d'intégration guidée, mais trouvaient les implémentations actuelles trop génériques. Trois thèmes clés sont apparus autour des attentes de valeur rapide, du rôle de la preuve sociale et des frustrations liées à la découverte des fonctionnalités.",
+    "keyThemesTitle": "Thèmes clés",
+    "theme1Title": "Anxiété liée au délai de valeur",
+    "theme1Count": "Mentionné par 9 des 12 participants",
+    "theme1Quote": "« Je dois voir de la valeur dans les 10 premières minutes, sinon je pars. Je n'ai pas le temps de regarder des tutoriels. »",
+    "theme1Attr": "— Product Manager, startup Série A",
+    "theme2Title": "Friction dans la découverte des fonctionnalités",
+    "theme2Count": "Mentionné par 7 des 12 participants",
+    "theme2Quote": "« J'ai découvert la fonctionnalité d'export seulement après trois mois. Je le faisais manuellement depuis le début. »",
+    "theme2Attr": "— Designer UX, Fintech",
+    "recsTitle": "Recommandations",
+    "rec1": "Mettre en place un parcours d'intégration basé sur des tâches qui apporte de la valeur dès la première session",
+    "rec2": "Ajouter des conseils contextuels déclenchés par les comportements des utilisateurs",
+    "rec3": "Créer des parcours d'installation adaptés aux rôles (chercheur, PM, designer)"
+  },
+  "whoItsFor": {
+    "title": "Conçu pour ceux qui ont besoin d'insights, pas de paperasse",
+    "subtitle": "Que vous fassiez de la recherche à plein temps ou en parallèle de vos décisions produit.",
+    "items": [
+      {
+        "title": "Chercheurs UX",
+        "desc": "Menez plus d'études en moins de temps. Déléguez la logistique, conservez la rigueur analytique. L'IA gère la modération et la synthèse initiale — vous guidez l'interprétation.",
+        "examples": "Recherche exploratoire, études évaluatives, programmes de recherche continue"
+      },
+      {
+        "title": "Product Managers",
+        "desc": "Obtenez des insights utilisateurs sans attendre le carnet de commandes de l'équipe recherche. Configurez une étude en quelques minutes, envoyez le lien à vos beta users, recevez une synthèse actionnable.",
+        "examples": "Validation de fonctionnalités, analyse du churn, retours sur l'intégration"
+      },
+      {
+        "title": "Consultants & Agences",
+        "desc": "Menez des recherches qualitatives pour vos clients à grande échelle. Branding personnalisé, rapports partageables, plusieurs projets en parallèle.",
+        "examples": "Missions de recherche client, études de marché, entretiens avec les parties prenantes"
+      }
+    ]
+  },
   "howItWorks": {
     "title": "Comment ça marche",
     "subtitle": "Trois étapes, de la question de recherche au mémo prêt à partager.",

@@ -1,42 +1,56 @@
 import { useTranslation } from "react-i18next";
 
 interface LanguageSwitcherProps {
+  variant?: "light" | "dark";
   style?: React.CSSProperties;
 }
 
-export default function LanguageSwitcher({ style }: LanguageSwitcherProps) {
+export default function LanguageSwitcher({ variant = "light", style }: LanguageSwitcherProps) {
   const { i18n } = useTranslation();
   const current = i18n.language?.startsWith("fr") ? "fr" : "en";
+  const next = current === "fr" ? "en" : "fr";
 
   function toggle() {
-    const next = current === "fr" ? "en" : "fr";
     i18n.changeLanguage(next);
   }
+
+  const isDark = variant === "dark";
 
   return (
     <button
       onClick={toggle}
       aria-label={current === "fr" ? "Switch to English" : "Passer en français"}
       style={{
-        background: "none",
-        border: "1px solid var(--border)",
-        borderRadius: "6px",
+        background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)",
+        border: isDark ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(0,0,0,0.15)",
+        borderRadius: "20px",
         cursor: "pointer",
-        fontSize: "13px",
-        fontWeight: 500,
-        padding: "4px 10px",
-        color: "var(--text-secondary, #6b7280)",
-        lineHeight: 1.4,
-        minHeight: 44,
-        minWidth: 44,
+        fontSize: "12px",
+        fontWeight: 700,
+        letterSpacing: "0.05em",
+        padding: "0 14px",
+        color: isDark ? "#ffffff" : "#374151",
+        minHeight: "44px",
+        minWidth: "52px",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 4,
+        transition: "background 0.15s, border-color 0.15s",
+        flexShrink: 0,
         ...style,
       }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = isDark
+          ? "rgba(255,255,255,0.22)"
+          : "rgba(0,0,0,0.11)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = isDark
+          ? "rgba(255,255,255,0.12)"
+          : "rgba(0,0,0,0.06)";
+      }}
     >
-      {current === "fr" ? "EN" : "FR"}
+      {next.toUpperCase()}
     </button>
   );
 }

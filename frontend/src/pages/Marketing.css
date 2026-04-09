@@ -789,8 +789,10 @@
   .mkt-steps { grid-template-columns: 1fr; }
   .mkt-plans { grid-template-columns: 1fr; }
   .mkt-use-cases { grid-template-columns: 1fr; }
-  .mkt-nav { padding: 0 24px; }
-  .mkt-nav-links a:not(.mkt-nav-login):not(.mkt-nav-cta):not([href="#pricing"]) { display: none; }
+  .mkt-nav { padding: 0 20px; gap: 12px; }
+  .mkt-nav-links { gap: 10px; }
+  .mkt-nav-links a:not(.mkt-nav-login):not(.mkt-nav-cta) { display: none; }
+  .mkt-nav-login { display: none; }
   .mkt-section { padding: 56px 24px; }
   .mkt-pain { padding: 56px 24px; }
   .mkt-pain-grid { grid-template-columns: 1fr; }
