@@ -68,7 +68,7 @@ export default function Login() {
         {resetSuccess && (
           <div className="success-banner">{t("login.resetSuccess")}</div>
         )}
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error-banner" role="alert">{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <label className="field-label" htmlFor="login-email">{t("login.emailLabel")}</label>

@@ -117,6 +117,7 @@ export default function SharedReport() {
               <span
                 className="badge"
                 title="Confidence is based on sample size, response depth, and thematic saturation."
+                aria-label={`${report.confidence} confidence — based on sample size, response depth, and thematic saturation`}
                 style={{ cursor: "help" }}
               >
                 {report.confidence} confidence

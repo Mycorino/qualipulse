@@ -325,7 +325,7 @@ select.field-input {
 
 .hint-text {
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   margin-top: 8px;
 }
 
@@ -3923,4 +3923,23 @@ select.field-input {
   background: var(--primary);
   color: #fff;
   border-color: var(--primary);
+}
+
+/* ── Print styles ──────────────────────────────────────────────────────────── */
+@media print {
+  .dashboard-header,
+  .detail-header,
+  .mkt-nav,
+  .mkt-footer,
+  .modal-overlay,
+  .toast-container { display: none !important; }
+
+  body { background: white !important; color: black !important; }
+
+  .analysis-content,
+  .theme-card { break-inside: avoid; }
+
+  a { text-decoration: underline; }
+
+  * { box-shadow: none !important; }
 }

@@ -716,9 +716,9 @@
 
 /* ---- Final CTA ---- */
 .mkt-final-cta {
-  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
-  border-top: 1px solid #c7d2fe;
-  border-bottom: 1px solid #c7d2fe;
+  background: linear-gradient(135deg, var(--brand-50), var(--brand-100));
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   padding: 80px 48px;
 }
 
@@ -907,7 +907,5 @@
   }
   .mkt-final-cta {
     background: linear-gradient(135deg, #0d1226, #151c3a);
-    border-top-color: var(--border);
-    border-bottom-color: var(--border);
   }
 }

@@ -1542,7 +1542,7 @@ export default function Interview() {
               </div>
             ) : isRecording ? (
               <>
-                <button className="record-btn recording" onClick={handleStopAndPreview} aria-label="Stop recording">
+                <button className="record-btn recording" onClick={handleStopAndPreview} aria-label={t("interview.tapToStop")}>
                   <div className="record-btn-inner recording-pulse" />
                 </button>
                 <p className="record-label">{t("interview.tapToStop")}</p>

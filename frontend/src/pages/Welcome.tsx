@@ -265,7 +265,7 @@ export default function Welcome() {
           })}
         </div>
 
-        {error && <div className="error-banner" style={{ marginBottom: 20 }}>{error}</div>}
+        {error && <div className="error-banner" role="alert" style={{ marginBottom: 20 }}>{error}</div>}
 
         {/* ── Step 1: Verify Email ── */}
         {step === 1 && (
