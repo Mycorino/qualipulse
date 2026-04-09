@@ -55,6 +55,12 @@
   padding: 8px 18px !important;
 }
 
+/* Ensure primary button always shows white text in nav */
+.mkt-nav-links .btn-primary,
+.mkt-nav-cta.btn-primary {
+  color: #fff !important;
+}
+
 /* ---- Hero ---- */
 .mkt-hero {
   display: grid;
@@ -624,6 +630,7 @@
   padding: 28px;
   position: relative;
   background: #fff;
+  overflow: visible;
 }
 
 .mkt-plan-highlight {
@@ -783,7 +790,7 @@
   .mkt-plans { grid-template-columns: 1fr; }
   .mkt-use-cases { grid-template-columns: 1fr; }
   .mkt-nav { padding: 0 24px; }
-  .mkt-nav-links a:not(.mkt-nav-login):not(.mkt-nav-cta) { display: none; }
+  .mkt-nav-links a:not(.mkt-nav-login):not(.mkt-nav-cta):not([href="#pricing"]) { display: none; }
   .mkt-section { padding: 56px 24px; }
   .mkt-pain { padding: 56px 24px; }
   .mkt-pain-grid { grid-template-columns: 1fr; }

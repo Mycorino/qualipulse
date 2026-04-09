@@ -121,6 +121,7 @@ export default function AccountSettings() {
 
   return (
     <div className="dashboard-page">
+      <div style={{ maxWidth: "960px", margin: "0 auto" }}>
       <div className="dashboard-header">
         <div>
           <h1 className="dashboard-title">Account Settings</h1>
@@ -147,7 +148,7 @@ export default function AccountSettings() {
                 <label className="field-label">Email</label>
                 <input className="field-input" value={me?.email ?? ""} disabled style={{ opacity: 0.6 }} />
               </div>
-              {profileSuccess && <p style={{ color: "#16a34a", fontSize: 14 }}>✓ Profile updated</p>}
+              <p style={{ color: "var(--success)", fontSize: 14, minHeight: 20, visibility: profileSuccess ? "visible" : "hidden" }}>✓ Profile updated</p>
               <button className="btn btn-primary" type="submit" disabled={savingProfile} style={{ width: "fit-content" }}>
                 {savingProfile ? "Saving..." : "Save changes"}
               </button>
@@ -166,7 +167,7 @@ export default function AccountSettings() {
                 <input type="password" className="field-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" required minLength={8} />
               </div>
               {passwordError && <p className="error-text">{passwordError}</p>}
-              {passwordSuccess && <p style={{ color: "#16a34a", fontSize: 14 }}>✓ Password updated</p>}
+              <p style={{ color: "var(--success)", fontSize: 14, minHeight: 20, visibility: passwordSuccess ? "visible" : "hidden" }}>✓ Password updated</p>
               <button className="btn btn-primary" type="submit" style={{ width: "fit-content" }}>Update password</button>
             </form>
           </div>
@@ -181,7 +182,16 @@ export default function AccountSettings() {
               <div className="billing-current-plan">
                 <div>
                   <span className={`plan-badge plan-badge--${billing.tier}`}>{billing.tier_name}</span>
-                  <span className="billing-status-badge" style={{ marginLeft: 8 }}>{billing.status}</span>
+                  <span
+                    className="billing-status-badge"
+                    style={{
+                      marginLeft: 8,
+                      ...(billing.status === "trialing" ? {
+                        background: "var(--brand-50)",
+                        color: "var(--brand-500)",
+                      } : {}),
+                    }}
+                  >{billing.status}</span>
                 </div>
                 <div className="billing-limits">
                   <div className="billing-limit-row">
@@ -217,8 +227,11 @@ export default function AccountSettings() {
           <div className="settings-card" style={{ marginTop: 20 }}>
             <h2 className="settings-section-title">Upgrade plan</h2>
             <div className="plans-grid">
-              {plans.filter(p => p.id !== "free").map(plan => (
-                <div key={plan.id} className={`plan-card ${billing?.tier === plan.id ? "plan-card--current" : ""}`}>
+              {plans.filter(p => p.id !== "free").map(plan => {
+                const effectiveTier = billing?.tier === "free" ? "solo" : billing?.tier === "starter" ? "team" : billing?.tier === "pro" ? "lab" : billing?.tier;
+                const isCurrent = effectiveTier === plan.id;
+                return (
+                <div key={plan.id} className={`plan-card ${isCurrent ? "plan-card--current" : ""}`}>
                   <div className="plan-card-header">
                     <h3 className="plan-name">{plan.name}</h3>
                     <p className="plan-price">
@@ -232,21 +245,23 @@ export default function AccountSettings() {
                     <li>{plan.export_csv ? "✓ CSV export" : "✗ CSV export"}</li>
                     <li>{plan.team_members === -1 ? "Unlimited team members" : `${plan.team_members} team members`}</li>
                   </ul>
-                  {billing?.tier === plan.id ? (
+                  {isCurrent ? (
                     <button className="btn btn-ghost btn-sm" disabled>Current plan</button>
                   ) : plan.id === "enterprise" ? (
-                    <a href="mailto:hello@autointerview.com" className="btn btn-ghost btn-sm">Contact us</a>
+                    <a href="mailto:hello@qualipulse.com" className="btn btn-ghost btn-sm">Contact us</a>
                   ) : (
                     <button className="btn btn-primary btn-sm" onClick={() => handleUpgrade(plan.id)}>
                       Upgrade to {plan.name}
                     </button>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

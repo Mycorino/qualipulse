@@ -3,6 +3,25 @@ import { Link } from "react-router-dom";
 export default function Privacy() {
   return (
     <div className="legal-page">
+      {/* Sticky header */}
+      <div style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+        background: "var(--bg-surface)",
+        borderBottom: "1px solid var(--border)",
+        padding: "12px 24px",
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+      }}>
+        <Link to="/" style={{ textDecoration: "none", color: "var(--text-secondary)", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+          ← Back to home
+        </Link>
+        <span style={{ color: "var(--border)", fontSize: "14px" }}>|</span>
+        <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>Privacy Policy</span>
+      </div>
+
       <div className="legal-container">
         <div className="legal-header">
           <Link to="/" style={{ textDecoration: "none" }}>
@@ -11,8 +30,43 @@ export default function Privacy() {
           <h1 className="auth-title">Privacy Policy</h1>
         </div>
 
+        {/* Table of contents */}
+        <nav style={{
+          background: "var(--bg-sunken)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          padding: "20px 24px",
+          marginBottom: "32px",
+        }}>
+          <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>Contents</p>
+          <ol style={{ margin: 0, padding: "0 0 0 18px", display: "flex", flexDirection: "column", gap: "6px" }}>
+            {[
+              ["#section-1", "Introduction"],
+              ["#section-2", "Data Controller"],
+              ["#section-3", "Data We Collect"],
+              ["#section-4", "How We Use Your Data"],
+              ["#section-5", "Legal Basis for Processing"],
+              ["#section-6", "Third-Party Processors"],
+              ["#section-7", "Data Storage and Security"],
+              ["#section-8", "Data Retention"],
+              ["#section-9", "Your Rights"],
+              ["#section-10", "Cookies"],
+              ["#section-11", "Children's Privacy"],
+              ["#section-12", "Changes to This Policy"],
+              ["#section-13", "Contact and Complaints"],
+            ].map(([href, label]) => (
+              <li key={href}>
+                <a href={href} style={{ fontSize: "14px", color: "var(--primary)", textDecoration: "none" }}
+                  onMouseEnter={(e) => { (e.target as HTMLElement).style.textDecoration = "underline"; }}
+                  onMouseLeave={(e) => { (e.target as HTMLElement).style.textDecoration = "none"; }}
+                >{label}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
         <div className="legal-content">
-          <h2>1. Introduction</h2>
+          <h2 id="section-1" style={{ scrollMarginTop: "80px" }}>1. Introduction</h2>
           <p>
             QualiPulse ("we", "us", "our") is committed to protecting your privacy and complying
             with the General Data Protection Regulation (GDPR) and other applicable data protection
@@ -24,7 +78,7 @@ export default function Privacy() {
             (account holders) and interview participants.
           </p>
 
-          <h2>2. Data Controller</h2>
+          <h2 id="section-2" style={{ scrollMarginTop: "80px" }}>2. Data Controller</h2>
           <p>
             QualiPulse acts as a data processor on behalf of researchers who use the platform.
             Researchers are the data controllers for participant data collected through their
@@ -35,7 +89,7 @@ export default function Privacy() {
             Contact: <a href="mailto:privacy@qualipulse.com">privacy@qualipulse.com</a>
           </p>
 
-          <h2>3. Data We Collect</h2>
+          <h2 id="section-3" style={{ scrollMarginTop: "80px" }}>3. Data We Collect</h2>
           <p>We collect the following categories of personal data:</p>
 
           <p><strong>Researcher account data:</strong></p>
@@ -59,7 +113,7 @@ export default function Privacy() {
             <li>Usage logs and error reports</li>
           </ul>
 
-          <h2>4. How We Use Your Data</h2>
+          <h2 id="section-4" style={{ scrollMarginTop: "80px" }}>4. How We Use Your Data</h2>
           <p>We process personal data for the following purposes:</p>
           <ul>
             <li><strong>Service delivery:</strong> To operate the platform, conduct AI-powered interviews, generate transcripts, and produce analysis reports.</li>
@@ -68,7 +122,7 @@ export default function Privacy() {
             <li><strong>Service improvement:</strong> To monitor performance, fix bugs, and improve the user experience. We do not use your research data to train AI models.</li>
           </ul>
 
-          <h2>5. Legal Basis for Processing</h2>
+          <h2 id="section-5" style={{ scrollMarginTop: "80px" }}>5. Legal Basis for Processing</h2>
           <p>We process personal data under the following legal bases (GDPR Article 6):</p>
           <ul>
             <li><strong>Contract performance:</strong> Processing necessary to provide the Service you have subscribed to.</li>
@@ -77,7 +131,7 @@ export default function Privacy() {
             <li><strong>Legal obligation:</strong> Where we are required to process data to comply with applicable laws.</li>
           </ul>
 
-          <h2>6. Third-Party Processors</h2>
+          <h2 id="section-6" style={{ scrollMarginTop: "80px" }}>6. Third-Party Processors</h2>
           <p>
             We use the following third-party services to operate the platform. Each processes data
             under a data processing agreement:
@@ -98,7 +152,7 @@ export default function Privacy() {
             EU-US Data Privacy Framework.
           </p>
 
-          <h2>7. Data Storage and Security</h2>
+          <h2 id="section-7" style={{ scrollMarginTop: "80px" }}>7. Data Storage and Security</h2>
           <p>
             Your data is stored on servers located in the European Union (Google Cloud Platform,
             Belgium; Neon PostgreSQL, Frankfurt). Audio files are stored in Cloudflare R2 with
@@ -110,7 +164,7 @@ export default function Privacy() {
             and regular security reviews.
           </p>
 
-          <h2>8. Data Retention</h2>
+          <h2 id="section-8" style={{ scrollMarginTop: "80px" }}>8. Data Retention</h2>
           <ul>
             <li><strong>Account data:</strong> Retained for the duration of your account plus 30 days after deletion to allow data export.</li>
             <li><strong>Interview data:</strong> Retained as long as the associated project exists. Researchers can delete projects and participant data at any time.</li>
@@ -118,7 +172,7 @@ export default function Privacy() {
             <li><strong>Technical logs:</strong> Retained for up to 90 days for security and debugging purposes.</li>
           </ul>
 
-          <h2>9. Your Rights</h2>
+          <h2 id="section-9" style={{ scrollMarginTop: "80px" }}>9. Your Rights</h2>
           <p>Under the GDPR, you have the following rights:</p>
           <ul>
             <li><strong>Right of access:</strong> Request a copy of the personal data we hold about you.</li>
@@ -140,7 +194,7 @@ export default function Privacy() {
             who created the interview. Researchers can delete participant data through the platform.
           </p>
 
-          <h2>10. Cookies</h2>
+          <h2 id="section-10" style={{ scrollMarginTop: "80px" }}>10. Cookies</h2>
           <p>
             QualiPulse uses only essential cookies and local storage necessary for the operation
             of the Service:
@@ -153,14 +207,14 @@ export default function Privacy() {
             We do not use tracking cookies, advertising cookies, or third-party analytics cookies.
           </p>
 
-          <h2>11. Children's Privacy</h2>
+          <h2 id="section-11" style={{ scrollMarginTop: "80px" }}>11. Children's Privacy</h2>
           <p>
             The Service is not directed at individuals under the age of 18. We do not knowingly
             collect personal data from children. If you believe a child has provided us with
             personal data, please contact us and we will delete it.
           </p>
 
-          <h2>12. Changes to This Policy</h2>
+          <h2 id="section-12" style={{ scrollMarginTop: "80px" }}>12. Changes to This Policy</h2>
           <p>
             We may update this privacy policy from time to time. We will notify you of material
             changes via email or through the Service at least 30 days before they take effect.
@@ -168,7 +222,7 @@ export default function Privacy() {
             revised.
           </p>
 
-          <h2>13. Contact and Complaints</h2>
+          <h2 id="section-13" style={{ scrollMarginTop: "80px" }}>13. Contact and Complaints</h2>
           <p>
             For any questions or concerns about this privacy policy or our data practices, contact
             us at <a href="mailto:privacy@qualipulse.com">privacy@qualipulse.com</a>.

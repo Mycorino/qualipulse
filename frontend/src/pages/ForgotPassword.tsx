@@ -38,14 +38,16 @@ export default function ForgotPassword() {
         ) : (
           <form className="auth-form" onSubmit={handleSubmit}>
             <div>
-              <label className="field-label">Email</label>
+              <label className="field-label" htmlFor="forgot-email">Email</label>
               <input
+                id="forgot-email"
                 type="email"
                 className="field-input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="you@company.com"
+                autoComplete="email"
               />
             </div>
             {error && <div className="error-banner">{error}</div>}

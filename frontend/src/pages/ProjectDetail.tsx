@@ -1145,7 +1145,13 @@ export default function ProjectDetail() {
                 <div className="stat-value">{participants.length > 0 ? Math.round((completedCount / participants.length) * 100) : 0}%</div>
                 <div className="stat-label">Completion rate</div>
               </div>
-              <div className="stat-card"><div className="stat-value">{project.questions.length}</div><div className="stat-label">Guide questions</div></div>
+              <div className="stat-card">
+                <div className="stat-value">{project.questions.length}</div>
+                <div className="stat-label">Guide questions</div>
+                {project.questions.length === 0 && (
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>No questions yet — add in Setup tab</div>
+                )}
+              </div>
             </div>
             {/* Research Objective — inline edit */}
             <section className="detail-section">
@@ -1351,6 +1357,9 @@ export default function ProjectDetail() {
                   }}
                 >
                   <div
+                    role="switch"
+                    aria-checked={(project?.panel_collection_enabled ?? true)}
+                    tabIndex={0}
                     style={{
                       position: "relative",
                       width: 40,
@@ -1359,8 +1368,10 @@ export default function ProjectDetail() {
                       background: (project?.panel_collection_enabled ?? true) ? "#4f46e5" : "#d1d5db",
                       transition: "background 0.2s",
                       opacity: savingPanelToggle ? 0.6 : 1,
+                      cursor: savingPanelToggle ? "not-allowed" : "pointer",
                     }}
                     onClick={() => !savingPanelToggle && handlePanelToggle(!(project?.panel_collection_enabled ?? true))}
+                    onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !savingPanelToggle) { e.preventDefault(); handlePanelToggle(!(project?.panel_collection_enabled ?? true)); } }}
                   >
                     <div
                       style={{
@@ -1623,7 +1634,6 @@ export default function ProjectDetail() {
                 {/* Header row */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>Responses</span>
-                  <button className="btn btn-ghost btn-xs" onClick={handleExportCSV} title="Export all participants and transcripts as CSV">↓ CSV</button>
                 </div>
 
                 {/* Status filter pills */}
@@ -1673,6 +1683,9 @@ export default function ProjectDetail() {
                         key={p.id}
                         className={`participant-row participant-row--compact ${selectedParticipant?.id === p.id ? "active" : ""}`}
                         onClick={() => handleViewTranscript(p)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleViewTranscript(p); } }}
                       >
                         <div className="participant-avatar">{avatarInitial(p.display_name)}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1684,11 +1697,16 @@ export default function ProjectDetail() {
                               return (
                                 <span className={`status-badge ${isRecent ? "status-progress" : ""}`}
                                   style={{ fontSize: 10, background: isRecent ? undefined : "var(--border-subtle)", color: isRecent ? undefined : "var(--text-tertiary)" }}>
-                                  {isRecent ? "Live" : "Incomplete"}
+                                  {isRecent ? "Live" : "In progress"}
                                 </span>
                               );
                             })()}
                           </div>
+                          {(p.profession || p.country) && (
+                            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {[p.profession, p.country].filter(Boolean).join(" · ")}
+                            </div>
+                          )}
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
                             <span className="participant-date" style={{ fontSize: 11 }}>{relativeDate(p.started_at)}</span>
                             {p.quality_label && (
@@ -1711,8 +1729,25 @@ export default function ProjectDetail() {
               <div className="responses-transcript-col">
                 {transcript !== null && selectedParticipant ? (
                   <>
+                    {/* Back button — useful on mobile, also handy on desktop */}
+                    <button
+                      onClick={() => setSelectedParticipant(null)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--primary)",
+                        fontSize: "14px",
+                        cursor: "pointer",
+                        padding: "8px 0",
+                        marginBottom: "8px",
+                      }}
+                      className="responses-back-btn"
+                    >
+                      ← Back to participants
+                    </button>
+
                     {/* Transcript header */}
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, position: "sticky", top: 0, zIndex: 10, background: "var(--bg-surface)", paddingBottom: "12px", borderBottom: "1px solid var(--border)" }}>
                       <div>
                         <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{selectedParticipant.display_name || "Anonymous"}</h2>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1879,9 +1914,9 @@ export default function ProjectDetail() {
                   </>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 300, color: "var(--text-tertiary)" }}>
-                    <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>←</div>
-                    <p style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>Select a response</p>
-                    <p style={{ fontSize: 13 }}>Click a participant to view their transcript</p>
+                    <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.25 }}>📋</div>
+                    <p style={{ fontWeight: 500, fontSize: 14, marginBottom: 4, color: "var(--text-secondary)" }}>No response selected</p>
+                    <p style={{ fontSize: 13 }}>Choose a participant from the list to view their transcript</p>
                   </div>
                 )}
               </div>
@@ -1940,7 +1975,7 @@ export default function ProjectDetail() {
               )}
               <div className="section-header-row">
                 <h2>AI Analysis</h2>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   {analysis.report && (
                     <>
                       <button className="btn btn-ghost btn-sm" onClick={handleCopyMarkdown}>
@@ -1966,7 +2001,7 @@ export default function ProjectDetail() {
               {hasFilterOptions && (
                 <div style={{ marginBottom: 16 }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => setFiltersExpanded(!filtersExpanded)} style={{ marginBottom: 6 }}>
-                    {filtersExpanded ? "▲" : "▼"} Filter by participant
+                    {filtersExpanded ? "▲" : "▼"} Filter by segment
                     {activeFilterValues.length > 0 && <span className="badge" style={{ marginLeft: 4 }}>{activeFilterValues.length} active</span>}
                   </button>
                   {filtersExpanded && (
@@ -2050,6 +2085,7 @@ export default function ProjectDetail() {
 
                 return (
                   <div className="analysis-report">
+                    <h3 style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Summary</h3>
                     <div className="analysis-summary">{r.summary}</div>
                     <div className="analysis-meta">
                       <span className="badge analysis-ai-badge">
@@ -2130,7 +2166,7 @@ export default function ProjectDetail() {
                           const showNoteInput = !isViewingPastVersion && ann && (ann.status === "disputed" || ann.status === "needs_evidence");
                           return (
                             <div key={i} className="analysis-theme">
-                              <div className="analysis-theme-header">
+                              <div className="analysis-theme-header" style={{ flexWrap: "wrap" }}>
                                 <strong>{t.title}</strong>
                                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                                   <span className="badge">{t.frequency}</span>
@@ -2138,19 +2174,22 @@ export default function ProjectDetail() {
                                     <>
                                       <button
                                         className={`annotation-btn annotation-btn--confirmed${ann?.status === "confirmed" ? " annotation-btn--active" : ""}`}
-                                        title="Confirm this theme"
+                                        title="Confirmed"
+                                        aria-label="Confirmed"
                                         onClick={() => handleAnnotationClick(t.title, "confirmed")}
                                       >✓</button>
                                       <button
                                         className={`annotation-btn annotation-btn--needs-evidence${ann?.status === "needs_evidence" ? " annotation-btn--active" : ""}`}
-                                        title="Needs more evidence"
+                                        title="Needs evidence"
+                                        aria-label="Needs evidence"
                                         onClick={() => handleAnnotationClick(t.title, "needs_evidence")}
-                                      >~</button>
+                                      >−</button>
                                       <button
                                         className={`annotation-btn annotation-btn--disputed${ann?.status === "disputed" ? " annotation-btn--active" : ""}`}
-                                        title="Dispute this theme"
+                                        title="Disputed"
+                                        aria-label="Disputed"
                                         onClick={() => handleAnnotationClick(t.title, "disputed")}
-                                      >✗</button>
+                                      >✕</button>
                                     </>
                                   )}
                                   <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>

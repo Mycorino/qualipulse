@@ -67,7 +67,7 @@ export default function Blog() {
               textDecoration: "none",
               fontSize: "14px",
               fontWeight: 500,
-            }}>Get Started</Link>
+            }}>Get started free</Link>
           </nav>
         </header>
 
@@ -126,8 +126,9 @@ export default function Blog() {
           {loading ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)" }}>Loading...</div>
           ) : posts.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)" }}>
-              No posts yet. Check back soon!
+            <div style={{ textAlign: "center", padding: "40px 20px" }}>
+              <p style={{ fontSize: "16px", color: "var(--text-secondary)", marginBottom: "12px" }}>No posts yet</p>
+              <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>We're working on great content. Check back soon!</p>
             </div>
           ) : (
             <>

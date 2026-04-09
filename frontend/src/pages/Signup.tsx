@@ -4,10 +4,25 @@ import { signup } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 
+function getPasswordStrength(pw: string): { label: string; color: string; width: string } {
+  if (pw.length === 0) return { label: "", color: "", width: "0%" };
+  if (pw.length < 8) return { label: "Too short", color: "var(--danger)", width: "25%" };
+  const hasUpper = /[A-Z]/.test(pw);
+  const hasLower = /[a-z]/.test(pw);
+  const hasNum = /[0-9]/.test(pw);
+  const hasSpecial = /[^A-Za-z0-9]/.test(pw);
+  const score = [hasUpper, hasLower, hasNum, hasSpecial].filter(Boolean).length;
+  if (score <= 1) return { label: "Weak", color: "var(--danger)", width: "25%" };
+  if (score === 2) return { label: "Fair", color: "var(--warning)", width: "50%" };
+  if (score === 3) return { label: "Good", color: "var(--success)", width: "75%" };
+  return { label: "Strong", color: "var(--success)", width: "100%" };
+}
+
 export default function Signup() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [showLoginHint, setShowLoginHint] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -76,8 +91,9 @@ export default function Signup() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label">Company or your name</label>
+          <label className="field-label" htmlFor="signup-name">Company or your name</label>
           <input
+            id="signup-name"
             type="text"
             className="field-input"
             value={name}
@@ -85,35 +101,73 @@ export default function Signup() {
             placeholder="e.g. Acme Research"
             required
             autoFocus
+            autoComplete="name"
           />
 
-          <label className="field-label">Work email</label>
+          <label className="field-label" htmlFor="signup-email">Work email</label>
           <input
+            id="signup-email"
             type="email"
             className="field-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
             required
+            autoComplete="email"
           />
 
-          <label className="field-label">Password</label>
-          <input
-            type="password"
-            className="field-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 8 characters"
-            required
-            minLength={8}
-          />
+          <label className="field-label" htmlFor="signup-password">Password</label>
+          <div style={{ position: "relative" }}>
+            <input
+              id="signup-password"
+              type={showPassword ? "text" : "password"}
+              className="field-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 characters"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              style={{ paddingRight: "52px" }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: "absolute",
+                right: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--text-muted)",
+                fontSize: "13px",
+                padding: "4px",
+              }}
+              tabIndex={-1}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+          {password && (() => {
+            const strength = getPasswordStrength(password);
+            return (
+              <div style={{ marginTop: "6px" }}>
+                <div style={{ height: "3px", background: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: strength.width, background: strength.color, borderRadius: "2px", transition: "all 0.2s" }} />
+                </div>
+                <span style={{ fontSize: "12px", color: strength.color, marginTop: "2px", display: "block" }}>{strength.label}</span>
+              </div>
+            );
+          })()}
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? "Creating account..." : "Get started free"}
           </button>
         </form>
 
-        <p className="auth-terms">
+        <p className="auth-terms" style={{ fontSize: "0.813rem" }}>
           By signing up, you agree to our <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>.
         </p>
 

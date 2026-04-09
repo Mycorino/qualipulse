@@ -633,7 +633,7 @@ export default function Interview() {
       <div className="interview-page">
         <div className="interview-container" style={{ textAlign: "center", paddingTop: 60 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #6366f1)", marginBottom: 32 }}>QualiPulse</div>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔗</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}><span aria-hidden="true">🔗</span></div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>This interview link isn't active</h1>
           <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 15, maxWidth: 380, margin: "0 auto" }}>
             The link may have expired or been deactivated. Please contact the researcher for a new link.
@@ -662,6 +662,15 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container" style={{ maxWidth: 480 }}>
+        <div style={{
+          background: "#fff",
+          borderRadius: "var(--radius-lg)",
+          padding: "48px 36px",
+          boxShadow: "var(--shadow-md)",
+          maxWidth: "480px",
+          width: "100%",
+          margin: "0 auto",
+        }}>
           {info?.researcher_logo_url && (
             <div className="landing-researcher-logo">
               <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher"} />
@@ -700,6 +709,10 @@ export default function Interview() {
           >
             {sendingVerification ? "Sending…" : "Send my interview link →"}
           </button>
+          <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5, textAlign: "center" }}>
+            We'll send you a link to start. Your email is used to save progress and let you resume later.
+          </p>
+        </div>
         </div>
       </div>
     );
@@ -711,7 +724,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container" style={{ textAlign: "center", maxWidth: 440 }}>
-          <div style={{ fontSize: 52, marginBottom: 16 }}>📬</div>
+          <div style={{ fontSize: 52, marginBottom: 16 }}><span aria-hidden="true">📬</span></div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Check your inbox</h1>
           <p style={{ color: "var(--text-secondary, #6b7280)", lineHeight: 1.6, marginBottom: 8 }}>
             We sent a secure link to <strong>{verificationEmail}</strong>.
@@ -762,7 +775,7 @@ export default function Interview() {
           )}
           <div className="consent-body">
             <p>By participating in this study you agree to the following:</p>
-            <ul className="consent-list">
+            <ul className="consent-list" style={{ textAlign: "left" }}>
               <li>Your voice will be <strong>recorded and transcribed</strong> by AI.</li>
               <li>Your responses will be reviewed by the research team.</li>
               <li>Participation is <strong>voluntary</strong> — you may stop at any time.</li>
@@ -835,7 +848,7 @@ export default function Interview() {
             >
               I agree — continue
             </button>
-            <button className="btn btn-ghost" onClick={() => setConsentDeclined(true)}>
+            <button className="btn btn-ghost" onClick={() => setConsentDeclined(true)} style={{ color: "var(--text-secondary)" }}>
               Decline
             </button>
           </div>
@@ -849,11 +862,25 @@ export default function Interview() {
   if (phase === "profile") {
     return (
       <div className="interview-page">
-        <div className="interview-container" style={{ maxWidth: 540 }}>
+        <div className="interview-container" style={{ maxWidth: 560 }}>
+          <div style={{
+            background: "#fff",
+            borderRadius: "var(--radius-lg)",
+            padding: "48px 36px",
+            boxShadow: "var(--shadow-md)",
+            maxWidth: "560px",
+            width: "100%",
+            margin: "0 auto",
+          }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Tell us a bit about yourself</h1>
           <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6 }}>
             This helps us match you with relevant future studies. All fields are optional.
           </p>
+
+          {/* Section: About You */}
+          <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginBottom: 4 }}>
+            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>About You</p>
+          </div>
 
           {/* First name */}
           <div className="interview-name-field">
@@ -875,7 +902,6 @@ export default function Interview() {
                 <button
                   key={opt}
                   className={`profiling-option-btn${profile.ageRange === opt ? " selected" : ""}`}
-                  style={{ padding: "6px 14px", fontSize: 13 }}
                   onClick={() => setProfile((p) => ({ ...p, ageRange: p.ageRange === opt ? "" : opt }))}
                 >
                   {opt}
@@ -897,13 +923,17 @@ export default function Interview() {
                 <button
                   key={value}
                   className={`profiling-option-btn${profile.gender === value ? " selected" : ""}`}
-                  style={{ padding: "6px 14px", fontSize: 13 }}
                   onClick={() => setProfile((p) => ({ ...p, gender: p.gender === value ? "" : value }))}
                 >
                   {label}
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Section: Work Experience */}
+          <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginTop: 8, marginBottom: 4 }}>
+            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>Work Experience</p>
           </div>
 
           {/* Employment */}
@@ -921,7 +951,6 @@ export default function Interview() {
                 <button
                   key={value}
                   className={`profiling-option-btn${profile.employment === value ? " selected" : ""}`}
-                  style={{ padding: "6px 14px", fontSize: 13 }}
                   onClick={() => setProfile((p) => ({ ...p, employment: p.employment === value ? "" : value }))}
                 >
                   {label}
@@ -971,7 +1000,6 @@ export default function Interview() {
                 <button
                   key={value}
                   className={`profiling-option-btn${profile.companySize === value ? " selected" : ""}`}
-                  style={{ padding: "6px 14px", fontSize: 13 }}
                   onClick={() => setProfile((p) => ({ ...p, companySize: p.companySize === value ? "" : value }))}
                 >
                   {label}
@@ -995,7 +1023,6 @@ export default function Interview() {
                 <button
                   key={value}
                   className={`profiling-option-btn${profile.seniority === value ? " selected" : ""}`}
-                  style={{ padding: "6px 14px", fontSize: 13 }}
                   onClick={() => setProfile((p) => ({ ...p, seniority: p.seniority === value ? "" : value }))}
                 >
                   {label}
@@ -1019,7 +1046,6 @@ export default function Interview() {
                       <button
                         key={tag.id}
                         className={`profiling-option-btn${profile.selectedTagIds.includes(tag.id) ? " selected" : ""}`}
-                        style={{ padding: "5px 12px", fontSize: 12 }}
                         onClick={() => toggleTag(tag.id)}
                         disabled={!profile.selectedTagIds.includes(tag.id) && profile.selectedTagIds.length >= 5}
                       >
@@ -1037,7 +1063,6 @@ export default function Interview() {
                       <button
                         key={tag.id}
                         className={`profiling-option-btn${profile.selectedTagIds.includes(tag.id) ? " selected" : ""}`}
-                        style={{ padding: "5px 12px", fontSize: 12 }}
                         onClick={() => toggleTag(tag.id)}
                         disabled={!profile.selectedTagIds.includes(tag.id) && profile.selectedTagIds.length >= 5}
                       >
@@ -1049,6 +1074,11 @@ export default function Interview() {
               )}
             </div>
           )}
+
+          {/* Section: Location */}
+          <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginTop: 8, marginBottom: 4 }}>
+            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>Location</p>
+          </div>
 
           {/* City */}
           <div className="interview-name-field">
@@ -1076,6 +1106,7 @@ export default function Interview() {
             <button className="btn btn-ghost" onClick={handleSkipProfile} disabled={starting}>
               Skip
             </button>
+          </div>
           </div>
         </div>
       </div>
@@ -1201,7 +1232,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container interview-complete">
-          <div className="complete-icon disqualified-icon">🙏</div>
+          <div className="complete-icon disqualified-icon"><span aria-hidden="true">🙏</span></div>
           <h1 className="interview-complete-title">Thank you for your time</h1>
           <p className="interview-complete-text">
             This particular study is looking for a specific audience profile —
@@ -1228,7 +1259,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container mic-test-card">
-          <div className="mic-prompt-icon">🎙️</div>
+          <div className="mic-prompt-icon"><span aria-hidden="true">🎙️</span></div>
           <h2 className="mic-test-title">This interview uses your microphone</h2>
           <p className="mic-test-subtitle">
             When you click below, your browser will ask for microphone permission.
@@ -1354,7 +1385,14 @@ export default function Interview() {
           </div>
 
           <div className="interview-question-area">
-            <p className="interview-question-text">{currentQuestion}</p>
+            {!currentQuestion ? (
+              <div style={{ textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>
+                <div className="spinner" style={{ margin: "0 auto 12px" }} />
+                <p>Preparing your first question...</p>
+              </div>
+            ) : (
+              <p className="interview-question-text">{currentQuestion}</p>
+            )}
           </div>
 
           {error && <div className="error-banner">{error}</div>}
@@ -1389,8 +1427,8 @@ export default function Interview() {
           <div className="interview-controls">
             {processing ? (
               <div className="processing-indicator">
-                <div className="spinner" />
-                <span>{["Transcribing your answer…", "Thinking…", "Preparing next question…"][processingStep]}</span>
+                <div className="spinner" style={{ width: 28, height: 28 }} />
+                <span style={{ fontSize: "1rem" }}>{["Transcribing your answer…", "Thinking…", "Preparing next question…"][processingStep]}</span>
               </div>
             ) : pendingBlob ? (
               <div className="recording-preview">
@@ -1407,7 +1445,7 @@ export default function Interview() {
               </div>
             ) : isRecording ? (
               <>
-                <button className="record-btn recording" onClick={handleStopAndPreview}>
+                <button className="record-btn recording" onClick={handleStopAndPreview} aria-label="Stop recording">
                   <div className="record-btn-inner recording-pulse" />
                 </button>
                 <p className="record-label">Tap to stop recording</p>
@@ -1425,6 +1463,7 @@ export default function Interview() {
                   onClick={ttsPlaying ? undefined : startRecording}
                   disabled={ttsPlaying}
                   title={ttsPlaying ? "Wait for the question to finish" : "Tap to start recording"}
+                  aria-label={ttsPlaying ? "Recording paused — AI is responding" : "Start recording"}
                 >
                   <div className="record-btn-inner" />
                 </button>
@@ -1481,7 +1520,7 @@ export default function Interview() {
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 28, marginBottom: 8 }}>🎉</div>
+            <div style={{ fontSize: 28, marginBottom: 8 }}><span aria-hidden="true">🎉</span></div>
             <p style={{ fontWeight: 700, color: "#4f46e5", marginBottom: 4 }}>
               You're now part of the QualiPulse Research Community
             </p>

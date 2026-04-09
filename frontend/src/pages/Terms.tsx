@@ -3,6 +3,25 @@ import { Link } from "react-router-dom";
 export default function Terms() {
   return (
     <div className="legal-page">
+      {/* Sticky header */}
+      <div style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+        background: "var(--bg-surface)",
+        borderBottom: "1px solid var(--border)",
+        padding: "12px 24px",
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+      }}>
+        <Link to="/" style={{ textDecoration: "none", color: "var(--text-secondary)", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+          ← Back to home
+        </Link>
+        <span style={{ color: "var(--border)", fontSize: "14px" }}>|</span>
+        <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>Terms of Service</span>
+      </div>
+
       <div className="legal-container">
         <div className="legal-header">
           <Link to="/" style={{ textDecoration: "none" }}>
@@ -11,8 +30,42 @@ export default function Terms() {
           <h1 className="auth-title">Terms of Service</h1>
         </div>
 
+        {/* Table of contents */}
+        <nav style={{
+          background: "var(--bg-sunken)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          padding: "20px 24px",
+          marginBottom: "32px",
+        }}>
+          <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>Contents</p>
+          <ol style={{ margin: 0, padding: "0 0 0 18px", display: "flex", flexDirection: "column", gap: "6px" }}>
+            {[
+              ["#section-1", "Service Description"],
+              ["#section-2", "Accounts"],
+              ["#section-3", "Acceptable Use"],
+              ["#section-4", "Intellectual Property"],
+              ["#section-5", "Data and Privacy"],
+              ["#section-6", "Payment Terms"],
+              ["#section-7", "Service Availability"],
+              ["#section-8", "Limitation of Liability"],
+              ["#section-9", "Termination"],
+              ["#section-10", "Changes to Terms"],
+              ["#section-11", "Governing Law"],
+              ["#section-12", "Contact"],
+            ].map(([href, label]) => (
+              <li key={href}>
+                <a href={href} style={{ fontSize: "14px", color: "var(--primary)", textDecoration: "none" }}
+                  onMouseEnter={(e) => { (e.target as HTMLElement).style.textDecoration = "underline"; }}
+                  onMouseLeave={(e) => { (e.target as HTMLElement).style.textDecoration = "none"; }}
+                >{label}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
         <div className="legal-content">
-          <h2>1. Service Description</h2>
+          <h2 id="section-1" style={{ scrollMarginTop: "80px" }}>1. Service Description</h2>
           <p>
             QualiPulse ("the Service") is a software-as-a-service platform operated by QualiPulse
             ("we", "us", "our") that enables researchers to create, distribute, and analyse
@@ -20,7 +73,7 @@ export default function Terms() {
             transcription and analysis, participant management, and data export capabilities.
           </p>
 
-          <h2>2. Accounts</h2>
+          <h2 id="section-2" style={{ scrollMarginTop: "80px" }}>2. Accounts</h2>
           <p>
             To use the Service you must create an account with a valid email address and a secure
             password. You are responsible for maintaining the confidentiality of your credentials
@@ -33,7 +86,7 @@ export default function Terms() {
             you have the authority to bind that organisation to these terms.
           </p>
 
-          <h2>3. Acceptable Use</h2>
+          <h2 id="section-3" style={{ scrollMarginTop: "80px" }}>3. Acceptable Use</h2>
           <p>You agree not to:</p>
           <ul>
             <li>Use the Service for any unlawful purpose or in violation of any applicable laws or regulations.</li>
@@ -45,7 +98,7 @@ export default function Terms() {
             <li>Use the Service to build a competing product or service.</li>
           </ul>
 
-          <h2>4. Intellectual Property</h2>
+          <h2 id="section-4" style={{ scrollMarginTop: "80px" }}>4. Intellectual Property</h2>
           <p>
             The Service, including its design, code, AI models, and documentation, is owned by
             QualiPulse and protected by intellectual property laws. You retain ownership of all
@@ -58,7 +111,7 @@ export default function Terms() {
             models or share it with third parties except as described in our Privacy Policy.
           </p>
 
-          <h2>5. Data and Privacy</h2>
+          <h2 id="section-5" style={{ scrollMarginTop: "80px" }}>5. Data and Privacy</h2>
           <p>
             Your use of the Service is also governed by our{" "}
             <Link to="/privacy">Privacy Policy</Link>, which describes how we collect, use, store,
@@ -71,7 +124,7 @@ export default function Terms() {
             appropriate legal basis for collecting and processing participant data.
           </p>
 
-          <h2>6. Payment Terms</h2>
+          <h2 id="section-6" style={{ scrollMarginTop: "80px" }}>6. Payment Terms</h2>
           <p>
             The Service offers free and paid subscription tiers. Paid plans are billed monthly or
             annually as selected at checkout. All fees are non-refundable except where required by
@@ -82,14 +135,14 @@ export default function Terms() {
             data will be retained for at least 30 days after suspension to allow you to export it.
           </p>
 
-          <h2>7. Service Availability</h2>
+          <h2 id="section-7" style={{ scrollMarginTop: "80px" }}>7. Service Availability</h2>
           <p>
             We strive to maintain high availability but do not guarantee uninterrupted access. The
             Service may be temporarily unavailable for maintenance, updates, or circumstances
             beyond our control. We will provide reasonable notice of planned downtime when possible.
           </p>
 
-          <h2>8. Limitation of Liability</h2>
+          <h2 id="section-8" style={{ scrollMarginTop: "80px" }}>8. Limitation of Liability</h2>
           <p>
             To the maximum extent permitted by law, QualiPulse shall not be liable for any
             indirect, incidental, special, consequential, or punitive damages, including but not
@@ -102,14 +155,14 @@ export default function Terms() {
             provided "as is" and "as available" without warranties of any kind, express or implied.
           </p>
 
-          <h2>9. Termination</h2>
+          <h2 id="section-9" style={{ scrollMarginTop: "80px" }}>9. Termination</h2>
           <p>
             You may close your account at any time. We may suspend or terminate your account if
             you violate these terms, if required by law, or if we discontinue the Service. Upon
             termination, we will make your data available for export for at least 30 days.
           </p>
 
-          <h2>10. Changes to Terms</h2>
+          <h2 id="section-10" style={{ scrollMarginTop: "80px" }}>10. Changes to Terms</h2>
           <p>
             We may update these terms from time to time. We will notify you of material changes
             via email or through the Service at least 30 days before they take effect. Continued
@@ -117,7 +170,7 @@ export default function Terms() {
             terms.
           </p>
 
-          <h2>11. Governing Law</h2>
+          <h2 id="section-11" style={{ scrollMarginTop: "80px" }}>11. Governing Law</h2>
           <p>
             These terms are governed by the laws of the European Union and the member state in
             which QualiPulse is established. Any disputes shall be resolved in the competent courts
@@ -125,7 +178,7 @@ export default function Terms() {
             may apply to you.
           </p>
 
-          <h2>12. Contact</h2>
+          <h2 id="section-12" style={{ scrollMarginTop: "80px" }}>12. Contact</h2>
           <p>
             If you have questions about these terms, please contact us at{" "}
             <a href="mailto:hello@qualipulse.com">hello@qualipulse.com</a>.

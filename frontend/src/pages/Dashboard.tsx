@@ -7,7 +7,7 @@ import {
   unarchiveProject,
   ProjectListItem,
 } from "../api/projects";
-import { getMe } from "../api/auth";
+import { getMe, resendVerification } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
 
 export default function Dashboard() {
@@ -18,6 +18,8 @@ export default function Dashboard() {
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [me, setMe] = useState<CompanyResponse | null>(null);
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [verificationResent, setVerificationResent] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -57,6 +59,18 @@ export default function Dashboard() {
     }
   }
 
+  async function handleResendVerification() {
+    setResendingVerification(true);
+    try {
+      await resendVerification();
+      setVerificationResent(true);
+    } catch {
+      // handled by interceptor
+    } finally {
+      setResendingVerification(false);
+    }
+  }
+
   async function handleRestore(e: React.MouseEvent, projectId: string) {
     e.stopPropagation();
     setRestoringId(projectId);
@@ -76,13 +90,13 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-layout">
-      <header className="dashboard-header">
-        <h1 className="logo">QualiPulse</h1>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button className="btn btn-ghost" onClick={() => navigate("/account")}>
-            Account & Billing
+      <header className="dashboard-header" style={{ flexWrap: "wrap" }}>
+        <span className="logo">QualiPulse</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
+            Account
           </button>
-          <button className="btn btn-ghost" onClick={logout}>
+          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={logout}>
             Sign out
           </button>
         </div>
@@ -90,13 +104,20 @@ export default function Dashboard() {
 
       <main className="dashboard-main">
         <div className="dashboard-top-row">
-          <h2>Projects</h2>
-          <button
-            className="btn btn-primary"
-            onClick={() => navigate("/projects/new")}
-          >
-            + Create Project
-          </button>
+          <h1 style={{ fontSize: "inherit", fontWeight: "inherit", margin: 0 }}>Projects</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {!loading && me && (
+              <span style={{ fontSize: 13, color: "var(--muted, #6b7280)" }}>
+                {projects.length} of {me.subscription_tier === "solo" || me.subscription_tier === "free" ? 3 : me.subscription_tier === "team" || me.subscription_tier === "starter" ? 5 : "∞"} projects
+              </span>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate("/projects/new")}
+            >
+              + Create Project
+            </button>
+          </div>
         </div>
 
         {/* Global banners — always visible regardless of project count */}
@@ -104,7 +125,7 @@ export default function Dashboard() {
           <div className="gs-trial-banner" style={{ marginBottom: 16 }}>
             <span>🎉</span>
             <div>
-              <strong>14-day trial active</strong> — You have full Team features until {new Date(me.trial_ends_at).toLocaleDateString()}.
+              <strong>14-day trial active</strong> — You have full Team features until {new Date(me.trial_ends_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}.
               {" "}<button className="btn-inline" onClick={() => navigate("/account")}>View plans</button>
             </div>
           </div>
@@ -158,6 +179,17 @@ export default function Dashboard() {
                 <div>
                   <strong>Verify your email</strong>
                   <p>Check your inbox for a verification link to unlock all features.</p>
+                  {verificationResent ? (
+                    <span style={{ fontSize: 13, color: "#16a34a" }}>Email sent! Check your inbox.</span>
+                  ) : (
+                    <button
+                      className="btn-inline"
+                      disabled={resendingVerification}
+                      onClick={handleResendVerification}
+                    >
+                      {resendingVerification ? "Sending…" : "Resend email"}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -168,8 +200,19 @@ export default function Dashboard() {
           {me && !me.email_verified && (
             <div className="gs-verify-banner" style={{ marginBottom: 16 }}>
               <span>&#128231;</span>
-              <div>
-                <strong>Verify your email</strong> — Check your inbox for a verification link.
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <span><strong>Verify your email</strong> — Check your inbox for a verification link.</span>
+                {verificationResent ? (
+                  <span style={{ fontSize: 13, color: "#16a34a" }}>Email sent!</span>
+                ) : (
+                  <button
+                    className="btn-inline"
+                    disabled={resendingVerification}
+                    onClick={handleResendVerification}
+                  >
+                    {resendingVerification ? "Sending…" : "Resend email"}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -178,7 +221,11 @@ export default function Dashboard() {
               <div
                 key={p.id}
                 className="project-card"
+                style={{ maxWidth: 400 }}
+                role="button"
+                tabIndex={0}
                 onClick={() => navigate(`/projects/${p.id}`)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/projects/${p.id}`); } }}
               >
                 <h3 className="project-card-name">{p.name}</h3>
                 <div className="project-card-meta">
@@ -207,7 +254,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <p className="project-card-date">
-                  {new Date(p.created_at).toLocaleDateString()}
+                  {new Date(p.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </p>
               </div>
             ))}
@@ -239,7 +286,7 @@ export default function Dashboard() {
                       <span className="archive-row-meta">
                         <span className="badge badge--sm">{p.language.toUpperCase()}</span>
                         <span>
-                          Archived {p.archived_at ? new Date(p.archived_at).toLocaleDateString() : ""}
+                          Archived {p.archived_at ? new Date(p.archived_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : ""}
                         </span>
                         {p.completed_count > 0 && (
                           <span>· {p.completed_count} completed</span>

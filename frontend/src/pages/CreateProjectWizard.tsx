@@ -76,6 +76,7 @@ export default function CreateProjectWizard() {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
   const [hasDraft, setHasDraft] = useState(!!draft);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const { toast } = useToast();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -170,12 +171,11 @@ export default function CreateProjectWizard() {
   }
 
   async function handleSuggestQuestions() {
-    if (questions.length > 0) {
-      const ok = window.confirm(
-        `This will replace your ${questions.length} existing question${questions.length > 1 ? "s" : ""}. Any edits you've made will be lost. Continue?`
-      );
-      if (!ok) return;
+    if (questions.length > 0 && !confirmRegenerate) {
+      setConfirmRegenerate(true);
+      return;
     }
+    setConfirmRegenerate(false);
     setLoading(true);
     setLoadingMsg("Writing your interview guide...");
     setError("");
@@ -329,26 +329,30 @@ export default function CreateProjectWizard() {
           ← Back
         </button>
         <h2 className="wizard-title">{isEditMode ? "Edit Project" : "New Research Project"}</h2>
-        {!isEditMode && <span className="wizard-autosave">Draft auto-saved</span>}
+        {!isEditMode && <span className="wizard-autosave wizard-autosave--hide-mobile">Draft auto-saved</span>}
         {isEditMode && <div style={{ width: 80 }} />}
       </header>
 
       {/* Progress */}
-      <div className="wizard-progress">
+      <div className="wizard-progress" style={{ gap: "clamp(8px, 4vw, 48px)" }}>
         {STEPS.map((label, i) => (
           <div
             key={label}
             className={`wizard-step-dot ${step === i + 1 ? "active" : step > i + 1 ? "done" : ""}`}
           >
             <div className="wizard-dot-circle">{step > i + 1 ? "✓" : i + 1}</div>
-            <span className="wizard-dot-label">{label}</span>
+            <span
+              className={`wizard-dot-label${step !== i + 1 ? " wizard-dot-label--inactive" : ""}`}
+            >
+              {label}
+            </span>
           </div>
         ))}
       </div>
 
       <main className="wizard-main">
         {hasDraft && (
-        <div className="draft-banner">
+        <div className="draft-banner" style={{ background: "var(--brand-50, #eff6ff)", color: "var(--brand-700, #1d4ed8)", borderColor: "var(--brand-200, #bfdbfe)" }}>
           <span>Draft restored — pick up where you left off.</span>
           <button
             className="btn btn-ghost btn-sm"
@@ -454,13 +458,19 @@ export default function CreateProjectWizard() {
 
             <div className="wizard-nav">
               <div />
-              <button
-                className="btn btn-primary"
-                disabled={!name.trim()}
-                onClick={() => { setError(""); setStep(2); }}
-              >
-                Next →
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                {!name.trim() && (
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>Enter a project name to continue</p>
+                )}
+                <button
+                  className="btn btn-primary"
+                  disabled={!name.trim()}
+                  title={!name.trim() ? "Please enter a project name to continue" : undefined}
+                  onClick={() => { setError(""); setStep(2); }}
+                >
+                  Next →
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -652,21 +662,39 @@ export default function CreateProjectWizard() {
               </p>
             </div>
 
-            <button
-              className="btn btn-ai"
-              onClick={handleSuggestQuestions}
-              disabled={loading}
-            >
-              {loading
-                ? <><span className="spinner-sm" />{loadingMsg}</>
-                : questions.length > 0
-                ? "✦ Regenerate Guide"
-                : "✦ Generate Interview Guide"}
-            </button>
+            {confirmRegenerate ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 16px", background: "var(--warning-50, #fffbeb)", border: "1px solid var(--warning-200, #fde68a)", borderRadius: 8, marginBottom: 4 }}>
+                <p style={{ margin: 0, fontSize: 14, color: "var(--warning-800, #92400e)" }}>
+                  This will replace your {questions.length} existing question{questions.length > 1 ? "s" : ""}. Any edits you've made will be lost.
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="btn btn-ai btn-sm" onClick={handleSuggestQuestions} disabled={loading}>
+                    Yes, regenerate
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setConfirmRegenerate(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="btn btn-ai"
+                onClick={handleSuggestQuestions}
+                disabled={loading}
+              >
+                {loading
+                  ? <><span className="spinner-sm" />{loadingMsg}</>
+                  : questions.length > 0
+                  ? "✦ Regenerate Guide"
+                  : "✦ Generate Interview Guide"}
+              </button>
+            )}
 
             {questions.length > 0 && (
               <div className="guide-editor">
-                {questions.map((q, i) => (
+                {questions.map((q, i) => {
+                  const sectionLocalIndex = questions.slice(0, i).filter((prev) => prev.section_index === q.section_index).length + 1;
+                  return (
                   <div key={i} className="guide-editor-question">
                     <div
                       className="guide-editor-header"
@@ -674,7 +702,7 @@ export default function CreateProjectWizard() {
                     >
                       <div className="guide-editor-meta">
                         <span className="guide-editor-section">{q.section_title}</span>
-                        <span className="guide-editor-num">Q{i + 1}</span>
+                        <span className="guide-editor-num">Q{sectionLocalIndex}</span>
                       </div>
                       <span className="guide-editor-preview">
                         {q.main_question || <em className="muted-text">Empty question</em>}
@@ -724,14 +752,15 @@ export default function CreateProjectWizard() {
                         <button
                           className="btn btn-ghost btn-sm btn-danger-text"
                           style={{ marginTop: 8 }}
-                          onClick={() => { if (window.confirm("Remove this question?")) removeQuestion(i); }}
+                          onClick={() => removeQuestion(i)}
                         >
                           Remove question
                         </button>
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
 
                 <button className="btn btn-ghost btn-sm" onClick={addQuestion} style={{ border: "1.5px solid #d1d5db", borderRadius: 6, padding: "6px 16px" }}>
                   + Add question

@@ -7,6 +7,7 @@ import { getErrorMessage } from "../utils/errorMessages";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { saveToken } = useAuth();
@@ -65,8 +66,9 @@ export default function Login() {
         {error && <div className="error-banner">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label">Email</label>
+          <label className="field-label" htmlFor="login-email">Email</label>
           <input
+            id="login-email"
             type="email"
             className="field-input"
             value={email}
@@ -74,26 +76,51 @@ export default function Login() {
             placeholder="you@company.com"
             required
             autoFocus
+            autoComplete="email"
           />
 
-          <label className="field-label">Password</label>
-          <input
-            type="password"
-            className="field-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <label className="field-label" htmlFor="login-password">Password</label>
+          <div style={{ position: "relative" }}>
+            <input
+              id="login-password"
+              type={showPassword ? "text" : "password"}
+              className="field-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              style={{ paddingRight: "52px" }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: "absolute",
+                right: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--text-muted)",
+                fontSize: "13px",
+                padding: "4px",
+              }}
+              tabIndex={-1}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+
+          <div style={{ textAlign: "right", marginTop: "4px" }}>
+            <Link to="/forgot-password" className="auth-link">Forgot your password?</Link>
+          </div>
 
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-
-        <div className="auth-footer" style={{ marginTop: 12 }}>
-          <Link to="/forgot-password" className="auth-link">Forgot your password?</Link>
-        </div>
-        <p className="auth-footer">
+        <p className="auth-footer" style={{ marginTop: 12 }}>
           Don't have an account? <Link to="/signup">Sign up free</Link>
         </p>
       </div>
