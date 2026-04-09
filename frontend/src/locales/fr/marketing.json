@@ -11,7 +11,12 @@
     "title": "Des insights qualitatifs\nsans le casse-tête des plannings",
     "subtitle": "Vous savez que la recherche doit avoir lieu. Mais coordonner 12 entretiens, les conduire, transcrire et synthétiser prend des semaines que vous n'avez pas. QualiPulse mène des entretiens vocaux animés par l'IA de manière asynchrone et produit un mémo de recherche structuré — automatiquement.",
     "cta": "Commencer votre essai de 14 jours",
-    "note": "Essai gratuit de 14 jours · Aucune carte de crédit requise · Annulable à tout moment"
+    "note": "Essai gratuit de 14 jours · Aucune carte de crédit requise · Annulable à tout moment",
+    "interviewInProgress": "Entretien en cours",
+    "recordingStatus": "Enregistrement · 0:42",
+    "interviewQuestion": "Pouvez-vous me décrire la dernière fois que vous avez dû intégrer un nouvel outil au travail ?",
+    "emergingThemes": "Thèmes émergents",
+    "themeTags": ["Friction d'intégration", "Construction de confiance", "Valeur immédiate"]
   },
   "painPoints": {
     "title": "Ça vous parle ?",
@@ -99,6 +104,77 @@
         "desc": "Une fois les réponses collectées, déclenchez une synthèse IA. Vous obtenez des thèmes structurés avec des citations, des tensions, des jobs-to-be-done et des recommandations — prêts à partager avec vos parties prenantes."
       }
     ]
+  },
+  "output": {
+    "title": "De 12 entretiens à ceci — automatiquement",
+    "subtitle": "Voici à quoi ressemble votre mémo de recherche généré par IA. Thèmes, citations, tensions et recommandations — prêts à partager.",
+    "projectName": "Étude sur l'expérience d'intégration SaaS",
+    "meta": "12 participants · Généré en 45 secondes",
+    "summaryLabel": "Résumé",
+    "summaryText": "Les participants ont régulièrement signalé que la complexité de la configuration initiale est le principal obstacle à l'adoption. La plupart apprécient une expérience d'intégration guidée, mais trouvent les implémentations actuelles trop génériques. Trois thèmes clés ont émergé autour des attentes de time-to-value, du rôle de la preuve sociale dans l'établissement de la confiance, et des frustrations liées à la découverte des fonctionnalités.",
+    "keyThemesLabel": "Thèmes clés",
+    "mentionedBy": "Mentionné par {{x}} des {{y}} participants",
+    "theme1": {
+      "title": "Anxiété du time-to-value",
+      "quote": "Je dois voir de la valeur dans les 10 premières minutes ou je pars. Je n'ai pas le temps de regarder des tutoriels.",
+      "attr": "— Chef de produit, startup Série A"
+    },
+    "theme2": {
+      "title": "Friction dans la découverte des fonctionnalités",
+      "quote": "Je n'ai découvert la fonctionnalité d'export qu'après trois mois. Je le faisais manuellement jusque-là.",
+      "attr": "— Designer UX, Fintech"
+    },
+    "recommendationsLabel": "Recommandations",
+    "recs": [
+      "Mettre en place un parcours d'intégration basé sur les tâches qui apporte de la valeur dès la première session",
+      "Ajouter des conseils contextuels sur les fonctionnalités déclenchés par les comportements utilisateurs",
+      "Créer des parcours de configuration spécifiques à chaque rôle (chercheur, PM, designer)"
+    ]
+  },
+  "whoFor": {
+    "title": "Conçu pour ceux qui ont besoin d'insights, pas de corvées",
+    "subtitle": "Que vous fassiez de la recherche à temps plein ou entre deux décisions produit.",
+    "items": [
+      {
+        "title": "Chercheurs UX",
+        "desc": "Menez plus d'études en moins de temps. Déléguez la logistique, gardez la rigueur analytique. L'IA gère l'animation et la synthèse initiale — vous pilotez l'interprétation.",
+        "examples": "Recherche exploratoire, études évaluatives, programmes de recherche continus"
+      },
+      {
+        "title": "Chefs de produit",
+        "desc": "Obtenez des insights utilisateurs sans attendre le backlog de l'équipe de recherche. Configurez une étude en minutes, envoyez le lien aux bêta-utilisateurs, obtenez une synthèse exploitable.",
+        "examples": "Validation de fonctionnalités, analyse du churn, retours sur l'intégration"
+      },
+      {
+        "title": "Consultants et agences",
+        "desc": "Menez des recherches qualitatives pour vos clients à grande échelle. Branding personnalisé, rapports partageables, plusieurs projets en parallèle.",
+        "examples": "Missions de recherche client, études de marché, entretiens avec les parties prenantes"
+      }
+    ]
+  },
+  "differentiator": {
+    "title": "Vous vous posez peut-être des questions...",
+    "subtitle": "Comment QualiPulse se compare-t-il aux outils que vous connaissez déjà ?",
+    "items": [
+      {
+        "vs": "UserTesting / dscout",
+        "point": "Ces plateformes vous aident à recruter et à conduire des sessions modérées. QualiPulse remplace le modérateur par l'IA, mène les entretiens de manière asynchrone et synthétise les résultats. Aucune planification, aucun frais de session."
+      },
+      {
+        "vs": "Dovetail / EnjoyHQ",
+        "point": "Ce sont des outils d'analyse et de dépôt pour les recherches déjà réalisées. QualiPulse gère l'ensemble du flux de travail : création du guide, collecte des entretiens et synthèse en un seul endroit."
+      },
+      {
+        "vs": "Google Forms / Typeform",
+        "point": "Les sondages vous donnent des données structurées. QualiPulse vous offre la profondeur qualitative — questions de suivi, sondages, réponses vocales — sans la contrainte des entretiens en direct."
+      }
+    ]
+  },
+  "trust": {
+    "quote": "\"Nous avons créé QualiPulse parce que nous en avions assez de passer 80 % de notre temps de recherche sur la logistique et 20 % à réfléchir. Nous voulions inverser ce ratio.\"",
+    "name": "Corino Fontana",
+    "role": "Fondateur, QualiPulse",
+    "badges": ["Conforme RGPD", "Données chiffrées au repos", "Infrastructure hébergée en UE"]
   },
   "pricing": {
     "title": "Des tarifs simples et transparents",

@@ -101,7 +101,7 @@ export default function Marketing() {
             </div>
             <div className="mkt-preview-body">
               <div className="mkt-preview-question">
-                "Can you walk me through the last time you had to onboard a new tool at work?"
+                "{t("hero.interviewQuestion")}"
               </div>
               <div className="mkt-preview-wave">
                 {Array.from({ length: 20 }).map((_, i) => (
@@ -113,9 +113,9 @@ export default function Marketing() {
           </div>
           <div className="mkt-preview-stat mkt-stat-themes">
             <span className="mkt-stat-label">{t("preview.emergingThemes")}</span>
-            <span className="mkt-stat-tag">Onboarding friction</span>
-            <span className="mkt-stat-tag">Trust building</span>
-            <span className="mkt-stat-tag">Time to value</span>
+            {(t("hero.themeTags", { returnObjects: true }) as string[]).map((tag) => (
+              <span key={tag} className="mkt-stat-tag">{tag}</span>
+            ))}
           </div>
         </div>
       </section>
@@ -214,14 +214,10 @@ export default function Marketing() {
       {/* Differentiator */}
       <section className="mkt-diff">
         <div className="mkt-diff-inner">
-          <h2 className="mkt-section-title">You might be wondering...</h2>
-          <p className="mkt-section-sub">How does QualiPulse compare to tools you may already know?</p>
+          <h2 className="mkt-section-title">{t("differentiator.title")}</h2>
+          <p className="mkt-section-sub">{t("differentiator.subtitle")}</p>
           <div className="mkt-diff-list">
-            {[
-              { vs: "UserTesting / dscout", point: "Those platforms help you recruit and run moderated sessions. QualiPulse replaces the moderator with AI, runs interviews asynchronously, and synthesises the results. No scheduling, no session fees." },
-              { vs: "Dovetail / EnjoyHQ", point: "Those are analysis-and-repository tools for research you've already done. QualiPulse handles the full workflow: guide creation, interview collection, and synthesis in one place." },
-              { vs: "Google Forms / Typeform", point: "Surveys give you structured data. QualiPulse gives you qualitative depth — follow-up questions, probing, voice responses — without the overhead of live interviews." },
-            ].map((c) => (
+            {(t("differentiator.items", { returnObjects: true }) as Array<{ vs: string; point: string }>).map((c) => (
               <div key={c.vs} className="mkt-diff-row">
                 <span className="mkt-diff-vs">vs. {c.vs}</span>
                 <p className="mkt-diff-point">{c.point}</p>
@@ -234,15 +230,15 @@ export default function Marketing() {
       {/* Trust */}
       <section className="mkt-trust">
         <div className="mkt-trust-inner">
-          <h3>"We built QualiPulse because we were tired of spending 80% of our research time on logistics and 20% on thinking. We wanted to flip that ratio."</h3>
+          <h3>{t("trust.quote")}</h3>
           <div className="mkt-trust-meta">
-            <span className="mkt-trust-name">Corino Fontana</span>
-            <span className="mkt-trust-role">Founder, QualiPulse</span>
+            <span className="mkt-trust-name">{t("trust.name")}</span>
+            <span className="mkt-trust-role">{t("trust.role")}</span>
           </div>
           <div className="mkt-trust-badges">
-            <span>GDPR compliant</span>
-            <span>Data encrypted at rest</span>
-            <span>EU-hosted infrastructure</span>
+            {(t("trust.badges", { returnObjects: true }) as string[]).map((badge) => (
+              <span key={badge}>{badge}</span>
+            ))}
           </div>
         </div>
       </section>
