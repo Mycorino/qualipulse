@@ -680,6 +680,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Blog CMS (TipTap WYSIWYG editor, live preview, draft/publish, SEO meta + OG tags)
 - [x] Public blog listing (/blog) + article pages (/blog/:slug) with newsletter CTA
 - [x] Blog admin tab (create, edit, delete posts, status filter)
+- [x] UX audit fixes (82 items): dark mode for marketing/auth, CSS variable cleanup (~50 hardcoded hex→vars), password show/hide + strength indicator, focus-visible outlines, ARIA labels + keyboard nav, sticky TOC on Terms/Privacy, responsive analysis toolbar, 44px touch targets, interview profiling card styling
 - [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented)
 - [ ] Email invitation sending (template exists, no send endpoint)
 - [ ] Multi-language TTS voices (language field exists on projects)
