@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [me, setMe] = useState<CompanyResponse | null>(null);
   const [resendingVerification, setResendingVerification] = useState(false);
   const [verificationResent, setVerificationResent] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -35,8 +36,9 @@ export default function Dashboard() {
     try {
       const data = await listProjects();
       setProjects(data);
+      setLoadError(false);
     } catch {
-      // handled by interceptor
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -132,7 +134,7 @@ export default function Dashboard() {
         </div>
 
         {/* Global banners */}
-        {!loading && me?.trial_ends_at && (me?.subscription_tier === "starter" || me?.subscription_tier === "solo" || me?.subscription_tier === "free") && (
+        {!loading && me?.trial_ends_at && new Date(me.trial_ends_at) > new Date() && (
           <div className="gs-trial-banner" style={{ marginBottom: 16 }}>
             <span>🎉</span>
             <div>
@@ -141,6 +143,12 @@ export default function Dashboard() {
               })}
               {" "}<button className="btn-inline" onClick={() => navigate("/account")}>{t("trialBanner.viewPlans")}</button>
             </div>
+          </div>
+        )}
+
+        {loadError && (
+          <div className="error-banner" style={{ marginBottom: 16 }}>
+            {t("loadError")}
           </div>
         )}
 

@@ -248,23 +248,24 @@ export default function Welcome() {
         <div className="auth-logo" style={{ textAlign: "center", marginBottom: 8 }}>QualiPulse</div>
 
         {/* Progress indicator — 6 steps */}
-        <div className="onboarding-progress">
+        <div className="onboarding-progress" role="group" aria-label={`Step ${step} of ${STEP_LABELS.length}`}>
           {STEP_LABELS.map((label, i) => {
             const s = i + 1;
             return (
-              <div key={s} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <div key={s} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }} aria-current={s === step ? "step" : undefined}>
                 <div
                   className={`onboarding-progress-dot ${s <= step ? "active" : ""} ${s === step ? "current" : ""}`}
                 />
                 <span style={{ fontSize: 10, color: s <= step ? "var(--primary, #6366f1)" : "var(--text-tertiary, #9ca3af)", whiteSpace: "nowrap" }}>
                   {label}
                 </span>
+                {s === step && <span style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", borderWidth: 0 }}>{`Step ${step} of ${STEP_LABELS.length}`}</span>}
               </div>
             );
           })}
         </div>
 
-        {error && <div className="error-banner" style={{ marginBottom: 20 }}>{error}</div>}
+        {error && <div className="error-banner" role="alert" style={{ marginBottom: 20 }}>{error}</div>}
 
         {/* ── Step 1: Verify Email ── */}
         {step === 1 && (
@@ -313,6 +314,7 @@ export default function Welcome() {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder={t("onboarding.profileCompanyPlaceholder")}
+                  disabled={saving}
                 />
               </div>
 
@@ -326,6 +328,7 @@ export default function Welcome() {
                       key={value}
                       className={`onboarding-chip ${role === value ? "selected" : ""}`}
                       onClick={() => setRole(value)}
+                      disabled={saving}
                     >
                       {roleLabels[idx] ?? value}
                     </button>
@@ -343,6 +346,7 @@ export default function Welcome() {
                       key={value}
                       className={`onboarding-chip ${companySize === value ? "selected" : ""}`}
                       onClick={() => setCompanySize(value)}
+                      disabled={saving}
                     >
                       {teamSizeLabels[idx] ?? value}
                     </button>
@@ -386,11 +390,12 @@ export default function Welcome() {
                     placeholder={t("onboarding.websitePlaceholder")}
                     style={{ flex: 1 }}
                     onKeyDown={(e) => { if (e.key === "Enter") handleAnalyseWebsite(); }}
+                    disabled={saving}
                   />
                   <button
                     className="btn btn-secondary"
                     onClick={handleAnalyseWebsite}
-                    disabled={websiteLoading || !websiteUrl.trim()}
+                    disabled={websiteLoading || !websiteUrl.trim() || saving}
                     style={{ whiteSpace: "nowrap", flexShrink: 0 }}
                   >
                     {websiteLoading ? (
@@ -412,6 +417,7 @@ export default function Welcome() {
                     onChange={(e) => setBusinessSummary(e.target.value)}
                     rows={4}
                     style={{ resize: "vertical", lineHeight: 1.6 }}
+                    disabled={saving}
                   />
                 </div>
               )}
@@ -424,6 +430,7 @@ export default function Welcome() {
                       key={value}
                       className={`onboarding-chip ${industry === value ? "selected" : ""}`}
                       onClick={() => setIndustry(value)}
+                      disabled={saving}
                     >
                       {industryLabels[idx] ?? value}
                     </button>
@@ -439,6 +446,7 @@ export default function Welcome() {
                       key={r.value}
                       className={`onboarding-chip ${primaryRegion === r.value ? "selected" : ""}`}
                       onClick={() => setPrimaryRegion(r.value)}
+                      disabled={saving}
                     >
                       {regionLabels[idx] ?? r.value}
                     </button>
@@ -455,7 +463,7 @@ export default function Welcome() {
               >
                 {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
-              <button className="btn btn-ghost" onClick={() => setStep(2)}>
+              <button className="btn btn-ghost" onClick={() => setStep(2)} disabled={saving}>
                 ← {t("onboarding.stepProfile")}
               </button>
             </div>
@@ -530,6 +538,7 @@ export default function Welcome() {
                   rows={5}
                   style={{ minHeight: 120, resize: "vertical", lineHeight: 1.6 }}
                   placeholder={t("onboarding.goalsPlaceholder")}
+                  disabled={saving}
                 />
                 <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "right", marginTop: 4 }}>
                   {t("onboarding.goalsCharCount", { count: goalsFreeform.length })}
@@ -553,7 +562,7 @@ export default function Welcome() {
               >
                 {t("onboarding.skip")}
               </button>
-              <button className="btn btn-ghost" onClick={() => setStep(4)} style={{ fontSize: 13 }}>
+              <button className="btn btn-ghost" onClick={() => setStep(4)} disabled={saving} style={{ fontSize: 13 }}>
                 ← {t("onboarding.stepExperience")}
               </button>
             </div>

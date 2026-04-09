@@ -114,6 +114,8 @@ def list_published_posts(
 ):
     query = db.query(BlogPost).filter(BlogPost.status == "published")
     if tag:
+        if not re.match(r'^[a-zA-Z0-9\s\-àâäéèêëïîôùûüÿçÀÂÄÉÈÊËÏÎÔÙÛÜŸÇ]{1,50}$', tag):
+            raise HTTPException(400, "Invalid tag format")
         query = query.filter(BlogPost.tags.contains(f'"{tag}"'))
     total = query.count()
     posts = (

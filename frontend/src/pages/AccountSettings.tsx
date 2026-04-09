@@ -158,8 +158,8 @@ export default function AccountSettings() {
                 <input className="field-input" value={name} onChange={e => setName(e.target.value)} required />
               </div>
               <div>
-                <label className="field-label">{t("profile.emailLabel")}</label>
-                <input className="field-input" value={me?.email ?? ""} disabled style={{ opacity: 0.6 }} />
+                <label className="field-label">{t("profile.emailLabel")} <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-tertiary)" }}>({t("profile.emailReadOnly")})</span></label>
+                <input className="field-input" value={me?.email ?? ""} disabled style={{ opacity: 0.6, cursor: "not-allowed" }} />
               </div>
               <p style={{ color: "var(--success)", fontSize: 14, minHeight: 20, visibility: profileSuccess ? "visible" : "hidden" }}>{t("profile.saved")}</p>
               <button className="btn btn-primary" type="submit" disabled={savingProfile} style={{ width: "fit-content" }}>

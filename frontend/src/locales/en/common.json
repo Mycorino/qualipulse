@@ -57,5 +57,45 @@
   "resending": "Sending…",
   "emailSent": "Email sent! Check your inbox.",
   "learnMore": "Learn more",
-  "contactSupport": "Contact support"
+  "contactSupport": "Contact support",
+  "legal": {
+    "backToHome": "Back to home",
+    "contents": "Contents",
+    "lastUpdated": "Last updated: April 2026",
+    "terms": {
+      "pageTitle": "Terms of Service",
+      "toc": {
+        "serviceDescription": "Service Description",
+        "accounts": "Accounts",
+        "acceptableUse": "Acceptable Use",
+        "intellectualProperty": "Intellectual Property",
+        "dataAndPrivacy": "Data and Privacy",
+        "paymentTerms": "Payment Terms",
+        "serviceAvailability": "Service Availability",
+        "limitationOfLiability": "Limitation of Liability",
+        "termination": "Termination",
+        "changesToTerms": "Changes to Terms",
+        "governingLaw": "Governing Law",
+        "contact": "Contact"
+      }
+    },
+    "privacy": {
+      "pageTitle": "Privacy Policy",
+      "toc": {
+        "introduction": "Introduction",
+        "dataController": "Data Controller",
+        "dataWeCollect": "Data We Collect",
+        "howWeUseYourData": "How We Use Your Data",
+        "legalBasis": "Legal Basis for Processing",
+        "thirdPartyProcessors": "Third-Party Processors",
+        "dataStorageAndSecurity": "Data Storage and Security",
+        "dataRetention": "Data Retention",
+        "yourRights": "Your Rights",
+        "cookies": "Cookies",
+        "childrensPrivacy": "Children's Privacy",
+        "changesToPolicy": "Changes to This Policy",
+        "contactAndComplaints": "Contact and Complaints"
+      }
+    }
+  }
 }

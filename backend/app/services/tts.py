@@ -1,3 +1,4 @@
+import httpx
 import openai
 
 from app.config import settings
@@ -5,7 +6,7 @@ from app.config import settings
 
 def generate_speech(text: str) -> bytes:
     """Generate speech from text using OpenAI TTS and return the audio bytes."""
-    client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+    client = openai.OpenAI(api_key=settings.OPENAI_API_KEY, timeout=httpx.Timeout(60.0))
 
     response = client.audio.speech.create(
         model="tts-1",

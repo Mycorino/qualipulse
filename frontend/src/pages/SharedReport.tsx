@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { AnalysisReport, AttributedQuote } from "../api/projects";
+import { Skeleton } from "../components/Skeleton";
 
 interface SharedReportData {
   project_name: string | null;
@@ -29,8 +30,36 @@ export default function SharedReport() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <div className="spinner" />
+      <div className="shared-report-page">
+        <header className="shared-report-header">
+          <div className="shared-report-header-inner">
+            <div className="shared-report-brand">QualiPulse</div>
+          </div>
+        </header>
+        <main className="shared-report-main">
+          <div className="shared-report-title-block">
+            <Skeleton height="32px" width="60%" />
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <Skeleton height="22px" width="100px" />
+              <Skeleton height="22px" width="120px" />
+            </div>
+          </div>
+          <section className="shared-report-section">
+            <Skeleton height="14px" width="100%" />
+            <Skeleton height="14px" width="90%" />
+            <Skeleton height="14px" width="70%" />
+          </section>
+          <section className="shared-report-section">
+            <Skeleton height="22px" width="140px" />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="analysis-theme-card" style={{ marginTop: 16 }}>
+                <Skeleton height="18px" width="50%" />
+                <Skeleton height="14px" width="85%" />
+                <Skeleton height="14px" width="60%" />
+              </div>
+            ))}
+          </section>
+        </main>
       </div>
     );
   }
@@ -88,6 +117,7 @@ export default function SharedReport() {
               <span
                 className="badge"
                 title="Confidence is based on sample size, response depth, and thematic saturation."
+                aria-label={`${report.confidence} confidence — based on sample size, response depth, and thematic saturation`}
                 style={{ cursor: "help" }}
               >
                 {report.confidence} confidence

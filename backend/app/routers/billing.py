@@ -149,6 +149,8 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     webhook_secret = getattr(settings, "STRIPE_WEBHOOK_SECRET", "")
     if not stripe_key:
         raise HTTPException(status_code=503, detail="Billing not configured")
+    if not webhook_secret:
+        raise HTTPException(status_code=500, detail="Stripe webhook secret not configured")
 
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
@@ -156,12 +158,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     try:
         import stripe  # type: ignore
         stripe.api_key = stripe_key
-        event = stripe.Webhook.construct_event(payload, sig, webhook_secret) if webhook_secret else stripe.Event.construct_from(
-            stripe.util.convert_to_stripe_object(stripe.util.json.loads(payload)), stripe_key
-        )
+        event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
     except Exception as e:
         logger.error("Webhook error: %s", e)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid webhook payload")
 
     event_type = event["type"]
     logger.info("Stripe webhook: %s", event_type)

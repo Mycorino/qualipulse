@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import client from "../api/client";
 import { getErrorMessage } from "../utils/errorMessages";
 
 export default function ResetPassword() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const navigate = useNavigate();
@@ -14,8 +16,8 @@ export default function ResetPassword() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password !== confirm) { setError("Passwords don't match."); return; }
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (password !== confirm) { setError(t("auth:resetPassword.passwordsMismatch")); return; }
+    if (password.length < 8) { setError(t("auth:resetPassword.passwordTooShort")); return; }
     setLoading(true);
     setError("");
     try {
@@ -25,9 +27,9 @@ export default function ResetPassword() {
       const msg = getErrorMessage(err, "");
       // If it's a token issue, show a specific message
       if (msg.toLowerCase().includes("token") || msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("invalid")) {
-        setError("This reset link is invalid or has expired. Please request a new one.");
+        setError(t("auth:resetPassword.tokenExpired"));
       } else {
-        setError(msg || "Something went wrong. Please try again.");
+        setError(msg || t("auth:resetPassword.defaultError"));
       }
     } finally {
       setLoading(false);
@@ -39,9 +41,9 @@ export default function ResetPassword() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-logo">QualiPulse</div>
-          <h1 className="auth-title">Invalid link</h1>
-          <p className="auth-subtitle">This reset link is missing or malformed.</p>
-          <Link to="/forgot-password" className="btn btn-primary btn-block" style={{ textAlign: "center", textDecoration: "none" }}>Request a new one</Link>
+          <h1 className="auth-title">{t("auth:resetPassword.invalidLinkTitle")}</h1>
+          <p className="auth-subtitle">{t("auth:resetPassword.invalidLinkSubtitle")}</p>
+          <Link to="/forgot-password" className="btn btn-primary btn-block" style={{ textAlign: "center", textDecoration: "none" }}>{t("auth:resetPassword.requestNew")}</Link>
         </div>
       </div>
     );
@@ -51,11 +53,11 @@ export default function ResetPassword() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-logo">QualiPulse</div>
-        <h1 className="auth-title">Set new password</h1>
-        <p className="auth-subtitle">Choose a strong password for your account.</p>
+        <h1 className="auth-title">{t("auth:resetPassword.title")}</h1>
+        <p className="auth-subtitle">{t("auth:resetPassword.subtitle")}</p>
         <form className="auth-form" onSubmit={handleSubmit}>
           <div>
-            <label className="field-label">New password</label>
+            <label className="field-label">{t("auth:resetPassword.newPasswordLabel")}</label>
             <input
               type="password"
               className="field-input"
@@ -63,23 +65,23 @@ export default function ResetPassword() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              placeholder="At least 8 characters"
+              placeholder={t("auth:resetPassword.newPasswordPlaceholder")}
             />
           </div>
           <div>
-            <label className="field-label">Confirm password</label>
+            <label className="field-label">{t("auth:resetPassword.confirmPasswordLabel")}</label>
             <input
               type="password"
               className="field-input"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required
-              placeholder="Repeat your password"
+              placeholder={t("auth:resetPassword.confirmPasswordPlaceholder")}
             />
           </div>
           {error && <div className="error-banner">{error}</div>}
           <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
-            {loading ? "Updating..." : "Set new password"}
+            {loading ? t("auth:resetPassword.updating") : t("auth:resetPassword.submit")}
           </button>
         </form>
       </div>

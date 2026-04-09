@@ -1,6 +1,7 @@
 {
   "title": "Projets",
   "createProject": "+ Créer un projet",
+  "loadError": "Impossible de charger les projets. Veuillez rafraîchir la page.",
   "projectCount": "{{count}} sur {{max}} projets",
   "trialBanner": {
     "title": "Essai de 14 jours actif",
@@ -8,7 +9,7 @@
     "viewPlans": "Voir les plans"
   },
   "gettingStarted": {
-    "welcome": "Bienvenue{{name}} ! Configurons votre première étude.",
+    "welcome": "Bienvenue, {{name}} ! Configurons votre première étude.",
     "subtitle": "Suivez ces étapes pour lancer votre premier entretien IA.",
     "step1Title": "Créer un projet",
     "step1Desc": "Décrivez vos objectifs de recherche et laissez l'IA construire votre guide d'entretien.",

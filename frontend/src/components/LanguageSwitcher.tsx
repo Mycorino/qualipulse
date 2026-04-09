@@ -19,7 +19,7 @@ export default function LanguageSwitcher({ variant = "light", style }: LanguageS
   return (
     <button
       onClick={toggle}
-      aria-label={current === "fr" ? "Switch to English" : "Passer en français"}
+      aria-label={current === "en" ? "Passer en français" : "Switch to English"}
       style={{
         background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)",
         border: isDark ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(0,0,0,0.15)",

@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 import anthropic
+import httpx
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -151,7 +152,7 @@ def decide_next_action(
 
     Returns a dict with keys: action ("follow_up"|"next_question"|"close"), question (str)
     """
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
 
     # Compute how much of the allotted time has been used and questions answered
     time_used_pct = (elapsed_minutes / total_minutes * 100) if total_minutes > 0 else 100
@@ -298,7 +299,7 @@ def _get_first_question(
     first_q = guide_questions[0]
 
     # Use Claude to rephrase the first question as a natural conversation opener
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
 
     response = client.messages.create(
         model="claude-sonnet-4-20250514",

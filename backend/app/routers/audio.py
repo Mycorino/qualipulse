@@ -8,14 +8,25 @@ from app.config import settings
 router = APIRouter(prefix="/audio", tags=["audio"])
 
 
+ALLOWED_EXTENSIONS = {".mp3", ".webm", ".ogg", ".wav", ".mp4", ".m4a"}
+
+
 @router.get("/{path:path}")
 def serve_audio(path: str):
     """Serve an audio file from the uploads directory."""
-    abs_path = os.path.join(os.path.abspath(settings.UPLOAD_DIR), path)
+    # Extension whitelist
+    _, ext = os.path.splitext(path)
+    if ext.lower() not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="File type not allowed",
+        )
 
-    # Prevent directory traversal
-    upload_root = os.path.abspath(settings.UPLOAD_DIR)
-    if not os.path.abspath(abs_path).startswith(upload_root):
+    upload_root = os.path.realpath(settings.UPLOAD_DIR)
+    abs_path = os.path.realpath(os.path.join(upload_root, path))
+
+    # Prevent directory traversal (realpath resolves symlinks)
+    if not abs_path.startswith(upload_root + os.sep) and abs_path != upload_root:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",

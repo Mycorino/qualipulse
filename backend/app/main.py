@@ -60,9 +60,18 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
+_cors_origins = settings.allowed_origins_list
+if settings.is_production and _cors_origins == ["*"]:
+    logger.warning(
+        "CORS: wildcard origin '*' is not safe with allow_credentials in production. "
+        "Blocking all cross-origin requests as a safe default. "
+        "Set ALLOWED_ORIGINS to explicit origins."
+    )
+    _cors_origins = []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins_list,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -123,6 +123,7 @@ export default function Interview() {
   const [screeningAnswers, setScreeningAnswers] = useState<Record<string, string>>({});
   const [screeningLoading, setScreeningLoading] = useState(false);
   const [disqualifiedOn, setDisqualifiedOn] = useState("");
+  const [screeningError, setScreeningError] = useState("");
 
   // Recording UX
   const lastBlobRef = useRef<Blob | null>(null);
@@ -131,6 +132,7 @@ export default function Interview() {
   const [ttsEnded, setTtsEnded] = useState(true);
   const [processingStep, setProcessingStep] = useState(0);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingStartTimeRef = useRef<number | null>(null);
   const MAX_RECORDING_SECONDS = 180;
   const [micTestDone, setMicTestDone] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
@@ -140,6 +142,9 @@ export default function Interview() {
   const [lastTranscript, setLastTranscript] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [micPermissionRequested, setMicPermissionRequested] = useState(false);
+
+  const [ttsFailedWarning, setTtsFailedWarning] = useState(false);
+  const [panelSaveError, setPanelSaveError] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { isRecording, error: recError, startRecording, stopRecording } =
@@ -197,7 +202,7 @@ export default function Interview() {
           i18n.changeLanguage(data.language);
         }
       })
-      .catch(() => setError("This interview link is invalid or has expired."))
+      .catch(() => setError(t("linkInactive.title")))
       .finally(() => setInfoLoading(false));
   }, [token]);
 
@@ -225,19 +230,43 @@ export default function Interview() {
     return () => clearInterval(interval);
   }, [phase, totalSeconds]);
 
+  // ── beforeunload warning during active interview ─────────────────────
+  useEffect(() => {
+    if (phase !== "interview" || !participantId) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [phase, participantId]);
+
   // ── TTS ────────────────────────────────────────────────────────────────
 
   const playTTS = useCallback(
     (url: string) => {
-      if (audioRef.current) audioRef.current.pause();
+      if (audioRef.current) {
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
+        audioRef.current.pause();
+      }
+      setTtsFailedWarning(false);
       const audio = new Audio(url);
       audioRef.current = audio;
       if (!muted) {
         setTtsPlaying(true);
         setTtsEnded(false);
         audio.onended = () => { setTtsPlaying(false); setTtsEnded(true); };
-        audio.onerror = () => { setTtsPlaying(false); setTtsEnded(true); };
-        audio.play().catch(() => { setTtsPlaying(false); setTtsEnded(true); });
+        audio.onerror = () => {
+          setTtsPlaying(false);
+          setTtsEnded(true);
+          // Fix 2: Show visible warning so user knows audio failed
+          setTtsFailedWarning(true);
+        };
+        audio.play().catch(() => {
+          setTtsPlaying(false);
+          setTtsEnded(true);
+          setTtsFailedWarning(true);
+        });
       }
     },
     [muted]
@@ -246,15 +275,21 @@ export default function Interview() {
   // ── Recording time limit ─────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!isRecording) { setRecordingSeconds(0); return; }
+    if (!isRecording) {
+      setRecordingSeconds(0);
+      recordingStartTimeRef.current = null;
+      return;
+    }
+    recordingStartTimeRef.current = Date.now();
     const interval = setInterval(() => {
-      setRecordingSeconds((s) => {
-        if (s + 1 >= MAX_RECORDING_SECONDS) {
-          handleStopAndPreview();
-          return MAX_RECORDING_SECONDS;
-        }
-        return s + 1;
-      });
+      if (!recordingStartTimeRef.current) return;
+      const elapsed = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
+      if (elapsed >= MAX_RECORDING_SECONDS) {
+        handleStopAndPreview();
+        setRecordingSeconds(MAX_RECORDING_SECONDS);
+      } else {
+        setRecordingSeconds(elapsed);
+      }
     }, 1000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -320,7 +355,7 @@ export default function Interview() {
       setResendCountdown(60);
       setPhase("email_sent");
     } catch {
-      setError("Failed to send verification link. Please try again.");
+      setError(t("emailEntry.sendError"));
     } finally {
       setSendingVerification(false);
     }
@@ -332,7 +367,7 @@ export default function Interview() {
       await requestVerification(token, verificationEmail.trim());
       setResendCountdown(60);
     } catch {
-      setError("Failed to resend. Please try again.");
+      setError(t("emailEntry.resendError"));
     }
   }
 
@@ -389,7 +424,7 @@ export default function Interview() {
         await doStartInterview();
       }
     } catch {
-      setError("Failed to start interview. Please try again.");
+      setError(t("consent.startError"));
     } finally {
       setStarting(false);
     }
@@ -474,6 +509,7 @@ export default function Interview() {
       setScreeningStep((s) => s + 1);
     } else {
       setScreeningLoading(true);
+      setScreeningError("");
       try {
         const result = await submitScreening(token!, updated);
         if (result.qualified) {
@@ -483,8 +519,7 @@ export default function Interview() {
           setPhase("disqualified");
         }
       } catch {
-        setError("Something went wrong. Please try again.");
-        setPhase("consent");
+        setScreeningError(t("screening.submissionError"));
       } finally {
         setScreeningLoading(false);
       }
@@ -498,7 +533,7 @@ export default function Interview() {
       setPendingBlob(blob);
       setTtsEnded(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Recording failed. Please try again.";
+      const msg = err instanceof Error ? err.message : t("interview.recordingError");
       setError(msg);
     }
   }
@@ -525,7 +560,9 @@ export default function Interview() {
         if (audioRef.current) audioRef.current.pause();
         // Save panel profile if consent given
         if (panelConsent && email) {
-          savePanelProfile(token!, buildPanelProfileData()).catch(() => {});
+          savePanelProfile(token!, buildPanelProfileData()).catch(() => {
+            setPanelSaveError(true);
+          });
         }
       } else if (res.question_text) {
         const nextTurn = turnCount + 1;
@@ -548,7 +585,7 @@ export default function Interview() {
     } catch (err: unknown) {
       clearInterval(stepInterval);
       setPendingBlob(lastBlobRef.current);
-      const msg = err instanceof Error ? err.message : "Upload failed. Tap 'Try again' to resubmit.";
+      const msg = err instanceof Error ? err.message : t("interview.uploadError");
       setError(msg);
     } finally {
       setProcessing(false);
@@ -590,7 +627,9 @@ export default function Interview() {
         clearSession();
         setPhase("complete");
         if (panelConsent && email) {
-          savePanelProfile(token!, buildPanelProfileData()).catch(() => {});
+          savePanelProfile(token!, buildPanelProfileData()).catch(() => {
+            setPanelSaveError(true);
+          });
         }
       } else if (res.question_text) {
         const nextTurn = turnCount + 1;
@@ -604,7 +643,7 @@ export default function Interview() {
         else setTtsEnded(true);
       }
     } catch {
-      setError("Couldn't skip. Please try again.");
+      setError(t("interview.skipError"));
     } finally {
       setProcessing(false);
     }
@@ -613,7 +652,16 @@ export default function Interview() {
   function toggleMute() {
     setMuted((m) => {
       const next = !m;
-      if (next && audioRef.current) audioRef.current.pause();
+      if (next && audioRef.current) {
+        // Fix 5: Fully reset audio on mute — pause, reset position,
+        // clear callbacks to prevent stale state, and enable recording
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        setTtsPlaying(false);
+        setTtsEnded(true);
+      }
       return next;
     });
   }
@@ -631,7 +679,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container">
-          <p className="muted-text">Loading…</p>
+          <p className="muted-text">{t("loading")}</p>
         </div>
       </div>
     );
@@ -643,9 +691,9 @@ export default function Interview() {
         <div className="interview-container" style={{ textAlign: "center", paddingTop: 60 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #6366f1)", marginBottom: 32 }}>QualiPulse</div>
           <div style={{ fontSize: 48, marginBottom: 16 }}><span aria-hidden="true">🔗</span></div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>This interview link isn't active</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>{t("linkInactive.title")}</h1>
           <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 15, maxWidth: 380, margin: "0 auto" }}>
-            The link may have expired or been deactivated. Please contact the researcher for a new link.
+            {t("linkInactive.desc")}
           </p>
         </div>
       </div>
@@ -656,9 +704,9 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container interview-complete">
-          <h1 className="interview-complete-title">No problem</h1>
+          <h1 className="interview-complete-title">{t("consent.declinedTitle")}</h1>
           <p className="interview-complete-text">
-            You can close this page. Your participation is entirely voluntary — thank you for your time.
+            {t("consent.declinedDesc")}
           </p>
         </div>
       </div>
@@ -687,39 +735,38 @@ export default function Interview() {
           )}
           <h1 className="interview-project-name" style={{ marginBottom: 8 }}>{info?.project_name}</h1>
           {info?.researcher_name && (
-            <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24 }}>
-              A research study by <strong>{info.researcher_name}</strong>
-            </p>
+            <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24 }} dangerouslySetInnerHTML={{ __html: t("emailEntry.studyBy", { name: info.researcher_name }) }} />
           )}
           {info?.interview_duration_minutes && (
-            <p className="interview-duration">⏱ Approximately {info.interview_duration_minutes} minutes</p>
+            <p className="interview-duration">⏱ {t("emailEntry.duration", { minutes: info.interview_duration_minutes })}</p>
           )}
           <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6 }}>
-            Enter your email to receive a secure link to start your interview. No password needed.
+            {t("emailEntry.enterEmailDesc")}
           </p>
           <div className="interview-name-field">
-            <label className="field-label">Your email address</label>
+            <label className="field-label" htmlFor="interview-email">{t("emailEntry.yourEmail")}</label>
             <input
+              id="interview-email"
               type="email"
               className="field-input"
               value={verificationEmail}
               onChange={(e) => setVerificationEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("emailEntry.emailPlaceholder")}
               onKeyDown={(e) => e.key === "Enter" && handleSendVerification()}
               autoFocus
             />
           </div>
-          {error && <div className="error-banner">{error}</div>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
           <button
             className="btn btn-primary btn-lg"
             onClick={handleSendVerification}
             disabled={sendingVerification || !verificationEmail.trim()}
             style={{ width: "100%", marginTop: 8 }}
           >
-            {sendingVerification ? "Sending…" : "Send my interview link →"}
+            {sendingVerification ? t("emailEntry.sendingLink") : t("emailEntry.sendLink")}
           </button>
           <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5, textAlign: "center" }}>
-            We'll send you a link to start. Your email is used to save progress and let you resume later.
+            {t("emailEntry.emailNote")}
           </p>
         </div>
         </div>
@@ -734,29 +781,26 @@ export default function Interview() {
       <div className="interview-page">
         <div className="interview-container" style={{ textAlign: "center", maxWidth: 440 }}>
           <div style={{ fontSize: 52, marginBottom: 16 }}><span aria-hidden="true">📬</span></div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Check your inbox</h1>
-          <p style={{ color: "var(--text-secondary, #6b7280)", lineHeight: 1.6, marginBottom: 8 }}>
-            We sent a secure link to <strong>{verificationEmail}</strong>.
-            Click the link in the email to start your interview.
-          </p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{t("emailSent.title")}</h1>
+          <p style={{ color: "var(--text-secondary, #6b7280)", lineHeight: 1.6, marginBottom: 8 }} dangerouslySetInnerHTML={{ __html: t("emailSent.desc", { email: verificationEmail }) }} />
           <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 13, marginBottom: 24 }}>
-            The link expires in 30 minutes. Check your spam folder if you don't see it.
+            {t("emailSent.expiry")}
           </p>
-          {error && <div className="error-banner">{error}</div>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
           <button
             className="btn btn-ghost"
             onClick={handleResendVerification}
             disabled={resendCountdown > 0}
             style={{ marginBottom: 12 }}
           >
-            {resendCountdown > 0 ? `Resend in ${resendCountdown}s` : "Resend link"}
+            {resendCountdown > 0 ? t("emailSent.resendCooldown", { seconds: resendCountdown }) : t("emailSent.resend")}
           </button>
           <br />
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => { setPhase("email_entry"); setError(""); }}
           >
-            ← Use a different email
+            ← {t("emailSent.differentEmail")}
           </button>
         </div>
       </div>
@@ -777,33 +821,33 @@ export default function Interview() {
           {info.researcher_name && (
             <p className="consent-researcher-name">{info.researcher_name}</p>
           )}
-          <h1 className="consent-title">Before you begin</h1>
+          <h1 className="consent-title">{t("consent.title")}</h1>
           <p className="consent-project">{info.project_name}</p>
           {info.research_context && (
             <p className="consent-research-context">{info.research_context}</p>
           )}
           <div className="consent-body">
-            <p>By participating in this study you agree to the following:</p>
+            <p>{t("consent.byParticipating")}</p>
             <ul className="consent-list" style={{ textAlign: "left" }}>
-              <li>Your voice will be <strong>recorded and transcribed</strong> by AI.</li>
-              <li>Your responses will be reviewed by the research team.</li>
-              <li>Participation is <strong>voluntary</strong> — you may stop at any time.</li>
-              <li>Your data will be stored securely and used only for research purposes.</li>
+              <li dangerouslySetInnerHTML={{ __html: t("consent.listRecorded") }} />
+              <li>{t("consent.listReviewed")}</li>
+              <li dangerouslySetInnerHTML={{ __html: t("consent.listVoluntary") }} />
+              <li>{t("consent.listSecure")}</li>
             </ul>
             <p className="consent-duration">
               {info.interview_duration_minutes ? (
-                <>This interview takes approximately <strong>{info.interview_duration_minutes} minutes</strong></>
+                <span dangerouslySetInnerHTML={{ __html: t("consent.durationInfo", { minutes: info.interview_duration_minutes }) }} />
               ) : null}
               {info.interview_duration_minutes && info.question_count ? " · " : null}
               {info.question_count ? (
-                <><strong>{info.question_count} topic{info.question_count !== 1 ? "s" : ""}</strong> to cover</>
+                <span dangerouslySetInnerHTML={{ __html: info.question_count !== 1 ? t("consent.topicCount_plural", { count: info.question_count }) : t("consent.topicCount", { count: info.question_count }) }} />
               ) : null}
               {(info.interview_duration_minutes || info.question_count) ? "." : null}
             </p>
             {info.privacy_policy_url && (
               <p className="consent-privacy-link">
                 <a href={info.privacy_policy_url} target="_blank" rel="noopener noreferrer">
-                  Read our privacy policy →
+                  {t("consent.privacyPolicy")} →
                 </a>
               </p>
             )}
@@ -833,21 +877,21 @@ export default function Interview() {
                 />
                 <div>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>
-                    Join the QualiPulse Research Community
+                    {t("consent.panelJoinTitle")}
                   </span>
                   <span style={{ color: "var(--text-secondary, #6b7280)", fontSize: 13 }}>
-                    {" "}— get invited to future paid studies matching your profile
+                    {" "}— {t("consent.panelJoinDesc")}
                   </span>
                   <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 12, margin: "4px 0 0" }}>
-                    We'll save your profile securely. You can opt out any time.
+                    {t("consent.panelJoinNote")}
                   </p>
                 </div>
               </label>
             </div>
           )}
 
-          {starting && <p className="muted-text" style={{ marginTop: 12 }}>Starting…</p>}
-          {error && <div className="error-banner">{error}</div>}
+          {starting && <p className="muted-text" style={{ marginTop: 12 }}>{t("consent.starting")}</p>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
 
           <div className="consent-actions">
             <button
@@ -855,10 +899,10 @@ export default function Interview() {
               onClick={handleConsentAccept}
               disabled={starting}
             >
-              I agree — continue
+              {t("consent.accept")}
             </button>
             <button className="btn btn-ghost" onClick={() => setConsentDeclined(true)} style={{ color: "var(--text-secondary)" }}>
-              Decline
+              {t("consent.decline")}
             </button>
           </div>
         </div>
@@ -881,31 +925,32 @@ export default function Interview() {
             width: "100%",
             margin: "0 auto",
           }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Tell us a bit about yourself</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>{t("profile.title")}</h1>
           <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6 }}>
-            This helps us match you with relevant future studies. All fields are optional.
+            {t("profile.subtitle")}
           </p>
 
           {/* Section: About You */}
           <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginBottom: 4 }}>
-            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>About You</p>
+            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>{t("profile.sectionAboutYou")}</p>
           </div>
 
           {/* First name */}
           <div className="interview-name-field">
-            <label className="field-label">First name <span className="optional-tag">(optional)</span></label>
+            <label className="field-label" htmlFor="profile-first-name">{t("profile.firstNameLabel")} <span className="optional-tag">{t("profile.optional")}</span></label>
             <input
+              id="profile-first-name"
               type="text"
               className="field-input"
               value={profile.firstName}
               onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))}
-              placeholder="e.g. Alex"
+              placeholder={t("profile.firstNamePlaceholder")}
             />
           </div>
 
           {/* Age range */}
           <div className="interview-name-field">
-            <label className="field-label">Age range</label>
+            <label className="field-label">{t("profile.ageRangeLabel")}</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
               {["18-24", "25-34", "35-44", "45-54", "55+"].map((opt) => (
                 <button
@@ -921,13 +966,13 @@ export default function Interview() {
 
           {/* Gender */}
           <div className="interview-name-field">
-            <label className="field-label">Gender</label>
+            <label className="field-label">{t("profile.genderLabel")}</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
               {[
-                { value: "male", label: "Man" },
-                { value: "female", label: "Woman" },
-                { value: "non_binary", label: "Non-binary" },
-                { value: "prefer_not", label: "Prefer not to say" },
+                { value: "male", label: t("profile.genderMan") },
+                { value: "female", label: t("profile.genderWoman") },
+                { value: "non_binary", label: t("profile.genderNonBinary") },
+                { value: "prefer_not", label: t("profile.genderPreferNot") },
               ].map(({ value, label }) => (
                 <button
                   key={value}
@@ -942,20 +987,20 @@ export default function Interview() {
 
           {/* Section: Work Experience */}
           <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginTop: 8, marginBottom: 4 }}>
-            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>Work Experience</p>
+            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>{t("profile.sectionWorkExperience")}</p>
           </div>
 
           {/* Employment */}
           <div className="interview-name-field">
-            <label className="field-label">Employment</label>
+            <label className="field-label">{t("profile.employmentLabel")}</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
               {[
-                { value: "full_time", label: "Full-time" },
-                { value: "part_time", label: "Part-time" },
-                { value: "freelance", label: "Freelance" },
-                { value: "student", label: "Student" },
-                { value: "retired", label: "Retired" },
-                { value: "other", label: "Other" },
+                { value: "full_time", label: t("profile.employmentFullTime") },
+                { value: "part_time", label: t("profile.employmentPartTime") },
+                { value: "freelance", label: t("profile.employmentFreelance") },
+                { value: "student", label: t("profile.employmentStudent") },
+                { value: "retired", label: t("profile.employmentRetired") },
+                { value: "other", label: t("profile.employmentOther") },
               ].map(({ value, label }) => (
                 <button
                   key={value}
@@ -970,13 +1015,14 @@ export default function Interview() {
 
           {/* Job function */}
           <div className="interview-name-field">
-            <label className="field-label">Job function <span className="optional-tag">(optional)</span></label>
+            <label className="field-label" htmlFor="profile-job-function">{t("profile.jobFunctionLabel")} <span className="optional-tag">{t("profile.optional")}</span></label>
             <select
+              id="profile-job-function"
               className="field-input"
               value={profile.jobFunction}
               onChange={(e) => setProfile((p) => ({ ...p, jobFunction: e.target.value }))}
             >
-              <option value="">Select…</option>
+              <option value="">{t("profile.jobFunctionPlaceholder")}</option>
               {["Engineering", "Product", "Marketing", "Design", "Finance", "Operations", "HR", "Executive", "Other"].map((f) => (
                 <option key={f} value={f.toLowerCase()}>{f}</option>
               ))}
@@ -985,22 +1031,23 @@ export default function Interview() {
 
           {/* Industry */}
           <div className="interview-name-field">
-            <label className="field-label">Industry <span className="optional-tag">(optional)</span></label>
+            <label className="field-label" htmlFor="profile-industry">{t("profile.industryLabel")} <span className="optional-tag">{t("profile.optional")}</span></label>
             <input
+              id="profile-industry"
               type="text"
               className="field-input"
               value={profile.industry}
               onChange={(e) => setProfile((p) => ({ ...p, industry: e.target.value }))}
-              placeholder="e.g. Technology, Healthcare, Finance…"
+              placeholder={t("profile.industryPlaceholder")}
             />
           </div>
 
           {/* Company size */}
           <div className="interview-name-field">
-            <label className="field-label">Company size</label>
+            <label className="field-label">{t("profile.companySizeLabel")}</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
               {[
-                { value: "1", label: "Just me" },
+                { value: "1", label: t("profile.companySizeJustMe") },
                 { value: "2-10", label: "2–10" },
                 { value: "11-50", label: "11–50" },
                 { value: "51-200", label: "51–200" },
@@ -1019,15 +1066,15 @@ export default function Interview() {
 
           {/* Seniority */}
           <div className="interview-name-field">
-            <label className="field-label">Seniority</label>
+            <label className="field-label">{t("profile.seniorityLabel")}</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
               {[
-                { value: "junior", label: "Junior" },
-                { value: "mid", label: "Mid" },
-                { value: "senior", label: "Senior" },
-                { value: "manager", label: "Manager" },
-                { value: "director", label: "Director" },
-                { value: "c_suite", label: "C-Suite" },
+                { value: "junior", label: t("profile.seniorityJunior") },
+                { value: "mid", label: t("profile.seniorityMid") },
+                { value: "senior", label: t("profile.senioritySenior") },
+                { value: "manager", label: t("profile.seniorityManager") },
+                { value: "director", label: t("profile.seniorityDirector") },
+                { value: "c_suite", label: t("profile.seniorityCSuite") },
               ].map(({ value, label }) => (
                 <button
                   key={value}
@@ -1044,12 +1091,12 @@ export default function Interview() {
           {panelTags.length > 0 && (
             <div className="interview-name-field">
               <label className="field-label">
-                Interests & behaviors{" "}
-                <span className="optional-tag">(pick up to 5)</span>
+                {t("profile.interestsLabel")}{" "}
+                <span className="optional-tag">({t("profile.interestsMax")})</span>
               </label>
               {interestTags.length > 0 && (
                 <>
-                  <p style={{ fontSize: 12, color: "var(--text-secondary, #6b7280)", margin: "8px 0 6px" }}>Interests</p>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary, #6b7280)", margin: "8px 0 6px" }}>{t("profile.interestsTab")}</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {interestTags.map((tag) => (
                       <button
@@ -1066,7 +1113,7 @@ export default function Interview() {
               )}
               {behaviorTags.length > 0 && (
                 <>
-                  <p style={{ fontSize: 12, color: "var(--text-secondary, #6b7280)", margin: "10px 0 6px" }}>Behaviors</p>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary, #6b7280)", margin: "10px 0 6px" }}>{t("profile.behaviorsTab")}</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {behaviorTags.map((tag) => (
                       <button
@@ -1086,22 +1133,23 @@ export default function Interview() {
 
           {/* Section: Location */}
           <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginTop: 8, marginBottom: 4 }}>
-            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>Location</p>
+            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>{t("profile.sectionLocation")}</p>
           </div>
 
           {/* City */}
           <div className="interview-name-field">
-            <label className="field-label">City <span className="optional-tag">(optional)</span></label>
+            <label className="field-label" htmlFor="profile-city">{t("profile.cityLabel")} <span className="optional-tag">{t("profile.optional")}</span></label>
             <input
+              id="profile-city"
               type="text"
               className="field-input"
               value={profile.city}
               onChange={(e) => setProfile((p) => ({ ...p, city: e.target.value }))}
-              placeholder="e.g. London, New York…"
+              placeholder={t("profile.cityPlaceholder")}
             />
           </div>
 
-          {error && <div className="error-banner">{error}</div>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
 
           <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
             <button
@@ -1110,10 +1158,10 @@ export default function Interview() {
               disabled={starting}
               style={{ flex: 1 }}
             >
-              {starting ? "Starting…" : "Continue to interview →"}
+              {starting ? t("profile.starting") : t("profile.continue")}
             </button>
             <button className="btn btn-ghost" onClick={handleSkipProfile} disabled={starting}>
-              Skip
+              {t("profile.skip")}
             </button>
           </div>
           </div>
@@ -1128,15 +1176,13 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container resume-confirm-card">
-          <h1 className="consent-title">Welcome back!</h1>
-          <p className="resume-confirm-subtitle">
-            You have an interview in progress for <strong>{info?.project_name}</strong>.
-          </p>
+          <h1 className="consent-title">{t("resume.title")}</h1>
+          <p className="resume-confirm-subtitle" dangerouslySetInnerHTML={{ __html: t("resume.desc", { projectName: info?.project_name ?? "" }) }} />
           {loadingResumeSummary ? (
-            <p className="muted-text">Loading your progress…</p>
+            <p className="muted-text">{t("resume.loadingProgress")}</p>
           ) : resumeSummary && resumeSummary.questions_covered.length > 0 ? (
             <div className="resume-summary-panel">
-              <p className="resume-summary-label">Topics you've covered so far:</p>
+              <p className="resume-summary-label">{t("resume.coveredTopics")}</p>
               <ul className="resume-summary-list">
                 {resumeSummary.questions_covered.map((q, i) => (
                   <li key={i} className="resume-summary-item">
@@ -1147,21 +1193,22 @@ export default function Interview() {
               </ul>
               {resumeSummary.elapsed_minutes > 0 && (
                 <p className="muted-text" style={{ marginTop: 8, fontSize: 13 }}>
-                  {Math.round(resumeSummary.elapsed_minutes)} minutes in
-                  {info?.interview_duration_minutes ? ` of ${info.interview_duration_minutes}` : ""}
+                  {info?.interview_duration_minutes
+                    ? t("resume.elapsedOf", { elapsed: Math.round(resumeSummary.elapsed_minutes), total: info.interview_duration_minutes })
+                    : t("resume.elapsed", { minutes: Math.round(resumeSummary.elapsed_minutes) })}
                 </p>
               )}
             </div>
           ) : null}
           {resumeCheck.last_question && (
             <div className="resume-last-question">
-              <p className="resume-last-label">Pick up where you left off:</p>
+              <p className="resume-last-label">{t("resume.lastQuestion")}</p>
               <p className="resume-last-text">"{resumeCheck.last_question}"</p>
             </div>
           )}
           <div className="consent-actions">
             <button className="btn btn-primary" onClick={handleConfirmResume}>
-              Continue my interview →
+              {t("resume.resume")} →
             </button>
             <button
               className="btn btn-ghost"
@@ -1179,11 +1226,11 @@ export default function Interview() {
                     await doStartInterview();
                   }
                 } catch {
-                  setError("Failed to start interview. Please try again.");
+                  setError(t("consent.startError"));
                 }
               }}
             >
-              Start a new interview
+              {t("resume.startOver")}
             </button>
           </div>
         </div>
@@ -1195,12 +1242,13 @@ export default function Interview() {
 
   if (phase === "screening") {
     const sq = screeningQuestions[screeningStep];
+    if (!sq) return null;
     const progress = ((screeningStep + 1) / screeningQuestions.length) * 100;
     return (
       <div className="interview-page">
         <div className="interview-container interview-profiling">
           <div className="profiling-header">
-            <p className="profiling-intro">A few quick questions before we begin</p>
+            <p className="profiling-intro">{t("screening.title")}</p>
             <div className="profiling-progress-bar">
               <div className="profiling-progress-fill" style={{ width: `${progress}%` }} />
             </div>
@@ -1216,18 +1264,33 @@ export default function Interview() {
                   onClick={() => !screeningLoading && handleScreeningAnswer(sq.id, opt)}
                   disabled={screeningLoading}
                 >
-                  {screeningLoading && screeningAnswers[sq.id] === opt ? "Checking…" : opt}
+                  {screeningLoading && screeningAnswers[sq.id] === opt ? t("screening.checking") : opt}
                 </button>
               ))}
             </div>
           </div>
-          {error && <div className="error-banner">{error}</div>}
+          {screeningError && (
+            <div className="error-banner" role="alert" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <span>{screeningError}</span>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+                onClick={() => {
+                  setScreeningError("");
+                  handleScreeningAnswer(sq.id, screeningAnswers[sq.id]);
+                }}
+              >
+                {t("screening.retry")}
+              </button>
+            </div>
+          )}
+          {error && <div className="error-banner" role="alert">{error}</div>}
           {screeningStep > 0 && !screeningLoading && (
             <button
               className="profiling-back-btn"
               onClick={() => setScreeningStep((s) => s - 1)}
             >
-              ← Back
+              ← {t("screening.back")}
             </button>
           )}
         </div>
@@ -1242,21 +1305,15 @@ export default function Interview() {
       <div className="interview-page">
         <div className="interview-container interview-complete">
           <div className="complete-icon disqualified-icon"><span aria-hidden="true">🙏</span></div>
-          <h1 className="interview-complete-title">Thank you for your time</h1>
-          <p className="interview-complete-text">
-            This particular study is looking for a specific audience profile —
-            you're not the right fit for <strong>{info?.project_name}</strong> right now.
-          </p>
+          <h1 className="interview-complete-title">{t("screening.disqualified.title")}</h1>
+          <p className="interview-complete-text" dangerouslySetInnerHTML={{ __html: t("screening.disqualified.desc", { projectName: info?.project_name ?? "" }) }} />
           <p className="interview-complete-text" style={{ marginTop: 12 }}>
-            That's completely okay. Your answers helped us confirm we're reaching the right participants.
+            {t("screening.disqualified.desc2")}
           </p>
           {email && (
-            <p className="disqualified-email-note">
-              If other studies open up that match your profile, we may reach out to{" "}
-              <strong>{email}</strong>.
-            </p>
+            <p className="disqualified-email-note" dangerouslySetInnerHTML={{ __html: t("screening.disqualified.emailNote", { email }) }} />
           )}
-          <p className="muted-text" style={{ marginTop: 24 }}>You can safely close this page.</p>
+          <p className="muted-text" style={{ marginTop: 24 }}>{t("screening.disqualified.close")}</p>
         </div>
       </div>
     );
@@ -1269,33 +1326,30 @@ export default function Interview() {
       <div className="interview-page">
         <div className="interview-container mic-test-card">
           <div className="mic-prompt-icon"><span aria-hidden="true">🎙️</span></div>
-          <h2 className="mic-test-title">This interview uses your microphone</h2>
-          <p className="mic-test-subtitle">
-            When you click below, your browser will ask for microphone permission.
-            Click <strong>Allow</strong> — this is required to record your answers.
-          </p>
+          <h2 className="mic-test-title">{t("micPrompt.title")}</h2>
+          <p className="mic-test-subtitle" dangerouslySetInnerHTML={{ __html: t("micPrompt.subtitle") }} />
           <div className="mic-prompt-steps">
             <div className="mic-prompt-step">
               <span className="mic-prompt-num">1</span>
-              <span>Click "Enable microphone" below</span>
+              <span>{t("micPrompt.step1")}</span>
             </div>
             <div className="mic-prompt-step">
               <span className="mic-prompt-num">2</span>
-              <span>Click <strong>Allow</strong> in your browser's permission prompt</span>
+              <span dangerouslySetInnerHTML={{ __html: t("micPrompt.step2") }} />
             </div>
             <div className="mic-prompt-step">
               <span className="mic-prompt-num">3</span>
-              <span>Say something to confirm your mic is working</span>
+              <span>{t("micPrompt.step3")}</span>
             </div>
           </div>
           <button
             className="btn btn-primary"
             onClick={() => setMicPermissionRequested(true)}
           >
-            Enable microphone →
+            {t("micPrompt.enable")} →
           </button>
           <p className="mic-prompt-note">
-            Your audio is only recorded when you actively press the record button.
+            {t("micPrompt.note")}
           </p>
         </div>
       </div>
@@ -1308,26 +1362,26 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container mic-test-card">
-          <h2 className="mic-test-title">Quick mic check</h2>
-          <p className="mic-test-subtitle">Say anything to test your microphone before we begin.</p>
+          <h2 className="mic-test-title">{t("micTest.title")}</h2>
+          <p className="mic-test-subtitle">{t("micTest.desc")}</p>
           <div className="mic-level-wrap">
             <div className="mic-level-bar" style={{ width: `${micLevel}%` }} />
           </div>
           {micLevel > 20 ? (
-            <p className="mic-test-status mic-test-ok">✓ Microphone detected — you're good to go!</p>
+            <p className="mic-test-status mic-test-ok">✓ {t("micTest.autoPass")}</p>
           ) : (
-            <p className="mic-test-status">Speak to see your mic level…</p>
+            <p className="mic-test-status">{t("micTest.speakPrompt")}</p>
           )}
           <div className="mic-test-actions">
             <button
               className="btn btn-primary"
               onClick={() => {
                 if (micAnimRef.current) cancelAnimationFrame(micAnimRef.current);
-                micStreamRef.current?.getTracks().forEach((t) => t.stop());
+                micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
                 setMicTestDone(true);
               }}
             >
-              {micLevel > 20 ? "Start interview →" : "Skip mic test"}
+              {micLevel > 20 ? t("micTest.startInterview") + " →" : t("micTest.skip")}
             </button>
           </div>
         </div>
@@ -1342,7 +1396,14 @@ export default function Interview() {
       <div className="interview-page">
         <div className="interview-container interview-active">
           {info?.question_count && info.question_count > 0 && (
-            <div className="interview-progress-bar-wrap">
+            <div
+              className="interview-progress-bar-wrap"
+              role="progressbar"
+              aria-valuenow={questionIndex}
+              aria-valuemin={0}
+              aria-valuemax={info.question_count}
+              aria-label={t("interview.progressLabel", { current: questionIndex + 1, total: info.question_count })}
+            >
               <div
                 className="interview-progress-bar-fill"
                 style={{ width: `${Math.min(((questionIndex) / info.question_count) * 100, 95)}%` }}
@@ -1352,8 +1413,8 @@ export default function Interview() {
           <div className="interview-progress">
             <span className="interview-turn-count">
               {isFollowUp
-                ? `Follow-up · Q${questionIndex + 1} of ${info?.question_count ?? "?"}`
-                : `Q${questionIndex + 1} of ${info?.question_count ?? "?"}`}
+                ? t("interview.followUpLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })
+                : t("interview.progressLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               {totalSeconds > 0 && (
@@ -1364,14 +1425,15 @@ export default function Interview() {
                     const secs = remaining % 60;
                     const pct = elapsedSeconds / totalSeconds;
                     const cls = pct > 0.9 ? "time-critical" : pct > 0.75 ? "time-warning" : "";
-                    return <span className={cls}>{mins > 0 ? `~${mins} min left` : `${secs}s left`}</span>;
+                    return <span className={cls}>{mins > 0 ? t("interview.timeMinLeft", { mins }) : t("interview.timeSecLeft", { secs })}</span>;
                   })()}
                 </span>
               )}
               <button
                 className={`mute-btn ${muted ? "muted" : ""}`}
                 onClick={toggleMute}
-                title={muted ? "Unmute" : "Mute"}
+                title={muted ? t("interview.unmuteAudio") : t("interview.muteAudio")}
+                aria-label={muted ? t("interview.unmuteAudio") : t("interview.muteAudio")}
               >
                 {muted ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1397,14 +1459,35 @@ export default function Interview() {
             {!currentQuestion ? (
               <div style={{ textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>
                 <div className="spinner" style={{ margin: "0 auto 12px" }} />
-                <p>Preparing your first question...</p>
+                <p>{t("interview.preparingFirst")}</p>
               </div>
             ) : (
               <p className="interview-question-text">{currentQuestion}</p>
             )}
           </div>
 
-          {error && <div className="error-banner">{error}</div>}
+          {/* Fix 2: TTS audio failure warning */}
+          {ttsFailedWarning && (
+            <div className="error-banner" role="alert" style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <span>
+                {t("interview.ttsFailedWarning")}
+              </span>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+                onClick={() => {
+                  if (audioRef.current?.src) {
+                    setTtsFailedWarning(false);
+                    const url = audioRef.current.src;
+                    playTTS(url);
+                  }
+                }}
+              >
+                {t("interview.ttsReplay")}
+              </button>
+            </div>
+          )}
+          {error && <div className="error-banner" role="alert">{error}</div>}
           {recError === "PERMISSION_DENIED" ? (
             <div className="mic-permission-error">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1414,54 +1497,59 @@ export default function Interview() {
                 <line x1="12" y1="19" x2="12" y2="23" />
                 <line x1="8" y1="23" x2="16" y2="23" />
               </svg>
-              <h3 className="mic-permission-title">Microphone access denied</h3>
+              <h3 className="mic-permission-title">{t("micTest.permissionDenied")}</h3>
               <p className="mic-permission-text">
-                This interview requires microphone access. Please allow it in your browser settings, then refresh.
+                {t("micTest.permissionDeniedDesc")}
               </p>
+              {/iPad|iPhone|iPod/.test(navigator.userAgent) && (
+                <p className="mic-permission-text" style={{ fontSize: 13, marginTop: 8 }}>
+                  {t("micTest.permissionDeniedIOS")}
+                </p>
+              )}
               <button className="btn btn-primary" onClick={() => window.location.reload()}>
-                Refresh &amp; try again
+                {t("micTest.refresh")}
               </button>
             </div>
           ) : recError ? (
-            <div className="error-banner">{recError}</div>
+            <div className="error-banner" role="alert">{recError}</div>
           ) : null}
 
           {showTranscript && lastTranscript && (
             <div className="transcript-flash">
-              <span className="transcript-flash-label">We heard:</span>
+              <span className="transcript-flash-label">{t("interview.transcript")}</span>
               <span className="transcript-flash-text">"{lastTranscript}"</span>
             </div>
           )}
 
           <div className="interview-controls">
             {processing ? (
-              <div className="processing-indicator">
+              <div className="processing-indicator" aria-live="polite">
                 <div className="spinner" style={{ width: 28, height: 28 }} />
-                <span style={{ fontSize: "1rem" }}>{["Transcribing your answer…", "Thinking…", "Preparing next question…"][processingStep]}</span>
+                <span style={{ fontSize: "1rem" }}>{[t("interview.processing.transcribing"), t("interview.processing.thinking"), t("interview.processing.preparing")][processingStep]}</span>
               </div>
             ) : pendingBlob ? (
               <div className="recording-preview">
                 <div className="recording-preview-icon">✓</div>
-                <p className="recording-preview-label">Recording captured</p>
+                <p className="recording-preview-label">{t("interview.recordingCaptured")}</p>
                 <div className="recording-preview-actions">
                   <button className="btn btn-primary" onClick={handleSubmitPending}>
-                    Submit answer →
+                    {t("interview.submitButton")} →
                   </button>
                   <button className="btn btn-ghost" onClick={handleReRecord}>
-                    ↺ Re-record
+                    ↺ {t("interview.reRecord")}
                   </button>
                 </div>
               </div>
             ) : isRecording ? (
               <>
-                <button className="record-btn recording" onClick={handleStopAndPreview} aria-label="Stop recording">
+                <button className="record-btn recording" onClick={handleStopAndPreview} aria-label={t("interview.tapToStop")}>
                   <div className="record-btn-inner recording-pulse" />
                 </button>
-                <p className="record-label">Tap to stop recording</p>
+                <p className="record-label">{t("interview.tapToStop")}</p>
                 {recordingSeconds > 0 && (
                   <p className={`recording-timer ${recordingSeconds >= MAX_RECORDING_SECONDS - 30 ? "recording-timer--warning" : ""}`}>
                     {Math.floor((MAX_RECORDING_SECONDS - recordingSeconds) / 60)}:
-                    {String((MAX_RECORDING_SECONDS - recordingSeconds) % 60).padStart(2, "0")} remaining
+                    {String((MAX_RECORDING_SECONDS - recordingSeconds) % 60).padStart(2, "0")} {t("interview.remaining")}
                   </p>
                 )}
               </>
@@ -1471,21 +1559,21 @@ export default function Interview() {
                   className={`record-btn ${ttsPlaying ? "record-btn--waiting" : ttsEnded ? "record-btn--ready" : ""}`}
                   onClick={ttsPlaying ? undefined : startRecording}
                   disabled={ttsPlaying}
-                  title={ttsPlaying ? "Wait for the question to finish" : "Tap to start recording"}
-                  aria-label={ttsPlaying ? "Recording paused — AI is responding" : "Start recording"}
+                  title={ttsPlaying ? t("interview.waitForQuestion") : t("interview.tapToRecord")}
+                  aria-label={ttsPlaying ? t("interview.waitForQuestion") : t("interview.tapToRecord")}
                 >
                   <div className="record-btn-inner" />
                 </button>
                 <p className="record-label">
-                  {ttsPlaying ? "⏵ Listening to question…" : "Tap to start recording"}
+                  {ttsPlaying ? "⏵ " + t("interview.listeningToQuestion") : t("interview.tapToRecord")}
                 </p>
               </>
             )}
           </div>
 
           {!processing && !isRecording && !pendingBlob && (
-            <button className="skip-question-btn" onClick={handleSkip}>
-              Skip this question
+            <button className="skip-question-btn" onClick={handleSkip} aria-label={t("interview.skipQuestion")}>
+              {t("interview.skipQuestion")}
             </button>
           )}
         </div>
@@ -1507,15 +1595,12 @@ export default function Interview() {
           </svg>
         </div>
         <h1 className="interview-complete-title">
-          {completeName ? `Thank you, ${completeName.charAt(0).toUpperCase() + completeName.slice(1)}!` : "You're done — thank you!"}
+          {completeName ? t("completion.title", { name: completeName.charAt(0).toUpperCase() + completeName.slice(1) }) : t("completion.titleGeneric")}
         </h1>
-        <p className="interview-complete-text">
-          Your responses have been recorded and will help shape the research for{" "}
-          <strong>{info?.project_name}</strong>.
-        </p>
+        <p className="interview-complete-text" dangerouslySetInnerHTML={{ __html: t("completion.responsesRecorded", { projectName: info?.project_name ?? "" }) }} />
         {turnCount > 1 && (
           <p className="interview-complete-meta">
-            You answered {turnCount - 1} question{turnCount - 1 !== 1 ? "s" : ""}.
+            {(turnCount - 1) !== 1 ? t("completion.answeredCount_plural", { count: turnCount - 1 }) : t("completion.answeredCount", { count: turnCount - 1 })}
           </p>
         )}
 
@@ -1531,20 +1616,36 @@ export default function Interview() {
           >
             <div style={{ fontSize: 28, marginBottom: 8 }}><span aria-hidden="true">🎉</span></div>
             <p style={{ fontWeight: 700, color: "#4f46e5", marginBottom: 4 }}>
-              You're now part of the QualiPulse Research Community
+              {t("completion.panelJoined")}
             </p>
             <p style={{ color: "#6b7280", fontSize: 13 }}>
-              We'll match you with relevant future studies based on your profile.
+              {t("completion.panelJoinedDesc")}
             </p>
           </div>
         )}
 
+        {/* Fix 3: Panel profile save failure warning */}
+        {panelSaveError && (
+          <div style={{
+            background: "#fef3c7",
+            color: "#92400e",
+            border: "1px solid #fcd34d",
+            borderRadius: 8,
+            padding: "12px 16px",
+            margin: "0 0 16px",
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}>
+            {t("completion.panelSaveError")}
+          </div>
+        )}
+
         <div className="interview-complete-next">
-          <p className="interview-complete-next-label">What happens next?</p>
+          <p className="interview-complete-next-label">{t("completion.whatNext")}</p>
           <ul className="interview-complete-next-list">
-            <li>The research team will review your responses.</li>
-            <li>Your answers may be used to improve products or services.</li>
-            <li>You can safely close this page.</li>
+            <li>{t("completion.nextStep1")}</li>
+            <li>{t("completion.nextStep2")}</li>
+            <li>{t("completion.nextStep3")}</li>
           </ul>
         </div>
       </div>

@@ -68,7 +68,7 @@ export default function Login() {
         {resetSuccess && (
           <div className="success-banner">{t("login.resetSuccess")}</div>
         )}
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error-banner" role="alert">{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <label className="field-label" htmlFor="login-email">{t("login.emailLabel")}</label>
@@ -111,7 +111,8 @@ export default function Login() {
                 fontSize: "13px",
                 padding: "4px",
               }}
-              tabIndex={-1}
+              tabIndex={0}
+              aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
             >
               {showPassword ? t("login.hidePassword") : t("login.showPassword")}
             </button>
