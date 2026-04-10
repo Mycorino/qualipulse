@@ -1,5 +1,17 @@
 {
   "wizard": {
+    "templatePickerTitle": "Start from a template",
+    "templatePickerSubtitle": "Pre-built research projects from common use cases. Pick one, then customize everything.",
+    "templatePickerOrDivider": "or",
+    "templateStartFromScratch": "Start from scratch",
+    "templateQuestionCount": "{{count}} questions",
+    "templateDuration": "{{count}} min",
+    "templateHasScreening": "Includes screening",
+    "templateBestFor": "Best for:",
+    "templateUseThis": "Use this template",
+    "templateBack": "← Choose another template",
+    "templateLoadError": "Couldn't load templates. You can still start from scratch.",
+    "templateApplied": "Template loaded — customize it as you like.",
     "title": "New Research Project",
     "titleEdit": "Edit Project",
     "backButton": "← Back",

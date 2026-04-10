@@ -35,6 +35,62 @@ Your role:
 You must respond in JSON format: {"action": "follow_up" or "next_question" or "close", "question": "your question text"}
 """
 
+# Human-readable language names for prompting Claude. Keep in sync with the
+# LANGUAGES list in frontend/src/pages/CreateProjectWizard.tsx
+LANGUAGE_NAMES: dict[str, str] = {
+    "en": "English",
+    "fr": "French",
+    "es": "Spanish",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "nl": "Dutch",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh": "Chinese (Mandarin)",
+}
+
+
+CLOSING_MESSAGES: dict[str, str] = {
+    "en": "That wraps up our interview. Thank you so much for your time and thoughtful responses — it's been really helpful!",
+    "fr": "Voilà qui conclut notre entretien. Merci beaucoup pour votre temps et vos réponses — cela nous a été précieux !",
+    "es": "Con esto cerramos la entrevista. Muchas gracias por su tiempo y sus respuestas — ha sido muy útil.",
+    "de": "Damit beenden wir unser Interview. Vielen Dank für Ihre Zeit und Ihre durchdachten Antworten — das war sehr hilfreich!",
+    "it": "Con questo concludiamo la nostra intervista. Grazie mille per il suo tempo e le sue risposte — è stato davvero utile!",
+    "pt": "Com isto encerramos a entrevista. Muito obrigado pelo seu tempo e pelas suas respostas — foi muito útil!",
+    "nl": "Daarmee sluiten we dit interview af. Heel erg bedankt voor uw tijd en doordachte antwoorden — het was enorm behulpzaam!",
+    "ja": "以上でインタビューは終了です。お時間を割いて丁寧にお答えいただき、本当にありがとうございました。",
+    "ko": "이것으로 인터뷰를 마치겠습니다. 시간을 내어 성의 있게 답해 주셔서 정말 감사합니다.",
+    "zh": "我们的访谈到此结束。非常感谢您抽出宝贵时间并认真回答，这对我们非常有帮助！",
+}
+
+
+def _closing_message(language_code: str | None) -> str:
+    code = (language_code or "en").lower()
+    return CLOSING_MESSAGES.get(code, CLOSING_MESSAGES["en"])
+
+
+def _language_instruction(language_code: str | None) -> str:
+    """Build a short system-prompt suffix telling Claude what language to use.
+
+    The interview guide may be written in one language while the project
+    language is another — the project language is the source of truth for
+    how the AI interviewer should speak. Whisper transcribes responses
+    automatically; we don't need to translate those back.
+    """
+    code = (language_code or "en").lower()
+    name = LANGUAGE_NAMES.get(code, "English")
+    if code == "en":
+        return ""  # default, no extra instruction
+    return (
+        f"\n\nIMPORTANT — Language: You MUST conduct this entire interview in {name}. "
+        f"Ask every question in {name}, even if the interview guide questions are "
+        f"written in another language (translate them naturally as you go). "
+        f"If the participant replies in a different language, gently continue in {name} "
+        f"unless they explicitly ask to switch. Keep your tone warm and idiomatic — "
+        f"use natural {name} phrasing, not literal translations."
+    )
+
 
 def _build_interview_guide_str(project: Project) -> str:
     """Build a formatted string representation of the interview guide.
@@ -126,6 +182,7 @@ def get_interview_context(
         "total_minutes": project.interview_duration_minutes,
         "all_questions_done": all_questions_done,
         "system_prompt": project.system_prompt,
+        "language": project.language or "en",
         "project": project,
         "participant": participant,
         "turns": turns,
@@ -143,6 +200,7 @@ def decide_next_action(
     all_questions_done: bool,
     total_questions: int = 0,
     research_objective: str | None = None,
+    language: str | None = None,
     db=None,
     company_id=None,
     project_id=None,
@@ -245,10 +303,14 @@ Based on the conversation so far and the interview guide, decide what to do next
 
 Return ONLY a JSON object: {{"action": "follow_up" or "next_question" or "close", "question": "your question text"}}"""
 
+    # Append language instruction to the system prompt if the project uses a
+    # non-English interview language.
+    effective_system_prompt = (system_prompt or INTERVIEWER_SYSTEM_PROMPT) + _language_instruction(language)
+
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
-        system=system_prompt,
+        system=effective_system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )
 
@@ -293,25 +355,42 @@ def _get_first_question(
         [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
         key=lambda q: (q.section_index, q.question_index),
     )
+    language_code = (getattr(project, "language", None) or "en").lower()
+    language_name = LANGUAGE_NAMES.get(language_code, "English")
+
     if not guide_questions:
-        return "Thank you for joining. Could you start by telling me a bit about yourself?", 0
+        fallbacks = {
+            "en": "Thank you for joining. Could you start by telling me a bit about yourself?",
+            "fr": "Merci de nous rejoindre. Pour commencer, pourriez-vous me parler un peu de vous ?",
+            "es": "Gracias por participar. Para empezar, ¿podría contarme un poco sobre usted?",
+            "de": "Danke, dass Sie dabei sind. Könnten Sie mir zunächst etwas über sich erzählen?",
+            "it": "Grazie per essere qui. Per iniziare, può raccontarmi un po' di lei?",
+            "pt": "Obrigado por participar. Para começar, poderia me contar um pouco sobre você?",
+            "nl": "Bedankt dat u meedoet. Kunt u om te beginnen iets over uzelf vertellen?",
+            "ja": "ご参加ありがとうございます。まずはご自身について少しお話しいただけますか？",
+            "ko": "참여해 주셔서 감사합니다. 먼저 본인에 대해 간단히 소개해 주시겠어요?",
+            "zh": "感谢您的参与。首先，能否简单介绍一下您自己？",
+        }
+        return fallbacks.get(language_code, fallbacks["en"]), 0
 
     first_q = guide_questions[0]
 
     # Use Claude to rephrase the first question as a natural conversation opener
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
 
+    effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
+
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=256,
-        system=INTERVIEWER_SYSTEM_PROMPT,
+        system=effective_system_prompt,
         messages=[
             {
                 "role": "user",
                 "content": (
                     f"You are starting an interview. The first question from the guide is:\n"
                     f'"{first_q.main_question}"\n\n'
-                    f"Rephrase this as a warm, natural opening question. "
+                    f"Rephrase this as a warm, natural opening question in {language_name}. "
                     f"Return ONLY the question text, no JSON."
                 ),
             }
@@ -423,6 +502,7 @@ def process_interview_turn(
         all_questions_done=context["all_questions_done"],
         total_questions=context["total_questions"],
         research_objective=_proj.research_objective,
+        language=context["language"],
         db=db,
         company_id=_company_id,
         project_id=_project_id,
@@ -570,7 +650,7 @@ def skip_question(participant_id: str, db) -> dict:
 
     if not next_questions:
         # No more questions — close
-        closing_text = "That wraps up our interview. Thank you so much for your time and thoughtful responses — it's been really helpful!"
+        closing_text = _closing_message(getattr(project, "language", None))
         tts_url = None
         try:
             audio_data = generate_speech(closing_text)

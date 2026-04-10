@@ -7,6 +7,7 @@ from app.models.usage import AIUsageLog
 from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 from app.models.blog import BlogPost
+from app.models.team import WorkspaceInvitation, WorkspaceMember
 
 __all__ = [
     "AIUsageLog",
@@ -29,4 +30,6 @@ __all__ = [
     "ScreeningQuestion",
     "ProjectMemo",
     "QuoteTag",
+    "WorkspaceInvitation",
+    "WorkspaceMember",
 ]

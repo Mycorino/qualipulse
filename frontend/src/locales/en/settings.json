@@ -2,6 +2,8 @@
   "title": "Account Settings",
   "tabs": {
     "profile": "Profile",
+    "team": "Team",
+    "integrations": "Integrations",
     "billing": "Plan & Billing"
   },
   "profile": {
@@ -42,5 +44,60 @@
     "subtitle": "Choose the interface language.",
     "en": "English",
     "fr": "Français"
+  },
+  "team": {
+    "inviteTitle": "Invite a teammate",
+    "inviteDescription": "Collaborators get access to all projects in this workspace. Seats are capped by your plan.",
+    "emailPlaceholder": "teammate@company.com",
+    "sendInvite": "Send invite",
+    "inviting": "Sending…",
+    "inviteSent": "Invitation sent to {{email}}.",
+    "inviteError": "Couldn't send the invitation. Try again.",
+    "membersTitle": "Workspace members",
+    "pendingTitle": "Pending invitations",
+    "remove": "Remove",
+    "removeConfirm": "Remove this member from the workspace?",
+    "revoke": "Revoke",
+    "invitedAs": "Invited as {{role}}",
+    "expiresOn": "expires {{date}}",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "editor": "Editor",
+      "viewer": "Viewer"
+    },
+    "accept": {
+      "title": "You've been invited",
+      "invitedByNamed": "{{inviter}} invited you to join <strong>{{workspace}}</strong> as a {{role}}.",
+      "invitedAnon": "You've been invited to join <strong>{{workspace}}</strong> as a {{role}}.",
+      "sentTo": "This invitation was sent to {{email}}.",
+      "joinCta": "Join workspace",
+      "joining": "Joining…",
+      "needLogin": "Please sign in (or create an account) with the invited email to continue.",
+      "signIn": "Sign in",
+      "createAccount": "Create account",
+      "missingToken": "This invitation link is incomplete.",
+      "invalidToken": "This invitation link is invalid or has expired.",
+      "failed": "Couldn't accept the invitation."
+    }
+  },
+  "integrations": {
+    "slack": {
+      "title": "Slack",
+      "description": "Get a Slack notification whenever an AI analysis finishes for one of your projects.",
+      "step1": "Create an Incoming Webhook at",
+      "step2": "Pick the channel where notifications should land.",
+      "step3": "Copy the webhook URL Slack gives you and paste it below.",
+      "urlLabel": "Webhook URL",
+      "urlHint": "We only use this URL to send notifications. Leave blank to disable.",
+      "save": "Save",
+      "test": "Send test message",
+      "testing": "Sending…",
+      "saved": "✓ Slack webhook saved.",
+      "cleared": "Slack notifications disabled.",
+      "testSent": "✓ Test message sent — check your Slack channel.",
+      "testFailed": "Could not reach Slack. Double-check the URL and try again.",
+      "saveError": "Could not save the webhook URL."
+    }
   }
 }

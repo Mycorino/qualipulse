@@ -2,6 +2,8 @@
   "title": "Paramètres du compte",
   "tabs": {
     "profile": "Profil",
+    "team": "Équipe",
+    "integrations": "Intégrations",
     "billing": "Plan & Facturation"
   },
   "profile": {
@@ -42,5 +44,60 @@
     "subtitle": "Choisissez la langue de l'interface.",
     "en": "English",
     "fr": "Français"
+  },
+  "team": {
+    "inviteTitle": "Inviter un coéquipier",
+    "inviteDescription": "Les collaborateurs accèdent à tous les projets de cet espace. Le nombre de sièges dépend de votre plan.",
+    "emailPlaceholder": "collegue@entreprise.com",
+    "sendInvite": "Envoyer l'invitation",
+    "inviting": "Envoi…",
+    "inviteSent": "Invitation envoyée à {{email}}.",
+    "inviteError": "Impossible d'envoyer l'invitation. Réessayez.",
+    "membersTitle": "Membres de l'espace",
+    "pendingTitle": "Invitations en attente",
+    "remove": "Retirer",
+    "removeConfirm": "Retirer ce membre de l'espace ?",
+    "revoke": "Révoquer",
+    "invitedAs": "Invité(e) en tant que {{role}}",
+    "expiresOn": "expire le {{date}}",
+    "roles": {
+      "owner": "Propriétaire",
+      "admin": "Admin",
+      "editor": "Éditeur",
+      "viewer": "Lecteur"
+    },
+    "accept": {
+      "title": "Vous avez été invité(e)",
+      "invitedByNamed": "{{inviter}} vous invite à rejoindre <strong>{{workspace}}</strong> en tant que {{role}}.",
+      "invitedAnon": "Vous avez été invité(e) à rejoindre <strong>{{workspace}}</strong> en tant que {{role}}.",
+      "sentTo": "Cette invitation a été envoyée à {{email}}.",
+      "joinCta": "Rejoindre l'espace",
+      "joining": "Connexion…",
+      "needLogin": "Connectez-vous (ou créez un compte) avec l'email invité pour continuer.",
+      "signIn": "Se connecter",
+      "createAccount": "Créer un compte",
+      "missingToken": "Ce lien d'invitation est incomplet.",
+      "invalidToken": "Ce lien d'invitation est invalide ou expiré.",
+      "failed": "Impossible d'accepter l'invitation."
+    }
+  },
+  "integrations": {
+    "slack": {
+      "title": "Slack",
+      "description": "Recevez une notification Slack dès qu'une analyse IA est terminée pour l'un de vos projets.",
+      "step1": "Créez un Incoming Webhook sur",
+      "step2": "Choisissez le canal qui recevra les notifications.",
+      "step3": "Copiez l'URL que Slack vous fournit et collez-la ci-dessous.",
+      "urlLabel": "URL du webhook",
+      "urlHint": "Cette URL sert uniquement à envoyer les notifications. Laissez vide pour désactiver.",
+      "save": "Enregistrer",
+      "test": "Envoyer un message test",
+      "testing": "Envoi…",
+      "saved": "✓ Webhook Slack enregistré.",
+      "cleared": "Notifications Slack désactivées.",
+      "testSent": "✓ Message test envoyé — vérifiez votre canal Slack.",
+      "testFailed": "Impossible de contacter Slack. Vérifiez l'URL et réessayez.",
+      "saveError": "Échec de l'enregistrement du webhook."
+    }
   }
 }

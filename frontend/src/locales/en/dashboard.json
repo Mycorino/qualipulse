@@ -6,7 +6,14 @@
   "trialBanner": {
     "title": "14-day trial active",
     "desc": "You have full Team features until {{date}}.",
-    "viewPlans": "View plans"
+    "viewPlans": "View plans",
+    "daysLeft": "{{count}} days left",
+    "daysLeft_one": "{{count}} day left",
+    "endingSoonTitle": "Your trial ends in {{count}} days",
+    "endingSoonTitle_one": "Your trial ends tomorrow",
+    "endingSoonDesc": "Upgrade to keep your projects, analysis, and CSV exports. After {{date}}, you'll revert to the Starter plan.",
+    "upgradeCta": "Upgrade to Team",
+    "upgradeCtaShort": "Upgrade now"
   },
   "gettingStarted": {
     "welcome": "Welcome, {{name}}! Let's set up your first study.",
@@ -14,6 +21,8 @@
     "step1Title": "Create a project",
     "step1Desc": "Describe your research goals and let AI build your interview guide.",
     "step1Cta": "Create project →",
+    "demoCta": "Or explore a demo project",
+    "demoLoading": "Preparing demo…",
     "step2Title": "Share your interview link",
     "step2Desc": "Generate a link and send it to participants. They'll complete the interview in their browser.",
     "step3Title": "Review AI analysis",

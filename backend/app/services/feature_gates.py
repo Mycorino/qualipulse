@@ -2,8 +2,8 @@
 Feature gating based on subscription tier.
 Centralises all tier limit checks.
 
-Canonical tiers: starter (€49) | team (€99) | lab (€199) | enterprise (custom)
-Legacy DB aliases: free → starter, solo → starter, pro → lab
+Canonical tiers: free (€0) | starter (€49) | team (€99) | lab (€199) | enterprise (custom)
+Legacy DB aliases: solo → starter, pro → lab
 """
 from dataclasses import dataclass
 from datetime import datetime
@@ -26,6 +26,18 @@ class TierLimits:
 
 
 TIER_LIMITS: dict[str, TierLimits] = {
+    "free": TierLimits(
+        name="Free",
+        max_projects=1,
+        max_participants_per_project=5,
+        max_questions_per_guide=5,
+        ai_analysis=True,          # needed so new users experience the AI magic
+        export_csv=False,
+        custom_branding=False,
+        team_members=1,
+        interview_links_per_project=1,
+        price_monthly_usd=0,
+    ),
     "starter": TierLimits(
         name="Starter",
         max_projects=1,
@@ -77,14 +89,13 @@ TIER_LIMITS: dict[str, TierLimits] = {
 }
 
 # Legacy aliases — keep existing DB rows working after rename
-TIER_LIMITS["free"] = TIER_LIMITS["starter"]    # old free tier → starter
 TIER_LIMITS["solo"] = TIER_LIMITS["starter"]    # old solo tier → starter
 TIER_LIMITS["pro"] = TIER_LIMITS["lab"]         # old pro tier → lab
 
 DEFAULT_TIER = "starter"
 
 # Canonical tier IDs (no legacy aliases)
-CANONICAL_TIERS = ("starter", "team", "lab", "enterprise")
+CANONICAL_TIERS = ("free", "starter", "team", "lab", "enterprise")
 
 
 def get_limits(tier: str) -> TierLimits:
@@ -101,8 +112,11 @@ def get_effective_limits(company) -> TierLimits:
     tier = company.subscription_tier or DEFAULT_TIER
     limits = TIER_LIMITS.get(tier, TIER_LIMITS[DEFAULT_TIER])
 
-    # Starter/legacy-free/solo users with active trial get team-level limits
-    if tier in ("starter", "free", "solo") and getattr(company, "trial_ends_at", None):
+    # Starter/solo users with active trial get team-level limits.
+    # Free tier does NOT get a trial upgrade — they stay on free forever until
+    # they upgrade. (Free is for people who want to test indefinitely; Starter
+    # is for people who paid and get a 14-day team-level bonus.)
+    if tier in ("starter", "solo") and getattr(company, "trial_ends_at", None):
         if company.trial_ends_at > datetime.utcnow():
             limits = TIER_LIMITS["team"]
 

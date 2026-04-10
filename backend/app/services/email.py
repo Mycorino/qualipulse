@@ -167,6 +167,41 @@ def send_interview_magic_link(email: str, magic_url: str, expiry_minutes: int = 
     )
 
 
+def send_team_invite(
+    to: str,
+    *,
+    workspace_name: str,
+    inviter_name: str,
+    role: str,
+    accept_url: str,
+) -> None:
+    """Invite someone to join a workspace as a team member."""
+    send_email(
+        to=to,
+        subject=f"{inviter_name} invited you to {workspace_name} on QualiPulse",
+        body_html=_wrap_email(f"""
+          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">You've been invited to collaborate</h2>
+          <p style="color:#475569;line-height:1.6;margin:0 0 16px;">
+            <strong>{inviter_name}</strong> has invited you to join
+            <strong>{workspace_name}</strong> on QualiPulse as a <strong>{role}</strong>.
+          </p>
+          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">
+            QualiPulse is a research platform for running AI-driven voice interviews and
+            turning transcripts into themes, quotes, and recommendations. You'll get access
+            to all projects in the workspace.
+          </p>
+          <div style="text-align:center;margin:32px 0;">
+            <a href="{accept_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
+              Accept invitation →
+            </a>
+          </div>
+          <p style="color:#94a3b8;font-size:0.8rem;margin:0;">
+            This invitation expires in 7 days. If you weren't expecting it, you can safely ignore this email.
+          </p>
+        """),
+    )
+
+
 def send_newsletter_welcome(to: str) -> None:
     send_email(
         to=to,

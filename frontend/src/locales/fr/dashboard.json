@@ -6,7 +6,14 @@
   "trialBanner": {
     "title": "Essai de 14 jours actif",
     "desc": "Vous bénéficiez de toutes les fonctionnalités Team jusqu'au {{date}}.",
-    "viewPlans": "Voir les plans"
+    "viewPlans": "Voir les plans",
+    "daysLeft": "{{count}} jours restants",
+    "daysLeft_one": "{{count}} jour restant",
+    "endingSoonTitle": "Votre essai se termine dans {{count}} jours",
+    "endingSoonTitle_one": "Votre essai se termine demain",
+    "endingSoonDesc": "Passez à l'offre payante pour conserver vos projets, l'analyse IA et l'export CSV. Après le {{date}}, vous reviendrez au plan Starter.",
+    "upgradeCta": "Passer à Team",
+    "upgradeCtaShort": "Passer à l'offre payante"
   },
   "gettingStarted": {
     "welcome": "Bienvenue, {{name}} ! Configurons votre première étude.",
@@ -14,6 +21,8 @@
     "step1Title": "Créer un projet",
     "step1Desc": "Décrivez vos objectifs de recherche et laissez l'IA construire votre guide d'entretien.",
     "step1Cta": "Créer un projet →",
+    "demoCta": "Ou explorer un projet de démo",
+    "demoLoading": "Préparation de la démo…",
     "step2Title": "Partager votre lien d'entretien",
     "step2Desc": "Générez un lien et envoyez-le aux participants. Ils complèteront l'entretien dans leur navigateur.",
     "step3Title": "Consulter l'analyse IA",

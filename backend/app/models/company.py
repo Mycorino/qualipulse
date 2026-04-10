@@ -54,6 +54,9 @@ class Company(Base):
     storage_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     preferred_language: Mapped[str] = mapped_column(String(5), default="fr", nullable=False)
 
+    # Integrations
+    slack_webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
 
