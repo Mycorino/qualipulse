@@ -8,14 +8,109 @@ Every template helper takes an optional ``lang`` argument (``"en"`` or
 pass ``company.preferred_language`` (or the relevant project language for
 participant-facing emails). Unknown languages fall back to English.
 
+Deliverability
+--------------
+Every outgoing email includes:
+
+* A **plain-text alternative** generated from the HTML body via
+  :func:`_html_to_text`. Without this SpamAssassin triggers
+  ``MIME_HTML_ONLY`` and ``HTML_IMAGE_ONLY_24`` (when the HTML is short
+  relative to chrome), knocking ~1.4 points off the deliverability score.
+* A ``List-Unsubscribe`` header pointing at a ``mailto:`` so Gmail/Outlook
+  can surface a one-click unsubscribe affordance. We don't advertise
+  one-click POST (RFC 8058) yet because we don't have a public POST
+  endpoint to honour it; the mailto alone still clears Gmail's warning.
+
 To enable SendGrid: set SENDGRID_API_KEY in .env
 """
+import html as _html_stdlib
 import logging
+import re
 from typing import Optional
 
 from app.config import settings
 
 logger = logging.getLogger("auto_interview.email")
+
+
+# ── HTML → plain-text conversion ───────────────────────────────────────────
+
+# Tags that should become a blank line in the plain-text version.
+_BLOCK_TAGS = {"p", "div", "br", "tr", "li", "h1", "h2", "h3", "h4", "h5", "h6"}
+
+
+def _html_to_text(html: str) -> str:
+    """Turn our template HTML into a readable plain-text alternative.
+
+    Not a general HTML→text converter — it's tuned for the specific shape
+    of the templates below (no tables beyond simple layout, no lists,
+    anchors with ``href`` attributes). Good enough to pass SpamAssassin's
+    ``MIME_HTML_ONLY`` check and give non-HTML mail clients (mutt, screen
+    readers) a sensible readable version.
+    """
+    # 1. Drop <style>/<script> blocks entirely — they leak CSS into the text.
+    text = re.sub(
+        r"<(style|script)[^>]*>.*?</\1>",
+        "",
+        html,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+    # 2. Rewrite anchors as ``label (url)`` so the URL survives tag stripping.
+    def _anchor(match: re.Match) -> str:
+        href = match.group(1)
+        label = re.sub(r"<[^>]+>", "", match.group(2)).strip()
+        if not label:
+            return href
+        if label == href:
+            return href
+        return f"{label} ({href})"
+
+    text = re.sub(
+        r'<a\b[^>]*\bhref="([^"]+)"[^>]*>(.*?)</a>',
+        _anchor,
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+    # 3. Block tags → newline.
+    def _block(match: re.Match) -> str:
+        return "\n"
+
+    text = re.sub(
+        r"</?(" + "|".join(_BLOCK_TAGS) + r")\b[^>]*>",
+        _block,
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # 4. Strip remaining tags.
+    text = re.sub(r"<[^>]+>", "", text)
+
+    # 5. Decode HTML entities (&amp;, &nbsp;, …).
+    text = _html_stdlib.unescape(text)
+
+    # 6. Collapse runs of blank lines and trim.
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n[ \t]+", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+# ── List-Unsubscribe header ────────────────────────────────────────────────
+
+_UNSUBSCRIBE_MAILTO = "mailto:support@qualipulse.com?subject=Unsubscribe%20from%20QualiPulse"
+
+
+def _unsubscribe_headers(email_type: str = "transactional") -> dict[str, str]:
+    """Return the ``List-Unsubscribe`` (+ variants) headers for a message.
+
+    We always include ``mailto:`` because Gmail accepts that alone. We
+    intentionally skip ``List-Unsubscribe-Post: List-Unsubscribe=One-Click``
+    (RFC 8058) because we don't have a POST endpoint to honour one-click
+    yet — advertising one and returning 404 is worse than not advertising.
+    """
+    return {"List-Unsubscribe": f"<{_UNSUBSCRIBE_MAILTO}>"}
 
 
 # ── Language utilities ─────────────────────────────────────────────────────
@@ -188,7 +283,13 @@ def _c(section: str, lang: str, key: str, **fmt: object) -> str:
 # ── Transport ───────────────────────────────────────────────────────────────
 
 
-def _send_console(to: str, subject: str, body_html: str) -> bool:
+def _send_console(
+    to: str,
+    subject: str,
+    body_html: str,
+    body_text: Optional[str] = None,
+    headers: Optional[dict[str, str]] = None,
+) -> bool:
     """Development fallback — prints email to console. Always 'succeeds'."""
     logger.info(
         "📧 [EMAIL — not sent in dev] To: %s | Subject: %s",
@@ -198,7 +299,13 @@ def _send_console(to: str, subject: str, body_html: str) -> bool:
     return True
 
 
-def _send_sendgrid(to: str, subject: str, body_html: str) -> bool:
+def _send_sendgrid(
+    to: str,
+    subject: str,
+    body_html: str,
+    body_text: Optional[str] = None,
+    headers: Optional[dict[str, str]] = None,
+) -> bool:
     """Send via SendGrid. Returns True on HTTP 2xx, False otherwise.
 
     Any exception (missing SDK, network failure, bad API key, rejected
@@ -206,6 +313,10 @@ def _send_sendgrid(to: str, subject: str, body_html: str) -> bool:
     trace lands in Cloud Run logs — otherwise a silent swallow here
     caused participants to see "link sent" while nothing was actually
     delivered.
+
+    ``body_text`` is the plain-text multipart alternative. If omitted
+    we derive one from ``body_html`` via :func:`_html_to_text`, so
+    callers never accidentally ship an HTML-only email.
     """
     try:
         import sendgrid  # type: ignore
@@ -214,15 +325,32 @@ def _send_sendgrid(to: str, subject: str, body_html: str) -> bool:
         logger.exception("SendGrid SDK import failed: %s", exc)
         return False
 
+    if not body_text:
+        body_text = _html_to_text(body_html)
+
     try:
         sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
         message = Mail(
             from_email=(settings.EMAIL_FROM, settings.EMAIL_FROM_NAME),
             to_emails=to,
             subject=subject,
+            plain_text_content=body_text,
             html_content=body_html,
         )
         message.reply_to = ReplyTo("support@qualipulse.com", "QualiPulse Support")
+
+        # Custom headers (List-Unsubscribe, etc.). SendGrid's helper uses
+        # a Header object keyed on name→value, added via add_header.
+        for name, value in (headers or {}).items():
+            try:
+                from sendgrid.helpers.mail import Header  # type: ignore
+
+                message.add_header(Header(name, value))
+            except Exception:
+                # If the SDK version doesn't expose Header, fall back to
+                # the dict-style API that older versions accept.
+                message.header = {name: value}  # type: ignore[attr-defined]
+
         response = sg.send(message)
         status_code = getattr(response, "status_code", None)
         if status_code is None or not (200 <= int(status_code) < 300):
@@ -245,11 +373,23 @@ def _send_sendgrid(to: str, subject: str, body_html: str) -> bool:
         return False
 
 
-def send_email(to: str, subject: str, body_html: str) -> bool:
-    """Dispatch email via the configured provider. Returns delivery status."""
+def send_email(
+    to: str,
+    subject: str,
+    body_html: str,
+    body_text: Optional[str] = None,
+    email_type: str = "transactional",
+) -> bool:
+    """Dispatch email via the configured provider. Returns delivery status.
+
+    ``email_type`` picks the ``List-Unsubscribe`` header flavour
+    (``"transactional"`` or ``"marketing"``). All outgoing mail gets the
+    header — Gmail rewards its presence even on transactional mail.
+    """
+    headers = _unsubscribe_headers(email_type)
     if settings.SENDGRID_API_KEY:
-        return _send_sendgrid(to, subject, body_html)
-    return _send_console(to, subject, body_html)
+        return _send_sendgrid(to, subject, body_html, body_text, headers)
+    return _send_console(to, subject, body_html, body_text, headers)
 
 
 # ── Shared email wrapper ──────────────────────────────────────────────────
@@ -453,4 +593,5 @@ def send_newsletter_welcome(to: str, lang: str = "en") -> bool:
         to=to,
         subject=_c("newsletter", lang, "subject"),
         body_html=_wrap_email(content, lang),
+        email_type="marketing",
     )
