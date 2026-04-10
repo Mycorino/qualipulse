@@ -74,7 +74,11 @@ _OUTPUT_SPEC = (
     "}\n\n"
     "Prefer one of the predefined industry values when it reasonably fits. "
     "Only invent a custom label (e.g. \"Retail\", \"Banking\", \"Energy\") "
-    "when the predefined list is clearly wrong."
+    "when the predefined list is clearly wrong.\n\n"
+    "**The summary value must be plain prose only.** Do NOT include HTML "
+    "tags, markdown, footnotes, citation markers, ``<cite>`` blocks, or "
+    "``[1]`` style references. Even if you used web_search, return clean "
+    "sentences with no source attribution embedded in the text."
 )
 
 
@@ -123,6 +127,30 @@ def _is_unknown(text: str) -> bool:
     return False
 
 
+# Citation tags Claude inlines into the prose when web_search produces a hit.
+# Looks like: <cite index="11-1,11-6">E.Leclerc is...</cite>
+# We strip the wrapping tags but keep the inner text — those tags are an
+# artifact of the search tool and pollute the user-facing summary.
+_CITE_OPEN_RE = re.compile(r"<cite\b[^>]*>", flags=re.IGNORECASE)
+_CITE_CLOSE_RE = re.compile(r"</cite\s*>", flags=re.IGNORECASE)
+
+
+def _strip_citation_tags(text: str) -> str:
+    """Remove ``<cite index="...">…</cite>`` markup from a summary string.
+
+    Claude's web_search tool wraps cited spans in inline ``<cite>`` tags. We
+    keep the inner prose but drop the tag wrappers so the user sees clean
+    sentences in the onboarding textarea.
+    """
+    if not text:
+        return text
+    cleaned = _CITE_OPEN_RE.sub("", text)
+    cleaned = _CITE_CLOSE_RE.sub("", cleaned)
+    # Collapse the double-spaces left behind by removed tags.
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned.strip()
+
+
 def _parse_response(text: str) -> dict | None:
     """Parse Claude's JSON response. Returns ``{"summary": str, "industry": str | None}``
     or ``None`` if the payload is unparseable / contains the UNKNOWN sentinel.
@@ -131,6 +159,7 @@ def _parse_response(text: str) -> dict | None:
       - stray markdown fences (```json ... ```)
       - leading/trailing prose
       - Claude returning the bare UNKNOWN sentinel instead of JSON
+      - inline ``<cite index="…">…</cite>`` tags in the summary value
     """
     if not text:
         return None
@@ -165,11 +194,15 @@ def _parse_response(text: str) -> dict | None:
     if _is_unknown(summary):
         return None
 
+    summary = _strip_citation_tags(summary)
+    if not summary:
+        return None
+
     cleaned_industry: str | None = None
     if isinstance(industry, str) and industry.strip() and not _is_unknown(industry):
-        cleaned_industry = industry.strip()
+        cleaned_industry = _strip_citation_tags(industry.strip())
 
-    return {"summary": summary.strip(), "industry": cleaned_industry}
+    return {"summary": summary, "industry": cleaned_industry}
 
 
 def _build_prompt(url: str, language: str, *, with_search: bool) -> str:
