@@ -44,6 +44,42 @@ def _business_context(company: Company) -> str:
     return "\n".join(parts) + "\n\n"
 
 
+def _resolve_language(body_language: str | None, company: Company) -> str:
+    """Pick the language to use for an AI generation.
+
+    Order of precedence:
+      1. ``language`` explicitly supplied in the request body (the wizard's
+         language picker — lets users override their account default)
+      2. ``company.preferred_language`` (set at signup or in account settings)
+      3. ``"en"`` as a final fallback
+
+    Returns a 2-letter ISO code that's guaranteed to be a key in ``LANGUAGES``.
+    """
+    candidates = [body_language, getattr(company, "preferred_language", None), "en"]
+    for candidate in candidates:
+        if candidate and isinstance(candidate, str):
+            code = candidate.strip().lower()[:2]
+            if code in LANGUAGES:
+                return code
+    return "en"
+
+
+def _language_directive(language: str) -> str:
+    """Build the "Respond in X" instruction we paste into Claude prompts.
+
+    Returns an empty string for English so we don't bloat the prompt with
+    a no-op directive on the default path.
+    """
+    if language == "en":
+        return ""
+    lang_name = LANGUAGES.get(language, "English")
+    return (
+        f"IMPORTANT: Respond entirely in {lang_name}. All prose, all JSON "
+        f"string values, every word the user will read must be in "
+        f"{lang_name}. JSON keys stay in English."
+    )
+
+
 # ---------------------------------------------------------------------------
 # POST /research/parse-brief
 # ---------------------------------------------------------------------------
@@ -72,6 +108,8 @@ async def parse_brief(
         combined += "\n\nUPLOADED DOCUMENTS:\n" + "\n\n".join(file_contents)
 
     biz_ctx = _business_context(company)
+    language = _resolve_language(None, company)
+    lang_directive = _language_directive(language)
     response = _claude(512).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
@@ -84,6 +122,7 @@ async def parse_brief(
                 "the business does, what problem they want to understand, and what "
                 "decision this research will inform.\n\n"
                 f"BRIEF:\n{combined}\n\n"
+                f"{lang_directive}\n"
                 "Return ONLY the summary text, no headers or labels."
             ),
         }],
@@ -116,6 +155,8 @@ def suggest_objective(
         }
 
     biz_ctx = _business_context(company)
+    language = _resolve_language(body.get("language"), company)
+    lang_directive = _language_directive(language)
     response = _claude(1024).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
@@ -132,6 +173,7 @@ def suggest_objective(
                 "- Grounded in what decisions the research will inform\n"
                 "- Realistic for 5–8 qualitative voice interviews of 20–30 minutes\n\n"
                 f"PROJECT CONTEXT:\n{combined}\n\n"
+                f"{lang_directive}\n"
                 "Return ONLY a JSON object with this exact structure:\n"
                 '{"objective": "one clear sentence","learning_goals": ["goal 1","goal 2","goal 3"],'
                 '"study_type": "exploratory|evaluative|generative",'
@@ -158,13 +200,20 @@ def suggest_scope(
     objective = body.get("objective", "")
     learning_goals = body.get("learning_goals", [])
     context = body.get("context", "")
+    language = _resolve_language(body.get("language"), company)
 
     if not objective.strip():
-        return {"audience": "", "duration_minutes": 20, "language": "en", "participant_count": 6}
+        return {
+            "audience": "",
+            "duration_minutes": 20,
+            "language": language,
+            "participant_count": 6,
+        }
 
     goals_str = "\n".join(f"- {g}" for g in learning_goals if g)
 
     biz_ctx = _business_context(company)
+    lang_directive = _language_directive(language)
     response = _claude(512).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
@@ -177,10 +226,11 @@ def suggest_scope(
                 f"OBJECTIVE: {objective}\n"
                 f"LEARNING GOALS:\n{goals_str}\n"
                 f"ADDITIONAL CONTEXT: {context or 'none'}\n\n"
+                f"{lang_directive}\n"
                 "Return ONLY a JSON object:\n"
                 '{"audience": "brief profile of ideal participant (1-2 sentences)",'
                 '"duration_minutes": 20 or 30 or 45,'
-                '"language": "en",'
+                f'"language": "{language}",'
                 '"participant_count": 5 or 6 or 8,'
                 '"audience_rationale": "one sentence why this audience"}'
             ),
@@ -206,12 +256,17 @@ def suggest_questions(
     learning_goals: list[str] = body.get("learning_goals", [])
     audience = body.get("audience", "")
     duration_minutes = body.get("duration_minutes", 20)
-    language = body.get("language", "en")
+    language = _resolve_language(body.get("language"), company)
     context = body.get("context", "")
 
     lang_name = LANGUAGES.get(language, "English")
     goals_str = "\n".join(f"- {g}" for g in learning_goals if g)
-    lang_instruction = f"Write ALL question text in {lang_name}." if language != "en" else ""
+    lang_instruction = (
+        f"Write ALL question text, section titles, interview_notes, and "
+        f"desired_learning fields in {lang_name}. JSON keys stay in English."
+        if language != "en"
+        else ""
+    )
 
     biz_ctx = _business_context(company)
     response = _claude(2048).messages.create(

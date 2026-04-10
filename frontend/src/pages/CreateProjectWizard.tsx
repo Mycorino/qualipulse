@@ -43,10 +43,19 @@ export default function CreateProjectWizard() {
   const navigate = useNavigate();
   const { id: editId } = useParams<{ id?: string }>();
   const isEditMode = !!editId;
-  const { t } = useTranslation("project");
+  const { t, i18n } = useTranslation("project");
 
   // In edit mode, skip draft restore and load from API instead
   const draft = isEditMode ? null : loadDraft();
+
+  // Seed the project language from the user's UI locale on a fresh wizard
+  // so the AI research wizard generates the brief, objective, scope, and
+  // interview guide in their account language. We support en/fr in the UI
+  // and fall back to "en" for any other locale (the dropdown still lets
+  // them pick a different language for the participants).
+  const accountLang = (i18n.language || "en").toLowerCase().startsWith("fr")
+    ? "fr"
+    : "en";
 
   const [step, setStep] = useState(draft?.step ?? 1);
 
@@ -66,7 +75,7 @@ export default function CreateProjectWizard() {
   // Step 3
   const [audience, setAudience] = useState(draft?.audience ?? "");
   const [durationMinutes, setDurationMinutes] = useState(draft?.durationMinutes ?? 20);
-  const [language, setLanguage] = useState(draft?.language ?? "en");
+  const [language, setLanguage] = useState(draft?.language ?? accountLang);
   const [screeningQuestions, setScreeningQuestions] = useState<ScreeningQuestionCreate[]>(draft?.screeningQuestions ?? []);
   const [expandedSQ, setExpandedSQ] = useState<number | null>(null);
 

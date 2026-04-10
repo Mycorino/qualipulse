@@ -384,6 +384,10 @@ def save_onboarding_profile(
         company.research_experience = body.research_experience
     if body.primary_region is not None:
         company.primary_region = body.primary_region
+    if body.preferred_language:
+        normalized = body.preferred_language.strip().lower()[:2]
+        if normalized in ("en", "fr"):
+            company.preferred_language = normalized
     db.commit()
     logger.info("Onboarding profile saved for %s", company.email)
     return CompanyResponse.model_validate(company)
@@ -416,6 +420,10 @@ def complete_onboarding(
         company.primary_region = body.primary_region
     if body.goals_freeform is not None:
         company.goals_freeform = body.goals_freeform
+    if body.preferred_language:
+        normalized = body.preferred_language.strip().lower()[:2]
+        if normalized in ("en", "fr"):
+            company.preferred_language = normalized
     company.onboarding_completed = True
     db.commit()
     logger.info("Onboarding completed for %s", company.email)

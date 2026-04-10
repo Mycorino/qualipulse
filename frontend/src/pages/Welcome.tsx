@@ -181,10 +181,15 @@ export default function Welcome() {
     setSaving(true);
     setError("");
     try {
+      // Normalise the live UI locale into a 2-letter code we persist as the
+      // account's preferred_language. This is what the AI research wizard
+      // and email service will read for every future generation.
+      const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
       await saveOnboardingProfile({
         name: companyName.trim() || undefined,
         company_size: companySize || undefined,
         role: role || undefined,
+        preferred_language: uiLang,
       });
       setStep(3);
     } catch (err: unknown) {
@@ -447,6 +452,47 @@ export default function Welcome() {
             <p className="welcome-subtitle">{t("onboarding.readyDesc")}</p>
 
             <div className="onboarding-form">
+              {/* Language picker — drives email locale, AI research wizard
+                  output, and the default project language. Changing this
+                  swaps the onboarding UI itself in real time via i18n;
+                  it's persisted to the company record on Continue. */}
+              <div className="onboarding-field">
+                <label className="field-label">
+                  {t("onboarding.languageLabel")}
+                </label>
+                <div className="onboarding-chip-grid">
+                  {[
+                    { code: "en", label: "English" },
+                    { code: "fr", label: "Français" },
+                  ].map((opt) => {
+                    const active = (i18n.language || "en")
+                      .toLowerCase()
+                      .startsWith(opt.code);
+                    return (
+                      <button
+                        key={opt.code}
+                        type="button"
+                        className={`onboarding-chip ${active ? "selected" : ""}`}
+                        onClick={() => i18n.changeLanguage(opt.code)}
+                        disabled={saving}
+                        aria-pressed={active}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    marginTop: 6,
+                  }}
+                >
+                  {t("onboarding.languageHint")}
+                </div>
+              </div>
+
               <div className="onboarding-field">
                 <label className="field-label">{t("onboarding.profileCompanyLabel")}</label>
                 <input
