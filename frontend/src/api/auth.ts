@@ -109,6 +109,10 @@ export async function completeOnboarding(profile: OnboardingProfile): Promise<Co
 export interface AnalyseWebsiteResponse {
   business_summary: string;
   industry?: string | null;
+  // ISO-like code for the detected primary market (fr/be/ch/de/uk/es/it/
+  // nl/pt/europe/us/ca/global/other). Frontend preselects the matching
+  // chip in the onboarding flow.
+  primary_country?: string | null;
 }
 
 export async function analyseWebsite(websiteUrl: string): Promise<AnalyseWebsiteResponse> {
