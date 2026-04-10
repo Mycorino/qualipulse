@@ -105,11 +105,20 @@ _UNSUBSCRIBE_MAILTO = "mailto:support@qualipulse.com?subject=Unsubscribe%20from%
 def _unsubscribe_headers(email_type: str = "transactional") -> dict[str, str]:
     """Return the ``List-Unsubscribe`` (+ variants) headers for a message.
 
-    We always include ``mailto:`` because Gmail accepts that alone. We
-    intentionally skip ``List-Unsubscribe-Post: List-Unsubscribe=One-Click``
-    (RFC 8058) because we don't have a POST endpoint to honour one-click
-    yet — advertising one and returning 404 is worse than not advertising.
+    Only marketing/bulk mail (newsletter, digests) gets ``List-Unsubscribe``.
+    Transactional mail (verification, magic link, password reset, team
+    invite, analysis-ready, welcome) intentionally does NOT — advertising
+    "mailing list" on an account-lifecycle email trips spam filters (Apple
+    Mail even renders a "This message is from a mailing list" banner) and
+    confuses recipients who never opted into a list.
+
+    For marketing we include ``mailto:`` because Gmail accepts that alone.
+    We skip ``List-Unsubscribe-Post: List-Unsubscribe=One-Click`` (RFC 8058)
+    because we don't have a POST endpoint to honour one-click yet —
+    advertising one and returning 404 is worse than not advertising.
     """
+    if email_type != "marketing":
+        return {}
     return {"List-Unsubscribe": f"<{_UNSUBSCRIBE_MAILTO}>"}
 
 
