@@ -57,6 +57,12 @@ class Company(Base):
     # Integrations
     slack_webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Timestamp of when the onboarding showcase/demo project was seeded for
+    # this company. Used to keep the seeder idempotent — if it's non-null
+    # we skip seeding on subsequent onboarding-complete calls (e.g. when a
+    # user re-opens the welcome flow after clearing localStorage).
+    demo_seeded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
 

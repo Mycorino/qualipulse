@@ -30,7 +30,11 @@ def create_project(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ProjectResponse:
-    current_count = db.query(Project).filter(Project.company_id == company.id).count()
+    current_count = (
+        db.query(Project)
+        .filter(Project.company_id == company.id, Project.is_demo == False)  # noqa: E712
+        .count()
+    )
     require_project_limit(company, current_count)
     require_question_limit(company, len(body.questions))
     project = Project(
@@ -106,7 +110,11 @@ async def import_project_from_csv(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ProjectResponse:
-    current_count = db.query(Project).filter(Project.company_id == company.id).count()
+    current_count = (
+        db.query(Project)
+        .filter(Project.company_id == company.id, Project.is_demo == False)  # noqa: E712
+        .count()
+    )
     require_project_limit(company, current_count)
 
     content = await csv_file.read()
