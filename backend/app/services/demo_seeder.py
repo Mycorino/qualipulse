@@ -1,12 +1,25 @@
-"""Seed a read-only demo project for new users so they can explore the full app.
+"""Seed a rich, read-only showcase project for new users.
 
-Creates a fully-populated sample project (with completed participants, transcripts,
-and a finished AI analysis) so new researchers can click around, see themes, open
-transcripts, and export CSV before they run their own study.
+This seeds a single multilingual research project that demonstrates almost every
+QualiPulse feature so a brand-new user can poke around and feel what a fully
+populated project looks like before they run their own study:
 
-The seeded data is persisted like a regular project — the only thing that marks it
-as a demo is its name prefix and the fact that `is_demo_seeded` is tracked on the
-company record (so we only seed once per account).
+- Two interview links (one EU, one NA paused) so the link manager has content
+- A screening question with a disqualifying option
+- Six completed participants in two languages (3x FR, 3x EN), with adaptive
+  follow-ups, demographics for the segment heatmap, and one in-progress
+  participant so the responses tab shows mixed states
+- A manual codebook with four codes and a handful of tagged quotes
+- A finished AI analysis (v1 = ai_discovery) with verbatim quotes pulled from
+  the actual transcripts, plus a refined v2 (researcher_refined) showing the
+  iterative analysis flow
+- Three theme annotations (confirmed / needs_evidence / disputed) on the v2
+- Six project memos (general + theme- and tension-linked)
+- One transcript turn flagged as manually edited
+
+The fixture content lives in `_demo_data_fr.py` and `_demo_data_en.py` so the
+seeder logic stays readable. The seeder is idempotent at the call site via
+`Company.demo_seeded_at` and via a name match in the on-demand router endpoint.
 """
 
 from __future__ import annotations
@@ -17,261 +30,449 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.models.coding import ManualCode, QuoteTag
 from app.models.interview import (
+    AnalysisThemeAnnotation,
     InterviewLink,
     InterviewTurn,
     Participant,
     ProjectAnalysis,
 )
-from app.models.project import InterviewGuideQuestion, Project
+from app.models.memo import ProjectMemo
+from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
+from app.services._demo_data_en import NOTABLE_QUOTES_EN, PARTICIPANTS_EN
+from app.services._demo_data_fr import NOTABLE_QUOTES_FR, PARTICIPANTS_FR
 
 
-DEMO_PROJECT_NAME = "[Demo] Customer Discovery — Productivity App"
+DEMO_PROJECT_NAME = "[Demo] How modern teams work across borders"
 
 DEMO_RESEARCH_OBJECTIVE = (
-    "Understand how knowledge workers currently manage their daily tasks and "
-    "identify the biggest frustrations with existing productivity tools, so we "
-    "can design a mobile-first app that feels effortless for busy professionals."
+    "Understand how distributed product and engineering teams stay aligned "
+    "across time zones, languages, and tool stacks — and surface the moments "
+    "where coordination breaks down so we can design a product that fixes the "
+    "root cause rather than the symptoms."
+)
+
+DEMO_RESEARCH_CONTEXT = (
+    "This is a demo project that QualiPulse seeded automatically so you can "
+    "explore the platform with realistic data. It contains six completed "
+    "interviews in English and French, a finished AI analysis with two "
+    "versions, a researcher codebook, tagged quotes, and project memos. "
+    "Feel free to edit anything, archive it, or delete it whenever you're ready "
+    "to run your own study — it never counts against your project quota."
 )
 
 DEMO_WELCOME_MESSAGE = (
-    "Hi, thanks for joining! This is a short conversation about how you manage "
-    "your work day — there are no right or wrong answers, just share what comes "
-    "to mind."
+    "Hi, thanks for taking the time to talk with us! This is a short, informal "
+    "conversation about how you and your team work together day to day. There "
+    "are no right or wrong answers — we just want to understand how things "
+    "actually look from your side."
 )
 
 DEMO_GUIDE: list[dict] = [
     {
-        "section": "Context",
+        "section": "Daily rhythm",
         "questions": [
             {
-                "q": "Tell me a bit about your typical work day. How do you currently plan what you'll get done?",
-                "learning": "Baseline routine, existing habits, planning frequency.",
+                "q": "Walk me through a typical work day. When do you focus alone, and when do you collaborate with your team?",
+                "learning": "Baseline rhythm, focus vs collaboration ratio, async vs sync defaults.",
+            },
+            {
+                "q": "Which tools do you use to stay aligned with your team, and how has your tool stack changed to get to where it is today?",
+                "learning": "Tool stack, sprawl, tool consolidation history.",
             },
         ],
     },
     {
-        "section": "Tools in use",
+        "section": "Friction & breakdowns",
         "questions": [
             {
-                "q": "What tools or apps do you use to keep track of tasks and projects? Walk me through the ones you touch every day.",
-                "learning": "Current tool stack, switching cost, native vs third-party.",
+                "q": "Tell me about a recent moment where you felt blocked or frustrated working as a team. What happened?",
+                "learning": "Coordination breakdowns, where decisions and context get lost.",
             },
             {
-                "q": "Which of those do you actually enjoy using, and which feel like a chore?",
-                "learning": "Emotional relationship with tools, pain points.",
+                "q": "When you need something from a teammate in a different time zone, what's your playbook?",
+                "learning": "Async coping mechanisms, time-zone friction, rituals.",
             },
         ],
     },
     {
-        "section": "Pain & desired outcomes",
+        "section": "Aspirations",
         "questions": [
             {
-                "q": "Think back to the last time you felt overwhelmed by your to-do list. What was going on?",
-                "learning": "Overload triggers, coping mechanisms.",
-            },
-            {
-                "q": "If a magic wand could fix one thing about how you organise your work, what would it be?",
-                "learning": "Jobs-to-be-done, aspirational state.",
+                "q": "If you could wave a magic wand and fix one thing about how your team works together, what would it be and why?",
+                "learning": "Top-of-mind pain, wish list, jobs to be done.",
             },
         ],
     },
 ]
 
 
-# A list of fake completed interviews (participant + turns). Quotes are realistic
-# but fully synthetic — nothing here is from a real person.
-DEMO_PARTICIPANTS: list[dict] = [
-    {
-        "display_name": "Alex M.",
-        "email": "alex.demo@example.com",
-        "profession": "Product Manager",
-        "age_range": "30-39",
-        "country": "United Kingdom",
-        "answers": [
-            "I usually start around 8:30 by checking Slack and then I open Notion where my backlog lives. I try to block the first hour for deep work but it rarely happens — there's always a meeting or a Slack ping that pulls me away.",
-            "Mostly Notion for notes and tasks, Linear for engineering tickets, Slack for everything else. I keep Google Calendar open in a separate tab. Honestly it's too many tabs.",
-            "I like Linear — it feels fast and it doesn't get in the way. Notion I have a love-hate relationship with; it's flexible but things get lost in nested pages.",
-            "Last Thursday I had three product reviews back-to-back and my inbox was out of control. I ended up writing things on sticky notes because I couldn't even find my own to-do list.",
-            "I'd want one place that actually merges my calendar, my tasks, and my notes — and that surfaces what matters right now instead of making me dig for it.",
-        ],
-    },
-    {
-        "display_name": "Priya S.",
-        "email": "priya.demo@example.com",
-        "profession": "Software Engineer",
-        "age_range": "25-29",
-        "country": "Germany",
-        "answers": [
-            "I roll into my day by reviewing GitHub notifications and my Linear queue. I'm mostly heads-down coding, so I batch Slack to twice a day otherwise I get nothing done.",
-            "Linear, GitHub, VS Code, Slack. I also keep a markdown file in Obsidian for personal notes — nothing fancy, just a scratchpad.",
-            "VS Code and Obsidian are great, they stay out of the way. Slack on the other hand is the biggest drain on my focus.",
-            "Honestly I don't feel overwhelmed by tasks that often — my manager is good at shielding me. But I do feel overwhelmed by the sheer number of notifications across apps.",
-            "I wish there was a single inbox for all my tools. Right now I check four different places just to know what I should be working on.",
-        ],
-    },
-    {
-        "display_name": "Sophie L.",
-        "email": "sophie.demo@example.com",
-        "profession": "Freelance Designer",
-        "age_range": "30-39",
-        "country": "France",
-        "answers": [
-            "I'm freelance so every day is a bit different. I usually plan the night before in a paper notebook — yes, paper — because writing it down helps me think.",
-            "Figma for design, Notion for client briefs, Superhuman for email, and honestly iMessage for most of my client comms because they prefer it.",
-            "Figma is a joy. Notion I find clunky on mobile. I hate that my tasks and my emails don't talk to each other at all.",
-            "Two weeks ago I missed a deliverable because it was buried in an email thread. My client wasn't happy and I felt terrible. That's when I wrote everything down on paper for two weeks.",
-            "I'd love a tool that understood that most of my work lives in client threads and could pull tasks out of them automatically without me having to copy-paste.",
-        ],
-    },
-]
+# Build a flat ordered list of main questions, mirroring how the seeder
+# assigns turn_index → question_index. Used to look up question text.
+def _flat_main_questions() -> list[str]:
+    flat: list[str] = []
+    for section in DEMO_GUIDE:
+        for item in section["questions"]:
+            flat.append(item["q"])
+    return flat
 
 
-DEMO_ANALYSIS_REPORT: dict = {
-    "overview": (
-        "Knowledge workers are juggling too many disconnected tools to manage their "
-        "daily work. The biggest source of frustration is not the tools themselves "
-        "but the cognitive load of switching between them. Participants repeatedly "
-        "described a desire for a single pane of glass that surfaces what matters "
-        "right now across tasks, notifications, and communication."
-    ),
-    "themes": [
-        {
-            "title": "Tool fragmentation creates cognitive overhead",
-            "description": (
-                "All three participants described using 4+ tools daily with no "
-                "cross-app view. Switching between them is itself a source of stress "
-                "— especially when urgent items arrive via messaging apps rather than "
-                "the dedicated task tool."
-            ),
-            "confidence": 0.92,
-            "quotes": [
-                {
-                    "text": "I check four different places just to know what I should be working on.",
-                    "participant_display_name": "Priya S.",
-                },
-                {
-                    "text": "Honestly it's too many tabs.",
-                    "participant_display_name": "Alex M.",
-                },
-            ],
-        },
-        {
-            "title": "Notifications drown out intent",
-            "description": (
-                "Participants actively work against their own tools to protect focus "
-                "— batching Slack, turning off email, falling back to paper. Slack "
-                "was singled out as the biggest drain on attention."
-            ),
-            "confidence": 0.88,
-            "quotes": [
-                {
-                    "text": "Slack on the other hand is the biggest drain on my focus.",
-                    "participant_display_name": "Priya S.",
-                },
-                {
-                    "text": "I try to block the first hour for deep work but it rarely happens.",
-                    "participant_display_name": "Alex M.",
-                },
-            ],
-        },
-        {
-            "title": "Critical work hides inside conversations",
-            "description": (
-                "Tasks, briefs, and deadlines routinely live inside email threads, "
-                "Slack DMs, or iMessage — not inside the task manager. This is where "
-                "things fall through the cracks."
-            ),
-            "confidence": 0.85,
-            "quotes": [
-                {
-                    "text": "I missed a deliverable because it was buried in an email thread.",
-                    "participant_display_name": "Sophie L.",
-                },
-                {
-                    "text": "I ended up writing things on sticky notes because I couldn't even find my own to-do list.",
-                    "participant_display_name": "Alex M.",
-                },
-            ],
-        },
-    ],
-    "jobs_to_be_done": [
-        {
-            "statement": (
-                "When I start my day, I want to know exactly what needs my attention, "
-                "so I can protect my focus for deep work."
-            ),
-            "evidence_count": 3,
-        },
-        {
-            "statement": (
-                "When important information arrives in a conversation, I want it to "
-                "show up in my task list automatically, so I don't miss anything."
-            ),
-            "evidence_count": 2,
-        },
-    ],
-    "tensions": [
-        {
-            "title": "Flexibility vs focus",
-            "description": (
-                "Participants love that modern tools are flexible — but that same "
-                "flexibility means every team uses them differently, creating "
-                "inconsistent mental models."
-            ),
-        },
-    ],
-    "recommendations": [
-        {
-            "title": "Prioritise a unified daily view",
-            "description": (
-                "The strongest signal is the desire for one place that answers "
-                "'what should I be doing right now?' — prioritise this over feature "
-                "depth in any single tool category."
-            ),
-        },
-        {
-            "title": "Ingest from conversation channels",
-            "description": (
-                "Treat Slack, email, and iMessage as first-class task sources rather "
-                "than afterthoughts. Manual copy-paste is where the product will lose."
-            ),
-        },
-        {
-            "title": "Respect focus mode",
-            "description": (
-                "Notifications are seen as adversarial. Ship quiet-by-default "
-                "and let users explicitly opt into interruptions."
-            ),
-        },
-    ],
-    "metadata": {
-        "is_demo": True,
-        "note": "This is synthetic demo data to help you explore the platform.",
-    },
+DEMO_SCREENING_QUESTION = {
+    "question": "How many people are on your team today?",
+    "options": ["Just me", "2 to 5", "6 to 15", "16 or more"],
+    "disqualifying_options": ["Just me"],
 }
 
 
+DEMO_CODES = [
+    {"name": "Pain point", "color": "#dc2626"},
+    {"name": "Workaround", "color": "#f59e0b"},
+    {"name": "Aha moment", "color": "#16a34a"},
+    {"name": "Cultural difference", "color": "#2563eb"},
+]
+
+
+# (notable_quote_index_in_NOTABLE_QUOTES_*, language, code_name)
+# These point at the quotes already validated as substring matches.
+DEMO_TAG_PLAN: list[tuple[int, str, str]] = [
+    (0, "fr", "Aha moment"),         # "annoncer une règle ça change rien…"
+    (1, "fr", "Pain point"),         # "moteur de recherche humain"
+    (2, "fr", "Aha moment"),         # "le décalage horaire nous a rendus plus disciplinés"
+    (3, "fr", "Pain point"),         # Lucas focus impasse
+    (4, "fr", "Cultural difference"),# "ringard de proposer une réu"
+    (5, "fr", "Pain point"),         # "Les insights, ils meurent dans le rapport"
+    (0, "en", "Pain point"),         # Sarah archaeologist
+    (1, "en", "Cultural difference"),# Sarah room/shoulder
+    (2, "en", "Aha moment"),         # "documentation is a task, not a byproduct"
+    (3, "en", "Pain point"),         # Ben "seven or eight tools"
+    (4, "en", "Pain point"),         # Ben senior engineer holds the system
+    (5, "en", "Workaround"),         # James "announcing a process doesn't change anything"
+    (6, "en", "Aha moment"),         # James "knowing and doing"
+]
+
+
+# ── AI analysis report ──────────────────────────────────────────────────────
+#
+# Shape matches `frontend/src/api/projects.ts → AnalysisReport`:
+#   summary, themes[{title, summary, quotes, frequency}],
+#   jobs_to_be_done[{job, insight, frequency}],
+#   tensions[{tension, detail}], recommendations[], confidence, participant_count
+
+
+def _build_quote(text: str, participant_name: str, q_idx: int) -> dict:
+    return {
+        "text": text,
+        "participant_display_name": participant_name,
+        "turn_index": q_idx,
+    }
+
+
+def _v1_report() -> dict:
+    # Grab a few specific quotes by hand from the staging files. We use the
+    # validated NOTABLE_QUOTES_* entries so the strings are guaranteed to also
+    # appear inside the actual transcripts.
+    fr = NOTABLE_QUOTES_FR
+    en = NOTABLE_QUOTES_EN
+    p_fr = PARTICIPANTS_FR
+    p_en = PARTICIPANTS_EN
+
+    def fr_q(i: int) -> dict:
+        q = fr[i]
+        return _build_quote(q["text"], p_fr[q["participant_index"]]["display_name"], q["turn_index"])
+
+    def en_q(i: int) -> dict:
+        q = en[i]
+        return _build_quote(q["text"], p_en[q["participant_index"]]["display_name"], q["turn_index"])
+
+    return {
+        "summary": (
+            "Across six interviews in French and English, distributed teams "
+            "consistently described the same root problem: knowledge, decisions, "
+            "and context routinely get lost between tools, people, and time "
+            "zones. Participants are not asking for more tools — they are "
+            "asking for fewer, better connected, with documentation that "
+            "happens automatically as a side effect of doing the work. The "
+            "strongest signal is that culture and tooling are inseparable: "
+            "the most successful teams in the sample had leaders who modelled "
+            "the behaviours they wanted (writing things down, protecting focus "
+            "time) rather than announcing them in policies."
+        ),
+        "themes": [
+            {
+                "title": "Decisions evaporate the moment a meeting ends",
+                "summary": (
+                    "Every participant described the same scene: a decision is "
+                    "made in a call, nobody writes it down in a single canonical "
+                    "place, and three days later somebody asks the question again. "
+                    "The cost is not the rework — it's the slow erosion of trust "
+                    "in any shared source of truth. People stop believing the "
+                    "docs and start treating their own memory as the system of "
+                    "record."
+                ),
+                "quotes": [fr_q(1), en_q(0), en_q(2)],
+                "frequency": "6 of 6 participants",
+            },
+            {
+                "title": "Tool sprawl is the symptom, not the disease",
+                "summary": (
+                    "Teams average six to eight productivity tools and none of "
+                    "them talk to each other. Participants do not want a new "
+                    "task manager — they want the four they already have to "
+                    "share state. The friction is the manual copy-paste between "
+                    "Slack, the doc tool, the ticket tracker, and the calendar."
+                ),
+                "quotes": [en_q(3), fr_q(4)],
+                "frequency": "5 of 6 participants",
+            },
+            {
+                "title": "Focus time is socially expensive to defend",
+                "summary": (
+                    "Protecting deep work is described as a social negotiation, "
+                    "not a calendar setting. Participants who succeeded did so "
+                    "by quietly modelling the behaviour for weeks, not by "
+                    "announcing a rule. The ones who failed all said the same "
+                    "thing: announcing the rule changed nothing."
+                ),
+                "quotes": [fr_q(3), fr_q(0), en_q(5)],
+                "frequency": "5 of 6 participants",
+            },
+            {
+                "title": "Time-zone friction can quietly improve team hygiene",
+                "summary": (
+                    "Counter-intuitively, teams forced to operate across "
+                    "non-overlapping time zones described their async "
+                    "communication as more rigorous than co-located teams. "
+                    "Constraint produced clarity. The participants who had "
+                    "always worked across continents were noticeably more "
+                    "structured than those whose teams sat in one room."
+                ),
+                "quotes": [fr_q(2), en_q(1)],
+                "frequency": "4 of 6 participants",
+            },
+            {
+                "title": "Leaders model culture or they don't have one",
+                "summary": (
+                    "The most candid quotes in the sample came from a founder "
+                    "who openly admitted that values posted on a wall do nothing "
+                    "if leadership doesn't enact them in tiny daily moments. "
+                    "Other participants confirmed the same dynamic from the "
+                    "receiving side: they ignored stated norms and watched what "
+                    "their managers actually did."
+                ),
+                "quotes": [en_q(6), fr_q(0)],
+                "frequency": "4 of 6 participants",
+            },
+        ],
+        "jobs_to_be_done": [
+            {
+                "job": "When I leave a meeting where a decision was made, I want that decision captured automatically in one canonical place, so that I never have to be the team's archaeologist again.",
+                "insight": "Manual note-taking is the bottleneck — participants who try to do it well burn out doing it; participants who don't do it at all create rework for everyone else.",
+                "frequency": "6 of 6 participants",
+            },
+            {
+                "job": "When I start my work day, I want to know what actually needs my attention right now, so I can spend my morning on deep work instead of triaging four inboxes.",
+                "insight": "All participants triage across at least four surfaces (Slack, email, ticket tool, calendar). The triage itself is the work that prevents the work.",
+                "frequency": "6 of 6 participants",
+            },
+            {
+                "job": "When I need an answer from a teammate in a different time zone, I want the round-trip to be one cycle, so I don't lose a day to clarification ping-pong.",
+                "insight": "Participants with mature async habits over-specify questions deliberately. Participants without those habits lose 12–24 hours per question on average.",
+                "frequency": "4 of 6 participants",
+            },
+        ],
+        "tensions": [
+            {
+                "tension": "Speed vs documentation",
+                "detail": (
+                    "Writing things down slows individual work but speeds team "
+                    "work. Most participants resolve this in favour of "
+                    "individual speed and then suffer later — but only the "
+                    "person doing the writing pays the cost up front, while "
+                    "the whole team pays the cost of not writing."
+                ),
+            },
+            {
+                "tension": "Async rigor vs in-person spontaneity",
+                "detail": (
+                    "Co-located teams have effortless tap-on-shoulder access "
+                    "but build sloppy documentation habits. Distributed teams "
+                    "have rigorous documentation habits but lose the lightness "
+                    "of spontaneous conversation. Neither group wants to give "
+                    "up what they have to gain what the other has."
+                ),
+            },
+            {
+                "tension": "Stated values vs enacted behaviour",
+                "detail": (
+                    "Every participant described a gap between what their team "
+                    "claims to value and what their team actually rewards. The "
+                    "most self-aware participants admitted they are part of the "
+                    "problem they describe."
+                ),
+            },
+        ],
+        "recommendations": [
+            "Treat decision capture as a first-class product surface, not a polite reminder bot — the moment a meeting ends is the moment the value evaporates.",
+            "Don't build another task manager. Build the connective tissue between the four tools every team already has.",
+            "Make modelled behaviour visible: surface to leaders the gap between what they say in all-hands and what they do in their actual calendar and Slack patterns.",
+            "Design for async-first by default but with a clearly marked synchronous escape hatch — every participant uses both modes daily and resents tools that pretend only one exists.",
+            "Pull research findings forward into the moment a decision is being made, not just into a report nobody reads after the fact.",
+        ],
+        "confidence": "high",
+        "participant_count": 6,
+    }
+
+
+def _v2_report() -> dict:
+    # Refined version. Same shape, slightly tightened summary, one extra
+    # theme nuance reflecting the annotations.
+    base = _v1_report()
+    base["summary"] = (
+        "Refined after researcher review. The strongest signal — that "
+        "decisions evaporate the moment a meeting ends — is confirmed by all "
+        "six participants and is the recommended product wedge. The secondary "
+        "theme around time-zone friction needs more evidence: only four "
+        "participants brought it up unprompted, and the framing shifted "
+        "between languages (French participants emphasised the discipline "
+        "benefit, English participants emphasised the lag cost). The tool "
+        "sprawl finding is real but is downstream of the decision-capture "
+        "problem rather than independent of it; we should not treat them as "
+        "two separate product bets."
+    )
+    base["confidence"] = "high"
+    return base
+
+
+# Annotations applied to v2 themes (status: confirmed | disputed | needs_evidence)
+DEMO_ANNOTATIONS = [
+    {
+        "theme_title": "Decisions evaporate the moment a meeting ends",
+        "status": "confirmed",
+        "researcher_note": (
+            "Confirmed across all six interviews and across both languages. "
+            "This is the wedge — recommend we lead the product narrative with "
+            "decision capture rather than tool consolidation."
+        ),
+    },
+    {
+        "theme_title": "Time-zone friction can quietly improve team hygiene",
+        "status": "needs_evidence",
+        "researcher_note": (
+            "Only 4/6 participants brought this up unprompted, and the framing "
+            "differed by region (FR = discipline benefit, EN = lag cost). We "
+            "should run 4–6 more interviews with US-only and APAC-only teams "
+            "before treating this as a primary finding."
+        ),
+    },
+    {
+        "theme_title": "Tool sprawl is the symptom, not the disease",
+        "status": "disputed",
+        "researcher_note": (
+            "I think this is real but it's downstream of the decision-capture "
+            "problem, not independent of it. People reach for new tools because "
+            "the old ones don't preserve decisions — fix that root cause and "
+            "tool sprawl resolves itself. Recommend we don't position this as "
+            "a separate finding in the next pitch."
+        ),
+    },
+]
+
+
+# Project memos
+DEMO_MEMOS = [
+    {
+        "type": "general",
+        "linked_key": None,
+        "content": (
+            "First pass through the data. Strong consensus around decision "
+            "capture and tool fragmentation. Need to look closer at the "
+            "language differences — French participants framed time-zone "
+            "constraints positively, English participants framed them as "
+            "pure cost. Worth probing in the next round."
+        ),
+    },
+    {
+        "type": "general",
+        "linked_key": None,
+        "content": (
+            "Next steps: schedule 4–6 follow-ups with US-only teams (we are "
+            "underweight on co-located US samples) and 2–3 with APAC. Aim to "
+            "either confirm or kill the time-zone hygiene theme before the "
+            "next product review."
+        ),
+    },
+    {
+        "type": "general",
+        "linked_key": None,
+        "content": (
+            "Quote from James (founder, US) about the gap between knowing and "
+            "doing in leadership is the most quotable line in the dataset. "
+            "Use it on the landing page if we get permission."
+        ),
+    },
+    {
+        "type": "theme_note",
+        "linked_key": "Decisions evaporate the moment a meeting ends",
+        "content": (
+            "Every single participant produced a verbatim version of this "
+            "story. The detail that varied was *who* tries to fix it — in "
+            "smaller teams it's the PM playing scribe, in larger teams it's "
+            "either nobody or the most junior person. Either way, decision "
+            "capture is performed as an unpaid second job rather than as a "
+            "tool feature. Big opportunity."
+        ),
+    },
+    {
+        "type": "theme_note",
+        "linked_key": "Leaders model culture or they don't have one",
+        "content": (
+            "James (Founder, US) was extraordinarily candid here — he openly "
+            "admitted he sends Slack messages at 10 PM despite knowing it "
+            "destroys his team's focus norms. Worth coming back to whether "
+            "the product can hold a mirror up to leaders without being "
+            "preachy. Risky but potentially very differentiating."
+        ),
+    },
+    {
+        "type": "tension_note",
+        "linked_key": "Stated values vs enacted behaviour",
+        "content": (
+            "This tension showed up in every interview but was named most "
+            "directly by the founder participant. Could be a wedge for a "
+            "leadership-coaching feature — but be careful, this is the kind "
+            "of thing that gets nodded at in interviews and never bought."
+        ),
+    },
+]
+
+
+# ── Seeder ──────────────────────────────────────────────────────────────────
+
+
 def seed_demo_project(db: Session, company_id: str) -> Project:
-    """Create and persist a complete demo project for a company. Returns the project."""
+    """Create and persist the full showcase demo project for `company_id`.
+
+    Returns the created Project. The seeder is fully self-contained — it does
+    not commit until everything is built, so a partial failure rolls back
+    cleanly. The caller is responsible for setting `Company.demo_seeded_at`
+    after success if it wants idempotency.
+    """
     now = datetime.now(timezone.utc)
 
     project = Project(
         company_id=company_id,
         name=DEMO_PROJECT_NAME,
         language="en",
-        interview_duration_minutes=15,
+        interview_duration_minutes=20,
         welcome_message=DEMO_WELCOME_MESSAGE,
         research_objective=DEMO_RESEARCH_OBJECTIVE,
-        research_context=(
-            "This is a demo project created automatically so you can explore "
-            "QualiPulse with real-looking data. Feel free to edit, archive, or "
-            "delete it whenever you want."
-        ),
-        created_at=now,
+        research_context=DEMO_RESEARCH_CONTEXT,
+        is_demo=True,
+        created_at=now - timedelta(days=14),
     )
     db.add(project)
-    db.flush()  # assign id
+    db.flush()
 
     # Guide questions
     sort_order = 0
@@ -291,71 +492,261 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             )
             sort_order += 1
 
-    # Interview link (so the Overview tab has something to copy)
-    link = InterviewLink(
+    # Screening question
+    db.add(
+        ScreeningQuestion(
+            project_id=project.id,
+            sort_order=0,
+            question=DEMO_SCREENING_QUESTION["question"],
+            options=json.dumps(DEMO_SCREENING_QUESTION["options"]),
+            disqualifying_options=json.dumps(DEMO_SCREENING_QUESTION["disqualifying_options"]),
+        )
+    )
+
+    # Two interview links — one active EU, one paused NA
+    link_eu = InterviewLink(
         project_id=project.id,
         token=secrets.token_urlsafe(32),
         is_active=True,
-        created_at=now,
+        created_at=now - timedelta(days=14),
     )
-    db.add(link)
+    link_na = InterviewLink(
+        project_id=project.id,
+        token=secrets.token_urlsafe(32),
+        is_active=False,
+        created_at=now - timedelta(days=10),
+    )
+    db.add_all([link_eu, link_na])
     db.flush()
 
-    # Build flat ordered question list for turn generation
-    flat_questions: list[str] = []
-    for section in DEMO_GUIDE:
-        for item in section["questions"]:
-            flat_questions.append(item["q"])
+    # Manual codes
+    code_by_name: dict[str, ManualCode] = {}
+    for idx, c in enumerate(DEMO_CODES):
+        code = ManualCode(
+            project_id=project.id,
+            name=c["name"],
+            color=c["color"],
+            sort_order=idx,
+        )
+        db.add(code)
+        code_by_name[c["name"]] = code
+    db.flush()
 
-    # Participants with completed turns
-    for p_idx, p_data in enumerate(DEMO_PARTICIPANTS):
-        started = now - timedelta(days=3 - p_idx, hours=p_idx * 2)
-        completed = started + timedelta(minutes=12 + p_idx)
+    # Helper to add a participant and their turns. Returns (participant, turns_by_index_dict).
+    flat_questions = _flat_main_questions()
 
+    def add_participant(
+        data: dict,
+        link: InterviewLink,
+        days_ago: float,
+        status: str = "completed",
+        edit_first_turn: bool = False,
+    ) -> tuple[Participant, list[InterviewTurn]]:
+        started = now - timedelta(days=days_ago)
+        completed_at = (
+            started + timedelta(minutes=18) if status == "completed" else None
+        )
         participant = Participant(
             link_id=link.id,
             project_id=project.id,
-            display_name=p_data["display_name"],
-            email=p_data["email"],
-            profession=p_data["profession"],
-            age_range=p_data["age_range"],
-            country=p_data["country"],
-            status="completed",
+            display_name=data["display_name"],
+            email=data["email"],
+            profession=data["profession"],
+            age_range=data["age_range"],
+            country=data["country"],
+            email_verified=True,
+            status=status,
             started_at=started,
-            completed_at=completed,
-            quality_score=0.85 + (p_idx * 0.03),
-            quality_label="high",
+            completed_at=completed_at,
+            quality_score=0.86 if status == "completed" else None,
+            quality_label="high" if status == "completed" else None,
         )
         db.add(participant)
         db.flush()
 
-        for turn_idx, (q_text, answer) in enumerate(zip(flat_questions, p_data["answers"])):
-            db.add(
-                InterviewTurn(
-                    participant_id=participant.id,
-                    turn_index=turn_idx,
-                    question_index=turn_idx,
-                    is_follow_up=False,
-                    follow_up_index=0,
-                    question_text=q_text,
-                    response_transcript=answer,
-                    audio_recording_url=None,
-                    tts_audio_url=None,
-                    created_at=started + timedelta(minutes=turn_idx * 2),
-                )
+        turns: list[InterviewTurn] = []
+        for t_idx, turn in enumerate(data["turns"]):
+            # If the turn references a 1-indexed question, we want a 0-indexed
+            # question_index for the DB. The fixture uses 1-based question_index.
+            q_idx_zero_based = max(0, int(turn.get("question_index", 1)) - 1)
+            interview_turn = InterviewTurn(
+                participant_id=participant.id,
+                turn_index=t_idx,
+                question_index=q_idx_zero_based,
+                is_follow_up=bool(turn.get("is_follow_up", False)),
+                follow_up_index=0,
+                question_text=turn["question_text"],
+                response_transcript=turn["response_transcript"],
+                manually_edited=(edit_first_turn and t_idx == 0),
+                edited_at=(now - timedelta(days=days_ago - 0.1)) if (edit_first_turn and t_idx == 0) else None,
+                created_at=started + timedelta(minutes=t_idx * 2),
             )
+            db.add(interview_turn)
+            turns.append(interview_turn)
+        db.flush()
+        return participant, turns
 
-    # Pre-built AI analysis (so the Analysis tab shows themes immediately)
-    analysis = ProjectAnalysis(
+    # FR participants
+    fr_participants: list[tuple[Participant, list[InterviewTurn]]] = []
+    for i, p_data in enumerate(PARTICIPANTS_FR):
+        # First participant gets the manually-edited flag on its first turn
+        result = add_participant(
+            p_data,
+            link_eu,
+            days_ago=12 - i * 1.5,
+            status="completed",
+            edit_first_turn=(i == 0),
+        )
+        fr_participants.append(result)
+
+    # EN participants
+    en_participants: list[tuple[Participant, list[InterviewTurn]]] = []
+    for i, p_data in enumerate(PARTICIPANTS_EN):
+        result = add_participant(
+            p_data,
+            link_eu,
+            days_ago=8 - i * 1.5,
+            status="completed",
+        )
+        en_participants.append(result)
+
+    # In-progress participant (no completion timestamp, partial turns)
+    marco = Participant(
+        link_id=link_eu.id,
+        project_id=project.id,
+        display_name="Marco P.",
+        email="marco.demo@example.com",
+        profession="Product Manager",
+        age_range="30-39",
+        country="Italy",
+        email_verified=True,
+        status="in_progress",
+        started_at=now - timedelta(hours=3),
+        completed_at=None,
+    )
+    db.add(marco)
+    db.flush()
+    db.add(
+        InterviewTurn(
+            participant_id=marco.id,
+            turn_index=0,
+            question_index=0,
+            is_follow_up=False,
+            follow_up_index=0,
+            question_text=flat_questions[0],
+            response_transcript=(
+                "Sure, so my day usually starts around 9. I check Slack, "
+                "I look at what the team in Berlin closed overnight, and "
+                "then I try to block the morning for writing specs. After "
+                "lunch it's mostly meetings — design reviews, one-on-ones, "
+                "stakeholder syncs."
+            ),
+            created_at=now - timedelta(hours=3),
+        )
+    )
+    db.add(
+        InterviewTurn(
+            participant_id=marco.id,
+            turn_index=1,
+            question_index=1,
+            is_follow_up=False,
+            follow_up_index=0,
+            question_text=flat_questions[1],
+            response_transcript=(
+                "Slack, Linear, Notion, Figma, Google Calendar, and email. "
+                "Six tools. None of them really know about each other."
+            ),
+            created_at=now - timedelta(hours=3) + timedelta(minutes=4),
+        )
+    )
+
+    # Quote tags — compute offsets via .find() against the actual transcript text
+    for notable_idx, lang, code_name in DEMO_TAG_PLAN:
+        if lang == "fr":
+            quote = NOTABLE_QUOTES_FR[notable_idx]
+            participant, turns = fr_participants[quote["participant_index"]]
+        else:
+            quote = NOTABLE_QUOTES_EN[notable_idx]
+            participant, turns = en_participants[quote["participant_index"]]
+        turn = turns[quote["turn_index"]]
+        text = quote["text"]
+        if not turn.response_transcript:
+            continue
+        start = turn.response_transcript.find(text)
+        if start < 0:
+            # Should never happen — fixtures are validated — but skip silently
+            # rather than blow up the entire onboarding flow.
+            continue
+        end = start + len(text)
+        db.add(
+            QuoteTag(
+                turn_id=turn.id,
+                manual_code_id=code_by_name[code_name].id,
+                selected_text=text,
+                start_index=start,
+                end_index=end,
+                created_by="demo",
+            )
+        )
+
+    # Analysis v1 — ai_discovery
+    v1 = ProjectAnalysis(
         project_id=project.id,
         version=1,
-        status="ready",
         version_label="ai_discovery",
-        participant_count=len(DEMO_PARTICIPANTS),
-        report=json.dumps(DEMO_ANALYSIS_REPORT),
-        generated_at=now,
+        status="ready",
+        participant_count=6,
+        report=json.dumps(_v1_report()),
+        share_token=secrets.token_urlsafe(32),
+        generated_at=now - timedelta(days=4),
+        created_at=now - timedelta(days=4),
     )
-    db.add(analysis)
+    db.add(v1)
+    db.flush()
+
+    # Analysis v2 — researcher_refined, parented to v1
+    v2 = ProjectAnalysis(
+        project_id=project.id,
+        version=2,
+        version_label="researcher_refined",
+        status="ready",
+        participant_count=6,
+        report=json.dumps(_v2_report()),
+        parent_version_id=v1.id,
+        researcher_context=(
+            "Reviewed v1 with the product team. Decision capture is the wedge. "
+            "Time-zone hygiene needs more evidence. Tool sprawl should be folded "
+            "into the decision-capture narrative rather than positioned as a "
+            "separate finding."
+        ),
+        generated_at=now - timedelta(days=2),
+        created_at=now - timedelta(days=2),
+    )
+    db.add(v2)
+    db.flush()
+
+    # Annotations on v2
+    for ann in DEMO_ANNOTATIONS:
+        db.add(
+            AnalysisThemeAnnotation(
+                analysis_id=v2.id,
+                theme_title=ann["theme_title"],
+                status=ann["status"],
+                researcher_note=ann["researcher_note"],
+            )
+        )
+
+    # Memos
+    for memo in DEMO_MEMOS:
+        db.add(
+            ProjectMemo(
+                project_id=project.id,
+                type=memo["type"],
+                linked_key=memo["linked_key"],
+                content=memo["content"],
+                created_by="demo",
+            )
+        )
 
     db.commit()
     db.refresh(project)

@@ -42,6 +42,11 @@ class Project(Base):
     research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     panel_collection_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # True when this project was auto-seeded by the onboarding flow as a
+    # showcase/example. Demo projects are excluded from the tier project
+    # count so they never block a user from creating their real first
+    # project, and the UI can render them with a "Demo" badge.
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

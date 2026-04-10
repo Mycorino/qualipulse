@@ -28,6 +28,7 @@ from app.services.auth import (
     hash_password,
     verify_password,
 )
+from app.services.demo_seeder import seed_demo_project
 from app.services.email import (
     send_newsletter_welcome,
     send_password_reset,
@@ -437,6 +438,21 @@ def complete_onboarding(
             company.preferred_language = normalized
     company.onboarding_completed = True
     db.commit()
+
+    # Seed the showcase demo project the first time onboarding completes for
+    # this account. Idempotent: subsequent calls (e.g. user re-opens the
+    # welcome flow after clearing localStorage) skip seeding because
+    # demo_seeded_at is non-null. We swallow seeder errors so a fixture bug
+    # never blocks a real user from finishing onboarding.
+    if company.demo_seeded_at is None:
+        try:
+            seed_demo_project(db, company.id)
+            company.demo_seeded_at = datetime.utcnow()
+            db.commit()
+        except Exception:  # pragma: no cover - defensive
+            db.rollback()
+            logger.exception("Failed to seed demo project for %s", company.email)
+
     logger.info("Onboarding completed for %s", company.email)
     return CompanyResponse.model_validate(company)
 
