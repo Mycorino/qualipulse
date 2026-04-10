@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ClipboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -45,6 +45,17 @@ export default function Welcome() {
   const [businessSummary, setBusinessSummary] = useState("");
   const [industry, setIndustry] = useState("");
   const [primaryRegion, setPrimaryRegion] = useState("");
+  // URL we successfully analysed (so we can show a "regenerate" button if
+  // the user changes the URL after a successful analysis).
+  const [analysedUrl, setAnalysedUrl] = useState("");
+  // Extra industry chips Claude classified into that weren't in the static
+  // list — rendered alongside the predefined chips.
+  const [customIndustries, setCustomIndustries] = useState<string[]>([]);
+  // User can tap "no website, describe manually" to force the textarea open
+  // without going through the analyser.
+  const [manualMode, setManualMode] = useState(false);
+  // Debounce auto-analyse so we don't fire on every keystroke.
+  const analyseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Step 5 — Goals
   const [goalsFreeform, setGoalsFreeform] = useState("");
@@ -175,12 +186,45 @@ export default function Welcome() {
 
   // Step 3 — Analyse website with AI
   async function handleAnalyseWebsite() {
-    if (!websiteUrl.trim()) return;
+    const trimmed = websiteUrl.trim();
+    if (!trimmed) return;
+    // Cancel any pending debounced call so we don't double-fire.
+    if (analyseTimeoutRef.current) {
+      clearTimeout(analyseTimeoutRef.current);
+      analyseTimeoutRef.current = null;
+    }
     setWebsiteLoading(true);
     setError("");
     try {
-      const { business_summary } = await analyseWebsite(websiteUrl.trim());
+      const { business_summary, industry: detectedIndustry } =
+        await analyseWebsite(trimmed);
       setBusinessSummary(business_summary);
+      setAnalysedUrl(trimmed);
+      setManualMode(false);
+
+      // Auto-select the industry chip. If Claude returned a label that
+      // isn't in the predefined list, add it as a custom chip so the user
+      // sees it preselected and can still change it.
+      if (detectedIndustry) {
+        const known = INDUSTRY_VALUES.some(
+          (v) => v.toLowerCase() === detectedIndustry.toLowerCase(),
+        );
+        if (known) {
+          // Use the canonical casing from INDUSTRY_VALUES
+          const canonical =
+            INDUSTRY_VALUES.find(
+              (v) => v.toLowerCase() === detectedIndustry.toLowerCase(),
+            ) ?? detectedIndustry;
+          setIndustry(canonical);
+        } else {
+          setCustomIndustries((prev) =>
+            prev.some((v) => v.toLowerCase() === detectedIndustry.toLowerCase())
+              ? prev
+              : [...prev, detectedIndustry],
+          );
+          setIndustry(detectedIndustry);
+        }
+      }
     } catch (err: unknown) {
       // The backend returns { detail: { code, message } } for scraper
       // failures — translate the code rather than surfacing the English
@@ -195,10 +239,53 @@ export default function Welcome() {
       } else {
         setError(getErrorMessage(err, t("onboarding.failedWebsite")));
       }
+      // On failure, open the manual textarea so the user has a clear next
+      // step (type it themselves) instead of being stuck on the URL input.
+      setManualMode(true);
     } finally {
       setWebsiteLoading(false);
     }
   }
+
+  // Auto-analyse when the user pastes a URL (or types one and tabs out).
+  // Debounced so rapid keystrokes don't flood the API; a fresh paste that
+  // clearly looks like a URL fires after ~800ms of quiet.
+  function scheduleAutoAnalyse(url: string) {
+    if (analyseTimeoutRef.current) {
+      clearTimeout(analyseTimeoutRef.current);
+      analyseTimeoutRef.current = null;
+    }
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    // Only auto-fire when the string actually looks like a URL/domain.
+    const looksLikeUrl = /^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/.*)?$/i.test(trimmed);
+    if (!looksLikeUrl) return;
+    // Don't re-analyse an already-analysed URL.
+    if (trimmed === analysedUrl.trim()) return;
+    analyseTimeoutRef.current = setTimeout(() => {
+      handleAnalyseWebsite();
+    }, 800);
+  }
+
+  function handleWebsitePaste(e: ClipboardEvent<HTMLInputElement>) {
+    const pasted = e.clipboardData.getData("text").trim();
+    if (!pasted) return;
+    // Fire quickly after paste — no need to wait for the full debounce.
+    setTimeout(() => {
+      if (analyseTimeoutRef.current) {
+        clearTimeout(analyseTimeoutRef.current);
+        analyseTimeoutRef.current = null;
+      }
+      handleAnalyseWebsite();
+    }, 50);
+  }
+
+  // Clean up the debounce timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (analyseTimeoutRef.current) clearTimeout(analyseTimeoutRef.current);
+    };
+  }, []);
 
   // Step 3 → 4
   async function handleBusinessContinue() {
@@ -401,7 +488,26 @@ export default function Welcome() {
                     type="text"
                     className="field-input"
                     value={websiteUrl}
-                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    onChange={(e) => {
+                      setWebsiteUrl(e.target.value);
+                      scheduleAutoAnalyse(e.target.value);
+                    }}
+                    onPaste={handleWebsitePaste}
+                    onBlur={() => {
+                      // Fire immediately on blur if we haven't analysed yet.
+                      const trimmed = websiteUrl.trim();
+                      if (
+                        trimmed &&
+                        trimmed !== analysedUrl.trim() &&
+                        !websiteLoading
+                      ) {
+                        if (analyseTimeoutRef.current) {
+                          clearTimeout(analyseTimeoutRef.current);
+                          analyseTimeoutRef.current = null;
+                        }
+                        handleAnalyseWebsite();
+                      }
+                    }}
                     placeholder={t("onboarding.websitePlaceholder")}
                     style={{ flex: 1 }}
                     onKeyDown={(e) => { if (e.key === "Enter") handleAnalyseWebsite(); }}
@@ -418,60 +524,120 @@ export default function Welcome() {
                         <span className="spinner" style={{ width: 14, height: 14, border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.6s linear infinite" }} />
                         {t("onboarding.websiteAnalysing")}
                       </span>
-                    ) : t("onboarding.websiteAnalyse")}
+                    ) : (
+                      websiteUrl.trim() &&
+                      websiteUrl.trim() !== analysedUrl.trim() &&
+                      analysedUrl
+                        ? t("onboarding.websiteRegenerate")
+                        : t("onboarding.websiteAnalyseFriendly")
+                    )}
                   </button>
                 </div>
+                {/* "No website? Describe manually" escape hatch */}
+                {!businessSummary && !manualMode && !websiteLoading && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setManualMode(true)}
+                    style={{
+                      marginTop: 8,
+                      fontSize: 13,
+                      color: "var(--text-muted)",
+                      padding: "4px 0",
+                      textAlign: "left",
+                      textDecoration: "underline",
+                    }}
+                    disabled={saving}
+                  >
+                    {t("onboarding.websiteDescribeManually")}
+                  </button>
+                )}
               </div>
 
-              <div className="onboarding-field">
-                <label className="field-label">
-                  {t("onboarding.businessSummaryLabel")}{" "}
-                  <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
-                    {t("onboarding.websiteOptional")}
-                  </span>
-                </label>
-                <textarea
-                  className="field-input"
-                  value={businessSummary}
-                  onChange={(e) => setBusinessSummary(e.target.value)}
-                  rows={4}
-                  placeholder={t("onboarding.businessSummaryPlaceholder")}
-                  style={{ resize: "vertical", lineHeight: 1.6 }}
-                  disabled={saving}
-                />
-              </div>
-
-              <div className="onboarding-field">
-                <label className="field-label">{t("onboarding.industryLabel")}</label>
-                <div className="onboarding-chip-grid">
-                  {INDUSTRY_VALUES.map((value, idx) => (
-                    <button
-                      key={value}
-                      className={`onboarding-chip ${industry === value ? "selected" : ""}`}
-                      onClick={() => setIndustry(value)}
-                      disabled={saving}
+              {/* Textarea only appears once we have a summary, an error,
+                  or the user has opted into manual mode. */}
+              {(businessSummary || manualMode) && (
+                <div className="onboarding-field">
+                  <label className="field-label">
+                    {t("onboarding.businessSummaryLabel")}{" "}
+                    <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
+                      {t("onboarding.websiteOptional")}
+                    </span>
+                  </label>
+                  {businessSummary && analysedUrl && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--success, #16a34a)",
+                        marginBottom: 6,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
                     >
-                      {industryLabels[idx] ?? value}
-                    </button>
-                  ))}
+                      <span>✨</span>
+                      <span>{t("onboarding.websiteAutoFilled")}</span>
+                    </div>
+                  )}
+                  <textarea
+                    className="field-input"
+                    value={businessSummary}
+                    onChange={(e) => setBusinessSummary(e.target.value)}
+                    rows={4}
+                    placeholder={t("onboarding.businessSummaryPlaceholder")}
+                    style={{ resize: "vertical", lineHeight: 1.6 }}
+                    disabled={saving}
+                  />
                 </div>
-              </div>
+              )}
 
-              <div className="onboarding-field">
-                <label className="field-label">{t("onboarding.primaryMarketLabel")}</label>
-                <div className="onboarding-chip-grid">
-                  {REGION_VALUES.map((r, idx) => (
-                    <button
-                      key={r.value}
-                      className={`onboarding-chip ${primaryRegion === r.value ? "selected" : ""}`}
-                      onClick={() => setPrimaryRegion(r.value)}
-                      disabled={saving}
-                    >
-                      {regionLabels[idx] ?? r.value}
-                    </button>
-                  ))}
+              {/* Industry chips — hidden until we have a summary OR the user
+                  is in manual mode. */}
+              {(businessSummary || manualMode) && (
+                <div className="onboarding-field">
+                  <label className="field-label">{t("onboarding.industryLabel")}</label>
+                  <div className="onboarding-chip-grid">
+                    {INDUSTRY_VALUES.map((value, idx) => (
+                      <button
+                        key={value}
+                        className={`onboarding-chip ${industry === value ? "selected" : ""}`}
+                        onClick={() => setIndustry(value)}
+                        disabled={saving}
+                      >
+                        {industryLabels[idx] ?? value}
+                      </button>
+                    ))}
+                    {customIndustries.map((value) => (
+                      <button
+                        key={`custom-${value}`}
+                        className={`onboarding-chip ${industry === value ? "selected" : ""}`}
+                        onClick={() => setIndustry(value)}
+                        disabled={saving}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {(businessSummary || manualMode) && (
+                <div className="onboarding-field">
+                  <label className="field-label">{t("onboarding.primaryMarketLabel")}</label>
+                  <div className="onboarding-chip-grid">
+                    {REGION_VALUES.map((r, idx) => (
+                      <button
+                        key={r.value}
+                        className={`onboarding-chip ${primaryRegion === r.value ? "selected" : ""}`}
+                        onClick={() => setPrimaryRegion(r.value)}
+                        disabled={saving}
+                      >
+                        {regionLabels[idx] ?? r.value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="welcome-actions" style={{ marginTop: 28 }}>

@@ -104,8 +104,13 @@ export async function completeOnboarding(profile: OnboardingProfile): Promise<Co
   return data;
 }
 
-export async function analyseWebsite(websiteUrl: string): Promise<{ business_summary: string }> {
-  const { data } = await client.post<{ business_summary: string }>("/auth/website-intel", {
+export interface AnalyseWebsiteResponse {
+  business_summary: string;
+  industry?: string | null;
+}
+
+export async function analyseWebsite(websiteUrl: string): Promise<AnalyseWebsiteResponse> {
+  const { data } = await client.post<AnalyseWebsiteResponse>("/auth/website-intel", {
     website_url: websiteUrl,
   });
   return data;
