@@ -54,6 +54,10 @@ export default function Welcome() {
   // User can tap "no website, describe manually" to force the textarea open
   // without going through the analyser.
   const [manualMode, setManualMode] = useState(false);
+  // After an AI-generated summary arrives, the user must explicitly
+  // confirm it before the Continue button unlocks. In manual mode this
+  // is implicitly true because the user typed it themselves.
+  const [summaryConfirmed, setSummaryConfirmed] = useState(false);
   // Debounce auto-analyse so we don't fire on every keystroke.
   const analyseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -195,6 +199,9 @@ export default function Welcome() {
     }
     setWebsiteLoading(true);
     setError("");
+    // Fresh result — require the user to explicitly confirm before
+    // the Continue button unlocks.
+    setSummaryConfirmed(false);
     try {
       const { business_summary, industry: detectedIndustry } =
         await analyseWebsite(trimmed);
@@ -245,26 +252,6 @@ export default function Welcome() {
     } finally {
       setWebsiteLoading(false);
     }
-  }
-
-  // Auto-analyse when the user pastes a URL (or types one and tabs out).
-  // Debounced so rapid keystrokes don't flood the API; a fresh paste that
-  // clearly looks like a URL fires after ~800ms of quiet.
-  function scheduleAutoAnalyse(url: string) {
-    if (analyseTimeoutRef.current) {
-      clearTimeout(analyseTimeoutRef.current);
-      analyseTimeoutRef.current = null;
-    }
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    // Only auto-fire when the string actually looks like a URL/domain.
-    const looksLikeUrl = /^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/.*)?$/i.test(trimmed);
-    if (!looksLikeUrl) return;
-    // Don't re-analyse an already-analysed URL.
-    if (trimmed === analysedUrl.trim()) return;
-    analyseTimeoutRef.current = setTimeout(() => {
-      handleAnalyseWebsite();
-    }, 800);
   }
 
   function handleWebsitePaste(e: ClipboardEvent<HTMLInputElement>) {
@@ -490,27 +477,20 @@ export default function Welcome() {
                     value={websiteUrl}
                     onChange={(e) => {
                       setWebsiteUrl(e.target.value);
-                      scheduleAutoAnalyse(e.target.value);
+                      // Typing doesn't auto-analyse — the user must press
+                      // Enter or click the button. Paste still auto-fires
+                      // (handleWebsitePaste) since pasting is an explicit
+                      // "use this URL" intent.
                     }}
                     onPaste={handleWebsitePaste}
-                    onBlur={() => {
-                      // Fire immediately on blur if we haven't analysed yet.
-                      const trimmed = websiteUrl.trim();
-                      if (
-                        trimmed &&
-                        trimmed !== analysedUrl.trim() &&
-                        !websiteLoading
-                      ) {
-                        if (analyseTimeoutRef.current) {
-                          clearTimeout(analyseTimeoutRef.current);
-                          analyseTimeoutRef.current = null;
-                        }
+                    placeholder={t("onboarding.websitePlaceholder")}
+                    style={{ flex: 1 }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
                         handleAnalyseWebsite();
                       }
                     }}
-                    placeholder={t("onboarding.websitePlaceholder")}
-                    style={{ flex: 1 }}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleAnalyseWebsite(); }}
                     disabled={saving}
                   />
                   <button
@@ -564,7 +544,28 @@ export default function Welcome() {
                       {t("onboarding.websiteOptional")}
                     </span>
                   </label>
-                  {businessSummary && analysedUrl && (
+                  {businessSummary && analysedUrl && !summaryConfirmed && (
+                    <div
+                      style={{
+                        background: "var(--primary-subtle, #eef2ff)",
+                        border: "1px solid var(--primary-border, #c7d2fe)",
+                        borderRadius: "var(--radius)",
+                        padding: "10px 12px",
+                        marginBottom: 8,
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 8,
+                        fontSize: 13,
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      <span style={{ fontSize: 16 }}>✨</span>
+                      <span style={{ flex: 1 }}>
+                        {t("onboarding.websiteReviewPrompt")}
+                      </span>
+                    </div>
+                  )}
+                  {businessSummary && summaryConfirmed && (
                     <div
                       style={{
                         fontSize: 12,
@@ -575,19 +576,47 @@ export default function Welcome() {
                         gap: 6,
                       }}
                     >
-                      <span>✨</span>
-                      <span>{t("onboarding.websiteAutoFilled")}</span>
+                      <span>✓</span>
+                      <span>{t("onboarding.websiteConfirmed")}</span>
                     </div>
                   )}
                   <textarea
                     className="field-input"
                     value={businessSummary}
-                    onChange={(e) => setBusinessSummary(e.target.value)}
+                    onChange={(e) => {
+                      setBusinessSummary(e.target.value);
+                      // Editing the summary counts as reviewing it.
+                      if (!summaryConfirmed) setSummaryConfirmed(true);
+                    }}
                     rows={4}
                     placeholder={t("onboarding.businessSummaryPlaceholder")}
                     style={{ resize: "vertical", lineHeight: 1.6 }}
                     disabled={saving}
                   />
+                  {/* Explicit confirm button appears once we have an
+                      AI-generated summary that the user hasn't touched. */}
+                  {businessSummary && analysedUrl && !summaryConfirmed && !manualMode && (
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => setSummaryConfirmed(true)}
+                        disabled={saving}
+                        style={{ fontSize: 13 }}
+                      >
+                        ✓ {t("onboarding.websiteLooksRight")}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={handleAnalyseWebsite}
+                        disabled={saving || websiteLoading}
+                        style={{ fontSize: 13 }}
+                      >
+                        ↻ {t("onboarding.websiteTryAgain")}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -641,13 +670,38 @@ export default function Welcome() {
             </div>
 
             <div className="welcome-actions" style={{ marginTop: 28 }}>
-              <button
-                className="btn btn-primary btn-lg"
-                onClick={handleBusinessContinue}
-                disabled={saving}
-              >
-                {saving ? t("onboarding.saving") : t("onboarding.continue")}
-              </button>
+              {(() => {
+                // Continue is locked until either:
+                //   (a) the user confirmed an AI-generated summary, OR
+                //   (b) the user is in manual mode (they typed it themselves), OR
+                //   (c) there's no summary at all (website is optional — skip)
+                const hasAi = !!(businessSummary && analysedUrl);
+                const continueLocked = hasAi && !summaryConfirmed && !manualMode;
+                return (
+                  <>
+                    <button
+                      className="btn btn-primary btn-lg"
+                      onClick={handleBusinessContinue}
+                      disabled={saving || continueLocked}
+                      title={continueLocked ? t("onboarding.websiteReviewPrompt") : undefined}
+                    >
+                      {saving ? t("onboarding.saving") : t("onboarding.continue")}
+                    </button>
+                    {continueLocked && (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-muted)",
+                          textAlign: "center",
+                          marginTop: -4,
+                        }}
+                      >
+                        {t("onboarding.websiteReviewHint")}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <button className="btn btn-ghost" onClick={() => setStep(2)} disabled={saving}>
                 ← {t("onboarding.stepProfile")}
               </button>
