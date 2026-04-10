@@ -42,12 +42,18 @@ export default function Welcome() {
   // Step 3 — Business
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [websiteLoading, setWebsiteLoading] = useState(false);
+  // Index of the cycling progress message shown while websiteLoading is true
+  // ("Reading your site…" → "Understanding your business…" → …).
+  const [websiteProgressStep, setWebsiteProgressStep] = useState(0);
   const [businessSummary, setBusinessSummary] = useState("");
   const [industry, setIndustry] = useState("");
   const [primaryRegion, setPrimaryRegion] = useState("");
   // URL we successfully analysed (so we can show a "regenerate" button if
   // the user changes the URL after a successful analysis).
   const [analysedUrl, setAnalysedUrl] = useState("");
+  // URL we last *attempted* to analyse — including failures. Used to skip
+  // the auto-trigger debounce when the user re-types the same broken URL.
+  const lastAttemptedUrlRef = useRef<string>("");
   // Extra industry chips Claude classified into that weren't in the static
   // list — rendered alongside the predefined chips.
   const [customIndustries, setCustomIndustries] = useState<string[]>([]);
@@ -197,7 +203,9 @@ export default function Welcome() {
       clearTimeout(analyseTimeoutRef.current);
       analyseTimeoutRef.current = null;
     }
+    lastAttemptedUrlRef.current = trimmed;
     setWebsiteLoading(true);
+    setWebsiteProgressStep(0);
     setError("");
     // Fresh result — require the user to explicitly confirm before
     // the Continue button unlocks.
@@ -273,6 +281,50 @@ export default function Welcome() {
       if (analyseTimeoutRef.current) clearTimeout(analyseTimeoutRef.current);
     };
   }, []);
+
+  // Auto-trigger the website analyser ~900ms after the user stops typing,
+  // as long as the URL looks plausibly complete (has a dot, ≥4 chars after
+  // any scheme). Skips:
+  //   - manualMode (user opted out of AI)
+  //   - URLs we've already attempted (success or failure) — they re-fire
+  //     only via the explicit "Regenerate" button or pressing Enter
+  //   - the loading state (don't queue a second call while one's in flight)
+  useEffect(() => {
+    if (manualMode) return;
+    if (websiteLoading) return;
+    const trimmed = websiteUrl.trim();
+    if (!trimmed) return;
+    if (trimmed === lastAttemptedUrlRef.current) return;
+
+    // Crude "looks like a URL" gate. We accept anything with a dot and a
+    // TLD-ish suffix, optionally prefixed with a scheme. The backend
+    // normaliser handles missing https://.
+    const looksLikeUrl = /^(https?:\/\/)?[^\s.]+\.[a-z]{2,}/i.test(trimmed);
+    if (!looksLikeUrl) return;
+
+    if (analyseTimeoutRef.current) clearTimeout(analyseTimeoutRef.current);
+    analyseTimeoutRef.current = setTimeout(() => {
+      handleAnalyseWebsite();
+    }, 900);
+
+    return () => {
+      if (analyseTimeoutRef.current) clearTimeout(analyseTimeoutRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [websiteUrl, manualMode, websiteLoading]);
+
+  // While the analyser is running, cycle through 4 progress messages
+  // ("Reading your site…" → "Understanding your business…" → …) every
+  // 1.5s so the user has something concrete to look at instead of a
+  // bare spinner. Resets to step 0 each time loading flips on.
+  useEffect(() => {
+    if (!websiteLoading) return;
+    setWebsiteProgressStep(0);
+    const id = setInterval(() => {
+      setWebsiteProgressStep((s) => (s + 1) % 4);
+    }, 1500);
+    return () => clearInterval(id);
+  }, [websiteLoading]);
 
   // Step 3 → 4
   async function handleBusinessContinue() {
@@ -513,6 +565,48 @@ export default function Welcome() {
                     )}
                   </button>
                 </div>
+                {/* Claude-style cycling progress panel — shown only while
+                    the analyser is running. Replaces the bare spinner with
+                    a sequence of concrete status messages so the user has
+                    something tangible to look at during the ~3-5s round
+                    trip. */}
+                {websiteLoading && (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    style={{
+                      marginTop: 12,
+                      padding: "12px 14px",
+                      borderRadius: "var(--radius)",
+                      background: "var(--primary-subtle, #eef2ff)",
+                      border: "1px solid var(--primary-border, #c7d2fe)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      fontSize: 14,
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    <span
+                      className="spinner"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        border: "2px solid var(--primary)",
+                        borderTopColor: "transparent",
+                        borderRadius: "50%",
+                        display: "inline-block",
+                        animation: "spin 0.6s linear infinite",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ flex: 1 }}>
+                      {t(`onboarding.websiteProgress.${websiteProgressStep}`, {
+                        defaultValue: t("onboarding.websiteAnalysing"),
+                      })}
+                    </span>
+                  </div>
+                )}
                 {/* "No website? Describe manually" escape hatch */}
                 {!businessSummary && !manualMode && !websiteLoading && (
                   <button
@@ -675,19 +769,28 @@ export default function Welcome() {
                 //   (a) the user confirmed an AI-generated summary, OR
                 //   (b) the user is in manual mode (they typed it themselves), OR
                 //   (c) there's no summary at all (website is optional — skip)
+                // Also locked while the analyser is in flight so the user
+                // can't click past a half-loaded summary.
                 const hasAi = !!(businessSummary && analysedUrl);
-                const continueLocked = hasAi && !summaryConfirmed && !manualMode;
+                const reviewLocked = hasAi && !summaryConfirmed && !manualMode;
+                const continueLocked = reviewLocked || websiteLoading;
                 return (
                   <>
                     <button
                       className="btn btn-primary btn-lg"
                       onClick={handleBusinessContinue}
                       disabled={saving || continueLocked}
-                      title={continueLocked ? t("onboarding.websiteReviewPrompt") : undefined}
+                      title={
+                        websiteLoading
+                          ? t("onboarding.websiteAnalysing")
+                          : reviewLocked
+                            ? t("onboarding.websiteReviewPrompt")
+                            : undefined
+                      }
                     >
                       {saving ? t("onboarding.saving") : t("onboarding.continue")}
                     </button>
-                    {continueLocked && (
+                    {reviewLocked && !websiteLoading && (
                       <div
                         style={{
                           fontSize: 12,
