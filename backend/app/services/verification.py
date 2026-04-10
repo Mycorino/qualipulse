@@ -15,8 +15,18 @@ def generate_magic_token(
     email: str,
     interview_link_token: str,
     expiry_minutes: int = 30,
-) -> str:
-    """Generate a magic link token, store it, and send the verification email."""
+    lang: str = "en",
+) -> tuple[str, bool]:
+    """Generate a magic link token, store it, and send the verification email.
+
+    Returns
+    -------
+    (token, delivered)
+        ``token`` is the freshly-minted magic token (already stored in the
+        DB). ``delivered`` is ``True`` if SendGrid accepted the email,
+        ``False`` if the send failed. The token is always persisted so the
+        caller can retry or surface it to the user.
+    """
     # Use base58-safe alphabet (no ambiguous chars)
     alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
     token = "".join(secrets.choice(alphabet) for _ in range(48))
@@ -35,9 +45,14 @@ def generate_magic_token(
     magic_url = f"{settings.APP_BASE_URL}/interview/verify/{token}"
 
     from app.services.email import send_interview_magic_link
-    send_interview_magic_link(email=email, magic_url=magic_url, expiry_minutes=expiry_minutes)
+    delivered = send_interview_magic_link(
+        email=email,
+        magic_url=magic_url,
+        expiry_minutes=expiry_minutes,
+        lang=lang,
+    )
 
-    return token
+    return token, delivered
 
 
 def verify_magic_token(db: Session, token: str) -> ParticipantMagicToken | None:

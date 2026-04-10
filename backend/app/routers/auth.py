@@ -70,12 +70,20 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
         tier = "starter"
         trial_ends = datetime.utcnow() + timedelta(days=14)
 
+    # Honour the UI locale from the landing page (falls back to "fr" for
+    # historical reasons — the model default). Anything other than en/fr
+    # normalises to "en" inside the email service.
+    signup_lang = (body.preferred_language or "").lower().strip()
+    if signup_lang not in ("en", "fr"):
+        signup_lang = "fr"
+
     company = Company(
         name=body.name.strip(),
         email=body.email.lower().strip(),
         password_hash=hash_password(body.password),
         subscription_tier=tier,
         trial_ends_at=trial_ends,
+        preferred_language=signup_lang,
     )
     db.add(company)
     db.commit()
@@ -111,12 +119,12 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     db.add(verification_token)
     db.commit()
 
-    # Send verification email
+    # Send verification email + welcome in the user's language
     verify_url = f"{settings.APP_BASE_URL}/verify-email?token={verification_token.token}"
-    send_verification_email(company.email, company.name, verify_url)
-
-    # Also send welcome
-    send_welcome(company.email, company.name)
+    send_verification_email(
+        company.email, company.name, verify_url, lang=company.preferred_language
+    )
+    send_welcome(company.email, company.name, lang=company.preferred_language)
 
     return TokenResponse(
         access_token=create_access_token({"sub": company.id}),
@@ -210,7 +218,9 @@ def resend_verification(
     db.commit()
 
     verify_url = f"{settings.APP_BASE_URL}/verify-email?token={verification_token.token}"
-    send_verification_email(company.email, company.name, verify_url)
+    send_verification_email(
+        company.email, company.name, verify_url, lang=company.preferred_language
+    )
 
     logger.info("Verification email resent to %s", company.email)
     return {"message": "Verification email sent"}
@@ -236,7 +246,7 @@ def request_password_reset(request: Request, body: PasswordResetRequest, db: Ses
         db.add(token)
         db.commit()
         reset_url = f"{settings.APP_BASE_URL}/reset-password?token={token.token}"
-        send_password_reset(company.email, reset_url)
+        send_password_reset(company.email, reset_url, lang=company.preferred_language)
         logger.info("Password reset requested for %s", company.email)
     return {"message": "If that email exists, a reset link has been sent."}
 
@@ -498,6 +508,10 @@ class NewsletterSubscribe(BaseModel):
 @limiter.limit("5/minute")
 def subscribe_newsletter(request: Request, body: NewsletterSubscribe):
     """Subscribe to newsletter â just sends a welcome email for now."""
-    send_newsletter_welcome(body.email.lower().strip())
-    logger.info("Newsletter subscription: %s", body.email)
+    # Pick language from Accept-Language (the newsletter form is anonymous,
+    # so we have no user record to read preferred_language from).
+    accept_lang = (request.headers.get("accept-language") or "").lower()
+    lang = "fr" if accept_lang.startswith("fr") else "en"
+    send_newsletter_welcome(body.email.lower().strip(), lang=lang)
+    logger.info("Newsletter subscription: %s (lang=%s)", body.email, lang)
     return {"message": "Subscribed successfully"}

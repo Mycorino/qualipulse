@@ -302,6 +302,7 @@ def invite_member(
             inviter_name=company.name,
             role=role,
             accept_url=accept_url,
+            lang=getattr(company, "preferred_language", None) or "en",
         )
     except Exception as exc:
         logger.warning("Failed to send team invite email to %s: %s", email, exc)

@@ -80,7 +80,12 @@ def trigger_analysis(
                 proj = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
                 if proj and proj.company:
                     project_url = f"{settings.APP_BASE_URL}/projects/{project_id}?tab=analysis"
-                    send_analysis_ready(proj.company.email, proj.name, project_url)
+                    send_analysis_ready(
+                        proj.company.email,
+                        proj.name,
+                        project_url,
+                        lang=getattr(proj.company, "preferred_language", None) or "en",
+                    )
 
                     # Slack webhook (fire-and-forget, never raises)
                     if getattr(proj.company, "slack_webhook_url", None):

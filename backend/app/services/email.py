@@ -1,29 +1,220 @@
 """
 Email service — console logger in development, SendGrid in production.
+
+Language support
+----------------
+Every template helper takes an optional ``lang`` argument (``"en"`` or
+``"fr"``). The correct copy is picked from :data:`_COPY`. Call sites should
+pass ``company.preferred_language`` (or the relevant project language for
+participant-facing emails). Unknown languages fall back to English.
+
 To enable SendGrid: set SENDGRID_API_KEY in .env
 """
 import logging
+from typing import Optional
 
 from app.config import settings
 
 logger = logging.getLogger("auto_interview.email")
 
 
-def _send_console(to: str, subject: str, body_html: str) -> None:
-    """Development fallback — prints email to console."""
+# ── Language utilities ─────────────────────────────────────────────────────
+
+_SUPPORTED_LANGS = ("en", "fr")
+
+
+def _normalise_lang(lang: Optional[str]) -> str:
+    """Return a supported language code. Unknown inputs fall back to 'en'."""
+    if not lang:
+        return "en"
+    code = lang.lower().split("-")[0].strip()
+    return code if code in _SUPPORTED_LANGS else "en"
+
+
+# All translated copy lives here so we can see both languages side-by-side.
+# Keys correspond 1:1 to the template helpers below.
+_COPY: dict[str, dict[str, dict[str, str]]] = {
+    "welcome": {
+        "en": {
+            "subject": "Welcome to QualiPulse",
+            "heading": "Welcome, {name}!",
+            "body": "Your QualiPulse account is ready. Start by creating your first research project.",
+            "cta": "Create your first project",
+            "foot": "Need help getting started? Just reply to this email.",
+        },
+        "fr": {
+            "subject": "Bienvenue sur QualiPulse",
+            "heading": "Bienvenue, {name} !",
+            "body": "Votre compte QualiPulse est prêt. Commencez par créer votre premier projet de recherche.",
+            "cta": "Créer votre premier projet",
+            "foot": "Besoin d'aide pour démarrer ? Répondez simplement à cet email.",
+        },
+    },
+    "verification": {
+        "en": {
+            "subject": "Verify your QualiPulse email",
+            "heading": "Verify your email",
+            "body": "Hi {name}, please confirm your email address to complete your account setup.",
+            "cta": "Verify email address",
+            "foot": "This link expires in 24 hours. If you didn't create an account, you can ignore this email.",
+        },
+        "fr": {
+            "subject": "Vérifiez votre email QualiPulse",
+            "heading": "Vérifiez votre email",
+            "body": "Bonjour {name}, confirmez votre adresse email pour finaliser la configuration de votre compte.",
+            "cta": "Vérifier mon adresse",
+            "foot": "Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.",
+        },
+    },
+    "password_reset": {
+        "en": {
+            "subject": "Reset your QualiPulse password",
+            "heading": "Reset your password",
+            "body": "Click the button below to set a new password. This link expires in 1 hour.",
+            "cta": "Reset password",
+            "foot": "If you didn't request this, you can safely ignore this email. Your password won't change.",
+        },
+        "fr": {
+            "subject": "Réinitialisez votre mot de passe QualiPulse",
+            "heading": "Réinitialisez votre mot de passe",
+            "body": "Cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe. Ce lien expire dans 1 heure.",
+            "cta": "Réinitialiser le mot de passe",
+            "foot": "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email. Votre mot de passe restera inchangé.",
+        },
+    },
+    "analysis_ready": {
+        "en": {
+            "subject": "Analysis ready: {project_name}",
+            "heading": "Your analysis is ready",
+            "body": "The AI analysis for <strong>{project_name}</strong> has been completed. Themes, quotes, and recommendations are waiting for you.",
+            "cta": "View analysis",
+        },
+        "fr": {
+            "subject": "Analyse prête : {project_name}",
+            "heading": "Votre analyse est prête",
+            "body": "L'analyse IA pour <strong>{project_name}</strong> est terminée. Thèmes, citations et recommandations vous attendent.",
+            "cta": "Voir l'analyse",
+        },
+    },
+    "interview_invite": {
+        "en": {
+            "subject": "You're invited to a research interview",
+            "heading": "You're invited to participate",
+            "body": "{sender_name} has invited you to a voice interview about <strong>{project_name}</strong>. It takes about 15-30 minutes and runs entirely in your browser.",
+            "cta": "Start interview",
+            "foot": "No account needed. Just click the button and speak naturally.",
+        },
+        "fr": {
+            "subject": "Invitation à un entretien de recherche",
+            "heading": "Vous êtes invité·e à participer",
+            "body": "{sender_name} vous invite à un entretien vocal sur <strong>{project_name}</strong>. Cela prend environ 15 à 30 minutes et se déroule entièrement dans votre navigateur.",
+            "cta": "Commencer l'entretien",
+            "foot": "Aucun compte requis. Cliquez simplement sur le bouton et parlez naturellement.",
+        },
+    },
+    "interview_magic": {
+        "en": {
+            "subject": "Your interview access link",
+            "heading": "You're one click away",
+            "body": "Click the button below to verify your email and start your interview.",
+            "cta": "Start my interview →",
+            "foot": "This link expires in {expiry_minutes} minutes. If you didn't request this, you can ignore this email.",
+        },
+        "fr": {
+            "subject": "Votre lien d'accès à l'entretien",
+            "heading": "Plus qu'un clic",
+            "body": "Cliquez sur le bouton ci-dessous pour vérifier votre adresse email et démarrer l'entretien.",
+            "cta": "Démarrer mon entretien →",
+            "foot": "Ce lien expire dans {expiry_minutes} minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.",
+        },
+    },
+    "team_invite": {
+        "en": {
+            "subject": "{inviter_name} invited you to {workspace_name} on QualiPulse",
+            "heading": "You've been invited to collaborate",
+            "body1": "<strong>{inviter_name}</strong> has invited you to join <strong>{workspace_name}</strong> on QualiPulse as a <strong>{role}</strong>.",
+            "body2": "QualiPulse is a research platform for running AI-driven voice interviews and turning transcripts into themes, quotes, and recommendations. You'll get access to all projects in the workspace.",
+            "cta": "Accept invitation →",
+            "foot": "This invitation expires in 7 days. If you weren't expecting it, you can safely ignore this email.",
+        },
+        "fr": {
+            "subject": "{inviter_name} vous invite à {workspace_name} sur QualiPulse",
+            "heading": "Vous êtes invité·e à collaborer",
+            "body1": "<strong>{inviter_name}</strong> vous invite à rejoindre <strong>{workspace_name}</strong> sur QualiPulse en tant que <strong>{role}</strong>.",
+            "body2": "QualiPulse est une plateforme de recherche pour mener des entretiens vocaux pilotés par l'IA et transformer les transcriptions en thèmes, citations et recommandations. Vous aurez accès à tous les projets de l'espace de travail.",
+            "cta": "Accepter l'invitation →",
+            "foot": "Cette invitation expire dans 7 jours. Si vous ne l'attendiez pas, vous pouvez ignorer cet email en toute sécurité.",
+        },
+    },
+    "newsletter": {
+        "en": {
+            "subject": "Welcome to the QualiPulse newsletter",
+            "heading": "You're on the list!",
+            "body": "Thanks for subscribing. We'll send you occasional updates on qualitative research best practices, product updates, and tips for getting better insights from your interviews.",
+            "foot": "No spam, ever. Unsubscribe anytime.",
+        },
+        "fr": {
+            "subject": "Bienvenue dans la newsletter QualiPulse",
+            "heading": "Vous êtes inscrit·e !",
+            "body": "Merci pour votre abonnement. Nous vous enverrons occasionnellement des conseils sur les bonnes pratiques de la recherche qualitative, les nouveautés produit et des astuces pour tirer le meilleur de vos entretiens.",
+            "foot": "Pas de spam, jamais. Désabonnement à tout moment.",
+        },
+    },
+    "footer": {
+        "en": {
+            "tagline": "QualiPulse — AI-powered qualitative research",
+            "reason": "You're receiving this because you signed up or were invited to QualiPulse.",
+        },
+        "fr": {
+            "tagline": "QualiPulse — Recherche qualitative boostée à l'IA",
+            "reason": "Vous recevez cet email parce que vous vous êtes inscrit·e ou avez été invité·e sur QualiPulse.",
+        },
+    },
+}
+
+
+def _c(section: str, lang: str, key: str, **fmt: object) -> str:
+    """Look up a copy string, falling back to English, then format it."""
+    lang = _normalise_lang(lang)
+    block = _COPY.get(section, {})
+    entry = block.get(lang) or block.get("en") or {}
+    raw = entry.get(key, "")
+    try:
+        return raw.format(**fmt) if fmt else raw
+    except (KeyError, IndexError):
+        return raw
+
+
+# ── Transport ───────────────────────────────────────────────────────────────
+
+
+def _send_console(to: str, subject: str, body_html: str) -> bool:
+    """Development fallback — prints email to console. Always 'succeeds'."""
     logger.info(
         "📧 [EMAIL — not sent in dev] To: %s | Subject: %s",
         to,
         subject,
     )
+    return True
 
 
-def _send_sendgrid(to: str, subject: str, body_html: str) -> None:
-    """Send via SendGrid. Requires SENDGRID_API_KEY."""
+def _send_sendgrid(to: str, subject: str, body_html: str) -> bool:
+    """Send via SendGrid. Returns True on HTTP 2xx, False otherwise.
+
+    Any exception (missing SDK, network failure, bad API key, rejected
+    recipient, etc.) is logged with ``logger.exception`` so the stack
+    trace lands in Cloud Run logs — otherwise a silent swallow here
+    caused participants to see "link sent" while nothing was actually
+    delivered.
+    """
     try:
         import sendgrid  # type: ignore
         from sendgrid.helpers.mail import Mail, ReplyTo  # type: ignore
+    except Exception as exc:  # pragma: no cover - import guard
+        logger.exception("SendGrid SDK import failed: %s", exc)
+        return False
 
+    try:
         sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
         message = Mail(
             from_email=(settings.EMAIL_FROM, settings.EMAIL_FROM_NAME),
@@ -32,27 +223,46 @@ def _send_sendgrid(to: str, subject: str, body_html: str) -> None:
             html_content=body_html,
         )
         message.reply_to = ReplyTo("support@qualipulse.com", "QualiPulse Support")
-        sg.send(message)
-        logger.info("Email sent to %s: %s", to, subject)
+        response = sg.send(message)
+        status_code = getattr(response, "status_code", None)
+        if status_code is None or not (200 <= int(status_code) < 300):
+            logger.error(
+                "SendGrid rejected email to %s (subject=%r, status=%s, body=%s)",
+                to,
+                subject,
+                status_code,
+                getattr(response, "body", b"")[:500],
+            )
+            return False
+        logger.info(
+            "Email sent to %s (subject=%r, status=%s)", to, subject, status_code
+        )
+        return True
     except Exception as exc:
-        logger.error("SendGrid error: %s", exc)
+        logger.exception(
+            "SendGrid send failed for %s (subject=%r): %s", to, subject, exc
+        )
+        return False
 
 
-def send_email(to: str, subject: str, body_html: str) -> None:
-    """Dispatch email via the configured provider."""
+def send_email(to: str, subject: str, body_html: str) -> bool:
+    """Dispatch email via the configured provider. Returns delivery status."""
     if settings.SENDGRID_API_KEY:
-        _send_sendgrid(to, subject, body_html)
-    else:
-        _send_console(to, subject, body_html)
+        return _send_sendgrid(to, subject, body_html)
+    return _send_console(to, subject, body_html)
 
 
 # ── Shared email wrapper ──────────────────────────────────────────────────
 
-def _wrap_email(content: str) -> str:
+
+def _wrap_email(content: str, lang: str = "en") -> str:
     """Wrap content in a branded email template."""
+    lang = _normalise_lang(lang)
+    tagline = _c("footer", lang, "tagline")
+    reason = _c("footer", lang, "reason")
     return f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="{lang}">
     <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
     <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
       <div style="max-width:560px;margin:0 auto;padding:40px 24px;">
@@ -63,8 +273,8 @@ def _wrap_email(content: str) -> str:
           {content}
         </div>
         <div style="text-align:center;font-size:0.75rem;color:#94a3b8;">
-          <p>QualiPulse — AI-powered qualitative research</p>
-          <p>You're receiving this because you signed up or were invited to QualiPulse.</p>
+          <p>{tagline}</p>
+          <p>{reason}</p>
         </div>
       </div>
     </body>
@@ -74,96 +284,120 @@ def _wrap_email(content: str) -> str:
 
 # ── Template helpers ────────────────────────────────────────────────────────
 
-def send_welcome(to: str, name: str) -> None:
-    send_email(
+
+def send_welcome(to: str, name: str, lang: str = "en") -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("welcome", lang, "heading", name=name)}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("welcome", lang, "body")}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{settings.APP_BASE_URL}/dashboard" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("welcome", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("welcome", lang, "foot")}</p>
+    """
+    return send_email(
         to=to,
-        subject="Welcome to QualiPulse",
-        body_html=_wrap_email(f"""
-          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">Welcome, {name}!</h2>
-          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">Your QualiPulse account is ready. Start by creating your first research project.</p>
-          <div style="text-align:center;margin:24px 0;">
-            <a href="{settings.APP_BASE_URL}/dashboard" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">Create your first project</a>
-          </div>
-          <p style="color:#94a3b8;font-size:0.85rem;margin:0;">Need help getting started? Just reply to this email.</p>
-        """),
+        subject=_c("welcome", lang, "subject"),
+        body_html=_wrap_email(content, lang),
     )
 
 
-def send_verification_email(to: str, name: str, verify_url: str) -> None:
-    send_email(
+def send_verification_email(to: str, name: str, verify_url: str, lang: str = "en") -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("verification", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("verification", lang, "body", name=name)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{verify_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("verification", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("verification", lang, "foot")}</p>
+    """
+    return send_email(
         to=to,
-        subject="Verify your QualiPulse email",
-        body_html=_wrap_email(f"""
-          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">Verify your email</h2>
-          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">Hi {name}, please confirm your email address to complete your account setup.</p>
-          <div style="text-align:center;margin:24px 0;">
-            <a href="{verify_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">Verify email address</a>
-          </div>
-          <p style="color:#94a3b8;font-size:0.85rem;margin:0;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
-        """),
+        subject=_c("verification", lang, "subject"),
+        body_html=_wrap_email(content, lang),
     )
 
 
-def send_password_reset(to: str, reset_url: str) -> None:
-    send_email(
+def send_password_reset(to: str, reset_url: str, lang: str = "en") -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("password_reset", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("password_reset", lang, "body")}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{reset_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("password_reset", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("password_reset", lang, "foot")}</p>
+    """
+    return send_email(
         to=to,
-        subject="Reset your QualiPulse password",
-        body_html=_wrap_email(f"""
-          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">Reset your password</h2>
-          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">Click the button below to set a new password. This link expires in 1 hour.</p>
-          <div style="text-align:center;margin:24px 0;">
-            <a href="{reset_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">Reset password</a>
-          </div>
-          <p style="color:#94a3b8;font-size:0.85rem;margin:0;">If you didn't request this, you can safely ignore this email. Your password won't change.</p>
-        """),
+        subject=_c("password_reset", lang, "subject"),
+        body_html=_wrap_email(content, lang),
     )
 
 
-def send_analysis_ready(to: str, project_name: str, project_url: str) -> None:
-    send_email(
+def send_analysis_ready(to: str, project_name: str, project_url: str, lang: str = "en") -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("analysis_ready", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("analysis_ready", lang, "body", project_name=project_name)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{project_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("analysis_ready", lang, "cta")}</a>
+      </div>
+    """
+    return send_email(
         to=to,
-        subject=f"Analysis ready: {project_name}",
-        body_html=_wrap_email(f"""
-          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">Your analysis is ready</h2>
-          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">The AI analysis for <strong>{project_name}</strong> has been completed. Themes, quotes, and recommendations are waiting for you.</p>
-          <div style="text-align:center;margin:24px 0;">
-            <a href="{project_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">View analysis</a>
-          </div>
-        """),
+        subject=_c("analysis_ready", lang, "subject", project_name=project_name),
+        body_html=_wrap_email(content, lang),
     )
 
 
-def send_interview_invite(to: str, project_name: str, interview_url: str, sender_name: str) -> None:
-    send_email(
+def send_interview_invite(
+    to: str,
+    project_name: str,
+    interview_url: str,
+    sender_name: str,
+    lang: str = "en",
+) -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("interview_invite", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("interview_invite", lang, "body", sender_name=sender_name, project_name=project_name)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{interview_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("interview_invite", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("interview_invite", lang, "foot")}</p>
+    """
+    return send_email(
         to=to,
-        subject=f"You're invited to a research interview",
-        body_html=_wrap_email(f"""
-          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">You're invited to participate</h2>
-          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{sender_name} has invited you to a voice interview about <strong>{project_name}</strong>. It takes about 15-30 minutes and runs entirely in your browser.</p>
-          <div style="text-align:center;margin:24px 0;">
-            <a href="{interview_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">Start interview</a>
-          </div>
-          <p style="color:#94a3b8;font-size:0.85rem;margin:0;">No account needed. Just click the button and speak naturally.</p>
-        """),
+        subject=_c("interview_invite", lang, "subject"),
+        body_html=_wrap_email(content, lang),
     )
 
 
-def send_interview_magic_link(email: str, magic_url: str, expiry_minutes: int = 30) -> None:
-    send_email(
+def send_interview_magic_link(
+    email: str,
+    magic_url: str,
+    expiry_minutes: int = 30,
+    lang: str = "en",
+) -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("interview_magic", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("interview_magic", lang, "body")}</p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="{magic_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
+          {_c("interview_magic", lang, "cta")}
+        </a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.8rem;margin:0;">
+        {_c("interview_magic", lang, "foot", expiry_minutes=expiry_minutes)}
+      </p>
+    """
+    return send_email(
         to=email,
-        subject="Your interview access link",
-        body_html=_wrap_email(f"""
-          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">You're one click away</h2>
-          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">Click the button below to verify your email and start your interview.</p>
-          <div style="text-align:center;margin:32px 0;">
-            <a href="{magic_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
-              Start my interview →
-            </a>
-          </div>
-          <p style="color:#94a3b8;font-size:0.8rem;margin:0;">
-            This link expires in {expiry_minutes} minutes. If you didn't request this, you can ignore this email.
-          </p>
-        """),
+        subject=_c("interview_magic", lang, "subject"),
+        body_html=_wrap_email(content, lang),
     )
 
 
@@ -174,41 +408,49 @@ def send_team_invite(
     inviter_name: str,
     role: str,
     accept_url: str,
-) -> None:
+    lang: str = "en",
+) -> bool:
     """Invite someone to join a workspace as a team member."""
-    send_email(
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("team_invite", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;">
+        {_c("team_invite", lang, "body1", inviter_name=inviter_name, workspace_name=workspace_name, role=role)}
+      </p>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">
+        {_c("team_invite", lang, "body2")}
+      </p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="{accept_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
+          {_c("team_invite", lang, "cta")}
+        </a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.8rem;margin:0;">
+        {_c("team_invite", lang, "foot")}
+      </p>
+    """
+    return send_email(
         to=to,
-        subject=f"{inviter_name} invited you to {workspace_name} on QualiPulse",
-        body_html=_wrap_email(f"""
-          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">You've been invited to collaborate</h2>
-          <p style="color:#475569;line-height:1.6;margin:0 0 16px;">
-            <strong>{inviter_name}</strong> has invited you to join
-            <strong>{workspace_name}</strong> on QualiPulse as a <strong>{role}</strong>.
-          </p>
-          <p style="color:#475569;line-height:1.6;margin:0 0 24px;">
-            QualiPulse is a research platform for running AI-driven voice interviews and
-            turning transcripts into themes, quotes, and recommendations. You'll get access
-            to all projects in the workspace.
-          </p>
-          <div style="text-align:center;margin:32px 0;">
-            <a href="{accept_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
-              Accept invitation →
-            </a>
-          </div>
-          <p style="color:#94a3b8;font-size:0.8rem;margin:0;">
-            This invitation expires in 7 days. If you weren't expecting it, you can safely ignore this email.
-          </p>
-        """),
+        subject=_c(
+            "team_invite",
+            lang,
+            "subject",
+            inviter_name=inviter_name,
+            workspace_name=workspace_name,
+        ),
+        body_html=_wrap_email(content, lang),
     )
 
 
-def send_newsletter_welcome(to: str) -> None:
-    send_email(
+def send_newsletter_welcome(to: str, lang: str = "en") -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("newsletter", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;">{_c("newsletter", lang, "body")}</p>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("newsletter", lang, "foot")}</p>
+    """
+    return send_email(
         to=to,
-        subject="Welcome to the QualiPulse newsletter",
-        body_html=_wrap_email("""
-          <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">You're on the list!</h2>
-          <p style="color:#475569;line-height:1.6;margin:0 0 16px;">Thanks for subscribing. We'll send you occasional updates on qualitative research best practices, product updates, and tips for getting better insights from your interviews.</p>
-          <p style="color:#94a3b8;font-size:0.85rem;margin:0;">No spam, ever. Unsubscribe anytime.</p>
-        """),
+        subject=_c("newsletter", lang, "subject"),
+        body_html=_wrap_email(content, lang),
     )

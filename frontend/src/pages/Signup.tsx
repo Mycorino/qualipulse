@@ -22,7 +22,7 @@ function getPasswordStrength(pw: string, t: (key: string) => string): { label: s
 }
 
 export default function Signup() {
-  const { t } = useTranslation("auth");
+  const { t, i18n } = useTranslation("auth");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -64,9 +64,11 @@ export default function Signup() {
 
     setLoading(true);
     try {
+      const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
       const res = await signup(trimmedName, trimmedEmail, password, {
         plan: selectedPlan,
         refCode,
+        preferredLanguage: uiLang,
       });
       saveToken(res.access_token, res.refresh_token);
       setCachedOnboarded(false);

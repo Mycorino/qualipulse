@@ -13,6 +13,9 @@ class SignupRequest(BaseModel):
     plan: Optional[str] = None
     # Affiliate referral code, if present
     ref_code: Optional[str] = None
+    # UI locale at signup time — used to pick the language of the welcome
+    # and verification emails. Stored on the company record.
+    preferred_language: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
