@@ -1,21 +1,20 @@
 """Generate a short business summary for an onboarding company URL.
 
-Two-tier strategy (no HTTP scraping):
+Single-pass strategy using Claude + the ``web_search`` server tool. We used
+to do a "knowledge-first" pass (no tools) to save ~$0.01 on famous brands,
+but Claude would confidently hallucinate on similar-sounding domains — e.g.
+``qualipulse.com`` got described as "Ideagen Q-Pulse" (an unrelated UK
+quality-management vendor). Always forcing a real web search trades ~$0.01
+and ~1s of latency for dramatically higher correctness, which is the right
+call for a first-impression onboarding flow.
 
-1. **Knowledge pass** — Ask Claude directly, without tools, whether it already
-   knows the site from training data. For famous brands (stripe.com,
-   airbnb.com, e.leclerc, university.edu, ...) this returns a clean summary
-   in ~1–2s and costs about $0.001.
+1. **Web search pass** — Claude is given the URL plus the ``web_search``
+   tool and asked to return a structured ``{"summary", "industry"}`` JSON
+   payload. If after searching Claude still can't identify the business,
+   it returns the ``UNKNOWN`` sentinel and we raise.
 
-2. **Web search fallback** — If Claude responds ``UNKNOWN``, retry the same
-   request with Anthropic's ``web_search`` server tool enabled. Claude
-   executes the search itself, reads the results, and synthesizes. This
-   handles modern JS-only SPAs, Cloudflare-protected sites, and anything a
-   real browser could see. Costs ~$0.01 per call (one search) + tokens.
-
-3. **Manual fallback** — If both passes fail we raise
-   ``WebsiteIntelligenceError`` and the UI prompts the user to describe their
-   business in the textarea we already render.
+2. **Manual fallback** — On failure the UI flips into ``manualMode`` and
+   the user describes their business in the textarea we already render.
 
 Returns a structured ``{"summary": str, "industry": str | None}`` so the
 onboarding UI can auto-preselect the industry chip in addition to populating
@@ -177,10 +176,18 @@ def _build_prompt(url: str, language: str, *, with_search: bool) -> str:
     lang_directive = _LANGUAGE_DIRECTIVES.get(language, _LANGUAGE_DIRECTIVES["en"])
     if with_search:
         retrieval = (
-            "Search the web for information about the company at this URL, "
-            "then produce the JSON. If after searching you still cannot "
-            f"determine what this business does, return the single word "
-            f"{_UNKNOWN_SENTINEL} (no JSON)."
+            "**You must fetch the actual website before answering.** Use the "
+            "web_search tool to search for information about the EXACT domain "
+            "in the URL below — not a similar-sounding brand, not a company "
+            "with a related name. The summary must describe whatever business "
+            "actually operates at that specific domain.\n\n"
+            "Do NOT pattern-match on the company name. For example, if the "
+            "URL is ``foo-pulse.com``, do not describe a different product "
+            "also called ``Pulse``. Search for ``foo-pulse.com`` directly "
+            "and read the site.\n\n"
+            "If after searching you still cannot determine what the business "
+            f"at this exact domain does, return the single word {_UNKNOWN_SENTINEL} "
+            "(no JSON)."
         )
     else:
         retrieval = (
@@ -216,7 +223,7 @@ async def fetch_website_summary(
     company_id=None,
 ) -> dict:
     """Produce a business summary and industry classification for ``url``
-    using Claude's knowledge first, then the ``web_search`` tool as a fallback.
+    using Claude with the ``web_search`` tool.
 
     Args:
         url: The company website URL the user typed.
@@ -228,7 +235,8 @@ async def fetch_website_summary(
         A dict with keys ``summary`` (str) and ``industry`` (str | None).
 
     Raises:
-        WebsiteIntelligenceError: if neither pass yields a usable result.
+        WebsiteIntelligenceError: if Claude can't identify the business
+        even after searching.
     """
     clean_url = _normalize_url(url)
     if not clean_url:
@@ -243,41 +251,9 @@ async def fetch_website_summary(
     lang = language if language in _LANGUAGE_DIRECTIVES else "en"
     ai_client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    # ── Pass 1: knowledge-only ────────────────────────────────────────────
-    try:
-        knowledge_msg = ai_client.messages.create(
-            model=_MODEL,
-            max_tokens=_MAX_TOKENS,
-            messages=[{
-                "role": "user",
-                "content": _build_prompt(clean_url, lang, with_search=False),
-            }],
-        )
-    except Exception as exc:
-        logger.warning(
-            "website_intel.knowledge_pass_failed",
-            extra={"url": clean_url, "error": str(exc)},
-        )
-        raise WebsiteIntelligenceError(
-            "ai_failed",
-            "We couldn't generate a summary right now. Please describe your "
-            "business manually below.",
-        )
-
-    _log_usage(db, knowledge_msg, company_id)
-    knowledge_text = _extract_text(knowledge_msg)
-    parsed = _parse_response(knowledge_text)
-
-    if parsed is not None:
-        logger.info(
-            "website_intel.knowledge_hit",
-            extra={"url": clean_url, "industry": parsed.get("industry")},
-        )
-        return parsed
-
-    logger.info("website_intel.knowledge_miss", extra={"url": clean_url})
-
-    # ── Pass 2: web_search fallback ───────────────────────────────────────
+    # Single pass: always use web_search. A knowledge-only pre-pass was
+    # tried but Claude pattern-matched similar-sounding domains into
+    # confident wrong answers (e.g. qualipulse.com → "Ideagen Q-Pulse").
     try:
         search_msg = ai_client.messages.create(
             model=_MODEL,

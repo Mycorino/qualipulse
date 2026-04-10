@@ -473,7 +473,7 @@ export default function Welcome() {
         {step === 3 && (
           <div className="onboarding-step">
             <h1 className="welcome-title">{t("onboarding.businessTitle")}</h1>
-            <p className="welcome-subtitle">{t("onboarding.experienceSubtitle")}</p>
+            <p className="welcome-subtitle">{t("onboarding.businessSubtitle")}</p>
 
             <div className="onboarding-form">
               <div className="onboarding-field">
