@@ -34,7 +34,10 @@ from app.services.email import (
     send_verification_email,
     send_welcome,
 )
-from app.services.website_intelligence import fetch_website_summary
+from app.services.website_intelligence import (
+    WebsiteIntelligenceError,
+    fetch_website_summary,
+)
 
 logger = logging.getLogger("auto_interview.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -302,7 +305,19 @@ async def website_intel(
     if not url:
         raise HTTPException(status_code=400, detail="website_url is required")
 
-    summary = await fetch_website_summary(url, db=db, company_id=company.id)
+    try:
+        summary = await fetch_website_summary(url, db=db, company_id=company.id)
+    except WebsiteIntelligenceError as exc:
+        # Still persist the URL so we don't ask for it again; just skip the summary.
+        company.website_url = url
+        db.commit()
+        logger.info(
+            "Website intel failed for %s (%s): %s", company.email, exc.code, url
+        )
+        raise HTTPException(
+            status_code=422,
+            detail={"code": exc.code, "message": exc.message},
+        )
 
     company.website_url = url
     company.business_summary = summary

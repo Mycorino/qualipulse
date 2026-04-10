@@ -408,19 +408,23 @@ export default function Welcome() {
                 </div>
               </div>
 
-              {businessSummary && (
-                <div className="onboarding-field">
-                  <label className="field-label">{t("onboarding.businessSummaryLabel")}</label>
-                  <textarea
-                    className="field-input"
-                    value={businessSummary}
-                    onChange={(e) => setBusinessSummary(e.target.value)}
-                    rows={4}
-                    style={{ resize: "vertical", lineHeight: 1.6 }}
-                    disabled={saving}
-                  />
-                </div>
-              )}
+              <div className="onboarding-field">
+                <label className="field-label">
+                  {t("onboarding.businessSummaryLabel")}{" "}
+                  <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
+                    {t("onboarding.websiteOptional")}
+                  </span>
+                </label>
+                <textarea
+                  className="field-input"
+                  value={businessSummary}
+                  onChange={(e) => setBusinessSummary(e.target.value)}
+                  rows={4}
+                  placeholder={t("onboarding.businessSummaryPlaceholder")}
+                  style={{ resize: "vertical", lineHeight: 1.6 }}
+                  disabled={saving}
+                />
+              </div>
 
               <div className="onboarding-field">
                 <label className="field-label">{t("onboarding.industryLabel")}</label>
