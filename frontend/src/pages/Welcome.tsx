@@ -182,7 +182,19 @@ export default function Welcome() {
       const { business_summary } = await analyseWebsite(websiteUrl.trim());
       setBusinessSummary(business_summary);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, t("onboarding.failedWebsite")));
+      // The backend returns { detail: { code, message } } for scraper
+      // failures — translate the code rather than surfacing the English
+      // fallback message from the server.
+      const detail = (err as {
+        response?: { data?: { detail?: { code?: string } | string } };
+      })?.response?.data?.detail;
+      const code =
+        typeof detail === "object" && detail !== null ? detail.code : undefined;
+      if (code) {
+        setError(t(`onboarding.scraperError_${code}`, { defaultValue: t("onboarding.failedWebsite") }));
+      } else {
+        setError(getErrorMessage(err, t("onboarding.failedWebsite")));
+      }
     } finally {
       setWebsiteLoading(false);
     }
