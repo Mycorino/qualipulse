@@ -3,6 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import client from "../api/client";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { updateSlackWebhook, testSlackWebhook } from "../api/auth";
+import {
+  listTeamMembers,
+  listTeamInvitations,
+  inviteTeamMember,
+  revokeTeamInvitation,
+  removeTeamMember,
+  TeamMember,
+  TeamInvitation,
+  TeamRole,
+} from "../api/team";
 
 interface BillingStatus {
   tier: string;
@@ -35,11 +46,11 @@ interface Plan {
 export default function AccountSettings() {
   const { t, i18n } = useTranslation(["settings", "common"]);
   const navigate = useNavigate();
-  const [me, setMe] = useState<{ name: string; email: string; preferred_language?: string } | null>(null);
+  const [me, setMe] = useState<{ name: string; email: string; preferred_language?: string; slack_webhook_url?: string | null } | null>(null);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"profile" | "billing">("profile");
+  const [tab, setTab] = useState<"profile" | "team" | "integrations" | "billing">("profile");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [name, setName] = useState("");
@@ -47,6 +58,22 @@ export default function AccountSettings() {
   const [newPassword, setNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Slack integration
+  const [slackUrl, setSlackUrl] = useState("");
+  const [slackSaving, setSlackSaving] = useState(false);
+  const [slackTesting, setSlackTesting] = useState(false);
+  const [slackMessage, setSlackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Team
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teamInvites, setTeamInvites] = useState<TeamInvitation[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<TeamRole>("editor");
+  const [inviting, setInviting] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [teamSuccess, setTeamSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -56,6 +83,7 @@ export default function AccountSettings() {
     ]).then(([meData, billingData, plansData]) => {
       setMe(meData);
       setName(meData.name);
+      setSlackUrl(meData.slack_webhook_url ?? "");
       setBilling(billingData);
       setPlans(plansData);
       // Sync UI language with user's stored preference
@@ -116,6 +144,109 @@ export default function AccountSettings() {
     }
   }
 
+  async function loadTeam() {
+    setTeamLoading(true);
+    try {
+      const [members, invites] = await Promise.all([
+        listTeamMembers(),
+        listTeamInvitations().catch(() => []),
+      ]);
+      setTeamMembers(members);
+      setTeamInvites(invites);
+    } catch {
+      // handled by interceptor
+    } finally {
+      setTeamLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab === "team" && teamMembers.length === 0 && !teamLoading) {
+      loadTeam();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function handleInviteMember(e: React.FormEvent) {
+    e.preventDefault();
+    setTeamError(null);
+    setTeamSuccess(null);
+    const email = inviteEmail.trim();
+    if (!email) return;
+    setInviting(true);
+    try {
+      const invite = await inviteTeamMember(email, inviteRole);
+      setTeamInvites((prev) => [invite, ...prev.filter((p) => p.email !== email)]);
+      setInviteEmail("");
+      setTeamSuccess(t("team.inviteSent", { email }));
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        t("team.inviteError");
+      setTeamError(msg);
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleRevokeInvite(id: string) {
+    try {
+      await revokeTeamInvitation(id);
+      setTeamInvites((prev) => prev.filter((i) => i.id !== id));
+    } catch {
+      // handled by interceptor
+    }
+  }
+
+  async function handleRemoveMember(memberRowId: string) {
+    if (memberRowId === "owner") return;
+    if (!confirm(t("team.removeConfirm"))) return;
+    try {
+      await removeTeamMember(memberRowId);
+      setTeamMembers((prev) => prev.filter((m) => m.id !== memberRowId));
+    } catch {
+      // handled by interceptor
+    }
+  }
+
+  async function handleSaveSlack(e: React.FormEvent) {
+    e.preventDefault();
+    setSlackMessage(null);
+    setSlackSaving(true);
+    try {
+      const trimmed = slackUrl.trim();
+      await updateSlackWebhook(trimmed || null);
+      setMe((m) => (m ? { ...m, slack_webhook_url: trimmed || null } : m));
+      setSlackMessage({
+        type: "success",
+        text: trimmed ? t("integrations.slack.saved") : t("integrations.slack.cleared"),
+      });
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        t("integrations.slack.saveError");
+      setSlackMessage({ type: "error", text: msg });
+    } finally {
+      setSlackSaving(false);
+    }
+  }
+
+  async function handleTestSlack() {
+    setSlackMessage(null);
+    setSlackTesting(true);
+    try {
+      await testSlackWebhook(slackUrl.trim() || null);
+      setSlackMessage({ type: "success", text: t("integrations.slack.testSent") });
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        t("integrations.slack.testFailed");
+      setSlackMessage({ type: "error", text: msg });
+    } finally {
+      setSlackTesting(false);
+    }
+  }
+
   async function handleManageBilling() {
     try {
       const { data } = await client.post("/billing/portal", {
@@ -145,6 +276,8 @@ export default function AccountSettings() {
 
       <div className="settings-tabs">
         <button className={`settings-tab ${tab === "profile" ? "active" : ""}`} onClick={() => setTab("profile")}>{t("tabs.profile")}</button>
+        <button className={`settings-tab ${tab === "team" ? "active" : ""}`} onClick={() => setTab("team")}>{t("tabs.team")}</button>
+        <button className={`settings-tab ${tab === "integrations" ? "active" : ""}`} onClick={() => setTab("integrations")}>{t("tabs.integrations")}</button>
         <button className={`settings-tab ${tab === "billing" ? "active" : ""}`} onClick={() => setTab("billing")}>{t("tabs.billing")}</button>
       </div>
 
@@ -182,6 +315,202 @@ export default function AccountSettings() {
               {passwordError && <p className="error-text">{passwordError}</p>}
               <p style={{ color: "var(--success)", fontSize: 14, minHeight: 20, visibility: passwordSuccess ? "visible" : "hidden" }}>{t("profile.passwordUpdated")}</p>
               <button className="btn btn-primary" type="submit" style={{ width: "fit-content" }}>{t("profile.updatePassword")}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {tab === "team" && (
+        <div className="settings-section">
+          <div className="settings-card">
+            <h2 className="settings-section-title">{t("team.inviteTitle")}</h2>
+            <p className="muted-text" style={{ marginTop: -4, marginBottom: 16 }}>
+              {t("team.inviteDescription")}
+            </p>
+            <form
+              className="auth-form"
+              style={{ maxWidth: 560, display: "flex", flexDirection: "column", gap: 12 }}
+              onSubmit={handleInviteMember}
+            >
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input
+                  className="field-input"
+                  type="email"
+                  placeholder={t("team.emailPlaceholder")}
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  required
+                  style={{ flex: 1, minWidth: 220 }}
+                />
+                <select
+                  className="field-input"
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as TeamRole)}
+                  style={{ width: 140 }}
+                >
+                  <option value="admin">{t("team.roles.admin")}</option>
+                  <option value="editor">{t("team.roles.editor")}</option>
+                  <option value="viewer">{t("team.roles.viewer")}</option>
+                </select>
+                <button className="btn btn-primary" type="submit" disabled={inviting}>
+                  {inviting ? t("team.inviting") : t("team.sendInvite")}
+                </button>
+              </div>
+              {teamError && <p className="error-text" style={{ margin: 0 }}>{teamError}</p>}
+              {teamSuccess && (
+                <p style={{ color: "var(--success)", fontSize: 14, margin: 0 }}>{teamSuccess}</p>
+              )}
+            </form>
+          </div>
+
+          <div className="settings-card" style={{ marginTop: 20 }}>
+            <h2 className="settings-section-title">{t("team.membersTitle")}</h2>
+            {teamLoading ? (
+              <p className="muted-text">{t("common:loading")}</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {teamMembers.map((m) => (
+                  <div
+                    key={m.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 14px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>{m.name}</div>
+                      <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>{m.email}</div>
+                    </div>
+                    <span
+                      className="badge"
+                      style={{ textTransform: "capitalize" }}
+                    >
+                      {t(`team.roles.${m.role}`)}
+                    </span>
+                    {m.id !== "owner" && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleRemoveMember(m.id)}
+                      >
+                        {t("team.remove")}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {teamInvites.length > 0 && (
+            <div className="settings-card" style={{ marginTop: 20 }}>
+              <h2 className="settings-section-title">{t("team.pendingTitle")}</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {teamInvites.map((i) => (
+                  <div
+                    key={i.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 14px",
+                      border: "1px dashed var(--border)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600 }}>{i.email}</div>
+                      <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+                        {t("team.invitedAs", { role: t(`team.roles.${i.role}`) })} ·{" "}
+                        {t("team.expiresOn", {
+                          date: new Date(i.expires_at).toLocaleDateString(),
+                        })}
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleRevokeInvite(i.id)}
+                    >
+                      {t("team.revoke")}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "integrations" && (
+        <div className="settings-section">
+          <div className="settings-card">
+            <h2 className="settings-section-title">
+              {t("integrations.slack.title")}
+            </h2>
+            <p className="muted-text" style={{ marginTop: -4, marginBottom: 16 }}>
+              {t("integrations.slack.description")}
+            </p>
+
+            <ol style={{ fontSize: 14, color: "var(--text-secondary)", paddingLeft: 20, marginBottom: 16, lineHeight: 1.7 }}>
+              <li>
+                {t("integrations.slack.step1")}{" "}
+                <a
+                  href="https://api.slack.com/messaging/webhooks"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--brand-500)" }}
+                >
+                  api.slack.com/messaging/webhooks
+                </a>
+              </li>
+              <li>{t("integrations.slack.step2")}</li>
+              <li>{t("integrations.slack.step3")}</li>
+            </ol>
+
+            <form className="auth-form" style={{ maxWidth: 560 }} onSubmit={handleSaveSlack}>
+              <div>
+                <label className="field-label">{t("integrations.slack.urlLabel")}</label>
+                <input
+                  className="field-input"
+                  type="url"
+                  value={slackUrl}
+                  onChange={(e) => setSlackUrl(e.target.value)}
+                  placeholder="https://hooks.slack.com/services/T.../B.../..."
+                  autoComplete="off"
+                />
+                <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>
+                  {t("integrations.slack.urlHint")}
+                </p>
+              </div>
+
+              {slackMessage && (
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: slackMessage.type === "success" ? "var(--success)" : "var(--danger)",
+                    margin: 0,
+                  }}
+                >
+                  {slackMessage.text}
+                </p>
+              )}
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="btn btn-primary" type="submit" disabled={slackSaving}>
+                  {slackSaving ? t("profile.saving") : t("integrations.slack.save")}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  disabled={slackTesting || !slackUrl.trim()}
+                  onClick={handleTestSlack}
+                >
+                  {slackTesting ? t("integrations.slack.testing") : t("integrations.slack.test")}
+                </button>
+              </div>
             </form>
           </div>
         </div>

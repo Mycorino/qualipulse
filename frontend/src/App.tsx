@@ -21,6 +21,7 @@ import Admin from "./pages/Admin";
 import AffiliatePortal from "./pages/AffiliatePortal";
 import Blog from "./pages/Blog";
 import BlogPostPage from "./pages/BlogPost";
+import AcceptInvitation from "./pages/AcceptInvitation";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -45,6 +46,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/team/accept" element={<AcceptInvitation />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route

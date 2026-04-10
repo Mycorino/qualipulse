@@ -1,5 +1,17 @@
 {
   "wizard": {
+    "templatePickerTitle": "Partir d'un modèle",
+    "templatePickerSubtitle": "Projets de recherche prêts à l'emploi pour les cas d'usage les plus courants. Choisissez-en un, puis personnalisez tout.",
+    "templatePickerOrDivider": "ou",
+    "templateStartFromScratch": "Partir de zéro",
+    "templateQuestionCount": "{{count}} questions",
+    "templateDuration": "{{count}} min",
+    "templateHasScreening": "Qualification incluse",
+    "templateBestFor": "Idéal pour :",
+    "templateUseThis": "Utiliser ce modèle",
+    "templateBack": "← Choisir un autre modèle",
+    "templateLoadError": "Impossible de charger les modèles. Vous pouvez toujours partir de zéro.",
+    "templateApplied": "Modèle chargé — personnalisez-le à votre guise.",
     "title": "Nouveau projet de recherche",
     "titleEdit": "Modifier le projet",
     "backButton": "← Retour",

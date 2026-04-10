@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../hooks/useAuth";
 import { SkeletonCard } from "../components/Skeleton";
 import {
+  createDemoProject,
   listProjects,
   unarchiveProject,
   ProjectListItem,
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [resendingVerification, setResendingVerification] = useState(false);
   const [verificationResent, setVerificationResent] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [seedingDemo, setSeedingDemo] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -73,6 +75,18 @@ export default function Dashboard() {
       // handled by interceptor
     } finally {
       setResendingVerification(false);
+    }
+  }
+
+  async function handleCreateDemo() {
+    setSeedingDemo(true);
+    try {
+      const project = await createDemoProject();
+      navigate(`/projects/${project.id}?tab=analysis&demo=1`);
+    } catch {
+      // interceptor handles toast
+    } finally {
+      setSeedingDemo(false);
     }
   }
 
@@ -134,17 +148,47 @@ export default function Dashboard() {
         </div>
 
         {/* Global banners */}
-        {!loading && me?.trial_ends_at && new Date(me.trial_ends_at) > new Date() && (
-          <div className="gs-trial-banner" style={{ marginBottom: 16 }}>
-            <span>🎉</span>
-            <div>
-              <strong>{t("trialBanner.title")}</strong> — {t("trialBanner.desc", {
-                date: new Date(me.trial_ends_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
-              })}
-              {" "}<button className="btn-inline" onClick={() => navigate("/account")}>{t("trialBanner.viewPlans")}</button>
+        {!loading && me?.trial_ends_at && new Date(me.trial_ends_at) > new Date() && (() => {
+          const trialEnd = new Date(me.trial_ends_at);
+          const msLeft = trialEnd.getTime() - Date.now();
+          const daysLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+          const endingSoon = daysLeft <= 3;
+          const formattedDate = trialEnd.toLocaleDateString(undefined, {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          });
+          return (
+            <div
+              className={`gs-trial-banner${endingSoon ? " gs-trial-banner--urgent" : ""}`}
+              style={{ marginBottom: 16 }}
+            >
+              <span aria-hidden="true">{endingSoon ? "⚠️" : "🎉"}</span>
+              <div style={{ flex: 1 }}>
+                <strong>
+                  {endingSoon
+                    ? t("trialBanner.endingSoonTitle", { count: daysLeft })
+                    : t("trialBanner.title")}
+                </strong>{" "}
+                <span className="gs-trial-badge">
+                  {t("trialBanner.daysLeft", { count: daysLeft })}
+                </span>
+                <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.5 }}>
+                  {endingSoon
+                    ? t("trialBanner.endingSoonDesc", { date: formattedDate })
+                    : t("trialBanner.desc", { date: formattedDate })}
+                </div>
+              </div>
+              <button
+                className={endingSoon ? "btn btn-primary btn-sm" : "btn-inline"}
+                onClick={() => navigate("/account")}
+                style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+              >
+                {endingSoon ? t("trialBanner.upgradeCta") : t("trialBanner.viewPlans")}
+              </button>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {loadError && (
           <div className="error-banner" style={{ marginBottom: 16 }}>
@@ -171,9 +215,18 @@ export default function Dashboard() {
                 <div className="gs-step-content">
                   <h3>{t("gettingStarted.step1Title")}</h3>
                   <p>{t("gettingStarted.step1Desc")}</p>
-                  <button className="btn btn-primary btn-sm" onClick={() => navigate("/projects/new")}>
-                    {t("gettingStarted.step1Cta")}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => navigate("/projects/new")}>
+                      {t("gettingStarted.step1Cta")}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={handleCreateDemo}
+                      disabled={seedingDemo}
+                    >
+                      {seedingDemo ? t("gettingStarted.demoLoading") : t("gettingStarted.demoCta")}
+                    </button>
+                  </div>
                 </div>
               </div>
 

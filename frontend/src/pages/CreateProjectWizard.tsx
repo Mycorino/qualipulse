@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
-import { createProject, updateProject, getProject } from "../api/projects";
+import { createProject, updateProject, getProject, createLink } from "../api/projects";
 import type { QuestionCreate, ScreeningQuestionCreate } from "../api/projects";
 import {
   parseBrief,
@@ -10,6 +10,8 @@ import {
   suggestScope,
   suggestQuestions,
 } from "../api/research";
+import { listTemplates, getTemplate } from "../api/templates";
+import type { TemplateSummary } from "../api/templates";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -79,6 +81,12 @@ export default function CreateProjectWizard() {
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const { toast } = useToast();
 
+  // Template picker: shown first on fresh create (no draft, not edit)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(!isEditMode && !draft);
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const STEPS = [
@@ -97,6 +105,62 @@ export default function CreateProjectWizard() {
       audience, durationMinutes, language, questions, screeningQuestions,
     }));
   }, [isEditMode, step, name, context, briefSummary, objective, learningGoals, studyType, rationale, audience, durationMinutes, language, questions, screeningQuestions]);
+
+  // Load template list on mount (only when picker is visible)
+  useEffect(() => {
+    if (!showTemplatePicker) return;
+    if (templates.length > 0) return;
+    setTemplatesLoading(true);
+    listTemplates()
+      .then((list) => setTemplates(list))
+      .catch(() => {
+        // Fall through silently — user can still start from scratch
+        setError(t("wizard.templateLoadError"));
+      })
+      .finally(() => setTemplatesLoading(false));
+  }, [showTemplatePicker]);
+
+  async function handleUseTemplate(templateId: string) {
+    setApplyingTemplateId(templateId);
+    setError("");
+    try {
+      const tpl = await getTemplate(templateId);
+      // Pre-fill wizard state from template
+      setName(tpl.name);
+      setObjective(tpl.research_objective);
+      // Ensure at least 3 learning goal slots so the UI stays consistent
+      const goals = [...tpl.learning_goals];
+      while (goals.length < 3) goals.push("");
+      setLearningGoals(goals);
+      setAudience(tpl.target_audience);
+      setDurationMinutes(tpl.duration_minutes);
+      setQuestions(
+        tpl.questions.map((q) => ({
+          section_index: q.section_index,
+          section_title: q.section_title,
+          question_index: q.question_index,
+          main_question: q.main_question,
+          interview_notes: q.interview_notes,
+          desired_learning: q.desired_learning,
+        }))
+      );
+      setScreeningQuestions(
+        tpl.screening_questions.map((sq) => ({
+          question: sq.question,
+          options: sq.options,
+          disqualifying_options: sq.disqualifying_options,
+        }))
+      );
+      // Hide picker and jump to Step 1 so user can tweak the name + context first
+      setShowTemplatePicker(false);
+      setStep(1);
+      toast(t("wizard.templateApplied"), "success");
+    } catch {
+      setError(t("wizard.templateLoadError"));
+    } finally {
+      setApplyingTemplateId(null);
+    }
+  }
 
   // Load existing project in edit mode
   useEffect(() => {
@@ -226,6 +290,15 @@ export default function CreateProjectWizard() {
       if (!isEditMode) {
         localStorage.removeItem(DRAFT_KEY);
         toast(t("wizard.projectCreated"), "success");
+        // Auto-generate the first interview link so the welcome modal on the
+        // project page can display it immediately. Failure is non-blocking.
+        try {
+          await createLink(project.id);
+        } catch {
+          // silent — user can create one manually on the project page
+        }
+        navigate(`/projects/${project.id}?created=1`);
+        return;
       }
       navigate(`/projects/${project.id}`);
     } catch {
@@ -330,6 +403,88 @@ export default function CreateProjectWizard() {
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
+
+  // ── Template picker view ───────────────────────────────────────────────
+  if (showTemplatePicker) {
+    return (
+      <div className="wizard-layout">
+        <header className="wizard-header">
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate("/dashboard")}>
+            {t("wizard.backButton")}
+          </button>
+          <h2 className="wizard-title">{t("wizard.title")}</h2>
+          <div style={{ width: 80 }} />
+        </header>
+
+        <main className="wizard-main">
+          <div className="wizard-card template-picker">
+            <div className="wizard-card-header" style={{ textAlign: "center" }}>
+              <h2>{t("wizard.templatePickerTitle")}</h2>
+              <p className="muted-text">{t("wizard.templatePickerSubtitle")}</p>
+            </div>
+
+            {error && <div className="error-banner">{error}</div>}
+
+            {templatesLoading ? (
+              <div style={{ textAlign: "center", padding: "48px 16px" }}>
+                <span className="spinner-sm" />
+              </div>
+            ) : (
+              <div className="template-grid">
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    className="template-card"
+                    onClick={() => handleUseTemplate(tpl.id)}
+                    disabled={applyingTemplateId !== null}
+                    type="button"
+                  >
+                    <div className="template-card-icon" aria-hidden="true">{tpl.icon}</div>
+                    <div className="template-card-name">{tpl.name}</div>
+                    <div className="template-card-desc">{tpl.description}</div>
+                    <div className="template-card-meta">
+                      <span className="template-card-chip">
+                        {t("wizard.templateQuestionCount", { count: tpl.question_count })}
+                      </span>
+                      <span className="template-card-chip">
+                        {t("wizard.templateDuration", { count: tpl.duration_minutes })}
+                      </span>
+                      {tpl.has_screening && (
+                        <span className="template-card-chip">{t("wizard.templateHasScreening")}</span>
+                      )}
+                    </div>
+                    <div className="template-card-bestfor">
+                      <span className="template-card-bestfor-label">{t("wizard.templateBestFor")}</span>{" "}
+                      {tpl.best_for}
+                    </div>
+                    {applyingTemplateId === tpl.id && (
+                      <div className="template-card-loading">
+                        <span className="spinner-sm" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="template-picker-divider">
+              <span>{t("wizard.templatePickerOrDivider")}</span>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowTemplatePicker(false)}
+                disabled={applyingTemplateId !== null}
+              >
+                {t("wizard.templateStartFromScratch")}
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="wizard-layout">

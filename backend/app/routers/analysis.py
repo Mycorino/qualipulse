@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.models.interview import AnalysisThemeAnnotation, Participant, ProjectAnalysis
@@ -70,14 +71,49 @@ def trigger_analysis(
             logger.info("Analysis started for project %s", project_id)
             run_analysis(project_id, db, filter_by, filter_values)
             logger.info("Analysis completed for project %s", project_id)
-            # Notify company that analysis is ready
+            # Notify company that analysis is ready (email + Slack)
             try:
                 from app.models.project import Project as ProjectModel
                 from app.services.email import send_analysis_ready
+                from app.services.slack import send_analysis_ready as slack_analysis_ready
+
                 proj = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
                 if proj and proj.company:
-                    project_url = f"https://app.autointerview.com/projects/{project_id}?tab=analysis"
+                    project_url = f"{settings.APP_BASE_URL}/projects/{project_id}?tab=analysis"
                     send_analysis_ready(proj.company.email, proj.name, project_url)
+
+                    # Slack webhook (fire-and-forget, never raises)
+                    if getattr(proj.company, "slack_webhook_url", None):
+                        latest = (
+                            db.query(ProjectAnalysis)
+                            .filter(
+                                ProjectAnalysis.project_id == project_id,
+                                ProjectAnalysis.status == "ready",
+                            )
+                            .order_by(ProjectAnalysis.version.desc())
+                            .first()
+                        )
+                        top_themes: list[str] = []
+                        participant_count = 0
+                        if latest:
+                            participant_count = latest.participant_count or 0
+                            try:
+                                report = json.loads(latest.report) if latest.report else {}
+                                themes = report.get("themes", []) or []
+                                top_themes = [
+                                    str(t.get("title", "")).strip()
+                                    for t in themes
+                                    if isinstance(t, dict) and t.get("title")
+                                ][:5]
+                            except Exception:
+                                pass
+                        slack_analysis_ready(
+                            proj.company.slack_webhook_url,
+                            project_name=proj.name,
+                            project_url=project_url,
+                            participant_count=participant_count,
+                            top_themes=top_themes,
+                        )
             except Exception:
                 pass
         except Exception as exc:

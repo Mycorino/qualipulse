@@ -16,8 +16,10 @@ from app.schemas.project import (
     QuestionResponse,
     ScreeningQuestionResponse,
 )
+from app.services.demo_seeder import DEMO_PROJECT_NAME, seed_demo_project
 from app.services.feature_gates import require_project_limit, require_question_limit
 from app.services.guide_parser import parse_guide_csv
+from app.services.workspace import accessible_workspace_ids, can_edit, get_member_role
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -71,6 +73,31 @@ def create_project(
     return _project_to_response(project)
 
 
+@router.post("/demo", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
+def create_demo_project(
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ProjectResponse:
+    """Create (or return existing) a pre-populated demo project for this company.
+
+    Idempotent: if the user already has a project named `DEMO_PROJECT_NAME`, it is
+    returned instead of creating a duplicate. This also bypasses the project limit
+    so free-tier users can still try the demo even if they're at 1/1 usage.
+    """
+    existing = (
+        db.query(Project)
+        .filter(Project.company_id == company.id, Project.name == DEMO_PROJECT_NAME)
+        .first()
+    )
+    if existing:
+        return _project_to_response(existing)
+
+    # Deliberately bypass project/question limits for the demo so a free-tier user
+    # can always try it. We cap at one demo per company via the name check above.
+    project = seed_demo_project(db, company.id)
+    return _project_to_response(project)
+
+
 @router.post("/import", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def import_project_from_csv(
     name: str = Form(...),
@@ -119,7 +146,8 @@ def list_projects(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> list[ProjectListResponse]:
-    query = db.query(Project).filter(Project.company_id == company.id)
+    workspace_ids = accessible_workspace_ids(db, company)
+    query = db.query(Project).filter(Project.company_id.in_(workspace_ids))
     if archived:
         query = query.filter(Project.archived_at.isnot(None))
     else:
@@ -308,14 +336,36 @@ def patch_question(
 # ---------------------------------------------------------------------------
 
 def _get_project_or_404(project_id: str, company_id: str, db: Session) -> Project:
+    """Fetch a project accessible by this company (as owner or workspace member).
+
+    Projects are accessible if the caller's company owns them, OR if the caller
+    is a member of the workspace that owns the project.
+    """
+    # Direct ownership fast path
     project = (
         db.query(Project)
         .filter(Project.id == project_id, Project.company_id == company_id)
         .first()
     )
-    if project is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    return project
+    if project is not None:
+        return project
+
+    # Workspace membership path — resolve caller to a Company and check access
+    caller = db.query(Company).filter(Company.id == company_id).first()
+    if caller is not None:
+        workspace_ids = accessible_workspace_ids(db, caller)
+        project = (
+            db.query(Project)
+            .filter(
+                Project.id == project_id,
+                Project.company_id.in_(workspace_ids),
+            )
+            .first()
+        )
+        if project is not None:
+            return project
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
 
 def _project_to_response(project: Project) -> ProjectResponse:

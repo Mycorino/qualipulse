@@ -8,6 +8,11 @@ class SignupRequest(BaseModel):
     name: str
     email: EmailStr
     password: str
+    # Plan selected on the landing page (free/starter/team/lab). Optional —
+    # defaults to "starter" with 14-day Team-level trial if omitted.
+    plan: Optional[str] = None
+    # Affiliate referral code, if present
+    ref_code: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -67,6 +72,7 @@ class CompanyResponse(BaseModel):
     primary_region: Optional[str] = None
     goals_freeform: Optional[str] = None
     preferred_language: str = "fr"
+    slack_webhook_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -74,3 +80,7 @@ class CompanyResponse(BaseModel):
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     preferred_language: Optional[str] = None
+
+
+class SlackWebhookUpdate(BaseModel):
+    slack_webhook_url: Optional[str] = None

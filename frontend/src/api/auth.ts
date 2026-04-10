@@ -25,6 +25,7 @@ export interface CompanyResponse {
   primary_region: string | null;
   goals_freeform: string | null;
   preferred_language: string;
+  slack_webhook_url: string | null;
 }
 
 export interface OnboardingProfile {
@@ -43,12 +44,15 @@ export interface OnboardingProfile {
 export async function signup(
   name: string,
   email: string,
-  password: string
+  password: string,
+  opts?: { plan?: string; refCode?: string }
 ): Promise<TokenResponse> {
   const { data } = await client.post<TokenResponse>("/auth/signup", {
     name,
     email,
     password,
+    plan: opts?.plan,
+    ref_code: opts?.refCode,
   });
   return data;
 }
@@ -103,6 +107,20 @@ export async function completeOnboarding(profile: OnboardingProfile): Promise<Co
 export async function analyseWebsite(websiteUrl: string): Promise<{ business_summary: string }> {
   const { data } = await client.post<{ business_summary: string }>("/auth/website-intel", {
     website_url: websiteUrl,
+  });
+  return data;
+}
+
+export async function updateSlackWebhook(url: string | null): Promise<{ slack_webhook_url: string | null }> {
+  const { data } = await client.put<{ slack_webhook_url: string | null }>("/auth/me/slack", {
+    slack_webhook_url: url,
+  });
+  return data;
+}
+
+export async function testSlackWebhook(url?: string | null): Promise<{ message: string }> {
+  const { data } = await client.post<{ message: string }>("/auth/me/slack/test", {
+    slack_webhook_url: url ?? null,
   });
   return data;
 }

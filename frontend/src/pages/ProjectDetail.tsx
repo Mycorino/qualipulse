@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
 import {
@@ -63,6 +63,11 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ── First-run welcome modal (shown after project creation) ──────────────
+  const [welcomeOpen, setWelcomeOpen] = useState(() => searchParams.get("created") === "1");
+  const [welcomeCopied, setWelcomeCopied] = useState(false);
 
   // ── Core state ─────────────────────────────────────────────────────────────
   const [project, setProject] = useState<ProjectResponse | null>(null);
@@ -2417,6 +2422,118 @@ export default function ProjectDetail() {
           </div>
         )}
       </main>
+
+      {/* ── Welcome / first-participant modal ─────────────────────────── */}
+      {welcomeOpen && (() => {
+        const activeLink = links.find((l) => l.is_active) ?? links[0];
+        const shareUrl = activeLink ? interviewUrl(activeLink.token) : "";
+        const closeWelcome = () => {
+          setWelcomeOpen(false);
+          // Remove ?created=1 so a reload won't re-open the modal
+          searchParams.delete("created");
+          setSearchParams(searchParams, { replace: true });
+        };
+        const copyShareUrl = async () => {
+          if (!shareUrl) return;
+          try {
+            await navigator.clipboard.writeText(shareUrl);
+            setWelcomeCopied(true);
+            setTimeout(() => setWelcomeCopied(false), 2000);
+          } catch {
+            toast("Could not copy to clipboard", "error");
+          }
+        };
+        const subject = encodeURIComponent(`Quick research interview — ${project?.name ?? ""}`);
+        const bodyText = encodeURIComponent(
+          `Hi,\n\nI'd love your input on a short research study I'm running.\n` +
+            `It's a 10–20 minute voice interview you can do right from your browser, at your own pace.\n\n` +
+            `Start here: ${shareUrl}\n\nThanks so much!`
+        );
+        const mailtoLink = `mailto:?subject=${subject}&body=${bodyText}`;
+        return (
+          <div
+            className="modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="welcome-modal-title"
+            onClick={closeWelcome}
+          >
+            <div className="modal-content welcome-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="modal-close" onClick={closeWelcome} aria-label="Close">×</button>
+              <div className="welcome-modal-icon" aria-hidden="true">🎉</div>
+              <h2 id="welcome-modal-title" className="welcome-modal-title">
+                Your project is live!
+              </h2>
+              <p className="welcome-modal-subtitle">
+                Share this link and start collecting responses — your first insights could be in as soon as an hour.
+              </p>
+
+              {activeLink ? (
+                <>
+                  <div className="welcome-modal-link">
+                    <input
+                      type="text"
+                      readOnly
+                      value={shareUrl}
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="field-input welcome-modal-link-input"
+                      aria-label="Interview link"
+                    />
+                    <button
+                      className="btn btn-primary"
+                      onClick={copyShareUrl}
+                      type="button"
+                    >
+                      {welcomeCopied ? "✓ Copied" : "Copy link"}
+                    </button>
+                  </div>
+
+                  <div className="welcome-modal-share">
+                    <a
+                      href={mailtoLink}
+                      className="btn btn-ghost welcome-modal-share-btn"
+                    >
+                      ✉ Send via email
+                    </a>
+                    <button
+                      className="btn btn-ghost welcome-modal-share-btn"
+                      type="button"
+                      onClick={() => {
+                        window.open(shareUrl, "_blank");
+                      }}
+                    >
+                      ▶ Preview interview
+                    </button>
+                  </div>
+
+                  <div className="welcome-modal-tips">
+                    <strong>Pro tip:</strong> The first 3 participants are the most valuable. Aim to recruit from inside your existing network — teammates, recent customers, or community members — rather than cold outreach.
+                  </div>
+                </>
+              ) : (
+                <div className="welcome-modal-tips">
+                  We couldn't auto-generate an interview link. Head to the Overview tab to create one manually.
+                </div>
+              )}
+
+              <div className="welcome-modal-footer">
+                <button className="btn btn-ghost" onClick={closeWelcome}>
+                  I'll share later
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setTab("overview");
+                    closeWelcome();
+                  }}
+                >
+                  Go to project
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

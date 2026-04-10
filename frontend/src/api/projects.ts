@@ -255,6 +255,11 @@ export async function createProject(body: ProjectCreate): Promise<ProjectRespons
   return data;
 }
 
+export async function createDemoProject(): Promise<ProjectResponse> {
+  const { data } = await client.post<ProjectResponse>("/projects/demo");
+  return data;
+}
+
 export async function updateProject(id: string, body: ProjectCreate): Promise<ProjectResponse> {
   const { data } = await client.put<ProjectResponse>(`/projects/${id}`, body);
   return data;

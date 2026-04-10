@@ -1,5 +1,5 @@
 import { useState, FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { signup } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
@@ -34,6 +34,10 @@ export default function Signup() {
   const { saveToken } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Plan chosen on landing page (?plan=free|starter|team|lab)
+  const selectedPlan = searchParams.get("plan") ?? undefined;
+  const refCode = searchParams.get("ref") ?? undefined;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -60,7 +64,10 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const res = await signup(trimmedName, trimmedEmail, password);
+      const res = await signup(trimmedName, trimmedEmail, password, {
+        plan: selectedPlan,
+        refCode,
+      });
       saveToken(res.access_token, res.refresh_token);
       toast(t("signup.accountCreated"), "success");
       navigate("/welcome");

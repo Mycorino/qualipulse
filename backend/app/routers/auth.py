@@ -18,6 +18,7 @@ from app.schemas.auth import (
     PasswordResetRequest,
     RefreshRequest,
     SignupRequest,
+    SlackWebhookUpdate,
     TokenResponse,
 )
 from app.services.auth import (
@@ -55,11 +56,23 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
             detail="Password must be at least 8 characters.",
         )
 
+    # Resolve plan selection from the landing page.
+    # Free tier → no trial (they get the free tier limits permanently).
+    # Paid tiers → default starter + 14-day team-level trial.
+    requested_plan = (body.plan or "").strip().lower()
+    if requested_plan == "free":
+        tier = "free"
+        trial_ends = None
+    else:
+        tier = "starter"
+        trial_ends = datetime.utcnow() + timedelta(days=14)
+
     company = Company(
         name=body.name.strip(),
         email=body.email.lower().strip(),
         password_hash=hash_password(body.password),
-        trial_ends_at=datetime.utcnow() + timedelta(days=14),
+        subscription_tier=tier,
+        trial_ends_at=trial_ends,
     )
     db.add(company)
     db.commit()
@@ -378,6 +391,66 @@ def change_password(
     db.commit()
     logger.info("Password changed for %s", company.email)
     return {"message": "Password updated successfully"}
+
+
+# ── Integrations: Slack ───────────────────────────────────────────────
+
+
+def _validate_slack_url(url: str | None) -> str | None:
+    """Normalize + validate a Slack webhook URL. Returns cleaned URL or raises."""
+    if url is None:
+        return None
+    cleaned = url.strip()
+    if not cleaned:
+        return None
+    if not cleaned.startswith("https://hooks.slack.com/services/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Slack webhook URL must start with https://hooks.slack.com/services/",
+        )
+    if len(cleaned) > 500:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Slack webhook URL is too long.",
+        )
+    return cleaned
+
+
+@router.put("/me/slack")
+def update_slack_webhook(
+    body: SlackWebhookUpdate,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Save (or clear) the company's Slack webhook URL."""
+    cleaned = _validate_slack_url(body.slack_webhook_url)
+    company.slack_webhook_url = cleaned
+    db.commit()
+    logger.info("Slack webhook %s for %s", "set" if cleaned else "cleared", company.email)
+    return {"slack_webhook_url": cleaned}
+
+
+@router.post("/me/slack/test")
+def test_slack_webhook(
+    body: SlackWebhookUpdate,
+    company: Company = Depends(get_current_company),
+):
+    """Send a test message to the provided (or saved) Slack webhook URL."""
+    from app.services.slack import send_test_message
+
+    url = _validate_slack_url(body.slack_webhook_url) or company.slack_webhook_url
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No Slack webhook URL configured.",
+        )
+    ok = send_test_message(url)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Slack webhook call failed. Double-check the URL and try again.",
+        )
+    return {"message": "Test message sent"}
 
 
 class NewsletterSubscribe(BaseModel):

@@ -193,7 +193,7 @@ def update_tier(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ) -> AdminUserSummary:
-    valid_tiers = {"solo", "team", "lab", "enterprise"}
+    valid_tiers = {"free", "starter", "solo", "team", "lab", "enterprise"}
     if body.tier not in valid_tiers:
         raise HTTPException(status_code=422, detail=f"tier must be one of {sorted(valid_tiers)}")
 

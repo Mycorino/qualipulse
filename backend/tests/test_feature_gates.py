@@ -34,8 +34,8 @@ class TestGetLimits:
             assert limits.name is not None
 
     def test_legacy_aliases(self):
-        """Old DB values ('free', 'solo', 'pro') still resolve."""
-        assert get_limits("free").name == "Starter"
+        """Legacy DB values ('solo', 'pro') still resolve. 'free' is now its own tier."""
+        assert get_limits("free").name == "Free"
         assert get_limits("solo").name == "Starter"
         assert get_limits("pro").name == "Lab"
 
@@ -62,12 +62,22 @@ class TestGetEffectiveLimits:
         limits = get_effective_limits(company)
         assert limits.name == "Starter"
 
-    def test_legacy_free_with_trial_gets_team(self):
-        """Old 'free' tier values still get trial upgrade."""
+    def test_free_tier_does_not_get_trial_upgrade(self):
+        """'free' is its own tier now — no trial upgrade to Team."""
         future = datetime.utcnow() + timedelta(days=7)
         company = make_company("free", trial_ends_at=future)
         limits = get_effective_limits(company)
-        assert limits.name == "Team"
+        assert limits.name == "Free"
+
+    def test_free_tier_no_trial(self):
+        company = make_company("free")
+        limits = get_effective_limits(company)
+        assert limits.name == "Free"
+        # Free tier limits sanity check
+        assert limits.max_projects == 1
+        assert limits.max_participants_per_project == 5
+        assert limits.ai_analysis is True
+        assert limits.export_csv is False
 
     def test_team_tier_ignores_trial(self):
         future = datetime.utcnow() + timedelta(days=7)
