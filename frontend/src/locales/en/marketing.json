@@ -105,53 +105,6 @@
       }
     ]
   },
-  "output": {
-    "title": "From 12 interviews to this — automatically",
-    "subtitle": "This is what your AI-generated research memo looks like. Themes, quotes, tensions, and recommendations — ready to share.",
-    "projectName": "SaaS Onboarding Experience Study",
-    "meta": "12 participants · Generated in 45 seconds",
-    "summaryLabel": "Summary",
-    "summaryText": "Participants consistently reported that initial setup complexity is the primary barrier to adoption. Most valued a guided onboarding experience but found current implementations overly generic. Three key themes emerged around time-to-value expectations, the role of social proof in building confidence, and frustrations with feature discovery.",
-    "keyThemesLabel": "Key Themes",
-    "mentionedBy": "Mentioned by {{x}} of {{y}} participants",
-    "theme1": {
-      "title": "Time-to-value anxiety",
-      "quote": "I need to see value in the first 10 minutes or I'm gone. I don't have time to watch tutorials.",
-      "attr": "— Product Manager, Series A startup"
-    },
-    "theme2": {
-      "title": "Feature discovery friction",
-      "quote": "I only found out about the export feature after three months. I'd been doing it manually.",
-      "attr": "— UX Designer, Fintech"
-    },
-    "recommendationsLabel": "Recommendations",
-    "recs": [
-      "Implement a task-based onboarding flow that delivers value within the first session",
-      "Add contextual feature hints triggered by user behaviour patterns",
-      "Create role-specific setup paths (researcher vs. PM vs. designer)"
-    ]
-  },
-  "whoFor": {
-    "title": "Built for people who need insights, not busywork",
-    "subtitle": "Whether you run research full-time or fit it in between product decisions.",
-    "items": [
-      {
-        "title": "UX Researchers",
-        "desc": "Run more studies in less time. Offload the logistics, keep the analytical rigor. AI handles moderation and initial synthesis — you steer the interpretation.",
-        "examples": "Discovery research, evaluative studies, continuous research programs"
-      },
-      {
-        "title": "Product Managers",
-        "desc": "Get user insights without waiting for the research team's backlog. Set up a study in minutes, send the link to beta users, get a synthesis you can act on.",
-        "examples": "Feature validation, churn investigation, onboarding feedback"
-      },
-      {
-        "title": "Consultants & Agencies",
-        "desc": "Run qualitative research for clients at scale. Custom branding, shareable reports, multiple projects running in parallel.",
-        "examples": "Client research engagements, market research, stakeholder interviews"
-      }
-    ]
-  },
   "differentiator": {
     "title": "You might be wondering...",
     "subtitle": "How does QualiPulse compare to tools you may already know?",
