@@ -17,11 +17,12 @@ Two-tier strategy (no HTTP scraping):
    ``WebsiteIntelligenceError`` and the UI prompts the user to describe their
    business in the textarea we already render.
 
-This replaces the previous httpx + BeautifulSoup pipeline, which blindly
-passed raw HTML to Claude and hallucinated summaries of 403 pages and cookie
-walls.
+Returns a structured ``{"summary": str, "industry": str | None}`` so the
+onboarding UI can auto-preselect the industry chip in addition to populating
+the free-text summary.
 """
 
+import json
 import logging
 import re
 
@@ -32,37 +33,49 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _MODEL = "claude-sonnet-4-20250514"
-_MAX_TOKENS = 300
+_MAX_TOKENS = 500
 
 # Sentinel Claude returns when it has no useful knowledge of the URL/brand.
 _UNKNOWN_SENTINEL = "UNKNOWN"
 
+# Predefined industries the frontend shows as selectable chips. We ask Claude
+# to prefer one of these when possible, but it can return a custom label and
+# the UI will render it as a new chip.
+_PREDEFINED_INDUSTRIES = [
+    "Consumer Brands",
+    "SaaS / Tech",
+    "Agency",
+    "Healthcare",
+    "Academia",
+    "Government",
+    "Other",
+]
+
+_LANGUAGE_DIRECTIVES = {
+    "en": "Write the summary in English.",
+    "fr": "Écris le résumé en français (le JSON et les clés restent en anglais, seule la valeur du champ \"summary\" est en français).",
+}
+
 _BASE_INSTRUCTIONS = (
     "You are helping onboard a researcher onto a user-research SaaS. They "
-    "just typed their company's website URL. Write a 2-3 sentence summary of "
-    "what this company does, who their customers are, and what market they "
-    "operate in. Be specific and factual. Third person, no marketing fluff, "
-    "no emojis, no quotation marks around the URL."
+    "just typed their company's website URL. Your job is to produce a short "
+    "business summary AND classify the company into an industry bucket."
 )
 
-_KNOWLEDGE_PROMPT = (
-    _BASE_INSTRUCTIONS
-    + "\n\n"
-    + "If you are NOT confident about what this specific company does — for "
-    + "example you've never heard of them, or the URL is too generic to "
-    + "identify a single business — respond with exactly the single word "
-    + f"{_UNKNOWN_SENTINEL} and nothing else. Do not guess. Do not describe "
-    + "what a company at a similar-sounding domain might do.\n\n"
-    + "Company URL: {url}\n\nSummary:"
-)
-
-_SEARCH_PROMPT = (
-    _BASE_INSTRUCTIONS
-    + "\n\n"
-    + "Search the web for information about the company at this URL, then "
-    + "write the summary. If after searching you still cannot determine what "
-    + f"this business does, respond with exactly the single word {_UNKNOWN_SENTINEL}.\n\n"
-    + "Company URL: {url}\n\nSummary:"
+_OUTPUT_SPEC = (
+    "Respond with ONLY a single JSON object (no prose, no markdown fences) "
+    "with this exact shape:\n"
+    "{\n"
+    '  "summary": "<2-3 sentence factual description: what the company does, '
+    'who their customers are, what market they operate in. Third person, no '
+    'marketing fluff, no emojis.>",\n'
+    '  "industry": "<one of: Consumer Brands | SaaS / Tech | Agency | '
+    'Healthcare | Academia | Government | Other — OR a short custom label '
+    '(max 3 words) if none of the predefined options fit.>"\n'
+    "}\n\n"
+    "Prefer one of the predefined industry values when it reasonably fits. "
+    "Only invent a custom label (e.g. \"Retail\", \"Banking\", \"Energy\") "
+    "when the predefined list is clearly wrong."
 )
 
 
@@ -106,10 +119,84 @@ def _is_unknown(text: str) -> bool:
     stripped = text.strip().upper()
     if stripped == _UNKNOWN_SENTINEL:
         return True
-    # First word is UNKNOWN, followed by space/punctuation
     if re.match(rf"^{_UNKNOWN_SENTINEL}\b", stripped):
         return True
     return False
+
+
+def _parse_response(text: str) -> dict | None:
+    """Parse Claude's JSON response. Returns ``{"summary": str, "industry": str | None}``
+    or ``None`` if the payload is unparseable / contains the UNKNOWN sentinel.
+
+    Tolerant of:
+      - stray markdown fences (```json ... ```)
+      - leading/trailing prose
+      - Claude returning the bare UNKNOWN sentinel instead of JSON
+    """
+    if not text:
+        return None
+    if _is_unknown(text):
+        return None
+
+    # Strip markdown fences if present
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        # Remove opening fence (```json or ```)
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```\s*$", "", cleaned)
+
+    # Find first { ... } block (Claude may emit a trailing sentence).
+    match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+    if not match:
+        return None
+
+    try:
+        payload = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    summary = payload.get("summary")
+    industry = payload.get("industry")
+
+    if not isinstance(summary, str) or not summary.strip():
+        return None
+    if _is_unknown(summary):
+        return None
+
+    cleaned_industry: str | None = None
+    if isinstance(industry, str) and industry.strip() and not _is_unknown(industry):
+        cleaned_industry = industry.strip()
+
+    return {"summary": summary.strip(), "industry": cleaned_industry}
+
+
+def _build_prompt(url: str, language: str, *, with_search: bool) -> str:
+    lang_directive = _LANGUAGE_DIRECTIVES.get(language, _LANGUAGE_DIRECTIVES["en"])
+    if with_search:
+        retrieval = (
+            "Search the web for information about the company at this URL, "
+            "then produce the JSON. If after searching you still cannot "
+            f"determine what this business does, return the single word "
+            f"{_UNKNOWN_SENTINEL} (no JSON)."
+        )
+    else:
+        retrieval = (
+            "If you are NOT confident about what this specific company does — "
+            "for example you've never heard of them, or the URL is too generic "
+            "to identify a single business — return the single word "
+            f"{_UNKNOWN_SENTINEL} (no JSON). Do not guess. Do not describe what "
+            "a company at a similar-sounding domain might do."
+        )
+    return (
+        f"{_BASE_INSTRUCTIONS}\n\n"
+        f"{lang_directive}\n\n"
+        f"{retrieval}\n\n"
+        f"{_OUTPUT_SPEC}\n\n"
+        f"Company URL: {url}"
+    )
 
 
 def _log_usage(db, message, company_id) -> None:
@@ -122,13 +209,26 @@ def _log_usage(db, message, company_id) -> None:
         pass
 
 
-async def fetch_website_summary(url: str, db=None, company_id=None) -> str:
-    """Produce a business summary for ``url`` using Claude's knowledge first,
-    then the ``web_search`` tool as a fallback.
+async def fetch_website_summary(
+    url: str,
+    language: str = "en",
+    db=None,
+    company_id=None,
+) -> dict:
+    """Produce a business summary and industry classification for ``url``
+    using Claude's knowledge first, then the ``web_search`` tool as a fallback.
 
-    Raises ``WebsiteIntelligenceError`` if neither pass yields a usable
-    summary so the UI can surface a localized message and let the user
-    describe their business manually.
+    Args:
+        url: The company website URL the user typed.
+        language: ISO language code for the summary prose (``"en"`` or ``"fr"``).
+        db: Optional DB session for AI usage logging.
+        company_id: Optional company ID for AI usage logging.
+
+    Returns:
+        A dict with keys ``summary`` (str) and ``industry`` (str | None).
+
+    Raises:
+        WebsiteIntelligenceError: if neither pass yields a usable result.
     """
     clean_url = _normalize_url(url)
     if not clean_url:
@@ -140,6 +240,7 @@ async def fetch_website_summary(url: str, db=None, company_id=None) -> str:
             "ai_failed", "The AI service is not configured."
         )
 
+    lang = language if language in _LANGUAGE_DIRECTIVES else "en"
     ai_client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
     # ── Pass 1: knowledge-only ────────────────────────────────────────────
@@ -149,7 +250,7 @@ async def fetch_website_summary(url: str, db=None, company_id=None) -> str:
             max_tokens=_MAX_TOKENS,
             messages=[{
                 "role": "user",
-                "content": _KNOWLEDGE_PROMPT.format(url=clean_url),
+                "content": _build_prompt(clean_url, lang, with_search=False),
             }],
         )
     except Exception as exc:
@@ -165,10 +266,14 @@ async def fetch_website_summary(url: str, db=None, company_id=None) -> str:
 
     _log_usage(db, knowledge_msg, company_id)
     knowledge_text = _extract_text(knowledge_msg)
+    parsed = _parse_response(knowledge_text)
 
-    if knowledge_text and not _is_unknown(knowledge_text):
-        logger.info("website_intel.knowledge_hit", extra={"url": clean_url})
-        return knowledge_text
+    if parsed is not None:
+        logger.info(
+            "website_intel.knowledge_hit",
+            extra={"url": clean_url, "industry": parsed.get("industry")},
+        )
+        return parsed
 
     logger.info("website_intel.knowledge_miss", extra={"url": clean_url})
 
@@ -184,7 +289,7 @@ async def fetch_website_summary(url: str, db=None, company_id=None) -> str:
             }],
             messages=[{
                 "role": "user",
-                "content": _SEARCH_PROMPT.format(url=clean_url),
+                "content": _build_prompt(clean_url, lang, with_search=True),
             }],
         )
     except Exception as exc:
@@ -200,10 +305,14 @@ async def fetch_website_summary(url: str, db=None, company_id=None) -> str:
 
     _log_usage(db, search_msg, company_id)
     search_text = _extract_text(search_msg)
+    parsed = _parse_response(search_text)
 
-    if search_text and not _is_unknown(search_text):
-        logger.info("website_intel.search_hit", extra={"url": clean_url})
-        return search_text
+    if parsed is not None:
+        logger.info(
+            "website_intel.search_hit",
+            extra={"url": clean_url, "industry": parsed.get("industry")},
+        )
+        return parsed
 
     logger.info("website_intel.search_miss", extra={"url": clean_url})
     raise WebsiteIntelligenceError(
@@ -211,3 +320,6 @@ async def fetch_website_summary(url: str, db=None, company_id=None) -> str:
         "We couldn't identify what this business does from their website. "
         "Please describe it manually below.",
     )
+
+
+__all__ = ["fetch_website_summary", "WebsiteIntelligenceError", "_PREDEFINED_INDUSTRIES"]

@@ -300,13 +300,25 @@ async def website_intel(
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
 ):
-    """Fetch a website and generate a business summary using Claude. Saves to company record."""
+    """Fetch a website and generate a business summary + industry using Claude.
+
+    Uses the company's ``preferred_language`` so the prose matches the UI
+    locale the user is currently filling the onboarding form in. Persists
+    the URL, summary, and detected industry to the company record.
+    """
     url = (body.get("website_url") or "").strip()
     if not url:
         raise HTTPException(status_code=400, detail="website_url is required")
 
+    language = company.preferred_language or "en"
+
     try:
-        summary = await fetch_website_summary(url, db=db, company_id=company.id)
+        result = await fetch_website_summary(
+            url,
+            language=language,
+            db=db,
+            company_id=company.id,
+        )
     except WebsiteIntelligenceError as exc:
         # Still persist the URL so we don't ask for it again; just skip the summary.
         company.website_url = url
@@ -319,12 +331,22 @@ async def website_intel(
             detail={"code": exc.code, "message": exc.message},
         )
 
+    summary = result.get("summary", "")
+    industry = result.get("industry")
+
     company.website_url = url
     company.business_summary = summary
+    if industry:
+        company.industry = industry
     db.commit()
 
-    logger.info("Website intel generated for %s: %s", company.email, url)
-    return {"business_summary": summary}
+    logger.info(
+        "Website intel generated for %s: %s (industry=%s)",
+        company.email,
+        url,
+        industry,
+    )
+    return {"business_summary": summary, "industry": industry}
 
 
 @router.patch("/onboarding")
