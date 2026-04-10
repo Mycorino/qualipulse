@@ -7,7 +7,9 @@ import { AxiosError } from "axios";
 export function getErrorMessage(err: unknown, fallback = "Something went wrong"): string {
   if (!err) return fallback;
 
-  const axiosErr = err as AxiosError<{ detail?: string | { msg: string }[] }>;
+  const axiosErr = err as AxiosError<{
+    detail?: string | { msg: string }[] | { code?: string; message?: string };
+  }>;
 
   // Network error — no response at all
   if (axiosErr.code === "ERR_NETWORK" || !axiosErr.response) {
@@ -30,6 +32,12 @@ export function getErrorMessage(err: unknown, fallback = "Something went wrong")
   // Known API detail string
   if (typeof detail === "string" && detail.length > 0) {
     return detail;
+  }
+
+  // Structured detail object: { code, message }
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const msg = (detail as { message?: string }).message;
+    if (typeof msg === "string" && msg.length > 0) return msg;
   }
 
   // HTTP status-based fallbacks

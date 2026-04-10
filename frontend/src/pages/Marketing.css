@@ -1115,17 +1115,3 @@
   .mkt-diff { padding: 40px 16px; }
   .mkt-final-cta { padding: 40px 16px; }
 }
-
-/* ---- Dark mode overrides ---- */
-@media (prefers-color-scheme: dark) {
-  .mkt-nav {
-    background: rgba(14, 15, 20, 0.95);
-  }
-  .mkt-final-cta {
-    background: linear-gradient(135deg, #0d1226, #151c3a);
-  }
-  .mkt-ba-manual { text-decoration-color: rgba(255,255,255,0.15); }
-  .mkt-ba-total { background: rgba(79, 70, 229, 0.12); }
-  .mkt-hero-stat { background: rgba(79, 70, 229, 0.14); border-color: rgba(79, 70, 229, 0.3); }
-  .mkt-use-case-best { background: rgba(79, 70, 229, 0.14); }
-}
