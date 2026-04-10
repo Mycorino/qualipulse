@@ -54,6 +54,11 @@ class OnboardingProfileRequest(BaseModel):
     research_experience: Optional[str] = None
     primary_region: Optional[str] = None
     goals_freeform: Optional[str] = None
+    # Account language — drives email locale, AI generation language
+    # (research wizard suggestions, interview guide drafting), and the
+    # default project language. Set at signup from i18n.language and
+    # confirmable in onboarding step 2.
+    preferred_language: Optional[str] = None
 
 
 class CompanyResponse(BaseModel):

@@ -39,6 +39,7 @@ export interface OnboardingProfile {
   research_experience?: string;
   primary_region?: string;
   goals_freeform?: string;
+  preferred_language?: string;
 }
 
 export async function signup(
