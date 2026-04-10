@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "./hooks/useAuth";
+import { useAuth, getCachedOnboarded, setCachedOnboarded } from "./hooks/useAuth";
+import { getMe } from "./api/auth";
 import { ToastProvider } from "./components/Toast";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -31,9 +33,53 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Guards routes that require onboarding to be completed. If the cached flag
+ * is missing (e.g. old session, refresh after deploy), we fetch /auth/me
+ * once, write the result to the cache, and then render or redirect.
+ *
+ * This prevents the "clicked back from /welcome and landed on the dashboard
+ * with onboarding half-done" bug.
+ */
+function OnboardedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  const cached = getCachedOnboarded();
+  const [status, setStatus] = useState<"checking" | "onboarded" | "incomplete">(
+    cached === true ? "onboarded" : cached === false ? "incomplete" : "checking"
+  );
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (cached !== null) return;
+    let cancelled = false;
+    getMe()
+      .then((me) => {
+        if (cancelled) return;
+        setCachedOnboarded(!!me.onboarding_completed);
+        setStatus(me.onboarding_completed ? "onboarded" : "incomplete");
+      })
+      .catch(() => {
+        // If /auth/me fails (401, network), fall through — ProtectedRoute
+        // or the API interceptor will handle auth expiry.
+        if (!cancelled) setStatus("onboarded");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, cached]);
+
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (status === "checking") return null;
+  if (status === "incomplete") return <Navigate to="/welcome" replace />;
+  return <>{children}</>;
+}
+
 function HomeRoute() {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Marketing />;
+  const cached = getCachedOnboarded();
+  if (!isAuthenticated) return <Marketing />;
+  if (cached === false) return <Navigate to="/welcome" replace />;
+  return <Navigate to="/dashboard" replace />;
 }
 
 export default function App() {
@@ -60,33 +106,33 @@ export default function App() {
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
+          <OnboardedRoute>
             <Dashboard />
-          </ProtectedRoute>
+          </OnboardedRoute>
         }
       />
       <Route
         path="/projects/:id"
         element={
-          <ProtectedRoute>
+          <OnboardedRoute>
             <ProjectDetail />
-          </ProtectedRoute>
+          </OnboardedRoute>
         }
       />
       <Route
         path="/projects/new"
         element={
-          <ProtectedRoute>
+          <OnboardedRoute>
             <CreateProjectWizard />
-          </ProtectedRoute>
+          </OnboardedRoute>
         }
       />
       <Route
         path="/projects/:id/edit"
         element={
-          <ProtectedRoute>
+          <OnboardedRoute>
             <CreateProjectWizard />
-          </ProtectedRoute>
+          </OnboardedRoute>
         }
       />
       <Route path="/i/:token" element={<Interview />} />
@@ -100,9 +146,9 @@ export default function App() {
       <Route
         path="/account"
         element={
-          <ProtectedRoute>
+          <OnboardedRoute>
             <AccountSettings />
-          </ProtectedRoute>
+          </OnboardedRoute>
         }
       />
     </Routes>
