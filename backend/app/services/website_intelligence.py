@@ -70,16 +70,33 @@ _OUTPUT_SPEC = (
     'marketing fluff, no emojis.>",\n'
     '  "industry": "<one of: Consumer Brands | SaaS / Tech | Agency | '
     'Healthcare | Academia | Government | Other — OR a short custom label '
-    '(max 3 words) if none of the predefined options fit.>"\n'
+    '(max 3 words) if none of the predefined options fit.>",\n'
+    '  "primary_country": "<the company\'s main market as one of: fr | be | '
+    'ch | de | uk | es | it | nl | pt | europe | us | ca | global | other. '
+    'Use the lowercase ISO alpha-2 code for a single country; use '
+    '\\"europe\\" if they serve multiple European countries without one '
+    'clearly dominant; use \\"global\\" if they operate worldwide; use '
+    '\\"other\\" for a single non-listed country.>"\n'
     "}\n\n"
     "Prefer one of the predefined industry values when it reasonably fits. "
     "Only invent a custom label (e.g. \"Retail\", \"Banking\", \"Energy\") "
     "when the predefined list is clearly wrong.\n\n"
+    "For primary_country, use the domain TLD, language, currency, physical "
+    "store locations, and any \"about\" page as signal. A .fr domain with "
+    "French prose is almost certainly fr; a .com SaaS selling to US "
+    "enterprises is us; a multinational retailer is europe or global.\n\n"
     "**The summary value must be plain prose only.** Do NOT include HTML "
     "tags, markdown, footnotes, citation markers, ``<cite>`` blocks, or "
     "``[1]`` style references. Even if you used web_search, return clean "
     "sentences with no source attribution embedded in the text."
 )
+
+# Allowed primary_country values — must stay in sync with REGION_VALUES in
+# frontend/src/pages/Welcome.tsx.
+_ALLOWED_COUNTRIES = {
+    "fr", "be", "ch", "de", "uk", "es", "it", "nl", "pt",
+    "europe", "us", "ca", "global", "other",
+}
 
 
 class WebsiteIntelligenceError(Exception):
@@ -188,6 +205,7 @@ def _parse_response(text: str) -> dict | None:
 
     summary = payload.get("summary")
     industry = payload.get("industry")
+    primary_country = payload.get("primary_country")
 
     if not isinstance(summary, str) or not summary.strip():
         return None
@@ -202,7 +220,17 @@ def _parse_response(text: str) -> dict | None:
     if isinstance(industry, str) and industry.strip() and not _is_unknown(industry):
         cleaned_industry = _strip_citation_tags(industry.strip())
 
-    return {"summary": summary, "industry": cleaned_industry}
+    cleaned_country: str | None = None
+    if isinstance(primary_country, str):
+        code = primary_country.strip().lower()
+        if code in _ALLOWED_COUNTRIES:
+            cleaned_country = code
+
+    return {
+        "summary": summary,
+        "industry": cleaned_industry,
+        "primary_country": cleaned_country,
+    }
 
 
 def _build_prompt(url: str, language: str, *, with_search: bool) -> str:

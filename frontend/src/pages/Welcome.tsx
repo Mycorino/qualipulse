@@ -15,14 +15,33 @@ import { getErrorMessage } from "../utils/errorMessages";
 const TEAM_SIZE_VALUES = ["Just me", "2–10", "11–50", "50+"];
 const ROLE_VALUES = ["Researcher", "Product Manager", "Marketer", "Consultant", "Academic", "Founder", "Other"];
 const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Other"];
+// Country-level chips for "Primary market". Ordered for a French-launch
+// audience: France first (matches our initial go-to-market), then other
+// French-speaking markets, then major European markets, then a Europe
+// catch-all, then North America and global. Values are ISO 3166-1 alpha-2
+// codes where possible so the backend stores a stable identifier.
 const REGION_VALUES = [
+  { value: "fr" },
+  { value: "be" },
+  { value: "ch" },
+  { value: "de" },
+  { value: "uk" },
+  { value: "es" },
+  { value: "it" },
+  { value: "nl" },
+  { value: "pt" },
   { value: "europe" },
-  { value: "north_america" },
-  { value: "apac" },
+  { value: "us" },
+  { value: "ca" },
   { value: "global" },
   { value: "other" },
 ];
 const EXPERIENCE_VALUES = ["new", "some", "professional"] as const;
+
+// Number of "reading your site / understanding your business / …" messages
+// shown while the website analyser is running. Must stay in sync with the
+// number of keys under `onboarding.websiteProgress.*` in the locale files.
+const WEBSITE_PROGRESS_STEP_COUNT = 8;
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -216,11 +235,24 @@ export default function Welcome() {
     // the Continue button unlocks.
     setSummaryConfirmed(false);
     try {
-      const { business_summary, industry: detectedIndustry } =
-        await analyseWebsite(trimmed);
+      const {
+        business_summary,
+        industry: detectedIndustry,
+        primary_country: detectedCountry,
+      } = await analyseWebsite(trimmed);
       setBusinessSummary(business_summary);
       setAnalysedUrl(trimmed);
       setManualMode(false);
+
+      // Auto-select the country chip if Claude identified a primary market.
+      // Only overwrite if we don't already have a user selection so the
+      // user's explicit choice takes precedence on a regenerate.
+      if (detectedCountry) {
+        const known = REGION_VALUES.some((r) => r.value === detectedCountry);
+        if (known) {
+          setPrimaryRegion((prev) => prev || detectedCountry);
+        }
+      }
 
       // Auto-select the industry chip. If Claude returned a label that
       // isn't in the predefined list, add it as a custom chip so the user
@@ -301,10 +333,11 @@ export default function Welcome() {
     if (!trimmed) return;
     if (trimmed === lastAttemptedUrlRef.current) return;
 
-    // Crude "looks like a URL" gate. We accept anything with a dot and a
-    // TLD-ish suffix, optionally prefixed with a scheme. The backend
-    // normaliser handles missing https://.
-    const looksLikeUrl = /^(https?:\/\/)?[^\s.]+\.[a-z]{2,}/i.test(trimmed);
+    // Crude "looks like a URL" gate. Has to be lenient enough to accept
+    // domains with single-letter subdomains (www.e.leclerc) and odd TLDs,
+    // so we just require a dot, a 2+ char tail, and no whitespace. The
+    // backend normaliser handles missing https://.
+    const looksLikeUrl = /\.[^\s.]{2,}$/.test(trimmed) && !/\s/.test(trimmed);
     if (!looksLikeUrl) return;
 
     if (analyseTimeoutRef.current) clearTimeout(analyseTimeoutRef.current);
@@ -318,26 +351,53 @@ export default function Welcome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [websiteUrl, manualMode, websiteLoading]);
 
-  // While the analyser is running, cycle through 4 progress messages
-  // ("Reading your site…" → "Understanding your business…" → …) every
-  // 1.5s so the user has something concrete to look at instead of a
-  // bare spinner. Resets to step 0 each time loading flips on.
+  // While the analyser is running, walk through 8 progress messages
+  // ("Reading your site…" → "Exploring your homepage…" → …) every
+  // ~1.8s so the user has something concrete to look at instead of a
+  // bare spinner. Caps at the last message if the request is still
+  // running — we deliberately don't loop so the user doesn't see the
+  // same message twice and wonder if the call is stuck.
   useEffect(() => {
     if (!websiteLoading) return;
     setWebsiteProgressStep(0);
     const id = setInterval(() => {
-      setWebsiteProgressStep((s) => (s + 1) % 4);
-    }, 1500);
+      setWebsiteProgressStep((s) =>
+        s >= WEBSITE_PROGRESS_STEP_COUNT - 1 ? s : s + 1,
+      );
+    }, 1800);
     return () => clearInterval(id);
   }, [websiteLoading]);
 
   // Step 3 → 4
+  //
+  // The Continue button is the single primary action on this step. Its
+  // behaviour depends on where we are in the analyse → review → proceed
+  // cycle:
+  //
+  // 1. URL entered, never analysed, not in manual mode → trigger the
+  //    website analyser instead of advancing. The user doesn't need to
+  //    click a separate "Describe my business for me" CTA.
+  // 2. Analyser still running → the button is disabled (see JSX) so this
+  //    handler should never fire in that state.
+  // 3. Summary present but not confirmed and not manual → the button is
+  //    disabled and we show a review hint; the user has to click the
+  //    "Looks right" confirm button first.
+  // 4. Confirmed / manual mode / no URL at all → save the step and advance.
   async function handleBusinessContinue() {
+    const trimmed = websiteUrl.trim();
+    // (1) We have a URL, no summary yet, not in manual mode, not already
+    // loading → run the analyser. This is the path a user who typed a
+    // URL and clicked Continue straight away ends up on.
+    if (trimmed && !businessSummary && !manualMode && !websiteLoading) {
+      handleAnalyseWebsite();
+      return;
+    }
+
     setSaving(true);
     setError("");
     try {
       await saveOnboardingProfile({
-        website_url: websiteUrl.trim() || undefined,
+        website_url: trimmed || undefined,
         business_summary: businessSummary.trim() || undefined,
         industry: industry || undefined,
         primary_region: primaryRegion || undefined,
@@ -568,49 +628,27 @@ export default function Welcome() {
                     {t("onboarding.websiteOptional")}
                   </span>
                 </label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    type="text"
-                    className="field-input"
-                    value={websiteUrl}
-                    onChange={(e) => {
-                      setWebsiteUrl(e.target.value);
-                      // Typing doesn't auto-analyse — the user must press
-                      // Enter or click the button. Paste still auto-fires
-                      // (handleWebsitePaste) since pasting is an explicit
-                      // "use this URL" intent.
-                    }}
-                    onPaste={handleWebsitePaste}
-                    placeholder={t("onboarding.websitePlaceholder")}
-                    style={{ flex: 1 }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAnalyseWebsite();
-                      }
-                    }}
-                    disabled={saving}
-                  />
-                  <button
-                    className="btn btn-secondary"
-                    onClick={handleAnalyseWebsite}
-                    disabled={websiteLoading || !websiteUrl.trim() || saving}
-                    style={{ whiteSpace: "nowrap", flexShrink: 0 }}
-                  >
-                    {websiteLoading ? (
-                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="spinner" style={{ width: 14, height: 14, border: "2px solid currentColor", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.6s linear infinite" }} />
-                        {t("onboarding.websiteAnalysing")}
-                      </span>
-                    ) : (
-                      websiteUrl.trim() &&
-                      websiteUrl.trim() !== analysedUrl.trim() &&
-                      analysedUrl
-                        ? t("onboarding.websiteRegenerate")
-                        : t("onboarding.websiteAnalyseFriendly")
-                    )}
-                  </button>
-                </div>
+                <input
+                  type="text"
+                  className="field-input"
+                  value={websiteUrl}
+                  onChange={(e) => {
+                    setWebsiteUrl(e.target.value);
+                    // Typing doesn't auto-analyse — the user must press
+                    // Enter or click Continue. Paste still auto-fires
+                    // (handleWebsitePaste) since pasting is an explicit
+                    // "use this URL" intent.
+                  }}
+                  onPaste={handleWebsitePaste}
+                  placeholder={t("onboarding.websitePlaceholder")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAnalyseWebsite();
+                    }
+                  }}
+                  disabled={saving || websiteLoading}
+                />
                 {/* Claude-style cycling progress panel — shown only while
                     the analyser is running. Replaces the bare spinner with
                     a sequence of concrete status messages so the user has

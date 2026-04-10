@@ -343,20 +343,31 @@ async def website_intel(
 
     summary = result.get("summary", "")
     industry = result.get("industry")
+    primary_country = result.get("primary_country")
 
     company.website_url = url
     company.business_summary = summary
     if industry:
         company.industry = industry
+    # Persist detected primary market so it survives a page reload and so
+    # the AccountSettings / email flows have a default to work with. The
+    # frontend also preselects the matching chip in the onboarding UI.
+    if primary_country:
+        company.primary_region = primary_country
     db.commit()
 
     logger.info(
-        "Website intel generated for %s: %s (industry=%s)",
+        "Website intel generated for %s: %s (industry=%s, country=%s)",
         company.email,
         url,
         industry,
+        primary_country,
     )
-    return {"business_summary": summary, "industry": industry}
+    return {
+        "business_summary": summary,
+        "industry": industry,
+        "primary_country": primary_country,
+    }
 
 
 @router.patch("/onboarding")
