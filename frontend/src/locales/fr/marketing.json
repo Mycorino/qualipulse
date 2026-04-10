@@ -105,53 +105,6 @@
       }
     ]
   },
-  "output": {
-    "title": "De 12 entretiens à ceci — automatiquement",
-    "subtitle": "Voici à quoi ressemble votre mémo de recherche généré par IA. Thèmes, citations, tensions et recommandations — prêts à partager.",
-    "projectName": "Étude sur l'expérience d'intégration SaaS",
-    "meta": "12 participants · Généré en 45 secondes",
-    "summaryLabel": "Résumé",
-    "summaryText": "Les participants ont régulièrement signalé que la complexité de la configuration initiale est le principal obstacle à l'adoption. La plupart apprécient une expérience d'intégration guidée, mais trouvent les implémentations actuelles trop génériques. Trois thèmes clés ont émergé autour des attentes de time-to-value, du rôle de la preuve sociale dans l'établissement de la confiance, et des frustrations liées à la découverte des fonctionnalités.",
-    "keyThemesLabel": "Thèmes clés",
-    "mentionedBy": "Mentionné par {{x}} des {{y}} participants",
-    "theme1": {
-      "title": "Anxiété du time-to-value",
-      "quote": "Je dois voir de la valeur dans les 10 premières minutes ou je pars. Je n'ai pas le temps de regarder des tutoriels.",
-      "attr": "— Chef de produit, startup Série A"
-    },
-    "theme2": {
-      "title": "Friction dans la découverte des fonctionnalités",
-      "quote": "Je n'ai découvert la fonctionnalité d'export qu'après trois mois. Je le faisais manuellement jusque-là.",
-      "attr": "— Designer UX, Fintech"
-    },
-    "recommendationsLabel": "Recommandations",
-    "recs": [
-      "Mettre en place un parcours d'intégration basé sur les tâches qui apporte de la valeur dès la première session",
-      "Ajouter des conseils contextuels sur les fonctionnalités déclenchés par les comportements utilisateurs",
-      "Créer des parcours de configuration spécifiques à chaque rôle (chercheur, PM, designer)"
-    ]
-  },
-  "whoFor": {
-    "title": "Conçu pour ceux qui ont besoin d'insights, pas de corvées",
-    "subtitle": "Que vous fassiez de la recherche à temps plein ou entre deux décisions produit.",
-    "items": [
-      {
-        "title": "Chercheurs UX",
-        "desc": "Menez plus d'études en moins de temps. Déléguez la logistique, gardez la rigueur analytique. L'IA gère l'animation et la synthèse initiale — vous pilotez l'interprétation.",
-        "examples": "Recherche exploratoire, études évaluatives, programmes de recherche continus"
-      },
-      {
-        "title": "Chefs de produit",
-        "desc": "Obtenez des insights utilisateurs sans attendre le backlog de l'équipe de recherche. Configurez une étude en minutes, envoyez le lien aux bêta-utilisateurs, obtenez une synthèse exploitable.",
-        "examples": "Validation de fonctionnalités, analyse du churn, retours sur l'intégration"
-      },
-      {
-        "title": "Consultants et agences",
-        "desc": "Menez des recherches qualitatives pour vos clients à grande échelle. Branding personnalisé, rapports partageables, plusieurs projets en parallèle.",
-        "examples": "Missions de recherche client, études de marché, entretiens avec les parties prenantes"
-      }
-    ]
-  },
   "differentiator": {
     "title": "Vous vous posez peut-être des questions...",
     "subtitle": "Comment QualiPulse se compare-t-il aux outils que vous connaissez déjà ?",

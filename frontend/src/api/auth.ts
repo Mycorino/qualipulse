@@ -45,7 +45,7 @@ export async function signup(
   name: string,
   email: string,
   password: string,
-  opts?: { plan?: string; refCode?: string }
+  opts?: { plan?: string; refCode?: string; preferredLanguage?: string }
 ): Promise<TokenResponse> {
   const { data } = await client.post<TokenResponse>("/auth/signup", {
     name,
@@ -53,6 +53,7 @@ export async function signup(
     password,
     plan: opts?.plan,
     ref_code: opts?.refCode,
+    preferred_language: opts?.preferredLanguage,
   });
   return data;
 }

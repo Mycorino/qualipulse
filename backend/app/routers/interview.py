@@ -98,26 +98,32 @@ def request_verification(
     body: VerificationRequest,
     db: Session = Depends(get_db),
 ):
-    """Send a magic link to the participant's email to verify and start the interview."""
+    """Send a magic link to the participant's email to verify and start the interview.
+
+    The frontend already enforces a 60-second resend cooldown, so we don't
+    dedup on the server side — if the first send silently failed (SendGrid
+    reject, network blip, etc.) the participant can retry immediately and
+    actually get an email. We still surface a 502 when SendGrid refuses so
+    the UI can show a real error instead of pretending success.
+    """
     link = _get_active_link_or_404(token, db)
 
-    # Dedup: don't send another token within 60 seconds
-    from datetime import datetime as dt
-    recent_cutoff = dt.utcnow() - timedelta(seconds=60)
-    existing = (
-        db.query(ParticipantMagicToken)
-        .filter(
-            ParticipantMagicToken.email == body.email,
-            ParticipantMagicToken.interview_link_token == token,
-            ParticipantMagicToken.used.is_(False),
-            ParticipantMagicToken.created_at >= recent_cutoff,
-        )
-        .first()
-    )
-    if existing:
-        return {"message": "Magic link already sent", "email": body.email}
+    # Use the project's configured language for the email body so the
+    # participant reads the copy in the same language as the interview.
+    project_lang = getattr(link.project, "language", "en") or "en"
 
-    generate_magic_token(db, body.email, token)
+    _, delivered = generate_magic_token(
+        db, body.email, token, lang=project_lang
+    )
+    if not delivered:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "We couldn't send the verification email. Please try again in a "
+                "moment — if the problem persists, contact the researcher who "
+                "shared this link."
+            ),
+        )
     return {"message": "Magic link sent", "email": body.email}
 
 
