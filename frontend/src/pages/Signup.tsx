@@ -2,7 +2,7 @@ import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { signup } from "../api/auth";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -69,8 +69,9 @@ export default function Signup() {
         refCode,
       });
       saveToken(res.access_token, res.refresh_token);
+      setCachedOnboarded(false);
       toast(t("signup.accountCreated"), "success");
-      navigate("/welcome");
+      navigate("/welcome", { replace: true });
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       if (status === 409) {

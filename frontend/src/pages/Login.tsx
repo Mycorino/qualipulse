@@ -2,7 +2,7 @@ import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { login, getMe } from "../api/auth";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
@@ -40,13 +40,14 @@ export default function Login() {
       // Check if onboarding is completed — route accordingly
       try {
         const me = await getMe();
+        setCachedOnboarded(!!me.onboarding_completed);
         if (!me.onboarding_completed) {
-          navigate("/welcome");
+          navigate("/welcome", { replace: true });
         } else {
-          navigate("/dashboard");
+          navigate("/dashboard", { replace: true });
         }
       } catch {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       }
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("login.signIn")));

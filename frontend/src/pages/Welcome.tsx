@@ -9,6 +9,7 @@ import {
   analyseWebsite,
 } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
+import { setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 
 const TEAM_SIZE_VALUES = ["Just me", "2–10", "11–50", "50+"];
@@ -77,6 +78,7 @@ export default function Welcome() {
       .then((data) => {
         setMe(data);
         setCompanyName(data.name);
+        setCachedOnboarded(!!data.onboarding_completed);
         if (data.onboarding_completed) {
           navigate("/dashboard", { replace: true });
           return;
@@ -223,6 +225,7 @@ export default function Welcome() {
       await completeOnboarding({
         goals_freeform: skipGoals ? undefined : goalsFreeform.trim() || undefined,
       });
+      setCachedOnboarded(true);
       setStep(6);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("onboarding.failedSave")));
