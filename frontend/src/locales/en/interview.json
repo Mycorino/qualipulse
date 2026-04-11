@@ -16,7 +16,9 @@
     "sendingLink": "Sending...",
     "emailNote": "We'll send you a link to start. Your email is used to save progress and let you resume later.",
     "sendError": "Failed to send verification link. Please try again.",
-    "resendError": "Failed to resend. Please try again."
+    "resendError": "Failed to resend. Please try again.",
+    "skipEmail": "Continue without email →",
+    "skipEmailNote": "You won't be able to resume later from a different device."
   },
   "emailSent": {
     "title": "Check your inbox",

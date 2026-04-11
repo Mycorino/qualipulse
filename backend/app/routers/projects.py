@@ -167,8 +167,19 @@ def list_projects(
     from app.models.interview import ProjectAnalysis
     results = []
     for p in projects:
-        completed = sum(1 for pt in p.participants if pt.status == "completed")
+        completed_participants = [pt for pt in p.participants if pt.status == "completed"]
+        completed = len(completed_participants)
         in_progress = sum(1 for pt in p.participants if pt.status == "in_progress")
+        # Most recent completion so the dashboard can show "N days since last
+        # response" without a separate project-state fetch per card. Guard
+        # against participants with a completed status but no timestamp
+        # (legacy / partially-seeded data).
+        last_response_at = None
+        completion_timestamps = [
+            pt.completed_at for pt in completed_participants if pt.completed_at is not None
+        ]
+        if completion_timestamps:
+            last_response_at = max(completion_timestamps)
         latest_analysis = (
             db.query(ProjectAnalysis)
             .filter(ProjectAnalysis.project_id == p.id)
@@ -186,6 +197,7 @@ def list_projects(
                 completed_count=completed,
                 in_progress_count=in_progress,
                 analysis_status=latest_analysis.status if latest_analysis else None,
+                last_response_at=last_response_at,
             )
         )
     return results
@@ -199,6 +211,30 @@ def get_project(
 ) -> ProjectResponse:
     project = _get_project_or_404(project_id, company.id, db)
     return _project_to_response(project)
+
+
+@router.get("/{project_id}/state")
+def get_project_state(
+    project_id: str,
+    include_ai_summary: bool = Query(True, description="Ask Claude for a one-sentence headline"),
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Return a glanceable state-of-the-study summary for the Overview tab.
+
+    Combines deterministic counts (participants, staleness, analysis gap)
+    with an optional AI-written one-sentence headline so the researcher
+    knows immediately what to do next. See
+    ``services.project_state.compute_project_state`` for the full contract.
+    """
+    project = _get_project_or_404(project_id, company.id, db)
+    from app.services.project_state import compute_project_state
+
+    return compute_project_state(
+        project,
+        db,
+        include_ai_summary=include_ai_summary,
+    )
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)

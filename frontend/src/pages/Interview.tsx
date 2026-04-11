@@ -371,6 +371,15 @@ export default function Interview() {
     }
   }
 
+  // Skip path: participants whose mail provider (iCloud, Outlook, strict
+  // corp filters) silently drops our magic link shouldn't get locked out
+  // of the study. This jumps straight to the consent screen and lets the
+  // backend create a participant without a session token.
+  function handleSkipEmail() {
+    setError("");
+    setPhase("consent");
+  }
+
   // ── Consent ──────────────────────────────────────────────────────────────
 
   function handleConsentAccept() {
@@ -454,14 +463,17 @@ export default function Interview() {
   // ── Interview start ────────────────────────────────────────────────────
 
   async function doStartInterview() {
-    if (!token || !sessionToken) return;
+    if (!token) return;
+    // ``sessionToken`` is optional — participants who took the "skip email"
+    // path don't have one and the backend now accepts that. Only attach
+    // the token when we actually have one.
     const res = await startInterview(token, {
       displayName: profile.firstName || displayName || undefined,
       profession: profile.jobFunction || profession || undefined,
       ageRange: profile.ageRange || ageRange || undefined,
       country: profile.city || country || undefined,
       email: email || undefined,
-      sessionToken,
+      sessionToken: sessionToken || undefined,
     });
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
@@ -761,13 +773,50 @@ export default function Interview() {
             className="btn btn-primary btn-lg"
             onClick={handleSendVerification}
             disabled={sendingVerification || !verificationEmail.trim()}
-            style={{ width: "100%", marginTop: 8 }}
+            style={{ width: "100%", marginTop: 8, minHeight: 44 }}
           >
             {sendingVerification ? t("emailEntry.sendingLink") : t("emailEntry.sendLink")}
           </button>
           <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5, textAlign: "center" }}>
             {t("emailEntry.emailNote")}
           </p>
+
+          {/* Escape hatch for participants whose mail provider drops or
+              heavily delays the magic link (iCloud Hide My Email, strict
+              corporate filters, etc.). The interview will still run, we
+              just won't store a verified email against the participant. */}
+          <div
+            style={{
+              marginTop: 20,
+              paddingTop: 16,
+              borderTop: "1px dashed var(--border, #e5e7eb)",
+              textAlign: "center",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={handleSkipEmail}
+              style={{ minHeight: 44, fontSize: 14 }}
+            >
+              {t("emailEntry.skipEmail", {
+                defaultValue: "Continue without email →",
+              })}
+            </button>
+            <p
+              style={{
+                fontSize: 11,
+                color: "var(--text-muted, #9ca3af)",
+                marginTop: 6,
+                lineHeight: 1.5,
+              }}
+            >
+              {t("emailEntry.skipEmailNote", {
+                defaultValue:
+                  "You won't be able to resume later from a different device.",
+              })}
+            </p>
+          </div>
         </div>
         </div>
       </div>

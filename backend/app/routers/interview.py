@@ -343,18 +343,23 @@ def start_interview_session(
 ):
     """Create a new participant and generate the first interview question.
 
-    Requires a valid session_token (from email verification magic link).
+    Email verification is **optional**. If the request carries a valid
+    ``session_token`` from the magic-link flow we record the verified
+    email on the participant; otherwise we accept an anonymous start so
+    participants whose mail providers silently drop our magic link (hi
+    iCloud, hi Outlook Safe Senders) aren't locked out of the study.
     """
     link = _get_active_link_or_404(token, db)
 
-    # Validate session token (email verification)
+    # Validate session token if one was supplied. A missing token is a
+    # valid "skip email" path — not an error.
     session_payload = None
     if body and body.session_token:
         session_payload = _decode_session_token(body.session_token)
         if session_payload is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Email verification required",
+                detail="This verification link has expired. Please request a new one or continue without email.",
             )
         # Ensure the session is for this link
         if session_payload.get("link_token") != token:
@@ -362,11 +367,6 @@ def start_interview_session(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Session token does not match this interview link",
             )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email verification required",
-        )
 
     # Enforce participant limit for this project
     current_count = db.query(Participant).filter(
@@ -378,8 +378,15 @@ def start_interview_session(
     if project and project.company:
         require_participant_limit(project.company, project, current_count)
 
-    # Use email from session token
-    verified_email = session_payload.get("email")
+    # Use email from session token if we have one. Otherwise fall back to
+    # whatever the participant typed in the landing form (or nothing).
+    verified_email: str | None = None
+    email_was_verified = False
+    if session_payload is not None:
+        verified_email = session_payload.get("email")
+        email_was_verified = True
+    elif body and getattr(body, "email", None):
+        verified_email = body.email
 
     participant = Participant(
         link_id=link.id,
@@ -389,7 +396,7 @@ def start_interview_session(
         age_range=body.age_range if body else None,
         country=body.country if body else None,
         email=verified_email,
-        email_verified=True,
+        email_verified=email_was_verified,
         status="in_progress",
     )
     db.add(participant)

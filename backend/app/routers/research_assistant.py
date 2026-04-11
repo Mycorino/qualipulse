@@ -10,6 +10,7 @@ from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.services.business_context import company_context_block
+from app.services.templates import match_templates_for_company
 from app.services.usage_logger import log_claude_usage
 
 router = APIRouter(prefix="/research", tags=["research"])
@@ -301,3 +302,54 @@ def suggest_questions(
     log_claude_usage(db, response, "research", company_id=company.id)
     questions = json.loads(_strip_fences(response.content[0].text.strip()))
     return {"questions": questions}
+
+
+# ---------------------------------------------------------------------------
+# GET /research/recommended-studies
+# ---------------------------------------------------------------------------
+#
+# Personalised Dashboard card: given what the company told us during
+# onboarding (goals classification, product stage, customer type), return the
+# top N templates that make sense for them *right now*, with human-readable
+# reasons so the UI can show why each one matched.
+#
+# No Claude call — this is a deterministic scoring pass on the templates
+# metadata (see ``match_templates_for_company``). That keeps it cheap enough
+# to call on every Dashboard render.
+
+@router.get("/recommended-studies")
+def recommended_studies(
+    company: Company = Depends(get_current_company),
+    limit: int = 3,
+):
+    """Return the top templates that match this company's onboarding profile.
+
+    Shape mirrors ``/templates`` so the Dashboard can reuse the same card
+    component, plus a ``reasons`` array explaining the match and a
+    ``match_score`` for debugging.
+    """
+    # Cap the limit so the endpoint can't be abused to fetch everything.
+    limit = max(1, min(int(limit or 3), 6))
+    matches = match_templates_for_company(company, limit=limit)
+    return {
+        "recommendations": [
+            {
+                "id": t["id"],
+                "name": t["name"],
+                "category": t["category"],
+                "icon": t["icon"],
+                "description": t["description"],
+                "best_for": t["best_for"],
+                "duration_minutes": t["duration_minutes"],
+                "question_count": len(t["questions"]),
+                "has_screening": len(t["screening_questions"]) > 0,
+                "reasons": reasons,
+                "match_score": score,
+            }
+            for (t, score, reasons) in matches
+        ],
+        # Expose whether the match was personalised or a generic fallback so
+        # the UI can reword the header ("Recommended for you" vs "Popular
+        # starting points") without having to re-derive from match scores.
+        "personalised": any(score > 0 for (_, score, _) in matches),
+    }

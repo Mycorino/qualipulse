@@ -9,11 +9,20 @@ questions, and a full interview guide that can then be customized.
 Templates are intentionally defined in code (not the database) so they can be
 version-controlled, internationalized via i18n in the frontend, and tweaked
 without migrations.
+
+Each template also carries *matching metadata* — ``goals_buckets``,
+``product_stages``, ``customer_types`` — that let us recommend the right
+templates to a company based on what they told us during onboarding. The
+``match_templates_for_company`` helper at the bottom of this file scores
+templates against a company's profile and returns a ranked list.
 """
 
 from __future__ import annotations
 
-from typing import List, TypedDict
+from typing import TYPE_CHECKING, List, TypedDict
+
+if TYPE_CHECKING:
+    from app.models.company import Company
 
 
 class TemplateQuestion(TypedDict):
@@ -44,6 +53,11 @@ class ProjectTemplate(TypedDict):
     learning_goals: List[str]
     screening_questions: List[TemplateScreeningQuestion]
     questions: List[TemplateQuestion]
+    # Matching metadata — used by ``match_templates_for_company`` to
+    # personalise Dashboard recommendations. See bottom of file.
+    goals_buckets: List[str]  # e.g. ["customer_retention", "product_discovery"]
+    product_stages: List[str]  # subset of ["idea","mvp","growth","scale"]
+    customer_types: List[str]  # subset of ["b2c","b2b","b2b2c","internal"]
 
 
 TEMPLATES: List[ProjectTemplate] = [
@@ -77,6 +91,9 @@ TEMPLATES: List[ProjectTemplate] = [
             {"section_index": 2, "section_title": "Alternatives", "question_index": 4, "main_question": "What are you using instead now, if anything? How is it working out?", "interview_notes": "Don't lead. Let them name alternatives freely.", "desired_learning": "Competitive alternatives and their perceived advantages"},
             {"section_index": 2, "section_title": "Alternatives", "question_index": 5, "main_question": "What would have made you stay?", "interview_notes": "This is the money question — probe for specifics.", "desired_learning": "Actionable retention levers"},
         ],
+        "goals_buckets": ["customer_retention", "competitor_research"],
+        "product_stages": ["growth", "scale"],
+        "customer_types": ["b2b", "b2b2c", "b2c"],
     },
     {
         "id": "feature-validation",
@@ -108,6 +125,9 @@ TEMPLATES: List[ProjectTemplate] = [
             {"section_index": 2, "section_title": "Ideal solution", "question_index": 4, "main_question": "If you could wave a magic wand and fix this, what would happen?", "interview_notes": "Open-ended. Let them dream.", "desired_learning": "Their mental model of ideal"},
             {"section_index": 2, "section_title": "Ideal solution", "question_index": 5, "main_question": "If we built [proposed feature], how would you use it? Would it actually solve the problem for you?", "interview_notes": "Only describe the feature briefly. Don't oversell.", "desired_learning": "Fit of the proposed solution"},
         ],
+        "goals_buckets": ["feature_validation", "product_discovery"],
+        "product_stages": ["mvp", "growth", "scale"],
+        "customer_types": ["b2c", "b2b", "b2b2c", "internal"],
     },
     {
         "id": "onboarding-friction",
@@ -139,6 +159,9 @@ TEMPLATES: List[ProjectTemplate] = [
             {"section_index": 2, "section_title": "First value", "question_index": 4, "main_question": "Was there a moment the product clicked for you — where you saw 'oh, this is useful'?", "interview_notes": "", "desired_learning": "Aha moment (or absence of one)"},
             {"section_index": 2, "section_title": "First value", "question_index": 5, "main_question": "What would have made your first session smoother or faster?", "interview_notes": "", "desired_learning": "Concrete improvement ideas"},
         ],
+        "goals_buckets": ["onboarding_optimization", "usability_testing"],
+        "product_stages": ["mvp", "growth", "scale"],
+        "customer_types": ["b2c", "b2b", "b2b2c"],
     },
     {
         "id": "pricing-research",
@@ -170,6 +193,9 @@ TEMPLATES: List[ProjectTemplate] = [
             {"section_index": 2, "section_title": "Pricing reaction", "question_index": 4, "main_question": "If I told you a tool like this cost €X per month per user, what would your reaction be?", "interview_notes": "Use Van Westendorp framing: too cheap / bargain / expensive / too expensive.", "desired_learning": "Price perception"},
             {"section_index": 2, "section_title": "Pricing reaction", "question_index": 5, "main_question": "How would you decide between a cheaper basic tier and a more expensive pro tier? What's in the pro tier that would move you?", "interview_notes": "", "desired_learning": "Tier-move triggers"},
         ],
+        "goals_buckets": ["pricing_research", "positioning"],
+        "product_stages": ["mvp", "growth", "scale"],
+        "customer_types": ["b2c", "b2b", "b2b2c"],
     },
     {
         "id": "product-market-fit",
@@ -202,6 +228,9 @@ TEMPLATES: List[ProjectTemplate] = [
             {"section_index": 2, "section_title": "Alternatives", "question_index": 5, "main_question": "Have you ever tried to pay someone or buy a tool to make this go away?", "interview_notes": "", "desired_learning": "Willingness to pay history"},
             {"section_index": 3, "section_title": "Solution fit", "question_index": 6, "main_question": "If you could wave a magic wand, how would this problem disappear?", "interview_notes": "Let them describe their ideal.", "desired_learning": "Ideal solution shape"},
         ],
+        "goals_buckets": ["product_discovery", "market_sizing"],
+        "product_stages": ["idea", "mvp"],
+        "customer_types": ["b2c", "b2b", "b2b2c", "internal"],
     },
     {
         "id": "customer-discovery",
@@ -227,6 +256,9 @@ TEMPLATES: List[ProjectTemplate] = [
             {"section_index": 2, "section_title": "Tools & workarounds", "question_index": 4, "main_question": "What tools or processes do you use to get your work done? Which ones do you love, and which ones frustrate you?", "interview_notes": "", "desired_learning": "Current stack"},
             {"section_index": 2, "section_title": "Tools & workarounds", "question_index": 5, "main_question": "If you could change one thing about how your team works, what would it be?", "interview_notes": "", "desired_learning": "Opportunity areas"},
         ],
+        "goals_buckets": ["product_discovery", "market_sizing"],
+        "product_stages": ["idea", "mvp", "growth"],
+        "customer_types": ["b2c", "b2b", "b2b2c", "internal"],
     },
     {
         "id": "brand-perception",
@@ -257,6 +289,9 @@ TEMPLATES: List[ProjectTemplate] = [
             {"section_index": 1, "section_title": "Messaging", "question_index": 3, "main_question": "Does that tagline make it clearer what the product is, or more confusing?", "interview_notes": "", "desired_learning": "Clarity"},
             {"section_index": 2, "section_title": "Competitive framing", "question_index": 4, "main_question": "If you had to describe what we do to a friend, how would you do it?", "interview_notes": "", "desired_learning": "Natural language framing"},
         ],
+        "goals_buckets": ["positioning", "competitor_research"],
+        "product_stages": ["mvp", "growth", "scale"],
+        "customer_types": ["b2c", "b2b", "b2b2c"],
     },
 ]
 
@@ -272,3 +307,94 @@ def get_template_by_id(template_id: str) -> ProjectTemplate | None:
         if t["id"] == template_id:
             return t
     return None
+
+
+def _parse_goals_classification(value: str | None) -> list[str]:
+    """Split the comma/semicolon-separated goals_classification blob into a list.
+
+    Claude stores classifications as e.g. ``"product_discovery,customer_retention"``
+    in ``Company.goals_classification``. We defensively handle empty strings,
+    whitespace, and separator variation so downstream matching never explodes.
+    """
+    if not value:
+        return []
+    raw = value.replace(";", ",")
+    return [chunk.strip().lower() for chunk in raw.split(",") if chunk.strip()]
+
+
+def match_templates_for_company(
+    company: "Company | None",
+    limit: int = 3,
+) -> list[tuple[ProjectTemplate, int, list[str]]]:
+    """Score templates against a company's profile and return the top matches.
+
+    Returns a list of ``(template, score, reasons)`` tuples. ``reasons`` is a
+    short list of human-readable match explanations we surface on the Dashboard
+    card ("Matches your stage: growth", "Matches your goal: pricing research").
+
+    Scoring is simple and deterministic — no Claude call required. Matching on
+    goals is weighted most (×3) because it captures *what the researcher wants
+    to learn*, which is the strongest signal. Product stage (×2) narrows by
+    maturity. Customer type (×1) is the weakest filter because most templates
+    work across customer types.
+
+    When ``company`` is ``None`` or has no profile filled in, we fall back to
+    returning the first ``limit`` templates in definition order so the UI still
+    shows something useful.
+    """
+    if company is None:
+        return [(t, 0, []) for t in TEMPLATES[:limit]]
+
+    goals = _parse_goals_classification(getattr(company, "goals_classification", None))
+    stage = (getattr(company, "product_stage", None) or "").strip().lower() or None
+    ctype = (getattr(company, "customer_type", None) or "").strip().lower() or None
+
+    # Nothing to match on → preserve definition order for a stable default.
+    if not goals and not stage and not ctype:
+        return [(t, 0, []) for t in TEMPLATES[:limit]]
+
+    _GOAL_LABELS = {
+        "product_discovery": "product discovery",
+        "feature_validation": "feature validation",
+        "customer_retention": "retention / churn",
+        "pricing_research": "pricing research",
+        "positioning": "positioning",
+        "competitor_research": "competitor research",
+        "usability_testing": "usability",
+        "market_sizing": "market sizing",
+        "onboarding_optimization": "onboarding",
+        "other": "general research",
+    }
+
+    scored: list[tuple[ProjectTemplate, int, list[str]]] = []
+    for template in TEMPLATES:
+        score = 0
+        reasons: list[str] = []
+
+        # Goal overlap is the strongest signal.
+        goal_hits = [g for g in goals if g in template.get("goals_buckets", [])]
+        if goal_hits:
+            score += 3 * len(goal_hits)
+            labels = [_GOAL_LABELS.get(g, g) for g in goal_hits[:2]]
+            reasons.append(f"Matches your goal: {', '.join(labels)}")
+
+        # Product stage: the template explicitly targets this stage.
+        if stage and stage in template.get("product_stages", []):
+            score += 2
+            reasons.append(f"Right for {stage}-stage teams")
+
+        # Customer type: generic reinforcement.
+        if ctype and ctype in template.get("customer_types", []):
+            score += 1
+
+        if score > 0:
+            scored.append((template, score, reasons))
+
+    # Rank by score desc. Break ties by definition order (stable sort keeps it).
+    scored.sort(key=lambda row: row[1], reverse=True)
+
+    # If we didn't find anything that matched, fall back to definition order.
+    if not scored:
+        return [(t, 0, []) for t in TEMPLATES[:limit]]
+
+    return scored[:limit]

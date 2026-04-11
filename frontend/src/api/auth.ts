@@ -36,6 +36,11 @@ export interface CompanyResponse {
   current_tool?: string | null;
   decision_role?: string | null;
   goals_classification?: string | null;
+  // Monthly "what are you focused on right now?" prompt shown on the
+  // Dashboard. Null when never set; ``current_priority_updated_at`` drives
+  // the 30-day re-prompt cadence.
+  current_priority?: string | null;
+  current_priority_updated_at?: string | null;
 }
 
 export interface OnboardingProfile {
@@ -151,6 +156,15 @@ export async function updateSlackWebhook(url: string | null): Promise<{ slack_we
 export async function testSlackWebhook(url?: string | null): Promise<{ message: string }> {
   const { data } = await client.post<{ message: string }>("/auth/me/slack/test", {
     slack_webhook_url: url ?? null,
+  });
+  return data;
+}
+
+export async function updateCurrentPriority(
+  currentPriority: string | null
+): Promise<CompanyResponse> {
+  const { data } = await client.patch<CompanyResponse>("/auth/me/priority", {
+    current_priority: currentPriority,
   });
   return data;
 }

@@ -156,18 +156,46 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
     },
     "verification": {
         "en": {
-            "subject": "Verify your QualiPulse email",
-            "heading": "Verify your email",
-            "body": "Hi {name}, please confirm your email address to complete your account setup.",
-            "cta": "Verify email address",
-            "foot": "This link expires in 24 hours. If you didn't create an account, you can ignore this email.",
+            "subject": "Confirm your email to activate QualiPulse",
+            "heading": "Welcome to QualiPulse, {name} \u2014 one last step",
+            "body": (
+                "Thanks for signing up. Click the button below to confirm this "
+                "is your email so we know account alerts, research analysis "
+                "notifications, and your magic links are reaching the right "
+                "inbox. Your 14-day trial starts the moment you verify."
+            ),
+            "cta": "Verify my email",
+            "subfoot": (
+                "If the button doesn't work, copy and paste this link into "
+                "your browser:"
+            ),
+            "foot": (
+                "This link expires in 24 hours. If you didn't sign up for "
+                "QualiPulse, you can safely ignore this email and the "
+                "account will be deleted automatically."
+            ),
         },
         "fr": {
-            "subject": "Vérifiez votre email QualiPulse",
-            "heading": "Vérifiez votre email",
-            "body": "Bonjour {name}, confirmez votre adresse email pour finaliser la configuration de votre compte.",
-            "cta": "Vérifier mon adresse",
-            "foot": "Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.",
+            "subject": "Confirmez votre email pour activer QualiPulse",
+            "heading": "Bienvenue sur QualiPulse, {name} \u2014 une derni\u00e8re \u00e9tape",
+            "body": (
+                "Merci pour votre inscription. Cliquez sur le bouton ci-dessous "
+                "pour confirmer que cet email vous appartient : nous "
+                "utiliserons cette adresse pour vos alertes de compte, les "
+                "notifications d\u2019analyses de recherche et vos liens "
+                "magiques. Votre essai de 14 jours d\u00e9marre au moment de "
+                "la v\u00e9rification."
+            ),
+            "cta": "Vérifier mon email",
+            "subfoot": (
+                "Si le bouton ne fonctionne pas, copiez-collez ce lien dans "
+                "votre navigateur :"
+            ),
+            "foot": (
+                "Ce lien expire dans 24 heures. Si vous n'avez pas créé de "
+                "compte QualiPulse, vous pouvez ignorer cet email en toute "
+                "sécurité — le compte sera supprimé automatiquement."
+            ),
         },
     },
     "password_reset": {
@@ -452,14 +480,29 @@ def send_welcome(to: str, name: str, lang: str = "en") -> bool:
 
 
 def send_verification_email(to: str, name: str, verify_url: str, lang: str = "en") -> bool:
+    """Send the "confirm your email" message.
+
+    The HTML body is intentionally chunkier than most transactional mails.
+    Short HTML-only emails trigger Gmail/Outlook's template-heuristic spam
+    filters (high chrome-to-content ratio), and users — who were burned
+    by the terse earlier version — need to understand *why* they're being
+    asked to click. The explicit raw URL block below the button also
+    gives the plain-text alternative real content so SpamAssassin's
+    ``MIME_HTML_ONLY`` check doesn't fire.
+    """
     lang = _normalise_lang(lang)
+    # Use only the first word of whatever was passed (usually "Jean Dupont"
+    # or a business name like "Leclerc SARL") so the greeting feels human.
+    friendly_name = (name or "").strip().split()[0] if name else "there"
     content = f"""
-      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("verification", lang, "heading")}</h2>
-      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("verification", lang, "body", name=name)}</p>
-      <div style="text-align:center;margin:24px 0;">
-        <a href="{verify_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("verification", lang, "cta")}</a>
+      <h2 style="margin:0 0 12px;font-size:1.35rem;color:#0f172a;line-height:1.3;">{_c("verification", lang, "heading", name=friendly_name)}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("verification", lang, "body")}</p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="{verify_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:600;font-size:1rem;">{_c("verification", lang, "cta")}</a>
       </div>
-      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("verification", lang, "foot")}</p>
+      <p style="color:#64748b;font-size:0.85rem;line-height:1.6;margin:0 0 8px;">{_c("verification", lang, "subfoot")}</p>
+      <p style="background:#f1f5f9;border-radius:6px;padding:10px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;color:#475569;word-break:break-all;margin:0 0 24px;">{verify_url}</p>
+      <p style="color:#94a3b8;font-size:0.8rem;margin:0;line-height:1.6;">{_c("verification", lang, "foot")}</p>
     """
     return send_email(
         to=to,
