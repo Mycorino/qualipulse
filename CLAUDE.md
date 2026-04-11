@@ -67,7 +67,12 @@ auto-interview/
 │   │       ├── tts.py               # OpenAI TTS generation
 │   │       ├── storage.py           # Audio: Cloudflare R2 or local disk
 │   │       ├── guide_parser.py      # CSV import parser
-│   │       └── usage_logger.py      # Fire-and-forget AI cost logging (Claude/Whisper/TTS)
+│   │       ├── usage_logger.py      # Fire-and-forget AI cost logging (Claude/Whisper/TTS)
+│   │       ├── website_intelligence.py  # Onboarding: scrape + summarise a company website
+│   │       ├── workspace.py         # Team workspace membership + permission helpers
+│   │       ├── demo_seeder.py       # Seeds the onboarding showcase demo project
+│   │       ├── _demo_data_fr.py     # French transcripts for the showcase demo (fixture)
+│   │       └── _demo_data_en.py     # English transcripts for the showcase demo (fixture)
 │   ├── alembic/
 │   │   └── versions/
 │   │       ├── 0001_add_researcher_features.py
@@ -78,12 +83,17 @@ auto-interview/
 │   │       ├── 0006_ai_usage_log.py
 │   │       ├── 0007_participant_panel.py
 │   │       ├── 0008_affiliate_program.py
-│   │       └── 0009_blog_posts.py
+│   │       ├── 0009_blog_posts.py
+│   │       ├── 0010_add_preferred_language.py
+│   │       ├── 0011_add_slack_webhook_url.py
+│   │       ├── 0012_team_collaboration.py
+│   │       └── 0013_add_demo_project_flag.py
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
 │   │   ├── test_projects.py     # CRUD, auth isolation, archive, tier limits
-│   │   └── test_feature_gates.py # All tier limits + feature gates
+│   │   ├── test_feature_gates.py # All tier limits + feature gates
+│   │   └── test_demo_seeder.py  # Showcase demo project seeding + quota exclusion
 │   ├── Dockerfile               # Python 3.11, runs alembic + uvicorn
 │   ├── pytest.ini
 │   ├── requirements.txt
@@ -317,6 +327,40 @@ After signup, users are redirected to `/welcome` (4-step onboarding):
 4. **Ready** — trial info, CTA to dashboard
 
 Login checks `onboarding_completed` — if false, redirects to `/welcome` instead of `/dashboard`.
+
+### Showcase Demo Project (auto-seeded)
+On the first successful `POST /auth/onboarding`, the backend calls
+`seed_demo_project()` to populate a read-only example project named
+`[Demo] How modern teams work across borders` for the new account.
+Idempotent via `Company.demo_seeded_at` — subsequent onboarding completions
+skip seeding. Seeder errors are swallowed so a fixture bug never blocks a
+real user from finishing onboarding.
+
+The showcase project demonstrates almost every platform surface in one place:
+
+- **Bilingual interviews** — 3 French + 3 English completed participants +
+  1 in-progress (Marco P.), with realistic adaptive follow-ups and demographics
+  (profession / age_range / country) to power the segment heatmap
+- **Setup content** — 5 main guide questions across 3 sections, 1 screening
+  question with a disqualifying option, 2 interview links (1 active EU,
+  1 paused NA)
+- **Coding** — 4 manual codes (Pain point / Workaround / Aha moment /
+  Cultural difference) and 13 tagged quotes with real character offsets
+  computed via `.find()` against the transcript text
+- **Analysis** — 2 versions: `ai_discovery` v1 (with `share_token`) and
+  `researcher_refined` v2 parented to v1. 3 annotations (`confirmed`,
+  `needs_evidence`, `disputed`) on v2 themes. All analysis quotes are
+  verbatim substrings of real participant transcripts.
+- **Memos** — 6 project memos (general + theme-linked + tension-linked)
+- **Editing state** — one turn flagged `manually_edited=True`
+
+The content lives in `backend/app/services/_demo_data_{en,fr}.py` so the
+`demo_seeder.py` logic stays readable. Demo projects set `Project.is_demo=True`
+and are **excluded from the tier project-quota count** in `routers/projects.py`
+so they never block a user from creating their first real study. Tests:
+`backend/tests/test_demo_seeder.py` (4 tests — relationship graph, quote-tag
+offset integrity, every analysis quote appears verbatim in a real transcript,
+quota exclusion).
 
 ### Email Verification
 - On signup: `EmailVerificationToken` created (24h expiry), verification + welcome emails sent
@@ -667,6 +711,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Terms of Service + Privacy Policy pages
 - [x] SendGrid email integration (domain-authenticated, branded HTML templates)
 - [x] Getting-started checklist on empty dashboard
+- [x] Auto-seeded showcase demo project on onboarding completion — bilingual (3 FR + 3 EN + 1 in-progress participant), 2 interview links, screening question, codebook with tagged quotes, 2 analysis versions with annotations, memos. `is_demo=True` so it never counts against tier project quota. Idempotent via `Company.demo_seeded_at`.
 - [x] Trial banner on dashboard (visible to solo/free users with active trial)
 - [x] Email verification banner (yellow) when unverified
 - [x] Admin panel (user management, tier changes, trial management, user deletion)
@@ -737,10 +782,10 @@ gcloud builds list --region=europe-west1 --limit=5
 ## Data Models Summary
 
 ### Company (auth)
-`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `created_at`
+`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience`, `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at` (idempotency guard for showcase demo), `created_at`
 
 ### Project
-`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `created_at`, `archived_at`
+`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
 
 ### InterviewGuideQuestion
 `id`, `project_id`, `section_index`, `section_title`, `question_index`, `main_question`, `interview_notes`, `desired_learning`, `researcher_notes`, `deprecated_at`, `sort_order`
