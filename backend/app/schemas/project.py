@@ -43,6 +43,9 @@ class ProjectCreate(BaseModel):
     research_objective: str | None = None
     welcome_message: str | None = None
     panel_collection_enabled: bool = True
+    # Study grounding — used by AI analysis + interview engine
+    decision_to_inform: str | None = None
+    target_customer_description: str | None = None
     questions: list[QuestionCreate] = []
     screening_questions: list[ScreeningQuestionCreate] = []
 
@@ -75,6 +78,8 @@ class ProjectResponse(BaseModel):
     research_objective: str | None = None
     welcome_message: str | None = None
     panel_collection_enabled: bool = True
+    decision_to_inform: str | None = None
+    target_customer_description: str | None = None
     created_at: datetime
     questions: list[QuestionResponse] = []
     screening_questions: list[ScreeningQuestionResponse] = []

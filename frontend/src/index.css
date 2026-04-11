@@ -30,7 +30,10 @@
   --primary-light: var(--brand-50);
   --text: #0d0f1a;
   --text-secondary: #5a6076;
-  --text-muted: #8c93a8;
+  /* Was #8c93a8 which was ~3.4:1 on white — below WCAG AA 4.5:1. Darkened
+     to #6c7386 (≈4.9:1) so muted labels and hints stay readable for folks
+     with low contrast sensitivity. */
+  --text-muted: #6c7386;
   --border: #e2e4ed;
   --border-light: #eceef5;
   --danger: #dc2626;
@@ -44,7 +47,8 @@
 
   /* ── Text ────────────────────────────────────── */
   --text-primary:   #0d0f1a;
-  --text-tertiary:  #8c93a8;
+  /* Same rationale as --text-muted: lifted from #8c93a8 to #6c7386 for AA. */
+  --text-tertiary:  #6c7386;
   --text-disabled:  #b8bccc;
 
   /* ── Border ──────────────────────────────────── */
@@ -157,7 +161,11 @@ a:hover {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
+  /* WCAG 2.5.5 AA — minimum 44×44px touch target. We keep the visual padding
+     modest and enforce the tap area via min-height instead so buttons don't
+     suddenly look chunky. */
+  min-height: 44px;
+  padding: 10px 16px;
   font-size: 0.867rem;
   font-weight: 500;
   font-family: inherit;
@@ -233,6 +241,10 @@ a:hover {
 }
 
 .btn-sm {
+  /* Intentionally relaxes the 44px floor: used inside dense toolbars and
+     card footers where a 44px button would dominate the row. Pair with a
+     larger hit-target wrapper for mobile contexts. */
+  min-height: 32px;
   padding: 5px 10px;
   font-size: 0.8rem;
 }
@@ -281,7 +293,9 @@ textarea:focus-visible {
 
 .field-input {
   width: 100%;
-  padding: 8px 12px;
+  /* 44px min tap target (WCAG 2.5.5). Desktop was 8+8+18≈34px. */
+  min-height: 44px;
+  padding: 11px 12px;
   font-size: 16px; /* Prevents iOS Safari auto-zoom on focus */
   font-family: inherit;
   border: 1px solid var(--border-default);
@@ -292,6 +306,10 @@ textarea:focus-visible {
   transition:
     border-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out);
+}
+/* Textareas need to breathe — don't force the 44px floor on multi-line. */
+textarea.field-input {
+  min-height: 72px;
 }
 .field-input:focus {
   outline: none;

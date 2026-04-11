@@ -29,6 +29,10 @@ export interface ProjectCreate {
   interview_duration_minutes?: number;
   system_prompt?: string;
   research_objective?: string;
+  // Study-specific grounding fields sent to the analysis prompt. These
+  // override whatever company-level context is attached via business_context.
+  decision_to_inform?: string;
+  target_customer_description?: string;
   welcome_message?: string;
   questions: QuestionCreate[];
   screening_questions?: ScreeningQuestionCreate[];
@@ -54,6 +58,8 @@ export interface ProjectResponse {
   interview_duration_minutes: number;
   system_prompt?: string;
   research_objective?: string;
+  decision_to_inform?: string | null;
+  target_customer_description?: string | null;
   welcome_message?: string;
   panel_collection_enabled?: boolean;
   created_at: string;

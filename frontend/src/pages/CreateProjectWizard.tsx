@@ -71,6 +71,12 @@ export default function CreateProjectWizard() {
   const [learningGoals, setLearningGoals] = useState(draft?.learningGoals ?? ["", "", ""]);
   const [studyType, setStudyType] = useState(draft?.studyType ?? "exploratory");
   const [rationale, setRationale] = useState(draft?.rationale ?? "");
+  // Study-specific grounding fields — see backend services/business_context.py.
+  // These override whatever company-level context is attached, so the analysis
+  // prompt always knows exactly what this study is trying to decide and who
+  // it's about (not just the general "what does the company do").
+  const [decisionToInform, setDecisionToInform] = useState(draft?.decisionToInform ?? "");
+  const [targetCustomerDescription, setTargetCustomerDescription] = useState(draft?.targetCustomerDescription ?? "");
 
   // Step 3
   const [audience, setAudience] = useState(draft?.audience ?? "");
@@ -111,9 +117,10 @@ export default function CreateProjectWizard() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       step, name, context, briefSummary,
       objective, learningGoals, studyType, rationale,
+      decisionToInform, targetCustomerDescription,
       audience, durationMinutes, language, questions, screeningQuestions,
     }));
-  }, [isEditMode, step, name, context, briefSummary, objective, learningGoals, studyType, rationale, audience, durationMinutes, language, questions, screeningQuestions]);
+  }, [isEditMode, step, name, context, briefSummary, objective, learningGoals, studyType, rationale, decisionToInform, targetCustomerDescription, audience, durationMinutes, language, questions, screeningQuestions]);
 
   // Load template list on mount (only when picker is visible)
   useEffect(() => {
@@ -179,6 +186,8 @@ export default function CreateProjectWizard() {
       setLanguage(p.language);
       setDurationMinutes(p.interview_duration_minutes);
       setObjective(p.research_objective ?? "");
+      setDecisionToInform(p.decision_to_inform ?? "");
+      setTargetCustomerDescription(p.target_customer_description ?? "");
       setQuestions(p.questions.map((q) => ({
         section_index: q.section_index,
         section_title: q.section_title,
@@ -290,6 +299,8 @@ export default function CreateProjectWizard() {
         language,
         interview_duration_minutes: durationMinutes,
         research_objective: objective || undefined,
+        decision_to_inform: decisionToInform.trim() || undefined,
+        target_customer_description: targetCustomerDescription.trim() || undefined,
         questions: questions.filter((q) => q.main_question.trim()),
         screening_questions: screeningQuestions.filter((sq) => sq.question.trim()),
       };
@@ -702,6 +713,37 @@ export default function CreateProjectWizard() {
                 placeholder={t("wizard.learningGoalPlaceholder", { number: i + 1 })}
               />
             ))}
+
+            {/* Study-specific grounding fields — these sharpen the analysis
+                prompt beyond the company-level context. Optional, but when
+                filled they dramatically improve theme + recommendation quality. */}
+            <label className="field-label" style={{ marginTop: 16 }}>
+              {t("wizard.decisionToInformLabel")}{" "}
+              <span style={{ color: "var(--text-muted)", fontWeight: 400, fontSize: 13 }}>
+                {t("wizard.decisionToInformOptional")}
+              </span>
+            </label>
+            <textarea
+              className="field-input wizard-textarea"
+              rows={2}
+              value={decisionToInform}
+              onChange={(e) => setDecisionToInform(e.target.value)}
+              placeholder={t("wizard.decisionToInformPlaceholder")}
+            />
+
+            <label className="field-label" style={{ marginTop: 12 }}>
+              {t("wizard.targetCustomerLabel")}{" "}
+              <span style={{ color: "var(--text-muted)", fontWeight: 400, fontSize: 13 }}>
+                {t("wizard.decisionToInformOptional")}
+              </span>
+            </label>
+            <textarea
+              className="field-input wizard-textarea"
+              rows={2}
+              value={targetCustomerDescription}
+              onChange={(e) => setTargetCustomerDescription(e.target.value)}
+              placeholder={t("wizard.targetCustomerPlaceholder")}
+            />
 
             <div className="wizard-nav">
               <button className="btn btn-ghost" onClick={() => setStep(1)}>{t("wizard.backButton")}</button>

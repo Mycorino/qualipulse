@@ -42,6 +42,24 @@ class Company(Base):
     # "europe" | "north_america" | "apac" | "global" | "other"
     goals_freeform: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Business context (used to ground AI analysis + research suggestions)
+    value_proposition: Mapped[str | None] = mapped_column(Text, nullable=True)
+    primary_competitors: Mapped[str | None] = mapped_column(Text, nullable=True)
+    product_stage: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # "idea" | "mvp" | "growth" | "scale"
+    customer_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # "b2c" | "b2b" | "b2b2c" | "internal"
+
+    # Qualification signals for sales routing
+    interviews_per_month_target: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # "0-5" | "5-20" | "20-50" | "50+"
+    current_tool: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Free-form with suggestions: "Nothing yet" | "User interviews (service)" | "Dovetail" | etc.
+    decision_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # "buyer" | "influencer" | "user" | "evaluator"
+    goals_classification: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Claude-classified bucket(s), e.g. "product_discovery,customer_retention"
+
     # Subscription
     subscription_tier: Mapped[str] = mapped_column(String(20), default="starter", nullable=False)
     # "starter" | "team" | "lab" | "enterprise"
