@@ -77,6 +77,9 @@ export interface ProjectListItem {
   completed_count: number;
   in_progress_count: number;
   analysis_status: string | null;
+  /** Most-recent participant completion timestamp; null until someone
+   *  finishes an interview. Used for "N days since last response" nudges. */
+  last_response_at: string | null;
 }
 
 export interface InterviewLink {
@@ -487,5 +490,73 @@ export async function saveResearcherContext(projectId: string, version: number, 
 
 export async function triggerRefinedAnalysis(projectId: string): Promise<{ status: string; version: number }> {
   const { data } = await client.post<{ status: string; version: number }>(`/projects/${projectId}/analysis/refine`);
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Project state summary — drives the Overview "state-of-study" card and the
+// Dashboard stale-project nudges.
+// ---------------------------------------------------------------------------
+
+export interface ProjectStateLatestAnalysis {
+  version: number | null;
+  status: string | null;
+  generated_at: string | null;
+  participant_count: number | null;
+  is_behind: boolean;
+  gap: number;
+}
+
+export interface ProjectState {
+  completed_count: number;
+  in_progress_count: number;
+  target_count: number | null;
+  last_response_at: string | null;
+  days_since_last_response: number | null;
+  is_stale: boolean;
+  latest_analysis: ProjectStateLatestAnalysis | null;
+  headline: string;
+  suggested_next_action: string;
+}
+
+export async function getProjectState(
+  projectId: string,
+  includeAiSummary = true
+): Promise<ProjectState> {
+  const { data } = await client.get<ProjectState>(`/projects/${projectId}/state`, {
+    params: { include_ai_summary: includeAiSummary },
+  });
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Promote an analysis theme into a codebook code (with auto-tagged quotes).
+// ---------------------------------------------------------------------------
+
+export interface PromoteThemeResult {
+  code: ManualCode;
+  tags_created: Array<{
+    id: string;
+    turn_id: string;
+    selected_text: string;
+    already_existed: boolean;
+  }>;
+  unmatched_quotes: Array<{
+    text: string;
+    participant_display_name?: string | null;
+    reason: string;
+  }>;
+}
+
+export async function promoteThemeToCode(
+  projectId: string,
+  analysisId: string,
+  themeTitle: string,
+  color?: string
+): Promise<PromoteThemeResult> {
+  const { data } = await client.post<PromoteThemeResult>(
+    `/projects/${projectId}/analysis/themes/promote-to-code`,
+    { analysis_id: analysisId, theme_title: themeTitle, color }
+  );
   return data;
 }

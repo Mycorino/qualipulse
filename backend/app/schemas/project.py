@@ -97,5 +97,10 @@ class ProjectListResponse(BaseModel):
     completed_count: int = 0
     in_progress_count: int = 0
     analysis_status: str | None = None
+    # Most-recent participant completion time. ``None`` when no one has
+    # completed an interview yet. Dashboard cards use this to show a
+    # "N days since last response" stale nudge without having to fetch
+    # a full project-state (and the Claude headline) for every tile.
+    last_response_at: datetime | None = None
 
     model_config = {"from_attributes": True}

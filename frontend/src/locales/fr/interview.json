@@ -16,7 +16,9 @@
     "sendingLink": "Envoi en cours...",
     "emailNote": "Nous vous enverrons un lien pour commencer. Votre email est utilisé pour sauvegarder votre progression et vous permettre de reprendre plus tard.",
     "sendError": "Impossible d'envoyer le lien de vérification. Veuillez réessayer.",
-    "resendError": "Impossible de renvoyer le lien. Veuillez réessayer."
+    "resendError": "Impossible de renvoyer le lien. Veuillez réessayer.",
+    "skipEmail": "Continuer sans email →",
+    "skipEmailNote": "Vous ne pourrez pas reprendre plus tard depuis un autre appareil."
   },
   "emailSent": {
     "title": "Vérifiez votre boîte de réception",

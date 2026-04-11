@@ -33,7 +33,11 @@
     "inProgress": "{{count}} in progress",
     "noResponses": "No responses yet",
     "analysisReady": "Analysis ready",
-    "analysing": "Analysing…"
+    "analysing": "Analysing…",
+    "nudgeAnalyse": "✦ Ready to analyse — you have {{count}} completed interviews",
+    "nudgeAnalyse_one": "✦ Ready to analyse — you have {{count}} completed interview",
+    "nudgeStale": "⏸ No new responses in {{count}} days",
+    "nudgeStale_one": "⏸ No new responses in {{count}} day"
   },
   "archive": {
     "title": "Archived projects",
@@ -42,5 +46,18 @@
     "archived": "Archived {{date}}",
     "restore": "↩ Restore",
     "view": "View"
+  },
+  "insights": {
+    "priorityTitle": "What are you focused on right now?",
+    "priorityUpdatedAgo": "Updated {{count}} day ago",
+    "priorityUpdatedAgo_other": "Updated {{count}} days ago",
+    "priorityPlaceholder": "e.g. Understand why power users stop upgrading after 6 months",
+    "priorityHint": "A short sentence so we can suggest research that moves your needle.",
+    "prioritySave": "Save priority",
+    "priorityEdit": "Update",
+    "recsTitlePersonalised": "Studies that fit your company",
+    "recsTitleGeneric": "Popular starting points",
+    "recsSubtitle": "Based on what you told us at signup",
+    "recsEmpty": "We'll recommend studies here once your profile is set up."
   }
 }

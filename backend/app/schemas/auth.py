@@ -100,6 +100,8 @@ class CompanyResponse(BaseModel):
     current_tool: Optional[str] = None
     decision_role: Optional[str] = None
     goals_classification: Optional[str] = None
+    current_priority: Optional[str] = None
+    current_priority_updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -111,3 +113,13 @@ class ProfileUpdate(BaseModel):
 
 class SlackWebhookUpdate(BaseModel):
     slack_webhook_url: Optional[str] = None
+
+
+class PriorityUpdate(BaseModel):
+    """Monthly "what's top of mind" priority update from the Dashboard.
+
+    Stored on the Company record so the UI can nudge the researcher to refresh
+    it every ~30 days. Max 280 chars keeps it short and scannable on the
+    Dashboard header.
+    """
+    current_priority: Optional[str] = None

@@ -81,3 +81,36 @@ export async function suggestQuestions(
   );
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Recommended studies — the Dashboard "what should I research next?" card.
+// ---------------------------------------------------------------------------
+
+export interface RecommendedStudy {
+  id: string;
+  name: string;
+  category: string;
+  icon: string;
+  description: string;
+  best_for: string;
+  duration_minutes: number;
+  question_count: number;
+  has_screening: boolean;
+  reasons: string[];
+  match_score: number;
+}
+
+export interface RecommendedStudiesResponse {
+  recommendations: RecommendedStudy[];
+  personalised: boolean;
+}
+
+export async function getRecommendedStudies(
+  limit: number = 3
+): Promise<RecommendedStudiesResponse> {
+  const { data } = await client.get<RecommendedStudiesResponse>(
+    "/research/recommended-studies",
+    { params: { limit } }
+  );
+  return data;
+}

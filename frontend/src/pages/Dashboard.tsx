@@ -12,6 +12,7 @@ import {
 import { getMe, resendVerification } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import DashboardInsights from "../components/DashboardInsights";
 
 export default function Dashboard() {
   const { t } = useTranslation(["dashboard", "common"]);
@@ -196,6 +197,14 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* AI-driven priority re-prompt + personalised study recommendations.
+            Only renders once we have a loaded `me` so the priority block knows
+            whether the prompt is due. Degrades silently when there's nothing
+            useful to show. */}
+        {!loading && me && projects.length > 0 && (
+          <DashboardInsights me={me} onPriorityUpdated={setMe} />
+        )}
+
         {loading ? (
           <div className="project-grid">
             <SkeletonCard />
@@ -291,47 +300,105 @@ export default function Dashboard() {
             </div>
           )}
           <div className="project-grid">
-            {projects.map((p) => (
-              <div
-                key={p.id}
-                className="project-card"
-                style={{ maxWidth: 400 }}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/projects/${p.id}`)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/projects/${p.id}`); } }}
-              >
-                <h3 className="project-card-name">{p.name}</h3>
-                <div className="project-card-meta">
-                  <span className="badge">{p.language.toUpperCase()}</span>
-                  <span>{p.question_count} questions</span>
+            {projects.map((p) => {
+              // Staleness nudge: a project is "stale" when it has some
+              // responses and they stopped coming in more than 14 days ago.
+              // This is the gentle kick the researcher needs to remember
+              // they have unfinished work — but we only compute it from
+              // fields that are already in the list payload, so the grid
+              // never fans out N AI calls.
+              const daysSinceLastResponse = p.last_response_at
+                ? Math.floor(
+                    (Date.now() - new Date(p.last_response_at).getTime()) /
+                      (1000 * 60 * 60 * 24)
+                  )
+                : null;
+              const isStale =
+                p.completed_count > 0 &&
+                daysSinceLastResponse !== null &&
+                daysSinceLastResponse >= 14;
+              const hasResponsesNoAnalysis =
+                p.completed_count >= 3 && !p.analysis_status;
+
+              return (
+                <div
+                  key={p.id}
+                  className="project-card"
+                  style={{ maxWidth: 400 }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/projects/${p.id}`)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/projects/${p.id}`); } }}
+                >
+                  <h3 className="project-card-name">{p.name}</h3>
+                  <div className="project-card-meta">
+                    <span className="badge">{p.language.toUpperCase()}</span>
+                    <span>{p.question_count} questions</span>
+                  </div>
+                  <div className="project-card-stats">
+                    {p.completed_count > 0 && (
+                      <span className="project-stat project-stat-completed">
+                        ✓ {t("projectCard.completed", { count: p.completed_count })}
+                      </span>
+                    )}
+                    {p.in_progress_count > 0 && (
+                      <span className="project-stat project-stat-inprogress">
+                        ● {t("projectCard.inProgress", { count: p.in_progress_count })}
+                      </span>
+                    )}
+                    {p.completed_count === 0 && p.in_progress_count === 0 && (
+                      <span className="project-stat project-stat-empty">{t("projectCard.noResponses")}</span>
+                    )}
+                    {p.analysis_status === "ready" && (
+                      <span className="project-stat project-stat-analysis">✦ {t("projectCard.analysisReady")}</span>
+                    )}
+                    {p.analysis_status === "generating" && (
+                      <span className="project-stat project-stat-generating">✦ {t("projectCard.analysing")}</span>
+                    )}
+                  </div>
+
+                  {/* Gentle nudge row: only one message, picked by priority.
+                      "Analyse now" beats "stale" — if they've got responses
+                      and haven't analysed, that's the action we want. */}
+                  {hasResponsesNoAnalysis ? (
+                    <p
+                      className="project-card-nudge project-card-nudge--action"
+                      style={{
+                        margin: "8px 0 0",
+                        fontSize: 12,
+                        color: "var(--accent, #4338ca)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {t("projectCard.nudgeAnalyse", {
+                        defaultValue:
+                          "✦ Ready to analyse — you have {{count}} completed interviews",
+                        count: p.completed_count,
+                      })}
+                    </p>
+                  ) : isStale ? (
+                    <p
+                      className="project-card-nudge project-card-nudge--stale"
+                      style={{
+                        margin: "8px 0 0",
+                        fontSize: 12,
+                        color: "var(--muted, #6b7280)",
+                      }}
+                    >
+                      {t("projectCard.nudgeStale", {
+                        defaultValue:
+                          "⏸ No new responses in {{count}} days",
+                        count: daysSinceLastResponse!,
+                      })}
+                    </p>
+                  ) : null}
+
+                  <p className="project-card-date">
+                    {new Date(p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
                 </div>
-                <div className="project-card-stats">
-                  {p.completed_count > 0 && (
-                    <span className="project-stat project-stat-completed">
-                      ✓ {t("projectCard.completed", { count: p.completed_count })}
-                    </span>
-                  )}
-                  {p.in_progress_count > 0 && (
-                    <span className="project-stat project-stat-inprogress">
-                      ● {t("projectCard.inProgress", { count: p.in_progress_count })}
-                    </span>
-                  )}
-                  {p.completed_count === 0 && p.in_progress_count === 0 && (
-                    <span className="project-stat project-stat-empty">{t("projectCard.noResponses")}</span>
-                  )}
-                  {p.analysis_status === "ready" && (
-                    <span className="project-stat project-stat-analysis">✦ {t("projectCard.analysisReady")}</span>
-                  )}
-                  {p.analysis_status === "generating" && (
-                    <span className="project-stat project-stat-generating">✦ {t("projectCard.analysing")}</span>
-                  )}
-                </div>
-                <p className="project-card-date">
-                  {new Date(p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
           </>
         )}

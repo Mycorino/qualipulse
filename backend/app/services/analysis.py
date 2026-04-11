@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.company import Company
 from app.models.interview import AnalysisThemeAnnotation, Participant, ProjectAnalysis
+from app.models.memo import ProjectMemo
 from app.models.project import Project
 from app.services.business_context import full_context_block
 from app.services.usage_logger import log_claude_usage
@@ -306,6 +307,40 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         if researcher_context.strip():
             annotation_sections.append("RESEARCHER CONTEXT (implicit knowledge not visible in transcripts):")
             annotation_sections.append(researcher_context.strip())
+            annotation_sections.append("")
+
+        # Project memos — if the researcher has been taking notes while
+        # reading transcripts, surface them so the refined run can weave
+        # that knowledge into themes instead of ignoring it. We pull the
+        # most recent 15 memos to stay under the token budget; older notes
+        # are usually stale or already reflected in annotations.
+        memos = (
+            db.query(ProjectMemo)
+            .filter(ProjectMemo.project_id == project_id)
+            .order_by(ProjectMemo.updated_at.desc())
+            .limit(15)
+            .all()
+        )
+        if memos:
+            annotation_sections.append(
+                "RESEARCHER MEMOS (notes the researcher wrote while reading "
+                "transcripts — treat as soft evidence, not hard facts):"
+            )
+            for memo in memos:
+                # Normalise memo type → short label so Claude sees what kind
+                # of note this is (general / theme-linked / tension-linked /
+                # jtbd-linked).
+                label_map = {
+                    "general": "Note",
+                    "theme_note": "Theme note",
+                    "tension_note": "Tension note",
+                    "jtbd_note": "JTBD note",
+                }
+                label = label_map.get(memo.type, "Note")
+                linked = f" ({memo.linked_key})" if memo.linked_key else ""
+                content = (memo.content or "").strip().replace("\n", " ")
+                if content:
+                    annotation_sections.append(f"- {label}{linked}: {content}")
             annotation_sections.append("")
 
         annotations_block = "\n".join(annotation_sections)

@@ -16,6 +16,7 @@ from app.schemas.auth import (
     OnboardingProfileRequest,
     PasswordResetConfirm,
     PasswordResetRequest,
+    PriorityUpdate,
     RefreshRequest,
     SignupRequest,
     SlackWebhookUpdate,
@@ -120,12 +121,18 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     db.add(verification_token)
     db.commit()
 
-    # Send verification email + welcome in the user's language
+    # Send ONLY the verification email at signup — not a separate welcome.
+    # We used to send both immediately and users confused the "Your account
+    # is ready" welcome mail with an action email, missed the verify step,
+    # and then the verify mail (which landed in spam) never got clicked.
+    # The welcome now fires from ``verify_email`` right after the address
+    # is confirmed, which is both cleaner (one action at a time) and better
+    # for deliverability (fewer messages in the first 30 seconds = lower
+    # engagement-based spam risk).
     verify_url = f"{settings.APP_BASE_URL}/verify-email?token={verification_token.token}"
     send_verification_email(
         company.email, company.name, verify_url, lang=company.preferred_language
     )
-    send_welcome(company.email, company.name, lang=company.preferred_language)
 
     return TokenResponse(
         access_token=create_access_token({"sub": company.id}),
@@ -185,11 +192,25 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
 
+    already_verified = company.email_verified
     company.email_verified = True
     token_row.used = True
     db.commit()
 
     logger.info("Email verified for %s", company.email)
+
+    # Fire the welcome email only once, on the first successful verification.
+    # This used to run at signup alongside the verify email; users confused
+    # the two and missed the verification step entirely. Sending it here
+    # means the welcome always lands *after* the "please verify" flow is
+    # done — it celebrates an action the user just took, rather than
+    # competing with it.
+    if not already_verified:
+        try:
+            send_welcome(company.email, company.name, lang=company.preferred_language)
+        except Exception as exc:  # pragma: no cover - never fail verify on email
+            logger.warning("Failed to send welcome email to %s: %s", company.email, exc)
+
     return {"message": "Email verified successfully"}
 
 
@@ -298,6 +319,35 @@ def update_profile(
         company.name = str(body["name"]).strip()
     if "preferred_language" in body and body["preferred_language"] in ("en", "fr"):
         company.preferred_language = body["preferred_language"]
+    db.commit()
+    db.refresh(company)
+    return CompanyResponse.model_validate(company)
+
+
+@router.patch("/me/priority", response_model=CompanyResponse)
+def update_current_priority(
+    body: PriorityUpdate,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Update the researcher's current top-of-mind priority.
+
+    The Dashboard shows a soft prompt every ~30 days asking "what's most
+    important for you to learn right now?". The answer is stored on the
+    Company record so we can (a) show it as a reminder next time they visit
+    and (b) eventually feed it into the recommended-studies ranking.
+
+    Pass ``current_priority=None`` or an empty string to clear.
+    """
+    value = body.current_priority
+    if value is not None:
+        value = value.strip()
+        if not value:
+            value = None
+        elif len(value) > 280:
+            value = value[:280]
+    company.current_priority = value
+    company.current_priority_updated_at = datetime.utcnow()
     db.commit()
     db.refresh(company)
     return CompanyResponse.model_validate(company)

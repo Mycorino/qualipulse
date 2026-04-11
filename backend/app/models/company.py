@@ -75,6 +75,13 @@ class Company(Base):
     # Integrations
     slack_webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Current priority — monthly re-prompt on the Dashboard so the researcher's
+    # top-of-mind focus stays fresh. The UI nudges them to update this every
+    # ~30 days. Free-form text so they can write "understanding why X churned"
+    # or whatever matches their context.
+    current_priority: Mapped[str | None] = mapped_column(Text, nullable=True)
+    current_priority_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # Timestamp of when the onboarding showcase/demo project was seeded for
     # this company. Used to keep the seeder idempotent — if it's non-null
     # we skip seeding on subsequent onboarding-complete calls (e.g. when a
