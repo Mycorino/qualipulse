@@ -26,6 +26,16 @@ export interface CompanyResponse {
   goals_freeform: string | null;
   preferred_language: string;
   slack_webhook_url: string | null;
+  // Business context
+  value_proposition?: string | null;
+  primary_competitors?: string | null;
+  product_stage?: string | null;
+  customer_type?: string | null;
+  // Qualification signals
+  interviews_per_month_target?: string | null;
+  current_tool?: string | null;
+  decision_role?: string | null;
+  goals_classification?: string | null;
 }
 
 export interface OnboardingProfile {
@@ -40,6 +50,15 @@ export interface OnboardingProfile {
   primary_region?: string;
   goals_freeform?: string;
   preferred_language?: string;
+  // Business context
+  value_proposition?: string;
+  primary_competitors?: string;
+  product_stage?: string;
+  customer_type?: string;
+  // Qualification signals
+  interviews_per_month_target?: string;
+  current_tool?: string;
+  decision_role?: string;
 }
 
 export async function signup(

@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     # Admin
     ADMIN_SECRET_KEY: str = ""  # If empty, admin routes return 403
 
+    # Sales Slack webhook — posts a message every time a new account
+    # completes onboarding. Optional: if empty, notifications are skipped.
+    SALES_SLACK_WEBHOOK_URL: str = ""
+
     # Rate limits (requests per minute)
     RATE_LIMIT_PUBLIC: str = "60/minute"     # Interview public endpoints
     RATE_LIMIT_AUTH: str = "10/minute"       # Login/signup

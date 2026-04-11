@@ -371,47 +371,13 @@ async def website_intel(
     }
 
 
-@router.patch("/onboarding")
-def save_onboarding_profile(
-    body: OnboardingProfileRequest,
-    company: Company = Depends(get_current_company),
-    db: Session = Depends(get_db),
-):
-    """Save company profile details during onboarding (intermediate save, doesn't mark complete)."""
-    if body.name:
-        company.name = body.name.strip()
-    if body.company_size:
-        company.company_size = body.company_size
-    if body.role:
-        company.role = body.role
-    if body.industry:
-        company.industry = body.industry
-    if body.use_case:
-        company.use_case = body.use_case
-    if body.website_url is not None:
-        company.website_url = body.website_url
-    if body.business_summary is not None:
-        company.business_summary = body.business_summary
-    if body.research_experience is not None:
-        company.research_experience = body.research_experience
-    if body.primary_region is not None:
-        company.primary_region = body.primary_region
-    if body.preferred_language:
-        normalized = body.preferred_language.strip().lower()[:2]
-        if normalized in ("en", "fr"):
-            company.preferred_language = normalized
-    db.commit()
-    logger.info("Onboarding profile saved for %s", company.email)
-    return CompanyResponse.model_validate(company)
+def _apply_onboarding_fields(company: Company, body: OnboardingProfileRequest) -> None:
+    """Persist any onboarding fields provided in the request.
 
-
-@router.post("/onboarding")
-def complete_onboarding(
-    body: OnboardingProfileRequest,
-    company: Company = Depends(get_current_company),
-    db: Session = Depends(get_db),
-):
-    """Save company profile details and mark onboarding as complete."""
+    Single source of truth for PATCH /onboarding (intermediate save) and
+    POST /onboarding (complete). Empty-string is treated as "clear this
+    field" for text fields; missing/None leaves the existing value alone.
+    """
     if body.name:
         company.name = body.name.strip()
     if body.company_size:
@@ -436,6 +402,57 @@ def complete_onboarding(
         normalized = body.preferred_language.strip().lower()[:2]
         if normalized in ("en", "fr"):
             company.preferred_language = normalized
+
+    # Business context
+    if body.value_proposition is not None:
+        company.value_proposition = body.value_proposition
+    if body.primary_competitors is not None:
+        company.primary_competitors = body.primary_competitors
+    if body.product_stage is not None:
+        company.product_stage = body.product_stage
+    if body.customer_type is not None:
+        company.customer_type = body.customer_type
+
+    # Qualification signals
+    if body.interviews_per_month_target is not None:
+        company.interviews_per_month_target = body.interviews_per_month_target
+    if body.current_tool is not None:
+        company.current_tool = body.current_tool
+    if body.decision_role is not None:
+        company.decision_role = body.decision_role
+
+
+@router.patch("/onboarding")
+def save_onboarding_profile(
+    body: OnboardingProfileRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Save company profile details during onboarding (intermediate save, doesn't mark complete)."""
+    _apply_onboarding_fields(company, body)
+    db.commit()
+    logger.info("Onboarding profile saved for %s", company.email)
+    return CompanyResponse.model_validate(company)
+
+
+@router.post("/onboarding")
+def complete_onboarding(
+    body: OnboardingProfileRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Save company profile details and mark onboarding as complete."""
+    _apply_onboarding_fields(company, body)
+
+    # Classify free-form goals into stable buckets for analytics / sales.
+    # Best-effort: if the classifier fails (API down, no key) we just skip.
+    if body.goals_freeform:
+        try:
+            from app.services.goals_classifier import classify_goals
+            company.goals_classification = classify_goals(body.goals_freeform)
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Failed to classify goals for %s", company.email)
+
     company.onboarding_completed = True
     db.commit()
 
@@ -452,6 +469,13 @@ def complete_onboarding(
         except Exception:  # pragma: no cover - defensive
             db.rollback()
             logger.exception("Failed to seed demo project for %s", company.email)
+
+    # Fire-and-forget sales notification to Slack. Never blocks the user.
+    try:
+        from app.services.sales_notify import notify_new_signup
+        notify_new_signup(company)
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Failed to send sales notification for %s", company.email)
 
     logger.info("Onboarding completed for %s", company.email)
     return CompanyResponse.model_validate(company)

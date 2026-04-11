@@ -60,6 +60,17 @@ class OnboardingProfileRequest(BaseModel):
     # confirmable in onboarding step 2.
     preferred_language: Optional[str] = None
 
+    # Business context (grounds AI analysis + research suggestions)
+    value_proposition: Optional[str] = None
+    primary_competitors: Optional[str] = None
+    product_stage: Optional[str] = None
+    customer_type: Optional[str] = None
+
+    # Qualification signals (routes leads for sales)
+    interviews_per_month_target: Optional[str] = None
+    current_tool: Optional[str] = None
+    decision_role: Optional[str] = None
+
 
 class CompanyResponse(BaseModel):
     id: str
@@ -81,6 +92,14 @@ class CompanyResponse(BaseModel):
     goals_freeform: Optional[str] = None
     preferred_language: str = "fr"
     slack_webhook_url: Optional[str] = None
+    value_proposition: Optional[str] = None
+    primary_competitors: Optional[str] = None
+    product_stage: Optional[str] = None
+    customer_type: Optional[str] = None
+    interviews_per_month_target: Optional[str] = None
+    current_tool: Optional[str] = None
+    decision_role: Optional[str] = None
+    goals_classification: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

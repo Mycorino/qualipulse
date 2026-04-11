@@ -8,8 +8,10 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.models.company import Company
 from app.models.interview import AnalysisThemeAnnotation, Participant, ProjectAnalysis
 from app.models.project import Project
+from app.services.business_context import full_context_block
 from app.services.usage_logger import log_claude_usage
 
 ANALYSIS_SYSTEM_PROMPT = """\
@@ -134,6 +136,12 @@ def run_analysis(
 
     try:
         transcripts_block, participant_map = _build_transcripts_block(completed)
+        # Load the owning company so we can prepend business context to the
+        # Claude prompt. The analysis is infinitely more useful when the model
+        # knows what the researcher actually sells and who they sell it to.
+        company = db.query(Company).filter(Company.id == project.company_id).first()
+        context_block = full_context_block(company, project)
+
         objective_block = (
             f"RESEARCH OBJECTIVE:\n{project.research_objective}\n\n"
             if project.research_objective
@@ -144,7 +152,7 @@ def run_analysis(
         if filter_by and filter_values:
             filter_note = f"NOTE: This analysis covers only participants filtered by {filter_by} = {', '.join(filter_values)}.\n\n"
 
-        prompt = f"""{objective_block}{filter_note}TRANSCRIPTS ({len(completed)} completed interviews):
+        prompt = f"""{context_block}{objective_block}{filter_note}TRANSCRIPTS ({len(completed)} completed interviews):
 
 {transcripts_block}
 
@@ -305,6 +313,10 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         # Load completed participants
         all_completed = [p for p in project.participants if p.status == "completed" and p.turns]
 
+        # Business + study context — same grounding as the v1 run.
+        company = db.query(Company).filter(Company.id == project.company_id).first()
+        context_block = full_context_block(company, project)
+
         objective_block = (
             f"RESEARCH OBJECTIVE:\n{project.research_objective}\n\n"
             if project.research_objective
@@ -313,7 +325,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
 
         transcripts_block, _ = _build_transcripts_block(all_completed)
 
-        prompt = f"""{objective_block}{annotations_block}
+        prompt = f"""{context_block}{objective_block}{annotations_block}
 TRANSCRIPTS ({len(all_completed)} completed interviews):
 
 {transcripts_block}

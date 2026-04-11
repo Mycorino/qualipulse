@@ -44,6 +44,8 @@ def create_project(
         interview_duration_minutes=body.interview_duration_minutes,
         system_prompt=body.system_prompt or Project.__table__.columns["system_prompt"].default.arg,
         research_objective=body.research_objective or None,
+        decision_to_inform=body.decision_to_inform or None,
+        target_customer_description=body.target_customer_description or None,
         panel_collection_enabled=body.panel_collection_enabled,
     )
     db.add(project)
@@ -213,6 +215,8 @@ def update_project(
     project.interview_duration_minutes = body.interview_duration_minutes
     project.research_objective = body.research_objective or None
     project.welcome_message = body.welcome_message or None
+    project.decision_to_inform = body.decision_to_inform or None
+    project.target_customer_description = body.target_customer_description or None
     project.panel_collection_enabled = body.panel_collection_enabled
     if body.system_prompt is not None:
         project.system_prompt = body.system_prompt
@@ -411,6 +415,8 @@ def _project_to_response(project: Project) -> ProjectResponse:
         research_objective=project.research_objective,
         welcome_message=project.welcome_message,
         panel_collection_enabled=getattr(project, "panel_collection_enabled", True),
+        decision_to_inform=getattr(project, "decision_to_inform", None),
+        target_customer_description=getattr(project, "target_customer_description", None),
         created_at=project.created_at,
         questions=questions,
         screening_questions=screening,

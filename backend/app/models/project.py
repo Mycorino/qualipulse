@@ -40,6 +40,10 @@ class Project(Base):
     researcher_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     researcher_logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Study grounding — what business decision this study will inform
+    decision_to_inform: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Who we're interviewing for this specific study (overrides company customer_type)
+    target_customer_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     panel_collection_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # True when this project was auto-seeded by the onboarding flow as a

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
+from app.services.business_context import company_context_block
 from app.services.usage_logger import log_claude_usage
 
 router = APIRouter(prefix="/research", tags=["research"])
@@ -32,16 +33,12 @@ def _strip_fences(text: str) -> str:
 
 
 def _business_context(company: Company) -> str:
-    """Build a business context prefix to personalise AI suggestions."""
-    parts = []
-    if company.business_summary:
-        parts.append(f"Context about this researcher's business: {company.business_summary}")
-    if company.primary_region:
-        parts.append(f"Their primary market: {company.primary_region}")
-    if not parts:
-        return ""
-    parts.append("Use this context to make suggestions more specific and relevant to their business.")
-    return "\n".join(parts) + "\n\n"
+    """Build a business context prefix to personalise AI suggestions.
+
+    Delegates to the shared ``company_context_block`` helper so analysis.py
+    and research_assistant.py always see the same grounding.
+    """
+    return company_context_block(company)
 
 
 def _resolve_language(body_language: str | None, company: Company) -> str:

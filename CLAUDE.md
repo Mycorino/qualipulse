@@ -3,6 +3,45 @@
 ## Working Directory
 All work for this project lives at: `/Users/corinofontana/Desktop/auto-interview`
 
+## Session Start Checklist (READ FIRST)
+**Every Claude Code session must begin from a fresh branch off the current `origin/main`.** The repo uses a lot of parallel worktrees under `.claude/worktrees/` and they accumulate stale state fast — pick up an old one and you'll be coding against a world that doesn't exist anymore. When in doubt, assume your local state is wrong and check `origin/main`, never local `main`.
+
+**At the start of every session, run these four commands before touching anything:**
+
+```bash
+cd /Users/corinofontana/Desktop/auto-interview
+git fetch origin                        # pull in anything merged since you last looked
+git log --oneline origin/main -5        # what's actually on production-ready main?
+git rev-list --left-right --count HEAD...origin/main  # am I ahead / behind?
+```
+
+If the third command reports `0  N` (zero ahead, N behind), your local branch is stale — you are missing N commits that are on `origin/main`. **Do not start work from a stale branch.** Fast-forward or create a fresh worktree first.
+
+### Good practices for sessions
+
+1. **One task = one worktree off fresh `origin/main`.** Don't reuse a worktree from a previous task — create a new one: `git fetch origin && git worktree add .claude/worktrees/<new-name> -b claude/<task-slug> origin/main`. Stale worktrees are the #1 cause of "it works on my machine but production shows something else."
+2. **Trust `origin/main`, not local `main`.** Local `main` is only as fresh as your last `git pull`. When a session asks "what's on main?", the correct answer comes from `git log origin/main`, never `git log main`.
+3. **Don't trust `CLAUDE.md` in an old worktree.** This file gets updated alongside features. If your worktree is 40 commits behind, your `CLAUDE.md` is too — cross-check against `git show origin/main:CLAUDE.md` if something looks off.
+4. **Re-sync long-running sessions.** If a session runs for more than a few hours while other PRs are merging, periodically `git fetch origin && git merge origin/main` (or rebase) to keep your branch current. Otherwise you'll write code against assumptions that no longer hold.
+5. **Before opening a PR**, rebase onto the current `origin/main` one last time: `git fetch origin && git rebase origin/main`. This catches conflicts before CI instead of after.
+6. **Delete worktrees when the PR merges.** `git worktree remove .claude/worktrees/<name>` + `git branch -d claude/<name>`. Don't let branches pile up — every dead worktree is a trap for the next session.
+7. **Never treat a local worktree's state as authoritative about production.** Production state lives in Cloud Run revisions, which are built from `origin/main`. The only way to know what's live is `gcloud run services describe ...` or `curl https://api.qualipulse.com/`.
+8. **If you see dark mode or any other "fixed" issue reappear**, it's almost certainly a stale worktree, not a regression. Check the current branch's commit ancestry for `c1b99fc` (the dark-mode-kill commit) via `git merge-base --is-ancestor c1b99fc HEAD && echo "has kill" || echo "STALE"` before filing a bug.
+
+### Recovering a stale setup
+If you realise the main repo or a worktree is behind `origin/main`, the safe recovery is:
+
+```bash
+# From an up-to-date worktree (check with git rev-parse origin/main first)
+cd <stale-worktree-or-main-repo>
+git status                              # see what's dirty
+git stash push -u -m "pre-sync"         # preserve uncommitted work (or git reset --hard if writing it off)
+git fetch origin
+git reset --hard origin/main            # snap to origin/main exactly
+```
+
+For bulk recovery of all worktrees at once, the pattern is `for wt in $(git worktree list --porcelain | awk '/^worktree /{print $2}'); do (cd "$wt" && git reset --hard origin/main); done` — skip the worktree you're currently working in.
+
 ## Project Overview
 A SaaS platform that lets companies create AI-driven voice interviews. Researchers build an interview guide, generate a shareable link, and participants complete the interview in-browser. Responses are transcribed, analysed, and stored. Researchers can then review transcripts, tag quotes, add memos, and generate AI analysis reports.
 
@@ -67,7 +106,12 @@ auto-interview/
 │   │       ├── tts.py               # OpenAI TTS generation
 │   │       ├── storage.py           # Audio: Cloudflare R2 or local disk
 │   │       ├── guide_parser.py      # CSV import parser
-│   │       └── usage_logger.py      # Fire-and-forget AI cost logging (Claude/Whisper/TTS)
+│   │       ├── usage_logger.py      # Fire-and-forget AI cost logging (Claude/Whisper/TTS)
+│   │       ├── website_intelligence.py  # Onboarding: scrape + summarise a company website
+│   │       ├── workspace.py         # Team workspace membership + permission helpers
+│   │       ├── demo_seeder.py       # Seeds the onboarding showcase demo project
+│   │       ├── _demo_data_fr.py     # French transcripts for the showcase demo (fixture)
+│   │       └── _demo_data_en.py     # English transcripts for the showcase demo (fixture)
 │   ├── alembic/
 │   │   └── versions/
 │   │       ├── 0001_add_researcher_features.py
@@ -78,12 +122,17 @@ auto-interview/
 │   │       ├── 0006_ai_usage_log.py
 │   │       ├── 0007_participant_panel.py
 │   │       ├── 0008_affiliate_program.py
-│   │       └── 0009_blog_posts.py
+│   │       ├── 0009_blog_posts.py
+│   │       ├── 0010_add_preferred_language.py
+│   │       ├── 0011_add_slack_webhook_url.py
+│   │       ├── 0012_team_collaboration.py
+│   │       └── 0013_add_demo_project_flag.py
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
 │   │   ├── test_projects.py     # CRUD, auth isolation, archive, tier limits
-│   │   └── test_feature_gates.py # All tier limits + feature gates
+│   │   ├── test_feature_gates.py # All tier limits + feature gates
+│   │   └── test_demo_seeder.py  # Showcase demo project seeding + quota exclusion
 │   ├── Dockerfile               # Python 3.11, runs alembic + uvicorn
 │   ├── pytest.ini
 │   ├── requirements.txt
@@ -317,6 +366,40 @@ After signup, users are redirected to `/welcome` (4-step onboarding):
 4. **Ready** — trial info, CTA to dashboard
 
 Login checks `onboarding_completed` — if false, redirects to `/welcome` instead of `/dashboard`.
+
+### Showcase Demo Project (auto-seeded)
+On the first successful `POST /auth/onboarding`, the backend calls
+`seed_demo_project()` to populate a read-only example project named
+`[Demo] How modern teams work across borders` for the new account.
+Idempotent via `Company.demo_seeded_at` — subsequent onboarding completions
+skip seeding. Seeder errors are swallowed so a fixture bug never blocks a
+real user from finishing onboarding.
+
+The showcase project demonstrates almost every platform surface in one place:
+
+- **Bilingual interviews** — 3 French + 3 English completed participants +
+  1 in-progress (Marco P.), with realistic adaptive follow-ups and demographics
+  (profession / age_range / country) to power the segment heatmap
+- **Setup content** — 5 main guide questions across 3 sections, 1 screening
+  question with a disqualifying option, 2 interview links (1 active EU,
+  1 paused NA)
+- **Coding** — 4 manual codes (Pain point / Workaround / Aha moment /
+  Cultural difference) and 13 tagged quotes with real character offsets
+  computed via `.find()` against the transcript text
+- **Analysis** — 2 versions: `ai_discovery` v1 (with `share_token`) and
+  `researcher_refined` v2 parented to v1. 3 annotations (`confirmed`,
+  `needs_evidence`, `disputed`) on v2 themes. All analysis quotes are
+  verbatim substrings of real participant transcripts.
+- **Memos** — 6 project memos (general + theme-linked + tension-linked)
+- **Editing state** — one turn flagged `manually_edited=True`
+
+The content lives in `backend/app/services/_demo_data_{en,fr}.py` so the
+`demo_seeder.py` logic stays readable. Demo projects set `Project.is_demo=True`
+and are **excluded from the tier project-quota count** in `routers/projects.py`
+so they never block a user from creating their first real study. Tests:
+`backend/tests/test_demo_seeder.py` (4 tests — relationship graph, quote-tag
+offset integrity, every analysis quote appears verbatim in a real transcript,
+quota exclusion).
 
 ### Email Verification
 - On signup: `EmailVerificationToken` created (24h expiry), verification + welcome emails sent
@@ -667,6 +750,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Terms of Service + Privacy Policy pages
 - [x] SendGrid email integration (domain-authenticated, branded HTML templates)
 - [x] Getting-started checklist on empty dashboard
+- [x] Auto-seeded showcase demo project on onboarding completion — bilingual (3 FR + 3 EN + 1 in-progress participant), 2 interview links, screening question, codebook with tagged quotes, 2 analysis versions with annotations, memos. `is_demo=True` so it never counts against tier project quota. Idempotent via `Company.demo_seeded_at`.
 - [x] Trial banner on dashboard (visible to solo/free users with active trial)
 - [x] Email verification banner (yellow) when unverified
 - [x] Admin panel (user management, tier changes, trial management, user deletion)
@@ -737,10 +821,10 @@ gcloud builds list --region=europe-west1 --limit=5
 ## Data Models Summary
 
 ### Company (auth)
-`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `created_at`
+`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience`, `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at` (idempotency guard for showcase demo), `created_at`
 
 ### Project
-`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `created_at`, `archived_at`
+`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
 
 ### InterviewGuideQuestion
 `id`, `project_id`, `section_index`, `section_title`, `question_index`, `main_question`, `interview_notes`, `desired_learning`, `researcher_notes`, `deprecated_at`, `sort_order`
