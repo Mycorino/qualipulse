@@ -45,3 +45,27 @@ def get_current_company(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return company
+
+
+def get_current_company_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Company | None:
+    """Return the authenticated company if the request carries a valid token.
+
+    Unlike ``get_current_company`` this dependency never raises — it just
+    hands back ``None`` for anonymous or invalid-token calls. Endpoints that
+    work for both marketing visitors and signed-in users (e.g. the public
+    ``/templates`` list, which should localise for logged-in users) use
+    this to avoid duplicating the decode logic.
+    """
+    if credentials is None:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+    except Exception:
+        return None
+    company_id: str | None = payload.get("sub")
+    if company_id is None:
+        return None
+    return db.query(Company).filter(Company.id == company_id).first()

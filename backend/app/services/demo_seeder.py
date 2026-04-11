@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.models.coding import ManualCode, QuoteTag
+from app.models.company import Company
 from app.models.interview import (
     AnalysisThemeAnnotation,
     InterviewLink,
@@ -45,12 +46,19 @@ from app.services._demo_data_fr import NOTABLE_QUOTES_FR, PARTICIPANTS_FR
 
 
 DEMO_PROJECT_NAME = "[Demo] How modern teams work across borders"
+DEMO_PROJECT_NAME_FR = "[Démo] Comment les équipes modernes travaillent à distance"
 
 DEMO_RESEARCH_OBJECTIVE = (
     "Understand how distributed product and engineering teams stay aligned "
     "across time zones, languages, and tool stacks — and surface the moments "
     "where coordination breaks down so we can design a product that fixes the "
     "root cause rather than the symptoms."
+)
+DEMO_RESEARCH_OBJECTIVE_FR = (
+    "Comprendre comment les équipes produit et engineering distribuées restent "
+    "alignées à travers les fuseaux horaires, les langues et les outils — et "
+    "faire émerger les moments où la coordination casse, pour concevoir un "
+    "produit qui règle la cause racine plutôt que les symptômes."
 )
 
 DEMO_RESEARCH_CONTEXT = (
@@ -61,12 +69,26 @@ DEMO_RESEARCH_CONTEXT = (
     "Feel free to edit anything, archive it, or delete it whenever you're ready "
     "to run your own study — it never counts against your project quota."
 )
+DEMO_RESEARCH_CONTEXT_FR = (
+    "Ceci est un projet de démo que QualiPulse a créé automatiquement pour que "
+    "vous puissiez explorer la plateforme avec des données réalistes. Il "
+    "contient six entretiens complétés en anglais et en français, une analyse "
+    "IA aboutie avec deux versions, un codebook chercheur, des verbatims "
+    "taggués et des mémos. Modifiez, archivez ou supprimez quand vous voulez "
+    "— ce projet ne compte pas dans votre quota."
+)
 
 DEMO_WELCOME_MESSAGE = (
     "Hi, thanks for taking the time to talk with us! This is a short, informal "
     "conversation about how you and your team work together day to day. There "
     "are no right or wrong answers — we just want to understand how things "
     "actually look from your side."
+)
+DEMO_WELCOME_MESSAGE_FR = (
+    "Bonjour, merci de prendre le temps de discuter avec nous ! C'est une "
+    "conversation courte et informelle sur la façon dont vous travaillez avec "
+    "votre équipe au quotidien. Il n'y a pas de bonnes ou mauvaises réponses "
+    "— on veut juste comprendre comment ça se passe vraiment de votre côté."
 )
 
 DEMO_GUIDE: list[dict] = [
@@ -107,12 +129,53 @@ DEMO_GUIDE: list[dict] = [
     },
 ]
 
+# Parallel FR guide — section order and question count mirror DEMO_GUIDE so
+# both the seeder's question_index bookkeeping and the analysis quote lookups
+# (which match by turn_index) continue to work.
+DEMO_GUIDE_FR: list[dict] = [
+    {
+        "section": "Rythme quotidien",
+        "questions": [
+            {
+                "q": "Racontez-moi une journée de travail type. Quand êtes-vous en focus seul, et quand collaborez-vous avec votre équipe ?",
+                "learning": "Rythme de base, ratio focus vs collaboration, async vs synchrone par défaut.",
+            },
+            {
+                "q": "Quels outils utilisez-vous pour rester aligné avec votre équipe, et comment votre stack a-t-elle évolué pour en arriver là ?",
+                "learning": "Stack d'outils, sprawl, historique de consolidation.",
+            },
+        ],
+    },
+    {
+        "section": "Frictions et ruptures",
+        "questions": [
+            {
+                "q": "Parlez-moi d'un moment récent où vous vous êtes senti bloqué ou frustré en travaillant en équipe. Que s'est-il passé ?",
+                "learning": "Ruptures de coordination, où se perdent les décisions et le contexte.",
+            },
+            {
+                "q": "Quand vous avez besoin de quelque chose d'un collègue dans un autre fuseau horaire, quel est votre playbook ?",
+                "learning": "Mécanismes d'adaptation async, friction liée aux fuseaux, rituels.",
+            },
+        ],
+    },
+    {
+        "section": "Aspirations",
+        "questions": [
+            {
+                "q": "Si vous aviez une baguette magique pour régler une seule chose dans la façon dont votre équipe travaille ensemble, ce serait quoi et pourquoi ?",
+                "learning": "Douleur top-of-mind, wishlist, jobs-to-be-done.",
+            },
+        ],
+    },
+]
+
 
 # Build a flat ordered list of main questions, mirroring how the seeder
 # assigns turn_index → question_index. Used to look up question text.
-def _flat_main_questions() -> list[str]:
+def _flat_main_questions(guide: list[dict] | None = None) -> list[str]:
     flat: list[str] = []
-    for section in DEMO_GUIDE:
+    for section in (guide or DEMO_GUIDE):
         for item in section["questions"]:
             flat.append(item["q"])
     return flat
@@ -122,6 +185,12 @@ DEMO_SCREENING_QUESTION = {
     "question": "How many people are on your team today?",
     "options": ["Just me", "2 to 5", "6 to 15", "16 or more"],
     "disqualifying_options": ["Just me"],
+}
+
+DEMO_SCREENING_QUESTION_FR = {
+    "question": "Combien de personnes sont dans votre équipe aujourd'hui ?",
+    "options": ["Juste moi", "2 à 5", "6 à 15", "16 ou plus"],
+    "disqualifying_options": ["Juste moi"],
 }
 
 
@@ -457,17 +526,46 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
     not commit until everything is built, so a partial failure rolls back
     cleanly. The caller is responsible for setting `Company.demo_seeded_at`
     after success if it wants idempotency.
+
+    The project scaffolding (name, objective, welcome, guide, screening) is
+    emitted in the company's ``preferred_language`` — defaults to English if
+    the company row can't be loaded. The *participant transcripts* stay
+    bilingual on purpose (3 FR + 3 EN + 1 in-progress) so the seed showcases
+    cross-language capability regardless of the researcher's UI locale.
     """
     now = datetime.now(timezone.utc)
 
+    # Resolve the researcher's language so the project scaffolding is emitted
+    # in the right tongue. The participant transcripts remain bilingual by
+    # design — see the module docstring.
+    company = db.query(Company).filter(Company.id == company_id).first()
+    lang = (getattr(company, "preferred_language", None) or "en").strip().lower()[:2]
+    if lang not in ("en", "fr"):
+        lang = "en"
+
+    if lang == "fr":
+        demo_name = DEMO_PROJECT_NAME_FR
+        demo_welcome = DEMO_WELCOME_MESSAGE_FR
+        demo_objective = DEMO_RESEARCH_OBJECTIVE_FR
+        demo_context = DEMO_RESEARCH_CONTEXT_FR
+        demo_guide = DEMO_GUIDE_FR
+        demo_screening = DEMO_SCREENING_QUESTION_FR
+    else:
+        demo_name = DEMO_PROJECT_NAME
+        demo_welcome = DEMO_WELCOME_MESSAGE
+        demo_objective = DEMO_RESEARCH_OBJECTIVE
+        demo_context = DEMO_RESEARCH_CONTEXT
+        demo_guide = DEMO_GUIDE
+        demo_screening = DEMO_SCREENING_QUESTION
+
     project = Project(
         company_id=company_id,
-        name=DEMO_PROJECT_NAME,
-        language="en",
+        name=demo_name,
+        language=lang,
         interview_duration_minutes=20,
-        welcome_message=DEMO_WELCOME_MESSAGE,
-        research_objective=DEMO_RESEARCH_OBJECTIVE,
-        research_context=DEMO_RESEARCH_CONTEXT,
+        welcome_message=demo_welcome,
+        research_objective=demo_objective,
+        research_context=demo_context,
         is_demo=True,
         created_at=now - timedelta(days=14),
     )
@@ -476,7 +574,7 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
 
     # Guide questions
     sort_order = 0
-    for section_index, section in enumerate(DEMO_GUIDE):
+    for section_index, section in enumerate(demo_guide):
         for question_index, item in enumerate(section["questions"]):
             db.add(
                 InterviewGuideQuestion(
@@ -497,9 +595,9 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         ScreeningQuestion(
             project_id=project.id,
             sort_order=0,
-            question=DEMO_SCREENING_QUESTION["question"],
-            options=json.dumps(DEMO_SCREENING_QUESTION["options"]),
-            disqualifying_options=json.dumps(DEMO_SCREENING_QUESTION["disqualifying_options"]),
+            question=demo_screening["question"],
+            options=json.dumps(demo_screening["options"]),
+            disqualifying_options=json.dumps(demo_screening["disqualifying_options"]),
         )
     )
 
@@ -533,7 +631,7 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
     db.flush()
 
     # Helper to add a participant and their turns. Returns (participant, turns_by_index_dict).
-    flat_questions = _flat_main_questions()
+    flat_questions = _flat_main_questions(demo_guide)
 
     def add_participant(
         data: dict,

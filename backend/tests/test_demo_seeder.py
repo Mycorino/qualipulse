@@ -12,14 +12,22 @@ from app.models.interview import (
 )
 from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
-from app.services.demo_seeder import DEMO_PROJECT_NAME, seed_demo_project
+from app.services.demo_seeder import (
+    DEMO_PROJECT_NAME,
+    DEMO_PROJECT_NAME_FR,
+    seed_demo_project,
+)
 
 
-def _make_company(db_session) -> Company:
+def _make_company(db_session, preferred_language: str = "en") -> Company:
+    """Create a test company. Defaults to English so existing assertions
+    continue to reference the EN project name; pass ``preferred_language="fr"``
+    to exercise the French seeding path."""
     company = Company(
         name="Test Co",
         email="seed@example.com",
         password_hash="x",
+        preferred_language=preferred_language,
     )
     db_session.add(company)
     db_session.commit()
@@ -170,6 +178,50 @@ class TestDemoSeeder:
         assert "general" in memo_types
         assert "theme_note" in memo_types
         assert "tension_note" in memo_types
+
+    def test_seed_uses_french_scaffolding_for_fr_company(self, db_session):
+        """A company with preferred_language=fr gets the FR project name,
+        welcome, objective, guide and screening question — but the bilingual
+        participant transcripts are still both FR and EN (by design, to
+        demonstrate cross-language capability)."""
+        company = _make_company(db_session, preferred_language="fr")
+        project = seed_demo_project(db_session, company.id)
+
+        assert project.name == DEMO_PROJECT_NAME_FR
+        assert project.language == "fr"
+        # Welcome should open in French.
+        assert project.welcome_message.startswith("Bonjour")
+        # Objective should be in French.
+        assert "comprendre" in project.research_objective.lower()
+
+        # Screening question should be French with French disqualifier.
+        screening = (
+            db_session.query(ScreeningQuestion)
+            .filter(ScreeningQuestion.project_id == project.id)
+            .one()
+        )
+        assert json.loads(screening.disqualifying_options) == ["Juste moi"]
+
+        # Guide questions should be French, preserving 5 main questions.
+        questions = (
+            db_session.query(InterviewGuideQuestion)
+            .filter(InterviewGuideQuestion.project_id == project.id)
+            .order_by(InterviewGuideQuestion.sort_order)
+            .all()
+        )
+        assert len(questions) == 5
+        assert any("équipe" in q.main_question.lower() for q in questions)
+
+        # Bilingual participants still present — the FR scaffolding shouldn't
+        # affect who gets seeded as a participant.
+        countries = {
+            p.country
+            for p in db_session.query(Participant)
+            .filter(Participant.project_id == project.id)
+            .all()
+        }
+        assert "France" in countries
+        assert "United States" in countries
 
     def test_seed_quotes_are_substrings_of_real_transcripts(self, db_session):
         """Every analysis quote must appear verbatim in some participant's turn."""
