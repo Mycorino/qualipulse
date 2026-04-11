@@ -3,6 +3,45 @@
 ## Working Directory
 All work for this project lives at: `/Users/corinofontana/Desktop/auto-interview`
 
+## Session Start Checklist (READ FIRST)
+**Every Claude Code session must begin from a fresh branch off the current `origin/main`.** The repo uses a lot of parallel worktrees under `.claude/worktrees/` and they accumulate stale state fast — pick up an old one and you'll be coding against a world that doesn't exist anymore. When in doubt, assume your local state is wrong and check `origin/main`, never local `main`.
+
+**At the start of every session, run these four commands before touching anything:**
+
+```bash
+cd /Users/corinofontana/Desktop/auto-interview
+git fetch origin                        # pull in anything merged since you last looked
+git log --oneline origin/main -5        # what's actually on production-ready main?
+git rev-list --left-right --count HEAD...origin/main  # am I ahead / behind?
+```
+
+If the third command reports `0  N` (zero ahead, N behind), your local branch is stale — you are missing N commits that are on `origin/main`. **Do not start work from a stale branch.** Fast-forward or create a fresh worktree first.
+
+### Good practices for sessions
+
+1. **One task = one worktree off fresh `origin/main`.** Don't reuse a worktree from a previous task — create a new one: `git fetch origin && git worktree add .claude/worktrees/<new-name> -b claude/<task-slug> origin/main`. Stale worktrees are the #1 cause of "it works on my machine but production shows something else."
+2. **Trust `origin/main`, not local `main`.** Local `main` is only as fresh as your last `git pull`. When a session asks "what's on main?", the correct answer comes from `git log origin/main`, never `git log main`.
+3. **Don't trust `CLAUDE.md` in an old worktree.** This file gets updated alongside features. If your worktree is 40 commits behind, your `CLAUDE.md` is too — cross-check against `git show origin/main:CLAUDE.md` if something looks off.
+4. **Re-sync long-running sessions.** If a session runs for more than a few hours while other PRs are merging, periodically `git fetch origin && git merge origin/main` (or rebase) to keep your branch current. Otherwise you'll write code against assumptions that no longer hold.
+5. **Before opening a PR**, rebase onto the current `origin/main` one last time: `git fetch origin && git rebase origin/main`. This catches conflicts before CI instead of after.
+6. **Delete worktrees when the PR merges.** `git worktree remove .claude/worktrees/<name>` + `git branch -d claude/<name>`. Don't let branches pile up — every dead worktree is a trap for the next session.
+7. **Never treat a local worktree's state as authoritative about production.** Production state lives in Cloud Run revisions, which are built from `origin/main`. The only way to know what's live is `gcloud run services describe ...` or `curl https://api.qualipulse.com/`.
+8. **If you see dark mode or any other "fixed" issue reappear**, it's almost certainly a stale worktree, not a regression. Check the current branch's commit ancestry for `c1b99fc` (the dark-mode-kill commit) via `git merge-base --is-ancestor c1b99fc HEAD && echo "has kill" || echo "STALE"` before filing a bug.
+
+### Recovering a stale setup
+If you realise the main repo or a worktree is behind `origin/main`, the safe recovery is:
+
+```bash
+# From an up-to-date worktree (check with git rev-parse origin/main first)
+cd <stale-worktree-or-main-repo>
+git status                              # see what's dirty
+git stash push -u -m "pre-sync"         # preserve uncommitted work (or git reset --hard if writing it off)
+git fetch origin
+git reset --hard origin/main            # snap to origin/main exactly
+```
+
+For bulk recovery of all worktrees at once, the pattern is `for wt in $(git worktree list --porcelain | awk '/^worktree /{print $2}'); do (cd "$wt" && git reset --hard origin/main); done` — skip the worktree you're currently working in.
+
 ## Project Overview
 A SaaS platform that lets companies create AI-driven voice interviews. Researchers build an interview guide, generate a shareable link, and participants complete the interview in-browser. Responses are transcribed, analysed, and stored. Researchers can then review transcripts, tag quotes, add memos, and generate AI analysis reports.
 
