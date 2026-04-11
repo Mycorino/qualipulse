@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
+import LanguageSwitcher from "../components/LanguageSwitcher";
+import { useAuth } from "../hooks/useAuth";
+import { getMe } from "../api/auth";
 import { createProject, updateProject, getProject, createLink } from "../api/projects";
 import type { QuestionCreate, ScreeningQuestionCreate } from "../api/projects";
 import {
@@ -42,8 +45,10 @@ function loadDraft() {
 export default function CreateProjectWizard() {
   const navigate = useNavigate();
   const { id: editId } = useParams<{ id?: string }>();
+  const [searchParams] = useSearchParams();
   const isEditMode = !!editId;
-  const { t, i18n } = useTranslation("project");
+  const { t, i18n } = useTranslation(["project", "common"]);
+  const { logout } = useAuth();
 
   // In edit mode, skip draft restore and load from API instead
   const draft = isEditMode ? null : loadDraft();
@@ -61,7 +66,7 @@ export default function CreateProjectWizard() {
 
   // Step 1
   const [name, setName] = useState(draft?.name ?? "");
-  const [context, setContext] = useState(draft?.context ?? "");
+  const [context, setContext] = useState<string>(draft?.context ?? "");
   const [originalContext, setOriginalContext] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [briefSummary, setBriefSummary] = useState(draft?.briefSummary ?? "");
@@ -96,8 +101,15 @@ export default function CreateProjectWizard() {
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const { toast } = useToast();
 
-  // Template picker: shown first on fresh create (no draft, not edit)
-  const [showTemplatePicker, setShowTemplatePicker] = useState(!isEditMode && !draft);
+  // Template picker: shown first on fresh create (no draft, not edit).
+  // If the URL carries `?template=<id>` (from the Dashboard "Studies that
+  // fit your company" cards) we skip the picker entirely — the user already
+  // chose their template when they clicked the recommendation, so showing
+  // a picker again would feel like the click didn't do anything.
+  const initialTemplateParam = searchParams.get("template");
+  const [showTemplatePicker, setShowTemplatePicker] = useState(
+    !isEditMode && !draft && !initialTemplateParam
+  );
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
@@ -177,6 +189,64 @@ export default function CreateProjectWizard() {
       setApplyingTemplateId(null);
     }
   }
+
+  // Handle `?template=<id>` — the Dashboard "Studies that fit your company"
+  // cards deep-link here so the researcher doesn't have to pick the template
+  // twice. We auto-apply the template AND pre-fill the Step 1 brief with
+  // whatever grounding we already have on the company (their monthly
+  // priority, business summary, industry) so the AI parse-brief step has
+  // something meaningful to work with instead of a blank canvas. That way
+  // the first click on a recommendation feels like "the assistant already
+  // knows who I am" rather than "empty form again".
+  //
+  // Skipped in edit mode and when a draft exists — those take precedence
+  // so we don't silently blow away work the user had in progress.
+  useEffect(() => {
+    if (isEditMode) return;
+    if (draft) return;
+    const templateId = searchParams.get("template");
+    if (!templateId) return;
+
+    // Fire-and-forget company fetch to pre-seed the brief context.
+    // We don't await it before applying the template because the template
+    // load is the user-visible action — the context pre-fill is a bonus.
+    getMe()
+      .then((company) => {
+        const parts: string[] = [];
+        if (company.current_priority) {
+          parts.push(
+            t("wizard.contextPrefillPriority", {
+              defaultValue: "Current priority: {{value}}",
+              value: company.current_priority,
+            })
+          );
+        }
+        if (company.business_summary) {
+          parts.push(company.business_summary);
+        }
+        if (company.industry) {
+          parts.push(
+            t("wizard.contextPrefillIndustry", {
+              defaultValue: "Industry: {{value}}",
+              value: company.industry,
+            })
+          );
+        }
+        if (parts.length > 0) {
+          // Only pre-fill if the user hasn't typed anything yet — we don't
+          // want to clobber a half-written brief on a re-render.
+          setContext((prev) => (prev.trim() ? prev : parts.join("\n\n")));
+        }
+      })
+      .catch(() => {
+        // Silent — missing grounding is fine, the template alone is useful.
+      });
+
+    handleUseTemplate(templateId);
+    // We intentionally only want this to run once on mount — the template
+    // param is read from the URL at load time, not reactively.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load existing project in edit mode
   useEffect(() => {
@@ -429,11 +499,43 @@ export default function CreateProjectWizard() {
     return (
       <div className="wizard-layout">
         <header className="wizard-header">
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate("/dashboard")}>
-            {t("wizard.backButton")}
-          </button>
-          <h2 className="wizard-title">{t("wizard.title")}</h2>
-          <div style={{ width: 80 }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <span
+              className="logo"
+              onClick={() => navigate("/dashboard")}
+              style={{ cursor: "pointer" }}
+            >
+              QualiPulse
+            </span>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => navigate("/dashboard")}
+            >
+              {t("wizard.backButton")}
+            </button>
+          </div>
+          <h2 className="wizard-title" style={{ margin: 0 }}>
+            {t("wizard.title")}
+          </h2>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <LanguageSwitcher variant="light" />
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => navigate("/account")}
+            >
+              {t("common:account")}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={logout}>
+              {t("common:signOut")}
+            </button>
+          </div>
         </header>
 
         <main className="wizard-main">
@@ -509,12 +611,57 @@ export default function CreateProjectWizard() {
   return (
     <div className="wizard-layout">
       <header className="wizard-header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate("/dashboard")}>
-          {t("wizard.backButton")}
-        </button>
-        <h2 className="wizard-title">{isEditMode ? t("wizard.titleEdit") : t("wizard.title")}</h2>
-        {!isEditMode && <span className="wizard-autosave wizard-autosave--hide-mobile">{t("wizard.draftAutoSaved")}</span>}
-        {isEditMode && <div style={{ width: 80 }} />}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span
+            className="logo"
+            onClick={() => navigate("/dashboard")}
+            style={{ cursor: "pointer" }}
+          >
+            QualiPulse
+          </span>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => navigate("/dashboard")}
+          >
+            {t("wizard.backButton")}
+          </button>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
+          <h2 className="wizard-title" style={{ margin: 0 }}>
+            {isEditMode ? t("wizard.titleEdit") : t("wizard.title")}
+          </h2>
+          {!isEditMode && (
+            <span className="wizard-autosave wizard-autosave--hide-mobile">
+              {t("wizard.draftAutoSaved")}
+            </span>
+          )}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <LanguageSwitcher variant="light" />
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => navigate("/account")}
+          >
+            {t("common:account")}
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={logout}>
+            {t("common:signOut")}
+          </button>
+        </div>
       </header>
 
       {/* Progress */}

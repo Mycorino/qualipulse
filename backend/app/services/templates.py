@@ -19,7 +19,10 @@ templates against a company's profile and returns a ranked list.
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, List, TypedDict
+
+from app.services._templates_fr import GOAL_LABELS_FR, STAGE_LABELS_FR, TEMPLATES_FR
 
 if TYPE_CHECKING:
     from app.models.company import Company
@@ -296,16 +299,82 @@ TEMPLATES: List[ProjectTemplate] = [
 ]
 
 
-def get_templates() -> List[ProjectTemplate]:
-    """Return all available templates."""
-    return TEMPLATES
+def _normalise_lang(lang: str | None) -> str:
+    """Reduce any language hint to a supported 2-letter code.
+
+    Unknown / empty / truthy-garbage values all fall back to ``"en"`` so the
+    downstream localisation path can assume a valid key.
+    """
+    if not lang or not isinstance(lang, str):
+        return "en"
+    code = lang.strip().lower()[:2]
+    return code if code in {"en", "fr"} else "en"
 
 
-def get_template_by_id(template_id: str) -> ProjectTemplate | None:
+def _localise_template(template: ProjectTemplate, lang: str) -> ProjectTemplate:
+    """Return a deep copy of ``template`` with French overrides merged in.
+
+    Questions are merged positionally by list index, preserving the
+    load-bearing ``section_index`` and ``question_index`` values from the
+    English canonical template. Any field missing from the FR overrides
+    falls back to the English source, so new templates ship safely even
+    before their translations land.
+    """
+    if lang == "en":
+        return template  # No work to do — canonical copy is already English.
+
+    overrides = TEMPLATES_FR.get(template["id"])
+    if not overrides:
+        return template  # Missing translation → degrade gracefully to English.
+
+    merged = copy.deepcopy(template)
+    for key, value in overrides.items():
+        if key == "questions":
+            # Positional merge: keep section_index / question_index from the
+            # English template, overlay translatable fields from the FR copy.
+            translated_qs = value
+            for idx, english_q in enumerate(merged["questions"]):
+                if idx >= len(translated_qs):
+                    break
+                fr_q = translated_qs[idx]
+                for q_key in ("section_title", "main_question", "interview_notes", "desired_learning"):
+                    if q_key in fr_q:
+                        english_q[q_key] = fr_q[q_key]
+        elif key == "screening_questions":
+            # Same positional merge so option indexes line up with
+            # disqualifying_options even when we overwrite the strings.
+            translated_sqs = value
+            for idx, english_sq in enumerate(merged.get("screening_questions", [])):
+                if idx >= len(translated_sqs):
+                    break
+                fr_sq = translated_sqs[idx]
+                for sq_key in ("question", "options", "disqualifying_options"):
+                    if sq_key in fr_sq:
+                        english_sq[sq_key] = fr_sq[sq_key]
+        else:
+            merged[key] = value  # type: ignore[literal-required]
+    return merged
+
+
+def get_templates(lang: str | None = None) -> List[ProjectTemplate]:
+    """Return all available templates, optionally localised.
+
+    ``lang`` is a 2-letter ISO code; anything unsupported (or missing) falls
+    through to the canonical English definitions. Callers that want the raw
+    English source (e.g. tests, matching logic) can just omit the argument.
+    """
+    code = _normalise_lang(lang)
+    if code == "en":
+        return TEMPLATES
+    return [_localise_template(t, code) for t in TEMPLATES]
+
+
+def get_template_by_id(template_id: str, lang: str | None = None) -> ProjectTemplate | None:
     """Look up a template by its id. Returns None if not found."""
     for t in TEMPLATES:
         if t["id"] == template_id:
-            return t
+            code = _normalise_lang(lang)
+            return _localise_template(t, code) if code != "en" else t
     return None
 
 
@@ -325,6 +394,7 @@ def _parse_goals_classification(value: str | None) -> list[str]:
 def match_templates_for_company(
     company: "Company | None",
     limit: int = 3,
+    lang: str | None = None,
 ) -> list[tuple[ProjectTemplate, int, list[str]]]:
     """Score templates against a company's profile and return the top matches.
 
@@ -342,8 +412,13 @@ def match_templates_for_company(
     returning the first ``limit`` templates in definition order so the UI still
     shows something useful.
     """
+    code = _normalise_lang(lang or getattr(company, "preferred_language", None) if company else "en")
+
+    def _loc(t: ProjectTemplate) -> ProjectTemplate:
+        return _localise_template(t, code) if code != "en" else t
+
     if company is None:
-        return [(t, 0, []) for t in TEMPLATES[:limit]]
+        return [(_loc(t), 0, []) for t in TEMPLATES[:limit]]
 
     goals = _parse_goals_classification(getattr(company, "goals_classification", None))
     stage = (getattr(company, "product_stage", None) or "").strip().lower() or None
@@ -351,9 +426,9 @@ def match_templates_for_company(
 
     # Nothing to match on → preserve definition order for a stable default.
     if not goals and not stage and not ctype:
-        return [(t, 0, []) for t in TEMPLATES[:limit]]
+        return [(_loc(t), 0, []) for t in TEMPLATES[:limit]]
 
-    _GOAL_LABELS = {
+    _GOAL_LABELS_EN = {
         "product_discovery": "product discovery",
         "feature_validation": "feature validation",
         "customer_retention": "retention / churn",
@@ -365,6 +440,24 @@ def match_templates_for_company(
         "onboarding_optimization": "onboarding",
         "other": "general research",
     }
+    _STAGE_LABELS_EN = {
+        "idea": "idea",
+        "mvp": "MVP",
+        "growth": "growth",
+        "scale": "scale",
+    }
+    goal_labels = GOAL_LABELS_FR if code == "fr" else _GOAL_LABELS_EN
+    stage_labels = STAGE_LABELS_FR if code == "fr" else _STAGE_LABELS_EN
+
+    def _reason_goal(labels: list[str]) -> str:
+        if code == "fr":
+            return f"Correspond à votre objectif : {', '.join(labels)}"
+        return f"Matches your goal: {', '.join(labels)}"
+
+    def _reason_stage(stage_label: str) -> str:
+        if code == "fr":
+            return f"Adapté aux équipes en phase {stage_label}"
+        return f"Right for {stage_label}-stage teams"
 
     scored: list[tuple[ProjectTemplate, int, list[str]]] = []
     for template in TEMPLATES:
@@ -375,26 +468,26 @@ def match_templates_for_company(
         goal_hits = [g for g in goals if g in template.get("goals_buckets", [])]
         if goal_hits:
             score += 3 * len(goal_hits)
-            labels = [_GOAL_LABELS.get(g, g) for g in goal_hits[:2]]
-            reasons.append(f"Matches your goal: {', '.join(labels)}")
+            labels = [goal_labels.get(g, g) for g in goal_hits[:2]]
+            reasons.append(_reason_goal(labels))
 
         # Product stage: the template explicitly targets this stage.
         if stage and stage in template.get("product_stages", []):
             score += 2
-            reasons.append(f"Right for {stage}-stage teams")
+            reasons.append(_reason_stage(stage_labels.get(stage, stage)))
 
         # Customer type: generic reinforcement.
         if ctype and ctype in template.get("customer_types", []):
             score += 1
 
         if score > 0:
-            scored.append((template, score, reasons))
+            scored.append((_loc(template), score, reasons))
 
     # Rank by score desc. Break ties by definition order (stable sort keeps it).
     scored.sort(key=lambda row: row[1], reverse=True)
 
     # If we didn't find anything that matched, fall back to definition order.
     if not scored:
-        return [(t, 0, []) for t in TEMPLATES[:limit]]
+        return [(_loc(t), 0, []) for t in TEMPLATES[:limit]]
 
     return scored[:limit]

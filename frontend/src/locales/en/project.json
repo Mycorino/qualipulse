@@ -29,6 +29,8 @@
     "projectNamePlaceholder": "e.g. Customer Churn Research Q2",
     "contextLabel": "Context & Business Situation",
     "contextPlaceholder": "Describe your business, the problem you're trying to understand, and what decision this research will inform. The more detail you give, the sharper the AI guidance will be.",
+    "contextPrefillPriority": "Current priority: {{value}}",
+    "contextPrefillIndustry": "Industry: {{value}}",
     "supportingDocs": "Supporting Documents",
     "optional": "optional",
     "uploadPrompt": "Click to upload .txt or .md files",

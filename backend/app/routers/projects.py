@@ -16,7 +16,11 @@ from app.schemas.project import (
     QuestionResponse,
     ScreeningQuestionResponse,
 )
-from app.services.demo_seeder import DEMO_PROJECT_NAME, seed_demo_project
+from app.services.demo_seeder import (
+    DEMO_PROJECT_NAME,
+    DEMO_PROJECT_NAME_FR,
+    seed_demo_project,
+)
 from app.services.feature_gates import require_project_limit, require_question_limit
 from app.services.guide_parser import parse_guide_csv
 from app.services.workspace import accessible_workspace_ids, can_edit, get_member_role
@@ -90,9 +94,16 @@ def create_demo_project(
     returned instead of creating a duplicate. This also bypasses the project limit
     so free-tier users can still try the demo even if they're at 1/1 usage.
     """
+    # The demo can exist under either the EN or FR name depending on the
+    # company's language at seeding time — match on either so we stay
+    # idempotent after a language switch.
     existing = (
         db.query(Project)
-        .filter(Project.company_id == company.id, Project.name == DEMO_PROJECT_NAME)
+        .filter(
+            Project.company_id == company.id,
+            Project.is_demo == True,  # noqa: E712
+            Project.name.in_([DEMO_PROJECT_NAME, DEMO_PROJECT_NAME_FR]),
+        )
         .first()
     )
     if existing:

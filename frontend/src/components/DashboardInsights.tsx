@@ -122,14 +122,24 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
     <section
       className="dashboard-insights"
       style={{
-        background: "var(--surface-raised, #ffffff)",
-        border: "1px solid var(--border, #e5e7eb)",
+        // Use the canonical design-system tokens from index.css. The older
+        // inline fallbacks (--surface-raised / --border / --muted) don't
+        // exist in the theme so they were silently falling through to the
+        // literal hex — and on macOS/iOS with prefers-color-scheme: dark,
+        // native form controls rendered against a dark background even
+        // though the rest of the page stayed light. Pinning the
+        // color-scheme below plus using real tokens keeps the whole card
+        // coherent regardless of OS theme.
+        background: "var(--bg-surface)",
+        color: "var(--text-primary)",
+        border: "1px solid var(--border-default)",
         borderRadius: 12,
         padding: 20,
         marginBottom: 20,
         display: "flex",
         flexDirection: "column",
         gap: 20,
+        colorScheme: "light",
       }}
     >
       {/* ── Priority prompt ───────────────────────────────────────────── */}
@@ -140,7 +150,7 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
               {t("insights.priorityTitle", "What are you focused on right now?")}
             </h2>
             {priorityAgeDays !== null && priorityAgeDays < PRIORITY_STALE_DAYS && (
-              <span style={{ fontSize: 12, color: "var(--muted, #6b7280)" }}>
+              <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                 {t("insights.priorityUpdatedAgo", {
                   defaultValue: "Updated {{count}} day(s) ago",
                   count: priorityAgeDays,
@@ -164,11 +174,17 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                   width: "100%",
                   padding: "10px 12px",
                   borderRadius: 8,
-                  border: "1px solid var(--border, #e5e7eb)",
+                  border: "1px solid var(--border-default)",
+                  background: "var(--bg-surface)",
+                  color: "var(--text-primary)",
                   fontSize: 14,
                   fontFamily: "inherit",
                   resize: "vertical",
                   minHeight: 44,
+                  // Prevent Safari/iOS from inverting the control when the
+                  // user has OS-level dark mode on — the rest of the card
+                  // stays light so the control should too.
+                  colorScheme: "light",
                 }}
               />
               <div
@@ -181,7 +197,7 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ fontSize: 12, color: "var(--muted, #6b7280)" }}>
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                   {t("insights.priorityHint", "A short sentence so we can suggest research that moves your needle.")}
                 </span>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -224,7 +240,7 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                 style={{
                   margin: 0,
                   fontSize: 14,
-                  color: "var(--text, #111827)",
+                  color: "var(--text-primary)",
                   flex: 1,
                   minWidth: 200,
                 }}
@@ -262,7 +278,7 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                 : t("insights.recsTitleGeneric", "Popular starting points")}
             </h2>
             {personalised && (
-              <span style={{ fontSize: 12, color: "var(--muted, #6b7280)" }}>
+              <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                 {t("insights.recsSubtitle", "Based on what you told us at signup")}
               </span>
             )}
@@ -277,13 +293,13 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                     flex: "1 1 220px",
                     minHeight: 120,
                     borderRadius: 8,
-                    background: "var(--surface-muted, #f3f4f6)",
+                    background: "var(--bg-sunken)",
                   }}
                 />
               ))}
             </div>
           ) : recommendations.length === 0 ? (
-            <p style={{ fontSize: 13, color: "var(--muted, #6b7280)", margin: 0 }}>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
               {t("insights.recsEmpty", "We'll recommend studies here once your profile is set up.")}
             </p>
           ) : (
@@ -307,19 +323,21 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                     gap: 8,
                     padding: "14px 14px 12px",
                     borderRadius: 8,
-                    border: "1px solid var(--border, #e5e7eb)",
-                    background: "var(--surface, #ffffff)",
+                    border: "1px solid var(--border-default)",
+                    background: "var(--bg-surface)",
+                    color: "var(--text-primary)",
                     textAlign: "left",
                     cursor: "pointer",
                     minHeight: 44,
                     transition: "border-color .15s, transform .15s",
                     font: "inherit",
+                    colorScheme: "light",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "var(--accent, #6366f1)";
+                    e.currentTarget.style.borderColor = "var(--primary)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border, #e5e7eb)";
+                    e.currentTarget.style.borderColor = "var(--border-default)";
                   }}
                 >
                   <span style={{ fontSize: 20 }} aria-hidden="true">
@@ -329,7 +347,7 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                   <span
                     style={{
                       fontSize: 12,
-                      color: "var(--muted, #6b7280)",
+                      color: "var(--text-tertiary)",
                       lineHeight: 1.4,
                     }}
                   >
@@ -351,8 +369,8 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                             fontSize: 11,
                             padding: "2px 8px",
                             borderRadius: 999,
-                            background: "var(--accent-soft, #eef2ff)",
-                            color: "var(--accent, #4338ca)",
+                            background: "var(--primary-light)",
+                            color: "var(--primary)",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -364,7 +382,7 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                   <span
                     style={{
                       fontSize: 11,
-                      color: "var(--muted, #6b7280)",
+                      color: "var(--text-tertiary)",
                       marginTop: "auto",
                     }}
                   >

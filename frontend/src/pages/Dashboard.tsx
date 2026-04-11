@@ -15,7 +15,7 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 import DashboardInsights from "../components/DashboardInsights";
 
 export default function Dashboard() {
-  const { t } = useTranslation(["dashboard", "common"]);
+  const { t, i18n } = useTranslation(["dashboard", "common"]);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [archivedProjects, setArchivedProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadProjects();
-    getMe().then(setMe).catch(() => {});
+    // Dashboard is the app's entry after login — this is where we sync
+    // i18n.language to the account's preferred_language. Without this,
+    // a French researcher on an English-locale browser would see localised
+    // components (which read from i18n) render in English even though the
+    // backend already knows their real language. We only switch when the
+    // two actually disagree so we don't fight a user who just clicked the
+    // language switcher in this session.
+    getMe()
+      .then((data) => {
+        setMe(data);
+        const accountLang = (data.preferred_language || "").slice(0, 2);
+        const uiLang = (i18n.language || "").slice(0, 2);
+        if (accountLang && accountLang !== uiLang && (accountLang === "fr" || accountLang === "en")) {
+          i18n.changeLanguage(accountLang);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   async function loadProjects() {

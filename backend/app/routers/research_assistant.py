@@ -330,7 +330,11 @@ def recommended_studies(
     """
     # Cap the limit so the endpoint can't be abused to fetch everything.
     limit = max(1, min(int(limit or 3), 6))
-    matches = match_templates_for_company(company, limit=limit)
+    matches = match_templates_for_company(
+        company,
+        limit=limit,
+        lang=getattr(company, "preferred_language", None),
+    )
     return {
         "recommendations": [
             {

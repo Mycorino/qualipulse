@@ -29,6 +29,8 @@
     "projectNamePlaceholder": "ex. : Recherche sur l'attrition client T2",
     "contextLabel": "Contexte et situation",
     "contextPlaceholder": "Décrivez votre entreprise, le problème que vous cherchez à comprendre, et la décision que cette recherche éclairera. Plus vous donnez de détails, plus les recommandations de l'IA seront pertinentes.",
+    "contextPrefillPriority": "Priorité actuelle : {{value}}",
+    "contextPrefillIndustry": "Secteur : {{value}}",
     "supportingDocs": "Documents complémentaires",
     "optional": "facultatif",
     "uploadPrompt": "Cliquez pour importer des fichiers .txt ou .md",
