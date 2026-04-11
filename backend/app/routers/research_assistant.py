@@ -305,6 +305,177 @@ def suggest_questions(
 
 
 # ---------------------------------------------------------------------------
+# POST /research/refine-question
+# ---------------------------------------------------------------------------
+#
+# Scoped, non-destructive AI refinement of a single guide question.
+#
+# The entire point of this endpoint is that refining Q5 never touches Q1-Q4
+# or Q6+. We enforce that at the contract level: the request accepts a
+# single question object, and the response returns a single refined
+# question object. There is no list parameter on the way out — a well-
+# behaved client literally cannot get sibling questions back by calling
+# this endpoint, which is the guarantee researchers kept asking for.
+#
+# The surrounding guide (objective, learning goals, audience, the full
+# list of other questions) is passed *into* the prompt so Claude can keep
+# the refined question coherent with the rest of the study, but that
+# context is read-only — Claude is instructed not to suggest changes to
+# anything else, and even if it did we wouldn't propagate them because we
+# only pluck the one refined question out of the response.
+#
+# The frontend is responsible for "undo": it snapshots the original
+# question before calling this endpoint and swaps back if the researcher
+# dislikes the refinement.
+
+@router.post("/refine-question")
+def refine_question(
+    body: dict,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Refine a single interview guide question without touching its siblings.
+
+    Expected body shape::
+
+        {
+          "question": {
+            "section_title": str,
+            "main_question": str,
+            "interview_notes": str,
+            "desired_learning": str
+          },
+          "question_index": int,           # 0-based position in the full guide
+          "objective": str,                # research objective for context
+          "learning_goals": list[str],     # learning goals for context
+          "audience": str,                 # target audience for context
+          "all_questions": list[{          # read-only siblings for coherence
+            "section_title": str,
+            "main_question": str
+          }],
+          "language": str | None,          # project language (overrides account)
+          "instruction": str | None        # optional user steering
+        }
+
+    Returns::
+
+        {
+          "refined": { ...same shape as input question... },
+          "rationale": "Short explanation of what changed and why."
+        }
+    """
+    question = body.get("question") or {}
+    if not isinstance(question, dict) or not question.get("main_question", "").strip():
+        # Nothing to refine — don't burn a Claude call.
+        return {
+            "refined": question,
+            "rationale": "",
+        }
+
+    question_index = body.get("question_index", 0)
+    objective = (body.get("objective") or "").strip()
+    learning_goals = body.get("learning_goals") or []
+    audience = (body.get("audience") or "").strip()
+    all_questions = body.get("all_questions") or []
+    user_instruction = (body.get("instruction") or "").strip()
+
+    language = _resolve_language(body.get("language"), company)
+    lang_directive = _language_directive(language)
+
+    # Build a compact read-only view of the other questions so Claude can
+    # keep the refined question coherent (no duplicates, no gaps) without
+    # being tempted to rewrite them. We deliberately omit interview_notes
+    # and desired_learning from the siblings — they're noise for this call
+    # and every extra token makes the refinement slower + costlier.
+    siblings_view_lines: list[str] = []
+    for idx, q in enumerate(all_questions):
+        if not isinstance(q, dict):
+            continue
+        marker = "→ THIS ONE" if idx == question_index else "  "
+        section = (q.get("section_title") or "").strip() or "—"
+        main = (q.get("main_question") or "").strip() or "(empty)"
+        siblings_view_lines.append(f"{marker} [{idx + 1}] ({section}) {main}")
+    siblings_view = "\n".join(siblings_view_lines) or "(no other questions yet)"
+
+    goals_str = "\n".join(f"- {g}" for g in learning_goals if g) or "(none)"
+
+    # Default steering when the researcher clicks "Refine" without typing
+    # anything: the most common ask is "make it sharper and less leading".
+    default_instruction = (
+        "Make it sharper: more open-ended, less leading, better suited to "
+        "eliciting a concrete story or example. Preserve the original intent "
+        "(what the researcher was trying to learn) — don't pivot the topic."
+    )
+    instruction_block = user_instruction or default_instruction
+
+    biz_ctx = _business_context(company)
+    response = _claude(1024).messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"{biz_ctx}"
+                "You are a senior qualitative researcher helping polish ONE "
+                "question in an interview guide. The rest of the guide is "
+                "shown only as context — you MUST NOT suggest changes to any "
+                "other question. Your entire output is a refined version of "
+                "the single target question.\n\n"
+                f"RESEARCH OBJECTIVE: {objective or '(not set)'}\n"
+                f"LEARNING GOALS:\n{goals_str}\n"
+                f"TARGET AUDIENCE: {audience or '(not set)'}\n\n"
+                "FULL GUIDE (read-only, for coherence):\n"
+                f"{siblings_view}\n\n"
+                "TARGET QUESTION (the one you are refining):\n"
+                f"  Section: {question.get('section_title') or '(none)'}\n"
+                f"  Main:    {question.get('main_question') or ''}\n"
+                f"  Notes:   {question.get('interview_notes') or '(none)'}\n"
+                f"  Learning: {question.get('desired_learning') or '(none)'}\n\n"
+                f"INSTRUCTION: {instruction_block}\n\n"
+                "Rules you MUST follow:\n"
+                "- Open-ended only — never yes/no.\n"
+                "- Avoid 'why' — prefer 'walk me through', 'tell me about', "
+                "'what led you to'.\n"
+                "- Don't duplicate what another question in the guide "
+                "already asks.\n"
+                "- Keep the same section_title unless the topic genuinely "
+                "belongs elsewhere (rare — err on the side of keeping it).\n"
+                "- interview_notes: 1-2 practical probes the interviewer "
+                "can use as follow-ups.\n"
+                "- desired_learning: one sentence on what insight this "
+                "question is trying to uncover.\n"
+                "- rationale: one short sentence on what changed and why "
+                "(for the researcher's benefit — they'll read this above "
+                "the accept/undo affordance).\n\n"
+                f"{lang_directive}\n"
+                "Return ONLY a JSON object with this exact shape:\n"
+                '{"refined":{"section_title":"...","main_question":"...",'
+                '"interview_notes":"...","desired_learning":"..."},'
+                '"rationale":"..."}'
+            ),
+        }],
+    )
+
+    log_claude_usage(db, response, "research", company_id=company.id)
+    parsed = json.loads(_strip_fences(response.content[0].text.strip()))
+
+    # Defence in depth: even if Claude ignored the instructions and tried
+    # to return extra fields, we only ever pluck the single refined
+    # question back out. There is no code path where sibling data could
+    # leak through this endpoint.
+    refined = parsed.get("refined") or {}
+    return {
+        "refined": {
+            "section_title": refined.get("section_title") or question.get("section_title", ""),
+            "main_question": refined.get("main_question") or question.get("main_question", ""),
+            "interview_notes": refined.get("interview_notes") or "",
+            "desired_learning": refined.get("desired_learning") or "",
+        },
+        "rationale": (parsed.get("rationale") or "").strip(),
+    }
+
+
+# ---------------------------------------------------------------------------
 # GET /research/recommended-studies
 # ---------------------------------------------------------------------------
 #

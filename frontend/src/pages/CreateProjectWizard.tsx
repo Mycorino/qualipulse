@@ -12,6 +12,7 @@ import {
   suggestObjective,
   suggestScope,
   suggestQuestions,
+  refineQuestion,
 } from "../api/research";
 import { listTemplates, getTemplate } from "../api/templates";
 import type { TemplateSummary } from "../api/templates";
@@ -93,6 +94,16 @@ export default function CreateProjectWizard() {
   // Step 4
   const [questions, setQuestions] = useState<QuestionCreate[]>(draft?.questions ?? []);
   const [expandedQ, setExpandedQ] = useState<number | null>(null);
+  // Per-question refinement state. These are keyed by question index so
+  // the researcher can have an undo available on Q2 without it blocking
+  // refinement on Q5, etc. Deliberately not persisted to the autosave
+  // draft — refinement history is session-local by design.
+  const [refiningQ, setRefiningQ] = useState<number | null>(null);
+  const [refineSnapshot, setRefineSnapshot] = useState<Record<number, QuestionCreate>>({});
+  const [refineRationale, setRefineRationale] = useState<Record<number, string>>({});
+  // Optional user steering ("make it shorter", "less leading") typed into
+  // a small inline field before calling refine. Also keyed per question.
+  const [refineInstruction, setRefineInstruction] = useState<Record<number, string>>({});
 
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
@@ -490,6 +501,80 @@ export default function CreateProjectWizard() {
         desired_learning: "",
       },
     ]);
+  }
+
+  // ── Per-question AI refinement ─────────────────────────────────────────
+  //
+  // Refines ONE question without touching its siblings. We snapshot the
+  // current question before the call so the researcher can undo if they
+  // don't like the refinement. The snapshot lives in component state, not
+  // the autosave draft — refinement history is session-local by design,
+  // because resurrecting an undo stack across tabs would feel uncanny.
+  async function handleRefineQuestion(i: number) {
+    const current = questions[i];
+    if (!current || !current.main_question.trim()) return;
+
+    // Snapshot only if we don't already have one — a second refine without
+    // undoing the first should still let the user get back to the original
+    // (not the intermediate refined version).
+    if (!refineSnapshot[i]) {
+      setRefineSnapshot((prev) => ({ ...prev, [i]: { ...current } }));
+    }
+
+    setRefiningQ(i);
+    setError("");
+    try {
+      const res = await refineQuestion({
+        question: current,
+        questionIndex: i,
+        objective,
+        learningGoals,
+        audience,
+        allQuestions: questions,
+        language,
+        instruction: refineInstruction[i] || undefined,
+      });
+      // Apply the refined question — explicitly only touching index `i`.
+      setQuestions((prev) =>
+        prev.map((q, idx) =>
+          idx === i
+            ? {
+                ...q,
+                section_title: res.refined.section_title || q.section_title,
+                main_question: res.refined.main_question || q.main_question,
+                interview_notes: res.refined.interview_notes,
+                desired_learning: res.refined.desired_learning,
+              }
+            : q
+        )
+      );
+      setRefineRationale((prev) => ({ ...prev, [i]: res.rationale }));
+      // Clear the steering input so the next refine starts from a blank
+      // field (the rationale above stays visible until the user acts).
+      setRefineInstruction((prev) => ({ ...prev, [i]: "" }));
+    } catch {
+      setError(t("wizard.errorRefineQuestion", { defaultValue: "Couldn't refine that question. Please try again." }));
+    } finally {
+      setRefiningQ(null);
+    }
+  }
+
+  function handleUndoRefine(i: number) {
+    const snapshot = refineSnapshot[i];
+    if (!snapshot) return;
+    setQuestions((prev) => prev.map((q, idx) => (idx === i ? { ...snapshot } : q)));
+    // Clear the undo affordance + rationale so the card returns to its
+    // pre-refinement state visually too.
+    setRefineSnapshot((prev) => {
+      const next = { ...prev };
+      delete next[i];
+      return next;
+    });
+    setRefineRationale((prev) => {
+      const next = { ...prev };
+      delete next[i];
+      return next;
+    });
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -1056,7 +1141,16 @@ export default function CreateProjectWizard() {
             {questions.length > 0 && (
               <div className="guide-editor">
                 {questions.map((q, i) => {
-                  const sectionLocalIndex = questions.slice(0, i).filter((prev) => prev.section_index === q.section_index).length + 1;
+                  // Global question number (Q1..Qn across the whole guide).
+                  // We used to show section-local indices here — e.g. Q1, Q2,
+                  // Q1, Q2 — which made a 5-question guide look like it only
+                  // had 2 questions. Global numbering matches how researchers
+                  // actually talk about an interview guide ("let's tweak
+                  // question 4", not "question 1 of section 2").
+                  const globalNum = i + 1;
+                  const isRefining = refiningQ === i;
+                  const hasSnapshot = !!refineSnapshot[i];
+                  const lastRationale = refineRationale[i];
                   return (
                   <div key={i} className="guide-editor-question">
                     <div
@@ -1065,7 +1159,7 @@ export default function CreateProjectWizard() {
                     >
                       <div className="guide-editor-meta">
                         <span className="guide-editor-section">{q.section_title}</span>
-                        <span className="guide-editor-num">Q{sectionLocalIndex}</span>
+                        <span className="guide-editor-num">Q{globalNum}</span>
                       </div>
                       <span className="guide-editor-preview">
                         {q.main_question || <em className="muted-text">{t("wizard.emptyQuestion")}</em>}
@@ -1111,6 +1205,99 @@ export default function CreateProjectWizard() {
                           value={q.desired_learning ?? ""}
                           onChange={(e) => updateQuestion(i, "desired_learning", e.target.value)}
                         />
+
+                        {/* ── Per-question AI refinement ───────────────
+                            The whole point is scoped refinement: this
+                            button refines ONLY this question. The
+                            pre-refine version is snapshotted so the
+                            researcher can undo in one click. */}
+                        <div
+                          className="refine-question-block"
+                          style={{
+                            marginTop: 14,
+                            padding: "12px 14px",
+                            borderRadius: 8,
+                            border: "1px dashed var(--border-default)",
+                            background: "var(--bg-sunken)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <input
+                              className="field-input"
+                              style={{ flex: "1 1 200px", minWidth: 0 }}
+                              placeholder={t("wizard.refineInstructionPlaceholder", {
+                                defaultValue: "Optional: how should we sharpen it? (e.g. more open-ended, shorter…)",
+                              })}
+                              value={refineInstruction[i] ?? ""}
+                              onChange={(e) =>
+                                setRefineInstruction((prev) => ({
+                                  ...prev,
+                                  [i]: e.target.value,
+                                }))
+                              }
+                              disabled={isRefining}
+                            />
+                            <button
+                              className="btn btn-ai btn-sm"
+                              onClick={() => handleRefineQuestion(i)}
+                              disabled={isRefining || !q.main_question.trim()}
+                              type="button"
+                            >
+                              {isRefining ? (
+                                <>
+                                  <span className="spinner-sm" />
+                                  {t("wizard.refiningQuestion", { defaultValue: "Refining…" })}
+                                </>
+                              ) : (
+                                t("wizard.refineQuestion", { defaultValue: "✦ Refine with AI" })
+                              )}
+                            </button>
+                            {hasSnapshot && !isRefining && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => handleUndoRefine(i)}
+                                type="button"
+                                title={t("wizard.undoRefineTitle", {
+                                  defaultValue: "Restore the version before refinement",
+                                })}
+                              >
+                                {t("wizard.undoRefine", { defaultValue: "↺ Undo refine" })}
+                              </button>
+                            )}
+                          </div>
+                          {lastRationale && (
+                            <p
+                              style={{
+                                margin: "8px 0 0",
+                                fontSize: 12,
+                                color: "var(--text-tertiary)",
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              <strong>{t("wizard.refineRationaleLabel", { defaultValue: "What changed:" })}</strong>{" "}
+                              {lastRationale}
+                            </p>
+                          )}
+                          <p
+                            style={{
+                              margin: "6px 0 0",
+                              fontSize: 11,
+                              color: "var(--text-tertiary)",
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {t("wizard.refineScopeHint", {
+                              defaultValue: "Only this question will be rewritten. The rest of your guide stays untouched.",
+                            })}
+                          </p>
+                        </div>
 
                         <button
                           className="btn btn-ghost btn-sm btn-danger-text"
