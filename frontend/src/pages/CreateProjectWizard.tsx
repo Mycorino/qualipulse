@@ -259,6 +259,43 @@ export default function CreateProjectWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pre-fill the Step 1 context with company profile data ("we remembered you")
+  // for the start-from-scratch path. Skipped when a template deep-link is present
+  // (that path has its own pre-fill above), when editing, or when a draft exists.
+  useEffect(() => {
+    if (isEditMode) return;
+    if (draft) return;
+    if (searchParams.get("template")) return; // handled by template useEffect above
+    getMe()
+      .then((company) => {
+        const parts: string[] = [];
+        if (company.current_priority) {
+          parts.push(
+            t("wizard.contextPrefillPriority", {
+              defaultValue: "Current priority: {{value}}",
+              value: company.current_priority,
+            })
+          );
+        }
+        if (company.business_summary) {
+          parts.push(company.business_summary);
+        }
+        if (company.industry) {
+          parts.push(
+            t("wizard.contextPrefillIndustry", {
+              defaultValue: "Industry: {{value}}",
+              value: company.industry,
+            })
+          );
+        }
+        if (parts.length > 0) {
+          setContext((prev) => (prev.trim() ? prev : parts.join("\n\n")));
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Load existing project in edit mode
   useEffect(() => {
     if (!editId) return;
@@ -767,7 +804,7 @@ export default function CreateProjectWizard() {
 
       <main className="wizard-main">
         {hasDraft && (
-        <div className="draft-banner" style={{ background: "var(--brand-50, #eff6ff)", color: "var(--brand-700, #1d4ed8)", borderColor: "var(--brand-200, #bfdbfe)" }}>
+        <div className="draft-banner" style={{ background: "var(--brand-50)", color: "var(--brand-700)", borderColor: "var(--brand-200)" }}>
           <span>{t("wizard.draftRestored")}</span>
           <button
             className="btn btn-ghost btn-sm"
@@ -1214,10 +1251,11 @@ export default function CreateProjectWizard() {
                           className="refine-question-block"
                           style={{
                             marginTop: 14,
-                            padding: "12px 14px",
+                            padding: "14px 16px",
                             borderRadius: 8,
-                            border: "1px dashed var(--border-default)",
-                            background: "var(--bg-sunken)",
+                            border: "1px solid var(--border-default)",
+                            borderLeft: "3px solid var(--primary)",
+                            background: "var(--bg-surface)",
                           }}
                         >
                           <div
