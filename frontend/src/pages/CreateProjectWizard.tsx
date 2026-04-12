@@ -1390,9 +1390,43 @@ export default function CreateProjectWizard() {
                   );
                 })}
 
-                <button className="btn btn-ghost btn-sm" onClick={addQuestion} style={{ border: "1.5px solid #d1d5db", borderRadius: 6, padding: "6px 16px" }}>
+                <button className="btn btn-ghost btn-sm" onClick={addQuestion} style={{ border: "1.5px solid var(--border-default)", borderRadius: 6, padding: "6px 16px" }}>
                   {t("wizard.addQuestion")}
                 </button>
+              </div>
+            )}
+
+            {/* ── Pre-create summary ── */}
+            {!isEditMode && questions.length > 0 && (
+              <div
+                style={{
+                  marginTop: 20,
+                  padding: "12px 16px",
+                  borderRadius: 8,
+                  background: "var(--bg-sunken)",
+                  border: "1px solid var(--border-default)",
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "6px 16px",
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                  {t("wizard.summaryTitle")}
+                </span>
+                <span>{name}</span>
+                <span>·</span>
+                <span>{t("wizard.summaryQuestions", { count: questions.length })}</span>
+                <span>·</span>
+                <span>{durationMinutes} min</span>
+                <span>·</span>
+                <span>
+                  {screeningQuestions.length > 0
+                    ? t("wizard.summaryScreening", { count: screeningQuestions.length })
+                    : t("wizard.summaryNoScreening")}
+                </span>
               </div>
             )}
 
@@ -1400,7 +1434,7 @@ export default function CreateProjectWizard() {
               <button className="btn btn-ghost" onClick={() => setStep(3)}>{t("wizard.backButton")}</button>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 {!isEditMode && questions.length === 0 && (
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>{t("wizard.generateGuideFirst")}</p>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>{t("wizard.generateGuideFirst")}</p>
                 )}
                 <button
                   className="btn btn-primary btn-lg"
