@@ -74,7 +74,7 @@ export default function CreateProjectWizard() {
 
   // Step 2
   const [objective, setObjective] = useState(draft?.objective ?? "");
-  const [learningGoals, setLearningGoals] = useState(draft?.learningGoals ?? ["", "", ""]);
+  const [learningGoals, setLearningGoals] = useState(draft?.learningGoals ?? ["", ""]);
   const [studyType, setStudyType] = useState(draft?.studyType ?? "exploratory");
   const [rationale, setRationale] = useState(draft?.rationale ?? "");
   // Study-specific grounding fields — see backend services/business_context.py.
@@ -167,9 +167,9 @@ export default function CreateProjectWizard() {
       // Pre-fill wizard state from template
       setName(tpl.name);
       setObjective(tpl.research_objective);
-      // Ensure at least 3 learning goal slots so the UI stays consistent
+      // Ensure at least 1 learning goal slot so the UI stays usable
       const goals = [...tpl.learning_goals];
-      while (goals.length < 3) goals.push("");
+      if (goals.length === 0) goals.push("");
       setLearningGoals(goals);
       setAudience(tpl.target_audience);
       setDurationMinutes(tpl.duration_minutes);
@@ -967,20 +967,41 @@ export default function CreateProjectWizard() {
 
             <label className="field-label">{t("wizard.learningGoalsLabel")}</label>
             {learningGoals.map((goal: string, i: number) => (
-              <textarea
-                key={i}
-                className="field-input"
-                rows={2}
-                style={{ marginBottom: 8, resize: "vertical", whiteSpace: "normal" }}
-                value={goal}
-                onChange={(e) =>
-                  setLearningGoals((prev: string[]) =>
-                    prev.map((g: string, j: number) => (j === i ? e.target.value : g))
-                  )
-                }
-                placeholder={t("wizard.learningGoalPlaceholder", { number: i + 1 })}
-              />
+              <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "start" }}>
+                <textarea
+                  className="field-input"
+                  rows={2}
+                  style={{ flex: 1, resize: "vertical", whiteSpace: "normal" }}
+                  value={goal}
+                  onChange={(e) =>
+                    setLearningGoals((prev: string[]) =>
+                      prev.map((g: string, j: number) => (j === i ? e.target.value : g))
+                    )
+                  }
+                  placeholder={t("wizard.learningGoalPlaceholder", { number: i + 1 })}
+                />
+                {learningGoals.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ padding: "4px 8px", marginTop: 4, flexShrink: 0 }}
+                    title={t("wizard.removeLearningGoal")}
+                    onClick={() => setLearningGoals((prev: string[]) => prev.filter((_, j) => j !== i))}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             ))}
+            {learningGoals.length < 8 && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setLearningGoals((prev: string[]) => [...prev, ""])}
+              >
+                {t("wizard.addLearningGoal")}
+              </button>
+            )}
 
             {/* Study-specific grounding fields — these sharpen the analysis
                 prompt beyond the company-level context. Optional, but when
