@@ -1,20 +1,20 @@
 """Generate a short business summary for an onboarding company URL.
 
-Single-pass strategy using Claude + the ``web_search`` server tool. We used
-to do a "knowledge-first" pass (no tools) to save ~$0.01 on famous brands,
-but Claude would confidently hallucinate on similar-sounding domains — e.g.
-``qualipulse.com`` got described as "Ideagen Q-Pulse" (an unrelated UK
-quality-management vendor). Always forcing a real web search trades ~$0.01
-and ~1s of latency for dramatically higher correctness, which is the right
-call for a first-impression onboarding flow.
+**Fetch-first strategy**: we always fetch the actual website HTML, extract
+readable text, and feed it to Claude for summarization. This eliminates
+hallucination from pattern-matching on similar-sounding domains (e.g.
+``qualipulse.com`` was described as "Ideagen Q-Pulse" when we relied on
+web_search alone).
 
-1. **Web search pass** — Claude is given the URL plus the ``web_search``
-   tool and asked to return a structured ``{"summary", "industry"}`` JSON
-   payload. If after searching Claude still can't identify the business,
-   it returns the ``UNKNOWN`` sentinel and we raise.
+1. **Direct fetch** — HTTP GET the URL, extract visible text from the HTML.
+   If successful, Claude summarizes the *actual page content* — no web
+   search needed, no hallucination possible.
 
-2. **Manual fallback** — On failure the UI flips into ``manualMode`` and
-   the user describes their business in the textarea we already render.
+2. **Web search fallback** — If the direct fetch fails (blocked, timeout,
+   non-HTML response), fall back to Claude + ``web_search`` tool as before.
+
+3. **Manual fallback** — On total failure the UI flips into ``manualMode``
+   and the user describes their business in the textarea we already render.
 
 Returns a structured ``{"summary": str, "industry": str | None}`` so the
 onboarding UI can auto-preselect the industry chip in addition to populating
@@ -24,7 +24,9 @@ the free-text summary.
 import json
 import logging
 import re
+from html.parser import HTMLParser
 
+import httpx
 from anthropic import Anthropic
 
 from app.config import settings
@@ -36,6 +38,9 @@ _MAX_TOKENS = 500
 
 # Sentinel Claude returns when it has no useful knowledge of the URL/brand.
 _UNKNOWN_SENTINEL = "UNKNOWN"
+
+# Max chars of page text to send to Claude (keeps tokens reasonable).
+_MAX_PAGE_TEXT_CHARS = 12_000
 
 # Predefined industries the frontend shows as selectable chips. We ask Claude
 # to prefer one of these when possible, but it can return a custom label and
@@ -87,8 +92,8 @@ _OUTPUT_SPEC = (
     "enterprises is us; a multinational retailer is europe or global.\n\n"
     "**The summary value must be plain prose only.** Do NOT include HTML "
     "tags, markdown, footnotes, citation markers, ``<cite>`` blocks, or "
-    "``[1]`` style references. Even if you used web_search, return clean "
-    "sentences with no source attribution embedded in the text."
+    "``[1]`` style references. Return clean sentences with no source "
+    "attribution embedded in the text."
 )
 
 # Allowed primary_country values — must stay in sync with REGION_VALUES in
@@ -119,6 +124,122 @@ def _normalize_url(url: str) -> str:
     return url
 
 
+# ---------------------------------------------------------------------------
+# HTML → plain text extractor
+# ---------------------------------------------------------------------------
+
+class _HTMLTextExtractor(HTMLParser):
+    """Lightweight HTML→text converter. Strips scripts, styles, and tags;
+    keeps the visible prose that a human would read on the page."""
+
+    _SKIP_TAGS = frozenset({"script", "style", "noscript", "svg", "head"})
+
+    def __init__(self):
+        super().__init__()
+        self._parts: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag, _attrs):
+        if tag.lower() in self._SKIP_TAGS:
+            self._skip_depth += 1
+
+    def handle_endtag(self, tag):
+        if tag.lower() in self._SKIP_TAGS and self._skip_depth > 0:
+            self._skip_depth -= 1
+
+    def handle_data(self, data):
+        if self._skip_depth == 0:
+            text = data.strip()
+            if text:
+                self._parts.append(text)
+
+    def get_text(self) -> str:
+        return " ".join(self._parts)
+
+
+def _html_to_text(html: str) -> str:
+    """Extract readable text from an HTML string."""
+    extractor = _HTMLTextExtractor()
+    try:
+        extractor.feed(html)
+    except Exception:
+        pass
+    return extractor.get_text()
+
+
+# ---------------------------------------------------------------------------
+# Direct page fetch
+# ---------------------------------------------------------------------------
+
+_FETCH_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (compatible; QualiPulseBot/1.0; "
+        "+https://qualipulse.com/about)"
+    ),
+    "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
+}
+
+
+async def _fetch_page_text(url: str) -> str | None:
+    """Fetch a URL and return its visible text content, or None on failure.
+
+    Follows redirects (up to 5), respects a 10s timeout, and only processes
+    HTML responses. Returns None (triggering web_search fallback) for:
+    - network errors, timeouts, non-2xx status
+    - non-HTML content types (PDFs, images, etc.)
+    - pages with too little visible text (< 50 chars — likely a JS-only SPA)
+    """
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            max_redirects=5,
+            timeout=httpx.Timeout(10.0, connect=5.0),
+            headers=_FETCH_HEADERS,
+        ) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+
+            content_type = resp.headers.get("content-type", "")
+            if "html" not in content_type.lower():
+                logger.info(
+                    "website_intel.fetch_not_html",
+                    extra={"url": url, "content_type": content_type},
+                )
+                return None
+
+            html = resp.text
+            text = _html_to_text(html)
+
+            if len(text) < 50:
+                logger.info(
+                    "website_intel.fetch_too_short",
+                    extra={"url": url, "text_len": len(text)},
+                )
+                return None
+
+            # Truncate to keep Claude prompt tokens reasonable
+            if len(text) > _MAX_PAGE_TEXT_CHARS:
+                text = text[:_MAX_PAGE_TEXT_CHARS] + "…"
+
+            logger.info(
+                "website_intel.fetch_ok",
+                extra={"url": url, "text_len": len(text)},
+            )
+            return text
+
+    except Exception as exc:
+        logger.info(
+            "website_intel.fetch_failed",
+            extra={"url": url, "error": str(exc)},
+        )
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Response helpers
+# ---------------------------------------------------------------------------
+
 def _extract_text(message) -> str:
     """Concatenate all text blocks from an Anthropic response, ignoring
     tool-use / tool-result / citation blocks."""
@@ -145,52 +266,32 @@ def _is_unknown(text: str) -> bool:
 
 
 # Citation tags Claude inlines into the prose when web_search produces a hit.
-# Looks like: <cite index="11-1,11-6">E.Leclerc is...</cite>
-# We strip the wrapping tags but keep the inner text — those tags are an
-# artifact of the search tool and pollute the user-facing summary.
 _CITE_OPEN_RE = re.compile(r"<cite\b[^>]*>", flags=re.IGNORECASE)
 _CITE_CLOSE_RE = re.compile(r"</cite\s*>", flags=re.IGNORECASE)
 
 
 def _strip_citation_tags(text: str) -> str:
-    """Remove ``<cite index="...">…</cite>`` markup from a summary string.
-
-    Claude's web_search tool wraps cited spans in inline ``<cite>`` tags. We
-    keep the inner prose but drop the tag wrappers so the user sees clean
-    sentences in the onboarding textarea.
-    """
+    """Remove ``<cite index="...">…</cite>`` markup from a summary string."""
     if not text:
         return text
     cleaned = _CITE_OPEN_RE.sub("", text)
     cleaned = _CITE_CLOSE_RE.sub("", cleaned)
-    # Collapse the double-spaces left behind by removed tags.
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     return cleaned.strip()
 
 
 def _parse_response(text: str) -> dict | None:
-    """Parse Claude's JSON response. Returns ``{"summary": str, "industry": str | None}``
-    or ``None`` if the payload is unparseable / contains the UNKNOWN sentinel.
-
-    Tolerant of:
-      - stray markdown fences (```json ... ```)
-      - leading/trailing prose
-      - Claude returning the bare UNKNOWN sentinel instead of JSON
-      - inline ``<cite index="…">…</cite>`` tags in the summary value
-    """
+    """Parse Claude's JSON response. Returns dict or None if unparseable."""
     if not text:
         return None
     if _is_unknown(text):
         return None
 
-    # Strip markdown fences if present
     cleaned = text.strip()
     if cleaned.startswith("```"):
-        # Remove opening fence (```json or ```)
         cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
         cleaned = re.sub(r"\s*```\s*$", "", cleaned)
 
-    # Find first { ... } block (Claude may emit a trailing sentence).
     match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
     if not match:
         return None
@@ -233,31 +334,49 @@ def _parse_response(text: str) -> dict | None:
     }
 
 
-def _build_prompt(url: str, language: str, *, with_search: bool) -> str:
+# ---------------------------------------------------------------------------
+# Prompt builders
+# ---------------------------------------------------------------------------
+
+def _build_prompt_with_content(url: str, page_text: str, language: str) -> str:
+    """Build a prompt that includes the actual fetched page content.
+
+    Claude has no excuse to hallucinate here — the website text is right
+    in front of it. We explicitly tell it to describe ONLY what the page
+    says, not what it might recall from training.
+    """
     lang_directive = _LANGUAGE_DIRECTIVES.get(language, _LANGUAGE_DIRECTIVES["en"])
-    if with_search:
-        retrieval = (
-            "**You must fetch the actual website before answering.** Use the "
-            "web_search tool to search for information about the EXACT domain "
-            "in the URL below — not a similar-sounding brand, not a company "
-            "with a related name. The summary must describe whatever business "
-            "actually operates at that specific domain.\n\n"
-            "Do NOT pattern-match on the company name. For example, if the "
-            "URL is ``foo-pulse.com``, do not describe a different product "
-            "also called ``Pulse``. Search for ``foo-pulse.com`` directly "
-            "and read the site.\n\n"
-            "If after searching you still cannot determine what the business "
-            f"at this exact domain does, return the single word {_UNKNOWN_SENTINEL} "
-            "(no JSON)."
-        )
-    else:
-        retrieval = (
-            "If you are NOT confident about what this specific company does — "
-            "for example you've never heard of them, or the URL is too generic "
-            "to identify a single business — return the single word "
-            f"{_UNKNOWN_SENTINEL} (no JSON). Do not guess. Do not describe what "
-            "a company at a similar-sounding domain might do."
-        )
+    return (
+        f"{_BASE_INSTRUCTIONS}\n\n"
+        f"{lang_directive}\n\n"
+        "Below is the actual text content fetched from the company's website. "
+        "Base your summary EXCLUSIVELY on this content. Do NOT use your "
+        "training knowledge about similarly-named companies — describe only "
+        "what is evident from the page text below.\n\n"
+        f"If the page text is too generic or unclear to determine what the "
+        f"business does, return the single word {_UNKNOWN_SENTINEL} (no JSON).\n\n"
+        f"{_OUTPUT_SPEC}\n\n"
+        f"Company URL: {url}\n\n"
+        f"--- BEGIN PAGE CONTENT ---\n{page_text}\n--- END PAGE CONTENT ---"
+    )
+
+
+def _build_prompt_web_search(url: str, language: str) -> str:
+    """Build a web-search prompt (fallback when direct fetch fails)."""
+    lang_directive = _LANGUAGE_DIRECTIVES.get(language, _LANGUAGE_DIRECTIVES["en"])
+    retrieval = (
+        "**You must search the web for this exact website before answering.** "
+        "Use the web_search tool to search for the EXACT domain in the URL "
+        "below — not a similar-sounding brand, not a company with a related "
+        "name. The summary must describe whatever business actually operates "
+        "at that specific domain.\n\n"
+        "Do NOT pattern-match on the company name. For example, if the URL "
+        "is ``foo-pulse.com``, do not describe a different product also "
+        "called ``Pulse``. Search for ``foo-pulse.com`` directly.\n\n"
+        "If after searching you still cannot determine what the business at "
+        f"this exact domain does, return the single word {_UNKNOWN_SENTINEL} "
+        "(no JSON)."
+    )
     return (
         f"{_BASE_INSTRUCTIONS}\n\n"
         f"{lang_directive}\n\n"
@@ -266,6 +385,10 @@ def _build_prompt(url: str, language: str, *, with_search: bool) -> str:
         f"Company URL: {url}"
     )
 
+
+# ---------------------------------------------------------------------------
+# Usage logging
+# ---------------------------------------------------------------------------
 
 def _log_usage(db, message, company_id) -> None:
     if db is None:
@@ -277,14 +400,25 @@ def _log_usage(db, message, company_id) -> None:
         pass
 
 
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
 async def fetch_website_summary(
     url: str,
     language: str = "en",
     db=None,
     company_id=None,
 ) -> dict:
-    """Produce a business summary and industry classification for ``url``
-    using Claude with the ``web_search`` tool.
+    """Produce a business summary and industry classification for ``url``.
+
+    Strategy:
+      1. Fetch the actual page HTML → extract text → summarize with Claude.
+         This is the most reliable path: Claude sees the real page content
+         and cannot hallucinate from training data.
+      2. If direct fetch fails (blocked, timeout, JS-only SPA), fall back
+         to Claude + web_search tool.
+      3. If both fail, raise WebsiteIntelligenceError → UI shows manual mode.
 
     Args:
         url: The company website URL the user typed.
@@ -293,11 +427,11 @@ async def fetch_website_summary(
         company_id: Optional company ID for AI usage logging.
 
     Returns:
-        A dict with keys ``summary`` (str) and ``industry`` (str | None).
+        A dict with keys ``summary`` (str), ``industry`` (str | None),
+        and ``primary_country`` (str | None).
 
     Raises:
-        WebsiteIntelligenceError: if Claude can't identify the business
-        even after searching.
+        WebsiteIntelligenceError: if Claude can't identify the business.
     """
     clean_url = _normalize_url(url)
     if not clean_url:
@@ -312,13 +446,53 @@ async def fetch_website_summary(
     lang = language if language in _LANGUAGE_DIRECTIVES else "en"
     ai_client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-    # Single pass: always use web_search. A knowledge-only pre-pass was
-    # tried but Claude pattern-matched similar-sounding domains into
-    # confident wrong answers (e.g. qualipulse.com → "Ideagen Q-Pulse").
+    # ── Strategy 1: Direct fetch → Claude summarization ──────────────────
+    page_text = await _fetch_page_text(clean_url)
+
+    if page_text:
+        try:
+            msg = ai_client.messages.create(
+                model=_MODEL,
+                max_tokens=_MAX_TOKENS,
+                temperature=0.3,
+                messages=[{
+                    "role": "user",
+                    "content": _build_prompt_with_content(
+                        clean_url, page_text, lang
+                    ),
+                }],
+            )
+            _log_usage(db, msg, company_id)
+            parsed = _parse_response(_extract_text(msg))
+            if parsed is not None:
+                logger.info(
+                    "website_intel.direct_fetch_hit",
+                    extra={
+                        "url": clean_url,
+                        "industry": parsed.get("industry"),
+                    },
+                )
+                return parsed
+            logger.info(
+                "website_intel.direct_fetch_parse_fail",
+                extra={"url": clean_url},
+            )
+        except Exception as exc:
+            logger.warning(
+                "website_intel.direct_summarize_failed",
+                extra={"url": clean_url, "error": str(exc)},
+            )
+
+    # ── Strategy 2: Web search fallback ──────────────────────────────────
+    logger.info(
+        "website_intel.falling_back_to_search",
+        extra={"url": clean_url, "had_page_text": page_text is not None},
+    )
     try:
         search_msg = ai_client.messages.create(
             model=_MODEL,
             max_tokens=_MAX_TOKENS,
+            temperature=0.3,
             tools=[{
                 "type": "web_search_20250305",
                 "name": "web_search",
@@ -326,7 +500,7 @@ async def fetch_website_summary(
             }],
             messages=[{
                 "role": "user",
-                "content": _build_prompt(clean_url, lang, with_search=True),
+                "content": _build_prompt_web_search(clean_url, lang),
             }],
         )
     except Exception as exc:
