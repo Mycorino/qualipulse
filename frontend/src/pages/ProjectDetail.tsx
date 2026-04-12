@@ -1367,7 +1367,12 @@ export default function ProjectDetail() {
             <section className="detail-section">
               <div className="section-header-row">
                 <h2>Interview Link</h2>
-                <button className="btn btn-primary btn-sm" onClick={handleGenerateLink}>+ New Link</button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleGenerateLink}
+                  disabled={project.is_demo}
+                  title={project.is_demo ? "Demo projects don't support live interviews" : undefined}
+                >+ New Link</button>
               </div>
               {links.length === 0 ? (
                 <p className="muted-text">No links yet. Generate one to share with participants.</p>

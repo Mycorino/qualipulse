@@ -81,6 +81,7 @@ export interface ProjectListItem {
   /** Most-recent participant completion timestamp; null until someone
    *  finishes an interview. Used for "N days since last response" nudges. */
   last_response_at: string | null;
+  is_demo?: boolean;
 }
 
 export interface InterviewLink {

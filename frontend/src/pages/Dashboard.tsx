@@ -133,6 +133,9 @@ export default function Dashboard() {
     return "∞";
   }
 
+  // Real projects (non-demo) for counting and gating
+  const realProjects = projects.filter((p) => !p.is_demo);
+
   const sortedProjects = [...projects].sort((a, b) => {
     switch (sortBy) {
       case "oldest":
@@ -177,7 +180,7 @@ export default function Dashboard() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {!loading && me && (
               <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-                {t("projectCount", { count: projects.length, max: getProjectMax(me.subscription_tier) })}
+                {t("projectCount", { count: realProjects.length, max: getProjectMax(me.subscription_tier) })}
               </span>
             )}
             {projects.length > 1 && (
@@ -194,10 +197,10 @@ export default function Dashboard() {
                   cursor: "pointer",
                 }}
               >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="responses">Most responses</option>
-                <option value="name">Name A–Z</option>
+                <option value="newest">{t("sort.newest", "Newest first")}</option>
+                <option value="oldest">{t("sort.oldest", "Oldest first")}</option>
+                <option value="responses">{t("sort.responses", "Most responses")}</option>
+                <option value="name">{t("sort.name", "Name A–Z")}</option>
               </select>
             )}
             <button
@@ -262,7 +265,10 @@ export default function Dashboard() {
             Only renders once we have a loaded `me` so the priority block knows
             whether the prompt is due. Degrades silently when there's nothing
             useful to show. */}
-        {!loading && me && projects.length > 0 && (
+        {/* Only show priority prompt + recommendations once the user has
+            at least one real (non-demo) project — showing it immediately
+            after onboarding is too early and adds friction. */}
+        {!loading && me && realProjects.length > 0 && (
           <DashboardInsights me={me} onPriorityUpdated={setMe} />
         )}
 
