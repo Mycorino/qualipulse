@@ -170,6 +170,7 @@ export interface AnalysisReport {
   tensions: AnalysisTension[];
   recommendations: string[];
   confidence: string;
+  confidence_rationale?: string;
   participant_count: number;
 }
 export interface AnalysisResponse {

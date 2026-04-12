@@ -193,6 +193,7 @@ Analyse these interviews and return a JSON object with this exact structure:
     "specific, actionable recommendation for the product team"
   ],
   "confidence": "low / medium / high",
+  "confidence_rationale": "1-2 sentence explanation of why this confidence level was assigned (e.g. sample size, response depth, thematic saturation, diversity of perspectives)",
   "participant_count": {len(completed)}
 }}"""
 
@@ -402,6 +403,7 @@ Analyse these interviews and return a JSON object with this exact structure:
     "specific, actionable recommendation for the product team"
   ],
   "confidence": "low / medium / high",
+  "confidence_rationale": "1-2 sentence explanation of why this confidence level was assigned (e.g. sample size, response depth, thematic saturation, diversity of perspectives)",
   "participant_count": {len(all_completed)}
 }}
 
