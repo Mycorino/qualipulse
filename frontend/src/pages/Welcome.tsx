@@ -97,6 +97,7 @@ export default function Welcome() {
   const lastAttemptedUrlRef = useRef<string>("");
   const [customIndustries, setCustomIndustries] = useState<string[]>([]);
   const [manualMode, setManualMode] = useState(false);
+  const [websiteHint, setWebsiteHint] = useState<string | null>(null);
   const analyseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Use cases
   const [useCases, setUseCases] = useState<string[]>([]);
@@ -286,17 +287,8 @@ export default function Welcome() {
           setIndustry(detectedIndustry);
         }
       }
-    } catch (err: unknown) {
-      const detail = (err as {
-        response?: { data?: { detail?: { code?: string } | string } };
-      })?.response?.data?.detail;
-      const code =
-        typeof detail === "object" && detail !== null ? detail.code : undefined;
-      if (code) {
-        setError(t(`onboarding.scraperError_${code}`, { defaultValue: t("onboarding.failedWebsite") }));
-      } else {
-        setError(getErrorMessage(err, t("onboarding.failedWebsite")));
-      }
+    } catch {
+      setWebsiteHint("fallback");
       setManualMode(true);
     } finally {
       setWebsiteLoading(false);
@@ -693,7 +685,7 @@ export default function Welcome() {
                   type="text"
                   className="field-input"
                   value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  onChange={(e) => { setWebsiteUrl(e.target.value); setWebsiteHint(null); }}
                   onPaste={handleWebsitePaste}
                   placeholder={t("onboarding.websitePlaceholder")}
                   onKeyDown={(e) => {
@@ -754,7 +746,41 @@ export default function Welcome() {
                     </span>
                   </div>
                 )}
-                {!businessSummary && !manualMode && !websiteLoading && (
+                {websiteHint === "fallback" && !websiteLoading && (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      padding: "14px 16px",
+                      borderRadius: "var(--radius)",
+                      background: "var(--warning-bg, #fffbeb)",
+                      border: "1px solid var(--warning-border, #fde68a)",
+                      fontSize: 14,
+                      lineHeight: 1.5,
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                      {t("onboarding.websiteFallbackTitle")}
+                    </div>
+                    <div style={{ color: "var(--text-secondary)", marginBottom: 10 }}>
+                      {t("onboarding.websiteFallbackBody")}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        setWebsiteHint(null);
+                        setManualMode(false);
+                        setWebsiteUrl("");
+                        lastAttemptedUrlRef.current = "";
+                      }}
+                      style={{ fontSize: 13, padding: "4px 0", textDecoration: "underline" }}
+                    >
+                      {t("onboarding.websiteFallbackRetry")}
+                    </button>
+                  </div>
+                )}
+                {!businessSummary && !manualMode && !websiteLoading && !websiteHint && (
                   <button
                     type="button"
                     className="btn btn-ghost"
