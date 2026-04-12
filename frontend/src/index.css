@@ -3509,6 +3509,10 @@ select.field-input {
   background: var(--brand-50, #f0f4ff);
 }
 
+.use-case-chip:not(.use-case-chip--selected) {
+  opacity: 0.55;
+}
+
 .use-case-chip--selected {
   border-color: var(--primary, #4369f5);
   background: var(--brand-50, #f0f4ff);

@@ -268,6 +268,12 @@ def _generate_ai_headline(
                 f"{', behind current data by ' + str(latest_info['gap']) + ' interviews' if latest_info['is_behind'] else ''}).\n\n"
             )
 
+        system_msg = (
+            "You write concise study-state headlines for product researchers. "
+            "ONE sentence, max 25 words. Be concrete — reference numbers. "
+            "No preamble, no quotes."
+        )
+
         prompt = (
             f"{context}"
             f"{latest_block}"
@@ -275,10 +281,8 @@ def _generate_ai_headline(
             f"- {completed_count} completed interviews\n"
             f"- {in_progress_count} interviews in progress\n"
             f"- Last response was {days_since_last if days_since_last is not None else '—'} days ago\n\n"
-            "Write ONE sentence (max 25 words) for a product researcher that "
-            "tells them at a glance (a) where the study stands and (b) the most "
-            "useful next thing they should do. Be concrete — reference the "
-            "numbers above. No preamble, no quotes, just the sentence. "
+            "Tell the researcher at a glance (a) where the study stands and "
+            "(b) the most useful next thing they should do. "
             "If a refresh or more recruiting is warranted, say so explicitly."
         )
 
@@ -290,6 +294,7 @@ def _generate_ai_headline(
             model=_STATE_MODEL,
             max_tokens=_STATE_MAX_TOKENS,
             temperature=0.3,
+            system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )
 

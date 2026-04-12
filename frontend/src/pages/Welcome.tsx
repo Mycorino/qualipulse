@@ -100,6 +100,7 @@ export default function Welcome() {
   const analyseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Use cases
   const [useCases, setUseCases] = useState<string[]>([]);
+  const [deselectedUseCases, setDeselectedUseCases] = useState<Set<string>>(new Set());
   const [useCasesLoading, setUseCasesLoading] = useState(false);
   const [useCasesFetched, setUseCasesFetched] = useState(false);
   const [newUseCaseInput, setNewUseCaseInput] = useState("");
@@ -405,7 +406,7 @@ export default function Welcome() {
         business_summary: businessSummary.trim() || undefined,
         industry: industry || undefined,
         primary_region: primaryRegion || undefined,
-        selected_use_cases: useCases.length > 0 ? useCases : undefined,
+        selected_use_cases: activeUseCases.length > 0 ? activeUseCases.join(",") : undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
       setStep(4);
@@ -430,7 +431,7 @@ export default function Welcome() {
       research_experience: researchExperience || undefined,
       industry: industry || undefined,
       business_summary: businessSummary.trim() || undefined,
-      selected_use_cases: useCases.length > 0 ? useCases : undefined,
+      selected_use_cases: activeUseCases.length > 0 ? activeUseCases : undefined,
       goals_freeform: goalsFreeform.trim() || undefined,
       language: uiLang,
     })
@@ -453,7 +454,7 @@ export default function Welcome() {
     try {
       await completeOnboarding({
         onboarding_recap: recap || undefined,
-        selected_use_cases: useCases.length > 0 ? useCases : undefined,
+        selected_use_cases: activeUseCases.length > 0 ? activeUseCases.join(",") : undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
       setCachedOnboarded(true);
@@ -466,10 +467,16 @@ export default function Welcome() {
   }
 
   function toggleUseCase(uc: string) {
-    setUseCases((prev) =>
-      prev.includes(uc) ? prev.filter((x) => x !== uc) : [...prev, uc],
-    );
+    setDeselectedUseCases((prev) => {
+      const next = new Set(prev);
+      if (next.has(uc)) next.delete(uc);
+      else next.add(uc);
+      return next;
+    });
   }
+
+  // Active use cases = all chips minus deselected ones
+  const activeUseCases = useCases.filter((uc) => !deselectedUseCases.has(uc));
 
   function addCustomUseCase() {
     const trimmed = newUseCaseInput.trim();
@@ -913,17 +920,22 @@ export default function Welcome() {
                   ) : (
                     <>
                       <div className="use-case-chips">
-                        {useCases.map((uc) => (
-                          <button
-                            key={uc}
-                            type="button"
-                            className="use-case-chip use-case-chip--selected"
-                            onClick={() => toggleUseCase(uc)}
-                            disabled={saving}
-                          >
-                            {uc}
-                          </button>
-                        ))}
+                        {useCases.map((uc) => {
+                          const selected = !deselectedUseCases.has(uc);
+                          return (
+                            <button
+                              key={uc}
+                              type="button"
+                              className={`use-case-chip${selected ? " use-case-chip--selected" : ""}`}
+                              onClick={() => toggleUseCase(uc)}
+                              disabled={saving}
+                              aria-pressed={selected}
+                            >
+                              <span style={{ marginRight: 6, fontSize: 13 }}>{selected ? "✓" : "+"}</span>
+                              {uc}
+                            </button>
+                          );
+                        })}
                       </div>
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                         <input
