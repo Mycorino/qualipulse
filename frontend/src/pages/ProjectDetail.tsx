@@ -186,6 +186,8 @@ export default function ProjectDetail() {
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [questionDraft, setQuestionDraft] = useState("");
   const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
+  const [dragQuestionId, setDragQuestionId] = useState<string | null>(null);
+  const [dragOverQuestionId, setDragOverQuestionId] = useState<string | null>(null);
 
   // ── P6: Memos ──────────────────────────────────────────────────────────────
   const [memos, setMemos] = useState<ProjectMemo[]>([]);
@@ -779,6 +781,73 @@ export default function ProjectDetail() {
             return q;
           }),
         } : prev
+      );
+    } catch {
+      toast("Failed to reorder", "error");
+    }
+  }
+
+  async function handleQuestionDrop(draggedId: string, targetId: string) {
+    if (!project || draggedId === targetId) return;
+    const allActive = [...project.questions]
+      .filter((q) => !q.deprecated_at)
+      .sort((a, b) => a.section_index - b.section_index || a.question_index - b.question_index);
+    const fromIdx = allActive.findIndex((q) => q.id === draggedId);
+    const toIdx = allActive.findIndex((q) => q.id === targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    // Reorder the array
+    const reordered = [...allActive];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+
+    // Assign new indices: keep target's section for the moved item,
+    // and renumber within each section
+    const updates: { id: string; section_index: number; section_title: string; question_index: number }[] = [];
+    const sectionOrder: string[] = [];
+    for (const q of reordered) {
+      const sec = q.id === draggedId ? allActive[toIdx].section_title : q.section_title;
+      if (!sectionOrder.includes(sec)) sectionOrder.push(sec);
+    }
+
+    let currentSection = "";
+    let qIdx = 0;
+    for (const q of reordered) {
+      const sec = q.id === draggedId ? allActive[toIdx].section_title : q.section_title;
+      const secIdx = sectionOrder.indexOf(sec);
+      if (sec !== currentSection) { qIdx = 0; currentSection = sec; }
+      const needsUpdate =
+        q.section_index !== secIdx ||
+        q.section_title !== sec ||
+        q.question_index !== qIdx;
+      if (needsUpdate) {
+        updates.push({ id: q.id, section_index: secIdx, section_title: sec, question_index: qIdx });
+      }
+      qIdx++;
+    }
+
+    if (updates.length === 0) return;
+
+    try {
+      await Promise.all(
+        updates.map((u) =>
+          patchQuestion(id!, u.id, {
+            section_index: u.section_index,
+            section_title: u.section_title,
+            question_index: u.question_index,
+          })
+        )
+      );
+      setProject((prev) =>
+        prev
+          ? {
+              ...prev,
+              questions: prev.questions.map((q) => {
+                const upd = updates.find((u) => u.id === q.id);
+                return upd ? { ...q, ...upd } : q;
+              }),
+            }
+          : prev
       );
     } catch {
       toast("Failed to reorder", "error");
@@ -1583,18 +1652,27 @@ export default function ProjectDetail() {
                               <div
                                 key={q.id}
                                 className="guide-question-card"
+                                draggable={!isEditing}
+                                onDragStart={(e) => { setDragQuestionId(q.id); e.dataTransfer.effectAllowed = "move"; }}
+                                onDragEnd={() => { setDragQuestionId(null); setDragOverQuestionId(null); }}
+                                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverQuestionId(q.id); }}
+                                onDragLeave={() => { if (dragOverQuestionId === q.id) setDragOverQuestionId(null); }}
+                                onDrop={(e) => { e.preventDefault(); if (dragQuestionId && dragQuestionId !== q.id) handleQuestionDrop(dragQuestionId, q.id); setDragQuestionId(null); setDragOverQuestionId(null); }}
                                 style={{
                                   padding: "12px 14px",
                                   marginBottom: 8,
                                   borderRadius: 8,
-                                  border: isEditing ? "1.5px solid var(--primary, #6366f1)" : "1px solid var(--border, #e5e7eb)",
-                                  background: isEditing ? "var(--bg-surface-hover, #f8f9fc)" : "white",
-                                  transition: "border-color 0.15s, background 0.15s",
+                                  border: dragOverQuestionId === q.id ? "1.5px dashed var(--primary, #6366f1)" : isEditing ? "1.5px solid var(--primary, #6366f1)" : "1px solid var(--border, #e5e7eb)",
+                                  background: dragQuestionId === q.id ? "var(--brand-50, #f0f4ff)" : isEditing ? "var(--bg-surface-hover, #f8f9fc)" : "white",
+                                  opacity: dragQuestionId === q.id ? 0.5 : 1,
+                                  transition: "border-color 0.15s, background 0.15s, opacity 0.15s",
+                                  cursor: isEditing ? "default" : "grab",
                                 }}
                               >
                                 <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                                  {/* Reorder arrows */}
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0, marginTop: 2 }}>
+                                  {/* Drag handle + reorder arrows */}
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0, marginTop: 2, alignItems: "center" }}>
+                                    <span style={{ fontSize: 11, color: "var(--text-muted, #9ca3af)", cursor: "grab", userSelect: "none", lineHeight: 1 }} title="Drag to reorder">⠿</span>
                                     <button
                                       className="btn btn-ghost btn-xs"
                                       style={{ padding: "0 4px", fontSize: 10, color: isFirst ? "var(--border, #e5e7eb)" : "var(--text-muted, #9ca3af)", lineHeight: 1 }}
