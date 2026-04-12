@@ -92,6 +92,7 @@ def classify_role_and_suggest(
         response = client.messages.create(
             model=_MODEL,
             max_tokens=_MAX_TOKENS,
+            temperature=0.3,
             timeout=10.0,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -200,6 +201,7 @@ def generate_onboarding_recap(
         response = client.messages.create(
             model=_MODEL,
             max_tokens=_MAX_TOKENS,
+            temperature=0.7,
             timeout=15.0,
             messages=[{"role": "user", "content": prompt}],
         )

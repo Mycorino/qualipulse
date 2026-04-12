@@ -200,6 +200,7 @@ Analyse these interviews and return a JSON object with this exact structure:
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
+            temperature=0.5,
             system=ANALYSIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -410,6 +411,7 @@ For any theme that was disputed and you have reframed, add a "researcher_note" k
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
+            temperature=0.5,
             system=ANALYSIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )

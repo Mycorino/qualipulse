@@ -111,6 +111,7 @@ async def parse_brief(
     response = _claude(512).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
+        temperature=0.3,
         messages=[{
             "role": "user",
             "content": (
@@ -158,6 +159,7 @@ def suggest_objective(
     response = _claude(1024).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
+        temperature=0.7,
         messages=[{
             "role": "user",
             "content": (
@@ -215,6 +217,7 @@ def suggest_scope(
     response = _claude(512).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
+        temperature=0.5,
         messages=[{
             "role": "user",
             "content": (
@@ -270,6 +273,7 @@ def suggest_questions(
     response = _claude(2048).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=2048,
+        temperature=0.6,
         messages=[{
             "role": "user",
             "content": (
@@ -412,6 +416,7 @@ def refine_question(
     response = _claude(1024).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
+        temperature=0.6,
         messages=[{
             "role": "user",
             "content": (

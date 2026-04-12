@@ -177,12 +177,15 @@ export default function ProjectDetail() {
   const [renamingCodeId, setRenamingCodeId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
 
-  // ── P5: Guide annotation ───────────────────────────────────────────────────
+  // ── P5: Guide annotation + inline editing ──────────────────────────────────
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState("");
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [editingInterviewNotes, setEditingInterviewNotes] = useState<{ id: string; field: "interview_notes" | "desired_learning" } | null>(null);
   const [interviewNotesText, setInterviewNotesText] = useState("");
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [questionDraft, setQuestionDraft] = useState("");
+  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
 
   // ── P6: Memos ──────────────────────────────────────────────────────────────
   const [memos, setMemos] = useState<ProjectMemo[]>([]);
@@ -717,6 +720,52 @@ export default function ProjectDetail() {
       setEditingInterviewNotes(null);
     } catch {
       toast("Failed to save notes", "error");
+    }
+  }
+
+  async function saveQuestionText(questionId: string) {
+    if (!questionDraft.trim()) return;
+    setSavingQuestionId(questionId);
+    try {
+      const updated = await patchQuestion(id!, questionId, { main_question: questionDraft.trim() });
+      setProject((prev) =>
+        prev ? { ...prev, questions: prev.questions.map((q) => q.id === questionId ? { ...q, main_question: updated.main_question } : q) } : prev
+      );
+      setEditingQuestionId(null);
+    } catch {
+      toast("Failed to save question", "error");
+    } finally {
+      setSavingQuestionId(null);
+    }
+  }
+
+  async function moveQuestion(questionId: string, direction: "up" | "down") {
+    if (!project) return;
+    const allQs = [...project.questions].sort((a, b) => a.section_index - b.section_index || a.question_index - b.question_index);
+    const idx = allQs.findIndex((q) => q.id === questionId);
+    if (idx < 0) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= allQs.length) return;
+    const current = allQs[idx];
+    const swap = allQs[swapIdx];
+    // Swap question_index values (and section if crossing section boundaries)
+    try {
+      const [u1, u2] = await Promise.all([
+        patchQuestion(id!, current.id, { question_index: swap.question_index, section_index: swap.section_index, section_title: swap.section_title }),
+        patchQuestion(id!, swap.id, { question_index: current.question_index, section_index: current.section_index, section_title: current.section_title }),
+      ]);
+      setProject((prev) =>
+        prev ? {
+          ...prev,
+          questions: prev.questions.map((q) => {
+            if (q.id === current.id) return { ...q, question_index: u1.question_index, section_index: u1.section_index, section_title: u1.section_title };
+            if (q.id === swap.id) return { ...q, question_index: u2.question_index, section_index: u2.section_index, section_title: u2.section_title };
+            return q;
+          }),
+        } : prev
+      );
+    } catch {
+      toast("Failed to reorder", "error");
     }
   }
 
@@ -1448,139 +1497,217 @@ export default function ProjectDetail() {
                 <div>
                   <h2>Interview Guide</h2>
                   <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>
-                    {project.questions.length} questions across {Object.keys(sections).length} section{Object.keys(sections).length !== 1 ? "s" : ""}
+                    {project.questions.filter((q) => !q.deprecated_at).length} active question{project.questions.filter((q) => !q.deprecated_at).length !== 1 ? "s" : ""} across {Object.keys(sections).length} section{Object.keys(sections).length !== 1 ? "s" : ""}
                     {project.questions.some((q) => q.deprecated_at) && (
-                      <span className="badge" style={{ marginLeft: 8, background: "#fef2f2", color: "#dc2626" }}>
+                      <span className="badge" style={{ marginLeft: 8, background: "var(--danger-bg, #fef2f2)", color: "var(--danger, #dc2626)" }}>
                         {project.questions.filter((q) => q.deprecated_at).length} disabled
                       </span>
                     )}
                   </p>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>Edit Guide</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>Add Questions</button>
               </div>
               {project.questions.length === 0 ? (
-                <p className="muted-text">No questions defined yet.</p>
+                <p className="muted-text">No questions defined yet. <button className="btn btn-primary btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>Create interview guide</button></p>
               ) : (
-                Object.entries(sections).map(([title, qs]) => (
-                  <div key={title} className="guide-section">
-                    <h3 className="guide-section-title">{title}</h3>
-                    <div>
-                      {qs.sort((a, b) => a.question_index - b.question_index).map((q) => (
-                        <div
-                          key={q.id}
-                          style={{
-                            padding: "10px 12px",
-                            marginBottom: 8,
-                            borderRadius: 8,
-                            border: "1px solid #e5e7eb",
-                            opacity: q.deprecated_at ? 0.55 : 1,
-                            borderLeft: q.deprecated_at ? "3px solid #ef4444" : "1px solid #e5e7eb",
-                            background: "white",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                            <span style={{ flex: 1 }}>
-                              {q.deprecated_at ? (
-                                <s style={{ color: "#9ca3af" }}>{q.main_question}</s>
-                              ) : (
-                                <span style={{ color: "var(--text, #111827)" }}>{q.main_question}</span>
-                              )}
-                              {q.deprecated_at && (
-                                <span className="badge" style={{ marginLeft: 6, background: "#fef2f2", color: "#dc2626", fontSize: 10 }}>Disabled</span>
-                              )}
-                            </span>
-                            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                              <button
-                                className="btn btn-ghost btn-xs"
-                                title={q.researcher_notes ? "Edit note" : "Add researcher note"}
-                                style={{ color: q.researcher_notes ? "#d97706" : "#9ca3af" }}
-                                onClick={() => {
-                                  if (editingNoteId === q.id) { setEditingNoteId(null); }
-                                  else { setEditingNoteId(q.id); setNoteText(q.researcher_notes ?? ""); }
+                <>
+                  {/* Active questions */}
+                  {Object.entries(sections).map(([title, qs]) => {
+                    const activeQs = qs.filter((q) => !q.deprecated_at).sort((a, b) => a.question_index - b.question_index);
+                    if (activeQs.length === 0) return null;
+                    return (
+                      <div key={title} className="guide-section">
+                        <h3 className="guide-section-title">{title}</h3>
+                        <div>
+                          {activeQs.map((q, qi) => {
+                            const isEditing = editingQuestionId === q.id;
+                            const allSorted = [...project.questions].filter((x) => !x.deprecated_at).sort((a, b) => a.section_index - b.section_index || a.question_index - b.question_index);
+                            const globalIdx = allSorted.findIndex((x) => x.id === q.id);
+                            const isFirst = globalIdx === 0;
+                            const isLast = globalIdx === allSorted.length - 1;
+                            return (
+                              <div
+                                key={q.id}
+                                className="guide-question-card"
+                                style={{
+                                  padding: "12px 14px",
+                                  marginBottom: 8,
+                                  borderRadius: 8,
+                                  border: isEditing ? "1.5px solid var(--primary, #6366f1)" : "1px solid var(--border, #e5e7eb)",
+                                  background: isEditing ? "var(--bg-surface-hover, #f8f9fc)" : "white",
+                                  transition: "border-color 0.15s, background 0.15s",
                                 }}
                               >
-                                Note
-                              </button>
+                                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                                  {/* Reorder arrows */}
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0, marginTop: 2 }}>
+                                    <button
+                                      className="btn btn-ghost btn-xs"
+                                      style={{ padding: "0 4px", fontSize: 10, color: isFirst ? "var(--border, #e5e7eb)" : "var(--text-muted, #9ca3af)", lineHeight: 1 }}
+                                      disabled={isFirst}
+                                      onClick={() => moveQuestion(q.id, "up")}
+                                      title="Move up"
+                                    >▲</button>
+                                    <button
+                                      className="btn btn-ghost btn-xs"
+                                      style={{ padding: "0 4px", fontSize: 10, color: isLast ? "var(--border, #e5e7eb)" : "var(--text-muted, #9ca3af)", lineHeight: 1 }}
+                                      disabled={isLast}
+                                      onClick={() => moveQuestion(q.id, "down")}
+                                      title="Move down"
+                                    >▼</button>
+                                  </div>
+
+                                  {/* Question text — click to edit */}
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    {isEditing ? (
+                                      <div>
+                                        <textarea
+                                          className="field-input"
+                                          value={questionDraft}
+                                          onChange={(e) => setQuestionDraft(e.target.value)}
+                                          rows={2}
+                                          style={{ width: "100%", fontSize: 14, marginBottom: 6 }}
+                                          autoFocus
+                                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveQuestionText(q.id); } if (e.key === "Escape") setEditingQuestionId(null); }}
+                                        />
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                          <button className="btn btn-primary btn-xs" onClick={() => saveQuestionText(q.id)} disabled={savingQuestionId === q.id}>{savingQuestionId === q.id ? "Saving..." : "Save"}</button>
+                                          <button className="btn btn-ghost btn-xs" onClick={() => setEditingQuestionId(null)}>Cancel</button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span
+                                        style={{ color: "var(--text, #111827)", cursor: "pointer", display: "block" }}
+                                        onClick={() => { setEditingQuestionId(q.id); setQuestionDraft(q.main_question); }}
+                                        title="Click to edit"
+                                      >
+                                        <span style={{ color: "var(--text-muted, #9ca3af)", fontSize: 12, marginRight: 6 }}>Q{qi + 1}</span>
+                                        {q.main_question}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Action buttons */}
+                                  {!isEditing && (
+                                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                                      <button
+                                        className="btn btn-ghost btn-xs"
+                                        title={q.researcher_notes ? "Edit note" : "Add note"}
+                                        style={{ color: q.researcher_notes ? "#d97706" : "var(--text-muted, #9ca3af)" }}
+                                        onClick={() => {
+                                          if (editingNoteId === q.id) { setEditingNoteId(null); }
+                                          else { setEditingNoteId(q.id); setNoteText(q.researcher_notes ?? ""); }
+                                        }}
+                                      >
+                                        {q.researcher_notes ? "📝" : "Note"}
+                                      </button>
+                                      <button
+                                        className="btn btn-ghost btn-xs"
+                                        style={{ color: "var(--text-muted, #9ca3af)" }}
+                                        onClick={() => setExpandedQuestionId(expandedQuestionId === q.id ? null : q.id)}
+                                        title="Interview notes & desired learning"
+                                      >
+                                        {expandedQuestionId === q.id ? "▲" : "▼"}
+                                      </button>
+                                      <button
+                                        className="btn btn-ghost btn-xs"
+                                        title="Disable question"
+                                        style={{ color: "var(--text-muted, #9ca3af)" }}
+                                        onClick={() => toggleDeprecateQuestion(q.id, q.deprecated_at)}
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Researcher note display */}
+                                {editingNoteId === q.id && (
+                                  <div style={{ marginTop: 8, marginLeft: 28 }}>
+                                    <textarea
+                                      className="field-input"
+                                      value={noteText}
+                                      onChange={(e) => setNoteText(e.target.value)}
+                                      placeholder="Research notes, reminders, observations..."
+                                      rows={2}
+                                      style={{ width: "100%", marginBottom: 6, fontSize: 13 }}
+                                      autoFocus
+                                    />
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                      <button className="btn btn-primary btn-xs" onClick={() => saveQuestionNote(q.id)}>Save</button>
+                                      <button className="btn btn-ghost btn-xs" onClick={() => setEditingNoteId(null)}>Cancel</button>
+                                    </div>
+                                  </div>
+                                )}
+                                {q.researcher_notes && editingNoteId !== q.id && (
+                                  <div style={{ marginTop: 6, marginLeft: 28, padding: "4px 8px", background: "#fffbeb", borderRadius: 4, fontSize: 12, color: "#92400e" }}>
+                                    📝 {q.researcher_notes}
+                                  </div>
+                                )}
+
+                                {/* Interview notes + desired learning (expanded) */}
+                                {expandedQuestionId === q.id && (
+                                  <div style={{ marginTop: 8, marginLeft: 28, display: "flex", flexDirection: "column", gap: 8 }}>
+                                    {(["interview_notes", "desired_learning"] as const).map((field) => {
+                                      const label = field === "interview_notes" ? "Interview Tips" : "Desired Learning";
+                                      const isFieldEditing = editingInterviewNotes?.id === q.id && editingInterviewNotes?.field === field;
+                                      return (
+                                        <div key={field} style={{ background: "var(--bg-surface, #f9fafb)", borderRadius: 6, padding: "8px 10px", border: "1px solid var(--border, #e5e7eb)" }}>
+                                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted, #6b7280)", textTransform: "uppercase" }}>{label}</span>
+                                            {!isFieldEditing && (
+                                              <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => { setEditingInterviewNotes({ id: q.id, field }); setInterviewNotesText(q[field] ?? ""); }}>Edit</button>
+                                            )}
+                                          </div>
+                                          {isFieldEditing ? (
+                                            <>
+                                              <textarea className="field-input" value={interviewNotesText} onChange={(e) => setInterviewNotesText(e.target.value)} rows={2} style={{ width: "100%", fontSize: 12, marginBottom: 4 }} autoFocus />
+                                              <div style={{ display: "flex", gap: 4 }}>
+                                                <button className="btn btn-primary btn-xs" onClick={() => saveInterviewNotes(q.id, field)}>Save</button>
+                                                <button className="btn btn-ghost btn-xs" onClick={() => setEditingInterviewNotes(null)}>Cancel</button>
+                                              </div>
+                                            </>
+                                          ) : (
+                                            <p style={{ fontSize: 12, color: "var(--text-secondary, #374151)", margin: 0 }}>{q[field] || <em className="muted-text">None — click Edit to add</em>}</p>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Disabled questions section */}
+                  {project.questions.some((q) => q.deprecated_at) && (
+                    <details style={{ marginTop: 16 }}>
+                      <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--text-muted, #6b7280)", userSelect: "none" }}>
+                        {project.questions.filter((q) => q.deprecated_at).length} disabled question{project.questions.filter((q) => q.deprecated_at).length !== 1 ? "s" : ""}
+                      </summary>
+                      <div style={{ marginTop: 8 }}>
+                        {project.questions.filter((q) => q.deprecated_at).sort((a, b) => a.section_index - b.section_index || a.question_index - b.question_index).map((q) => (
+                          <div key={q.id} style={{ padding: "8px 12px", marginBottom: 6, borderRadius: 6, border: "1px solid var(--border, #e5e7eb)", background: "var(--bg-surface, #f9fafb)", opacity: 0.7 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <s style={{ flex: 1, color: "var(--text-muted, #9ca3af)", fontSize: 14 }}>{q.main_question}</s>
                               <button
                                 className="btn btn-ghost btn-xs"
-                                title={q.deprecated_at ? "Re-enable question" : "Disable question"}
-                                aria-label={q.deprecated_at ? "Re-enable question" : "Disable question"}
-                                style={{ color: q.deprecated_at ? "#dc2626" : "#9ca3af" }}
+                                style={{ color: "var(--primary, #6366f1)", flexShrink: 0 }}
                                 onClick={() => toggleDeprecateQuestion(q.id, q.deprecated_at)}
                               >
-                                {q.deprecated_at ? "Re-enable question" : "Disable question"}
+                                Re-enable
                               </button>
                             </div>
                           </div>
-
-                          {editingNoteId === q.id && (
-                            <div style={{ marginTop: 8 }}>
-                              <textarea
-                                className="field-input"
-                                value={noteText}
-                                onChange={(e) => setNoteText(e.target.value)}
-                                placeholder="Research notes, reminders, observations..."
-                                rows={3}
-                                style={{ width: "100%", marginBottom: 6, fontSize: 13 }}
-                                autoFocus
-                              />
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <button className="btn btn-primary btn-xs" onClick={() => saveQuestionNote(q.id)}>Save</button>
-                                <button className="btn btn-ghost btn-xs" onClick={() => setEditingNoteId(null)}>Cancel</button>
-                              </div>
-                            </div>
-                          )}
-
-                          {q.researcher_notes && editingNoteId !== q.id && (
-                            <div style={{ marginTop: 6, padding: "4px 8px", background: "#fffbeb", borderRadius: 4, fontSize: 12, color: "#92400e" }}>
-                              📝 {q.researcher_notes}
-                            </div>
-                          )}
-
-                          {/* Expandable interview notes */}
-                          {(q.interview_notes || q.desired_learning) && (
-                            <button
-                              className="btn btn-ghost btn-xs"
-                              style={{ fontSize: 11, marginTop: 4, color: "#6b7280" }}
-                              onClick={() => setExpandedQuestionId(expandedQuestionId === q.id ? null : q.id)}
-                            >
-                              {expandedQuestionId === q.id ? "▲ Hide notes" : "▼ Interview notes"}
-                            </button>
-                          )}
-                          {expandedQuestionId === q.id && (
-                            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 10 }}>
-                              {(["interview_notes", "desired_learning"] as const).map((field) => {
-                                const label = field === "interview_notes" ? "Interview Notes" : "Desired Learning";
-                                const isEditing = editingInterviewNotes?.id === q.id && editingInterviewNotes?.field === field;
-                                return (
-                                  <div key={field} style={{ background: "#f9fafb", borderRadius: 6, padding: "8px 10px", border: "1px solid #e5e7eb" }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                      <span style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>{label}</span>
-                                      {!isEditing && (
-                                        <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => { setEditingInterviewNotes({ id: q.id, field }); setInterviewNotesText(q[field] ?? ""); }}>Edit</button>
-                                      )}
-                                    </div>
-                                    {isEditing ? (
-                                      <>
-                                        <textarea className="field-input" value={interviewNotesText} onChange={(e) => setInterviewNotesText(e.target.value)} rows={3} style={{ width: "100%", fontSize: 12, marginBottom: 4 }} autoFocus />
-                                        <div style={{ display: "flex", gap: 4 }}>
-                                          <button className="btn btn-primary btn-xs" onClick={() => saveInterviewNotes(q.id, field)}>Save</button>
-                                          <button className="btn btn-ghost btn-xs" onClick={() => setEditingInterviewNotes(null)}>Cancel</button>
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <p style={{ fontSize: 12, color: "#374151", margin: 0 }}>{q[field] || <em className="muted-text">None</em>}</p>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
               )}
             </section>
 
@@ -2209,14 +2336,14 @@ export default function ProjectDetail() {
                     {/* Themes */}
                     {r.themes.length > 0 && (
                       <div className="analysis-block">
-                        <h3>Key Themes</h3>
+                        <h3>Key Themes ({r.themes.length})</h3>
                         {r.themes.map((t, i) => {
                           const ann = themeAnnotations[t.title];
                           const showNoteInput = !isViewingPastVersion && ann && (ann.status === "disputed" || ann.status === "needs_evidence");
                           return (
                             <div key={i} className="analysis-theme">
                               <div className="analysis-theme-header" style={{ flexWrap: "wrap" }}>
-                                <strong>{t.title}</strong>
+                                <strong>{t.title}{t.quotes.length > 0 && <span className="analysis-quote-count">{t.quotes.length} quote{t.quotes.length !== 1 ? "s" : ""}</span>}</strong>
                                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                                   <span className="badge">{t.frequency}</span>
                                   {!isViewingPastVersion && (
@@ -2273,7 +2400,7 @@ export default function ProjectDetail() {
                     {/* JTBD */}
                     {r.jobs_to_be_done.length > 0 && (
                       <div className="analysis-block">
-                        <h3>Jobs to be Done</h3>
+                        <h3>Jobs to be Done ({r.jobs_to_be_done.length})</h3>
                         {r.jobs_to_be_done.map((j, i) => (
                           <div key={i} className="analysis-jtbd">
                             <div className="analysis-jtbd-job">"{j.job}"</div>
@@ -2291,7 +2418,7 @@ export default function ProjectDetail() {
                     {/* Tensions */}
                     {r.tensions.length > 0 && (
                       <div className="analysis-block">
-                        <h3>Tensions & Contradictions</h3>
+                        <h3>Tensions & Contradictions ({r.tensions.length})</h3>
                         {r.tensions.map((t, i) => (
                           <div key={i} className="analysis-tension">
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
