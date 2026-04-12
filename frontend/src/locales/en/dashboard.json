@@ -49,6 +49,12 @@
     "restore": "↩ Restore",
     "view": "View"
   },
+  "sort": {
+    "newest": "Newest first",
+    "oldest": "Oldest first",
+    "responses": "Most responses",
+    "name": "Name A–Z"
+  },
   "insights": {
     "priorityTitle": "What are you focused on right now?",
     "priorityUpdatedAgo": "Updated {{count}} day ago",

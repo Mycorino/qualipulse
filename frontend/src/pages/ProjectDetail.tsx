@@ -351,7 +351,7 @@ export default function ProjectDetail() {
     const r = analysis.report;
     const lines: string[] = [];
     lines.push(`# Analysis Report — ${project?.name ?? "Project"}`);
-    lines.push(`\n*Based on ${r.participant_count} participant(s) · ${r.confidence} confidence*\n`);
+    lines.push(`\n*Based on ${r.participant_count} participant(s) · ${r.confidence} confidence${r.confidence_rationale ? ` — ${r.confidence_rationale}` : ""}*\n`);
     lines.push(`## Summary\n${r.summary}\n`);
     if (r.themes?.length) {
       lines.push("## Key Themes");
@@ -1367,7 +1367,12 @@ export default function ProjectDetail() {
             <section className="detail-section">
               <div className="section-header-row">
                 <h2>Interview Link</h2>
-                <button className="btn btn-primary btn-sm" onClick={handleGenerateLink}>+ New Link</button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleGenerateLink}
+                  disabled={project.is_demo}
+                  title={project.is_demo ? "Demo projects don't support live interviews" : undefined}
+                >+ New Link</button>
               </div>
               {links.length === 0 ? (
                 <p className="muted-text">No links yet. Generate one to share with participants.</p>
@@ -2326,7 +2331,7 @@ export default function ProjectDetail() {
                       <span className="badge">n={r.participant_count} interview{r.participant_count !== 1 ? "s" : ""}</span>
                       <span
                         className="badge"
-                        title="Confidence reflects sample size, response depth, and thematic saturation. Low = &lt;5 interviews or very short responses. High = 10+ rich interviews with consistent themes."
+                        title={r.confidence_rationale || "Confidence reflects sample size, response depth, and thematic saturation."}
                         style={{ cursor: "help", textDecoration: "underline dotted" }}
                       >
                         {r.confidence} confidence

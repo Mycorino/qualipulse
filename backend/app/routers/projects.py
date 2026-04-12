@@ -209,6 +209,7 @@ def list_projects(
                 in_progress_count=in_progress,
                 analysis_status=latest_analysis.status if latest_analysis else None,
                 last_response_at=last_response_at,
+                is_demo=getattr(p, "is_demo", False),
             )
         )
     return results

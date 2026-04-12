@@ -77,10 +77,14 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
     };
   }, []);
 
-  // Sync draft with server value whenever `me` changes.
+  // Sync draft with server value whenever `me` changes. If the user has
+  // never set a priority but filled in goals_freeform during onboarding,
+  // pre-fill the draft so they see something useful instead of a blank box.
   useEffect(() => {
-    setPriorityDraft((me?.current_priority || "").slice(0, 280));
-  }, [me?.current_priority]);
+    const saved = me?.current_priority || "";
+    const fallback = !saved && me?.goals_freeform ? me.goals_freeform : "";
+    setPriorityDraft((saved || fallback).slice(0, 280));
+  }, [me?.current_priority, me?.goals_freeform]);
 
   // "Is the priority stale or never set?" drives whether we show the prompt
   // automatically or keep it collapsed behind an edit affordance.

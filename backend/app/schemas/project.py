@@ -107,5 +107,6 @@ class ProjectListResponse(BaseModel):
     # "N days since last response" stale nudge without having to fetch
     # a full project-state (and the Claude headline) for every tile.
     last_response_at: datetime | None = None
+    is_demo: bool = False
 
     model_config = {"from_attributes": True}

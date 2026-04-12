@@ -49,6 +49,12 @@
     "restore": "↩ Restaurer",
     "view": "Voir"
   },
+  "sort": {
+    "newest": "Plus récents",
+    "oldest": "Plus anciens",
+    "responses": "Plus de réponses",
+    "name": "Nom A–Z"
+  },
   "insights": {
     "priorityTitle": "Sur quoi vous concentrez-vous en ce moment ?",
     "priorityUpdatedAgo": "Actualisé il y a {{count}} jour",
