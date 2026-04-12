@@ -375,28 +375,34 @@ Idempotent via `Company.demo_seeded_at` — subsequent onboarding completions
 skip seeding. Seeder errors are swallowed so a fixture bug never blocks a
 real user from finishing onboarding.
 
-The showcase project demonstrates almost every platform surface in one place:
+The showcase project uses a **Maison Aura brand trust study** theme —
+a fictional premium candle/skincare brand — chosen because consumer brand
+trust is universally understandable (not SaaS-specific). Language-aware:
+FR companies get `[Démo] Confiance de marque — Maison Aura`, EN companies
+get `[Demo] Brand trust — Maison Aura`.
 
-- **Bilingual interviews** — 3 French + 3 English completed participants +
-  1 in-progress (Marco P.), with realistic adaptive follow-ups and demographics
-  (profession / age_range / country) to power the segment heatmap
-- **Setup content** — 5 main guide questions across 3 sections, 1 screening
-  question with a disqualifying option, 2 interview links (1 active EU,
-  1 paused NA)
-- **Coding** — 4 manual codes (Pain point / Workaround / Aha moment /
-  Cultural difference) and 13 tagged quotes with real character offsets
-  computed via `.find()` against the transcript text
+- **Bilingual interviews** — 2 French (Claire M., Thomas R.) + 2 English
+  (Emma W., James P.) completed participants with realistic adaptive
+  follow-ups and demographics (profession / age_range / country)
+- **Setup content** — 3 main guide questions across 3 sections (Discovery /
+  Experience / Trust & return), 1 screening question with a disqualifying
+  option, 1 active interview link
+- **Coding** — 3 manual codes (Trust signal / Friction / Price concern)
+  and 8 tagged quotes with real character offsets computed via `.find()`
 - **Analysis** — 2 versions: `ai_discovery` v1 (with `share_token`) and
-  `researcher_refined` v2 parented to v1. 3 annotations (`confirmed`,
-  `needs_evidence`, `disputed`) on v2 themes. All analysis quotes are
-  verbatim substrings of real participant transcripts.
-- **Memos** — 6 project memos (general + theme-linked + tension-linked)
+  `researcher_refined` v2 parented to v1. 2 annotations (`confirmed`,
+  `needs_evidence`) on v2 themes. All analysis quotes are verbatim
+  substrings of real participant transcripts.
+- **Memos** — 3 project memos (general + theme-linked + tension-linked)
 - **Editing state** — one turn flagged `manually_edited=True`
+- **Demo CTA banner** — When viewing a demo project, a styled banner
+  prompts users to create their first real study
 
 The content lives in `backend/app/services/_demo_data_{en,fr}.py` so the
 `demo_seeder.py` logic stays readable. Demo projects set `Project.is_demo=True`
-and are **excluded from the tier project-quota count** in `routers/projects.py`
-so they never block a user from creating their first real study. Tests:
+(exposed in `ProjectResponse` API schema) and are **excluded from the tier
+project-quota count** in `routers/projects.py` so they never block a user
+from creating their first real study. Tests:
 `backend/tests/test_demo_seeder.py` (4 tests — relationship graph, quote-tag
 offset integrity, every analysis quote appears verbatim in a real transcript,
 quota exclusion).
@@ -750,7 +756,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Terms of Service + Privacy Policy pages
 - [x] SendGrid email integration (domain-authenticated, branded HTML templates)
 - [x] Getting-started checklist on empty dashboard
-- [x] Auto-seeded showcase demo project on onboarding completion — bilingual (3 FR + 3 EN + 1 in-progress participant), 2 interview links, screening question, codebook with tagged quotes, 2 analysis versions with annotations, memos. `is_demo=True` so it never counts against tier project quota. Idempotent via `Company.demo_seeded_at`.
+- [x] Auto-seeded showcase demo project on onboarding completion — Maison Aura brand trust study, language-aware (FR/EN), 2 FR + 2 EN participants, 3 guide questions, 3 codes, 8 tagged quotes, 2 analysis versions with annotations, 3 memos. `is_demo=True` exposed in API, never counts against tier quota. Demo CTA banner prompts first real project creation. Idempotent via `Company.demo_seeded_at`.
 - [x] Trial banner on dashboard (visible to solo/free users with active trial)
 - [x] Email verification banner (yellow) when unverified
 - [x] Admin panel (user management, tier changes, trial management, user deletion)
@@ -764,10 +770,17 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Blog CMS (TipTap WYSIWYG editor, live preview, draft/publish, SEO meta + OG tags)
 - [x] Public blog listing (/blog) + article pages (/blog/:slug) with newsletter CTA
 - [x] Blog admin tab (create, edit, delete posts, status filter)
-- [x] UX audit fixes (82 items): dark mode for marketing/auth, CSS variable cleanup (~50 hardcoded hex→vars), password show/hide + strength indicator, focus-visible outlines, ARIA labels + keyboard nav, sticky TOC on Terms/Privacy, responsive analysis toolbar, 44px touch targets, interview profiling card styling
+- [x] UX audit fixes (82 items): CSS variable cleanup (~50 hardcoded hex→vars), password show/hide + strength indicator, focus-visible outlines, ARIA labels + keyboard nav, sticky TOC on Terms/Privacy, responsive analysis toolbar, 44px touch targets, interview profiling card styling
 - [x] EN/FR i18n foundation: react-i18next with namespaced JSON files (`frontend/src/locales/{en,fr}/`) covering marketing, auth, dashboard, project, interview, analysis, settings, affiliate, common
-- [x] LanguageSwitcher component (`components/LanguageSwitcher.tsx`): pill-shaped toggle, light/dark variant prop, 44px WCAG touch target, shown in marketing nav and dashboard sidebar
-- [x] Marketing page fully translated (EN/FR): all hardcoded strings replaced with `t()` calls including hero widget, output preview section, who-it's-for, differentiator, trust quote
+- [x] LanguageSwitcher component (`components/LanguageSwitcher.tsx`): pill-shaped toggle, light/dark variant prop, 44px WCAG touch target, CSS classes (no inline styles), shown on marketing nav and auth pages
+- [x] Marketing page fully translated (EN/FR): all hardcoded strings replaced with `t()` calls including hero widget, output preview section, who-it's-for, differentiator, trust quote, **pricing cards** (plan names, features, CTAs)
+- [x] Shared report (SharedReport.tsx) fully i18n'd: 17 keys in analysis namespace (EN/FR)
+- [x] Project templates language-aware: wizard passes `i18n.language` to template API for FR content
+- [x] Design system tokens: typography scale (`--text-xs` to `--text-2xl`), font weights (`--weight-*`), line heights (`--leading-*`), semantic colors (`--warning-text`, `--success-text`, `--info-*`), complete brand scale (`--brand-300/400/800`)
+- [x] Mobile dashboard hamburger nav (collapses at 640px)
+- [x] Auth page logo clickable (links to `/`), signup password toggle keyboard-accessible
+- [x] Memo timestamps displayed (relative time) in project detail
+- [x] Light-only color scheme (no dark mode)
 - [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented)
 - [ ] Email invitation sending (template exists, no send endpoint)
 - [ ] Multi-language TTS voices (language field exists on projects)
