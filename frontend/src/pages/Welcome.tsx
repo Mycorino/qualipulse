@@ -14,6 +14,40 @@ import type { CompanyResponse } from "../api/auth";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 
+// ── Lightweight markdown renderer (bold + bullets + paragraphs) ──
+
+function renderLightMarkdown(text: string): React.ReactNode[] {
+  const paragraphs = text.split(/\n{2,}/);
+  return paragraphs.map((para, pi) => {
+    const lines = para.split("\n");
+    const isBulletBlock = lines.every((l) => l.startsWith("- ") || l.trim() === "");
+    if (isBulletBlock) {
+      const items = lines.filter((l) => l.startsWith("- ")).map((l) => l.slice(2));
+      return (
+        <ul key={pi} style={{ paddingLeft: 20, margin: "12px 0", listStyleType: "disc" }}>
+          {items.map((item, li) => (
+            <li key={li} style={{ marginBottom: 6, lineHeight: 1.7 }}>{renderInline(item)}</li>
+          ))}
+        </ul>
+      );
+    }
+    return (
+      <p key={pi} style={{ margin: "10px 0", lineHeight: 1.7 }}>{renderInline(para.replace(/\n/g, " "))}</p>
+    );
+  });
+}
+
+function renderInline(text: string): React.ReactNode[] {
+  // Split on **bold** markers
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Other"];
 
 const REGION_VALUES = [
@@ -495,40 +529,6 @@ export default function Welcome() {
       }}
     >
       <div className="auth-logo" style={{ margin: 0 }}>QualiPulse</div>
-      <div className="onboarding-header-lang" role="group" aria-label={t("onboarding.languageLabel")}>
-        {[
-          { code: "en", label: "EN" },
-          { code: "fr", label: "FR" },
-        ].map((opt) => {
-          const active = (i18n.language || "en")
-            .toLowerCase()
-            .startsWith(opt.code);
-          return (
-            <button
-              key={opt.code}
-              type="button"
-              onClick={() => i18n.changeLanguage(opt.code)}
-              aria-pressed={active}
-              className={`onboarding-header-lang-btn ${active ? "active" : ""}`}
-              style={{
-                minHeight: 36,
-                minWidth: 44,
-                padding: "6px 12px",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius)",
-                background: active ? "var(--primary)" : "var(--bg-surface)",
-                color: active ? "#fff" : "var(--text-secondary)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                marginLeft: 4,
-              }}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 
@@ -1042,9 +1042,9 @@ export default function Welcome() {
                   </>
                 ) : (
                   <>
-                    <p style={{ whiteSpace: "pre-line", color: "var(--text-secondary)", lineHeight: 1.7, margin: 0, fontSize: 14 }}>
-                      {recap}
-                    </p>
+                    <div style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+                      {renderLightMarkdown(recap)}
+                    </div>
                     <button
                       type="button"
                       className="btn btn-ghost"

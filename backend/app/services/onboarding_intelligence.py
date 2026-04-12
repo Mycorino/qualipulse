@@ -179,14 +179,17 @@ def generate_onboarding_recap(
         f"Write a personalized research needs assessment in {language_name}.\n\n"
         "Use the client's ACTUAL OCCUPATION to frame everything -- their own "
         "words about what they do, not a generic title.\n\n"
-        "Structure:\n"
-        f"1. Opening sentence addressing {first_name or 'the client'} and "
-        f"{company_name or 'their company'}, showing you understand their context\n"
-        '2. 3-4 lines starting with "\u2014", each a specific research question '
-        "they probably face, connected to a business outcome\n"
-        "3. Closing sentence about how AI-driven interviews fit their workflow\n\n"
-        "Under 180 words. Professional, warm. No exclamation marks, no emojis, "
-        f"no markdown. Write in {language_name}.\n"
+        "Structure (use light markdown formatting):\n"
+        f"1. Opening paragraph (2-3 sentences) addressing **{first_name or 'the client'}** and "
+        f"**{company_name or 'their company'}**, showing you understand their context. "
+        "Use **bold** for key phrases that show you listened.\n"
+        '2. A section with 3-4 bullet points (use `- ` markdown bullets), each a '
+        "specific research question they probably face, connected to a business "
+        "outcome. Bold the core question within each bullet.\n"
+        "3. Closing paragraph about how AI-driven interviews fit their specific workflow.\n\n"
+        "Under 180 words. Professional, warm. No exclamation marks, no emojis. "
+        "Use **bold** for emphasis and `- ` for bullets. No headers, no code blocks. "
+        f"Write in {language_name}.\n"
         "</instructions>"
     )
 

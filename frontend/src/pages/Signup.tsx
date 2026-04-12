@@ -5,7 +5,7 @@ import { signup } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import { useToast } from "../components/Toast";
-import LanguageSwitcher from "../components/LanguageSwitcher";
+
 
 function getPasswordStrength(pw: string, t: (key: string) => string): { label: string; color: string; width: string } {
   if (pw.length === 0) return { label: "", color: "", width: "0%" };
@@ -112,9 +112,6 @@ export default function Signup() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-          <LanguageSwitcher />
-        </div>
         <Link to="/" className="auth-logo" style={{ textDecoration: "none", color: "inherit" }}>QualiPulse</Link>
         <h1 className="auth-title">{t("signup.title")}</h1>
         <p className="auth-subtitle">{t("signup.subtitle")}</p>
@@ -158,6 +155,31 @@ export default function Signup() {
               />
             </div>
           </div>
+
+          <label className="field-label">{t("onboarding.languageLabel")}</label>
+          <div role="group" aria-label={t("onboarding.languageLabel")} style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+            {[
+              { code: "en", label: "English" },
+              { code: "fr", label: "Français" },
+            ].map((opt) => {
+              const active = (i18n.language || "en").toLowerCase().startsWith(opt.code);
+              return (
+                <button
+                  key={opt.code}
+                  type="button"
+                  onClick={() => i18n.changeLanguage(opt.code)}
+                  aria-pressed={active}
+                  className={`onboarding-chip ${active ? "selected" : ""}`}
+                  style={{ flex: 1 }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, marginBottom: 12 }}>
+            {t("onboarding.languageHint")}
+          </p>
 
           <label className="field-label" htmlFor="signup-company">{t("signup.companyNameLabel")}</label>
           <input
