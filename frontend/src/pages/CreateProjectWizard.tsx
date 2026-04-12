@@ -150,7 +150,7 @@ export default function CreateProjectWizard() {
     if (!showTemplatePicker) return;
     if (templates.length > 0) return;
     setTemplatesLoading(true);
-    listTemplates()
+    listTemplates(i18n.language)
       .then((list) => setTemplates(list))
       .catch(() => {
         // Fall through silently — user can still start from scratch
@@ -163,7 +163,7 @@ export default function CreateProjectWizard() {
     setApplyingTemplateId(templateId);
     setError("");
     try {
-      const tpl = await getTemplate(templateId);
+      const tpl = await getTemplate(templateId, i18n.language);
       // Pre-fill wizard state from template
       setName(tpl.name);
       setObjective(tpl.research_objective);

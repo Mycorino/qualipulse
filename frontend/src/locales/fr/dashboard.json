@@ -29,6 +29,8 @@
     "step3Desc": "Une fois les réponses reçues, déclenchez une analyse IA pour obtenir des thèmes, des citations et des recommandations."
   },
   "projectCard": {
+    "questions": "{{count}} questions",
+    "questions_one": "{{count}} question",
     "completed": "{{count}} complété(s)",
     "inProgress": "{{count}} en cours",
     "noResponses": "Aucune réponse pour l'instant",

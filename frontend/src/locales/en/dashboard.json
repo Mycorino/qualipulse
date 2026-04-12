@@ -29,6 +29,8 @@
     "step3Desc": "Once you have responses, trigger an AI analysis to get themes, quotes, and recommendations."
   },
   "projectCard": {
+    "questions": "{{count}} questions",
+    "questions_one": "{{count}} question",
     "completed": "{{count}} completed",
     "inProgress": "{{count}} in progress",
     "noResponses": "No responses yet",

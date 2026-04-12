@@ -634,6 +634,61 @@ def send_team_invite(
     )
 
 
+def send_personalized_welcome(
+    to: str,
+    name: str,
+    *,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    company_name: str | None = None,
+    role_title: str | None = None,
+    occupation_description: str | None = None,
+    industry: str | None = None,
+    selected_use_cases: list[str] | None = None,
+    lang: str = "en",
+) -> bool:
+    """Send a Claude-generated personalised welcome email after onboarding.
+
+    Falls back to the generic ``send_welcome`` if generation fails so the
+    user always receives *something*.
+    """
+    lang = _normalise_lang(lang)
+    try:
+        from app.services.welcome_email_generator import generate_personalized_welcome
+
+        body_html = generate_personalized_welcome(
+            first_name=first_name,
+            last_name=last_name,
+            company_name=company_name,
+            role_title=role_title,
+            occupation_description=occupation_description,
+            industry=industry,
+            selected_use_cases=selected_use_cases,
+            language=lang,
+        )
+        if not body_html:
+            raise ValueError("Generator returned empty body")
+    except Exception as exc:
+        logger.warning(
+            "Personalized welcome generation failed for %s, falling back: %s",
+            to,
+            exc,
+        )
+        return send_welcome(to, name, lang=lang)
+
+    subject_map = {
+        "en": "Your research brief is ready",
+        "fr": "Votre brief recherche est pr\u00eat",
+    }
+    subject = subject_map.get(lang, subject_map["en"])
+
+    return send_email(
+        to=to,
+        subject=subject,
+        body_html=_wrap_email(body_html, lang),
+    )
+
+
 def send_newsletter_welcome(to: str, lang: str = "en") -> bool:
     lang = _normalise_lang(lang)
     content = f"""

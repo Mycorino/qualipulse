@@ -135,7 +135,47 @@
     "recommended": "Recommandé",
     "enterprise": "Vous gérez un programme de recherche important ?",
     "enterpriseCta": "Parlons Enterprise",
-    "perMonth": "/mois"
+    "perMonth": "/mois",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "desc": "Pour les chercheurs individuels qui débutent",
+        "features": [
+          "1 projet",
+          "10 participants par projet",
+          "Générateur de guide d'entretien IA",
+          "Analyse IA des thèmes et citations",
+          "2 liens d'entretien par projet"
+        ],
+        "cta": "Essai gratuit de 14 jours"
+      },
+      "team": {
+        "name": "Team",
+        "desc": "Pour les équipes recherche internes menant des études régulières",
+        "features": [
+          "5 projets",
+          "50 participants par projet",
+          "Mémo de synthèse IA complet",
+          "Segments démographiques et heatmaps",
+          "Export CSV",
+          "3 membres d'équipe"
+        ],
+        "cta": "Essai gratuit de 14 jours"
+      },
+      "lab": {
+        "name": "Lab",
+        "desc": "Pour les programmes de recherche et agences",
+        "features": [
+          "Projets illimités",
+          "500 participants par projet",
+          "Tout ce qui est dans Team",
+          "Branding personnalisé sur les entretiens",
+          "10 membres d'équipe",
+          "Support prioritaire"
+        ],
+        "cta": "Essai gratuit de 14 jours"
+      }
+    }
   },
   "finalCta": {
     "title": "Votre prochaine étude pourrait être prête vendredi",

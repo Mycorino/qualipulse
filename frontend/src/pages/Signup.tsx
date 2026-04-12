@@ -5,7 +5,7 @@ import { signup } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import { useToast } from "../components/Toast";
-import LanguageSwitcher from "../components/LanguageSwitcher";
+
 
 function getPasswordStrength(pw: string, t: (key: string) => string): { label: string; color: string; width: string } {
   if (pw.length === 0) return { label: "", color: "", width: "0%" };
@@ -23,7 +23,9 @@ function getPasswordStrength(pw: string, t: (key: string) => string): { label: s
 
 export default function Signup() {
   const { t, i18n } = useTranslation("auth");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,10 +45,21 @@ export default function Signup() {
     e.preventDefault();
     setError("");
 
-    const trimmedName = name.trim();
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    const trimmedCompany = companyName.trim();
     const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedName) {
-      setError(t("signup.errors.nameRequired"));
+
+    if (!trimmedFirst) {
+      setError(t("signup.errors.firstNameRequired"));
+      return;
+    }
+    if (!trimmedLast) {
+      setError(t("signup.errors.lastNameRequired"));
+      return;
+    }
+    if (!trimmedCompany) {
+      setError(t("signup.errors.companyNameRequired"));
       return;
     }
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(trimmedEmail)) {
@@ -65,10 +78,12 @@ export default function Signup() {
     setLoading(true);
     try {
       const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
-      const res = await signup(trimmedName, trimmedEmail, password, {
+      const res = await signup(trimmedCompany, trimmedEmail, password, {
         plan: selectedPlan,
         refCode,
         preferredLanguage: uiLang,
+        firstName: trimmedFirst,
+        lastName: trimmedLast,
       });
       saveToken(res.access_token, res.refresh_token);
       setCachedOnboarded(false);
@@ -97,10 +112,7 @@ export default function Signup() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-          <LanguageSwitcher />
-        </div>
-        <div className="auth-logo">QualiPulse</div>
+        <Link to="/" className="auth-logo" style={{ textDecoration: "none", color: "inherit" }}>QualiPulse</Link>
         <h1 className="auth-title">{t("signup.title")}</h1>
         <p className="auth-subtitle">{t("signup.subtitle")}</p>
 
@@ -114,17 +126,71 @@ export default function Signup() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label" htmlFor="signup-name">{t("signup.nameLabel")}</label>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label className="field-label" htmlFor="signup-first-name">{t("signup.firstNameLabel")}</label>
+              <input
+                id="signup-first-name"
+                type="text"
+                className="field-input"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder={t("signup.firstNamePlaceholder")}
+                required
+                autoFocus
+                autoComplete="given-name"
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="field-label" htmlFor="signup-last-name">{t("signup.lastNameLabel")}</label>
+              <input
+                id="signup-last-name"
+                type="text"
+                className="field-input"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder={t("signup.lastNamePlaceholder")}
+                required
+                autoComplete="family-name"
+              />
+            </div>
+          </div>
+
+          <label className="field-label">{t("onboarding.languageLabel")}</label>
+          <div role="group" aria-label={t("onboarding.languageLabel")} style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+            {[
+              { code: "en", label: "English" },
+              { code: "fr", label: "Français" },
+            ].map((opt) => {
+              const active = (i18n.language || "en").toLowerCase().startsWith(opt.code);
+              return (
+                <button
+                  key={opt.code}
+                  type="button"
+                  onClick={() => i18n.changeLanguage(opt.code)}
+                  aria-pressed={active}
+                  className={`onboarding-chip ${active ? "selected" : ""}`}
+                  style={{ flex: 1 }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, marginBottom: 12 }}>
+            {t("onboarding.languageHint")}
+          </p>
+
+          <label className="field-label" htmlFor="signup-company">{t("signup.companyNameLabel")}</label>
           <input
-            id="signup-name"
+            id="signup-company"
             type="text"
             className="field-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("signup.namePlaceholder")}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder={t("signup.companyNamePlaceholder")}
             required
-            autoFocus
-            autoComplete="name"
+            autoComplete="organization"
           />
 
           <label className="field-label" htmlFor="signup-email">{t("signup.emailLabel")}</label>
@@ -168,7 +234,8 @@ export default function Signup() {
                 fontSize: "13px",
                 padding: "4px",
               }}
-              tabIndex={-1}
+              tabIndex={0}
+              aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
             >
               {showPassword ? t("login.hidePassword") : t("login.showPassword")}
             </button>

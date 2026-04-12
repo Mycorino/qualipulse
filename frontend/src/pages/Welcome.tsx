@@ -7,50 +7,69 @@ import {
   saveOnboardingProfile,
   resendVerification,
   analyseWebsite,
+  classifyRole,
+  generateRecap,
 } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 
-const TEAM_SIZE_VALUES = ["Just me", "2–10", "11–50", "50+"];
-const ROLE_VALUES = ["Researcher", "Product Manager", "Marketer", "Consultant", "Academic", "Founder", "Other"];
-const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Other"];
-// Experience is now inline on Step 2 (not a dedicated step) — kept as a
-// constant here so we don't duplicate the stable order between component
-// and locale arrays.
-const EXPERIENCE_VALUES = ["new", "some", "professional"] as const;
+// ── Lightweight markdown renderer (bold + bullets + paragraphs) ──
 
-// Country-level values for the "Primary market" select. Keep in the same
-// order as the `regions` i18n array so labels line up by index. ISO 3166-1
-// alpha-2 codes where possible; "europe", "global", "other" are our own
-// catch-all buckets.
+function renderLightMarkdown(text: string): React.ReactNode[] {
+  const paragraphs = text.split(/\n{2,}/);
+  return paragraphs.map((para, pi) => {
+    const lines = para.split("\n");
+    const isBulletBlock = lines.every((l) => l.startsWith("- ") || l.trim() === "");
+    if (isBulletBlock) {
+      const items = lines.filter((l) => l.startsWith("- ")).map((l) => l.slice(2));
+      return (
+        <ul key={pi} style={{ paddingLeft: 20, margin: "12px 0", listStyleType: "disc" }}>
+          {items.map((item, li) => (
+            <li key={li} style={{ marginBottom: 6, lineHeight: 1.7 }}>{renderInline(item)}</li>
+          ))}
+        </ul>
+      );
+    }
+    return (
+      <p key={pi} style={{ margin: "10px 0", lineHeight: 1.7 }}>{renderInline(para.replace(/\n/g, " "))}</p>
+    );
+  });
+}
+
+function renderInline(text: string): React.ReactNode[] {
+  // Split on **bold** markers
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Other"];
+
 const REGION_VALUES = [
   "fr", "be", "ch", "de", "uk", "es", "it", "nl", "pt",
   "europe", "us", "ca", "global", "other",
 ];
 
-// Qualification selects on Step 4. Keys are stable identifiers sent to the
-// backend; labels come from the i18n files.
-const INTERVIEWS_TARGET_VALUES = ["0-5", "5-20", "20-50", "50+"];
-const CURRENT_TOOL_VALUES = [
-  "nothing",
-  "diy_interviews",
-  "dovetail",
-  "usertesting",
-  "userinterviews",
-  "respondent",
-  "other",
-];
-const DECISION_ROLE_VALUES = ["buyer", "influencer", "user", "evaluator"];
+const EXPERIENCE_VALUES = ["new", "some", "professional"] as const;
 
-// Number of "reading your site / understanding your business / …" messages
-// shown while the website analyser is running. Must stay in sync with the
-// number of keys under `onboarding.websiteProgress.*` in the locale files.
+// Number of "reading your site / understanding your business / ..." messages
 const WEBSITE_PROGRESS_STEP_COUNT = 8;
 
-// Field names used for per-field inline errors. Keeps the state object
-// typed — see `fieldErrors` below.
-type FieldErrors = Partial<Record<"role" | "companySize" | "interviewsTarget" | "decisionRole", string>>;
+// ── Reusable loading carousel ──
+
+function LoadingCarousel({ messages, interval = 2500 }: { messages: string[]; interval?: number }) {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setIndex(i => (i + 1) % messages.length), interval);
+    return () => clearInterval(timer);
+  }, [messages, interval]);
+  return <p className="loading-carousel">{messages[index]}</p>;
+}
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -59,73 +78,59 @@ export default function Welcome() {
   const [me, setMe] = useState<CompanyResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // Global "something blew up on save" banner. Field-level validation now
-  // uses the per-field `fieldErrors` state instead of this.
   const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Step 2 — Profile (now also holds research_experience — we folded the
-  // old dedicated Step 4 into this one to cut the flow from 6 steps to 5).
-  const [companyName, setCompanyName] = useState("");
-  const [companySize, setCompanySize] = useState("");
-  const [role, setRole] = useState("");
+  // Step 2 — About you
+  const [roleTitle, setRoleTitle] = useState("");
+  const [occupationDescription, setOccupationDescription] = useState("");
   const [researchExperience, setResearchExperience] = useState<string>("");
 
-  // Step 3 — Business
+  // Step 3 — Your company
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [websiteLoading, setWebsiteLoading] = useState(false);
-  // Index of the cycling progress message shown while websiteLoading is true
-  // ("Reading your site…" → "Understanding your business…" → …).
   const [websiteProgressStep, setWebsiteProgressStep] = useState(0);
   const [businessSummary, setBusinessSummary] = useState("");
   const [industry, setIndustry] = useState("");
   const [primaryRegion, setPrimaryRegion] = useState("");
-  // URL we successfully analysed (so we can show a "regenerate" button if
-  // the user changes the URL after a successful analysis).
   const [analysedUrl, setAnalysedUrl] = useState("");
-  // URL we last *attempted* to analyse — including failures. Used to skip
-  // the auto-trigger debounce when the user re-types the same broken URL.
   const lastAttemptedUrlRef = useRef<string>("");
-  // Extra industry chips Claude classified into that weren't in the static
-  // list — rendered alongside the predefined chips.
   const [customIndustries, setCustomIndustries] = useState<string[]>([]);
-  // User can tap "no website, describe manually" to force the textarea open
-  // without going through the analyser.
   const [manualMode, setManualMode] = useState(false);
-  // Debounce auto-analyse so we don't fire on every keystroke.
   const analyseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Use cases
+  const [useCases, setUseCases] = useState<string[]>([]);
+  const [useCasesLoading, setUseCasesLoading] = useState(false);
+  const [useCasesFetched, setUseCasesFetched] = useState(false);
+  const [newUseCaseInput, setNewUseCaseInput] = useState("");
+  const [goalsFreeform, setGoalsFreeform] = useState("");
 
-  // Step 4 — Goals + qualification
-  const [goalsFreeform, setGoalsFreeform] = useState<string>("");
-  const [interviewsTarget, setInterviewsTarget] = useState("");
-  const [currentTool, setCurrentTool] = useState("");
-  const [decisionRole, setDecisionRole] = useState("");
+  // Step 4 — Brief
+  const [recap, setRecap] = useState("");
+  const [recapLoading, setRecapLoading] = useState(false);
+  const [recapError, setRecapError] = useState(false);
+  const [recapEditing, setRecapEditing] = useState(false);
 
-  // Translated option arrays (re-read on language change)
-  const teamSizeLabels = t("onboarding.teamSizes", { returnObjects: true }) as string[];
-  const roleLabels = t("onboarding.roles", { returnObjects: true }) as string[];
+  // Translated option arrays
   const industryLabels = t("onboarding.industries", { returnObjects: true }) as string[];
   const regionLabels = t("onboarding.regions", { returnObjects: true }) as string[];
-  const interviewsTargetLabels = t("onboarding.interviewsTargetOptions", { returnObjects: true }) as string[];
-  const currentToolLabels = t("onboarding.currentToolOptions", { returnObjects: true }) as string[];
-  const decisionRoleLabels = t("onboarding.decisionRoleOptions", { returnObjects: true }) as string[];
 
-  // Step labels — 5 steps now (Experience was folded into Profile).
+  // Step labels — 4 steps
   const STEP_LABELS = [
-    t("onboarding.stepVerify"),
-    t("onboarding.stepProfile"),
-    t("onboarding.stepBusiness"),
-    t("onboarding.stepGoals"),
-    t("onboarding.stepReady"),
+    t("onboarding.steps.verify"),
+    t("onboarding.steps.aboutYou"),
+    t("onboarding.steps.yourCompany"),
+    t("onboarding.steps.yourBrief"),
   ];
 
-  // Experience chip copy (now inline on Step 2)
-  const EXPERIENCE_OPTIONS = [
-    { emoji: "🌱", title: t("onboarding.expTitle_new"), subtitle: t("onboarding.expSub_new"), value: "new" as const },
-    { emoji: "📊", title: t("onboarding.expTitle_some"), subtitle: t("onboarding.expSub_some"), value: "some" as const },
-    { emoji: "🎓", title: t("onboarding.expTitle_professional"), subtitle: t("onboarding.expSub_professional"), value: "professional" as const },
+  const experienceOptions = [
+    { label: t("onboarding.experienceFirst"), value: "new" as const },
+    { label: t("onboarding.experienceSome"), value: "some" as const },
+    { label: t("onboarding.experienceRegular"), value: "professional" as const },
   ];
+
+  const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
+  const companyName = me?.name ?? "";
 
   // Auto-poll for email verification
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -134,7 +139,6 @@ export default function Welcome() {
     getMe()
       .then((data) => {
         setMe(data);
-        setCompanyName(data.name);
         setCachedOnboarded(!!data.onboarding_completed);
         if (data.onboarding_completed) {
           navigate("/dashboard", { replace: true });
@@ -143,6 +147,16 @@ export default function Welcome() {
         if (data.email_verified) {
           setStep(2);
         }
+        // Pre-fill from existing data
+        if (data.role) setRoleTitle(data.role);
+        if (data.occupation_description) setOccupationDescription(data.occupation_description);
+        if (data.research_experience) setResearchExperience(data.research_experience);
+        if (data.website_url) setWebsiteUrl(data.website_url);
+        if (data.business_summary) setBusinessSummary(data.business_summary);
+        if (data.industry) setIndustry(data.industry);
+        if (data.primary_region) setPrimaryRegion(data.primary_region);
+        if (data.selected_use_cases) setUseCases(data.selected_use_cases);
+        if (data.goals_freeform) setGoalsFreeform(data.goals_freeform);
         setLoading(false);
       })
       .catch(() => {
@@ -204,29 +218,18 @@ export default function Welcome() {
     }
   }
 
-  // Step 2 → 3
-  async function handleProfileContinue() {
-    const errs: FieldErrors = {};
-    if (!role) errs.role = t("onboarding.profileRoleRequired");
-    if (!companySize) errs.companySize = t("onboarding.profileTeamRequired");
-    if (Object.keys(errs).length > 0) {
-      setFieldErrors(errs);
-      return;
-    }
-    setFieldErrors({});
+  // Step 2 -> 3
+  async function handleAboutYouContinue() {
+    if (!roleTitle.trim() || !researchExperience) return;
     setSaving(true);
     setError("");
     try {
-      // Normalise the live UI locale into a 2-letter code we persist as the
-      // account's preferred_language. This is what the AI research wizard
-      // and email service will read for every future generation.
-      const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
+      const langCode = uiLang;
       await saveOnboardingProfile({
-        name: companyName.trim() || undefined,
-        company_size: companySize || undefined,
-        role: role || undefined,
-        preferred_language: uiLang,
-        research_experience: researchExperience || undefined,
+        role: roleTitle.trim(),
+        occupation_description: occupationDescription.trim() || undefined,
+        research_experience: researchExperience,
+        preferred_language: langCode,
       });
       setStep(3);
     } catch (err: unknown) {
@@ -236,11 +239,10 @@ export default function Welcome() {
     }
   }
 
-  // Step 3 — Analyse website with AI
+  // Step 3 — Analyse website
   async function handleAnalyseWebsite() {
     const trimmed = websiteUrl.trim();
     if (!trimmed) return;
-    // Cancel any pending debounced call so we don't double-fire.
     if (analyseTimeoutRef.current) {
       clearTimeout(analyseTimeoutRef.current);
       analyseTimeoutRef.current = null;
@@ -259,17 +261,12 @@ export default function Welcome() {
       setAnalysedUrl(trimmed);
       setManualMode(false);
 
-      // Auto-select the country chip if Claude identified a primary market.
-      // Only overwrite if we don't already have a user selection so the
-      // user's explicit choice takes precedence on a regenerate.
       if (detectedCountry) {
         if (REGION_VALUES.includes(detectedCountry)) {
           setPrimaryRegion((prev) => prev || detectedCountry);
         }
       }
 
-      // Auto-select the industry chip. If Claude returned a label that
-      // isn't in the predefined list, add it as a custom chip.
       if (detectedIndustry) {
         const known = INDUSTRY_VALUES.some(
           (v) => v.toLowerCase() === detectedIndustry.toLowerCase(),
@@ -290,9 +287,6 @@ export default function Welcome() {
         }
       }
     } catch (err: unknown) {
-      // The backend returns { detail: { code, message } } for scraper
-      // failures — translate the code rather than surfacing the English
-      // fallback message from the server.
       const detail = (err as {
         response?: { data?: { detail?: { code?: string } | string } };
       })?.response?.data?.detail;
@@ -303,8 +297,6 @@ export default function Welcome() {
       } else {
         setError(getErrorMessage(err, t("onboarding.failedWebsite")));
       }
-      // On failure, open the manual textarea so the user has a clear next
-      // step (type it themselves) instead of being stuck on the URL input.
       setManualMode(true);
     } finally {
       setWebsiteLoading(false);
@@ -323,14 +315,14 @@ export default function Welcome() {
     }, 50);
   }
 
-  // Clean up the debounce timer on unmount.
+  // Clean up debounce timer on unmount
   useEffect(() => {
     return () => {
       if (analyseTimeoutRef.current) clearTimeout(analyseTimeoutRef.current);
     };
   }, []);
 
-  // Auto-trigger the website analyser ~900ms after the user stops typing.
+  // Auto-trigger website analyser ~900ms after typing stops
   useEffect(() => {
     if (manualMode) return;
     if (websiteLoading) return;
@@ -352,9 +344,7 @@ export default function Welcome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [websiteUrl, manualMode, websiteLoading]);
 
-  // Walk through 8 progress messages while the analyser runs, cap on the
-  // last one so the user doesn't see the sequence loop and wonder if the
-  // call is stuck.
+  // Website progress step cycling
   useEffect(() => {
     if (!websiteLoading) return;
     setWebsiteProgressStep(0);
@@ -366,11 +356,41 @@ export default function Welcome() {
     return () => clearInterval(id);
   }, [websiteLoading]);
 
-  // Step 3 → 4. Summary review gate removed — the summary is editable
-  // inline and users should not need a separate "Looks right" click to
-  // advance. If they typed a URL and nothing's analysed yet, we trigger
-  // the analyser instead of advancing.
-  async function handleBusinessContinue() {
+  // Fetch use-case suggestions when industry becomes available
+  const classifyTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (!industry) return;
+    if (classifyTriggeredRef.current) return;
+    if (useCasesFetched) return;
+
+    classifyTriggeredRef.current = true;
+    setUseCasesLoading(true);
+    classifyRole({
+      role_title: roleTitle.trim() || undefined,
+      occupation_description: occupationDescription.trim() || undefined,
+      industry,
+      business_summary: businessSummary.trim() || undefined,
+      language: uiLang,
+    })
+      .then((res) => {
+        if (res.suggested_use_cases && res.suggested_use_cases.length > 0) {
+          setUseCases(res.suggested_use_cases);
+        }
+        setUseCasesFetched(true);
+      })
+      .catch(() => {
+        // Fail silently — user can add their own
+        setUseCasesFetched(true);
+      })
+      .finally(() => {
+        setUseCasesLoading(false);
+        classifyTriggeredRef.current = false;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [industry]);
+
+  // Step 3 -> 4
+  async function handleCompanyContinue() {
     const trimmed = websiteUrl.trim();
     if (trimmed && !businessSummary && !manualMode && !websiteLoading) {
       handleAnalyseWebsite();
@@ -385,6 +405,8 @@ export default function Welcome() {
         business_summary: businessSummary.trim() || undefined,
         industry: industry || undefined,
         primary_region: primaryRegion || undefined,
+        selected_use_cases: useCases.length > 0 ? useCases : undefined,
+        goals_freeform: goalsFreeform.trim() || undefined,
       });
       setStep(4);
     } catch (err: unknown) {
@@ -394,29 +416,68 @@ export default function Welcome() {
     }
   }
 
-  // Step 4 → 5 (completes onboarding)
-  async function handleGoalsContinue(skipGoals = false) {
-    // Qualification selects are all optional — but we try to nudge the
-    // user into filling them because they drive sales routing and AI
-    // context. No hard validation here; an incomplete answer is better
-    // than a drop-off.
+  // Step 4 — generate recap on enter
+  useEffect(() => {
+    if (step !== 4) return;
+    setRecapLoading(true);
+    setRecapError(false);
+    generateRecap({
+      first_name: me?.first_name || undefined,
+      last_name: me?.last_name || undefined,
+      company_name: companyName || undefined,
+      role_title: roleTitle.trim() || undefined,
+      occupation_description: occupationDescription.trim() || undefined,
+      research_experience: researchExperience || undefined,
+      industry: industry || undefined,
+      business_summary: businessSummary.trim() || undefined,
+      selected_use_cases: useCases.length > 0 ? useCases : undefined,
+      goals_freeform: goalsFreeform.trim() || undefined,
+      language: uiLang,
+    })
+      .then((res) => {
+        setRecap(res.recap);
+      })
+      .catch(() => {
+        setRecapError(true);
+      })
+      .finally(() => {
+        setRecapLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // Step 4 — Launch workspace
+  async function handleLaunchWorkspace() {
     setSaving(true);
     setError("");
-    setFieldErrors({});
     try {
       await completeOnboarding({
-        goals_freeform: skipGoals ? undefined : (goalsFreeform || "").trim() || undefined,
-        interviews_per_month_target: interviewsTarget || undefined,
-        current_tool: currentTool || undefined,
-        decision_role: decisionRole || undefined,
+        onboarding_recap: recap || undefined,
+        selected_use_cases: useCases.length > 0 ? useCases : undefined,
+        goals_freeform: goalsFreeform.trim() || undefined,
       });
       setCachedOnboarded(true);
-      setStep(5);
+      navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("onboarding.failedSave")));
     } finally {
       setSaving(false);
     }
+  }
+
+  function toggleUseCase(uc: string) {
+    setUseCases((prev) =>
+      prev.includes(uc) ? prev.filter((x) => x !== uc) : [...prev, uc],
+    );
+  }
+
+  function addCustomUseCase() {
+    const trimmed = newUseCaseInput.trim();
+    if (!trimmed) return;
+    if (!useCases.includes(trimmed)) {
+      setUseCases((prev) => [...prev, trimmed]);
+    }
+    setNewUseCaseInput("");
   }
 
   if (loading) {
@@ -430,9 +491,7 @@ export default function Welcome() {
     );
   }
 
-  // Persistent trial ribbon — visible across Steps 1-4 so the user can see
-  // what they're unlocking while they work through onboarding. On Step 5
-  // we show a fancier framed version.
+  // Persistent trial ribbon
   const trialRibbon =
     step < 5 && me?.trial_ends_at ? (
       <div
@@ -459,10 +518,7 @@ export default function Welcome() {
       </div>
     ) : null;
 
-  // Header row — logo left, persistent language toggle right. Language
-  // was buried inside Step 2 before; moving it up means the flow is
-  // immediately usable in the user's real language without clicking
-  // through a step they can't read.
+  // Header row
   const header = (
     <div
       style={{
@@ -473,41 +529,22 @@ export default function Welcome() {
       }}
     >
       <div className="auth-logo" style={{ margin: 0 }}>QualiPulse</div>
-      <div className="onboarding-header-lang" role="group" aria-label={t("onboarding.languageLabel")}>
-        {[
-          { code: "en", label: "EN" },
-          { code: "fr", label: "FR" },
-        ].map((opt) => {
-          const active = (i18n.language || "en")
-            .toLowerCase()
-            .startsWith(opt.code);
-          return (
-            <button
-              key={opt.code}
-              type="button"
-              onClick={() => i18n.changeLanguage(opt.code)}
-              aria-pressed={active}
-              className={`onboarding-header-lang-btn ${active ? "active" : ""}`}
-              style={{
-                minHeight: 36,
-                minWidth: 44,
-                padding: "6px 12px",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius)",
-                background: active ? "var(--primary)" : "var(--bg-surface)",
-                color: active ? "#fff" : "var(--text-secondary)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                marginLeft: 4,
-              }}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
     </div>
+  );
+
+  // Carousel messages for use-case loading
+  const useCaseCarouselMessages = t("onboarding.useCasesCarousel", { returnObjects: true }) as string[];
+  // Carousel messages for recap loading
+  const recapCarouselMessages = (t("onboarding.briefCarousel", {
+    returnObjects: true,
+    firstName: me?.first_name || "",
+    roleTitle: roleTitle || "",
+    industry: industry || "",
+  }) as string[]).map((msg) =>
+    msg
+      .replace("{{firstName}}", me?.first_name || "")
+      .replace("{{roleTitle}}", roleTitle || "")
+      .replace("{{industry}}", industry || ""),
   );
 
   return (
@@ -515,7 +552,7 @@ export default function Welcome() {
       <div className="welcome-container">
         {header}
 
-        {/* Progress indicator — 5 steps */}
+        {/* Progress indicator — 4 steps */}
         <div className="onboarding-progress" role="group" aria-label={`Step ${step} of ${STEP_LABELS.length}`}>
           {STEP_LABELS.map((label, i) => {
             const s = i + 1;
@@ -569,96 +606,56 @@ export default function Welcome() {
           </div>
         )}
 
-        {/* ── Step 2: About you (now also includes experience) ── */}
+        {/* ── Step 2: About you ── */}
         {step === 2 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">{t("onboarding.profileTitle")}</h1>
-            <p className="welcome-subtitle">{t("onboarding.profileSubtitle")}</p>
+            <h1 className="welcome-title">{t("onboarding.aboutTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.aboutSubtitle")}</p>
 
             <div className="onboarding-form">
               <div className="onboarding-field">
-                <label className="field-label">{t("onboarding.profileCompanyLabel")}</label>
+                <label className="field-label" htmlFor="onb-role">
+                  {t("onboarding.roleTitleLabel", { companyName: companyName || "your company" })}
+                </label>
                 <input
+                  id="onb-role"
                   type="text"
                   className="field-input"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder={t("onboarding.profileCompanyPlaceholder")}
+                  value={roleTitle}
+                  onChange={(e) => setRoleTitle(e.target.value)}
+                  placeholder={t("onboarding.roleTitlePlaceholder")}
+                  disabled={saving}
+                  autoFocus
+                />
+              </div>
+
+              <div className="onboarding-field">
+                <label className="field-label" htmlFor="onb-occupation">
+                  {t("onboarding.occupationLabel")}
+                </label>
+                <textarea
+                  id="onb-occupation"
+                  className="field-input"
+                  value={occupationDescription}
+                  onChange={(e) => setOccupationDescription(e.target.value)}
+                  placeholder={t("onboarding.occupationPlaceholder")}
+                  rows={2}
+                  style={{ resize: "vertical", lineHeight: 1.6 }}
                   disabled={saving}
                 />
               </div>
 
               <div className="onboarding-field">
-                <label className="field-label">
-                  {t("onboarding.profileRoleLabel")} <span style={{ color: "var(--danger)" }}>*</span>
-                </label>
+                <label className="field-label">{t("onboarding.experienceLabel")}</label>
                 <div className="onboarding-chip-grid">
-                  {ROLE_VALUES.map((value, idx) => (
-                    <button
-                      key={value}
-                      className={`onboarding-chip ${role === value ? "selected" : ""}`}
-                      onClick={() => {
-                        setRole(value);
-                        if (fieldErrors.role) setFieldErrors((e) => ({ ...e, role: undefined }));
-                      }}
-                      disabled={saving}
-                    >
-                      {roleLabels[idx] ?? value}
-                    </button>
-                  ))}
-                </div>
-                {fieldErrors.role && (
-                  <div className="field-error" role="alert" style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>
-                    {fieldErrors.role}
-                  </div>
-                )}
-              </div>
-
-              <div className="onboarding-field">
-                <label className="field-label">
-                  {t("onboarding.teamSizeLabel")} <span style={{ color: "var(--danger)" }}>*</span>
-                </label>
-                <div className="onboarding-chip-grid">
-                  {TEAM_SIZE_VALUES.map((value, idx) => (
-                    <button
-                      key={value}
-                      className={`onboarding-chip ${companySize === value ? "selected" : ""}`}
-                      onClick={() => {
-                        setCompanySize(value);
-                        if (fieldErrors.companySize) setFieldErrors((e) => ({ ...e, companySize: undefined }));
-                      }}
-                      disabled={saving}
-                    >
-                      {teamSizeLabels[idx] ?? value}
-                    </button>
-                  ))}
-                </div>
-                {fieldErrors.companySize && (
-                  <div className="field-error" role="alert" style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>
-                    {fieldErrors.companySize}
-                  </div>
-                )}
-              </div>
-
-              {/* Experience — formerly Step 4. Optional, no validation. */}
-              <div className="onboarding-field">
-                <label className="field-label">
-                  {t("onboarding.experienceInlineLabel")}{" "}
-                  <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
-                    {t("onboarding.websiteOptional")}
-                  </span>
-                </label>
-                <div className="onboarding-chip-grid">
-                  {EXPERIENCE_OPTIONS.map((opt) => (
+                  {experienceOptions.map((opt) => (
                     <button
                       key={opt.value}
                       className={`onboarding-chip ${researchExperience === opt.value ? "selected" : ""}`}
                       onClick={() => setResearchExperience(opt.value)}
                       disabled={saving}
-                      title={opt.subtitle}
                     >
-                      <span style={{ marginRight: 4 }}>{opt.emoji}</span>
-                      {opt.title}
+                      {opt.label}
                     </button>
                   ))}
                 </div>
@@ -668,8 +665,8 @@ export default function Welcome() {
             <div className="welcome-actions" style={{ marginTop: 28 }}>
               <button
                 className="btn btn-primary btn-lg"
-                onClick={handleProfileContinue}
-                disabled={saving}
+                onClick={handleAboutYouContinue}
+                disabled={saving || !roleTitle.trim() || !researchExperience}
               >
                 {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
@@ -677,13 +674,14 @@ export default function Welcome() {
           </div>
         )}
 
-        {/* ── Step 3: Your business ── */}
+        {/* ── Step 3: Your company ── */}
         {step === 3 && (
           <div className="onboarding-step">
             <h1 className="welcome-title">{t("onboarding.businessTitle")}</h1>
             <p className="welcome-subtitle">{t("onboarding.businessSubtitle")}</p>
 
             <div className="onboarding-form">
+              {/* Website URL */}
               <div className="onboarding-field">
                 <label className="field-label">
                   {t("onboarding.websiteLabel")}{" "}
@@ -706,9 +704,6 @@ export default function Welcome() {
                   }}
                   disabled={saving || websiteLoading}
                 />
-                {/* Privacy reassurance — addresses the "why do you want my
-                    URL?" drop-off concern. Shown once the user starts
-                    engaging with the input. */}
                 <div
                   style={{
                     fontSize: 12,
@@ -779,10 +774,7 @@ export default function Welcome() {
                 )}
               </div>
 
-              {/* Textarea — drops the 'Looks right' gate. If there's a
-                  draft the user can edit it inline; if they need a new
-                  pass they can click Regenerate. Continue never blocks on
-                  review status anymore. */}
+              {/* Business summary textarea */}
               {(businessSummary || manualMode) && (
                 <div className="onboarding-field">
                   <label className="field-label">
@@ -831,8 +823,7 @@ export default function Welcome() {
                 </div>
               )}
 
-              {/* Industry chips — still here because we auto-detect from
-                  website analysis and changing the chip is a 1-click fix. */}
+              {/* Industry chips */}
               {(businessSummary || manualMode) && (
                 <div className="onboarding-field">
                   <label className="field-label">
@@ -866,9 +857,7 @@ export default function Welcome() {
                 </div>
               )}
 
-              {/* Primary market — moved from 14-chip grid to a native
-                  select. The grid was taking up half the viewport with
-                  options 90% of users would never pick. */}
+              {/* Primary market */}
               {(businessSummary || manualMode) && (
                 <div className="onboarding-field">
                   <label className="field-label">
@@ -893,206 +882,198 @@ export default function Welcome() {
                   </select>
                 </div>
               )}
+
+              {/* Use-case chips */}
+              {(industry || manualMode) && (
+                <div className="onboarding-field">
+                  <label className="field-label">{t("onboarding.useCasesLabel")}</label>
+                  <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
+                    {t("onboarding.useCasesHint")}
+                  </p>
+
+                  {useCasesLoading ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
+                      <span
+                        className="spinner"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          border: "2px solid var(--primary)",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          display: "inline-block",
+                          animation: "spin 0.6s linear infinite",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <LoadingCarousel
+                        messages={Array.isArray(useCaseCarouselMessages) ? useCaseCarouselMessages : ["Analyzing your profile..."]}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="use-case-chips">
+                        {useCases.map((uc) => (
+                          <button
+                            key={uc}
+                            type="button"
+                            className="use-case-chip use-case-chip--selected"
+                            onClick={() => toggleUseCase(uc)}
+                            disabled={saving}
+                          >
+                            {uc}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <input
+                          type="text"
+                          className="field-input add-use-case-input"
+                          value={newUseCaseInput}
+                          onChange={(e) => setNewUseCaseInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCustomUseCase();
+                            }
+                          }}
+                          placeholder={t("onboarding.addUseCasePlaceholder")}
+                          disabled={saving}
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Anything else */}
+              {(industry || manualMode) && (
+                <div className="onboarding-field">
+                  <label className="field-label">
+                    {t("onboarding.anythingElseLabel")}{" "}
+                    <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
+                      {t("onboarding.websiteOptional")}
+                    </span>
+                  </label>
+                  <textarea
+                    className="field-input"
+                    value={goalsFreeform}
+                    onChange={(e) => setGoalsFreeform(e.target.value)}
+                    rows={3}
+                    placeholder={t("onboarding.anythingElsePlaceholder")}
+                    style={{ resize: "vertical", lineHeight: 1.6 }}
+                    disabled={saving}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="welcome-actions" style={{ marginTop: 28 }}>
               <button
                 className="btn btn-primary btn-lg"
-                onClick={handleBusinessContinue}
+                onClick={handleCompanyContinue}
                 disabled={saving || websiteLoading}
               >
                 {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
               <button className="btn btn-ghost" onClick={() => setStep(2)} disabled={saving}>
-                ← {t("onboarding.stepProfile")}
+                ← {t("onboarding.steps.aboutYou")}
               </button>
             </div>
           </div>
         )}
 
-        {/* ── Step 4: Goals + qualification ── */}
+        {/* ── Step 4: Your brief ── */}
         {step === 4 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">{t("onboarding.goalsTitle")}</h1>
-            <p className="welcome-subtitle">{t("onboarding.goalsSubtitle")}</p>
+            <h1 className="welcome-title">{t("onboarding.briefTitle")}</h1>
 
-            <div className="onboarding-form" style={{ marginTop: 24 }}>
-              <div className="onboarding-field">
-                <label className="field-label">{t("onboarding.goalsInlineLabel")}</label>
-                <textarea
-                  className="field-input"
-                  value={goalsFreeform || ""}
-                  onChange={(e) => setGoalsFreeform(e.target.value)}
-                  rows={4}
-                  style={{ minHeight: 100, resize: "vertical", lineHeight: 1.6 }}
-                  placeholder={t("onboarding.goalsPlaceholder")}
-                  disabled={saving}
+            {recapLoading && (
+              <div style={{ padding: "40px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+                <span
+                  className="spinner"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    border: "3px solid var(--primary)",
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                    display: "inline-block",
+                    animation: "spin 0.6s linear infinite",
+                  }}
                 />
-                <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "right", marginTop: 4 }}>
-                  {t("onboarding.goalsCharCount", { count: (goalsFreeform || "").length })}
-                </div>
-              </div>
-
-              {/* Qualification — drives sales routing. Optional, never
-                  blocks advance, but heavily nudged. */}
-              <div className="onboarding-field">
-                <label className="field-label">{t("onboarding.interviewsTargetLabel")}</label>
-                <div className="onboarding-chip-grid">
-                  {INTERVIEWS_TARGET_VALUES.map((value, idx) => (
-                    <button
-                      key={value}
-                      className={`onboarding-chip ${interviewsTarget === value ? "selected" : ""}`}
-                      onClick={() => setInterviewsTarget(value)}
-                      disabled={saving}
-                    >
-                      {interviewsTargetLabels[idx] ?? value}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="onboarding-field">
-                <label className="field-label">{t("onboarding.currentToolLabel")}</label>
-                <select
-                  className="field-input"
-                  value={currentTool}
-                  onChange={(e) => setCurrentTool(e.target.value)}
-                  disabled={saving}
-                  style={{ minHeight: 44 }}
-                >
-                  <option value="">{t("onboarding.currentToolPlaceholder")}</option>
-                  {CURRENT_TOOL_VALUES.map((value, idx) => (
-                    <option key={value} value={value}>
-                      {currentToolLabels[idx] ?? value}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="onboarding-field">
-                <label className="field-label">{t("onboarding.decisionRoleLabel")}</label>
-                <div className="onboarding-chip-grid">
-                  {DECISION_ROLE_VALUES.map((value, idx) => (
-                    <button
-                      key={value}
-                      className={`onboarding-chip ${decisionRole === value ? "selected" : ""}`}
-                      onClick={() => setDecisionRole(value)}
-                      disabled={saving}
-                    >
-                      {decisionRoleLabels[idx] ?? value}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="welcome-actions" style={{ marginTop: 8 }}>
-              <button
-                className="btn btn-primary btn-lg"
-                onClick={() => handleGoalsContinue(false)}
-                disabled={saving}
-              >
-                {saving ? t("onboarding.saving") : t("onboarding.finishSetup")}
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={() => handleGoalsContinue(true)}
-                disabled={saving}
-                style={{ fontSize: 13, color: "var(--text-muted)" }}
-              >
-                {t("onboarding.skipAndFinish")}
-              </button>
-              <button className="btn btn-ghost" onClick={() => setStep(3)} disabled={saving} style={{ fontSize: 13 }}>
-                ← {t("onboarding.stepBusiness")}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 5: Ready ── */}
-        {step === 5 && (
-          <div className="onboarding-step">
-            <div className="onboarding-icon">🎉</div>
-            <h1 className="welcome-title">{t("onboarding.readyTitle")}</h1>
-
-            {me?.trial_ends_at && (
-              <div
-                style={{
-                  background: "var(--primary-subtle, #eef2ff)",
-                  border: "1px solid var(--primary-border, #c7d2fe)",
-                  borderRadius: "var(--radius)",
-                  padding: "12px 16px",
-                  marginBottom: 24,
-                  textAlign: "center",
-                }}
-              >
-                <span style={{ fontWeight: 600, color: "var(--primary)" }}>
-                  {t("onboarding.trialActive")}
-                </span>
-                <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>
-                  {" "}{t("onboarding.trialUntil", {
-                    date: new Date(me.trial_ends_at).toLocaleDateString(i18n.language),
-                  })}
-                </span>
+                <LoadingCarousel
+                  messages={Array.isArray(recapCarouselMessages) && recapCarouselMessages.length > 0
+                    ? recapCarouselMessages
+                    : ["Preparing your brief..."]
+                  }
+                />
               </div>
             )}
 
-            {/* Primary CTA now lands on the dashboard where the seeded
-                demo project is waiting, not on /projects/new. The demo
-                is the single biggest aha-moment we can deliver in the
-                first 60 seconds — sending users to a blank wizard was
-                burying it. */}
-            <p
-              style={{
-                fontSize: 14,
-                color: "var(--text-secondary)",
-                textAlign: "center",
-                marginBottom: 20,
-              }}
-            >
-              {t("onboarding.readyDemoPointer")}
-            </p>
+            {!recapLoading && recapError && (
+              <div className="recap-card" style={{ marginTop: 24 }}>
+                <p style={{ whiteSpace: "pre-line", color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>
+                  {t("onboarding.briefFallback")}
+                </p>
+              </div>
+            )}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-              {([
-                t("onboarding.benefit1"),
-                t("onboarding.benefit2"),
-                t("onboarding.benefit3"),
-              ] as string[]).map((benefit) => (
-                <div key={benefit} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ color: "var(--success, #16a34a)", fontWeight: 700, fontSize: 16 }}>✓</span>
-                  <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>{benefit}</span>
-                </div>
-              ))}
-            </div>
+            {!recapLoading && !recapError && recap && (
+              <div className="recap-card" style={{ marginTop: 24 }}>
+                {recapEditing ? (
+                  <>
+                    <textarea
+                      className="field-input"
+                      value={recap}
+                      onChange={(e) => setRecap(e.target.value)}
+                      rows={8}
+                      style={{ resize: "vertical", lineHeight: 1.7, width: "100%", border: "none", background: "transparent", fontSize: 14 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setRecapEditing(false)}
+                      style={{ fontSize: 13, marginTop: 8 }}
+                    >
+                      {t("onboarding.briefDoneEditing")}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+                      {renderLightMarkdown(recap)}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setRecapEditing(true)}
+                      style={{ fontSize: 13, marginTop: 12, color: "var(--text-muted)" }}
+                    >
+                      {t("onboarding.briefEdit")}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
-            <div className="welcome-actions">
+            <div className="welcome-actions" style={{ marginTop: 32 }}>
               <button
                 className="btn btn-primary btn-lg"
-                onClick={() => navigate("/dashboard")}
+                onClick={handleLaunchWorkspace}
+                disabled={saving || recapLoading}
               >
-                {t("onboarding.exploreDemo")}
+                {saving ? t("onboarding.saving") : t("onboarding.launchWorkspace")}
               </button>
               <button
                 className="btn btn-ghost"
-                onClick={() => navigate("/projects/new")}
+                onClick={() => setStep(3)}
+                disabled={saving}
                 style={{ fontSize: 13 }}
               >
-                {t("onboarding.createFirstProject")}
+                ← {t("onboarding.goBackAdjust")}
               </button>
-              {/* Talk-to-sales escape hatch for enterprise leads who
-                  don't want to self-serve. */}
-              <a
-                className="btn btn-ghost"
-                href="mailto:sales@qualipulse.com?subject=Enterprise%20inquiry"
-                style={{ fontSize: 13, color: "var(--text-muted)", textDecoration: "none" }}
-              >
-                {t("onboarding.talkToSales")}
-              </a>
-            </div>
-
-            <div className="welcome-trust" style={{ marginTop: 16 }}>
-              <span>{t("onboarding.trustNote")}</span>
             </div>
           </div>
         )}
@@ -1101,7 +1082,5 @@ export default function Welcome() {
   );
 }
 
-// Silence unused-variable warning for EXPERIENCE_VALUES — it's kept for
-// parity with backend valid values and docs even though we only iterate
-// `EXPERIENCE_OPTIONS` in the component.
+// Silence unused-variable warning
 void EXPERIENCE_VALUES;

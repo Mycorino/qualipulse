@@ -62,6 +62,7 @@ export interface ProjectResponse {
   target_customer_description?: string | null;
   welcome_message?: string;
   panel_collection_enabled?: boolean;
+  is_demo?: boolean;
   created_at: string;
   questions: QuestionResponse[];
   screening_questions: ScreeningQuestionResponse[];
