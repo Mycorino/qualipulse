@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import client from "../api/client";
-import LanguageSwitcher from "../components/LanguageSwitcher";
+
 import { updateSlackWebhook, testSlackWebhook } from "../api/auth";
 import {
   listTeamMembers,
@@ -269,7 +269,6 @@ export default function AccountSettings() {
           <p className="dashboard-subtitle">{me?.email}</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <LanguageSwitcher />
           <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}>← {t("common:dashboard")}</button>
         </div>
       </div>
@@ -316,6 +315,31 @@ export default function AccountSettings() {
               <p style={{ color: "var(--success)", fontSize: 14, minHeight: 20, visibility: passwordSuccess ? "visible" : "hidden" }}>{t("profile.passwordUpdated")}</p>
               <button className="btn btn-primary" type="submit" style={{ width: "fit-content" }}>{t("profile.updatePassword")}</button>
             </form>
+          </div>
+
+          <div className="settings-card" style={{ marginTop: 20 }}>
+            <h2 className="settings-section-title">{t("profile.languageTitle")}</h2>
+            <p className="muted-text" style={{ marginBottom: 12, fontSize: 13 }}>
+              {t("profile.languageWarning")}
+            </p>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              {(["en", "fr"] as const).map((code) => (
+                <button
+                  key={code}
+                  className={`btn ${i18n.language?.slice(0, 2) === code ? "btn-primary" : "btn-ghost"}`}
+                  style={{ minWidth: 100, minHeight: 44 }}
+                  onClick={async () => {
+                    i18n.changeLanguage(code);
+                    try {
+                      await client.patch("/auth/me", { preferred_language: code });
+                      setMe((prev) => prev ? { ...prev, preferred_language: code } : prev);
+                    } catch { /* best-effort */ }
+                  }}
+                >
+                  {code === "en" ? "English" : "Français"}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

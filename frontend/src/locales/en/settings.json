@@ -20,7 +20,9 @@
     "newPasswordPlaceholder": "At least 8 characters",
     "updatePassword": "Update password",
     "passwordUpdated": "✓ Password updated",
-    "passwordError": "Failed to update password. Check your current password."
+    "passwordError": "Failed to update password. Check your current password.",
+    "languageTitle": "Language",
+    "languageWarning": "Changing language updates menus and new content only. Existing studies, interview guides, and analysis reports will not be retranslated."
   },
   "billing": {
     "currentPlan": "Current plan",
@@ -42,6 +44,7 @@
   "language": {
     "title": "Language",
     "subtitle": "Choose the interface language.",
+    "warning": "Changing language updates menus and new content only. Existing studies, interview guides, and analysis reports will not be retranslated.",
     "en": "English",
     "fr": "Français"
   },
