@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { AnalysisReport, AttributedQuote } from "../api/projects";
 import { Skeleton } from "../components/Skeleton";
 
@@ -12,6 +13,7 @@ interface SharedReportData {
 
 export default function SharedReport() {
   const { token } = useParams<{ token: string }>();
+  const { t } = useTranslation("analysis");
   const [data, setData] = useState<SharedReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,13 +22,13 @@ export default function SharedReport() {
     if (!token) return;
     fetch(`/api/reports/${token}`)
       .then((r) => {
-        if (!r.ok) throw new Error("Report not found or link has been revoked.");
+        if (!r.ok) throw new Error(t("sharedReport.notFound"));
         return r.json();
       })
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, t]);
 
   if (loading) {
     return (
@@ -68,8 +70,8 @@ export default function SharedReport() {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", gap: 12, color: "var(--text-secondary)" }}>
         <div style={{ fontSize: 40 }}>🔒</div>
-        <p style={{ fontWeight: 600, fontSize: 18 }}>Report unavailable</p>
-        <p style={{ fontSize: 14 }}>{error ?? "This link may have been revoked."}</p>
+        <p style={{ fontWeight: 600, fontSize: 18 }}>{t("sharedReport.reportUnavailable")}</p>
+        <p style={{ fontSize: 14 }}>{error ?? t("sharedReport.linkRevoked")}</p>
       </div>
     );
   }
@@ -99,9 +101,9 @@ export default function SharedReport() {
         <div className="shared-report-header-inner">
           <div className="shared-report-brand">QualiPulse</div>
           <div className="shared-report-meta">
-            <span>{data.participant_count} participant{data.participant_count !== 1 ? "s" : ""}</span>
+            <span>{t("sharedReport.participant", { count: data.participant_count })}</span>
             {data.generated_at && (
-              <span>Generated {new Date(data.generated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+              <span>{t("sharedReport.generatedOn", { date: new Date(data.generated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) })}</span>
             )}
           </div>
         </div>
@@ -110,17 +112,17 @@ export default function SharedReport() {
       <main className="shared-report-main">
         {/* Title */}
         <div className="shared-report-title-block">
-          <h1 className="shared-report-title">{data.project_name ?? "Research Report"}</h1>
+          <h1 className="shared-report-title">{data.project_name ?? t("sharedReport.researchReport")}</h1>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-            <span className="badge">{report.participant_count} interviews</span>
+            <span className="badge">{t("sharedReport.interviews", { count: report.participant_count })}</span>
             {report.confidence && (
               <span
                 className="badge"
-                title="Confidence is based on sample size, response depth, and thematic saturation."
-                aria-label={`${report.confidence} confidence — based on sample size, response depth, and thematic saturation`}
+                title={t("sharedReport.confidenceTooltip")}
+                aria-label={`${t("sharedReport.confidence", { level: report.confidence })} — ${t("sharedReport.confidenceTooltip")}`}
                 style={{ cursor: "help" }}
               >
-                {report.confidence} confidence
+                {t("sharedReport.confidence", { level: report.confidence })}
               </span>
             )}
           </div>
@@ -136,7 +138,7 @@ export default function SharedReport() {
         {/* Key Themes */}
         {report.themes?.length > 0 && (
           <section className="shared-report-section">
-            <h2 className="shared-report-section-title">Key Themes</h2>
+            <h2 className="shared-report-section-title">{t("sharedReport.keyThemes")}</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               {report.themes.map((theme, i) => (
                 <div key={i} className="analysis-theme-card">
@@ -159,7 +161,7 @@ export default function SharedReport() {
         {/* Jobs to Be Done */}
         {report.jobs_to_be_done?.length > 0 && (
           <section className="shared-report-section">
-            <h2 className="shared-report-section-title">Jobs to Be Done</h2>
+            <h2 className="shared-report-section-title">{t("sharedReport.jobsToBeDone")}</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {report.jobs_to_be_done.map((j, i) => (
                 <div key={i} style={{ padding: "14px 16px", borderRadius: 8, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}>
@@ -175,12 +177,12 @@ export default function SharedReport() {
         {/* Tensions */}
         {report.tensions?.length > 0 && (
           <section className="shared-report-section">
-            <h2 className="shared-report-section-title">Tensions & Contradictions</h2>
+            <h2 className="shared-report-section-title">{t("sharedReport.tensionsAndContradictions")}</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {report.tensions.map((t, i) => (
+              {report.tensions.map((tn, i) => (
                 <div key={i} style={{ padding: "12px 16px", borderRadius: 8, borderLeft: "3px solid var(--brand-500)", background: "var(--bg-surface)" }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{t.tension}</div>
-                  <div style={{ color: "var(--text-secondary)", fontSize: 14 }}>{t.detail}</div>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{tn.tension}</div>
+                  <div style={{ color: "var(--text-secondary)", fontSize: 14 }}>{tn.detail}</div>
                 </div>
               ))}
             </div>
@@ -190,7 +192,7 @@ export default function SharedReport() {
         {/* Recommendations */}
         {report.recommendations?.length > 0 && (
           <section className="shared-report-section">
-            <h2 className="shared-report-section-title">Recommendations</h2>
+            <h2 className="shared-report-section-title">{t("sharedReport.recommendations")}</h2>
             <ol style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
               {report.recommendations.map((r, i) => (
                 <li key={i} style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>{r}</li>
@@ -201,7 +203,7 @@ export default function SharedReport() {
 
         {/* Footer */}
         <div style={{ textAlign: "center", padding: "32px 0 64px", color: "var(--text-tertiary)", fontSize: 13 }}>
-          Generated by <strong>QualiPulse</strong> · AI-moderated qualitative research
+          {t("sharedReport.generatedBy")} <strong>QualiPulse</strong> · {t("sharedReport.tagline")}
         </div>
       </main>
     </div>

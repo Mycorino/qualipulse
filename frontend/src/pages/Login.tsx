@@ -62,7 +62,7 @@ export default function Login() {
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           <LanguageSwitcher />
         </div>
-        <div className="auth-logo">QualiPulse</div>
+        <Link to="/" className="auth-logo" style={{ textDecoration: "none", color: "inherit" }}>QualiPulse</Link>
         <h1 className="auth-title">{t("login.title")}</h1>
         <p className="auth-subtitle">{t("login.subtitle")}</p>
 

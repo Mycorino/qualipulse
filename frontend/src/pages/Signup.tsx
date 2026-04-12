@@ -100,7 +100,7 @@ export default function Signup() {
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           <LanguageSwitcher />
         </div>
-        <div className="auth-logo">QualiPulse</div>
+        <Link to="/" className="auth-logo" style={{ textDecoration: "none", color: "inherit" }}>QualiPulse</Link>
         <h1 className="auth-title">{t("signup.title")}</h1>
         <p className="auth-subtitle">{t("signup.subtitle")}</p>
 
@@ -168,7 +168,8 @@ export default function Signup() {
                 fontSize: "13px",
                 padding: "4px",
               }}
-              tabIndex={-1}
+              tabIndex={0}
+              aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
             >
               {showPassword ? t("login.hidePassword") : t("login.showPassword")}
             </button>

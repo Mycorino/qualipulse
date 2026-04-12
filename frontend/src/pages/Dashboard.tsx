@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [verificationResent, setVerificationResent] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [seedingDemo, setSeedingDemo] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -133,16 +134,26 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-layout">
-      <header className="dashboard-header" style={{ flexWrap: "wrap" }}>
+      <header className="dashboard-header">
         <span className="logo">QualiPulse</span>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
+        <button
+          className="dashboard-hamburger"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+        >
+          <span className="dashboard-hamburger-bar" />
+          <span className="dashboard-hamburger-bar" />
+          <span className="dashboard-hamburger-bar" />
+        </button>
+        <nav className={`dashboard-nav${menuOpen ? " dashboard-nav--open" : ""}`}>
+          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { setMenuOpen(false); navigate("/account"); }}>
             {t("common:account")}
           </button>
-          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={logout}>
+          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { setMenuOpen(false); logout(); }}>
             {t("common:signOut")}
           </button>
-        </div>
+        </nav>
       </header>
 
       <main className="dashboard-main">
@@ -348,7 +359,7 @@ export default function Dashboard() {
                   <h3 className="project-card-name">{p.name}</h3>
                   <div className="project-card-meta">
                     <span className="badge">{p.language.toUpperCase()}</span>
-                    <span>{p.question_count} questions</span>
+                    <span>{t("projectCard.questions", { count: p.question_count })}</span>
                   </div>
                   <div className="project-card-stats">
                     {p.completed_count > 0 && (

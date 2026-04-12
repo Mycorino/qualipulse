@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
 import {
@@ -63,6 +64,8 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t: tAnalysis } = useTranslation("analysis");
+  const { t: tProject } = useTranslation("project");
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── First-run welcome modal (shown after project creation) ──────────────
@@ -312,9 +315,7 @@ export default function ProjectDetail() {
 
   async function handleTriggerAnalysis() {
     if (analysis?.report) {
-      const ok = window.confirm(
-        "This will replace your current analysis report. The previous version will not be saved.\n\nDownload it first (Export JSON) if you want to keep it. Continue?"
-      );
+      const ok = window.confirm(tAnalysis("regenerateConfirm"));
       if (!ok) return;
     }
     const filters =
@@ -749,6 +750,20 @@ export default function ProjectDetail() {
 
   // ── P6: Memos ──────────────────────────────────────────────────────────────
 
+  function timeAgo(dateStr: string): string {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return date.toLocaleDateString();
+  }
+
   async function handleAddMemo(type: string, linkedKey: string | null) {
     if (!newMemoContent.trim()) return;
     try {
@@ -937,9 +952,12 @@ export default function ProjectDetail() {
             ) : (
               <div>
                 <p style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 13 }}>{m.content}</p>
-                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
                   <button className="btn btn-ghost btn-xs" onClick={() => { setEditingMemoId(m.id); setEditingMemoContent(m.content); }}>Edit</button>
                   <button className="btn btn-ghost btn-xs btn-danger-text" onClick={() => handleDeleteMemo(m.id)}>Delete</button>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: "auto" }}>
+                    {timeAgo(m.updated_at || m.created_at)}
+                  </span>
                 </div>
               </div>
             )}
@@ -1139,6 +1157,32 @@ export default function ProjectDetail() {
       </div>
 
       <main className="detail-main">
+
+        {/* ── Demo project banner ── */}
+        {project.is_demo && (
+          <div style={{
+            background: "var(--brand-50, #eef2ff)",
+            border: "1px solid var(--brand-200, #c7d2fe)",
+            borderRadius: 10,
+            padding: "16px 20px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+          }}>
+            <p style={{ flex: 1, margin: 0, fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
+              {tProject("detail.demoBannerText")}
+            </p>
+            <Link
+              to="/projects/new"
+              className="btn btn-primary btn-sm"
+              style={{ whiteSpace: "nowrap", textDecoration: "none", flexShrink: 0 }}
+            >
+              {tProject("detail.demoBannerCta")}
+            </Link>
+          </div>
+        )}
 
         {/* ══ OVERVIEW ══ */}
         {tab === "overview" && (
@@ -2287,9 +2331,12 @@ export default function ProjectDetail() {
                           ) : (
                             <div>
                               <p style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 13 }}>{m.content}</p>
-                              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                              <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
                                 <button className="btn btn-ghost btn-xs" onClick={() => { setEditingMemoId(m.id); setEditingMemoContent(m.content); }}>Edit</button>
                                 <button className="btn btn-ghost btn-xs btn-danger-text" onClick={() => handleDeleteMemo(m.id)}>Delete</button>
+                                <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: "auto" }}>
+                                  {timeAgo(m.updated_at || m.created_at)}
+                                </span>
                               </div>
                             </div>
                           )}

@@ -14,41 +14,15 @@ export default function LanguageSwitcher({ variant = "light", style }: LanguageS
     i18n.changeLanguage(next);
   }
 
-  const isDark = variant === "dark";
+  const className =
+    variant === "dark" ? "lang-switcher lang-switcher--dark" : "lang-switcher";
 
   return (
     <button
       onClick={toggle}
       aria-label={current === "en" ? "Passer en français" : "Switch to English"}
-      style={{
-        background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)",
-        border: isDark ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(0,0,0,0.15)",
-        borderRadius: "20px",
-        cursor: "pointer",
-        fontSize: "12px",
-        fontWeight: 700,
-        letterSpacing: "0.05em",
-        padding: "0 14px",
-        color: isDark ? "#ffffff" : "#374151",
-        minHeight: "44px",
-        minWidth: "52px",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: "background 0.15s, border-color 0.15s",
-        flexShrink: 0,
-        ...style,
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = isDark
-          ? "rgba(255,255,255,0.22)"
-          : "rgba(0,0,0,0.11)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = isDark
-          ? "rgba(255,255,255,0.12)"
-          : "rgba(0,0,0,0.06)";
-      }}
+      className={className}
+      style={style}
     >
       {next.toUpperCase()}
     </button>

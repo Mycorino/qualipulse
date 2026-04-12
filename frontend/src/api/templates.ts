@@ -35,12 +35,16 @@ export interface ProjectTemplate extends TemplateSummary {
   screening_questions: TemplateScreeningQuestion[];
 }
 
-export async function listTemplates(): Promise<TemplateSummary[]> {
-  const { data } = await client.get<{ templates: TemplateSummary[] }>("/templates");
+export async function listTemplates(lang?: string): Promise<TemplateSummary[]> {
+  const { data } = await client.get<{ templates: TemplateSummary[] }>("/templates", {
+    params: lang ? { lang } : undefined,
+  });
   return data.templates;
 }
 
-export async function getTemplate(id: string): Promise<ProjectTemplate> {
-  const { data } = await client.get<ProjectTemplate>(`/templates/${id}`);
+export async function getTemplate(id: string, lang?: string): Promise<ProjectTemplate> {
+  const { data } = await client.get<ProjectTemplate>(`/templates/${id}`, {
+    params: lang ? { lang } : undefined,
+  });
   return data;
 }

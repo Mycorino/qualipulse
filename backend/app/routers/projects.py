@@ -464,6 +464,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
         panel_collection_enabled=getattr(project, "panel_collection_enabled", True),
         decision_to_inform=getattr(project, "decision_to_inform", None),
         target_customer_description=getattr(project, "target_customer_description", None),
+        is_demo=getattr(project, "is_demo", False),
         created_at=project.created_at,
         questions=questions,
         screening_questions=screening,

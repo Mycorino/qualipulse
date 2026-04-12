@@ -135,7 +135,47 @@
     "recommended": "Recommended",
     "enterprise": "Running a large research program?",
     "enterpriseCta": "Talk to us about Enterprise",
-    "perMonth": "/mo"
+    "perMonth": "/mo",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "desc": "For individual researchers starting out",
+        "features": [
+          "1 project",
+          "10 participants per project",
+          "AI interview guide builder",
+          "AI themes & quotes analysis",
+          "2 interview links per project"
+        ],
+        "cta": "Start 14-day free trial"
+      },
+      "team": {
+        "name": "Team",
+        "desc": "For in-house research teams running regular studies",
+        "features": [
+          "5 projects",
+          "50 participants per project",
+          "Full AI synthesis memo",
+          "Demographic segments & heatmaps",
+          "CSV export",
+          "3 team members"
+        ],
+        "cta": "Start 14-day free trial"
+      },
+      "lab": {
+        "name": "Lab",
+        "desc": "For research programs and agencies",
+        "features": [
+          "Unlimited projects",
+          "500 participants per project",
+          "Everything in Team",
+          "Custom branding on interviews",
+          "10 team members",
+          "Priority support"
+        ],
+        "cta": "Start 14-day free trial"
+      }
+    }
   },
   "finalCta": {
     "title": "Your next research study could be done by Friday",

@@ -4,58 +4,11 @@ import { useTranslation } from "react-i18next";
 import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
-const PLANS = [
-  {
-    id: "starter",
-    name: "Starter",
-    price: "€49",
-    period: "/mo",
-    desc: "For individual researchers starting out",
-    features: [
-      "1 project",
-      "10 participants per project",
-      "AI interview guide builder",
-      "AI themes & quotes analysis",
-      "2 interview links per project",
-    ],
-    cta: "Start 14-day free trial",
-    highlight: false,
-  },
-  {
-    id: "team",
-    name: "Team",
-    price: "€99",
-    period: "/mo",
-    desc: "For in-house research teams running regular studies",
-    features: [
-      "5 projects",
-      "50 participants per project",
-      "Full AI synthesis memo",
-      "Demographic segments & heatmaps",
-      "CSV export",
-      "3 team members",
-    ],
-    cta: "Start 14-day free trial",
-    highlight: true,
-  },
-  {
-    id: "lab",
-    name: "Lab",
-    price: "€199",
-    period: "/mo",
-    desc: "For research programs and agencies",
-    features: [
-      "Unlimited projects",
-      "500 participants per project",
-      "Everything in Team",
-      "Custom branding on interviews",
-      "10 team members",
-      "Priority support",
-    ],
-    cta: "Start 14-day free trial",
-    highlight: false,
-  },
-];
+const PLAN_IDS = [
+  { id: "starter", price: "€49", highlight: false },
+  { id: "team", price: "€99", highlight: true },
+  { id: "lab", price: "€199", highlight: false },
+] as const;
 
 export default function Marketing() {
   const { t } = useTranslation("marketing");
@@ -290,29 +243,32 @@ export default function Marketing() {
         <h2 className="mkt-section-title">{t("pricing.title")}</h2>
         <p className="mkt-section-sub">{t("pricing.subtitle")}</p>
         <div className="mkt-plans">
-          {PLANS.map((p) => (
-            <div key={p.id} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
-              {p.highlight && <div className="mkt-plan-badge">{t("pricing.recommended")}</div>}
-              <div className="mkt-plan-name">{p.name}</div>
-              <div className="mkt-plan-price">
-                {p.price}<span className="mkt-plan-period">{p.period}</span>
+          {PLAN_IDS.map((p) => {
+            const features = t(`pricing.plans.${p.id}.features`, { returnObjects: true }) as string[];
+            return (
+              <div key={p.id} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
+                {p.highlight && <div className="mkt-plan-badge">{t("pricing.recommended")}</div>}
+                <div className="mkt-plan-name">{t(`pricing.plans.${p.id}.name`)}</div>
+                <div className="mkt-plan-price">
+                  {p.price}<span className="mkt-plan-period">{t("pricing.perMonth")}</span>
+                </div>
+                <div className="mkt-plan-desc">{t(`pricing.plans.${p.id}.desc`)}</div>
+                <ul className="mkt-plan-features">
+                  {features.map((f, i) => (
+                    <li key={i}>
+                      <span className="mkt-check">&#10003;</span> {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  to={`/signup?plan=${p.id}`}
+                  className={`btn ${p.highlight ? "btn-primary" : "btn-secondary"} mkt-plan-cta`}
+                >
+                  {t(`pricing.plans.${p.id}.cta`)}
+                </Link>
               </div>
-              <div className="mkt-plan-desc">{p.desc}</div>
-              <ul className="mkt-plan-features">
-                {p.features.map((f) => (
-                  <li key={f}>
-                    <span className="mkt-check">&#10003;</span> {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                to={`/signup?plan=${p.id}`}
-                className={`btn ${p.highlight ? "btn-primary" : "btn-secondary"} mkt-plan-cta`}
-              >
-                {p.cta}
-              </Link>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <p className="mkt-plans-enterprise">
           {t("pricing.enterprise")}{" "}

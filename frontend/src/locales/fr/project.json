@@ -134,7 +134,9 @@
     "backToDashboard": "← Tableau de bord",
     "archiveProject": "Archiver le projet",
     "unarchiveProject": "Restaurer le projet",
-    "archivedBadge": "Archivé"
+    "archivedBadge": "Archivé",
+    "demoBannerText": "Ceci est un projet d'exemple pour vous montrer ce que QualiPulse peut faire. Prêt à lancer votre propre étude ?",
+    "demoBannerCta": "Créer votre premier projet"
   },
   "overview": {
     "totalParticipants": "Participants au total",

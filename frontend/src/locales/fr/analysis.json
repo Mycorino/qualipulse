@@ -52,6 +52,25 @@
     "rowLabel": "Thème",
     "columnLabel": "Segment"
   },
+  "sharedReport": {
+    "reportUnavailable": "Rapport indisponible",
+    "linkRevoked": "Ce lien a peut-être été révoqué.",
+    "notFound": "Rapport introuvable ou lien révoqué.",
+    "researchReport": "Rapport de recherche",
+    "interviews": "{{count}} entretiens",
+    "confidence": "Confiance {{level}}",
+    "confidenceTooltip": "La confiance repose sur la taille de l'échantillon, la profondeur des réponses et la saturation thématique.",
+    "generatedOn": "Généré le {{date}}",
+    "participant": "{{count}} participant",
+    "participant_other": "{{count}} participants",
+    "keyThemes": "Thèmes clés",
+    "jobsToBeDone": "Jobs to Be Done",
+    "tensionsAndContradictions": "Tensions et contradictions",
+    "recommendations": "Recommandations",
+    "generatedBy": "Généré par",
+    "tagline": "Recherche qualitative pilotée par l'IA"
+  },
+  "regenerateConfirm": "Générer une nouvelle analyse ? La version actuelle sera conservée dans l'historique des versions.",
   "memos": {
     "title": "Mémos",
     "addMemo": "+ Ajouter un mémo",

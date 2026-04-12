@@ -80,6 +80,7 @@ class ProjectResponse(BaseModel):
     panel_collection_enabled: bool = True
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
+    is_demo: bool = False
     created_at: datetime
     questions: list[QuestionResponse] = []
     screening_questions: list[ScreeningQuestionResponse] = []
