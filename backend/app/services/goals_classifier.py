@@ -48,13 +48,19 @@ def classify_goals(goals_freeform: str, timeout: float = 10.0) -> str | None:
         return None
 
     bucket_list = "\n".join(f"- {key}: {desc}" for key, desc in GOAL_BUCKETS.items())
+
+    system_msg = (
+        "You classify free-form research goals into predefined buckets. "
+        "Return ONLY a comma-separated list of bucket keys, nothing else. "
+        "No preamble, no explanation, no markdown."
+    )
+
     prompt = f"""A new user of a qualitative research platform wrote this about what they want to learn from their interviews:
 
 "{goals_freeform.strip()}"
 
-Classify this into 1-3 of the following buckets. Return ONLY a comma-separated list of bucket keys, nothing else. No preamble, no explanation, no markdown.
+Classify this into 1-3 of the following buckets:
 
-Available buckets:
 {bucket_list}
 
 Return format: "key1,key2" (1-3 keys, lowercase, comma-separated)"""
@@ -65,6 +71,7 @@ Return format: "key1,key2" (1-3 keys, lowercase, comma-separated)"""
             model="claude-sonnet-4-20250514",
             max_tokens=64,
             temperature=0.3,
+            system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )
         raw = response.content[0].text.strip()

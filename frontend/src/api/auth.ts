@@ -57,7 +57,7 @@ export interface OnboardingProfile {
   industry?: string;
   use_case?: string;
   occupation_description?: string;
-  selected_use_cases?: string[];
+  selected_use_cases?: string;  // comma-separated (backend stores as string)
   onboarding_recap?: string;
   website_url?: string;
   business_summary?: string;

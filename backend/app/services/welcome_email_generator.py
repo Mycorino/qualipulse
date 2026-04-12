@@ -40,20 +40,18 @@ def generate_personalized_welcome(
     language_name = _LANGUAGE_NAMES.get(language, "English")
     use_cases_str = ", ".join(selected_use_cases) if selected_use_cases else "Not specified"
 
-    prompt = (
-        "<system>\n"
+    system_msg = (
         "Write a follow-up email after an onboarding session for QualiPulse, "
         "an AI qualitative interview platform. Write like a consultant, not a "
-        "marketer.\n"
-        "</system>\n\n"
-        "<context>\n"
+        "marketer."
+    )
+
+    prompt = (
         f"Recipient: {first_name or ''} {last_name or ''} "
         f"({role_title or 'Researcher'}) at {company_name or 'their company'}\n"
         f"Focus: {occupation_description or 'Not specified'}\n"
         f"Industry: {industry or 'Not specified'}\n"
-        f"Research interests: {use_cases_str}\n"
-        "</context>\n\n"
-        "<instructions>\n"
+        f"Research interests: {use_cases_str}\n\n"
         f"Write in {language_name}. Structure:\n"
         f"1. Greet {first_name or 'the user'} by name\n"
         "2. One sentence about their role/context\n"
@@ -61,8 +59,7 @@ def generate_personalized_welcome(
         'this week:" -- 3 specific research questions for their occupation\n'
         "4. Point to demo project in dashboard\n"
         '5. Sign off from "The QualiPulse team"\n\n'
-        "Under 150 words. HTML (<p>, <ul>/<li>). No markdown, no emojis.\n"
-        "</instructions>"
+        "Under 150 words. HTML (<p>, <ul>/<li>). No markdown, no emojis."
     )
 
     try:
@@ -74,6 +71,7 @@ def generate_personalized_welcome(
             max_tokens=_MAX_TOKENS,
             temperature=0.7,
             timeout=15.0,
+            system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )
 

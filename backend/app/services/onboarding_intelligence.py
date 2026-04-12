@@ -57,18 +57,16 @@ def classify_role_and_suggest(
 
     language_name = _LANGUAGE_NAMES.get(language, "English")
 
-    prompt = (
-        "<system>\n"
+    system_msg = (
         "You are an expert at understanding professional roles and matching "
-        "them to qualitative research needs.\n"
-        "</system>\n\n"
-        "<context>\n"
+        "them to qualitative research needs."
+    )
+
+    prompt = (
         f"Role title: {role_title or 'Not specified'}\n"
         f"What they focus on: {occupation_description or 'Not specified'}\n"
         f"Industry: {industry or 'Not specified'}\n"
-        f"Company context: {business_summary or 'Not specified'}\n"
-        "</context>\n\n"
-        "<instructions>\n"
+        f"Company context: {business_summary or 'Not specified'}\n\n"
         "Return a JSON object with:\n"
         '1. "canonical_tag": short internal label (e.g. "product_analytics", '
         '"brand_marketing", "ux_research", "hr_operations", "founder", '
@@ -81,8 +79,7 @@ def classify_role_and_suggest(
         f"Write in {language_name}.\n"
         '4. "research_angle": One sentence describing what insights this '
         f"person needs. Write in {language_name}.\n\n"
-        "Return valid JSON only.\n"
-        "</instructions>"
+        "Return valid JSON only."
     )
 
     try:
@@ -94,6 +91,7 @@ def classify_role_and_suggest(
             max_tokens=_MAX_TOKENS,
             temperature=0.3,
             timeout=10.0,
+            system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -159,13 +157,13 @@ def generate_onboarding_recap(
     language_name = _LANGUAGE_NAMES.get(language, "English")
     use_cases_str = ", ".join(selected_use_cases) if selected_use_cases else "Not specified"
 
-    prompt = (
-        "<system>\n"
+    system_msg = (
         "You are a senior research strategist at a top-tier qualitative "
         "research consultancy. Write the opening of a strategy brief after "
-        "an intake meeting.\n"
-        "</system>\n\n"
-        "<context>\n"
+        "an intake meeting."
+    )
+
+    prompt = (
         f"Client: {first_name or ''} {last_name or ''}\n"
         f"Role: {role_title or 'Not specified'}\n"
         f"Day-to-day focus: {occupation_description or 'Not specified'}\n"
@@ -174,9 +172,7 @@ def generate_onboarding_recap(
         f"Research experience: {research_experience or 'Not specified'}\n"
         f"Business context: {business_summary or 'Not specified'}\n"
         f"Research priorities: {use_cases_str}\n"
-        f"Additional notes: {goals_freeform or 'None'}\n"
-        "</context>\n\n"
-        "<instructions>\n"
+        f"Additional notes: {goals_freeform or 'None'}\n\n"
         f"Write a personalized research needs assessment in {language_name}.\n\n"
         "Use the client's ACTUAL OCCUPATION to frame everything -- their own "
         "words about what they do, not a generic title.\n\n"
@@ -190,8 +186,7 @@ def generate_onboarding_recap(
         "3. Closing paragraph about how AI-driven interviews fit their specific workflow.\n\n"
         "Under 180 words. Professional, warm. No exclamation marks, no emojis. "
         "Use **bold** for emphasis and `- ` for bullets. No headers, no code blocks. "
-        f"Write in {language_name}.\n"
-        "</instructions>"
+        f"Write in {language_name}."
     )
 
     try:
@@ -203,6 +198,7 @@ def generate_onboarding_recap(
             max_tokens=_MAX_TOKENS,
             temperature=0.7,
             timeout=15.0,
+            system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )
 

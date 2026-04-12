@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState(false);
   const [seedingDemo, setSeedingDemo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "responses" | "name">("newest");
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -132,6 +133,20 @@ export default function Dashboard() {
     return "∞";
   }
 
+  const sortedProjects = [...projects].sort((a, b) => {
+    switch (sortBy) {
+      case "oldest":
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      case "responses":
+        return (b.completed_count || 0) - (a.completed_count || 0);
+      case "name":
+        return a.name.localeCompare(b.name);
+      case "newest":
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+  });
+
   return (
     <div className="dashboard-layout">
       <header className="dashboard-header">
@@ -164,6 +179,26 @@ export default function Dashboard() {
               <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
                 {t("projectCount", { count: projects.length, max: getProjectMax(me.subscription_tier) })}
               </span>
+            )}
+            {projects.length > 1 && (
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                style={{
+                  fontSize: 13,
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border, #e5e7eb)",
+                  background: "white",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="responses">Most responses</option>
+                <option value="name">Name A–Z</option>
+              </select>
             )}
             <button
               className="btn btn-primary"
@@ -326,7 +361,7 @@ export default function Dashboard() {
             </div>
           )}
           <div className="project-grid">
-            {projects.map((p) => {
+            {sortedProjects.map((p) => {
               // Staleness nudge: a project is "stale" when it has some
               // responses and they stopped coming in more than 14 days ago.
               // This is the gentle kick the researcher needs to remember

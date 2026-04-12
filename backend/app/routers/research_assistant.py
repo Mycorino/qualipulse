@@ -112,17 +112,19 @@ async def parse_brief(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
         temperature=0.3,
+        system=(
+            "You are a senior UX researcher. Read the project brief and "
+            "summarise the key business context in 2-3 sentences. Focus on: what "
+            "the business does, what problem they want to understand, and what "
+            "decision this research will inform. Return ONLY the summary text, "
+            "no headers or labels."
+        ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                "You are a senior UX researcher. Read the following project brief and "
-                "summarise the key business context in 2-3 sentences. Focus on: what "
-                "the business does, what problem they want to understand, and what "
-                "decision this research will inform.\n\n"
                 f"BRIEF:\n{combined}\n\n"
-                f"{lang_directive}\n"
-                "Return ONLY the summary text, no headers or labels."
+                f"{lang_directive}"
             ),
         }],
     )
@@ -160,12 +162,15 @@ def suggest_objective(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
         temperature=0.7,
+        system=(
+            "You are a senior product researcher with expertise in Jobs-to-be-Done "
+            "and qualitative research design. Propose sharp research objectives "
+            "and learning goals from project context."
+        ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                "You are a senior product researcher with expertise in Jobs-to-be-Done "
-                "and qualitative research design.\n\n"
                 "Based on the following project context, propose a sharp research "
                 "objective and exactly 3 secondary learning goals. The objective must be:\n"
                 "- Specific enough to know when it's been answered\n"
@@ -218,12 +223,15 @@ def suggest_scope(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
         temperature=0.5,
+        system=(
+            "You are a senior UX researcher. Given a research objective, "
+            "recommend the ideal study scope including audience, duration, "
+            "and participant count."
+        ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                "You are a senior UX researcher. Given this research objective, recommend "
-                "the ideal study scope.\n\n"
                 f"OBJECTIVE: {objective}\n"
                 f"LEARNING GOALS:\n{goals_str}\n"
                 f"ADDITIONAL CONTEXT: {context or 'none'}\n\n"
@@ -274,12 +282,16 @@ def suggest_questions(
         model="claude-sonnet-4-20250514",
         max_tokens=2048,
         temperature=0.6,
+        system=(
+            "You are a senior qualitative researcher. Design voice interview "
+            "guides following best product research practices. Open-ended "
+            "questions only. Avoid 'why' — prefer 'walk me through', 'tell me "
+            "about', 'what led you to'."
+        ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                "You are a senior qualitative researcher. Design a voice interview guide "
-                "following best product research practices.\n\n"
                 f"RESEARCH OBJECTIVE: {objective}\n"
                 f"LEARNING GOALS:\n{goals_str}\n"
                 f"TARGET AUDIENCE: {audience or 'general users'}\n"
@@ -288,7 +300,6 @@ def suggest_questions(
                 f"{lang_instruction}\n\n"
                 "Rules:\n"
                 "- Open-ended questions only (never yes/no)\n"
-                "- Avoid 'why' — use 'what led you to', 'walk me through', 'tell me about'\n"
                 "- Funnel from broad to specific within each section\n"
                 "- Start with a warm-up section to build rapport\n"
                 "- Each section: 1-2 questions max to stay within time\n"
@@ -417,15 +428,17 @@ def refine_question(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
         temperature=0.6,
+        system=(
+            "You are a senior qualitative researcher helping polish ONE "
+            "question in an interview guide. The rest of the guide is "
+            "shown only as context — you MUST NOT suggest changes to any "
+            "other question. Your entire output is a refined version of "
+            "the single target question."
+        ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                "You are a senior qualitative researcher helping polish ONE "
-                "question in an interview guide. The rest of the guide is "
-                "shown only as context — you MUST NOT suggest changes to any "
-                "other question. Your entire output is a refined version of "
-                "the single target question.\n\n"
                 f"RESEARCH OBJECTIVE: {objective or '(not set)'}\n"
                 f"LEARNING GOALS:\n{goals_str}\n"
                 f"TARGET AUDIENCE: {audience or '(not set)'}\n\n"

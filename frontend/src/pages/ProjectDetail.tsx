@@ -82,7 +82,7 @@ export default function ProjectDetail() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTabRaw] = useState<Tab>("overview");
   const [advancedPromptOpen, setAdvancedPromptOpen] = useState(false);
   const [projects, setProjects] = useState<import("../api/projects").ProjectListItem[]>([]);
 
@@ -202,6 +202,22 @@ export default function ProjectDetail() {
   // ── P8: AI Quality assessment ───────────────────────────────────────────────
   const [qualityAssessment, setQualityAssessment] = useState<import("../api/projects").QualityAssessment | null>(null);
   const [loadingQuality, setLoadingQuality] = useState(false);
+
+  // Guard tab switches when there are unsaved edits in Setup
+  function hasUnsavedSetupEdits(): boolean {
+    return editingScreening || editingQuestionId !== null || editingNoteId !== null || editingInterviewNotes !== null;
+  }
+
+  function setTab(next: Tab) {
+    if (next !== tab && tab === "setup" && hasUnsavedSetupEdits()) {
+      if (!window.confirm("You have unsaved changes in the Setup tab. Discard them?")) return;
+      setEditingScreening(false);
+      setEditingQuestionId(null);
+      setEditingNoteId(null);
+      setEditingInterviewNotes(null);
+    }
+    setTabRaw(next);
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -1251,6 +1267,44 @@ export default function ProjectDetail() {
                 )}
               </div>
             </div>
+            {/* Analysis readiness prompt */}
+            {completedCount >= 3 && (!analysis || (analysis.status === "ready" && analysis.participant_count < completedCount)) && (
+              <div
+                style={{
+                  background: "var(--success-bg, #f0fdf4)",
+                  border: "1px solid var(--success-border, #bbf7d0)",
+                  borderRadius: 10,
+                  padding: "14px 18px",
+                  marginBottom: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span style={{ fontSize: 20 }}>✦</span>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text-primary)" }}>
+                    {!analysis
+                      ? `${completedCount} interviews completed — ready for AI analysis`
+                      : `${completedCount - (analysis.participant_count || 0)} new interview${completedCount - (analysis.participant_count || 0) !== 1 ? "s" : ""} since last analysis`}
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
+                    {!analysis
+                      ? "Generate themes, insights, and recommendations from your data."
+                      : "Refresh to include the latest responses in your analysis."}
+                  </div>
+                </div>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setTab("analysis")}
+                  style={{ flexShrink: 0 }}
+                >
+                  {!analysis ? "Generate insights →" : "Refresh analysis →"}
+                </button>
+              </div>
+            )}
+
             {/* Research Objective — inline edit */}
             <section className="detail-section">
               <div className="section-header-row">
