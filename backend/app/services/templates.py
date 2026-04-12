@@ -451,12 +451,12 @@ def match_templates_for_company(
 
     def _reason_goal(labels: list[str]) -> str:
         if code == "fr":
-            return f"Correspond à votre objectif : {', '.join(labels)}"
+            return f"Aligné sur votre priorité : {', '.join(labels)}"
         return f"Matches your goal: {', '.join(labels)}"
 
     def _reason_stage(stage_label: str) -> str:
         if code == "fr":
-            return f"Adapté aux équipes en phase {stage_label}"
+            return f"Adapté à la phase {stage_label}"
         return f"Right for {stage_label}-stage teams"
 
     scored: list[tuple[ProjectTemplate, int, list[str]]] = []

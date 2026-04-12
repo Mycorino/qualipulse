@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import LanguageSwitcher from "../components/LanguageSwitcher";
+
 import {
   getInterviewInfo,
   getScreeningQuestions,

@@ -11,7 +11,7 @@ import {
 } from "../api/projects";
 import { getMe, resendVerification } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
-import LanguageSwitcher from "../components/LanguageSwitcher";
+
 import DashboardInsights from "../components/DashboardInsights";
 
 export default function Dashboard() {
@@ -136,7 +136,6 @@ export default function Dashboard() {
       <header className="dashboard-header" style={{ flexWrap: "wrap" }}>
         <span className="logo">QualiPulse</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <LanguageSwitcher variant="light" />
           <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
             {t("common:account")}
           </button>
@@ -151,7 +150,7 @@ export default function Dashboard() {
           <h1 style={{ fontSize: "inherit", fontWeight: "inherit", margin: 0 }}>{t("title")}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {!loading && me && (
-              <span style={{ fontSize: 13, color: "var(--muted, #6b7280)" }}>
+              <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
                 {t("projectCount", { count: projects.length, max: getProjectMax(me.subscription_tier) })}
               </span>
             )}
@@ -382,7 +381,7 @@ export default function Dashboard() {
                       style={{
                         margin: "8px 0 0",
                         fontSize: 12,
-                        color: "var(--accent, #4338ca)",
+                        color: "var(--primary)",
                         fontWeight: 500,
                       }}
                     >
@@ -398,7 +397,7 @@ export default function Dashboard() {
                       style={{
                         margin: "8px 0 0",
                         fontSize: 12,
-                        color: "var(--muted, #6b7280)",
+                        color: "var(--text-tertiary)",
                       }}
                     >
                       {t("projectCard.nudgeStale", {

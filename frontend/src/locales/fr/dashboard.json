@@ -49,15 +49,15 @@
   },
   "insights": {
     "priorityTitle": "Sur quoi vous concentrez-vous en ce moment ?",
-    "priorityUpdatedAgo": "Mis à jour il y a {{count}} jour",
-    "priorityUpdatedAgo_other": "Mis à jour il y a {{count}} jours",
+    "priorityUpdatedAgo": "Actualisé il y a {{count}} jour",
+    "priorityUpdatedAgo_other": "Actualisé il y a {{count}} jours",
     "priorityPlaceholder": "ex. Comprendre pourquoi les power users arrêtent de monter en gamme après 6 mois",
     "priorityHint": "Une phrase courte pour qu'on vous suggère la recherche qui fait bouger l'aiguille.",
     "prioritySave": "Enregistrer",
     "priorityEdit": "Mettre à jour",
-    "recsTitlePersonalised": "Études adaptées à votre entreprise",
+    "recsTitlePersonalised": "Études qui correspondent à vos enjeux",
     "recsTitleGeneric": "Points de départ populaires",
-    "recsSubtitle": "Basé sur ce que vous nous avez dit à l'inscription",
-    "recsEmpty": "Nous recommanderons des études ici dès que votre profil sera configuré."
+    "recsSubtitle": "Selon votre profil et vos priorités",
+    "recsEmpty": "Nous recommanderons des modèles dès que votre profil sera renseigné dans Paramètres."
   }
 }

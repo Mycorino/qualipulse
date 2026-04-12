@@ -20,7 +20,9 @@
     "newPasswordPlaceholder": "Au moins 8 caractères",
     "updatePassword": "Mettre à jour le mot de passe",
     "passwordUpdated": "✓ Mot de passe mis à jour",
-    "passwordError": "Échec de la mise à jour. Vérifiez votre mot de passe actuel."
+    "passwordError": "Échec de la mise à jour. Vérifiez votre mot de passe actuel.",
+    "languageTitle": "Langue",
+    "languageWarning": "Seuls les menus et les nouveaux contenus seront traduits. Vos études existantes, guides d'entretien et rapports d'analyse ne seront pas retraduits."
   },
   "billing": {
     "currentPlan": "Plan actuel",
@@ -42,6 +44,7 @@
   "language": {
     "title": "Langue",
     "subtitle": "Choisissez la langue de l'interface.",
+    "warning": "Seuls les menus et les nouveaux contenus seront traduits. Vos études existantes, guides d'entretien et rapports d'analyse ne seront pas retraduits.",
     "en": "English",
     "fr": "Français"
   },

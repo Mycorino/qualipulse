@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
-import LanguageSwitcher from "../components/LanguageSwitcher";
+
 import { useAuth } from "../hooks/useAuth";
 import { getMe } from "../api/auth";
 import { createProject, updateProject, getProject, createLink } from "../api/projects";
@@ -610,7 +610,7 @@ export default function CreateProjectWizard() {
               flexWrap: "wrap",
             }}
           >
-            <LanguageSwitcher variant="light" />
+
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => navigate("/account")}
@@ -736,7 +736,6 @@ export default function CreateProjectWizard() {
             flexWrap: "wrap",
           }}
         >
-          <LanguageSwitcher variant="light" />
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => navigate("/account")}
