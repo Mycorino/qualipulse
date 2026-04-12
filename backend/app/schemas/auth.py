@@ -16,6 +16,9 @@ class SignupRequest(BaseModel):
     # UI locale at signup time — used to pick the language of the welcome
     # and verification emails. Stored on the company record.
     preferred_language: Optional[str] = None
+    # Personal identity (onboarding redesign)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -71,6 +74,13 @@ class OnboardingProfileRequest(BaseModel):
     current_tool: Optional[str] = None
     decision_role: Optional[str] = None
 
+    # Onboarding redesign — personal identity + recap
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    occupation_description: Optional[str] = None
+    selected_use_cases: Optional[str] = None
+    onboarding_recap: Optional[str] = None
+
 
 class CompanyResponse(BaseModel):
     id: str
@@ -102,6 +112,11 @@ class CompanyResponse(BaseModel):
     goals_classification: Optional[str] = None
     current_priority: Optional[str] = None
     current_priority_updated_at: Optional[datetime] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    occupation_description: Optional[str] = None
+    selected_use_cases: Optional[str] = None
+    onboarding_recap: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

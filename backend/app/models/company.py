@@ -75,6 +75,13 @@ class Company(Base):
     # Integrations
     slack_webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Onboarding redesign — personal identity + recap
+    first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    occupation_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    selected_use_cases: Mapped[str | None] = mapped_column(Text, nullable=True)
+    onboarding_recap: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Current priority — monthly re-prompt on the Dashboard so the researcher's
     # top-of-mind focus stays fresh. The UI nudges them to update this every
     # ~30 days. Free-form text so they can write "understanding why X churned"

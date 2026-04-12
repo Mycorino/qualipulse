@@ -3434,10 +3434,74 @@ select.field-input {
   font-weight: 600;
 }
 
+/* ── Loading carousel ──────────────────── */
+
+.loading-carousel {
+  text-align: center;
+  color: var(--text-tertiary, #9ca3af);
+  font-size: 14px;
+  margin: 0;
+  animation: carousel-fade 0.4s ease-in-out;
+}
+
+@keyframes carousel-fade {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Use-case chips ───────────────────── */
+
+.use-case-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.use-case-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-surface);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.use-case-chip:hover {
+  border-color: var(--primary, #4369f5);
+  background: var(--brand-50, #f0f4ff);
+}
+
+.use-case-chip--selected {
+  border-color: var(--primary, #4369f5);
+  background: var(--brand-50, #f0f4ff);
+  color: var(--primary, #4369f5);
+  font-weight: 600;
+}
+
+.add-use-case-input {
+  font-size: 13px;
+}
+
+/* ── Recap card ───────────────────────── */
+
+.recap-card {
+  background: var(--brand-50, #f0f4ff);
+  border: 1px solid var(--primary-border, #c7d2fe);
+  border-radius: var(--radius-md, 10px);
+  padding: var(--space-6, 24px);
+  text-align: left;
+}
+
 @media (max-width: 480px) {
   .welcome-title { font-size: 22px; }
   .welcome-step { padding: 16px; }
   .onboarding-chip { padding: 6px 12px; font-size: 12px; }
+  .use-case-chip { padding: 6px 12px; font-size: 12px; }
 }
 
 /* ── Legal pages (Terms, Privacy) ────────────────────────────────────────── */

@@ -11,11 +11,16 @@ export interface CompanyResponse {
   name: string;
   email: string;
   email_verified: boolean;
+  first_name: string | null;
+  last_name: string | null;
   company_size: string | null;
   role: string | null;
   industry: string | null;
   use_case: string | null;
+  occupation_description: string | null;
+  selected_use_cases: string[] | null;
   onboarding_completed: boolean;
+  onboarding_recap: string | null;
   subscription_tier: string;
   trial_ends_at: string | null;
   created_at: string;
@@ -45,10 +50,15 @@ export interface CompanyResponse {
 
 export interface OnboardingProfile {
   name?: string;
+  first_name?: string;
+  last_name?: string;
   company_size?: string;
   role?: string;
   industry?: string;
   use_case?: string;
+  occupation_description?: string;
+  selected_use_cases?: string[];
+  onboarding_recap?: string;
   website_url?: string;
   business_summary?: string;
   research_experience?: string;
@@ -70,7 +80,7 @@ export async function signup(
   name: string,
   email: string,
   password: string,
-  opts?: { plan?: string; refCode?: string; preferredLanguage?: string }
+  opts?: { plan?: string; refCode?: string; preferredLanguage?: string; firstName?: string; lastName?: string }
 ): Promise<TokenResponse> {
   const { data } = await client.post<TokenResponse>("/auth/signup", {
     name,
@@ -79,6 +89,8 @@ export async function signup(
     plan: opts?.plan,
     ref_code: opts?.refCode,
     preferred_language: opts?.preferredLanguage,
+    first_name: opts?.firstName,
+    last_name: opts?.lastName,
   });
   return data;
 }
@@ -166,5 +178,54 @@ export async function updateCurrentPriority(
   const { data } = await client.patch<CompanyResponse>("/auth/me/priority", {
     current_priority: currentPriority,
   });
+  return data;
+}
+
+// ── Role classification (onboarding step 3) ──
+
+export interface RoleClassificationResponse {
+  canonical_tag: string;
+  orientation: string;
+  suggested_use_cases: string[];
+  research_angle: string;
+}
+
+export async function classifyRole(payload: {
+  role_title?: string;
+  occupation_description?: string;
+  industry?: string;
+  business_summary?: string;
+  language?: string;
+}): Promise<RoleClassificationResponse> {
+  const { data } = await client.post<RoleClassificationResponse>(
+    "/auth/onboarding/classify-role",
+    payload,
+  );
+  return data;
+}
+
+// ── Personalized recap (onboarding step 4) ──
+
+export interface RecapResponse {
+  recap: string;
+}
+
+export async function generateRecap(payload: {
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
+  role_title?: string;
+  occupation_description?: string;
+  research_experience?: string;
+  industry?: string;
+  business_summary?: string;
+  selected_use_cases?: string[];
+  goals_freeform?: string;
+  language?: string;
+}): Promise<RecapResponse> {
+  const { data } = await client.post<RecapResponse>(
+    "/auth/onboarding/generate-recap",
+    payload,
+  );
   return data;
 }

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -33,6 +34,7 @@ from app.services.demo_seeder import seed_demo_project
 from app.services.email import (
     send_newsletter_welcome,
     send_password_reset,
+    send_personalized_welcome,
     send_verification_email,
     send_welcome,
 )
@@ -86,6 +88,8 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
         subscription_tier=tier,
         trial_ends_at=trial_ends,
         preferred_language=signup_lang,
+        first_name=body.first_name.strip() if body.first_name else None,
+        last_name=body.last_name.strip() if body.last_name else None,
     )
     db.add(company)
     db.commit()
@@ -471,6 +475,18 @@ def _apply_onboarding_fields(company: Company, body: OnboardingProfileRequest) -
     if body.decision_role is not None:
         company.decision_role = body.decision_role
 
+    # Onboarding redesign — personal identity + recap
+    if body.first_name is not None:
+        company.first_name = body.first_name.strip() or None
+    if body.last_name is not None:
+        company.last_name = body.last_name.strip() or None
+    if body.occupation_description is not None:
+        company.occupation_description = body.occupation_description
+    if body.selected_use_cases is not None:
+        company.selected_use_cases = body.selected_use_cases
+    if body.onboarding_recap is not None:
+        company.onboarding_recap = body.onboarding_recap
+
 
 @router.patch("/onboarding")
 def save_onboarding_profile(
@@ -483,6 +499,80 @@ def save_onboarding_profile(
     db.commit()
     logger.info("Onboarding profile saved for %s", company.email)
     return CompanyResponse.model_validate(company)
+
+
+class ClassifyRoleRequest(BaseModel):
+    role_title: Optional[str] = None
+    occupation_description: Optional[str] = None
+    industry: Optional[str] = None
+    business_summary: Optional[str] = None
+    language: Optional[str] = None
+
+
+@router.post("/onboarding/classify-role")
+@limiter.limit("5/minute")
+def classify_role(
+    request: Request,
+    body: ClassifyRoleRequest,
+    company: Company = Depends(get_current_company),
+):
+    """Classify a professional role and suggest personalised research topics."""
+    from app.services.onboarding_intelligence import classify_role_and_suggest
+
+    lang = (body.language or company.preferred_language or "en").strip().lower()[:2]
+    result = classify_role_and_suggest(
+        role_title=body.role_title,
+        occupation_description=body.occupation_description,
+        industry=body.industry,
+        business_summary=body.business_summary,
+        language=lang,
+    )
+    return result
+
+
+class GenerateRecapRequest(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    company_name: Optional[str] = None
+    role_title: Optional[str] = None
+    occupation_description: Optional[str] = None
+    research_experience: Optional[str] = None
+    industry: Optional[str] = None
+    business_summary: Optional[str] = None
+    selected_use_cases: Optional[list[str]] = None
+    goals_freeform: Optional[str] = None
+    language: Optional[str] = None
+
+
+@router.post("/onboarding/generate-recap")
+@limiter.limit("3/minute")
+def generate_recap(
+    request: Request,
+    body: GenerateRecapRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Generate a personalised onboarding recap using Claude."""
+    from app.services.onboarding_intelligence import generate_onboarding_recap
+
+    lang = (body.language or company.preferred_language or "en").strip().lower()[:2]
+    recap = generate_onboarding_recap(
+        first_name=body.first_name,
+        last_name=body.last_name,
+        company_name=body.company_name,
+        role_title=body.role_title,
+        occupation_description=body.occupation_description,
+        research_experience=body.research_experience,
+        industry=body.industry,
+        business_summary=body.business_summary,
+        selected_use_cases=body.selected_use_cases,
+        goals_freeform=body.goals_freeform,
+        language=lang,
+    )
+    if recap:
+        company.onboarding_recap = recap
+        db.commit()
+    return {"recap": recap}
 
 
 @router.post("/onboarding")
@@ -526,6 +616,33 @@ def complete_onboarding(
         notify_new_signup(company)
     except Exception:  # pragma: no cover - defensive
         logger.exception("Failed to send sales notification for %s", company.email)
+
+    # Fire-and-forget personalised welcome email. Falls back to the generic
+    # welcome internally if Claude generation fails.
+    try:
+        # Parse selected_use_cases from JSON string if stored
+        use_cases_list: list[str] | None = None
+        if company.selected_use_cases:
+            import json as _json
+            try:
+                use_cases_list = _json.loads(company.selected_use_cases)
+            except (ValueError, TypeError):
+                use_cases_list = None
+
+        send_personalized_welcome(
+            to=company.email,
+            name=company.name,
+            first_name=company.first_name,
+            last_name=company.last_name,
+            company_name=company.name,
+            role_title=company.role,
+            occupation_description=company.occupation_description,
+            industry=company.industry,
+            selected_use_cases=use_cases_list,
+            lang=company.preferred_language,
+        )
+    except Exception:  # pragma: no cover - defensive
+        logger.exception("Failed to send personalized welcome for %s", company.email)
 
     logger.info("Onboarding completed for %s", company.email)
     return CompanyResponse.model_validate(company)

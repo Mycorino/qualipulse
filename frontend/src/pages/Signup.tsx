@@ -23,7 +23,9 @@ function getPasswordStrength(pw: string, t: (key: string) => string): { label: s
 
 export default function Signup() {
   const { t, i18n } = useTranslation("auth");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,10 +45,21 @@ export default function Signup() {
     e.preventDefault();
     setError("");
 
-    const trimmedName = name.trim();
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    const trimmedCompany = companyName.trim();
     const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedName) {
-      setError(t("signup.errors.nameRequired"));
+
+    if (!trimmedFirst) {
+      setError(t("signup.errors.firstNameRequired"));
+      return;
+    }
+    if (!trimmedLast) {
+      setError(t("signup.errors.lastNameRequired"));
+      return;
+    }
+    if (!trimmedCompany) {
+      setError(t("signup.errors.companyNameRequired"));
       return;
     }
     if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(trimmedEmail)) {
@@ -65,10 +78,12 @@ export default function Signup() {
     setLoading(true);
     try {
       const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
-      const res = await signup(trimmedName, trimmedEmail, password, {
+      const res = await signup(trimmedCompany, trimmedEmail, password, {
         plan: selectedPlan,
         refCode,
         preferredLanguage: uiLang,
+        firstName: trimmedFirst,
+        lastName: trimmedLast,
       });
       saveToken(res.access_token, res.refresh_token);
       setCachedOnboarded(false);
@@ -114,17 +129,46 @@ export default function Signup() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <label className="field-label" htmlFor="signup-name">{t("signup.nameLabel")}</label>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label className="field-label" htmlFor="signup-first-name">{t("signup.firstNameLabel")}</label>
+              <input
+                id="signup-first-name"
+                type="text"
+                className="field-input"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder={t("signup.firstNamePlaceholder")}
+                required
+                autoFocus
+                autoComplete="given-name"
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="field-label" htmlFor="signup-last-name">{t("signup.lastNameLabel")}</label>
+              <input
+                id="signup-last-name"
+                type="text"
+                className="field-input"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder={t("signup.lastNamePlaceholder")}
+                required
+                autoComplete="family-name"
+              />
+            </div>
+          </div>
+
+          <label className="field-label" htmlFor="signup-company">{t("signup.companyNameLabel")}</label>
           <input
-            id="signup-name"
+            id="signup-company"
             type="text"
             className="field-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("signup.namePlaceholder")}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder={t("signup.companyNamePlaceholder")}
             required
-            autoFocus
-            autoComplete="name"
+            autoComplete="organization"
           />
 
           <label className="field-label" htmlFor="signup-email">{t("signup.emailLabel")}</label>
