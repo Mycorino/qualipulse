@@ -19,8 +19,8 @@
     "draftRestored": "Draft restored — pick up where you left off.",
     "discardDraft": "Discard draft",
     "confirmDiscardDraft": "Are you sure? Your draft will be permanently deleted.",
-    "step1": "Your brief",
-    "step2": "What to learn",
+    "step1": "Research focus",
+    "step2": "Interview guide",
     "step3": "Scope & screening",
     "step4": "Your questions",
     "briefTitle": "Project Brief",
@@ -124,7 +124,14 @@
     "refineRationaleLabel": "What changed:",
     "refineScopeHint": "Only this question will be rewritten. The rest of your guide stays untouched.",
     "projectCreated": "Project created!",
-    "sectionGeneral": "General"
+    "sectionGeneral": "General",
+    "carouselBrief": ["Reading your brief…", "Extracting key points…", "Identifying research angles…", "Almost there…"],
+    "carouselObjective": ["Analyzing your context…", "Framing a research objective…", "Identifying learning goals…", "Polishing the recommendation…"],
+    "carouselScope": ["Evaluating your objective…", "Recommending audience fit…", "Estimating session length…"],
+    "carouselQuestions": ["Structuring interview sections…", "Writing adaptive questions…", "Adding probing tips…", "Reviewing question flow…", "Polishing wording…"],
+    "scopeSettingsLabel": "Study settings",
+    "briefAndObjectiveTitle": "Research Focus",
+    "briefAndObjectiveSubtitle": "Describe your project and define what you want to learn. The AI will help structure both."
   },
   "detail": {
     "tabOverview": "Overview",

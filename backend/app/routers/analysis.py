@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import SessionLocal
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.models.interview import AnalysisThemeAnnotation, Participant, ProjectAnalysis
@@ -66,10 +67,13 @@ def trigger_analysis(
     if filter_by and filter_values:
         filters_json = json.dumps({"filter_by": filter_by, "filter_values": filter_values})
 
-    def _run_with_timeout(project_id: str, db: Session, filter_by, filter_values):
+    def _run_with_timeout(project_id: str, filter_by, filter_values):
+        # Create a fresh session for the background thread — the request-scoped
+        # session will be closed by FastAPI after the 202 response returns.
+        bg_db = SessionLocal()
         try:
             logger.info("Analysis started for project %s", project_id)
-            run_analysis(project_id, db, filter_by, filter_values)
+            run_analysis(project_id, bg_db, filter_by, filter_values)
             logger.info("Analysis completed for project %s", project_id)
             # Notify company that analysis is ready (email + Slack)
             try:
@@ -77,7 +81,7 @@ def trigger_analysis(
                 from app.services.email import send_analysis_ready
                 from app.services.slack import send_analysis_ready as slack_analysis_ready
 
-                proj = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+                proj = bg_db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
                 if proj and proj.company:
                     project_url = f"{settings.APP_BASE_URL}/projects/{project_id}?tab=analysis"
                     send_analysis_ready(
@@ -90,7 +94,7 @@ def trigger_analysis(
                     # Slack webhook (fire-and-forget, never raises)
                     if getattr(proj.company, "slack_webhook_url", None):
                         latest = (
-                            db.query(ProjectAnalysis)
+                            bg_db.query(ProjectAnalysis)
                             .filter(
                                 ProjectAnalysis.project_id == project_id,
                                 ProjectAnalysis.status == "ready",
@@ -125,7 +129,7 @@ def trigger_analysis(
             logger.error("Analysis failed for project %s: %s", project_id, exc, exc_info=True)
             try:
                 analysis = (
-                    db.query(ProjectAnalysis)
+                    bg_db.query(ProjectAnalysis)
                     .filter(ProjectAnalysis.project_id == project_id)
                     .order_by(ProjectAnalysis.version.desc())
                     .first()
@@ -133,26 +137,29 @@ def trigger_analysis(
                 if analysis:
                     analysis.status = "failed"
                     analysis.error = str(exc)
-                    db.commit()
+                    bg_db.commit()
             except Exception:
                 pass
+        finally:
+            bg_db.close()
 
     # Run in background thread so the response returns immediately
     thread = threading.Thread(
         target=_run_with_timeout,
-        args=(project_id, db, filter_by, filter_values),
+        args=(project_id, filter_by, filter_values),
         daemon=True,
     )
     thread.start()
 
     # Monitor timeout in a watchdog thread
-    def _watchdog(t: threading.Thread, project_id: str, db: Session):
+    def _watchdog(t: threading.Thread, project_id: str):
         t.join(timeout=ANALYSIS_TIMEOUT_SECONDS)
         if t.is_alive():
             logger.error("Analysis timed out after 5 minutes for project %s", project_id)
+            wd_db = SessionLocal()
             try:
                 analysis = (
-                    db.query(ProjectAnalysis)
+                    wd_db.query(ProjectAnalysis)
                     .filter(ProjectAnalysis.project_id == project_id)
                     .order_by(ProjectAnalysis.version.desc())
                     .first()
@@ -160,11 +167,13 @@ def trigger_analysis(
                 if analysis and analysis.status == "generating":
                     analysis.status = "failed"
                     analysis.error = "Analysis timed out after 5 minutes"
-                    db.commit()
+                    wd_db.commit()
             except Exception:
                 pass
+            finally:
+                wd_db.close()
 
-    watchdog = threading.Thread(target=_watchdog, args=(thread, project_id, db), daemon=True)
+    watchdog = threading.Thread(target=_watchdog, args=(thread, project_id), daemon=True)
     watchdog.start()
 
     return {"status": "generating", "message": "Analysis started"}
@@ -646,43 +655,49 @@ def trigger_refined_analysis(
     new_analysis_id = new_analysis.id
     parent_analysis_id = parent_analysis.id
 
-    def _run_refined(project_id: str, new_analysis_id: str, parent_analysis_id: str, db: Session):
+    def _run_refined(project_id: str, new_analysis_id: str, parent_analysis_id: str):
+        bg_db = SessionLocal()
         try:
             logger.info("Refined analysis started for project %s (new version %s)", project_id, next_version)
-            run_refined_analysis(project_id, new_analysis_id, parent_analysis_id, db)
+            run_refined_analysis(project_id, new_analysis_id, parent_analysis_id, bg_db)
             logger.info("Refined analysis completed for project %s", project_id)
         except Exception as exc:
             logger.error("Refined analysis failed for project %s: %s", project_id, exc, exc_info=True)
             try:
-                row = db.query(ProjectAnalysis).filter(ProjectAnalysis.id == new_analysis_id).first()
+                row = bg_db.query(ProjectAnalysis).filter(ProjectAnalysis.id == new_analysis_id).first()
                 if row:
                     row.status = "failed"
                     row.error = str(exc)
-                    db.commit()
+                    bg_db.commit()
             except Exception:
                 pass
+        finally:
+            bg_db.close()
 
     thread = threading.Thread(
         target=_run_refined,
-        args=(project_id, new_analysis_id, parent_analysis_id, db),
+        args=(project_id, new_analysis_id, parent_analysis_id),
         daemon=True,
     )
     thread.start()
 
-    def _watchdog(t: threading.Thread, project_id: str, analysis_id: str, db: Session):
+    def _watchdog(t: threading.Thread, project_id: str, analysis_id: str):
         t.join(timeout=ANALYSIS_TIMEOUT_SECONDS)
         if t.is_alive():
             logger.error("Refined analysis timed out for project %s", project_id)
+            wd_db = SessionLocal()
             try:
-                row = db.query(ProjectAnalysis).filter(ProjectAnalysis.id == analysis_id).first()
+                row = wd_db.query(ProjectAnalysis).filter(ProjectAnalysis.id == analysis_id).first()
                 if row and row.status == "generating":
                     row.status = "failed"
                     row.error = "Analysis timed out after 5 minutes"
-                    db.commit()
+                    wd_db.commit()
             except Exception:
                 pass
+            finally:
+                wd_db.close()
 
-    watchdog = threading.Thread(target=_watchdog, args=(thread, project_id, new_analysis_id, db), daemon=True)
+    watchdog = threading.Thread(target=_watchdog, args=(thread, project_id, new_analysis_id), daemon=True)
     watchdog.start()
 
     return {"status": "generating", "message": "Refined analysis started", "version": next_version}

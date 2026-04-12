@@ -136,35 +136,43 @@ export default function SharedReport() {
         </section>
 
         {/* Key Themes */}
-        {report.themes?.length > 0 && (
-          <section className="shared-report-section">
-            <h2 className="shared-report-section-title">{t("sharedReport.keyThemes")}</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-              {report.themes.map((theme, i) => (
-                <div key={i} className="analysis-theme-card">
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15 }}>{i + 1}. {theme.title}</span>
-                    {theme.frequency && (
-                      <span className="badge" style={{ fontSize: 11 }}>{theme.frequency}</span>
-                    )}
+        {report.themes?.length > 0 && (() => {
+          const themeColors = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#f97316", "#06b6d4", "#a855f7"];
+          return (
+            <section className="shared-report-section">
+              <h2 className="shared-report-section-title">{t("sharedReport.keyThemes")} ({report.themes.length})</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                {report.themes.map((theme, i) => (
+                  <div key={i} className="analysis-theme-card" style={{ borderLeft: `4px solid ${themeColors[i % themeColors.length]}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <span style={{ fontWeight: 700, fontSize: 15 }}>{theme.title}</span>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        {theme.frequency && (
+                          <span className="badge" style={{ fontSize: 11 }}>{theme.frequency}</span>
+                        )}
+                        {theme.quotes?.length > 0 && (
+                          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{theme.quotes.length} quote{theme.quotes.length !== 1 ? "s" : ""}</span>
+                        )}
+                      </div>
+                    </div>
+                    <p style={{ color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: theme.quotes?.length ? 12 : 0 }}>
+                      {theme.summary}
+                    </p>
+                    {theme.quotes?.slice(0, 3).map((q, qi) => renderQuote(q, qi))}
                   </div>
-                  <p style={{ color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: theme.quotes?.length ? 12 : 0 }}>
-                    {theme.summary}
-                  </p>
-                  {theme.quotes?.slice(0, 2).map((q, qi) => renderQuote(q, qi))}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+                ))}
+              </div>
+            </section>
+          );
+        })()}
 
         {/* Jobs to Be Done */}
         {report.jobs_to_be_done?.length > 0 && (
           <section className="shared-report-section">
-            <h2 className="shared-report-section-title">{t("sharedReport.jobsToBeDone")}</h2>
+            <h2 className="shared-report-section-title">{t("sharedReport.jobsToBeDone")} ({report.jobs_to_be_done.length})</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {report.jobs_to_be_done.map((j, i) => (
-                <div key={i} style={{ padding: "14px 16px", borderRadius: 8, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}>
+                <div key={i} style={{ padding: "14px 16px", borderRadius: 8, background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderLeft: "4px solid #f59e0b" }}>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>{j.job}</div>
                   <div style={{ color: "var(--text-secondary)", fontSize: 14 }}>{j.insight}</div>
                   {j.frequency && <span className="badge" style={{ marginTop: 6, display: "inline-block", fontSize: 11 }}>{j.frequency}</span>}
@@ -177,10 +185,10 @@ export default function SharedReport() {
         {/* Tensions */}
         {report.tensions?.length > 0 && (
           <section className="shared-report-section">
-            <h2 className="shared-report-section-title">{t("sharedReport.tensionsAndContradictions")}</h2>
+            <h2 className="shared-report-section-title">{t("sharedReport.tensionsAndContradictions")} ({report.tensions.length})</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {report.tensions.map((tn, i) => (
-                <div key={i} style={{ padding: "12px 16px", borderRadius: 8, borderLeft: "3px solid var(--brand-500)", background: "var(--bg-surface)" }}>
+                <div key={i} style={{ padding: "12px 16px", borderRadius: 8, borderLeft: "4px solid #ef4444", background: "var(--bg-surface)" }}>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>{tn.tension}</div>
                   <div style={{ color: "var(--text-secondary)", fontSize: 14 }}>{tn.detail}</div>
                 </div>

@@ -310,6 +310,7 @@ Return ONLY a JSON object: {{"action": "follow_up" or "next_question" or "close"
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
+        temperature=0.7,
         system=effective_system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )
@@ -383,6 +384,7 @@ def _get_first_question(
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=256,
+        temperature=0.5,
         system=effective_system_prompt,
         messages=[
             {

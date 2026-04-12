@@ -319,6 +319,7 @@ quality_score guide: 0.0-0.25=low, 0.25-0.5=fair, 0.5-0.75=good, 0.75-1.0=strong
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
+        temperature=0.3,
         messages=[{"role": "user", "content": prompt}],
     )
 

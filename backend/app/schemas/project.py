@@ -13,6 +13,10 @@ class QuestionCreate(BaseModel):
 
 
 class QuestionPatch(BaseModel):
+    main_question: str | None = None
+    question_index: int | None = None
+    section_title: str | None = None
+    section_index: int | None = None
     researcher_notes: str | None = None
     deprecated_at: datetime | None = None
     interview_notes: str | None = None

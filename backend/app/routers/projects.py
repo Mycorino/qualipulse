@@ -364,6 +364,14 @@ def patch_question(
     if question is None:
         raise HTTPException(status_code=404, detail="Question not found")
 
+    if body.main_question is not None:
+        question.main_question = body.main_question
+    if body.question_index is not None:
+        question.question_index = body.question_index
+    if body.section_title is not None:
+        question.section_title = body.section_title
+    if body.section_index is not None:
+        question.section_index = body.section_index
     if body.researcher_notes is not None:
         question.researcher_notes = body.researcher_notes
     if body.interview_notes is not None:

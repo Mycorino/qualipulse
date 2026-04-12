@@ -301,7 +301,7 @@ export async function deleteProject(id: string): Promise<void> {
 export async function patchQuestion(
   projectId: string,
   questionId: string,
-  body: { researcher_notes?: string | null; deprecated_at?: string | null; interview_notes?: string | null; desired_learning?: string | null }
+  body: { main_question?: string | null; question_index?: number | null; section_title?: string | null; section_index?: number | null; researcher_notes?: string | null; deprecated_at?: string | null; interview_notes?: string | null; desired_learning?: string | null }
 ): Promise<QuestionResponse> {
   const { data } = await client.patch<QuestionResponse>(
     `/projects/${projectId}/questions/${questionId}`,

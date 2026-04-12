@@ -64,6 +64,7 @@ Return format: "key1,key2" (1-3 keys, lowercase, comma-separated)"""
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=64,
+            temperature=0.3,
             messages=[{"role": "user", "content": prompt}],
         )
         raw = response.content[0].text.strip()

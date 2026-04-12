@@ -72,6 +72,7 @@ def generate_personalized_welcome(
         response = client.messages.create(
             model=_MODEL,
             max_tokens=_MAX_TOKENS,
+            temperature=0.7,
             timeout=15.0,
             messages=[{"role": "user", "content": prompt}],
         )
