@@ -49,13 +49,13 @@ class TestDemoSeeder:
         company = _make_company(db_session)
         project = seed_demo_project(db_session, company.id)
 
-        # Guide: 5 main questions across 3 sections
+        # Guide: 3 main questions across 3 sections
         questions = (
             db_session.query(InterviewGuideQuestion)
             .filter(InterviewGuideQuestion.project_id == project.id)
             .all()
         )
-        assert len(questions) == 5
+        assert len(questions) == 3
 
         # 1 screening question with a disqualifying option
         screening = (
@@ -64,48 +64,47 @@ class TestDemoSeeder:
             .all()
         )
         assert len(screening) == 1
-        assert json.loads(screening[0].disqualifying_options) == ["Just me"]
+        assert json.loads(screening[0].disqualifying_options) == ["No"]
 
-        # 2 interview links (1 active EU, 1 paused NA)
+        # 1 interview link (active)
         links = (
             db_session.query(InterviewLink)
             .filter(InterviewLink.project_id == project.id)
             .all()
         )
-        assert len(links) == 2
-        assert sum(1 for l in links if l.is_active) == 1
+        assert len(links) == 1
+        assert links[0].is_active is True
 
-        # 4 manual codes
+        # 3 manual codes
         codes = (
             db_session.query(ManualCode)
             .filter(ManualCode.project_id == project.id)
             .all()
         )
-        assert len(codes) == 4
+        assert len(codes) == 3
 
-        # 7 participants: 6 completed + 1 in-progress (Marco)
+        # 4 participants: all completed (2 FR + 2 EN)
         participants = (
             db_session.query(Participant)
             .filter(Participant.project_id == project.id)
             .all()
         )
-        assert len(participants) == 7
-        assert sum(1 for p in participants if p.status == "completed") == 6
-        assert sum(1 for p in participants if p.status == "in_progress") == 1
+        assert len(participants) == 4
+        assert sum(1 for p in participants if p.status == "completed") == 4
 
         # Bilingual demographics
         countries = {p.country for p in participants}
         assert "France" in countries
-        assert "United States" in countries
+        assert "United Kingdom" in countries
 
-        # Lots of interview turns
+        # Interview turns (4 turns per participant × 4 = 16 minimum)
         turns = (
             db_session.query(InterviewTurn)
             .join(Participant)
             .filter(Participant.project_id == project.id)
             .all()
         )
-        assert len(turns) >= 50
+        assert len(turns) >= 16
 
         # At least one turn is flagged as manually edited
         edited = [t for t in turns if t.manually_edited]
@@ -119,7 +118,7 @@ class TestDemoSeeder:
             .filter(Participant.project_id == project.id)
             .all()
         )
-        assert len(tags) >= 10
+        assert len(tags) >= 6
         for tag in tags:
             turn = next(t for t in turns if t.id == tag.turn_id)
             assert turn.response_transcript is not None
@@ -157,23 +156,23 @@ class TestDemoSeeder:
         first_theme = report["themes"][0]
         assert set(first_theme.keys()) >= {"title", "summary", "quotes", "frequency"}
 
-        # 3 annotations on v2 (confirmed / needs_evidence / disputed)
+        # 2 annotations on v2 (confirmed / needs_evidence)
         annotations = (
             db_session.query(AnalysisThemeAnnotation)
             .filter(AnalysisThemeAnnotation.analysis_id == v2.id)
             .all()
         )
-        assert len(annotations) == 3
+        assert len(annotations) == 2
         statuses = {a.status for a in annotations}
-        assert statuses == {"confirmed", "needs_evidence", "disputed"}
+        assert statuses == {"confirmed", "needs_evidence"}
 
-        # 6 memos
+        # 3 memos
         memos = (
             db_session.query(ProjectMemo)
             .filter(ProjectMemo.project_id == project.id)
             .all()
         )
-        assert len(memos) == 6
+        assert len(memos) == 3
         memo_types = {m.type for m in memos}
         assert "general" in memo_types
         assert "theme_note" in memo_types
@@ -200,17 +199,17 @@ class TestDemoSeeder:
             .filter(ScreeningQuestion.project_id == project.id)
             .one()
         )
-        assert json.loads(screening.disqualifying_options) == ["Juste moi"]
+        assert json.loads(screening.disqualifying_options) == ["Non"]
 
-        # Guide questions should be French, preserving 5 main questions.
+        # Guide questions should be French, preserving 3 main questions.
         questions = (
             db_session.query(InterviewGuideQuestion)
             .filter(InterviewGuideQuestion.project_id == project.id)
             .order_by(InterviewGuideQuestion.sort_order)
             .all()
         )
-        assert len(questions) == 5
-        assert any("équipe" in q.main_question.lower() for q in questions)
+        assert len(questions) == 3
+        assert any("maison aura" in q.main_question.lower() for q in questions)
 
         # Bilingual participants still present — the FR scaffolding shouldn't
         # affect who gets seeded as a participant.
@@ -221,7 +220,7 @@ class TestDemoSeeder:
             .all()
         }
         assert "France" in countries
-        assert "United States" in countries
+        assert "United Kingdom" in countries
 
     def test_seed_quotes_are_substrings_of_real_transcripts(self, db_session):
         """Every analysis quote must appear verbatim in some participant's turn."""

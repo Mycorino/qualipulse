@@ -74,7 +74,7 @@ export default function CreateProjectWizard() {
 
   // Step 2
   const [objective, setObjective] = useState(draft?.objective ?? "");
-  const [learningGoals, setLearningGoals] = useState(draft?.learningGoals ?? ["", "", ""]);
+  const [learningGoals, setLearningGoals] = useState(draft?.learningGoals ?? ["", ""]);
   const [studyType, setStudyType] = useState(draft?.studyType ?? "exploratory");
   const [rationale, setRationale] = useState(draft?.rationale ?? "");
   // Study-specific grounding fields — see backend services/business_context.py.
@@ -167,9 +167,9 @@ export default function CreateProjectWizard() {
       // Pre-fill wizard state from template
       setName(tpl.name);
       setObjective(tpl.research_objective);
-      // Ensure at least 3 learning goal slots so the UI stays consistent
+      // Ensure at least 1 learning goal slot so the UI stays usable
       const goals = [...tpl.learning_goals];
-      while (goals.length < 3) goals.push("");
+      if (goals.length === 0) goals.push("");
       setLearningGoals(goals);
       setAudience(tpl.target_audience);
       setDurationMinutes(tpl.duration_minutes);
@@ -890,6 +890,11 @@ export default function CreateProjectWizard() {
                 {loading ? <><span className="spinner-sm" />{loadingMsg}</> : t("wizard.summariseWithAI")}
               </button>
             )}
+            {(context.trim() || files.length > 0) && !loading && !briefSummary && (
+              <p className="muted-text" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+                {t("wizard.summariseHint")}
+              </p>
+            )}
 
             {briefSummary && (
               <div className="ai-output-box">
@@ -913,7 +918,7 @@ export default function CreateProjectWizard() {
               <div />
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 {!name.trim() && (
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>{t("wizard.nameRequired")}</p>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>{t("wizard.nameRequired")}</p>
                 )}
                 <button
                   className="btn btn-primary"
@@ -943,6 +948,11 @@ export default function CreateProjectWizard() {
             >
               {loading ? <><span className="spinner-sm" />{loadingMsg}</> : t("wizard.generateObjective")}
             </button>
+            {!loading && !objective && (
+              <p className="muted-text" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+                {t("wizard.generateObjectiveHint")}
+              </p>
+            )}
 
             {rationale && (
               <div className="ai-output-box">
@@ -967,20 +977,41 @@ export default function CreateProjectWizard() {
 
             <label className="field-label">{t("wizard.learningGoalsLabel")}</label>
             {learningGoals.map((goal: string, i: number) => (
-              <textarea
-                key={i}
-                className="field-input"
-                rows={2}
-                style={{ marginBottom: 8, resize: "vertical", whiteSpace: "normal" }}
-                value={goal}
-                onChange={(e) =>
-                  setLearningGoals((prev: string[]) =>
-                    prev.map((g: string, j: number) => (j === i ? e.target.value : g))
-                  )
-                }
-                placeholder={t("wizard.learningGoalPlaceholder", { number: i + 1 })}
-              />
+              <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "start" }}>
+                <textarea
+                  className="field-input"
+                  rows={2}
+                  style={{ flex: 1, resize: "vertical", whiteSpace: "normal" }}
+                  value={goal}
+                  onChange={(e) =>
+                    setLearningGoals((prev: string[]) =>
+                      prev.map((g: string, j: number) => (j === i ? e.target.value : g))
+                    )
+                  }
+                  placeholder={t("wizard.learningGoalPlaceholder", { number: i + 1 })}
+                />
+                {learningGoals.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ padding: "4px 8px", marginTop: 4, flexShrink: 0 }}
+                    title={t("wizard.removeLearningGoal")}
+                    onClick={() => setLearningGoals((prev: string[]) => prev.filter((_, j) => j !== i))}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             ))}
+            {learningGoals.length < 8 && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setLearningGoals((prev: string[]) => [...prev, ""])}
+              >
+                {t("wizard.addLearningGoal")}
+              </button>
+            )}
 
             {/* Study-specific grounding fields — these sharpen the analysis
                 prompt beyond the company-level context. Optional, but when
@@ -1041,6 +1072,11 @@ export default function CreateProjectWizard() {
             >
               {loading ? <><span className="spinner-sm" />{loadingMsg}</> : t("wizard.generateScope")}
             </button>
+            {!loading && !audience && (
+              <p className="muted-text" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+                {t("wizard.generateScopeHint")}
+              </p>
+            )}
 
             <label className="field-label">{t("wizard.audienceLabel")}</label>
             <textarea
@@ -1089,7 +1125,7 @@ export default function CreateProjectWizard() {
                       {sq.question || <em className="muted-text">{t("wizard.emptyScreeningQuestion")}</em>}
                     </span>
                     {sq.disqualifying_options.length > 0 && (
-                      <span className="badge" style={{ marginRight: 8, background: "#fef2f2", color: "#dc2626", fontSize: 11 }}>
+                      <span className="badge" style={{ marginRight: 8, background: "var(--danger-light, #fef2f2)", color: "var(--danger, #dc2626)", fontSize: 11 }}>
                         {t("wizard.disqualifyingCount", { count: sq.disqualifying_options.length })}
                       </span>
                     )}
@@ -1105,12 +1141,12 @@ export default function CreateProjectWizard() {
                       {sq.options.map((opt, optIdx) => (
                         <div key={optIdx} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
                           <button
-                            style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: "1.5px solid", borderColor: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#d1d5db", background: sq.disqualifying_options.includes(opt) ? "#fef2f2" : "#fff", color: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#9ca3af", cursor: "pointer", fontWeight: 700, fontSize: 14 }}
+                            style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: "1.5px solid", borderColor: sq.disqualifying_options.includes(opt) ? "var(--danger, #dc2626)" : "var(--border-default)", background: sq.disqualifying_options.includes(opt) ? "var(--danger-light, #fef2f2)" : "var(--bg-surface)", color: sq.disqualifying_options.includes(opt) ? "var(--danger, #dc2626)" : "var(--text-tertiary)", cursor: "pointer", fontWeight: 700, fontSize: 14 }}
                             onClick={() => opt.trim() && toggleDisqualifying(sqIdx, opt)}
                           >{sq.disqualifying_options.includes(opt) ? "✕" : "✓"}</button>
                           <input className="field-input" style={{ flex: 1, marginBottom: 0 }} value={opt} onChange={(e) => updateSQOption(sqIdx, optIdx, e.target.value)} placeholder={t("wizard.optionPlaceholder", { number: optIdx + 1 })} />
                           {sq.options.length > 1 && (
-                            <button style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 18, padding: "0 4px" }} onClick={() => removeSQOption(sqIdx, optIdx)}>×</button>
+                            <button style={{ background: "none", border: "none", color: "var(--text-tertiary)", cursor: "pointer", fontSize: 18, padding: "0 4px" }} onClick={() => removeSQOption(sqIdx, optIdx)}>×</button>
                           )}
                         </div>
                       ))}
@@ -1147,8 +1183,8 @@ export default function CreateProjectWizard() {
             </div>
 
             {confirmRegenerate ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 16px", background: "var(--warning-50, #fffbeb)", border: "1px solid var(--warning-200, #fde68a)", borderRadius: 8, marginBottom: 4 }}>
-                <p style={{ margin: 0, fontSize: 14, color: "var(--warning-800, #92400e)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 16px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, marginBottom: 4 }}>
+                <p style={{ margin: 0, fontSize: 14, color: "#92400e" }}>
                   {t("wizard.regenerateWarning", { count: questions.length })}
                 </p>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -1172,6 +1208,11 @@ export default function CreateProjectWizard() {
                   ? t("wizard.regenerateGuide")
                   : t("wizard.generateGuide")}
               </button>
+            )}
+            {!loading && questions.length === 0 && !confirmRegenerate && (
+              <p className="muted-text" style={{ fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+                {t("wizard.generateGuideHint")}
+              </p>
             )}
 
             {questions.length > 0 && (
@@ -1349,9 +1390,43 @@ export default function CreateProjectWizard() {
                   );
                 })}
 
-                <button className="btn btn-ghost btn-sm" onClick={addQuestion} style={{ border: "1.5px solid #d1d5db", borderRadius: 6, padding: "6px 16px" }}>
+                <button className="btn btn-ghost btn-sm" onClick={addQuestion} style={{ border: "1.5px solid var(--border-default)", borderRadius: 6, padding: "6px 16px" }}>
                   {t("wizard.addQuestion")}
                 </button>
+              </div>
+            )}
+
+            {/* ── Pre-create summary ── */}
+            {!isEditMode && questions.length > 0 && (
+              <div
+                style={{
+                  marginTop: 20,
+                  padding: "12px 16px",
+                  borderRadius: 8,
+                  background: "var(--bg-sunken)",
+                  border: "1px solid var(--border-default)",
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "6px 16px",
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                  {t("wizard.summaryTitle")}
+                </span>
+                <span>{name}</span>
+                <span>·</span>
+                <span>{t("wizard.summaryQuestions", { count: questions.length })}</span>
+                <span>·</span>
+                <span>{durationMinutes} min</span>
+                <span>·</span>
+                <span>
+                  {screeningQuestions.length > 0
+                    ? t("wizard.summaryScreening", { count: screeningQuestions.length })
+                    : t("wizard.summaryNoScreening")}
+                </span>
               </div>
             )}
 
@@ -1359,7 +1434,7 @@ export default function CreateProjectWizard() {
               <button className="btn btn-ghost" onClick={() => setStep(3)}>{t("wizard.backButton")}</button>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 {!isEditMode && questions.length === 0 && (
-                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>{t("wizard.generateGuideFirst")}</p>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>{t("wizard.generateGuideFirst")}</p>
                 )}
                 <button
                   className="btn btn-primary btn-lg"
