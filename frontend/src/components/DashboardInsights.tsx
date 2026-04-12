@@ -371,7 +371,8 @@ export default function DashboardInsights({ me, onPriorityUpdated }: Props) {
                             borderRadius: 999,
                             background: "var(--primary-light)",
                             color: "var(--primary)",
-                            whiteSpace: "nowrap",
+                            whiteSpace: "normal",
+                            lineHeight: 1.3,
                           }}
                         >
                           {reason}
