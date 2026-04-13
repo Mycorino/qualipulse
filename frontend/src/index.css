@@ -4260,6 +4260,61 @@ select.field-input {
   border-bottom: 1px solid var(--border-default);
 }
 
+/* ── Tag pills (below transcript answers) ────────────────────────────────── */
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  cursor: default;
+  position: relative;
+}
+.tag-pill-remove {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--danger);
+  padding: 0 0 0 3px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.1s;
+}
+.tag-pill-remove:hover {
+  opacity: 1;
+}
+.tag-pill:hover .tag-pill-remove {
+  display: inline-flex;
+}
+/* Inline tagged text — × appears at end of highlight on hover */
+.tagged-text {
+  position: relative;
+}
+.tagged-text .tag-inline-remove {
+  position: absolute;
+  right: -6px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tagged-text:hover .tag-inline-remove {
+  display: inline-flex;
+  opacity: 1;
+}
+
 .quote-tag-instruction {
   font-size: 0.8rem;
   color: var(--text-tertiary);

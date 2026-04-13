@@ -938,11 +938,17 @@ export default function ProjectDetail() {
       parts.push(
         <span
           key={tag.id}
-          style={{ borderBottom: `2.5px solid ${color}`, background: `${color}22`, borderRadius: 2, cursor: "pointer" }}
-          title={`[${tag.code_name}] — click to remove`}
-          onClick={() => handleDeleteTag(tag.id)}
+          style={{ borderBottom: `2.5px solid ${color}`, background: `${color}22`, borderRadius: 2, cursor: "default", position: "relative" }}
+          title={`Tagged: ${tag.code_name}`}
+          className="tagged-text"
         >
           {text.slice(tag.start_index, tag.end_index)}
+          <button
+            className="tag-pill-remove tag-inline-remove"
+            onClick={(e) => { e.stopPropagation(); if (confirm(`Remove "${tag.code_name}" tag?`)) handleDeleteTag(tag.id); }}
+            aria-label={`Remove tag ${tag.code_name}`}
+            title="Remove tag"
+          >×</button>
         </span>
       );
       cursor = tag.end_index;
@@ -2054,8 +2060,14 @@ export default function ProjectDetail() {
                               {turnTags.length > 0 && (
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
                                   {turnTags.map((tg) => (
-                                    <span key={tg.id} style={{ padding: "2px 8px", borderRadius: 10, fontSize: 11, background: `${tg.code_color || "#6366f1"}22`, border: `1px solid ${tg.code_color || "#6366f1"}`, cursor: "pointer" }} title="Click to remove tag" onClick={() => handleDeleteTag(tg.id)}>
+                                    <span key={tg.id} className="tag-pill" style={{ background: `${tg.code_color || "var(--brand-500)"}22`, border: `1px solid ${tg.code_color || "var(--brand-500)"}` }}>
                                       {tg.code_name}
+                                      <button
+                                        className="tag-pill-remove"
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteTag(tg.id); }}
+                                        aria-label={`Remove tag ${tg.code_name}`}
+                                        title="Remove tag"
+                                      >×</button>
                                     </span>
                                   ))}
                                 </div>
