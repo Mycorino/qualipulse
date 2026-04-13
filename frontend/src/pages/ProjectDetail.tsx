@@ -3,6 +3,8 @@ import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom"
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
+import LanguageSwitcher from "../components/LanguageSwitcher";
+import { useAuth } from "../hooks/useAuth";
 import {
   getProject,
   listProjects,
@@ -66,6 +68,8 @@ export default function ProjectDetail() {
   const { toast } = useToast();
   const { t: tAnalysis } = useTranslation("analysis");
   const { t: tProject } = useTranslation("project");
+  const { t: tCommon } = useTranslation("common");
+  const { logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── First-run welcome modal (shown after project creation) ──────────────
@@ -194,7 +198,7 @@ export default function ProjectDetail() {
 
   function setTab(next: Tab) {
     if (next !== tab && tab === "setup" && hasUnsavedSetupEdits()) {
-      if (!window.confirm("You have unsaved changes in the Setup tab. Discard them?")) return;
+      if (!window.confirm(tProject("detail.unsavedChanges"))) return;
       setEditingScreening(false);
       setEditingQuestionId(null);
       setEditingNoteId(null);
@@ -1167,11 +1171,25 @@ export default function ProjectDetail() {
   return (
     <div className="detail-layout">
 
-      {/* ── Header ── */}
-      <header className="detail-header">
+      {/* ── Branded header (matches Dashboard) ── */}
+      <header className="dashboard-header" style={{ flexWrap: "wrap" }}>
+        <span className="logo">QualiPulse</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <LanguageSwitcher variant="light" />
+          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
+            {tCommon("account")}
+          </button>
+          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={logout}>
+            {tCommon("signOut")}
+          </button>
+        </div>
+      </header>
+
+      {/* ── Breadcrumb + actions ── */}
+      <div className="detail-header">
         <div className="detail-header-left">
           <div className="detail-breadcrumb">
-            <a href="/dashboard">Projects</a>
+            <a href="/dashboard">{tProject("detail.backToDashboard").replace("← ", "")}</a>
             <span className="detail-breadcrumb-sep">/</span>
             <span>{project.name}</span>
             {projects.length > 1 && (
@@ -1188,25 +1206,25 @@ export default function ProjectDetail() {
           </div>
         </div>
         <div className="detail-header-actions">
-          <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>Export CSV</button>
-          <button className="btn btn-ghost btn-sm" onClick={handleArchive} title="Archive this project (recoverable from the dashboard)">Archive</button>
+          <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>{tProject("responses.exportCSV")}</button>
+          <button className="btn btn-ghost btn-sm" onClick={handleArchive}>{tProject("detail.archiveProject")}</button>
         </div>
-      </header>
+      </div>
 
       {/* ── Tabs — ordered by researcher workflow ── */}
       <div className="detail-tabs" role="tablist">
-        {(["overview", "setup", "responses", "analysis"] as Tab[]).map((t) => (
+        {(["overview", "setup", "responses", "analysis"] as Tab[]).map((tabKey) => (
           <button
-            key={t}
+            key={tabKey}
             role="tab"
-            aria-selected={tab === t}
-            className={`detail-tab ${tab === t ? "active" : ""}`}
-            onClick={() => setTab(t)}
+            aria-selected={tab === tabKey}
+            className={`detail-tab ${tab === tabKey ? "active" : ""}`}
+            onClick={() => setTab(tabKey)}
           >
-            {t === "responses" && (<>Responses {participants.length > 0 && <span className="tab-count">{completedCount}/{participants.length}</span>}</>)}
-            {t === "analysis" && (<>Analysis {analysis?.status === "generating" && <span className="tab-dot tab-dot-pulse" />}</>)}
-            {t === "overview" && "Overview"}
-            {t === "setup" && "Setup"}
+            {tabKey === "responses" && (<>{tProject("detail.tabResponses")} {participants.length > 0 && <span className="tab-count">{completedCount}/{participants.length}</span>}</>)}
+            {tabKey === "analysis" && (<>{tProject("detail.tabAnalysis")} {analysis?.status === "generating" && <span className="tab-dot tab-dot-pulse" />}</>)}
+            {tabKey === "overview" && tProject("detail.tabOverview")}
+            {tabKey === "setup" && tProject("detail.tabSetup")}
           </button>
         ))}
       </div>
@@ -1215,25 +1233,9 @@ export default function ProjectDetail() {
 
         {/* ── Demo project banner ── */}
         {project.is_demo && (
-          <div style={{
-            background: "var(--brand-50, #eef2ff)",
-            border: "1px solid var(--brand-200, #c7d2fe)",
-            borderRadius: 10,
-            padding: "16px 20px",
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-          }}>
-            <p style={{ flex: 1, margin: 0, fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
-              {tProject("detail.demoBannerText")}
-            </p>
-            <Link
-              to="/projects/new"
-              className="btn btn-primary btn-sm"
-              style={{ whiteSpace: "nowrap", textDecoration: "none", flexShrink: 0 }}
-            >
+          <div className="demo-banner">
+            <p>{tProject("detail.demoBannerText")}</p>
+            <Link to="/projects/new" className="btn btn-primary btn-sm" style={{ whiteSpace: "nowrap", textDecoration: "none", flexShrink: 0 }}>
               {tProject("detail.demoBannerCta")}
             </Link>
           </div>
@@ -1243,54 +1245,38 @@ export default function ProjectDetail() {
         {tab === "overview" && (
           <div className="tab-content">
             <div className="stats-row">
-              <div className="stat-card"><div className="stat-value">{participants.length}</div><div className="stat-label">Participants</div></div>
-              <div className="stat-card"><div className="stat-value">{completedCount}</div><div className="stat-label">Completed</div></div>
+              <div className="stat-card"><div className="stat-value">{participants.length}</div><div className="stat-label">{tProject("overview.totalParticipants")}</div></div>
+              <div className="stat-card stat-card--success"><div className="stat-value">{completedCount}</div><div className="stat-label">{tProject("overview.completed")}</div></div>
               <div className="stat-card">
                 <div className="stat-value">{participants.length > 0 ? Math.round((completedCount / participants.length) * 100) : 0}%</div>
-                <div className="stat-label">Completion rate</div>
+                <div className="stat-label">{tProject("overview.completionRate")}</div>
               </div>
-              <div className="stat-card">
+              <div className={`stat-card${project.questions.length === 0 ? " stat-card--warning" : " stat-card--muted"}`}>
                 <div className="stat-value">{project.questions.length}</div>
-                <div className="stat-label">Guide questions</div>
+                <div className="stat-label">{tProject("overview.guideQuestions")}</div>
                 {project.questions.length === 0 && (
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>No questions yet — add in Setup tab</div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>{tProject("overview.noQuestionsHint")}</div>
                 )}
               </div>
             </div>
             {/* Analysis readiness prompt */}
             {completedCount >= 3 && (!analysis || (analysis.status === "ready" && analysis.participant_count < completedCount)) && (
-              <div
-                style={{
-                  background: "var(--success-bg, #f0fdf4)",
-                  border: "1px solid var(--success-border, #bbf7d0)",
-                  borderRadius: 10,
-                  padding: "14px 18px",
-                  marginBottom: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  flexWrap: "wrap",
-                }}
-              >
-                <span style={{ fontSize: 20 }}>✦</span>
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text-primary)" }}>
+              <div className="analysis-prompt">
+                <span className="analysis-prompt__icon">✦</span>
+                <div className="analysis-prompt__body">
+                  <div className="analysis-prompt__title">
                     {!analysis
-                      ? `${completedCount} interviews completed — ready for AI analysis`
-                      : `${completedCount - (analysis.participant_count || 0)} new interview${completedCount - (analysis.participant_count || 0) !== 1 ? "s" : ""} since last analysis`}
+                      ? tProject("overview.readyForAnalysis", { count: completedCount })
+                      : tProject("overview.newSinceAnalysis", { count: completedCount - (analysis.participant_count || 0) })}
                   </div>
-                  <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
+                  <div className="analysis-prompt__desc">
                     {!analysis
-                      ? "Generate themes, insights, and recommendations from your data."
-                      : "Refresh to include the latest responses in your analysis."}
+                      ? tProject("overview.readyForAnalysisDesc")
+                      : tProject("overview.refreshAnalysisDesc")}
                   </div>
                 </div>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setTab("analysis")}
-                  style={{ flexShrink: 0 }}
-                >
-                  {!analysis ? "Generate insights →" : "Refresh analysis →"}
+                <button className="btn btn-primary btn-sm" onClick={() => setTab("analysis")} style={{ flexShrink: 0 }}>
+                  {!analysis ? tProject("overview.generateInsights") : tProject("overview.refreshAnalysis")}
                 </button>
               </div>
             )}
@@ -1298,9 +1284,9 @@ export default function ProjectDetail() {
             {/* Research Objective — inline edit */}
             <section className="detail-section">
               <div className="section-header-row">
-                <h2>Research Objective</h2>
+                <h2>{tProject("overview.researchObjective")}</h2>
                 {!editingObjective && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setObjectiveDraft(project.research_objective ?? ""); setEditingObjective(true); }}>Edit</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setObjectiveDraft(project.research_objective ?? ""); setEditingObjective(true); }}>{tCommon("edit")}</button>
                 )}
               </div>
               {editingObjective ? (
@@ -1310,17 +1296,17 @@ export default function ProjectDetail() {
                     rows={3}
                     value={objectiveDraft}
                     onChange={(e) => setObjectiveDraft(e.target.value)}
-                    placeholder="What are you trying to learn from this research?"
+                    placeholder={tProject("overview.objectivePlaceholder")}
                     style={{ resize: "vertical" }}
                   />
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button className="btn btn-primary btn-sm" onClick={() => saveProjectMeta({ research_objective: objectiveDraft })} disabled={savingMeta}>{savingMeta ? "Saving…" : "Save"}</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingObjective(false)}>Cancel</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => saveProjectMeta({ research_objective: objectiveDraft })} disabled={savingMeta}>{savingMeta ? tCommon("saving") : tCommon("save")}</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingObjective(false)}>{tCommon("cancel")}</button>
                   </div>
                 </div>
               ) : (
                 <p className="objective-text" style={{ color: project.research_objective ? undefined : "var(--text-muted)", fontStyle: project.research_objective ? undefined : "italic" }}>
-                  {project.research_objective || "No objective set — click Edit to add one."}
+                  {project.research_objective || tProject("overview.noObjective")}
                 </p>
               )}
             </section>
@@ -1328,9 +1314,9 @@ export default function ProjectDetail() {
             {/* Welcome Message — inline edit */}
             <section className="detail-section">
               <div className="section-header-row">
-                <h2>Welcome Message <span className="optional-tag">(shown to participants)</span></h2>
+                <h2>{tProject("overview.welcomeMessageLabel")} <span className="optional-tag">{tProject("overview.welcomeMessageHint")}</span></h2>
                 {!editingWelcome && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setWelcomeDraft(project.welcome_message ?? ""); setEditingWelcome(true); }}>Edit</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setWelcomeDraft(project.welcome_message ?? ""); setEditingWelcome(true); }}>{tCommon("edit")}</button>
                 )}
               </div>
               {editingWelcome ? (
@@ -1340,53 +1326,53 @@ export default function ProjectDetail() {
                     rows={3}
                     value={welcomeDraft}
                     onChange={(e) => setWelcomeDraft(e.target.value)}
-                    placeholder="e.g. Thank you for taking part in this study. Your answers will help us improve our product."
+                    placeholder={tProject("overview.welcomePlaceholder")}
                     style={{ resize: "vertical" }}
                   />
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button className="btn btn-primary btn-sm" onClick={() => saveProjectMeta({ welcome_message: welcomeDraft })} disabled={savingMeta}>{savingMeta ? "Saving…" : "Save"}</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingWelcome(false)}>Cancel</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => saveProjectMeta({ welcome_message: welcomeDraft })} disabled={savingMeta}>{savingMeta ? tCommon("saving") : tCommon("save")}</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingWelcome(false)}>{tCommon("cancel")}</button>
                   </div>
                 </div>
               ) : (
                 <p className="objective-text" style={{ color: project.welcome_message ? undefined : "var(--text-muted)", fontStyle: project.welcome_message ? undefined : "italic" }}>
-                  {project.welcome_message || "No welcome message — click Edit to add one."}
+                  {project.welcome_message || tProject("overview.noWelcomeMessage")}
                 </p>
               )}
             </section>
             <section className="detail-section">
               <div className="section-header-row">
-                <h2>Interview Link</h2>
+                <h2>{tProject("overview.interviewLinkTitle")}</h2>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={handleGenerateLink}
                   disabled={project.is_demo}
-                  title={project.is_demo ? "Demo projects don't support live interviews" : undefined}
-                >+ New Link</button>
+                  title={project.is_demo ? tProject("overview.demoLinkDisabled") : undefined}
+                >{tProject("overview.newLink")}</button>
               </div>
               {links.length === 0 ? (
-                <p className="muted-text">No links yet. Generate one to share with participants.</p>
+                <p className="muted-text">{tProject("overview.noLinksHint")}</p>
               ) : (
                 <div className="links-list">
                   {links.map((l) => (
                     <div key={l.id} className={`link-row${l.is_active ? "" : " link-row--inactive"}`}>
                       <div className="link-row-main">
                         <span className={`link-status-badge ${l.is_active ? "link-status-badge--active" : "link-status-badge--inactive"}`}>
-                          {l.is_active ? "Active" : "Inactive"}
+                          {l.is_active ? tProject("overview.linkActive") : tProject("overview.linkInactive")}
                         </span>
-                        <code className="link-url" style={{ wordBreak: "break-all" }}>{interviewUrl(l.token)}</code>
+                        <code className="link-url" title={interviewUrl(l.token)}>{interviewUrl(l.token)}</code>
                       </div>
                       <div className="link-row-actions">
                         {l.is_active && (
                           <button className="btn btn-ghost btn-sm" onClick={() => copyLink(l.token)}>
-                            {copiedToken === l.token ? "✓ Copied!" : "Copy"}
+                            {copiedToken === l.token ? `✓ ${tProject("overview.linkCopied")}` : tProject("overview.copyLink")}
                           </button>
                         )}
                         <button
                           className={`btn btn-sm ${l.is_active ? "btn-ghost" : "btn-secondary"}`}
                           onClick={() => handleToggleLink(l.id)}
                         >
-                          {l.is_active ? "Deactivate" : "Activate"}
+                          {l.is_active ? tProject("overview.deactivateLink") : tProject("overview.activateLink")}
                         </button>
                       </div>
                     </div>
@@ -1405,17 +1391,17 @@ export default function ProjectDetail() {
             <section className="detail-section">
               <div className="section-header-row">
                 <div>
-                  <h2>Screening Questions</h2>
-                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>Asked before the interview — disqualifying answers block access.</p>
+                  <h2>{tProject("setup.screeningTitle")}</h2>
+                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>{tProject("setup.screeningSubtitle")}</p>
                 </div>
-                {!editingScreening && <button className="btn btn-ghost btn-sm" onClick={startEditScreening}>Edit</button>}
+                {!editingScreening && <button className="btn btn-ghost btn-sm" onClick={startEditScreening}>{tCommon("edit")}</button>}
               </div>
 
               {!editingScreening && (
                 (project.screening_questions ?? []).length === 0 ? (
                   <div className="empty-state-inline">
-                    <span>No screening questions.</span>
-                    <button className="btn btn-ghost btn-sm" onClick={startEditScreening}>Add one →</button>
+                    <span>{tProject("setup.noScreeningQuestions")}</span>
+                    <button className="btn btn-ghost btn-sm" onClick={startEditScreening}>{tProject("setup.addScreeningArrow")}</button>
                   </div>
                 ) : (
                   <div className="screening-list">
@@ -1445,41 +1431,45 @@ export default function ProjectDetail() {
                       <div className="guide-editor-header" onClick={() => setExpandedSQ(expandedSQ === sqIdx ? null : sqIdx)}>
                         <span className="guide-editor-num">Q{sqIdx + 1}</span>
                         <span className="guide-editor-preview" style={{ flex: 1, marginLeft: 8 }}>
-                          {sq.question || <em className="muted-text">Empty question</em>}
+                          {sq.question || <em className="muted-text">{tProject("setup.emptyQuestion")}</em>}
                         </span>
                         {sq.disqualifying_options.length > 0 && (
                           <span className="badge" style={{ marginRight: 8, background: "var(--danger-bg)", color: "var(--danger)", fontSize: 11 }}>
-                            {sq.disqualifying_options.length} disqualifying
+                            {tProject("setup.disqualifyingCount", { count: sq.disqualifying_options.length })}
                           </span>
                         )}
                         <span className="guide-editor-chevron">{expandedSQ === sqIdx ? "▲" : "▼"}</span>
                       </div>
                       {expandedSQ === sqIdx && (
                         <div className="guide-editor-body">
-                          <label className="field-label">Question</label>
-                          <input className="field-input" value={sq.question} onChange={(e) => sqSetQuestion(sqIdx, e.target.value)} placeholder="e.g. Do you shop online at least once a month?" />
-                          <label className="field-label" style={{ marginTop: 12 }}>Options <span className="optional-tag">— click ✕/✓ to mark disqualifying</span></label>
+                          <label className="field-label">{tProject("setup.questionLabel")}</label>
+                          <input className="field-input" value={sq.question} onChange={(e) => sqSetQuestion(sqIdx, e.target.value)} placeholder={tProject("setup.questionPlaceholder")} />
+                          <label className="field-label" style={{ marginTop: 12 }}>{tProject("setup.optionsLabel")} <span className="optional-tag">{tProject("setup.optionsHint")}</span></label>
                           {sq.options.map((opt, optIdx) => (
                             <div key={optIdx} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                              <button style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: "1.5px solid", borderColor: sq.disqualifying_options.includes(opt) ? "var(--danger)" : "var(--border-default)", background: sq.disqualifying_options.includes(opt) ? "var(--danger-bg)" : "var(--bg-surface)", color: sq.disqualifying_options.includes(opt) ? "var(--danger)" : "var(--text-disabled)", cursor: "pointer", fontWeight: 700, fontSize: 14 }} onClick={() => opt.trim() && sqToggleDisq(sqIdx, opt)}>
+                              <button
+                                className={`screening-disq-toggle${sq.disqualifying_options.includes(opt) ? " screening-disq-toggle--active" : ""}`}
+                                onClick={() => opt.trim() && sqToggleDisq(sqIdx, opt)}
+                                title={sq.disqualifying_options.includes(opt) ? "Disqualifying" : "Allowed"}
+                              >
                                 {sq.disqualifying_options.includes(opt) ? "✕" : "✓"}
                               </button>
-                              <input className="field-input" style={{ flex: 1, marginBottom: 0 }} value={opt} onChange={(e) => sqSetOption(sqIdx, optIdx, e.target.value)} placeholder={`Option ${optIdx + 1}`} />
+                              <input className="field-input" style={{ flex: 1, marginBottom: 0 }} value={opt} onChange={(e) => sqSetOption(sqIdx, optIdx, e.target.value)} placeholder={tProject("setup.optionNumber", { number: optIdx + 1 })} />
                               {sq.options.length > 1 && <button style={{ background: "none", border: "none", color: "var(--text-disabled)", cursor: "pointer", fontSize: 18, padding: "0 4px" }} onClick={() => sqRemoveOption(sqIdx, optIdx)}>×</button>}
                             </div>
                           ))}
-                          <button className="btn btn-ghost btn-sm" onClick={() => sqAddOption(sqIdx)}>+ Add option</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => sqAddOption(sqIdx)}>{tProject("setup.addOptionBtn")}</button>
                           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-                            <button className="btn btn-ghost btn-sm btn-danger-text" onClick={() => sqRemove(sqIdx)}>Remove question</button>
+                            <button className="btn btn-ghost btn-sm btn-danger-text" onClick={() => sqRemove(sqIdx)}>{tProject("setup.removeQuestion")}</button>
                           </div>
                         </div>
                       )}
                     </div>
                   ))}
-                  <button className="btn btn-ghost btn-sm" onClick={sqAddQuestion} style={{ marginBottom: 16 }}>+ Add screening question</button>
+                  <button className="btn btn-ghost btn-sm" onClick={sqAddQuestion} style={{ marginBottom: 16 }}>{tProject("setup.addScreeningQuestion")}</button>
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingScreening(false)}>Cancel</button>
-                    <button className="btn btn-primary btn-sm" onClick={saveScreening} disabled={screeningSaving}>{screeningSaving ? "Saving..." : "Save"}</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingScreening(false)}>{tCommon("cancel")}</button>
+                    <button className="btn btn-primary btn-sm" onClick={saveScreening} disabled={screeningSaving}>{screeningSaving ? tCommon("saving") : tCommon("save")}</button>
                   </div>
                 </div>
               )}
@@ -1488,20 +1478,20 @@ export default function ProjectDetail() {
             <section className="detail-section">
               <div className="section-header-row">
                 <div>
-                  <h2>Interview Guide</h2>
+                  <h2>{tProject("setup.guideTitle")}</h2>
                   <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>
-                    {project.questions.filter((q) => !q.deprecated_at).length} active question{project.questions.filter((q) => !q.deprecated_at).length !== 1 ? "s" : ""} across {Object.keys(sections).length} section{Object.keys(sections).length !== 1 ? "s" : ""}
+                    {tProject("setup.activeQuestionsCount", { active: project.questions.filter((q) => !q.deprecated_at).length, sections: Object.keys(sections).length })}
                     {project.questions.some((q) => q.deprecated_at) && (
                       <span className="badge" style={{ marginLeft: 8, background: "var(--danger-bg, #fef2f2)", color: "var(--danger, #dc2626)" }}>
-                        {project.questions.filter((q) => q.deprecated_at).length} disabled
+                        {tProject("setup.disabledCount", { count: project.questions.filter((q) => q.deprecated_at).length })}
                       </span>
                     )}
                   </p>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>Add Questions</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>{tProject("setup.addQuestions")}</button>
               </div>
               {project.questions.length === 0 ? (
-                <p className="muted-text">No questions defined yet. <button className="btn btn-primary btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>Create interview guide</button></p>
+                <p className="muted-text">{tProject("setup.noQuestionsYet")} <button className="btn btn-primary btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>{tProject("setup.createGuide")}</button></p>
               ) : (
                 <>
                   {/* Active questions */}
@@ -1521,37 +1511,29 @@ export default function ProjectDetail() {
                             return (
                               <div
                                 key={q.id}
-                                className="guide-question-card"
-                                style={{
-                                  padding: "12px 14px",
-                                  marginBottom: 8,
-                                  borderRadius: 8,
-                                  border: isEditing ? "1.5px solid var(--primary, #6366f1)" : "1px solid var(--border, #e5e7eb)",
-                                  background: isEditing ? "var(--bg-surface-hover, #f8f9fc)" : "white",
-                                  transition: "border-color 0.15s, background 0.15s",
-                                }}
+                                className={`guide-question-card${isEditing ? " guide-question-card--editing" : ""}`}
                               >
-                                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                                <div className="guide-question-card__layout">
                                   {/* Reorder arrows */}
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0, marginTop: 2 }}>
+                                  <div className="guide-question-card__reorder">
                                     <button
                                       className="btn btn-ghost btn-xs"
-                                      style={{ padding: "0 4px", fontSize: 10, color: isFirst ? "var(--border, #e5e7eb)" : "var(--text-muted, #9ca3af)", lineHeight: 1 }}
+                                      style={{ padding: "0 4px", fontSize: 10, lineHeight: 1 }}
                                       disabled={isFirst}
                                       onClick={() => moveQuestion(q.id, "up")}
-                                      title="Move up"
+                                      title={tProject("setup.moveUp")}
                                     >▲</button>
                                     <button
                                       className="btn btn-ghost btn-xs"
-                                      style={{ padding: "0 4px", fontSize: 10, color: isLast ? "var(--border, #e5e7eb)" : "var(--text-muted, #9ca3af)", lineHeight: 1 }}
+                                      style={{ padding: "0 4px", fontSize: 10, lineHeight: 1 }}
                                       disabled={isLast}
                                       onClick={() => moveQuestion(q.id, "down")}
-                                      title="Move down"
+                                      title={tProject("setup.moveDown")}
                                     >▼</button>
                                   </div>
 
                                   {/* Question text — click to edit */}
-                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div className="guide-question-card__body">
                                     {isEditing ? (
                                       <div>
                                         <textarea
@@ -1564,17 +1546,17 @@ export default function ProjectDetail() {
                                           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveQuestionText(q.id); } if (e.key === "Escape") setEditingQuestionId(null); }}
                                         />
                                         <div style={{ display: "flex", gap: 6 }}>
-                                          <button className="btn btn-primary btn-xs" onClick={() => saveQuestionText(q.id)} disabled={savingQuestionId === q.id}>{savingQuestionId === q.id ? "Saving..." : "Save"}</button>
-                                          <button className="btn btn-ghost btn-xs" onClick={() => setEditingQuestionId(null)}>Cancel</button>
+                                          <button className="btn btn-primary btn-xs" onClick={() => saveQuestionText(q.id)} disabled={savingQuestionId === q.id}>{savingQuestionId === q.id ? tCommon("saving") : tCommon("save")}</button>
+                                          <button className="btn btn-ghost btn-xs" onClick={() => setEditingQuestionId(null)}>{tCommon("cancel")}</button>
                                         </div>
                                       </div>
                                     ) : (
                                       <span
-                                        style={{ color: "var(--text, #111827)", cursor: "pointer", display: "block" }}
+                                        className="guide-question-card__text"
                                         onClick={() => { setEditingQuestionId(q.id); setQuestionDraft(q.main_question); }}
-                                        title="Click to edit"
+                                        title={tProject("setup.clickToEdit")}
                                       >
-                                        <span style={{ color: "var(--text-muted, #9ca3af)", fontSize: 12, marginRight: 6 }}>Q{qi + 1}</span>
+                                        <span className="guide-question-card__num">Q{qi + 1}</span>
                                         {q.main_question}
                                       </span>
                                     )}
@@ -1582,30 +1564,28 @@ export default function ProjectDetail() {
 
                                   {/* Action buttons */}
                                   {!isEditing && (
-                                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                                    <div className="guide-question-card__actions">
                                       <button
                                         className="btn btn-ghost btn-xs"
-                                        title={q.researcher_notes ? "Edit note" : "Add note"}
-                                        style={{ color: q.researcher_notes ? "#d97706" : "var(--text-muted, #9ca3af)" }}
+                                        title={q.researcher_notes ? tProject("setup.editNoteTitle") : tProject("setup.addNoteTitle")}
+                                        style={{ color: q.researcher_notes ? "var(--warning)" : undefined }}
                                         onClick={() => {
                                           if (editingNoteId === q.id) { setEditingNoteId(null); }
                                           else { setEditingNoteId(q.id); setNoteText(q.researcher_notes ?? ""); }
                                         }}
                                       >
-                                        {q.researcher_notes ? "📝" : "Note"}
+                                        {q.researcher_notes ? "📝" : tProject("setup.noteBtn")}
                                       </button>
                                       <button
                                         className="btn btn-ghost btn-xs"
-                                        style={{ color: "var(--text-muted, #9ca3af)" }}
                                         onClick={() => setExpandedQuestionId(expandedQuestionId === q.id ? null : q.id)}
-                                        title="Interview notes & desired learning"
+                                        title={tProject("setup.interviewNotesTip")}
                                       >
                                         {expandedQuestionId === q.id ? "▲" : "▼"}
                                       </button>
                                       <button
                                         className="btn btn-ghost btn-xs"
-                                        title="Disable question"
-                                        style={{ color: "var(--text-muted, #9ca3af)" }}
+                                        title={tProject("setup.disableQuestion")}
                                         onClick={() => toggleDeprecateQuestion(q.id, q.deprecated_at)}
                                       >
                                         ✕
@@ -1616,52 +1596,44 @@ export default function ProjectDetail() {
 
                                 {/* Researcher note display */}
                                 {editingNoteId === q.id && (
-                                  <div style={{ marginTop: 8, marginLeft: 28 }}>
-                                    <textarea
-                                      className="field-input"
-                                      value={noteText}
-                                      onChange={(e) => setNoteText(e.target.value)}
-                                      placeholder="Research notes, reminders, observations..."
-                                      rows={2}
-                                      style={{ width: "100%", marginBottom: 6, fontSize: 13 }}
-                                      autoFocus
-                                    />
+                                  <div className="guide-question-card__detail" style={{ marginTop: 8 }}>
+                                    <textarea className="field-input" value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder={tProject("setup.notePlaceholder")} rows={2} style={{ width: "100%", marginBottom: 6, fontSize: 13 }} autoFocus />
                                     <div style={{ display: "flex", gap: 6 }}>
-                                      <button className="btn btn-primary btn-xs" onClick={() => saveQuestionNote(q.id)}>Save</button>
-                                      <button className="btn btn-ghost btn-xs" onClick={() => setEditingNoteId(null)}>Cancel</button>
+                                      <button className="btn btn-primary btn-xs" onClick={() => saveQuestionNote(q.id)}>{tCommon("save")}</button>
+                                      <button className="btn btn-ghost btn-xs" onClick={() => setEditingNoteId(null)}>{tCommon("cancel")}</button>
                                     </div>
                                   </div>
                                 )}
                                 {q.researcher_notes && editingNoteId !== q.id && (
-                                  <div style={{ marginTop: 6, marginLeft: 28, padding: "4px 8px", background: "var(--warning-bg)", borderRadius: 4, fontSize: 12, color: "var(--warning-text)" }}>
+                                  <div className="guide-question-card__note">
                                     📝 {q.researcher_notes}
                                   </div>
                                 )}
 
                                 {/* Interview notes + desired learning (expanded) */}
                                 {expandedQuestionId === q.id && (
-                                  <div style={{ marginTop: 8, marginLeft: 28, display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <div className="guide-question-card__detail">
                                     {(["interview_notes", "desired_learning"] as const).map((field) => {
-                                      const label = field === "interview_notes" ? "Interview Tips" : "Desired Learning";
+                                      const label = field === "interview_notes" ? tProject("setup.interviewTips") : tProject("setup.desiredLearning");
                                       const isFieldEditing = editingInterviewNotes?.id === q.id && editingInterviewNotes?.field === field;
                                       return (
-                                        <div key={field} style={{ background: "var(--bg-surface, #f9fafb)", borderRadius: 6, padding: "8px 10px", border: "1px solid var(--border, #e5e7eb)" }}>
+                                        <div key={field} className="guide-question-card__detail-field">
                                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted, #6b7280)", textTransform: "uppercase" }}>{label}</span>
+                                            <span className="guide-question-card__detail-label">{label}</span>
                                             {!isFieldEditing && (
-                                              <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => { setEditingInterviewNotes({ id: q.id, field }); setInterviewNotesText(q[field] ?? ""); }}>Edit</button>
+                                              <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => { setEditingInterviewNotes({ id: q.id, field }); setInterviewNotesText(q[field] ?? ""); }}>{tCommon("edit")}</button>
                                             )}
                                           </div>
                                           {isFieldEditing ? (
                                             <>
                                               <textarea className="field-input" value={interviewNotesText} onChange={(e) => setInterviewNotesText(e.target.value)} rows={2} style={{ width: "100%", fontSize: 12, marginBottom: 4 }} autoFocus />
                                               <div style={{ display: "flex", gap: 4 }}>
-                                                <button className="btn btn-primary btn-xs" onClick={() => saveInterviewNotes(q.id, field)}>Save</button>
-                                                <button className="btn btn-ghost btn-xs" onClick={() => setEditingInterviewNotes(null)}>Cancel</button>
+                                                <button className="btn btn-primary btn-xs" onClick={() => saveInterviewNotes(q.id, field)}>{tCommon("save")}</button>
+                                                <button className="btn btn-ghost btn-xs" onClick={() => setEditingInterviewNotes(null)}>{tCommon("cancel")}</button>
                                               </div>
                                             </>
                                           ) : (
-                                            <p style={{ fontSize: 12, color: "var(--text-secondary, #374151)", margin: 0 }}>{q[field] || <em className="muted-text">None — click Edit to add</em>}</p>
+                                            <p style={{ fontSize: 12, color: "var(--text-secondary, #374151)", margin: 0 }}>{q[field] || <em className="muted-text">{tProject("setup.noneClickEdit")}</em>}</p>
                                           )}
                                         </div>
                                       );
@@ -1679,22 +1651,20 @@ export default function ProjectDetail() {
                   {/* Disabled questions section */}
                   {project.questions.some((q) => q.deprecated_at) && (
                     <details style={{ marginTop: 16 }}>
-                      <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--text-muted, #6b7280)", userSelect: "none" }}>
-                        {project.questions.filter((q) => q.deprecated_at).length} disabled question{project.questions.filter((q) => q.deprecated_at).length !== 1 ? "s" : ""}
+                      <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--text-tertiary)", userSelect: "none" }}>
+                        {tProject("setup.disabledQuestions", { count: project.questions.filter((q) => q.deprecated_at).length })}
                       </summary>
                       <div style={{ marginTop: 8 }}>
                         {project.questions.filter((q) => q.deprecated_at).sort((a, b) => a.section_index - b.section_index || a.question_index - b.question_index).map((q) => (
-                          <div key={q.id} style={{ padding: "8px 12px", marginBottom: 6, borderRadius: 6, border: "1px solid var(--border, #e5e7eb)", background: "var(--bg-surface, #f9fafb)", opacity: 0.7 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <s style={{ flex: 1, color: "var(--text-muted, #9ca3af)", fontSize: 14 }}>{q.main_question}</s>
+                          <div key={q.id} className="guide-question-card__disabled">
+                              <s style={{ flex: 1, color: "var(--text-tertiary)", fontSize: 14 }}>{q.main_question}</s>
                               <button
                                 className="btn btn-ghost btn-xs"
-                                style={{ color: "var(--primary, #6366f1)", flexShrink: 0 }}
+                                style={{ color: "var(--primary)", flexShrink: 0 }}
                                 onClick={() => toggleDeprecateQuestion(q.id, q.deprecated_at)}
                               >
-                                Re-enable
+                                {tProject("setup.reEnable")}
                               </button>
-                            </div>
                           </div>
                         ))}
                       </div>
@@ -1712,23 +1682,23 @@ export default function ProjectDetail() {
                   onClick={() => setAdvancedPromptOpen((o) => !o)}
                   aria-expanded={advancedPromptOpen}
                 >
-                  <span>⚙ Advanced — AI Interviewer Prompt</span>
+                  <span>⚙ {tProject("setup.advancedPromptTitle")}</span>
                   <span style={{ fontSize: "0.8rem" }}>{advancedPromptOpen ? "▲" : "▼"}</span>
                 </button>
                 {advancedPromptOpen && (
                   <div className="advanced-accordion-body">
                     <div className="advanced-warning">
-                      ⚠ Changes here affect all future interviews on this project and cannot be applied retroactively to completed sessions.
+                      ⚠ {tProject("setup.advancedWarning")}
                     </div>
                     <p className="muted-text" style={{ fontSize: 13, marginBottom: 8 }}>
-                      Customize how the AI interviewer behaves. Leave blank to use the default prompt.{" "}
+                      {tProject("setup.customizePromptDesc")}{" "}
                       {!editingSystemPrompt && !project.system_prompt && (
-                        <span style={{ color: "var(--text-tertiary)" }}>Currently using default.</span>
+                        <span style={{ color: "var(--text-tertiary)" }}>{tProject("setup.usingDefault")}</span>
                       )}
                     </p>
                     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
                       {!editingSystemPrompt && (
-                        <button className="btn btn-ghost btn-sm" onClick={() => { setSystemPromptDraft(project.system_prompt ?? ""); setEditingSystemPrompt(true); }}>Edit</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => { setSystemPromptDraft(project.system_prompt ?? ""); setEditingSystemPrompt(true); }}>{tCommon("edit")}</button>
                       )}
                     </div>
                     {editingSystemPrompt ? (
@@ -1741,12 +1711,12 @@ export default function ProjectDetail() {
                           style={{ width: "100%", fontFamily: "monospace", fontSize: 13, marginBottom: 8 }}
                         />
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button className="btn btn-primary btn-sm" onClick={saveSystemPrompt} disabled={savingSystemPrompt}>{savingSystemPrompt ? "Saving…" : "Save"}</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => setEditingSystemPrompt(false)}>Cancel</button>
+                          <button className="btn btn-primary btn-sm" onClick={saveSystemPrompt} disabled={savingSystemPrompt}>{savingSystemPrompt ? tCommon("saving") : tCommon("save")}</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setEditingSystemPrompt(false)}>{tCommon("cancel")}</button>
                         </div>
                       </>
                     ) : (
-                      <pre className="system-prompt-preview">{project.system_prompt || <em className="muted-text">No custom prompt — using default.</em>}</pre>
+                      <pre className="system-prompt-preview">{project.system_prompt || <em className="muted-text">{tProject("setup.noCustomPrompt")}</em>}</pre>
                     )}
                   </div>
                 )}
@@ -1801,14 +1771,14 @@ export default function ProjectDetail() {
               {/* ── Left column: filter + list ── */}
               <div className="responses-list-col">
                 {/* Header row */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>Responses</span>
+                <div style={{ marginBottom: 12 }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{tProject("responses.title")}</span>
                 </div>
 
                 {/* Status filter pills */}
                 <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
                   {(["all", "completed", "in_progress"] as const).map(f => {
-                    const label = f === "all" ? `All (${participants.length})` : f === "completed" ? `Done (${completedCount})` : `In progress (${inProgressCount})`;
+                    const label = f === "all" ? `${tProject("responses.allFilter")} (${participants.length})` : f === "completed" ? `${tProject("responses.doneFilter")} (${completedCount})` : `${tProject("responses.inProgressFilter")} (${inProgressCount})`;
                     return (
                       <button
                         key={f}
@@ -1826,9 +1796,9 @@ export default function ProjectDetail() {
                     value={responseSortBy}
                     onChange={e => setResponseSortBy(e.target.value as "date" | "quality" | "name")}
                   >
-                    <option value="date">Newest first</option>
-                    <option value="quality">By quality</option>
-                    <option value="name">By name</option>
+                    <option value="date">{tProject("responses.sortNewest")}</option>
+                    <option value="quality">{tProject("responses.sortQuality")}</option>
+                    <option value="name">{tProject("responses.sortName")}</option>
                   </select>
                 </div>
 
@@ -1836,13 +1806,13 @@ export default function ProjectDetail() {
                   <SkeletonTable rows={4} />
                 ) : participants.length === 0 ? (
                   <div className="empty-state" style={{ padding: "32px 16px" }}>
-                    <p style={{ fontWeight: 500 }}>No responses yet</p>
-                    <p className="muted-text" style={{ fontSize: 12, marginTop: 4 }}>Share an interview link to get started.</p>
-                    <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setTab("overview")}>Create interview link →</button>
+                    <p style={{ fontWeight: 500 }}>{tProject("responses.noResponsesYet")}</p>
+                    <p className="muted-text" style={{ fontSize: 12, marginTop: 4 }}>{tProject("responses.shareLink")}</p>
+                    <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setTab("overview")}>{tProject("responses.createLinkCta")} →</button>
                   </div>
                 ) : filtered.length === 0 ? (
                   <div style={{ padding: "24px 0", textAlign: "center" }}>
-                    <p className="muted-text" style={{ fontSize: 13 }}>No {responseStatusFilter === "completed" ? "completed" : "in-progress"} responses.</p>
+                    <p className="muted-text" style={{ fontSize: 13 }}>{tProject("responses.noFiltered", { status: responseStatusFilter === "completed" ? tProject("responses.doneFilter").toLowerCase() : tProject("responses.inProgressFilter").toLowerCase() })}</p>
                   </div>
                 ) : (
                   <div className="participants-list" style={{ gap: 2 }}>
@@ -1858,14 +1828,14 @@ export default function ProjectDetail() {
                         <div className="participant-avatar">{avatarInitial(p.display_name)}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span className="participant-name" style={{ fontSize: 13, marginRight: 0 }}>{p.display_name || "Anonymous"}</span>
+                            <span className="participant-name" style={{ fontSize: 13, marginRight: 0 }}>{p.display_name || tProject("responses.anonymous")}</span>
                             {p.status !== "completed" && (() => {
                               const ageMs = Date.now() - new Date(p.started_at).getTime();
                               const isRecent = ageMs < 2 * 60 * 60 * 1000; // < 2 hours
                               return (
                                 <span className={`status-badge ${isRecent ? "status-progress" : ""}`}
                                   style={{ fontSize: 10, background: isRecent ? undefined : "var(--border-subtle)", color: isRecent ? undefined : "var(--text-tertiary)" }}>
-                                  {isRecent ? "Live" : "In progress"}
+                                  {isRecent ? tProject("responses.live") : tProject("responses.statusInProgress")}
                                 </span>
                               );
                             })()}
@@ -1879,10 +1849,7 @@ export default function ProjectDetail() {
                             <span className="participant-date" style={{ fontSize: 11 }}>{relativeDate(p.started_at)}</span>
                             {p.quality_label && (
                               <span className={`quality-badge quality-badge--${p.quality_label}`} style={{ fontSize: 10, padding: "1px 6px" }}>
-                                {p.quality_label === "low" && "Low"}
-                                {p.quality_label === "fair" && "Fair"}
-                                {p.quality_label === "good" && "Good"}
-                                {p.quality_label === "strong" && "Strong"}
+                                {tProject(`responses.quality${p.quality_label!.charAt(0).toUpperCase() + p.quality_label!.slice(1)}`)}
                               </span>
                             )}
                           </div>
@@ -1903,13 +1870,13 @@ export default function ProjectDetail() {
                       className="btn btn-ghost btn-sm responses-back-btn"
                       style={{ padding: "6px 0", marginBottom: "4px", color: "var(--text-secondary)" }}
                     >
-                      ← Back to participants
+                      ← {tProject("responses.backToParticipants")}
                     </button>
 
                     {/* Transcript header */}
                     <div className="transcript-header">
                       <div>
-                        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>{selectedParticipant.display_name || "Anonymous"}</h2>
+                        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>{selectedParticipant.display_name || tProject("responses.anonymous")}</h2>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                           {selectedParticipant.profession && <span className="badge">{selectedParticipant.profession}</span>}
                           {selectedParticipant.age_range && <span className="badge">{selectedParticipant.age_range}</span>}
@@ -1917,7 +1884,7 @@ export default function ProjectDetail() {
                           <span className="participant-date" style={{ fontSize: 12 }}>{new Date(selectedParticipant.started_at).toLocaleString()}</span>
                         </div>
                       </div>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }}>Close</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }}>{tProject("responses.close")}</button>
                     </div>
 
                     {/* AI Quality Assessment */}
@@ -1925,43 +1892,40 @@ export default function ProjectDetail() {
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: qualityAssessment ? 12 : 0 }}>
                         {selectedParticipant.quality_label && (
                           <span className={`quality-badge quality-badge--${selectedParticipant.quality_label}`}>
-                            {selectedParticipant.quality_label === "low" && "⚠ Low quality"}
-                            {selectedParticipant.quality_label === "fair" && "◑ Fair quality"}
-                            {selectedParticipant.quality_label === "good" && "● Good quality"}
-                            {selectedParticipant.quality_label === "strong" && "★ Strong quality"}
+                            {tProject(`responses.quality${selectedParticipant.quality_label!.charAt(0).toUpperCase() + selectedParticipant.quality_label!.slice(1)}Full`)}
                           </span>
                         )}
                         <button className="btn btn-ai btn-sm" onClick={handleAssessQuality} disabled={loadingQuality}>
-                          {loadingQuality ? "Assessing…" : qualityAssessment ? "✦ Re-assess" : "✦ AI Quality Check"}
+                          {loadingQuality ? tProject("responses.assessing") : qualityAssessment ? `✦ ${tProject("responses.reAssess")}` : `✦ ${tProject("responses.aiQualityCheck")}`}
                         </button>
                         {qualityAssessment && (
-                          <button className="btn btn-ghost btn-xs" onClick={() => setQualityAssessment(null)}>Hide</button>
+                          <button className="btn btn-ghost btn-xs" onClick={() => setQualityAssessment(null)}>{tProject("responses.hide")}</button>
                         )}
                       </div>
                       {qualityAssessment && (
                         <div className="quality-panel">
                           <div className="quality-panel-header">
                             <span className={`quality-badge quality-badge--${qualityAssessment.quality_label} quality-badge--lg`}>
-                              {qualityAssessment.quality_label === "low" && "⚠ Low quality"}
-                              {qualityAssessment.quality_label === "fair" && "◑ Fair quality"}
-                              {qualityAssessment.quality_label === "good" && "● Good quality"}
-                              {qualityAssessment.quality_label === "strong" && "★ Strong quality"}
+                              {qualityAssessment.quality_label === "low" && `⚠ ${tProject("responses.qualityLowFull")}`}
+                              {qualityAssessment.quality_label === "fair" && `◑ ${tProject("responses.qualityFairFull")}`}
+                              {qualityAssessment.quality_label === "good" && `● ${tProject("responses.qualityGoodFull")}`}
+                              {qualityAssessment.quality_label === "strong" && `★ ${tProject("responses.qualityStrongFull")}`}
                             </span>
                             <div className="quality-stats">
-                              <span>~{qualityAssessment.avg_response_words} words/answer</span>
-                              <span>{qualityAssessment.short_answer_pct}% short answers</span>
+                              <span>{tProject("responses.wordsPerAnswer", { count: qualityAssessment.avg_response_words })}</span>
+                              <span>{tProject("responses.shortAnswerPct", { pct: qualityAssessment.short_answer_pct })}</span>
                             </div>
                           </div>
                           <p className="quality-summary">{qualityAssessment.summary}</p>
                           {qualityAssessment.strengths.length > 0 && (
                             <div className="quality-points quality-points--good">
-                              <strong>Strengths</strong>
+                              <strong>{tProject("responses.strengths")}</strong>
                               <ul>{qualityAssessment.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
                             </div>
                           )}
                           {qualityAssessment.issues.length > 0 && (
                             <div className="quality-points quality-points--warn">
-                              <strong>Issues</strong>
+                              <strong>{tProject("responses.issues")}</strong>
                               <ul>{qualityAssessment.issues.map((s, i) => <li key={i}>{s}</li>)}</ul>
                             </div>
                           )}
@@ -1972,27 +1936,27 @@ export default function ProjectDetail() {
                     {/* Codebook (inline, collapsible) */}
                     <div style={{ marginBottom: 16 }}>
                       <button className="btn btn-ghost btn-xs" onClick={() => setShowCodebookPersist(!showCodebook)} style={{ marginBottom: showCodebook ? 8 : 0 }}>
-                        {showCodebook ? "▲" : "▼"} Codebook ({codes.length})
+                        {showCodebook ? "▲" : "▼"} {tProject("responses.codebook", { count: codes.length })}
                       </button>
                       {showCodebook && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                           {codes.length === 0 ? (
-                            <p className="muted-text" style={{ fontSize: 12 }}>No codes yet. Select text to create one.</p>
+                            <p className="muted-text" style={{ fontSize: 12 }}>{tProject("responses.noCodesYet")}</p>
                           ) : codes.map((c) => (
                             <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: `${c.color}22`, border: `1.5px solid ${c.color}`, fontSize: 12 }}>
                               <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color, display: "inline-block", flexShrink: 0 }} />
                               {renamingCodeId === c.id ? (
                                 <>
                                   <input autoFocus value={renameText} onChange={(e) => setRenameText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRenameCode(c.id); if (e.key === "Escape") setRenamingCodeId(null); }} style={{ border: "none", background: "transparent", outline: "none", fontSize: 12, width: Math.max(60, renameText.length * 8) }} />
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-500)", padding: 0, fontSize: 11 }} onClick={() => handleRenameCode(c.id)} title="Save">���</button>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 11 }} onClick={() => setRenamingCodeId(null)} title="Cancel">✕</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-500)", padding: 0, fontSize: 11 }} onClick={() => handleRenameCode(c.id)} title={tCommon("save")}>✓</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 11 }} onClick={() => setRenamingCodeId(null)} title={tCommon("cancel")}>✕</button>
                                 </>
                               ) : (
                                 <>
                                   <span title="Double-click to rename" onDoubleClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} style={{ cursor: "text" }}>{c.name}</span>
                                   <span className="muted-text" style={{ fontSize: 10 }}>({c.tag_count})</span>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 10 }} onClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} title="Rename">✎</button>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 13 }} onClick={() => handleDeleteCode(c.id)} title="Delete code">×</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 10 }} onClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} title={tProject("responses.renameCode")}>✎</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 13 }} onClick={() => handleDeleteCode(c.id)} title={tProject("responses.deleteCodeBtn")}>×</button>
                                 </>
                               )}
                             </div>
@@ -2004,12 +1968,12 @@ export default function ProjectDetail() {
                     {/* Quote tagging instruction */}
                     <div className="quote-tag-instruction" style={{ marginBottom: 16 }}>
                       <span>💬</span>
-                      <span>Select any text in an answer to tag it with a code.</span>
+                      <span>{tProject("responses.selectTextToTag")}</span>
                     </div>
 
                     {/* Transcript turns */}
                     {transcript.length === 0 ? (
-                      <p className="muted-text">No transcript available.</p>
+                      <p className="muted-text">{tProject("responses.noTranscript")}</p>
                     ) : (
                       <div className="transcript-list" ref={transcriptListRef}>
                         {transcript.map((t) => {
@@ -2022,7 +1986,7 @@ export default function ProjectDetail() {
                               className={`transcript-turn${isHighlighted ? " transcript-turn--highlighted" : ""}`}
                             >
                               <div className="transcript-q">
-                                <strong>Q:</strong> {t.question_text}
+                                {t.question_text}
                                 {t.tts_audio_url && (
                                   <audio controls src={t.tts_audio_url} className="transcript-audio" aria-label={`AI question audio — turn ${t.turn_index}`} />
                                 )}
@@ -2032,24 +1996,23 @@ export default function ProjectDetail() {
                                   <textarea className="field-input" value={editingText} onChange={(e) => setEditingText(e.target.value)} rows={4} style={{ width: "100%", marginBottom: 6 }} autoFocus />
                                   <div style={{ display: "flex", gap: 6 }}>
                                     <button className="btn btn-primary btn-xs" disabled={savingTurnId === t.id} onClick={() => saveEditTurn(t)}>
-                                      {savingTurnId === t.id ? "Saving..." : "Save"}
+                                      {savingTurnId === t.id ? tCommon("saving") : tCommon("save")}
                                     </button>
                                     <button className="btn btn-ghost btn-xs" onClick={() => {
-                                      if (editingText !== editingOriginalText && !confirm("Discard changes?")) return;
+                                      if (editingText !== editingOriginalText && !confirm(tProject("responses.discardChanges"))) return;
                                       setEditingTurnId(null);
-                                    }}>Cancel</button>
+                                    }}>{tCommon("cancel")}</button>
                                   </div>
                                 </div>
                               ) : t.response_transcript ? (
                                 <div className="transcript-a" onMouseUp={() => handleTranscriptMouseUp(t.id)} style={{ userSelect: "text" }}>
-                                  <strong>A:</strong>{" "}
                                   {isHighlighted && highlightTarget
                                     ? renderWithQuoteHighlight(t.response_transcript, highlightTarget.quoteText, t.id)
                                     : renderTaggedText(t.response_transcript, t.id)}
                                   <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
-                                    <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>Edit</button>
+                                    <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>{tCommon("edit")}</button>
                                     {t.manually_edited && (
-                                      <span className="badge" style={{ fontSize: 10, background: "var(--warning-bg)", color: "var(--warning-text)" }}>edited</span>
+                                      <span className="badge" style={{ fontSize: 10, background: "var(--warning-bg)", color: "var(--warning-text)" }}>{tProject("responses.edited")}</span>
                                     )}
                                   </span>
                                   {t.audio_recording_url && (
@@ -2065,8 +2028,8 @@ export default function ProjectDetail() {
                                       <button
                                         className="tag-pill-remove"
                                         onClick={(e) => { e.stopPropagation(); handleDeleteTag(tg.id); }}
-                                        aria-label={`Remove tag ${tg.code_name}`}
-                                        title="Remove tag"
+                                        aria-label={`${tProject("responses.removeTag")} ${tg.code_name}`}
+                                        title={tProject("responses.removeTag")}
                                       >×</button>
                                     </span>
                                   ))}
@@ -2079,10 +2042,14 @@ export default function ProjectDetail() {
                     )}
                   </>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 300, color: "var(--text-tertiary)" }}>
-                    <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.25 }}>📋</div>
-                    <p style={{ fontWeight: 500, fontSize: 14, marginBottom: 4, color: "var(--text-secondary)" }}>No response selected</p>
-                    <p style={{ fontSize: 13 }}>Choose a participant from the list to view their transcript</p>
+                  <div className="empty-state" style={{ minHeight: 300, border: "none", background: "transparent" }}>
+                    <div className="empty-state-icon">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-disabled)" }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
+                      </svg>
+                    </div>
+                    <p style={{ fontWeight: 500, fontSize: 14, color: "var(--text-secondary)", margin: 0 }}>{tProject("responses.noSelected")}</p>
+                    <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>{tProject("responses.selectPrompt")}</p>
                   </div>
                 )}
               </div>
@@ -2093,7 +2060,7 @@ export default function ProjectDetail() {
               <div style={{ position: "fixed", left: selectionInfo.x - 90, top: selectionInfo.y, zIndex: 1000, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)", padding: 8, minWidth: 180 }}>
                 {!showNewCode ? (
                   <div>
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>Tag as:</div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>{tProject("responses.tagAs")}</div>
                     {codes.map((c) => (
                       <button key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "4px 8px", border: "none", background: "none", cursor: "pointer", borderRadius: 4, fontSize: 13, textAlign: "left" }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "var(--border-subtle)")}
@@ -2105,21 +2072,21 @@ export default function ProjectDetail() {
                       </button>
                     ))}
                     <div style={{ borderTop: "1px solid var(--border-subtle)", marginTop: 4, paddingTop: 4 }}>
-                      <button className="btn btn-ghost btn-xs" style={{ width: "100%" }} onClick={() => setShowNewCode(true)}>+ New code</button>
-                      <button className="btn btn-ghost btn-xs" style={{ width: "100%", color: "var(--text-disabled)" }} onClick={() => { setSelectionInfo(null); window.getSelection()?.removeAllRanges(); }}>Cancel</button>
+                      <button className="btn btn-ghost btn-xs" style={{ width: "100%" }} onClick={() => setShowNewCode(true)}>{tProject("responses.newCode")}</button>
+                      <button className="btn btn-ghost btn-xs" style={{ width: "100%", color: "var(--text-disabled)" }} onClick={() => { setSelectionInfo(null); window.getSelection()?.removeAllRanges(); }}>{tCommon("cancel")}</button>
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <input className="field-input" placeholder="Code name" value={newCodeName} onChange={(e) => setNewCodeName(e.target.value)} style={{ marginBottom: 6, fontSize: 13 }} autoFocus />
+                    <input className="field-input" placeholder={tProject("responses.codeName")} value={newCodeName} onChange={(e) => setNewCodeName(e.target.value)} style={{ marginBottom: 6, fontSize: 13 }} autoFocus />
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
                       {PRESET_COLORS.map((col) => (
                         <div key={col} style={{ width: 20, height: 20, borderRadius: "50%", background: col, cursor: "pointer", border: newCodeColor === col ? "2px solid #111" : "2px solid transparent" }} onClick={() => setNewCodeColor(col)} />
                       ))}
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button className="btn btn-primary btn-xs" disabled={!newCodeName.trim() || creatingCode} onClick={handleCreateAndTag}>{creatingCode ? "..." : "Create & Tag"}</button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => setShowNewCode(false)}>Back</button>
+                      <button className="btn btn-primary btn-xs" disabled={!newCodeName.trim() || creatingCode} onClick={handleCreateAndTag}>{creatingCode ? "..." : tProject("responses.createAndTag")}</button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => setShowNewCode(false)}>{tCommon("back")}</button>
                     </div>
                   </div>
                 )}
@@ -2136,28 +2103,28 @@ export default function ProjectDetail() {
               {/* Stale banner — above actions so it's seen before clicking Regenerate */}
               {analysis.report && analysis.completed_count > analysis.participant_count && (
                 <div className="analysis-stale-banner">
-                  ⚠ {analysis.completed_count - analysis.participant_count} new response{analysis.completed_count - analysis.participant_count > 1 ? "s" : ""} since last analysis — regenerate to include them.
+                  ⚠ {tAnalysis("staleWarning", { count: analysis.completed_count - analysis.participant_count })}
                 </div>
               )}
               <div className="section-header-row">
-                <h2>AI Analysis</h2>
+                <h2>{tAnalysis("aiAnalysis")}</h2>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   {analysis.report && (
                     <>
                       <button className="btn btn-ghost btn-sm" onClick={handleCopyMarkdown}>
-                        {exportCopied ? "✓ Copied" : "Copy MD"}
+                        {exportCopied ? `✓ ${tCommon("copied")}` : tAnalysis("copyMd")}
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={handleDownloadJSON}>
-                        ↓ JSON
+                        {tAnalysis("downloadJson")}
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={handleShareAnalysis}>
-                        🔗 Share
+                        🔗 {tAnalysis("shareBtn")}
                       </button>
                     </>
                   )}
                   {analysis.completed_count > 0 && (
                     <button className="btn btn-ai btn-sm" onClick={handleTriggerAnalysis} disabled={analysis.status === "generating"}>
-                      {analysis.status === "generating" ? "Analysing..." : analysis.status === "none" ? "✦ Generate" : "✦ Regenerate"}
+                      {analysis.status === "generating" ? tAnalysis("analysing") : analysis.status === "none" ? `✦ ${tAnalysis("generateBtn")}` : `✦ ${tAnalysis("regenerateBtn")}`}
                     </button>
                   )}
                 </div>
@@ -2167,8 +2134,8 @@ export default function ProjectDetail() {
               {hasFilterOptions && (
                 <div style={{ marginBottom: 16 }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => setFiltersExpanded(!filtersExpanded)} style={{ marginBottom: 6 }}>
-                    {filtersExpanded ? "▲" : "▼"} Filter by segment
-                    {activeFilterValues.length > 0 && <span className="badge" style={{ marginLeft: 4 }}>{activeFilterValues.length} active</span>}
+                    {filtersExpanded ? "▲" : "▼"} {tAnalysis("filterBySegment")}
+                    {activeFilterValues.length > 0 && <span className="badge" style={{ marginLeft: 4 }}>{tAnalysis("activeFilters", { count: activeFilterValues.length })}</span>}
                   </button>
                   {filtersExpanded && (
                     <div style={{ padding: 12, border: "1px solid var(--border-default)", borderRadius: "var(--radius)", background: "var(--bg-base)" }}>
@@ -2189,13 +2156,13 @@ export default function ProjectDetail() {
                         </div>
                       ))}
                       {activeFilterValues.length > 0 && (
-                        <button className="btn btn-ghost btn-xs" onClick={() => { setActiveFilterBy(""); setActiveFilterValues([]); }} style={{ marginTop: 4 }}>Clear filters</button>
+                        <button className="btn btn-ghost btn-xs" onClick={() => { setActiveFilterBy(""); setActiveFilterValues([]); }} style={{ marginTop: 4 }}>{tAnalysis("clearFilters")}</button>
                       )}
                     </div>
                   )}
                   {analysis.filters && (
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, marginTop: 6 }}>
-                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Filtered by:</span>
+                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{tAnalysis("filteredBy")}</span>
                       {analysis.filters.filter_values.map((v) => (
                         <span key={v} className="badge" style={{ background: "var(--brand-50)", color: "var(--brand-700)" }}>{analysis.filters!.filter_by}: {v}</span>
                       ))}
@@ -2206,29 +2173,29 @@ export default function ProjectDetail() {
 
               {analysis.status === "none" && analysis.completed_count === 0 && (
                 <div className="empty-state">
-                  <p style={{ fontWeight: 500 }}>Collect responses first</p>
-                  <p className="muted-text" style={{ fontSize: 13 }}>Complete at least one interview to generate an analysis.</p>
-                  <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setTab("responses")}>Go to Responses →</button>
+                  <p style={{ fontWeight: 500 }}>{tAnalysis("collectFirst")}</p>
+                  <p className="muted-text" style={{ fontSize: 13 }}>{tAnalysis("collectFirstDesc")}</p>
+                  <button className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setTab("responses")}>{tAnalysis("goToResponses")}</button>
                 </div>
               )}
               {analysis.status === "none" && analysis.completed_count > 0 && (
-                <p className="muted-text">{analysis.completed_count} completed interview{analysis.completed_count > 1 ? "s" : ""} ready to analyse.</p>
+                <p className="muted-text">{tAnalysis("readyToAnalyse", { count: analysis.completed_count })}</p>
               )}
               {analysis.status === "generating" && (
-                <div className="analysis-generating"><span className="spinner-sm" /><span>Claude is reading {analysis.participant_count} interview{analysis.participant_count !== 1 ? "s" : ""}...</span></div>
+                <div className="analysis-generating"><span className="spinner-sm" /><span>{tAnalysis("claudeReading", { count: analysis.participant_count })}</span></div>
               )}
               {analysis.status === "failed" && (
                 <div style={{ padding: "16px", borderRadius: "var(--radius)", background: "var(--danger-bg)", border: "1px solid var(--danger-border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <span style={{ fontSize: 18 }}>⚠</span>
                   <div>
-                    <p style={{ fontWeight: 600, color: "var(--danger-text)", marginBottom: 4 }}>Analysis couldn't complete</p>
+                    <p style={{ fontWeight: 600, color: "var(--danger-text)", marginBottom: 4 }}>{tAnalysis("failedTitle")}</p>
                     <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 10 }}>
-                      {analysis.error?.includes("timed out") ? "The analysis timed out — your dataset may be too large. Try filtering to a smaller group first." :
-                       analysis.error?.includes("No completed") ? "No completed interviews to analyse yet." :
-                       "Something went wrong on our end. Please try again."}
+                      {analysis.error?.includes("timed out") ? tAnalysis("failedTimeout") :
+                       analysis.error?.includes("No completed") ? tAnalysis("failedNoCompleted") :
+                       tAnalysis("failedGeneric")}
                     </p>
                     <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff" }} onClick={handleTriggerAnalysis}>
-                      Retry analysis
+                      {tAnalysis("retryAnalysis")}
                     </button>
                   </div>
                 </div>
@@ -2251,25 +2218,25 @@ export default function ProjectDetail() {
 
                 return (
                   <div className="analysis-report">
-                    <h3 style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Summary</h3>
+                    <h3 style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{tAnalysis("summary")}</h3>
                     <div className="analysis-summary">{r.summary}</div>
                     <div className="analysis-meta">
                       <span className="badge analysis-ai-badge">
                         {isViewingPastVersion
-                          ? (activeVersionReport!.version_label === "researcher_refined" ? "✦ Researcher-refined" : "✦ AI-generated")
-                          : (analysis.version_label === "researcher_refined" ? "✦ Researcher-refined" : "✦ AI-generated")}
+                          ? (activeVersionReport!.version_label === "researcher_refined" ? `✦ ${tAnalysis("researcherRefinedBadge")}` : `✦ ${tAnalysis("aiGenerated")}`)
+                          : (analysis.version_label === "researcher_refined" ? `✦ ${tAnalysis("researcherRefinedBadge")}` : `✦ ${tAnalysis("aiGenerated")}`)}
                       </span>
-                      <span className="badge">n={r.participant_count} interview{r.participant_count !== 1 ? "s" : ""}</span>
+                      <span className="badge">{tAnalysis("nInterviews", { count: r.participant_count })}</span>
                       <span
-                        className="badge"
-                        title={r.confidence_rationale || "Confidence reflects sample size, response depth, and thematic saturation."}
-                        style={{ cursor: "help", textDecoration: "underline dotted" }}
+                        className={`confidence-badge confidence-badge--${r.confidence || "medium"}`}
+                        title={r.confidence_rationale || tAnalysis("sharedReport.confidenceTooltip")}
+                        style={{ cursor: "help" }}
                       >
-                        {r.confidence} confidence
+                        {tAnalysis("confidenceBadge", { level: r.confidence })}
                       </span>
                       {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters) && (
                         <span className="badge" style={{ background: "var(--brand-50)", color: "var(--brand-700)" }}>
-                          Filtered: {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_by} ({(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_values.join(", ")})
+                          {tAnalysis("filteredBadge", { filterBy: (isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_by, values: (isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_values.join(", ") })}
                         </span>
                       )}
                     </div>
@@ -2283,8 +2250,8 @@ export default function ProjectDetail() {
                             ? v.version === activeVersionNumber
                             : isCurrent;
                           const labelText = v.version_label === "researcher_refined"
-                            ? "Researcher-refined"
-                            : "AI Discovery";
+                            ? tAnalysis("researcherRefinedBadge")
+                            : tAnalysis("aiDiscovery");
                           return (
                             <button
                               key={v.version}
@@ -2301,7 +2268,7 @@ export default function ProjectDetail() {
                               v{v.version} · {labelText}
                               {isCurrent && <span style={{ marginLeft: 4, color: "var(--brand-500)" }}>●</span>}
                               {v.annotation_count > 0 && !isCurrent && (
-                                <span style={{ marginLeft: 4, fontSize: 10, color: "var(--text-tertiary)" }}>{v.annotation_count} ann.</span>
+                                <span style={{ marginLeft: 4, fontSize: 10, color: "var(--text-tertiary)" }}>{tAnalysis("annCount", { count: v.annotation_count })}</span>
                               )}
                             </button>
                           );
@@ -2312,13 +2279,13 @@ export default function ProjectDetail() {
                     {/* Past version banner */}
                     {isViewingPastVersion && (
                       <div className="version-banner">
-                        Viewing v{activeVersionNumber} — {activeVersionReport!.version_label === "researcher_refined" ? "Researcher-refined" : "AI Discovery"}.{" "}
+                        {tAnalysis("viewingVersion", { version: activeVersionNumber, label: activeVersionReport!.version_label === "researcher_refined" ? tAnalysis("researcherRefinedBadge") : tAnalysis("aiDiscovery") })}{" "}
                         <button
                           className="btn btn-ghost btn-xs"
                           onClick={() => { setActiveVersionNumber(null); setActiveVersionReport(null); }}
                           style={{ color: "var(--brand-600)", padding: "0 4px" }}
                         >
-                          Switch to v{latestVersionNum} (latest)
+                          {tAnalysis("switchToLatest", { version: latestVersionNum })}
                         </button>
                       </div>
                     )}
@@ -2326,51 +2293,48 @@ export default function ProjectDetail() {
                     {/* Themes */}
                     {r.themes.length > 0 && (
                       <div className="analysis-block">
-                        <h3>Key Themes ({r.themes.length})</h3>
+                        <h3>{tAnalysis("keyThemesCount", { count: r.themes.length })}</h3>
                         {r.themes.map((t, i) => {
                           const ann = themeAnnotations[t.title];
                           const showNoteInput = !isViewingPastVersion && ann && (ann.status === "disputed" || ann.status === "needs_evidence");
                           return (
                             <div key={i} className="analysis-theme">
                               <div className="analysis-theme-header" style={{ flexWrap: "wrap" }}>
-                                <strong>{t.title}{t.quotes.length > 0 && <span className="analysis-quote-count">{t.quotes.length} quote{t.quotes.length !== 1 ? "s" : ""}</span>}</strong>
+                                <strong>{t.title}{t.quotes.length > 0 && <span className="analysis-quote-count">{tAnalysis("quoteCount", { count: t.quotes.length })}</span>}</strong>
                                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                                   <span className="badge">{t.frequency}</span>
                                   {!isViewingPastVersion && (
                                     <>
                                       <button
-                                        className={`annotation-btn annotation-btn--confirmed${ann?.status === "confirmed" ? " annotation-btn--active" : ""}`}
-                                        title="Confirmed"
+                                        className={`annotation-pill${ann?.status === "confirmed" ? " annotation-pill--confirmed" : ""}`}
                                         aria-label="Confirmed"
                                         onClick={() => handleAnnotationClick(t.title, "confirmed")}
-                                      >✓</button>
+                                      >✓ {tAnalysis("annotationConfirm")}</button>
                                       <button
-                                        className={`annotation-btn annotation-btn--needs-evidence${ann?.status === "needs_evidence" ? " annotation-btn--active" : ""}`}
-                                        title="Needs evidence"
+                                        className={`annotation-pill${ann?.status === "needs_evidence" ? " annotation-pill--needs_evidence" : ""}`}
                                         aria-label="Needs evidence"
                                         onClick={() => handleAnnotationClick(t.title, "needs_evidence")}
-                                      >−</button>
+                                      >? {tAnalysis("annotationEvidence")}</button>
                                       <button
-                                        className={`annotation-btn annotation-btn--disputed${ann?.status === "disputed" ? " annotation-btn--active" : ""}`}
-                                        title="Disputed"
+                                        className={`annotation-pill${ann?.status === "disputed" ? " annotation-pill--disputed" : ""}`}
                                         aria-label="Disputed"
                                         onClick={() => handleAnnotationClick(t.title, "disputed")}
-                                      >✕</button>
+                                      >✕ {tAnalysis("annotationDispute")}</button>
                                     </>
                                   )}
-                                  <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>
+                                  <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>{tAnalysis("addNote")}</button>
                                 </div>
                               </div>
                               <p>{t.summary}</p>
                               {t.researcher_note && (
                                 <p style={{ fontSize: 12, color: "var(--text-tertiary)", fontStyle: "italic", borderLeft: "3px solid var(--warning)", paddingLeft: 8, marginTop: 4 }}>
-                                  Researcher note: {t.researcher_note}
+                                  {tAnalysis("researcherNoteLabel")} {t.researcher_note}
                                 </p>
                               )}
                               {showNoteInput && (
                                 <textarea
                                   className="annotation-note-input"
-                                  placeholder="Add a note for Claude (optional)"
+                                  placeholder={tAnalysis("annotationNotePlaceholder")}
                                   defaultValue={ann?.researcher_note ?? ""}
                                   onBlur={(e) => handleAnnotationNoteBlur(t.title, e.target.value)}
                                 />
@@ -2390,14 +2354,14 @@ export default function ProjectDetail() {
                     {/* JTBD */}
                     {r.jobs_to_be_done.length > 0 && (
                       <div className="analysis-block">
-                        <h3>Jobs to be Done ({r.jobs_to_be_done.length})</h3>
+                        <h3>{tAnalysis("jtbdCount", { count: r.jobs_to_be_done.length })}</h3>
                         {r.jobs_to_be_done.map((j, i) => (
                           <div key={i} className="analysis-jtbd">
                             <div className="analysis-jtbd-job">"{j.job}"</div>
                             <p className="analysis-jtbd-insight">{j.insight}</p>
                             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                               <span className="badge">{j.frequency}</span>
-                              <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)" }} onClick={() => { setAddingMemoKey(j.job); setNewMemoContent(""); }}>+ Note</button>
+                              <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)" }} onClick={() => { setAddingMemoKey(j.job); setNewMemoContent(""); }}>{tAnalysis("addNote")}</button>
                             </div>
                             {renderMemoSection("jtbd_note", j.job)}
                           </div>
@@ -2408,12 +2372,12 @@ export default function ProjectDetail() {
                     {/* Tensions */}
                     {r.tensions.length > 0 && (
                       <div className="analysis-block">
-                        <h3>Tensions & Contradictions ({r.tensions.length})</h3>
+                        <h3>{tAnalysis("tensionsCount", { count: r.tensions.length })}</h3>
                         {r.tensions.map((t, i) => (
                           <div key={i} className="analysis-tension">
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                               <strong>{t.tension}</strong>
-                              <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)", flexShrink: 0 }} onClick={() => { setAddingMemoKey(t.tension); setNewMemoContent(""); }}>+ Note</button>
+                              <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)", flexShrink: 0 }} onClick={() => { setAddingMemoKey(t.tension); setNewMemoContent(""); }}>{tAnalysis("addNote")}</button>
                             </div>
                             <p>{t.detail}</p>
                             {renderMemoSection("tension_note", t.tension)}
@@ -2425,7 +2389,7 @@ export default function ProjectDetail() {
                     {/* Recommendations */}
                     {r.recommendations.length > 0 && (
                       <div className="analysis-block">
-                        <h3>Recommendations</h3>
+                        <h3>{tAnalysis("recommendations")}</h3>
                         <ol className="analysis-recommendations">
                           {r.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
                         </ol>
@@ -2434,23 +2398,23 @@ export default function ProjectDetail() {
 
                     {/* General memos */}
                     <div className="analysis-block">
-                      <h3>General Notes</h3>
+                      <h3>{tAnalysis("generalNotes")}</h3>
                       {memos.filter((m) => m.linked_key === null && m.type === "general").map((m) => (
                         <div key={m.id} className="memo-card">
                           {editingMemoId === m.id ? (
                             <div>
                               <textarea className="field-input" value={editingMemoContent} onChange={(e) => setEditingMemoContent(e.target.value)} rows={3} style={{ width: "100%", marginBottom: 6 }} />
                               <div style={{ display: "flex", gap: 6 }}>
-                                <button className="btn btn-primary btn-xs" onClick={() => handleUpdateMemo(m.id)}>Save</button>
-                                <button className="btn btn-ghost btn-xs" onClick={() => setEditingMemoId(null)}>Cancel</button>
+                                <button className="btn btn-primary btn-xs" onClick={() => handleUpdateMemo(m.id)}>{tCommon("save")}</button>
+                                <button className="btn btn-ghost btn-xs" onClick={() => setEditingMemoId(null)}>{tCommon("cancel")}</button>
                               </div>
                             </div>
                           ) : (
                             <div>
                               <p style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 13 }}>{m.content}</p>
                               <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
-                                <button className="btn btn-ghost btn-xs" onClick={() => { setEditingMemoId(m.id); setEditingMemoContent(m.content); }}>Edit</button>
-                                <button className="btn btn-ghost btn-xs btn-danger-text" onClick={() => handleDeleteMemo(m.id)}>Delete</button>
+                                <button className="btn btn-ghost btn-xs" onClick={() => { setEditingMemoId(m.id); setEditingMemoContent(m.content); }}>{tCommon("edit")}</button>
+                                <button className="btn btn-ghost btn-xs btn-danger-text" onClick={() => handleDeleteMemo(m.id)}>{tCommon("delete")}</button>
                                 <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: "auto" }}>
                                   {timeAgo(m.updated_at || m.created_at)}
                                 </span>
@@ -2461,15 +2425,15 @@ export default function ProjectDetail() {
                       ))}
                       {addingMemoKey === "__general__" ? (
                         <div style={{ marginTop: 8 }}>
-                          <textarea className="field-input" value={newMemoContent} onChange={(e) => setNewMemoContent(e.target.value)} placeholder="Add a project-wide note..." rows={3} style={{ width: "100%", marginBottom: 6 }} autoFocus />
+                          <textarea className="field-input" value={newMemoContent} onChange={(e) => setNewMemoContent(e.target.value)} placeholder={tAnalysis("generalNotePlaceholder")} rows={3} style={{ width: "100%", marginBottom: 6 }} autoFocus />
                           <div style={{ display: "flex", gap: 6 }}>
-                            <button className="btn btn-primary btn-xs" onClick={() => handleAddMemo("general", null)}>Save</button>
-                            <button className="btn btn-ghost btn-xs" onClick={() => { setAddingMemoKey(null); setNewMemoContent(""); }}>Cancel</button>
+                            <button className="btn btn-primary btn-xs" onClick={() => handleAddMemo("general", null)}>{tCommon("save")}</button>
+                            <button className="btn btn-ghost btn-xs" onClick={() => { setAddingMemoKey(null); setNewMemoContent(""); }}>{tCommon("cancel")}</button>
                           </div>
                         </div>
                       ) : (
                         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8, color: "var(--warning)" }} onClick={() => { setAddingMemoKey("__general__"); setNewMemoContent(""); }}>
-                          + Add General Note
+                          {tAnalysis("addGeneralNote")}
                         </button>
                       )}
                     </div>
@@ -2479,9 +2443,9 @@ export default function ProjectDetail() {
                       <div className="analysis-block">
                         <div className="researcher-context-box">
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                            <h3 style={{ margin: 0 }}>Researcher Context</h3>
+                            <h3 style={{ margin: 0 }}>{tAnalysis("researcherContext")}</h3>
                             <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                              {contextSaving === "saving" ? "Saving…" : contextSaving === "saved" ? "Saved ✓" : ""}
+                              {contextSaving === "saving" ? tCommon("saving") : contextSaving === "saved" ? `${tCommon("save")} ✓` : ""}
                             </span>
                           </div>
                           <textarea
@@ -2489,7 +2453,7 @@ export default function ProjectDetail() {
                             rows={4}
                             value={researcherContext}
                             onChange={(e) => handleResearcherContextChange(e.target.value)}
-                            placeholder="Add context Claude doesn't have from transcripts — industry norms, prior research, hypotheses, things to look for or avoid."
+                            placeholder={tAnalysis("contextPlaceholder")}
                             style={{ width: "100%", fontSize: 13, resize: "vertical" }}
                           />
                         </div>
@@ -2500,15 +2464,14 @@ export default function ProjectDetail() {
                               className="btn btn-ai btn-sm"
                               disabled={!canRefine || refining}
                               onClick={() => setRefineModalOpen(true)}
-                              title={!canRefine ? "Add disputed/needs-evidence annotations or researcher context first" : undefined}
+                              title={!canRefine ? tAnalysis("refineDisabledHint") : undefined}
                             >
-                              ✦ Refine with my annotations
+                              ✦ {tAnalysis("refineWithAnnotations")}
                             </button>
                           ) : (
                             <div className="refine-confirm-inline">
                               <p style={{ margin: "0 0 8px 0", fontSize: 13 }}>
-                                Generate v{latestVersionNum + 1} based on your {annotationCount} annotation{annotationCount !== 1 ? "s" : ""}?
-                                This won't overwrite v{latestVersionNum}.
+                                {tAnalysis("refineConfirmText", { version: latestVersionNum + 1, count: annotationCount, current: latestVersionNum })}
                               </p>
                               <div style={{ display: "flex", gap: 8 }}>
                                 <button
@@ -2516,13 +2479,13 @@ export default function ProjectDetail() {
                                   disabled={refining}
                                   onClick={handleTriggerRefine}
                                 >
-                                  {refining ? "Starting…" : "Confirm"}
+                                  {refining ? tAnalysis("starting") : tCommon("confirm")}
                                 </button>
                                 <button
                                   className="btn btn-ghost btn-sm"
                                   onClick={() => setRefineModalOpen(false)}
                                 >
-                                  Cancel
+                                  {tCommon("cancel")}
                                 </button>
                               </div>
                             </div>
@@ -2534,20 +2497,20 @@ export default function ProjectDetail() {
                     {/* P7: Heatmap */}
                     <div className="analysis-block">
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                        <h3 style={{ margin: 0 }}>Segment Heatmap</h3>
+                        <h3 style={{ margin: 0 }}>{tAnalysis("segmentHeatmap")}</h3>
                         <button className="btn btn-ghost btn-sm" onClick={() => { if (!heatmapExpanded) loadHeatmap(); else setHeatmapExpanded(false); }}>
-                          {heatmapLoading ? "Loading..." : heatmapExpanded ? "Hide" : "Show"}
+                          {heatmapLoading ? tCommon("loading") : heatmapExpanded ? tAnalysis("hideHeatmap") : tAnalysis("showHeatmap")}
                         </button>
                       </div>
                       {heatmapExpanded && heatmap && (
                         <div style={{ overflowX: "auto" }}>
                           {heatmap.segments.length === 0 ? (
-                            <p className="muted-text">No demographic segments found. Collect profession, age, or country data from participants to populate this view.</p>
+                            <p className="muted-text">{tAnalysis("noSegments")}</p>
                           ) : (
                             <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
                               <thead>
                                 <tr>
-                                  <th style={{ padding: "6px 10px", textAlign: "left", background: "var(--bg-base)", borderBottom: "1px solid var(--border-default)", minWidth: 160 }}>Theme</th>
+                                  <th style={{ padding: "6px 10px", textAlign: "left", background: "var(--bg-base)", borderBottom: "1px solid var(--border-default)", minWidth: 160 }}>{tAnalysis("themeHeader")}</th>
                                   {heatmap.segments.map((seg) => (
                                     <th key={seg} style={{ padding: "6px 8px", textAlign: "center", background: "var(--bg-base)", borderBottom: "1px solid var(--border-default)", whiteSpace: "nowrap" }}>
                                       {seg.split(":")[1]}
@@ -2626,10 +2589,10 @@ export default function ProjectDetail() {
               <button className="modal-close" onClick={closeWelcome} aria-label="Close">×</button>
               <div className="welcome-modal-icon" aria-hidden="true">🎉</div>
               <h2 id="welcome-modal-title" className="welcome-modal-title">
-                Your project is live!
+                {tProject("detail.welcomeModalTitle")}
               </h2>
               <p className="welcome-modal-subtitle">
-                Share this link and start collecting responses — your first insights could be in as soon as an hour.
+                {tProject("detail.welcomeModalSubtitle")}
               </p>
 
               {activeLink ? (
@@ -2648,7 +2611,7 @@ export default function ProjectDetail() {
                       onClick={copyShareUrl}
                       type="button"
                     >
-                      {welcomeCopied ? "✓ Copied" : "Copy link"}
+                      {welcomeCopied ? `✓ ${tCommon("copied")}` : tProject("detail.copyLink")}
                     </button>
                   </div>
 
@@ -2657,7 +2620,7 @@ export default function ProjectDetail() {
                       href={mailtoLink}
                       className="btn btn-ghost welcome-modal-share-btn"
                     >
-                      ✉ Send via email
+                      ✉ {tProject("detail.sendViaEmail")}
                     </a>
                     <button
                       className="btn btn-ghost welcome-modal-share-btn"
@@ -2666,23 +2629,23 @@ export default function ProjectDetail() {
                         window.open(shareUrl, "_blank");
                       }}
                     >
-                      ▶ Preview interview
+                      ▶ {tProject("detail.previewInterview")}
                     </button>
                   </div>
 
                   <div className="welcome-modal-tips">
-                    <strong>Pro tip:</strong> The first 3 participants are the most valuable. Aim to recruit from inside your existing network — teammates, recent customers, or community members — rather than cold outreach.
+                    <strong>Pro tip:</strong> {tProject("detail.proTip")}
                   </div>
                 </>
               ) : (
                 <div className="welcome-modal-tips">
-                  We couldn't auto-generate an interview link. Head to the Overview tab to create one manually.
+                  {tProject("detail.noAutoLink")}
                 </div>
               )}
 
               <div className="welcome-modal-footer">
                 <button className="btn btn-ghost" onClick={closeWelcome}>
-                  I'll share later
+                  {tProject("detail.shareLater")}
                 </button>
                 <button
                   className="btn btn-primary"
@@ -2691,7 +2654,7 @@ export default function ProjectDetail() {
                     closeWelcome();
                   }}
                 >
-                  Go to project
+                  {tProject("detail.goToProject")}
                 </button>
               </div>
             </div>
