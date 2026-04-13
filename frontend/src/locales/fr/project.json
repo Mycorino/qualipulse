@@ -292,7 +292,7 @@
     "shortAnswerPct": "{{pct}}% de réponses courtes",
     "strengths": "Points forts",
     "issues": "Points faibles",
-    "codebook": "Livre de codes ({{count}})",
+    "codebook": "Livre de codes",
     "noCodesYet": "Aucun code. Sélectionnez du texte pour en créer un.",
     "selectTextToTag": "Sélectionnez du texte dans une réponse pour l'annoter avec un code.",
     "noTranscript": "Aucune transcription disponible.",
@@ -304,7 +304,13 @@
     "createAndTag": "Créer et annoter",
     "removeTag": "Supprimer l'annotation",
     "renameCode": "Renommer",
-    "deleteCodeBtn": "Supprimer le code"
+    "deleteCodeBtn": "Supprimer le code",
+    "deleteCode": "Supprimer",
+    "qualityAssessment": "Évaluation qualité",
+    "avgWords": "Mots moy./réponse",
+    "shortAnswers": "Réponses courtes",
+    "noCodes": "Aucun code. Sélectionnez du texte dans une réponse pour en créer un.",
+    "quoteTagInstruction": "Sélectionnez du texte dans une réponse pour l'annoter avec un code."
   },
   "transcript": {
     "title": "Transcription",

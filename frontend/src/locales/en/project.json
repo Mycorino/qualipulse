@@ -292,7 +292,7 @@
     "shortAnswerPct": "{{pct}}% short answers",
     "strengths": "Strengths",
     "issues": "Issues",
-    "codebook": "Codebook ({{count}})",
+    "codebook": "Codebook",
     "noCodesYet": "No codes yet. Select text to create one.",
     "selectTextToTag": "Select any text in an answer to tag it with a code.",
     "noTranscript": "No transcript available.",
@@ -304,7 +304,13 @@
     "createAndTag": "Create & Tag",
     "removeTag": "Remove tag",
     "renameCode": "Rename",
-    "deleteCodeBtn": "Delete code"
+    "deleteCodeBtn": "Delete code",
+    "deleteCode": "Delete",
+    "qualityAssessment": "Quality Assessment",
+    "avgWords": "Avg. words/answer",
+    "shortAnswers": "Short answers",
+    "noCodes": "No codes yet. Select text in a response to create one.",
+    "quoteTagInstruction": "Select text in any answer to tag it with a code."
   },
   "transcript": {
     "title": "Transcript",
