@@ -42,8 +42,8 @@ from app.models.interview import (
 )
 from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
-from app.services._demo_data_en import NOTABLE_QUOTES_EN, PARTICIPANTS_EN
-from app.services._demo_data_fr import NOTABLE_QUOTES_FR, PARTICIPANTS_FR
+from app.services._demo_data_en import NOTABLE_QUOTES_EN, PARTICIPANTS_EN, QUALITY_EN as QUALITY_EN_EN, QUALITY_FR as QUALITY_EN_FR
+from app.services._demo_data_fr import NOTABLE_QUOTES_FR, PARTICIPANTS_FR, QUALITY_EN as QUALITY_FR_EN, QUALITY_FR as QUALITY_FR_FR
 
 
 DEMO_PROJECT_NAME = "[Demo] Brand trust — Maison Aura"
@@ -504,9 +504,11 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         data: dict,
         days_ago: float,
         edit_first_turn: bool = False,
+        quality: dict | None = None,
     ) -> tuple[Participant, list[InterviewTurn]]:
         started = now - timedelta(days=days_ago)
         completed_at = started + timedelta(minutes=14)
+        q = quality or {}
         participant = Participant(
             link_id=link.id,
             project_id=project.id,
@@ -519,8 +521,13 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             status="completed",
             started_at=started,
             completed_at=completed_at,
-            quality_score=0.85,
-            quality_label="high",
+            quality_score=q.get("quality_score", 0.80),
+            quality_label=q.get("quality_label", "good"),
+            quality_summary=q.get("quality_summary"),
+            quality_strengths=json.dumps(q["quality_strengths"]) if "quality_strengths" in q else None,
+            quality_issues=json.dumps(q["quality_issues"]) if "quality_issues" in q else None,
+            avg_response_words=q.get("avg_response_words"),
+            short_answer_pct=q.get("short_answer_pct"),
         )
         db.add(participant)
         db.flush()
@@ -545,16 +552,30 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         db.flush()
         return participant, turns
 
+    # Pick quality assessment text in the researcher's language
+    fr_quality = QUALITY_FR_FR if lang == "fr" else QUALITY_FR_EN  # FR participants
+    en_quality = QUALITY_EN_FR if lang == "fr" else QUALITY_EN_EN  # EN participants
+    fr_quality_keys = ["claire", "thomas"]
+    en_quality_keys = ["emma", "james"]
+
     # FR participants
     fr_participants: list[tuple[Participant, list[InterviewTurn]]] = []
     for i, p_data in enumerate(PARTICIPANTS_FR):
-        result = add_participant(p_data, days_ago=8 - i * 2, edit_first_turn=(i == 0))
+        q_key = fr_quality_keys[i] if i < len(fr_quality_keys) else None
+        result = add_participant(
+            p_data, days_ago=8 - i * 2, edit_first_turn=(i == 0),
+            quality=fr_quality.get(q_key) if q_key else None,
+        )
         fr_participants.append(result)
 
     # EN participants
     en_participants: list[tuple[Participant, list[InterviewTurn]]] = []
     for i, p_data in enumerate(PARTICIPANTS_EN):
-        result = add_participant(p_data, days_ago=6 - i * 2)
+        q_key = en_quality_keys[i] if i < len(en_quality_keys) else None
+        result = add_participant(
+            p_data, days_ago=6 - i * 2,
+            quality=en_quality.get(q_key) if q_key else None,
+        )
         en_participants.append(result)
 
     # Quote tags

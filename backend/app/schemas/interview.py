@@ -54,6 +54,11 @@ class ParticipantResponse(BaseModel):
     country: str | None = None
     quality_score: float | None = None
     quality_label: str | None = None
+    quality_summary: str | None = None
+    quality_strengths: list[str] | None = None
+    quality_issues: list[str] | None = None
+    avg_response_words: float | None = None
+    short_answer_pct: float | None = None
 
     model_config = {"from_attributes": True}
 

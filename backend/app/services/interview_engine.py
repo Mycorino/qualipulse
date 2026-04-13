@@ -595,16 +595,31 @@ def process_interview_turn(
         except Exception:
             pass  # Never fail the interview flow due to email errors
 
-        # Auto-score response quality in background thread
+        # Auto-run AI quality assessment in background thread
         try:
             import threading as _threading
-            def _score():
+            _pid = participant.id
+            _proj_id = participant.project_id
+            def _assess():
                 try:
-                    from app.services.quality import score_participant_heuristic
-                    score_participant_heuristic(participant.id, db)
+                    from app.database import SessionLocal
+                    from app.services.quality import run_ai_quality_assessment
+                    from app.models.project import Project
+                    from app.models.company import Company
+                    assess_db = SessionLocal()
+                    try:
+                        proj = assess_db.query(Project).filter(Project.id == _proj_id).first()
+                        lang = "en"
+                        if proj:
+                            company = assess_db.query(Company).filter(Company.id == proj.company_id).first()
+                            if company and company.preferred_language:
+                                lang = company.preferred_language
+                        run_ai_quality_assessment(_pid, assess_db, language=lang)
+                    finally:
+                        assess_db.close()
                 except Exception:
                     pass
-            _threading.Thread(target=_score, daemon=True).start()
+            _threading.Thread(target=_assess, daemon=True).start()
         except Exception:
             pass
 
@@ -664,6 +679,35 @@ def skip_question(participant_id: str, db) -> dict:
         participant.status = "completed"
         participant.completed_at = datetime.utcnow()
         db.commit()
+
+        # Auto-run AI quality assessment in background thread
+        try:
+            import threading as _threading
+            _pid = participant.id
+            _proj_id = participant.project_id
+            def _assess_skip():
+                try:
+                    from app.database import SessionLocal
+                    from app.services.quality import run_ai_quality_assessment
+                    from app.models.project import Project
+                    from app.models.company import Company
+                    assess_db = SessionLocal()
+                    try:
+                        proj = assess_db.query(Project).filter(Project.id == _proj_id).first()
+                        lang = "en"
+                        if proj:
+                            company = assess_db.query(Company).filter(Company.id == proj.company_id).first()
+                            if company and company.preferred_language:
+                                lang = company.preferred_language
+                        run_ai_quality_assessment(_pid, assess_db, language=lang)
+                    finally:
+                        assess_db.close()
+                except Exception:
+                    pass
+            _threading.Thread(target=_assess_skip, daemon=True).start()
+        except Exception:
+            pass
+
         return {"question_text": closing_text, "tts_audio_url": tts_url, "is_complete": True, "is_follow_up": False, "question_index": current_q_index, "elapsed_seconds": 0, "total_seconds": 0}
 
     next_q = next_questions[0]

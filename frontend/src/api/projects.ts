@@ -103,6 +103,11 @@ export interface ParticipantResponse {
   country?: string | null;
   quality_score?: number | null;
   quality_label?: string | null;
+  quality_summary?: string | null;
+  quality_strengths?: string[] | null;
+  quality_issues?: string[] | null;
+  avg_response_words?: number | null;
+  short_answer_pct?: number | null;
 }
 
 export interface QualityAssessment {
@@ -438,11 +443,6 @@ export async function updateMemo(projectId: string, memoId: string, content: str
 
 export async function deleteMemo(projectId: string, memoId: string): Promise<void> {
   await client.delete(`/projects/${projectId}/memos/${memoId}`);
-}
-
-export async function assessQuality(projectId: string, participantId: string): Promise<QualityAssessment> {
-  const { data } = await client.post<QualityAssessment>(`/projects/${projectId}/participants/${participantId}/quality`);
-  return data;
 }
 
 export async function shareAnalysis(projectId: string): Promise<{ share_token: string }> {

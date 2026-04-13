@@ -71,6 +71,68 @@ PARTICIPANTS_EN = [
     },
 ]
 
+QUALITY_EN = {
+    "emma": {
+        "quality_score": 0.91,
+        "quality_label": "strong",
+        "quality_summary": "Emma delivered consistently articulate, emotionally present responses that connected aesthetic sensibility (professional context as an interior designer) to brand trust in a way that was both specific and transferable. Her recall was vivid and her reasoning transparent, producing some of the most quotable material in the study.",
+        "quality_strengths": [
+            "Vivid sensory recall (bergamot and cedar candle, wax seal, tissue paper) that brings the experience to life",
+            "Proactive identification of the gap between expectation and delivery on shipping — offered without being prompted",
+            "Unprompted feature request (subscription/candle club) demonstrates genuine brand engagement and forward-looking thinking",
+        ],
+        "quality_issues": [],
+        "avg_response_words": 139,
+        "short_answer_pct": 0,
+    },
+    "james": {
+        "quality_score": 0.78,
+        "quality_label": "good",
+        "quality_summary": "James offered a grounded, pragmatic perspective from a reluctant-but-converted buyer who was ultimately lost to UX friction. His frustration was clearly articulated and well-reasoned, providing strong evidence for the navigation pain point. Responses were detailed but occasionally looped back to the same complaint rather than exploring new territory.",
+        "quality_strengths": [
+            "Precise description of the navigation failure (forgot poetic product name, no scent-note search, 10 minutes lost) — highly actionable for product teams",
+            "Honest comparative framing (Amazon vs. Maison Aura) that acknowledges brand quality while naming the decisive friction",
+            "Candid follow-up admission that the competitor product 'didn't have that same special feeling' — nuanced and balanced",
+        ],
+        "quality_issues": [
+            "Navigation frustration dominated turns 2 and 3 with limited exploration of other dimensions (emotional connection, packaging experience)",
+        ],
+        "avg_response_words": 139,
+        "short_answer_pct": 0,
+    },
+}
+
+QUALITY_FR = {
+    "emma": {
+        "quality_score": 0.91,
+        "quality_label": "strong",
+        "quality_summary": "Emma a fourni des réponses constamment articulées et émotionnellement présentes, connectant sa sensibilité esthétique professionnelle (décoratrice d'intérieur) à la confiance envers la marque de façon à la fois précise et généralisable. Sa mémoire sensorielle est vive et son raisonnement transparent, produisant certaines des citations les plus exploitables de l'étude.",
+        "quality_strengths": [
+            "Rappel sensoriel vivant (bougie bergamote-cèdre, cachet de cire, papier de soie) qui donne vie à l'expérience",
+            "Identification proactive de l'écart entre attentes et réalité sur la livraison, sans qu'on lui pose la question",
+            "Demande de fonctionnalité spontanée (abonnement / club bougie) révélant un engagement authentique et une réflexion prospective",
+        ],
+        "quality_issues": [],
+        "avg_response_words": 139,
+        "short_answer_pct": 0,
+    },
+    "james": {
+        "quality_score": 0.78,
+        "quality_label": "good",
+        "quality_summary": "James offre le regard pragmatique d'un acheteur converti puis perdu à cause de frictions UX. Sa frustration est clairement articulée et bien argumentée, fournissant des preuves solides pour le point de douleur de navigation. Les réponses sont détaillées, mais reviennent parfois sur la même friction plutôt que d'explorer de nouvelles dimensions.",
+        "quality_strengths": [
+            "Description précise de l'échec de navigation (nom poétique oublié, absence de recherche par note, 10 minutes perdues) — très actionnable pour les équipes produit",
+            "Cadrage comparatif honnête (Amazon vs. Maison Aura) reconnaissant la qualité de la marque tout en nommant la friction décisive",
+            "Aveu nuancé en suivi que le produit concurrent 'n'avait pas ce côté spécial' — perspective équilibrée et authentique",
+        ],
+        "quality_issues": [
+            "La frustration liée à la navigation a dominé les tours 2 et 3 sans exploration suffisante d'autres dimensions (connexion émotionnelle, expérience d'unboxing)",
+        ],
+        "avg_response_words": 139,
+        "short_answer_pct": 0,
+    },
+}
+
 NOTABLE_QUOTES_EN = [
     {
         "participant_index": 0,

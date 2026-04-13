@@ -71,6 +71,74 @@ PARTICIPANTS_FR = [
     },
 ]
 
+QUALITY_EN = {
+    "claire": {
+        "quality_score": 0.88,
+        "quality_label": "strong",
+        "quality_summary": "Claire gave rich, introspective answers that consistently linked emotional cues — packaging, handwritten notes, unexpected samples — to purchasing decisions and trust formation. Her responses balanced personal anecdote with analytical commentary, making her perspective highly actionable for brand-trust research.",
+        "quality_strengths": [
+            "Detailed narrative across all three topics with clear cause-and-effect reasoning",
+            "Unprompted articulation of the trust-building and trust-breaking mechanisms",
+            "Concrete examples (return policy friction, free sample surprise) grounded in real experience",
+        ],
+        "quality_issues": [
+            "Occasional hedging kept one or two points from full development",
+        ],
+        "avg_response_words": 128,
+        "short_answer_pct": 0,
+    },
+    "thomas": {
+        "quality_score": 0.72,
+        "quality_label": "good",
+        "quality_summary": "Thomas provided candid, critically engaged responses shaped by his background as a designer. His price-versus-perceived-value analysis was sharp and consistent, though his answers were somewhat shorter and more declarative, occasionally stopping before the 'why' behind a position was fully unpacked.",
+        "quality_strengths": [
+            "Clear, distinctive perspective (designer lens on branding vs. product substance) that adds analytical depth",
+            "Honest admission that the promo code was the primary purchase driver — rare candour",
+            "Specific, actionable improvement suggestions (sample discovery path, post-purchase follow-up)",
+        ],
+        "quality_issues": [
+            "A few responses ended with assertions rather than elaboration without fully exploring the underlying reasoning",
+            "Limited emotional engagement — more evaluative than experiential, which reduces richness on affective trust signals",
+        ],
+        "avg_response_words": 124,
+        "short_answer_pct": 0,
+    },
+}
+
+QUALITY_FR = {
+    "claire": {
+        "quality_score": 0.88,
+        "quality_label": "strong",
+        "quality_summary": "Claire a fourni des réponses riches et introspectives qui relient systématiquement des signaux émotionnels — packaging, mot manuscrit, échantillon surprise — à ses décisions d'achat et à la construction de la confiance. Son discours équilibre récit personnel et analyse, ce qui en fait une répondante particulièrement exploitable pour une étude sur la confiance de marque.",
+        "quality_strengths": [
+            "Narration détaillée sur les trois thèmes, avec un raisonnement causal clair",
+            "Articulation spontanée des mécanismes de confiance et de défiance envers la marque",
+            "Exemples concrets (friction autour de la politique de retour, surprise de l'échantillon gratuit) ancrés dans du vécu réel",
+        ],
+        "quality_issues": [
+            "Quelques formulations hésitantes qui ont freiné le développement de certains points",
+        ],
+        "avg_response_words": 128,
+        "short_answer_pct": 0,
+    },
+    "thomas": {
+        "quality_score": 0.72,
+        "quality_label": "good",
+        "quality_summary": "Thomas a livré des réponses franches et critiques, informées par son regard de graphiste sur le rapport entre branding et qualité produit. Son analyse du rapport qualité-prix est cohérente et tranchée, mais ses réponses s'arrêtent parfois avant d'avoir pleinement développé le « pourquoi » d'une position.",
+        "quality_strengths": [
+            "Perspective distinctive et analytique (regard de designer sur la substance vs. l'image) qui enrichit le corpus",
+            "Aveu sincère que c'est le code promo qui a déclenché l'achat — honnêteté rare et précieuse",
+            "Suggestions d'amélioration concrètes et actionnables (parcours découverte, suivi post-achat personnalisé)",
+        ],
+        "quality_issues": [
+            "Certaines réponses se terminent en affirmation plutôt qu'en développement sans explorer le raisonnement sous-jacent",
+            "Engagement émotionnel limité — plus évaluatif qu'expérientiel, ce qui réduit la richesse sur les signaux de confiance affectifs",
+        ],
+        "avg_response_words": 124,
+        "short_answer_pct": 0,
+    },
+}
+
 NOTABLE_QUOTES_FR = [
     {
         "participant_index": 0,
