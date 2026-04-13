@@ -13,6 +13,7 @@ import { getMe, resendVerification } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
 
 import DashboardInsights from "../components/DashboardInsights";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation(["dashboard", "common"]);
@@ -165,6 +166,7 @@ export default function Dashboard() {
           <span className="dashboard-hamburger-bar" />
         </button>
         <nav className={`dashboard-nav${menuOpen ? " dashboard-nav--open" : ""}`}>
+          <LanguageSwitcher variant="light" />
           <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { setMenuOpen(false); navigate("/account"); }}>
             {t("common:account")}
           </button>

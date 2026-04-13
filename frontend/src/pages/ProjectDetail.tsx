@@ -1771,107 +1771,43 @@ export default function ProjectDetail() {
               <div className="responses-transcript-col">
                 {transcript !== null && selectedParticipant ? (
                   <>
-                    {/* Back button — useful on mobile, also handy on desktop */}
-                    <button
-                      onClick={() => setSelectedParticipant(null)}
-                      className="btn btn-ghost btn-sm responses-back-btn"
-                      style={{ padding: "6px 0", marginBottom: "4px", color: "var(--text-secondary)" }}
-                    >
-                      ← {tProject("responses.backToParticipants")}
-                    </button>
-
-                    {/* Transcript header */}
-                    <div className="transcript-header">
-                      <div>
-                        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>{selectedParticipant.display_name || tProject("responses.anonymous")}</h2>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                          {selectedParticipant.profession && <span className="badge">{selectedParticipant.profession}</span>}
-                          {selectedParticipant.age_range && <span className="badge">{selectedParticipant.age_range}</span>}
-                          {selectedParticipant.country && <span className="badge">{selectedParticipant.country}</span>}
-                          <span className="participant-date" style={{ fontSize: 12 }}>{new Date(selectedParticipant.started_at).toLocaleString()}</span>
-                        </div>
+                    {/* Participant identity card — dark header */}
+                    <div className="participant-card">
+                      <div className="participant-card__top">
+                        <button
+                          onClick={() => setSelectedParticipant(null)}
+                          className="participant-card__back"
+                        >
+                          ← {tProject("responses.backToParticipants")}
+                        </button>
+                        <button className="participant-card__close" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }} aria-label={tProject("responses.close")}>✕</button>
                       </div>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }}>{tProject("responses.close")}</button>
-                    </div>
-
-                    {/* AI Quality Assessment — always visible, auto-run on completion */}
-                    {selectedParticipant.quality_summary ? (
-                      <div className="quality-panel" style={{ marginBottom: 16 }}>
-                        <div className="quality-panel-header">
-                          <span className={`quality-badge quality-badge--${selectedParticipant.quality_label} quality-badge--lg`}>
+                      <div className="participant-card__body">
+                        <div className="participant-card__info">
+                          <h2 className="participant-card__name">{selectedParticipant.display_name || tProject("responses.anonymous")}</h2>
+                          <div className="participant-card__meta">
+                            {selectedParticipant.profession && <span className="participant-card__badge">{selectedParticipant.profession}</span>}
+                            {selectedParticipant.age_range && <span className="participant-card__badge">{selectedParticipant.age_range}</span>}
+                            {selectedParticipant.country && <span className="participant-card__badge">{selectedParticipant.country}</span>}
+                          </div>
+                          <span className="participant-card__date">{new Date(selectedParticipant.started_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
+                        </div>
+                        {selectedParticipant.quality_label && (
+                          <span className={`quality-badge quality-badge--${selectedParticipant.quality_label} quality-badge--lg participant-card__quality`}>
                             {selectedParticipant.quality_label === "low" && `⚠ ${tProject("responses.qualityLowFull")}`}
                             {selectedParticipant.quality_label === "fair" && `◑ ${tProject("responses.qualityFairFull")}`}
                             {selectedParticipant.quality_label === "good" && `● ${tProject("responses.qualityGoodFull")}`}
                             {selectedParticipant.quality_label === "strong" && `★ ${tProject("responses.qualityStrongFull")}`}
                           </span>
-                          <div className="quality-stats">
-                            {selectedParticipant.avg_response_words != null && <span>{tProject("responses.wordsPerAnswer", { count: selectedParticipant.avg_response_words })}</span>}
-                            {selectedParticipant.short_answer_pct != null && <span>{tProject("responses.shortAnswerPct", { pct: selectedParticipant.short_answer_pct })}</span>}
-                          </div>
-                        </div>
-                        <p className="quality-summary">{selectedParticipant.quality_summary}</p>
-                        {selectedParticipant.quality_strengths && selectedParticipant.quality_strengths.length > 0 && (
-                          <div className="quality-points quality-points--good">
-                            <strong>{tProject("responses.strengths")}</strong>
-                            <ul>{selectedParticipant.quality_strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                          </div>
-                        )}
-                        {selectedParticipant.quality_issues && selectedParticipant.quality_issues.length > 0 && (
-                          <div className="quality-points quality-points--warn">
-                            <strong>{tProject("responses.issues")}</strong>
-                            <ul>{selectedParticipant.quality_issues.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                          </div>
                         )}
                       </div>
-                    ) : selectedParticipant.quality_label ? (
-                      <div style={{ marginBottom: 16 }}>
-                        <span className={`quality-badge quality-badge--${selectedParticipant.quality_label}`}>
-                          {tProject(`responses.quality${selectedParticipant.quality_label!.charAt(0).toUpperCase() + selectedParticipant.quality_label!.slice(1)}Full`)}
-                        </span>
-                      </div>
-                    ) : selectedParticipant.status === "completed" ? (
-                      <div className="quality-panel quality-panel--pending" style={{ marginBottom: 16 }}>
-                        <p className="muted-text" style={{ fontSize: 13 }}>{tProject("responses.qualityPending")}</p>
-                      </div>
-                    ) : null}
-
-                    {/* Codebook (inline, collapsible) */}
-                    <div style={{ marginBottom: 16 }}>
-                      <button className="btn btn-ghost btn-xs" onClick={() => setShowCodebookPersist(!showCodebook)} style={{ marginBottom: showCodebook ? 8 : 0 }}>
-                        {showCodebook ? "▲" : "▼"} {tProject("responses.codebook", { count: codes.length })}
-                      </button>
-                      {showCodebook && (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {codes.length === 0 ? (
-                            <p className="muted-text" style={{ fontSize: 12 }}>{tProject("responses.noCodesYet")}</p>
-                          ) : codes.map((c) => (
-                            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: `${c.color}22`, border: `1.5px solid ${c.color}`, fontSize: 12 }}>
-                              <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color, display: "inline-block", flexShrink: 0 }} />
-                              {renamingCodeId === c.id ? (
-                                <>
-                                  <input autoFocus value={renameText} onChange={(e) => setRenameText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRenameCode(c.id); if (e.key === "Escape") setRenamingCodeId(null); }} style={{ border: "none", background: "transparent", outline: "none", fontSize: 12, width: Math.max(60, renameText.length * 8) }} />
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-500)", padding: 0, fontSize: 11 }} onClick={() => handleRenameCode(c.id)} title={tCommon("save")}>✓</button>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 11 }} onClick={() => setRenamingCodeId(null)} title={tCommon("cancel")}>✕</button>
-                                </>
-                              ) : (
-                                <>
-                                  <span title="Double-click to rename" onDoubleClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} style={{ cursor: "text" }}>{c.name}</span>
-                                  <span className="muted-text" style={{ fontSize: 10 }}>({c.tag_count})</span>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 10 }} onClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} title={tProject("responses.renameCode")}>✎</button>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 13 }} onClick={() => handleDeleteCode(c.id)} title={tProject("responses.deleteCodeBtn")}>×</button>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
 
-                    {/* Quote tagging instruction */}
-                    <div className="quote-tag-instruction" style={{ marginBottom: 16 }}>
-                      <span>💬</span>
-                      <span>{tProject("responses.selectTextToTag")}</span>
-                    </div>
+                    {/* Two-column: transcript left, tools right */}
+                    <div className="transcript-tools-layout">
+
+                    {/* ── Left: Transcript ── */}
+                    <div className="transcript-main-col">
 
                     {/* Transcript turns */}
                     {transcript.length === 0 ? (
@@ -1942,6 +1878,92 @@ export default function ProjectDetail() {
                         })}
                       </div>
                     )}
+                    </div>{/* /transcript-main-col */}
+
+                    {/* ── Right: Tools sidebar ── */}
+                    <div className="transcript-sidebar">
+                      {/* Quality Assessment panel */}
+                      {selectedParticipant.quality_summary ? (
+                        <details className="sidebar-panel" open>
+                          <summary className="sidebar-panel__header">
+                            <span className="sidebar-panel__title">{tProject("responses.qualityAssessment")}</span>
+                          </summary>
+                          <div className="sidebar-panel__body">
+                            <p className="sidebar-panel__summary">{selectedParticipant.quality_summary}</p>
+                            {selectedParticipant.avg_response_words != null && (
+                              <div className="sidebar-panel__stats">
+                                <div className="sidebar-panel__stat">
+                                  <span className="sidebar-panel__stat-label">{tProject("responses.avgWords")}</span>
+                                  <span className="sidebar-panel__stat-value">{Math.round(selectedParticipant.avg_response_words)}</span>
+                                </div>
+                                {selectedParticipant.short_answer_pct != null && (
+                                  <div className="sidebar-panel__stat">
+                                    <span className="sidebar-panel__stat-label">{tProject("responses.shortAnswers")}</span>
+                                    <span className="sidebar-panel__stat-value">{Math.round(selectedParticipant.short_answer_pct * 100)}%</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {selectedParticipant.quality_strengths && selectedParticipant.quality_strengths.length > 0 && (
+                              <div className="sidebar-panel__list">
+                                <h4 className="sidebar-panel__list-title">{tProject("responses.strengths")}</h4>
+                                <ul>
+                                  {selectedParticipant.quality_strengths.map((s, i) => (
+                                    <li key={i}>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {selectedParticipant.quality_issues && selectedParticipant.quality_issues.length > 0 && (
+                              <div className="sidebar-panel__list sidebar-panel__list--issues">
+                                <h4 className="sidebar-panel__list-title">{tProject("responses.issues")}</h4>
+                                <ul>
+                                  {selectedParticipant.quality_issues.map((s, i) => (
+                                    <li key={i}>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      ) : (
+                        <div className="sidebar-panel sidebar-panel--pending">
+                          <div className="sidebar-panel__header">
+                            <span className="sidebar-panel__title">{tProject("responses.qualityAssessment")}</span>
+                          </div>
+                          <div className="sidebar-panel__body">
+                            <p className="sidebar-panel__pending">{tProject("qualityPending")}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Codebook panel */}
+                      <details className="sidebar-panel" open={showCodebook} onToggle={(e) => setShowCodebookPersist((e.target as HTMLDetailsElement).open)}>
+                        <summary className="sidebar-panel__header">
+                          <span className="sidebar-panel__title">{tProject("responses.codebook")}</span>
+                          <span className="sidebar-panel__count">{codes.length}</span>
+                        </summary>
+                        <div className="sidebar-panel__body">
+                          {codes.length === 0 ? (
+                            <p className="sidebar-panel__empty">{tProject("responses.noCodes")}</p>
+                          ) : (
+                            <div className="sidebar-panel__code-list">
+                              {codes.map((c) => (
+                                <div key={c.id} className="sidebar-code">
+                                  <span className="sidebar-code__dot" style={{ background: c.color }} />
+                                  <span className="sidebar-code__name">{c.name}</span>
+                                  <span className="sidebar-code__count">{tags.filter((tg) => tg.manual_code_id === c.id).length}</span>
+                                  <button className="sidebar-code__delete" onClick={() => handleDeleteCode(c.id)} aria-label={`${tProject("responses.deleteCode")} ${c.name}`}>×</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <p className="sidebar-panel__hint">{tProject("responses.quoteTagInstruction")}</p>
+                        </div>
+                      </details>
+                    </div>{/* /transcript-sidebar */}
+
+                    </div>{/* /transcript-tools-layout */}
                   </>
                 ) : (
                   <div className="empty-state" style={{ minHeight: 300, border: "none", background: "transparent" }}>

@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import client from "../api/client";
 
 interface LanguageSwitcherProps {
   variant?: "light" | "dark";
@@ -12,6 +13,11 @@ export default function LanguageSwitcher({ variant = "light", style }: LanguageS
 
   function toggle() {
     i18n.changeLanguage(next);
+    // Persist to backend if logged in (fire-and-forget, ignore errors)
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      client.patch("/auth/me", { preferred_language: next }).catch(() => {});
+    }
   }
 
   const className =

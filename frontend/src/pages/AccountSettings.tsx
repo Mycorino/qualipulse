@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import client from "../api/client";
 
 import { updateSlackWebhook, testSlackWebhook } from "../api/auth";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import {
   listTeamMembers,
   listTeamInvitations,
@@ -269,6 +270,7 @@ export default function AccountSettings() {
           <p className="dashboard-subtitle">{me?.email}</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <LanguageSwitcher variant="light" />
           <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}>← {t("common:dashboard")}</button>
         </div>
       </div>
