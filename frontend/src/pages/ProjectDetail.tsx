@@ -111,7 +111,7 @@ export default function ProjectDetail() {
 
   // ── Codebook persistence ───────────────────────────────────────────────────
   const codebookPrefKey = "qp_codebook_open";
-  const codebookInitial = localStorage.getItem(codebookPrefKey) === "true";
+  const codebookInitial = localStorage.getItem(codebookPrefKey) !== "false";
   const [showCodebook, setShowCodebook] = useState(codebookInitial);
   const setShowCodebookPersist = (val: boolean) => {
     localStorage.setItem(codebookPrefKey, String(val));
