@@ -58,6 +58,11 @@ class Participant(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     quality_label: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    quality_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_strengths: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
+    quality_issues: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
+    avg_response_words: Mapped[float | None] = mapped_column(Float, nullable=True)
+    short_answer_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Relationships
     link = relationship("InterviewLink", back_populates="participants")

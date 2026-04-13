@@ -222,6 +222,44 @@ class TestDemoSeeder:
         assert "France" in countries
         assert "United Kingdom" in countries
 
+    def test_seed_populates_quality_assessment_fields(self, db_session):
+        """All completed demo participants should have AI-quality assessment
+        fields pre-populated, using valid quality labels."""
+        company = _make_company(db_session)
+        project = seed_demo_project(db_session, company.id)
+
+        participants = (
+            db_session.query(Participant)
+            .filter(Participant.project_id == project.id)
+            .all()
+        )
+        valid_labels = {"low", "fair", "good", "strong"}
+        for p in participants:
+            assert p.quality_score is not None, f"{p.display_name} missing quality_score"
+            assert p.quality_label in valid_labels, f"{p.display_name} has invalid label '{p.quality_label}'"
+            assert p.quality_summary is not None, f"{p.display_name} missing quality_summary"
+            assert p.avg_response_words is not None, f"{p.display_name} missing avg_response_words"
+            assert p.short_answer_pct is not None, f"{p.display_name} missing short_answer_pct"
+            strengths = json.loads(p.quality_strengths)
+            assert isinstance(strengths, list) and len(strengths) > 0
+            issues = json.loads(p.quality_issues)
+            assert isinstance(issues, list)  # can be empty (Emma)
+
+    def test_seed_quality_in_researcher_language(self, db_session):
+        """FR company should get quality summaries in French."""
+        company = _make_company(db_session, preferred_language="fr")
+        project = seed_demo_project(db_session, company.id)
+
+        participants = (
+            db_session.query(Participant)
+            .filter(Participant.project_id == project.id)
+            .all()
+        )
+        # At least one summary should contain French text
+        summaries = [p.quality_summary for p in participants if p.quality_summary]
+        assert any("réponse" in s.lower() or "confiance" in s.lower() or "fourni" in s.lower() for s in summaries), \
+            "Expected French text in quality summaries for FR company"
+
     def test_seed_quotes_are_substrings_of_real_transcripts(self, db_session):
         """Every analysis quote must appear verbatim in some participant's turn."""
         company = _make_company(db_session)

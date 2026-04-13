@@ -31,7 +31,6 @@ import {
   updateMemo,
   deleteMemo,
   getHeatmap,
-  assessQuality,
   shareAnalysis,
   getAnalysisHistory,
   getAnalysisByVersion,
@@ -87,7 +86,7 @@ export default function ProjectDetail() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
   const [tab, setTabRaw] = useState<Tab>("overview");
-  const [advancedPromptOpen, setAdvancedPromptOpen] = useState(false);
+  // advancedPromptOpen removed — system prompt hidden from researchers
   const [projects, setProjects] = useState<import("../api/projects").ProjectListItem[]>([]);
 
   // ── Responses tab filters/sort ─────────────────────────────────────────────
@@ -129,10 +128,7 @@ export default function ProjectDetail() {
   const [welcomeDraft, setWelcomeDraft] = useState("");
   const [savingMeta, setSavingMeta] = useState(false);
 
-  // ── System prompt editor ────────────────────────────────────────────────────
-  const [editingSystemPrompt, setEditingSystemPrompt] = useState(false);
-  const [systemPromptDraft, setSystemPromptDraft] = useState("");
-  const [savingSystemPrompt, setSavingSystemPrompt] = useState(false);
+  // System prompt editor removed — hidden from researchers
 
   // ── Panel settings ─────────────────────────────────────────────────────────
   // ── Screening editor ───────────────────────────────────────────────────────
@@ -187,9 +183,7 @@ export default function ProjectDetail() {
   const [heatmapExpanded, setHeatmapExpanded] = useState(localStorage.getItem("qp_heatmap_open") === "true");
   const [heatmapLoading, setHeatmapLoading] = useState(false);
 
-  // ── P8: AI Quality assessment ───────────────────────────────────────────────
-  const [qualityAssessment, setQualityAssessment] = useState<import("../api/projects").QualityAssessment | null>(null);
-  const [loadingQuality, setLoadingQuality] = useState(false);
+  // Quality assessment is now auto-run on interview completion and stored in participant fields
 
   // Guard tab switches when there are unsaved edits in Setup
   function hasUnsavedSetupEdits(): boolean {
@@ -554,7 +548,6 @@ export default function ProjectDetail() {
     setSelectedParticipant(p);
     setTranscript(null);
     setEditingTurnId(null);
-    setQualityAssessment(null);
     setSelectionInfo(null);
     if (highlight) setHighlightTarget(highlight);
     else setHighlightTarget(null);
@@ -873,19 +866,7 @@ export default function ProjectDetail() {
     return "#1d4ed8";
   }
 
-  async function handleAssessQuality() {
-    if (!selectedParticipant) return;
-    setLoadingQuality(true);
-    setQualityAssessment(null);
-    try {
-      const result = await assessQuality(id!, selectedParticipant.id);
-      setQualityAssessment(result);
-    } catch {
-      toast("Failed to assess quality", "error");
-    } finally {
-      setLoadingQuality(false);
-    }
-  }
+  // handleAssessQuality removed — quality is auto-run on completion
 
   // ── P2: Filter helpers ─────────────────────────────────────────────────────
 
@@ -1076,33 +1057,6 @@ export default function ProjectDetail() {
       setEditingWelcome(false);
     } finally {
       setSavingMeta(false);
-    }
-  }
-
-  async function saveSystemPrompt() {
-    if (!project) return;
-    setSavingSystemPrompt(true);
-    try {
-      const updated = await updateProject(id!, {
-        name: project.name,
-        language: project.language,
-        interview_duration_minutes: project.interview_duration_minutes,
-        research_objective: project.research_objective,
-        welcome_message: project.welcome_message,
-        system_prompt: systemPromptDraft,
-        questions: project.questions.map((q) => ({
-          section_index: q.section_index, section_title: q.section_title,
-          question_index: q.question_index, main_question: q.main_question,
-          interview_notes: q.interview_notes, desired_learning: q.desired_learning,
-        })),
-        screening_questions: (project.screening_questions ?? []).map((sq) => ({
-          question: sq.question, options: sq.options, disqualifying_options: sq.disqualifying_options,
-        })),
-      });
-      setProject(updated);
-      setEditingSystemPrompt(false);
-    } finally {
-      setSavingSystemPrompt(false);
     }
   }
 
@@ -1674,54 +1628,7 @@ export default function ProjectDetail() {
               )}
             </section>
 
-            {/* System Prompt — Advanced accordion */}
-            <section className="detail-section">
-              <div className="advanced-accordion">
-                <button
-                  className="advanced-accordion-toggle"
-                  onClick={() => setAdvancedPromptOpen((o) => !o)}
-                  aria-expanded={advancedPromptOpen}
-                >
-                  <span>⚙ {tProject("setup.advancedPromptTitle")}</span>
-                  <span style={{ fontSize: "0.8rem" }}>{advancedPromptOpen ? "▲" : "▼"}</span>
-                </button>
-                {advancedPromptOpen && (
-                  <div className="advanced-accordion-body">
-                    <div className="advanced-warning">
-                      ⚠ {tProject("setup.advancedWarning")}
-                    </div>
-                    <p className="muted-text" style={{ fontSize: 13, marginBottom: 8 }}>
-                      {tProject("setup.customizePromptDesc")}{" "}
-                      {!editingSystemPrompt && !project.system_prompt && (
-                        <span style={{ color: "var(--text-tertiary)" }}>{tProject("setup.usingDefault")}</span>
-                      )}
-                    </p>
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                      {!editingSystemPrompt && (
-                        <button className="btn btn-ghost btn-sm" onClick={() => { setSystemPromptDraft(project.system_prompt ?? ""); setEditingSystemPrompt(true); }}>{tCommon("edit")}</button>
-                      )}
-                    </div>
-                    {editingSystemPrompt ? (
-                      <>
-                        <textarea
-                          className="field-input"
-                          value={systemPromptDraft}
-                          onChange={(e) => setSystemPromptDraft(e.target.value)}
-                          rows={8}
-                          style={{ width: "100%", fontFamily: "monospace", fontSize: 13, marginBottom: 8 }}
-                        />
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button className="btn btn-primary btn-sm" onClick={saveSystemPrompt} disabled={savingSystemPrompt}>{savingSystemPrompt ? tCommon("saving") : tCommon("save")}</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => setEditingSystemPrompt(false)}>{tCommon("cancel")}</button>
-                        </div>
-                      </>
-                    ) : (
-                      <pre className="system-prompt-preview">{project.system_prompt || <em className="muted-text">{tProject("setup.noCustomPrompt")}</em>}</pre>
-                    )}
-                  </div>
-                )}
-              </div>
-            </section>
+            {/* System prompt accordion removed — hidden from researchers */}
           </div>
         )}
 
@@ -1887,51 +1794,46 @@ export default function ProjectDetail() {
                       <button className="btn btn-ghost btn-sm" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }}>{tProject("responses.close")}</button>
                     </div>
 
-                    {/* AI Quality Assessment */}
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: qualityAssessment ? 12 : 0 }}>
-                        {selectedParticipant.quality_label && (
-                          <span className={`quality-badge quality-badge--${selectedParticipant.quality_label}`}>
-                            {tProject(`responses.quality${selectedParticipant.quality_label!.charAt(0).toUpperCase() + selectedParticipant.quality_label!.slice(1)}Full`)}
+                    {/* AI Quality Assessment — always visible, auto-run on completion */}
+                    {selectedParticipant.quality_summary ? (
+                      <div className="quality-panel" style={{ marginBottom: 16 }}>
+                        <div className="quality-panel-header">
+                          <span className={`quality-badge quality-badge--${selectedParticipant.quality_label} quality-badge--lg`}>
+                            {selectedParticipant.quality_label === "low" && `⚠ ${tProject("responses.qualityLowFull")}`}
+                            {selectedParticipant.quality_label === "fair" && `◑ ${tProject("responses.qualityFairFull")}`}
+                            {selectedParticipant.quality_label === "good" && `● ${tProject("responses.qualityGoodFull")}`}
+                            {selectedParticipant.quality_label === "strong" && `★ ${tProject("responses.qualityStrongFull")}`}
                           </span>
+                          <div className="quality-stats">
+                            {selectedParticipant.avg_response_words != null && <span>{tProject("responses.wordsPerAnswer", { count: selectedParticipant.avg_response_words })}</span>}
+                            {selectedParticipant.short_answer_pct != null && <span>{tProject("responses.shortAnswerPct", { pct: selectedParticipant.short_answer_pct })}</span>}
+                          </div>
+                        </div>
+                        <p className="quality-summary">{selectedParticipant.quality_summary}</p>
+                        {selectedParticipant.quality_strengths && selectedParticipant.quality_strengths.length > 0 && (
+                          <div className="quality-points quality-points--good">
+                            <strong>{tProject("responses.strengths")}</strong>
+                            <ul>{selectedParticipant.quality_strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                          </div>
                         )}
-                        <button className="btn btn-ai btn-sm" onClick={handleAssessQuality} disabled={loadingQuality}>
-                          {loadingQuality ? tProject("responses.assessing") : qualityAssessment ? `✦ ${tProject("responses.reAssess")}` : `✦ ${tProject("responses.aiQualityCheck")}`}
-                        </button>
-                        {qualityAssessment && (
-                          <button className="btn btn-ghost btn-xs" onClick={() => setQualityAssessment(null)}>{tProject("responses.hide")}</button>
+                        {selectedParticipant.quality_issues && selectedParticipant.quality_issues.length > 0 && (
+                          <div className="quality-points quality-points--warn">
+                            <strong>{tProject("responses.issues")}</strong>
+                            <ul>{selectedParticipant.quality_issues.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                          </div>
                         )}
                       </div>
-                      {qualityAssessment && (
-                        <div className="quality-panel">
-                          <div className="quality-panel-header">
-                            <span className={`quality-badge quality-badge--${qualityAssessment.quality_label} quality-badge--lg`}>
-                              {qualityAssessment.quality_label === "low" && `⚠ ${tProject("responses.qualityLowFull")}`}
-                              {qualityAssessment.quality_label === "fair" && `◑ ${tProject("responses.qualityFairFull")}`}
-                              {qualityAssessment.quality_label === "good" && `● ${tProject("responses.qualityGoodFull")}`}
-                              {qualityAssessment.quality_label === "strong" && `★ ${tProject("responses.qualityStrongFull")}`}
-                            </span>
-                            <div className="quality-stats">
-                              <span>{tProject("responses.wordsPerAnswer", { count: qualityAssessment.avg_response_words })}</span>
-                              <span>{tProject("responses.shortAnswerPct", { pct: qualityAssessment.short_answer_pct })}</span>
-                            </div>
-                          </div>
-                          <p className="quality-summary">{qualityAssessment.summary}</p>
-                          {qualityAssessment.strengths.length > 0 && (
-                            <div className="quality-points quality-points--good">
-                              <strong>{tProject("responses.strengths")}</strong>
-                              <ul>{qualityAssessment.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                            </div>
-                          )}
-                          {qualityAssessment.issues.length > 0 && (
-                            <div className="quality-points quality-points--warn">
-                              <strong>{tProject("responses.issues")}</strong>
-                              <ul>{qualityAssessment.issues.map((s, i) => <li key={i}>{s}</li>)}</ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    ) : selectedParticipant.quality_label ? (
+                      <div style={{ marginBottom: 16 }}>
+                        <span className={`quality-badge quality-badge--${selectedParticipant.quality_label}`}>
+                          {tProject(`responses.quality${selectedParticipant.quality_label!.charAt(0).toUpperCase() + selectedParticipant.quality_label!.slice(1)}Full`)}
+                        </span>
+                      </div>
+                    ) : selectedParticipant.status === "completed" ? (
+                      <div className="quality-panel quality-panel--pending" style={{ marginBottom: 16 }}>
+                        <p className="muted-text" style={{ fontSize: 13 }}>{tProject("responses.qualityPending")}</p>
+                      </div>
+                    ) : null}
 
                     {/* Codebook (inline, collapsible) */}
                     <div style={{ marginBottom: 16 }}>
