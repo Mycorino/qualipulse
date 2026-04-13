@@ -732,9 +732,10 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Welcome message and system prompt editing per project
 - [x] Overview tab: participant stats, completion rate, link management
 - [x] Responses tab: participant list with status, demographics, quality badges
+- [x] Responses tab redesign: dark participant card (`#0f172a`, rounded, demographic badges, quality label), two-column grid layout (transcript + 280px sticky tools sidebar), full-width breakout from 800px content container via `:has(.responses-layout)`, responsive collapse below 1100px
 - [x] Transcript viewer with full turn-by-turn display
 - [x] Transcript editing (manual corrections, `manually_edited` flag, saved to DB)
-- [x] Quote tagging + codebook (select text → assign code → codebook panel)
+- [x] Quote tagging + codebook in sidebar (select text → assign code → collapsible codebook panel with tag counts)
 - [x] Analysis tab: AI-generated summary, key themes (with quotes), JTBDs, tensions, recommendations
 - [x] Analysis filtering by demographic segment (profession / age_range / country)
 - [x] Iterative analysis (annotate themes as confirmed/disputed/needs_evidence → refine)
@@ -742,7 +743,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Shareable analysis reports (public token, read-only page)
 - [x] Project memos (general, theme/JTBD/tension-linked) with full CRUD
 - [x] Segment heatmap (profession / age_range / country vs themes)
-- [x] AI quality assessment per participant (Claude-scored, structured result)
+- [x] AI quality assessment per participant (Claude-scored, auto-triggered on completion, results in sidebar panel with summary, avg words, short answer %, strengths/issues lists)
 - [x] Export CSV (participants + all transcript turns, streaming response)
 - [x] Account & billing settings page (Profile tab + Plan & Billing tab)
 - [x] Subscription tier model with **enforced** feature gates (solo/team/lab/enterprise)
@@ -772,7 +773,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Blog admin tab (create, edit, delete posts, status filter)
 - [x] UX audit fixes (82 items): CSS variable cleanup (~50 hardcoded hex→vars), password show/hide + strength indicator, focus-visible outlines, ARIA labels + keyboard nav, sticky TOC on Terms/Privacy, responsive analysis toolbar, 44px touch targets, interview profiling card styling
 - [x] EN/FR i18n foundation: react-i18next with namespaced JSON files (`frontend/src/locales/{en,fr}/`) covering marketing, auth, dashboard, project, interview, analysis, settings, affiliate, common
-- [x] LanguageSwitcher component (`components/LanguageSwitcher.tsx`): pill-shaped toggle, light/dark variant prop, 44px WCAG touch target, CSS classes (no inline styles), shown on marketing nav and auth pages
+- [x] LanguageSwitcher component (`components/LanguageSwitcher.tsx`): pill-shaped toggle, light/dark variant prop, 44px WCAG touch target, CSS classes (no inline styles), shown on marketing nav, auth pages, dashboard nav, and account settings. Persists preference to backend via `PATCH /auth/me` when logged in.
 - [x] Marketing page fully translated (EN/FR): all hardcoded strings replaced with `t()` calls including hero widget, output preview section, who-it's-for, differentiator, trust quote, **pricing cards** (plan names, features, CTAs)
 - [x] Shared report (SharedReport.tsx) fully i18n'd: 17 keys in analysis namespace (EN/FR)
 - [x] Project templates language-aware: wizard passes `i18n.language` to template API for FR content
@@ -784,6 +785,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented)
 - [ ] Email invitation sending (template exists, no send endpoint)
 - [ ] Multi-language TTS voices (language field exists on projects)
+- [ ] Transcript translation overlay (researcher-language translation of participant responses, click to reveal original)
 - [ ] Dashboard-level analytics across projects
 - [ ] Team collaboration (multi-user, invitations, roles, audit trail)
 
