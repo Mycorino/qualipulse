@@ -51,7 +51,7 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript, patchProjectSettings } from "../api/projects";
+import { getTranscript } from "../api/projects";
 
 type Tab = "overview" | "setup" | "responses" | "analysis";
 
@@ -131,22 +131,6 @@ export default function ProjectDetail() {
   const [savingSystemPrompt, setSavingSystemPrompt] = useState(false);
 
   // ── Panel settings ─────────────────────────────────────────────────────────
-  const [savingPanelToggle, setSavingPanelToggle] = useState(false);
-
-  async function handlePanelToggle(enabled: boolean) {
-    if (!id || !project) return;
-    setSavingPanelToggle(true);
-    try {
-      const updated = await patchProjectSettings(id, { panel_collection_enabled: enabled });
-      setProject(updated);
-      toast(enabled ? "Panel collection enabled" : "Panel collection disabled", "success");
-    } catch {
-      toast("Failed to update setting", "error");
-    } finally {
-      setSavingPanelToggle(false);
-    }
-  }
-
   // ── Screening editor ───────────────────────────────────────────────────────
   const [editingScreening, setEditingScreening] = useState(false);
   const [screeningDraft, setScreeningDraft] = useState<ScreeningQuestionCreate[]>([]);
@@ -974,8 +958,8 @@ export default function ProjectDetail() {
     return (
       <blockquote key={idx} className="analysis-quote">
         <div>"{q.text}"</div>
-        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontWeight: 600, color: "#374151" }}>{q.participant_display_name || q.participant_identifier}</span>
+        <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{q.participant_display_name || q.participant_identifier}</span>
           {q.question_text && <span>· {q.question_text.slice(0, 60)}{q.question_text.length > 60 ? "…" : ""}</span>}
           <button
             className="btn btn-ghost btn-xs"
@@ -1458,7 +1442,7 @@ export default function ProjectDetail() {
                           {sq.question || <em className="muted-text">Empty question</em>}
                         </span>
                         {sq.disqualifying_options.length > 0 && (
-                          <span className="badge" style={{ marginRight: 8, background: "#fef2f2", color: "#dc2626", fontSize: 11 }}>
+                          <span className="badge" style={{ marginRight: 8, background: "var(--danger-bg)", color: "var(--danger)", fontSize: 11 }}>
                             {sq.disqualifying_options.length} disqualifying
                           </span>
                         )}
@@ -1471,11 +1455,11 @@ export default function ProjectDetail() {
                           <label className="field-label" style={{ marginTop: 12 }}>Options <span className="optional-tag">— click ✕/✓ to mark disqualifying</span></label>
                           {sq.options.map((opt, optIdx) => (
                             <div key={optIdx} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                              <button style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: "1.5px solid", borderColor: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#d1d5db", background: sq.disqualifying_options.includes(opt) ? "#fef2f2" : "#fff", color: sq.disqualifying_options.includes(opt) ? "#dc2626" : "#9ca3af", cursor: "pointer", fontWeight: 700, fontSize: 14 }} onClick={() => opt.trim() && sqToggleDisq(sqIdx, opt)}>
+                              <button style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 6, border: "1.5px solid", borderColor: sq.disqualifying_options.includes(opt) ? "var(--danger)" : "var(--border-default)", background: sq.disqualifying_options.includes(opt) ? "var(--danger-bg)" : "var(--bg-surface)", color: sq.disqualifying_options.includes(opt) ? "var(--danger)" : "var(--text-disabled)", cursor: "pointer", fontWeight: 700, fontSize: 14 }} onClick={() => opt.trim() && sqToggleDisq(sqIdx, opt)}>
                                 {sq.disqualifying_options.includes(opt) ? "✕" : "✓"}
                               </button>
                               <input className="field-input" style={{ flex: 1, marginBottom: 0 }} value={opt} onChange={(e) => sqSetOption(sqIdx, optIdx, e.target.value)} placeholder={`Option ${optIdx + 1}`} />
-                              {sq.options.length > 1 && <button style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 18, padding: "0 4px" }} onClick={() => sqRemoveOption(sqIdx, optIdx)}>×</button>}
+                              {sq.options.length > 1 && <button style={{ background: "none", border: "none", color: "var(--text-disabled)", cursor: "pointer", fontSize: 18, padding: "0 4px" }} onClick={() => sqRemoveOption(sqIdx, optIdx)}>×</button>}
                             </div>
                           ))}
                           <button className="btn btn-ghost btn-sm" onClick={() => sqAddOption(sqIdx)}>+ Add option</button>
@@ -1493,62 +1477,6 @@ export default function ProjectDetail() {
                   </div>
                 </div>
               )}
-            </section>
-
-            {/* Panel Collection */}
-            <section className="detail-section">
-              <div className="section-header-row" style={{ alignItems: "center" }}>
-                <div>
-                  <h2>Participant panel collection</h2>
-                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>
-                    When enabled, verified participants are invited to join the QualiPulse research community after their interview.
-                  </p>
-                </div>
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    cursor: savingPanelToggle ? "not-allowed" : "pointer",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div
-                    role="switch"
-                    aria-checked={(project?.panel_collection_enabled ?? true)}
-                    tabIndex={0}
-                    style={{
-                      position: "relative",
-                      width: 40,
-                      height: 22,
-                      borderRadius: 11,
-                      background: (project?.panel_collection_enabled ?? true) ? "#4f46e5" : "#d1d5db",
-                      transition: "background 0.2s",
-                      opacity: savingPanelToggle ? 0.6 : 1,
-                      cursor: savingPanelToggle ? "not-allowed" : "pointer",
-                    }}
-                    onClick={() => !savingPanelToggle && handlePanelToggle(!(project?.panel_collection_enabled ?? true))}
-                    onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !savingPanelToggle) { e.preventDefault(); handlePanelToggle(!(project?.panel_collection_enabled ?? true)); } }}
-                  >
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 3,
-                        left: (project?.panel_collection_enabled ?? true) ? 21 : 3,
-                        width: 16,
-                        height: 16,
-                        borderRadius: "50%",
-                        background: "#fff",
-                        transition: "left 0.2s",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                      }}
-                    />
-                  </div>
-                  <span style={{ fontSize: 13, color: "var(--text-secondary, #6b7280)" }}>
-                    {(project?.panel_collection_enabled ?? true) ? "On" : "Off"}
-                  </span>
-                </label>
-              </div>
             </section>
 
             <section className="detail-section">
@@ -1699,7 +1627,7 @@ export default function ProjectDetail() {
                                   </div>
                                 )}
                                 {q.researcher_notes && editingNoteId !== q.id && (
-                                  <div style={{ marginTop: 6, marginLeft: 28, padding: "4px 8px", background: "#fffbeb", borderRadius: 4, fontSize: 12, color: "#92400e" }}>
+                                  <div style={{ marginTop: 6, marginLeft: 28, padding: "4px 8px", background: "var(--warning-bg)", borderRadius: 4, fontSize: 12, color: "var(--warning-text)" }}>
                                     📝 {q.researcher_notes}
                                   </div>
                                 )}
@@ -1888,10 +1816,9 @@ export default function ProjectDetail() {
                 {/* Sort */}
                 <div style={{ marginBottom: 14 }}>
                   <select
-                    className="field-input"
+                    className="select-compact"
                     value={responseSortBy}
                     onChange={e => setResponseSortBy(e.target.value as "date" | "quality" | "name")}
-                    style={{ fontSize: 12, padding: "4px 8px", height: 30 }}
                   >
                     <option value="date">Newest first</option>
                     <option value="quality">By quality</option>
@@ -1967,25 +1894,17 @@ export default function ProjectDetail() {
                     {/* Back button — useful on mobile, also handy on desktop */}
                     <button
                       onClick={() => setSelectedParticipant(null)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--primary)",
-                        fontSize: "14px",
-                        cursor: "pointer",
-                        padding: "8px 0",
-                        marginBottom: "8px",
-                      }}
-                      className="responses-back-btn"
+                      className="btn btn-ghost btn-sm responses-back-btn"
+                      style={{ padding: "6px 0", marginBottom: "4px", color: "var(--text-secondary)" }}
                     >
                       ← Back to participants
                     </button>
 
                     {/* Transcript header */}
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, position: "sticky", top: 0, zIndex: 10, background: "var(--bg-surface)", paddingBottom: "12px", borderBottom: "1px solid var(--border)" }}>
+                    <div className="transcript-header">
                       <div>
-                        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{selectedParticipant.display_name || "Anonymous"}</h2>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>{selectedParticipant.display_name || "Anonymous"}</h2>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                           {selectedParticipant.profession && <span className="badge">{selectedParticipant.profession}</span>}
                           {selectedParticipant.age_range && <span className="badge">{selectedParticipant.age_range}</span>}
                           {selectedParticipant.country && <span className="badge">{selectedParticipant.country}</span>}
@@ -2059,15 +1978,15 @@ export default function ProjectDetail() {
                               {renamingCodeId === c.id ? (
                                 <>
                                   <input autoFocus value={renameText} onChange={(e) => setRenameText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRenameCode(c.id); if (e.key === "Escape") setRenamingCodeId(null); }} style={{ border: "none", background: "transparent", outline: "none", fontSize: 12, width: Math.max(60, renameText.length * 8) }} />
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#6366f1", padding: 0, fontSize: 11 }} onClick={() => handleRenameCode(c.id)} title="Save">✓</button>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 11 }} onClick={() => setRenamingCodeId(null)} title="Cancel">✕</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brand-500)", padding: 0, fontSize: 11 }} onClick={() => handleRenameCode(c.id)} title="Save">���</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 11 }} onClick={() => setRenamingCodeId(null)} title="Cancel">✕</button>
                                 </>
                               ) : (
                                 <>
                                   <span title="Double-click to rename" onDoubleClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} style={{ cursor: "text" }}>{c.name}</span>
                                   <span className="muted-text" style={{ fontSize: 10 }}>({c.tag_count})</span>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 10 }} onClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} title="Rename">✎</button>
-                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, fontSize: 13 }} onClick={() => handleDeleteCode(c.id)} title="Delete code">×</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 10 }} onClick={() => { setRenamingCodeId(c.id); setRenameText(c.name); }} title="Rename">✎</button>
+                                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-disabled)", padding: 0, fontSize: 13 }} onClick={() => handleDeleteCode(c.id)} title="Delete code">×</button>
                                 </>
                               )}
                             </div>
@@ -2124,7 +2043,7 @@ export default function ProjectDetail() {
                                   <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
                                     <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>Edit</button>
                                     {t.manually_edited && (
-                                      <span className="badge" style={{ fontSize: 10, background: "#fef9c3", color: "#854d0e" }}>edited</span>
+                                      <span className="badge" style={{ fontSize: 10, background: "var(--warning-bg)", color: "var(--warning-text)" }}>edited</span>
                                     )}
                                   </span>
                                   {t.audio_recording_url && (
@@ -2159,13 +2078,13 @@ export default function ProjectDetail() {
 
             {/* Floating tag popup */}
             {selectionInfo && (
-              <div style={{ position: "fixed", left: selectionInfo.x - 90, top: selectionInfo.y, zIndex: 1000, background: "white", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.15)", padding: 8, minWidth: 180 }}>
+              <div style={{ position: "fixed", left: selectionInfo.x - 90, top: selectionInfo.y, zIndex: 1000, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)", padding: 8, minWidth: 180 }}>
                 {!showNewCode ? (
                   <div>
-                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>Tag as:</div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>Tag as:</div>
                     {codes.map((c) => (
                       <button key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "4px 8px", border: "none", background: "none", cursor: "pointer", borderRadius: 4, fontSize: 13, textAlign: "left" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--border-subtle)")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
                         onClick={() => handleTagWithCode(c)}
                       >
@@ -2173,9 +2092,9 @@ export default function ProjectDetail() {
                         {c.name}
                       </button>
                     ))}
-                    <div style={{ borderTop: "1px solid #f3f4f6", marginTop: 4, paddingTop: 4 }}>
+                    <div style={{ borderTop: "1px solid var(--border-subtle)", marginTop: 4, paddingTop: 4 }}>
                       <button className="btn btn-ghost btn-xs" style={{ width: "100%" }} onClick={() => setShowNewCode(true)}>+ New code</button>
-                      <button className="btn btn-ghost btn-xs" style={{ width: "100%", color: "#9ca3af" }} onClick={() => { setSelectionInfo(null); window.getSelection()?.removeAllRanges(); }}>Cancel</button>
+                      <button className="btn btn-ghost btn-xs" style={{ width: "100%", color: "var(--text-disabled)" }} onClick={() => { setSelectionInfo(null); window.getSelection()?.removeAllRanges(); }}>Cancel</button>
                     </div>
                   </div>
                 ) : (
@@ -2240,15 +2159,15 @@ export default function ProjectDetail() {
                     {activeFilterValues.length > 0 && <span className="badge" style={{ marginLeft: 4 }}>{activeFilterValues.length} active</span>}
                   </button>
                   {filtersExpanded && (
-                    <div style={{ padding: 12, border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb" }}>
+                    <div style={{ padding: 12, border: "1px solid var(--border-default)", borderRadius: "var(--radius)", background: "var(--bg-base)" }}>
                       {Object.entries(filterOptions).map(([attr, values]) => (
                         <div key={attr} style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4, textTransform: "capitalize" }}>{attr.replace("_", " ")}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4, textTransform: "capitalize" }}>{attr.replace("_", " ")}</div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {values.map((val) => {
                               const active = activeFilterBy === attr && activeFilterValues.includes(val);
                               return (
-                                <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 10, fontSize: 12, border: `1px solid ${active ? "#6366f1" : "#e5e7eb"}`, background: active ? "#eef2ff" : "white", cursor: "pointer" }}>
+                                <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 10, fontSize: 12, border: `1px solid ${active ? "var(--brand-500)" : "var(--border-default)"}`, background: active ? "var(--brand-50)" : "var(--bg-surface)", cursor: "pointer" }}>
                                   <input type="checkbox" checked={active} onChange={() => toggleFilterValue(attr, val)} style={{ width: 12, height: 12 }} />
                                   {val}
                                 </label>
@@ -2264,9 +2183,9 @@ export default function ProjectDetail() {
                   )}
                   {analysis.filters && (
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, marginTop: 6 }}>
-                      <span style={{ fontSize: 12, color: "#6b7280" }}>Filtered by:</span>
+                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Filtered by:</span>
                       {analysis.filters.filter_values.map((v) => (
-                        <span key={v} className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>{analysis.filters!.filter_by}: {v}</span>
+                        <span key={v} className="badge" style={{ background: "var(--brand-50)", color: "var(--brand-700)" }}>{analysis.filters!.filter_by}: {v}</span>
                       ))}
                     </div>
                   )}
@@ -2287,16 +2206,16 @@ export default function ProjectDetail() {
                 <div className="analysis-generating"><span className="spinner-sm" /><span>Claude is reading {analysis.participant_count} interview{analysis.participant_count !== 1 ? "s" : ""}...</span></div>
               )}
               {analysis.status === "failed" && (
-                <div style={{ padding: "16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ padding: "16px", borderRadius: "var(--radius)", background: "var(--danger-bg)", border: "1px solid var(--danger-border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <span style={{ fontSize: 18 }}>⚠</span>
                   <div>
-                    <p style={{ fontWeight: 600, color: "#991b1b", marginBottom: 4 }}>Analysis couldn't complete</p>
-                    <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: 10 }}>
+                    <p style={{ fontWeight: 600, color: "var(--danger-text)", marginBottom: 4 }}>Analysis couldn't complete</p>
+                    <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 10 }}>
                       {analysis.error?.includes("timed out") ? "The analysis timed out — your dataset may be too large. Try filtering to a smaller group first." :
                        analysis.error?.includes("No completed") ? "No completed interviews to analyse yet." :
                        "Something went wrong on our end. Please try again."}
                     </p>
-                    <button className="btn btn-sm" style={{ background: "#991b1b", color: "#fff" }} onClick={handleTriggerAnalysis}>
+                    <button className="btn btn-sm" style={{ background: "var(--danger)", color: "#fff" }} onClick={handleTriggerAnalysis}>
                       Retry analysis
                     </button>
                   </div>
@@ -2337,7 +2256,7 @@ export default function ProjectDetail() {
                         {r.confidence} confidence
                       </span>
                       {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters) && (
-                        <span className="badge" style={{ background: "#eef2ff", color: "#4338ca" }}>
+                        <span className="badge" style={{ background: "var(--brand-50)", color: "var(--brand-700)" }}>
                           Filtered: {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_by} ({(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters)!.filter_values.join(", ")})
                         </span>
                       )}
@@ -2427,7 +2346,7 @@ export default function ProjectDetail() {
                                       >✕</button>
                                     </>
                                   )}
-                                  <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>
+                                  <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)" }} onClick={() => { setAddingMemoKey(t.title); setNewMemoContent(""); }}>+ Note</button>
                                 </div>
                               </div>
                               <p>{t.summary}</p>
@@ -2466,7 +2385,7 @@ export default function ProjectDetail() {
                             <p className="analysis-jtbd-insight">{j.insight}</p>
                             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                               <span className="badge">{j.frequency}</span>
-                              <button className="btn btn-ghost btn-xs" style={{ color: "#d97706" }} onClick={() => { setAddingMemoKey(j.job); setNewMemoContent(""); }}>+ Note</button>
+                              <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)" }} onClick={() => { setAddingMemoKey(j.job); setNewMemoContent(""); }}>+ Note</button>
                             </div>
                             {renderMemoSection("jtbd_note", j.job)}
                           </div>
@@ -2482,7 +2401,7 @@ export default function ProjectDetail() {
                           <div key={i} className="analysis-tension">
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                               <strong>{t.tension}</strong>
-                              <button className="btn btn-ghost btn-xs" style={{ color: "#d97706", flexShrink: 0 }} onClick={() => { setAddingMemoKey(t.tension); setNewMemoContent(""); }}>+ Note</button>
+                              <button className="btn btn-ghost btn-xs" style={{ color: "var(--warning)", flexShrink: 0 }} onClick={() => { setAddingMemoKey(t.tension); setNewMemoContent(""); }}>+ Note</button>
                             </div>
                             <p>{t.detail}</p>
                             {renderMemoSection("tension_note", t.tension)}
@@ -2537,7 +2456,7 @@ export default function ProjectDetail() {
                           </div>
                         </div>
                       ) : (
-                        <button className="btn btn-ghost btn-sm" style={{ marginTop: 8, color: "#d97706" }} onClick={() => { setAddingMemoKey("__general__"); setNewMemoContent(""); }}>
+                        <button className="btn btn-ghost btn-sm" style={{ marginTop: 8, color: "var(--warning)" }} onClick={() => { setAddingMemoKey("__general__"); setNewMemoContent(""); }}>
                           + Add General Note
                         </button>
                       )}
@@ -2616,11 +2535,11 @@ export default function ProjectDetail() {
                             <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
                               <thead>
                                 <tr>
-                                  <th style={{ padding: "6px 10px", textAlign: "left", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", minWidth: 160 }}>Theme</th>
+                                  <th style={{ padding: "6px 10px", textAlign: "left", background: "var(--bg-base)", borderBottom: "1px solid var(--border-default)", minWidth: 160 }}>Theme</th>
                                   {heatmap.segments.map((seg) => (
-                                    <th key={seg} style={{ padding: "6px 8px", textAlign: "center", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>
+                                    <th key={seg} style={{ padding: "6px 8px", textAlign: "center", background: "var(--bg-base)", borderBottom: "1px solid var(--border-default)", whiteSpace: "nowrap" }}>
                                       {seg.split(":")[1]}
-                                      <div style={{ fontSize: 10, color: "#9ca3af", fontWeight: 400 }}>{seg.split(":")[0].replace("_", " ")}</div>
+                                      <div style={{ fontSize: 10, color: "var(--text-disabled)", fontWeight: 400 }}>{seg.split(":")[0].replace("_", " ")}</div>
                                     </th>
                                   ))}
                                 </tr>
@@ -2628,12 +2547,12 @@ export default function ProjectDetail() {
                               <tbody>
                                 {heatmap.themes.map((theme, ti) => (
                                   <tr key={ti}>
-                                    <td style={{ padding: "6px 10px", borderBottom: "1px solid #f3f4f6", fontWeight: 500 }}>{theme.title}</td>
+                                    <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--border-subtle)", fontWeight: 500 }}>{theme.title}</td>
                                     {heatmap.segments.map((seg) => {
                                       const count = theme.segment_counts[seg] ?? 0;
                                       const segParticipants = heatmap.segment_participants[seg] ?? [];
                                       return (
-                                        <td key={seg} style={{ padding: "6px 8px", textAlign: "center", borderBottom: "1px solid #f3f4f6", background: heatmapColor(count), cursor: count > 0 ? "help" : "default" }}
+                                        <td key={seg} style={{ padding: "6px 8px", textAlign: "center", borderBottom: "1px solid var(--border-subtle)", background: heatmapColor(count), cursor: count > 0 ? "help" : "default" }}
                                           title={count > 0 ? `${count} quote(s) — ${segParticipants.join(", ")}` : "No quotes from this segment"}
                                         >
                                           {count > 0 ? count : ""}
