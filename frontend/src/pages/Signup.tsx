@@ -126,7 +126,7 @@ export default function Signup() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ display: "flex", gap: 12 }}>
+          <div className="signup-name-row">
             <div style={{ flex: 1 }}>
               <label className="field-label" htmlFor="signup-first-name">{t("signup.firstNameLabel")}</label>
               <input
@@ -222,18 +222,7 @@ export default function Signup() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              style={{
-                position: "absolute",
-                right: "12px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "var(--text-muted)",
-                fontSize: "13px",
-                padding: "4px",
-              }}
+              className="password-toggle"
               tabIndex={0}
               aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
             >
@@ -252,15 +241,15 @@ export default function Signup() {
             );
           })()}
 
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 8, marginBottom: 4 }}>
+          <div className="signup-terms-row">
             <input
               id="signup-terms"
               type="checkbox"
               checked={termsAccepted}
               onChange={(e) => setTermsAccepted(e.target.checked)}
-              style={{ marginTop: 3, accentColor: "var(--primary)" }}
+              className="signup-terms-checkbox"
             />
-            <label htmlFor="signup-terms" style={{ fontSize: "0.813rem", color: "var(--text-secondary)", cursor: "pointer" }}>
+            <label htmlFor="signup-terms" className="signup-terms-label">
               {t("signup.termsCheckboxPrefix")} <Link to="/terms">{t("signup.termsLink")}</Link> {t("signup.termsAnd")} <Link to="/privacy">{t("signup.privacyLink")}</Link>.
             </label>
           </div>

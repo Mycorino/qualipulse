@@ -100,18 +100,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              style={{
-                position: "absolute",
-                right: "12px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "var(--text-muted)",
-                fontSize: "13px",
-                padding: "4px",
-              }}
+              className="password-toggle"
               tabIndex={0}
               aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
             >

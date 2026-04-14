@@ -5160,6 +5160,123 @@ select.field-input {
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* ── Mobile polish (≤480px) ─────────────────────────────────────────────────
+ * Targeted onboarding + auth + dashboard fixes for narrow phones (iPhone SE
+ * 375×667). Paired with the JSX classes added in Signup.tsx, Login.tsx,
+ * Welcome.tsx and Dashboard.tsx.
+ */
+
+/* Password show/hide toggle — works on both Login and Signup. Sits at the
+ * right edge of a relatively-positioned input wrapper. Needs a 44×44 hit
+ * area so it isn't a tap-roulette on mobile. */
+.password-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+.password-toggle:hover { color: var(--text-primary); }
+.password-toggle:focus-visible {
+  outline: 2px solid var(--primary, #4369f5);
+  outline-offset: 2px;
+}
+
+/* Signup — first name / last name row */
+.signup-name-row {
+  display: flex;
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .signup-name-row { flex-direction: column; gap: 0; }
+}
+
+/* Signup — terms checkbox row. Needs a 44px hitbox across the whole label
+ * + checkbox so tapping anywhere on the line ticks the box. */
+.signup-terms-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  min-height: 44px;
+  padding: 6px 0;
+}
+.signup-terms-checkbox {
+  margin-top: 3px;
+  accent-color: var(--primary);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.signup-terms-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+/* Onboarding progress — at 375px four labels ("Verify", "About You",
+ * "Your Company", "Brief") won't fit on one row. Drop the labels entirely
+ * on narrow screens and show only the dots, which still convey step/of/N. */
+@media (max-width: 480px) {
+  .onboarding-progress {
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .onboarding-progress > div > span:first-of-type { display: none; }
+  .onboarding-progress-dot.current { width: 20px; }
+}
+
+/* Welcome wizard — trim vertical padding so primary CTA stays above the
+ * fold on short viewports (iPhone SE = 667px). Shrink the big emoji icon
+ * too — it eats ~60px of precious real estate on step 1. */
+@media (max-width: 480px) {
+  .welcome-page { padding: 20px 16px 32px; }
+  .onboarding-icon { font-size: 36px; margin-bottom: 8px; }
+  .welcome-title { font-size: 22px !important; }
+  .welcome-subtitle { font-size: 14px !important; }
+  .welcome-actions { margin-bottom: 16px; gap: 10px; }
+  .welcome-actions .btn-lg { width: 100%; padding: 13px 20px; font-size: 15px; }
+}
+
+/* Dashboard — top bar stacks vertically on narrow screens so the
+ * project title never collides with the sort dropdown and the primary
+ * "Create Project" button gets a full-width tap target. */
+@media (max-width: 480px) {
+  .dashboard-top-row {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+  .dashboard-top-row > div { justify-content: space-between; }
+  .dashboard-top-row h1 { font-size: 20px !important; }
+  .dashboard-hero-row {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+  .gs-verify-banner,
+  .verify-email-banner {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+  .gs-verify-banner .btn,
+  .verify-email-banner .btn { width: 100%; }
+}
+
 /* ── Print styles ──────────────────────────────────────────────────────────── */
 @media print {
   .dashboard-header,
