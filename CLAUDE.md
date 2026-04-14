@@ -111,7 +111,8 @@ auto-interview/
 │   │       ├── workspace.py         # Team workspace membership + permission helpers
 │   │       ├── demo_seeder.py       # Seeds the onboarding showcase demo project
 │   │       ├── _demo_data_fr.py     # French transcripts for the showcase demo (fixture)
-│   │       └── _demo_data_en.py     # English transcripts for the showcase demo (fixture)
+│   │       ├── _demo_data_en.py     # English transcripts for the showcase demo (fixture)
+│   │       └── translation.py       # Claude-based transcript translation (researcher reading aid)
 │   ├── alembic/
 │   │   └── versions/
 │   │       ├── 0001_add_researcher_features.py
@@ -126,7 +127,12 @@ auto-interview/
 │   │       ├── 0010_add_preferred_language.py
 │   │       ├── 0011_add_slack_webhook_url.py
 │   │       ├── 0012_team_collaboration.py
-│   │       └── 0013_add_demo_project_flag.py
+│   │       ├── 0013_add_demo_project_flag.py
+│   │       ├── 0014_onboarding_audit_fields.py
+│   │       ├── 0015_current_priority.py
+│   │       ├── 0016_onboarding_redesign_fields.py
+│   │       ├── 0017_quality_assessment_columns.py
+│   │       └── 0018_transcript_translation_columns.py
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
@@ -776,6 +782,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Marketing page fully translated (EN/FR): all hardcoded strings replaced with `t()` calls including hero widget, output preview section, who-it's-for, differentiator, trust quote, **pricing cards** (plan names, features, CTAs)
 - [x] Shared report (SharedReport.tsx) fully i18n'd: 17 keys in analysis namespace (EN/FR)
 - [x] Project templates language-aware: wizard passes `i18n.language` to template API for FR content
+- [x] Transcript translation as researcher reading aid: per-participant pill toggle in the dark participant card (shown only when researcher UI language ≠ project language). Original = data, translation = reading aid. Claude (Sonnet 4) translates all turns in one batched call, preserving voice (hedges, fillers, colloquialisms). Cached on `InterviewTurn.translated_response/translated_question/translation_language` so it never re-translates. `POST /projects/{id}/participants/{pid}/translate` (202, background thread). In translated view, precise text-selection tagging is disabled — researchers tag the **whole turn** via a "Tag turn" button, persisted with `QuoteTag.tagged_from_translation=True` so analysts know the provenance. Quote tags always stored against original text. Alembic 0018.
 - [x] Design system tokens: typography scale (`--text-xs` to `--text-2xl`), font weights (`--weight-*`), line heights (`--leading-*`), semantic colors (`--warning-text`, `--success-text`, `--info-*`), complete brand scale (`--brand-300/400/800`)
 - [x] Mobile dashboard hamburger nav (collapses at 640px)
 - [x] Auth page logo clickable (links to `/`), signup password toggle keyboard-accessible
@@ -852,7 +859,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `started_at`, `completed_at`
 
 ### InterviewTurn
-`id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `created_at`
+`id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `translated_response`, `translated_question`, `translation_language`, `translation_source_language`, `created_at`
 
 ### ProjectAnalysis
 `id`, `project_id`, `version`, `status` (generating/ready/failed), `participant_count`, `report` (JSON), `filters` (JSON), `researcher_context`, `version_label` (ai_discovery/researcher_refined), `parent_version_id`, `share_token`, `generated_at`, `error`
@@ -864,7 +871,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `project_id`, `name`, `color` (hex), `sort_order`, `created_at`
 
 ### QuoteTag
-`id`, `turn_id`, `code_id`, `selected_text`, `start_index`, `end_index`, `created_by`, `created_at`
+`id`, `turn_id`, `code_id`, `selected_text`, `start_index`, `end_index`, `tagged_from_translation`, `created_by`, `created_at`
 
 ### ProjectMemo
 `id`, `project_id`, `type` (general/theme_note/tension_note/jtbd_note), `linked_key`, `content`, `created_by`, `created_at`, `updated_at`
@@ -977,6 +984,7 @@ gcloud builds list --region=europe-west1 --limit=5
 | GET | `/projects/{id}/export` | export_csv | CSV export |
 | POST | `/projects/{id}/participants/{pid}/quality` | ai_analysis | AI quality assessment |
 | PUT | `/projects/{id}/participants/{pid}/turns/{tid}` | — | Edit transcript turn |
+| POST | `/projects/{id}/participants/{pid}/translate` | — | Translate all turns to target language (Claude, cached, async, idempotent) |
 
 ### Coding & Memos
 | Method | Path | Description |
