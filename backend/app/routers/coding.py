@@ -32,6 +32,7 @@ class TagCreate(BaseModel):
     selected_text: str
     start_index: int
     end_index: int
+    tagged_from_translation: bool = False
 
 
 # ── Code endpoints ─────────────────────────────────────────────────────────
@@ -189,6 +190,7 @@ def list_tags(
             "selected_text": tag.selected_text,
             "start_index": tag.start_index,
             "end_index": tag.end_index,
+            "tagged_from_translation": tag.tagged_from_translation,
             "participant_id": participant.id if participant else None,
             "participant_display_name": participant.display_name if participant else None,
             "created_at": tag.created_at.isoformat(),
@@ -232,6 +234,7 @@ def create_tag(
         selected_text=body.selected_text,
         start_index=body.start_index,
         end_index=body.end_index,
+        tagged_from_translation=body.tagged_from_translation,
     )
     db.add(tag)
     db.commit()
@@ -246,6 +249,7 @@ def create_tag(
         "selected_text": tag.selected_text,
         "start_index": tag.start_index,
         "end_index": tag.end_index,
+        "tagged_from_translation": tag.tagged_from_translation,
         "created_at": tag.created_at.isoformat(),
     }
 

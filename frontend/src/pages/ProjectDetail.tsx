@@ -52,7 +52,7 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript } from "../api/projects";
+import { getTranscript, translateTranscript } from "../api/projects";
 
 type Tab = "overview" | "setup" | "responses" | "analysis";
 
@@ -65,7 +65,7 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t: tAnalysis } = useTranslation("analysis");
+  const { t: tAnalysis, i18n } = useTranslation("analysis");
   const { t: tProject } = useTranslation("project");
   const { t: tCommon } = useTranslation("common");
   const { logout } = useAuth();
@@ -100,6 +100,10 @@ export default function ProjectDetail() {
   // ── Transcript highlight target (from "View transcript →" in analysis) ───────
   const [highlightTarget, setHighlightTarget] = useState<{ turnIndex: number; quoteText: string } | null>(null);
   const transcriptListRef = useRef<HTMLDivElement>(null);
+
+  // ── Transcript translation (reading aid) ──────────────────────────────────
+  const [transcriptViewMode, setTranscriptViewMode] = useState<"original" | "translated">("original");
+  const [translating, setTranslating] = useState(false);
 
   // ── Iterative analysis state ───────────────────────────────────────────────
   const [themeAnnotations, setThemeAnnotations] = useState<Record<string, ThemeAnnotation>>({});
@@ -152,7 +156,7 @@ export default function ProjectDetail() {
   const [codes, setCodes] = useState<ManualCode[]>([]);
   const [tags, setTags] = useState<QuoteTag[]>([]);
   const [selectionInfo, setSelectionInfo] = useState<{
-    turnId: string; text: string; start: number; end: number; x: number; y: number;
+    turnId: string; text: string; start: number; end: number; x: number; y: number; fromTranslation?: boolean;
   } | null>(null);
   const [newCodeName, setNewCodeName] = useState("");
   const [newCodeColor, setNewCodeColor] = useState(PRESET_COLORS[0]);
@@ -549,6 +553,7 @@ export default function ProjectDetail() {
     setTranscript(null);
     setEditingTurnId(null);
     setSelectionInfo(null);
+    setTranscriptViewMode("original");
     if (highlight) setHighlightTarget(highlight);
     else setHighlightTarget(null);
     try {
@@ -557,6 +562,54 @@ export default function ProjectDetail() {
       setTranscript(result.turns);
     } catch {
       setTranscript([]);
+    }
+  }
+
+  async function handleToggleTranslation() {
+    if (!selectedParticipant || !transcript) return;
+    const targetLang = (i18n.language || "en").slice(0, 2).toLowerCase();
+
+    // If switching to original, just flip
+    if (transcriptViewMode === "translated") {
+      setTranscriptViewMode("original");
+      return;
+    }
+
+    // Switching to translated — check if we already have it cached
+    const hasTranslation = transcript.some(
+      (t) => t.translated_response && t.translation_language === targetLang
+    );
+    if (hasTranslation) {
+      setTranscriptViewMode("translated");
+      return;
+    }
+
+    // Need to fetch translation
+    setTranslating(true);
+    try {
+      await translateTranscript(id!, selectedParticipant.id, targetLang);
+      // Poll for completion (translation is async on backend)
+      let attempts = 0;
+      const poll = async (): Promise<void> => {
+        attempts += 1;
+        const fresh = await getTranscript(id!, selectedParticipant.id);
+        const ready = fresh.turns.some(
+          (t) => t.translated_response && t.translation_language === targetLang
+        );
+        if (ready || attempts >= 30) {
+          setTranscript(fresh.turns);
+          setTranscriptViewMode("translated");
+          setTranslating(false);
+          if (!ready) toast(tProject("responses.translationFailed"), "error");
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+        return poll();
+      };
+      await poll();
+    } catch {
+      setTranslating(false);
+      toast(tProject("responses.translationFailed"), "error");
     }
   }
 
@@ -649,6 +702,7 @@ export default function ProjectDetail() {
         selected_text: selectionInfo.text,
         start_index: selectionInfo.start,
         end_index: selectionInfo.end,
+        tagged_from_translation: selectionInfo.fromTranslation || false,
       });
       setTags((prev) => [...prev, tag]);
       setCodes((prev) => prev.map((c) => c.id === code.id ? { ...c, tag_count: c.tag_count + 1 } : c));
@@ -1801,6 +1855,27 @@ export default function ProjectDetail() {
                           </span>
                         )}
                       </div>
+                      {/* Translation toggle (reading aid) */}
+                      {project?.language && project.language !== (i18n.language || "en").slice(0, 2).toLowerCase() && (
+                        <div className="translation-toggle" role="group" aria-label={tProject("responses.translationToggleLabel")}>
+                          <button
+                            className={`translation-toggle__btn${transcriptViewMode === "original" ? " is-active" : ""}`}
+                            onClick={() => setTranscriptViewMode("original")}
+                            disabled={translating}
+                          >
+                            {tProject("responses.viewOriginal", { lang: project.language.toUpperCase() })}
+                          </button>
+                          <button
+                            className={`translation-toggle__btn${transcriptViewMode === "translated" ? " is-active" : ""}`}
+                            onClick={handleToggleTranslation}
+                            disabled={translating}
+                          >
+                            {translating
+                              ? tProject("responses.translating")
+                              : tProject("responses.viewTranslated", { lang: (i18n.language || "en").slice(0, 2).toUpperCase() })}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Two-column: transcript left, tools right */}
@@ -1824,7 +1899,12 @@ export default function ProjectDetail() {
                               className={`transcript-turn${isHighlighted ? " transcript-turn--highlighted" : ""}`}
                             >
                               <div className="transcript-q">
-                                {t.question_text}
+                                {transcriptViewMode === "translated" && t.translated_question
+                                  ? t.translated_question
+                                  : t.question_text}
+                                {transcriptViewMode === "translated" && t.translated_question && (
+                                  <div className="transcript-q__original">{t.question_text}</div>
+                                )}
                                 {t.tts_audio_url && (
                                   <audio controls src={t.tts_audio_url} className="transcript-audio" aria-label={`AI question audio — turn ${t.turn_index}`} />
                                 )}
@@ -1843,12 +1923,45 @@ export default function ProjectDetail() {
                                   </div>
                                 </div>
                               ) : t.response_transcript ? (
-                                <div className="transcript-a" onMouseUp={() => handleTranscriptMouseUp(t.id)} style={{ userSelect: "text" }}>
-                                  {isHighlighted && highlightTarget
+                                <div
+                                  className={`transcript-a${transcriptViewMode === "translated" && t.translated_response ? " transcript-a--translated" : ""}`}
+                                  onMouseUp={() => transcriptViewMode === "original" && handleTranscriptMouseUp(t.id)}
+                                  style={{ userSelect: "text" }}
+                                >
+                                  {transcriptViewMode === "translated" && t.translated_response ? (
+                                    <>
+                                      <div className="transcript-a__translated">{t.translated_response}</div>
+                                      <div className="transcript-a__original" lang={project?.language || undefined}>
+                                        {t.response_transcript}
+                                      </div>
+                                    </>
+                                  ) : isHighlighted && highlightTarget
                                     ? renderWithQuoteHighlight(t.response_transcript, highlightTarget.quoteText, t.id)
                                     : renderTaggedText(t.response_transcript, t.id)}
                                   <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
                                     <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>{tCommon("edit")}</button>
+                                    {transcriptViewMode === "translated" && t.response_transcript && (
+                                      <button
+                                        className="btn btn-ghost btn-xs"
+                                        style={{ fontSize: 10 }}
+                                        onClick={(e) => {
+                                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                          setSelectionInfo({
+                                            turnId: t.id,
+                                            text: t.response_transcript || "",
+                                            start: 0,
+                                            end: (t.response_transcript || "").length,
+                                            x: rect.left + rect.width / 2,
+                                            y: rect.top + window.scrollY - 44,
+                                            fromTranslation: true,
+                                          });
+                                          setShowNewCode(false);
+                                        }}
+                                        title={tProject("responses.tagWholeTurn")}
+                                      >
+                                        🏷 {tProject("responses.tagTurn")}
+                                      </button>
+                                    )}
                                     {t.manually_edited && (
                                       <span className="badge" style={{ fontSize: 10, background: "var(--warning-bg)", color: "var(--warning-text)" }}>{tProject("responses.edited")}</span>
                                     )}

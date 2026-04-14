@@ -183,9 +183,15 @@ def get_transcript(
                 created_at=t.created_at,
                 audio_recording_url=t.audio_recording_url,
                 tts_audio_url=t.tts_audio_url,
+                translated_response=t.translated_response,
+                translated_question=t.translated_question,
+                translation_language=t.translation_language,
             )
             for t in turns
         ],
+        translation_language=next(
+            (t.translation_language for t in turns if t.translation_language), None
+        ),
     )
 
 

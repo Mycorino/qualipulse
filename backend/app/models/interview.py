@@ -148,6 +148,11 @@ class InterviewTurn(Base):
     tts_audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     manually_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Translation cache: response and question translated to researcher's language
+    translated_response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    translated_question: Mapped[str | None] = mapped_column(Text, nullable=True)
+    translation_language: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    translation_source_language: Mapped[str | None] = mapped_column(String(5), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

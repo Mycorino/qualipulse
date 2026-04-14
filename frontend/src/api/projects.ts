@@ -131,6 +131,9 @@ export interface TranscriptTurn {
   created_at: string;
   audio_recording_url: string | null;
   tts_audio_url: string | null;
+  translated_response: string | null;
+  translated_question: string | null;
+  translation_language: string | null;
 }
 
 // ── Analysis types ─────────────────────────────────────────────────────────
@@ -213,6 +216,7 @@ export interface QuoteTag {
   selected_text: string;
   start_index: number;
   end_index: number;
+  tagged_from_translation?: boolean;
   participant_id?: string | null;
   participant_display_name?: string | null;
   created_at: string;
@@ -340,9 +344,21 @@ export async function getParticipants(projectId: string): Promise<ParticipantRes
 export async function getTranscript(
   projectId: string,
   participantId: string
-): Promise<{ participant: ParticipantResponse; turns: TranscriptTurn[] }> {
-  const { data } = await client.get<{ participant: ParticipantResponse; turns: TranscriptTurn[] }>(
+): Promise<{ participant: ParticipantResponse; turns: TranscriptTurn[]; translation_language: string | null }> {
+  const { data } = await client.get<{ participant: ParticipantResponse; turns: TranscriptTurn[]; translation_language: string | null }>(
     `/projects/${projectId}/participants/${participantId}/transcript`
+  );
+  return data;
+}
+
+export async function translateTranscript(
+  projectId: string,
+  participantId: string,
+  targetLanguage: string
+): Promise<{ status: string; target_language: string }> {
+  const { data } = await client.post(
+    `/projects/${projectId}/participants/${participantId}/translate`,
+    { target_language: targetLanguage }
   );
   return data;
 }
@@ -411,7 +427,7 @@ export async function getTags(projectId: string): Promise<QuoteTag[]> {
 export async function createTag(
   projectId: string,
   turnId: string,
-  body: { manual_code_id: string; selected_text: string; start_index: number; end_index: number }
+  body: { manual_code_id: string; selected_text: string; start_index: number; end_index: number; tagged_from_translation?: boolean }
 ): Promise<QuoteTag> {
   const { data } = await client.post<QuoteTag>(`/projects/${projectId}/turns/${turnId}/tags`, body);
   return data;
