@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -45,6 +45,7 @@ class QuoteTag(Base):
     selected_text: Mapped[str] = mapped_column(Text, nullable=False)
     start_index: Mapped[int] = mapped_column(Integer, nullable=False)
     end_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    tagged_from_translation: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False

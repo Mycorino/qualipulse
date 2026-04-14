@@ -310,7 +310,14 @@
     "avgWords": "Avg. words/answer",
     "shortAnswers": "Short answers",
     "noCodes": "No codes yet. Select text in a response to create one.",
-    "quoteTagInstruction": "Select text in any answer to tag it with a code."
+    "quoteTagInstruction": "Select text in any answer to tag it with a code.",
+    "translationToggleLabel": "Transcript language",
+    "viewOriginal": "{{lang}} Original",
+    "viewTranslated": "{{lang}} Reading aid",
+    "translating": "Translating…",
+    "translationFailed": "Translation failed. Please try again.",
+    "tagTurn": "Tag turn",
+    "tagWholeTurn": "Tag the whole answer (precise selection unavailable in translated view)"
   },
   "transcript": {
     "title": "Transcript",

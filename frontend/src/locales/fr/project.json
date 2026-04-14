@@ -310,7 +310,14 @@
     "avgWords": "Mots moy./réponse",
     "shortAnswers": "Réponses courtes",
     "noCodes": "Aucun code. Sélectionnez du texte dans une réponse pour en créer un.",
-    "quoteTagInstruction": "Sélectionnez du texte dans une réponse pour l'annoter avec un code."
+    "quoteTagInstruction": "Sélectionnez du texte dans une réponse pour l'annoter avec un code.",
+    "translationToggleLabel": "Langue de la transcription",
+    "viewOriginal": "{{lang}} Original",
+    "viewTranslated": "{{lang}} Aide à la lecture",
+    "translating": "Traduction en cours…",
+    "translationFailed": "Échec de la traduction. Veuillez réessayer.",
+    "tagTurn": "Annoter la réponse",
+    "tagWholeTurn": "Annoter toute la réponse (sélection précise indisponible en vue traduite)"
   },
   "transcript": {
     "title": "Transcription",

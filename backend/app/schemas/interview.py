@@ -74,6 +74,9 @@ class TranscriptTurnResponse(BaseModel):
     created_at: datetime
     audio_recording_url: str | None = None
     tts_audio_url: str | None = None
+    translated_response: str | None = None
+    translated_question: str | None = None
+    translation_language: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -81,6 +84,7 @@ class TranscriptTurnResponse(BaseModel):
 class TranscriptResponse(BaseModel):
     participant: ParticipantResponse
     turns: list[TranscriptTurnResponse] = []
+    translation_language: str | None = None
 
 
 class ResumeCheckResponse(BaseModel):
