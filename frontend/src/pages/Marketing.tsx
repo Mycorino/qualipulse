@@ -295,7 +295,7 @@ export default function Marketing() {
           <Link to="/privacy">{t("footer.privacy")}</Link>
           <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
         </div>
-        <span className="mkt-footer-copy">{t("footer.copy")} &middot; <Link to="/interview/demo" style={{color: "inherit"}}>{t("footer.interviewLink")}</Link></span>
+        <span className="mkt-footer-copy">{t("footer.copy")} &middot; <Link to="/i/demo" style={{color: "inherit"}}>{t("footer.interviewLink")}</Link></span>
       </footer>
     </div>
   );
