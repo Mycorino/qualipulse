@@ -414,7 +414,7 @@ offset integrity, every analysis quote appears verbatim in a real transcript,
 quota exclusion).
 
 ### Email Verification
-- On signup: `EmailVerificationToken` created (24h expiry), verification + welcome emails sent
+- On signup: `EmailVerificationToken` created (24h expiry). Only the verification email is sent, and it greets by **first name** ("Welcome, Marie") rather than company name (falls back to company name if first name is missing).
 - `POST /auth/verify-email?token=...` marks `email_verified = True`
 - `POST /auth/resend-verification` (rate-limited 3/min, requires auth)
 - `email_verified` exposed in `GET /auth/me` response (CompanyResponse)
@@ -425,8 +425,9 @@ quota exclusion).
 - **Fallback:** Console logging when `SENDGRID_API_KEY` is not set
 - **From:** `noreply@qualipulse.com` (QualiPulse)
 - **Templates** (all in `services/email.py` with branded HTML wrapper):
-  - `send_welcome` — after signup
-  - `send_verification_email` — email verification link (24h)
+  - `send_verification_email` — email verification link (24h), nominative greeting (first name)
+  - `send_personalized_welcome` — fires from `POST /auth/onboarding` once the 4-step wizard completes; Claude generates a **personalised research brief** from role + company + use cases and embeds it in the email body (falls back to generic `send_welcome` if generation fails)
+  - `send_welcome` — generic fallback (no longer sent on signup or verify; only used as fallback for `send_personalized_welcome`)
   - `send_password_reset` — password reset link (1h)
   - `send_analysis_ready` — when AI analysis completes
   - `send_interview_invite` — (template exists, not yet wired to an endpoint)
@@ -913,7 +914,7 @@ gcloud builds list --region=europe-west1 --limit=5
 ### Auth (`/auth`)
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/auth/signup` | No | Create account, send verification + welcome emails, set 14-day trial |
+| POST | `/auth/signup` | No | Create account, send nominative verification email, set 14-day trial (welcome-with-brief fires later on onboarding completion) |
 | POST | `/auth/login` | No | Login, get access + refresh tokens |
 | POST | `/auth/refresh` | No | Refresh access token |
 | POST | `/auth/verify-email?token=` | No | Verify email address |
