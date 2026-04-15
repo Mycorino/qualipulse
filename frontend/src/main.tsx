@@ -15,6 +15,11 @@ function syncLang(lng: string) {
 syncLang(i18n.language ?? "en");
 i18n.on("languageChanged", syncLang);
 
+// Warm up the backend on app init so Cloud Run has a live instance ready
+// by the time the user reaches login or any authenticated page.
+// Fire-and-forget — never blocks rendering.
+fetch("/api/").catch(() => {});
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>
