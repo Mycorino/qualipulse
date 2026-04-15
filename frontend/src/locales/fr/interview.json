@@ -18,7 +18,9 @@
     "sendError": "Impossible d'envoyer le lien de vérification. Veuillez réessayer.",
     "resendError": "Impossible de renvoyer le lien. Veuillez réessayer.",
     "skipEmail": "Continuer sans email →",
-    "skipEmailNote": "Vous ne pourrez pas reprendre plus tard depuis un autre appareil."
+    "skipSession": "Passer — terminer en une seule session",
+    "skipEmailNote": "Vous ne pourrez pas reprendre plus tard depuis un autre appareil.",
+    "trustLine": "Vos réponses sont chiffrées et stockées de manière sécurisée."
   },
   "emailSent": {
     "title": "Vérifiez votre boîte de réception",
@@ -119,12 +121,16 @@
     "startInterview": "Démarrer l'entretien",
     "permissionDenied": "Accès au microphone refusé",
     "permissionDeniedDesc": "Cet entretien nécessite l'accès au microphone. Veuillez l'autoriser dans les paramètres de votre navigateur, puis actualisez la page.",
-    "permissionDeniedIOS": "Sur iPhone/iPad, allez dans Réglages > Safari > Microphone et autorisez l'accès pour ce site.",
+    "permissionDeniedIOS": "Sur iPhone/iPad, allez dans Réglages → Safari → Microphone et autorisez l'accès pour ce site.",
+    "permissionDeniedChrome": "Cliquez sur l'icône de caméra dans la barre d'adresse → Autoriser le microphone, puis actualisez.",
+    "permissionDeniedSafari": "Allez dans Réglages → Safari → Microphone → Autoriser pour ce site, puis actualisez.",
+    "permissionDeniedFirefox": "Cliquez sur l'icône du cadenas dans la barre d'adresse → Autorisations → Microphone → Autoriser, puis actualisez.",
     "refresh": "Actualiser et réessayer"
   },
   "screening": {
     "title": "Quelques questions rapides avant de commencer",
     "subtitle": "Ces questions permettent de vérifier que cette étude vous correspond.",
+    "progressLabel": "Question {{current}} sur {{total}}",
     "back": "Précédent",
     "next": "Suivant",
     "submit": "Valider",
@@ -155,9 +161,9 @@
     "unmuteAudio": "Rétablir le son",
     "skipQuestion": "Passer cette question",
     "processing": {
-      "transcribing": "Transcription de votre réponse...",
-      "thinking": "Analyse en cours...",
-      "preparing": "Préparation de la prochaine question..."
+      "transcribing": "🎙️ Transcription de votre réponse…",
+      "thinking": "💭 Analyse en cours…",
+      "preparing": "🔊 Préparation de la prochaine question…"
     },
     "transcript": "Nous avons entendu :",
     "networkError": "Erreur réseau. Votre réponse est sauvegardée — appuyez sur Soumettre pour réessayer.",
@@ -181,6 +187,7 @@
     "answeredCount_plural": "Vous avez répondu à {{count}} questions.",
     "responsesRecorded": "Vos réponses ont été enregistrées et contribueront à la recherche pour <strong>{{projectName}}</strong>.",
     "whatNext": "Et maintenant ?",
+    "nextStepFallback": "Vos réponses ont été enregistrées. Le chercheur vous contactera pour la suite.",
     "nextStep1": "L'équipe de recherche examinera vos réponses.",
     "nextStep2": "Vos réponses pourront être utilisées pour améliorer des produits ou services.",
     "nextStep3": "Vous pouvez fermer cette page en toute sécurité.",
@@ -204,6 +211,8 @@
   "loading": "Chargement...",
   "linkInactive": {
     "title": "Ce lien d'entretien n'est plus actif",
-    "desc": "Le lien a peut-être expiré ou a été désactivé. Veuillez contacter le chercheur pour obtenir un nouveau lien."
+    "desc": "Le lien a peut-être expiré ou a été désactivé. Veuillez contacter le chercheur pour obtenir un nouveau lien.",
+    "expiredHelp": "Ce lien a peut-être expiré. Veuillez contacter le chercheur qui vous l'a envoyé.",
+    "goBack": "Retour"
   }
 }

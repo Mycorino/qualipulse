@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   getInterviewInfo,
+  getDemoLink,
   getScreeningQuestions,
   submitScreening,
   startInterview,
@@ -194,6 +195,16 @@ export default function Interview() {
 
   useEffect(() => {
     if (!token) return;
+    // Special "demo" token: look up the real active demo link and redirect to it
+    if (token === "demo") {
+      getDemoLink()
+        .then(({ redirect_token }) => navigate(`/i/${redirect_token}`, { replace: true }))
+        .catch(() => {
+          setError(t("linkInactive.title"));
+          setInfoLoading(false);
+        });
+      return;
+    }
     getInterviewInfo(token)
       .then((data) => {
         setInfo(data);
@@ -704,9 +715,16 @@ export default function Interview() {
           <div style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #6366f1)", marginBottom: 32 }}>QualiPulse</div>
           <div style={{ fontSize: 48, marginBottom: 16 }}><span aria-hidden="true">🔗</span></div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>{t("linkInactive.title")}</h1>
-          <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 15, maxWidth: 380, margin: "0 auto" }}>
-            {t("linkInactive.desc")}
+          <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 15, maxWidth: 380, margin: "0 auto 20px" }}>
+            {t("linkInactive.expiredHelp")}
           </p>
+          <button
+            className="btn btn-ghost"
+            onClick={() => window.history.back()}
+            style={{ fontSize: 14 }}
+          >
+            ← {t("linkInactive.goBack")}
+          </button>
         </div>
       </div>
     );
@@ -730,13 +748,13 @@ export default function Interview() {
   if (phase === "email_entry") {
     return (
       <div className="interview-page">
-        <div className="interview-container" style={{ maxWidth: 480 }}>
+        <div className="interview-container" style={{ maxWidth: 680 }}>
         <div style={{
           background: "#fff",
           borderRadius: "var(--radius-lg)",
           padding: "48px 36px",
           boxShadow: "var(--shadow-md)",
-          maxWidth: "480px",
+          maxWidth: "680px",
           width: "100%",
           margin: "0 auto",
         }}>
@@ -745,40 +763,49 @@ export default function Interview() {
               <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher"} />
             </div>
           )}
-          <h1 className="interview-project-name" style={{ marginBottom: 8 }}>{info?.project_name}</h1>
+          <h1 className="interview-project-name" style={{ marginBottom: 8, textAlign: "center" }}>{info?.project_name}</h1>
           {info?.researcher_name && (
-            <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24 }} dangerouslySetInnerHTML={{ __html: t("emailEntry.studyBy", { name: info.researcher_name }) }} />
+            <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24, textAlign: "center" }} dangerouslySetInnerHTML={{ __html: t("emailEntry.studyBy", { name: info.researcher_name }) }} />
           )}
           {info?.interview_duration_minutes && (
-            <p className="interview-duration">⏱ {t("emailEntry.duration", { minutes: info.interview_duration_minutes })}</p>
+            <p className="interview-duration" style={{ textAlign: "center" }}>⏱ {t("emailEntry.duration", { minutes: info.interview_duration_minutes })}</p>
           )}
-          <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6 }}>
+          <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6, textAlign: "center" }}>
             {t("emailEntry.enterEmailDesc")}
           </p>
-          <div className="interview-name-field">
-            <label className="field-label" htmlFor="interview-email">{t("emailEntry.yourEmail")}</label>
-            <input
-              id="interview-email"
-              type="email"
-              className="field-input"
-              value={verificationEmail}
-              onChange={(e) => setVerificationEmail(e.target.value)}
-              placeholder={t("emailEntry.emailPlaceholder")}
-              onKeyDown={(e) => e.key === "Enter" && handleSendVerification()}
-              autoFocus
-            />
+          {/* Form fields left-aligned for better readability */}
+          <div style={{ textAlign: "left" }}>
+            <div className="interview-name-field">
+              <label className="field-label" htmlFor="interview-email">{t("emailEntry.yourEmail")}</label>
+              <input
+                id="interview-email"
+                type="email"
+                className="field-input"
+                value={verificationEmail}
+                onChange={(e) => setVerificationEmail(e.target.value)}
+                placeholder={t("emailEntry.emailPlaceholder")}
+                onKeyDown={(e) => e.key === "Enter" && handleSendVerification()}
+                autoFocus
+              />
+            </div>
+            {error && <div className="error-banner" role="alert">{error}</div>}
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={handleSendVerification}
+              disabled={sendingVerification || !verificationEmail.trim()}
+              style={{ width: "100%", marginTop: 8, minHeight: 44 }}
+            >
+              {sendingVerification ? t("emailEntry.sendingLink") : t("emailEntry.sendLink")}
+            </button>
+            <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5 }}>
+              {t("emailEntry.emailNote")}
+            </p>
           </div>
-          {error && <div className="error-banner" role="alert">{error}</div>}
-          <button
-            className="btn btn-primary btn-lg"
-            onClick={handleSendVerification}
-            disabled={sendingVerification || !verificationEmail.trim()}
-            style={{ width: "100%", marginTop: 8, minHeight: 44 }}
-          >
-            {sendingVerification ? t("emailEntry.sendingLink") : t("emailEntry.sendLink")}
-          </button>
-          <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5, textAlign: "center" }}>
-            {t("emailEntry.emailNote")}
+
+          {/* Trust signal */}
+          <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            {t("emailEntry.trustLine")}
           </p>
 
           {/* Escape hatch for participants whose mail provider drops or
@@ -799,9 +826,7 @@ export default function Interview() {
               onClick={handleSkipEmail}
               style={{ minHeight: 44, fontSize: 14 }}
             >
-              {t("emailEntry.skipEmail", {
-                defaultValue: "Continue without email →",
-              })}
+              {t("emailEntry.skipSession")}
             </button>
             <p
               style={{
@@ -811,10 +836,7 @@ export default function Interview() {
                 lineHeight: 1.5,
               }}
             >
-              {t("emailEntry.skipEmailNote", {
-                defaultValue:
-                  "You won't be able to resume later from a different device.",
-              })}
+              {t("emailEntry.skipEmailNote")}
             </p>
           </div>
         </div>
@@ -1301,7 +1323,7 @@ export default function Interview() {
             <div className="profiling-progress-bar">
               <div className="profiling-progress-fill" style={{ width: `${progress}%` }} />
             </div>
-            <p className="profiling-step-label">{screeningStep + 1} / {screeningQuestions.length}</p>
+            <p className="profiling-step-label">{t("screening.progressLabel", { current: screeningStep + 1, total: screeningQuestions.length })}</p>
           </div>
           <div className="profiling-question">
             <h2 className="profiling-label">{sq.question}</h2>
@@ -1421,16 +1443,30 @@ export default function Interview() {
           ) : (
             <p className="mic-test-status">{t("micTest.speakPrompt")}</p>
           )}
-          <div className="mic-test-actions">
+          <div className="mic-test-actions" style={{ flexDirection: "column", gap: 10 }}>
+            {micLevel > 20 && (
+              <button
+                className="btn btn-primary"
+                style={{ minHeight: 48, minWidth: 220 }}
+                onClick={() => {
+                  if (micAnimRef.current) cancelAnimationFrame(micAnimRef.current);
+                  micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+                  setMicTestDone(true);
+                }}
+              >
+                {t("micTest.startInterview")} →
+              </button>
+            )}
             <button
-              className="btn btn-primary"
+              className="btn btn-secondary"
+              style={{ minHeight: 48, minWidth: 220 }}
               onClick={() => {
                 if (micAnimRef.current) cancelAnimationFrame(micAnimRef.current);
                 micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
                 setMicTestDone(true);
               }}
             >
-              {micLevel > 20 ? t("micTest.startInterview") + " →" : t("micTest.skip")}
+              {t("micTest.skip")}
             </button>
           </div>
         </div>
@@ -1550,11 +1586,30 @@ export default function Interview() {
               <p className="mic-permission-text">
                 {t("micTest.permissionDeniedDesc")}
               </p>
-              {/iPad|iPhone|iPod/.test(navigator.userAgent) && (
-                <p className="mic-permission-text" style={{ fontSize: 13, marginTop: 8 }}>
-                  {t("micTest.permissionDeniedIOS")}
-                </p>
-              )}
+              {(() => {
+                const ua = navigator.userAgent;
+                if (/iPad|iPhone|iPod/.test(ua)) return (
+                  <p className="mic-permission-text" style={{ fontSize: 13, marginTop: 8 }}>
+                    {t("micTest.permissionDeniedIOS")}
+                  </p>
+                );
+                if (/Firefox/.test(ua)) return (
+                  <p className="mic-permission-text" style={{ fontSize: 13, marginTop: 8 }}>
+                    {t("micTest.permissionDeniedFirefox")}
+                  </p>
+                );
+                if (/Safari/.test(ua) && !/Chrome/.test(ua)) return (
+                  <p className="mic-permission-text" style={{ fontSize: 13, marginTop: 8 }}>
+                    {t("micTest.permissionDeniedSafari")}
+                  </p>
+                );
+                // Default: Chrome or unknown
+                return (
+                  <p className="mic-permission-text" style={{ fontSize: 13, marginTop: 8 }}>
+                    {t("micTest.permissionDeniedChrome")}
+                  </p>
+                );
+              })()}
               <button className="btn btn-primary" onClick={() => window.location.reload()}>
                 {t("micTest.refresh")}
               </button>
@@ -1572,9 +1627,13 @@ export default function Interview() {
 
           <div className="interview-controls">
             {processing ? (
-              <div className="processing-indicator" aria-live="polite">
+              <div className={`processing-indicator processing-step-${processingStep}`} aria-live="polite">
                 <div className="spinner" style={{ width: 28, height: 28 }} />
-                <span style={{ fontSize: "1rem" }}>{[t("interview.processing.transcribing"), t("interview.processing.thinking"), t("interview.processing.preparing")][processingStep]}</span>
+                <span className="processing-label">
+                  {processingStep === 0 && <>{t("interview.processing.transcribing")}</>}
+                  {processingStep === 1 && <>{t("interview.processing.thinking")}</>}
+                  {processingStep === 2 && <>{t("interview.processing.preparing")}</>}
+                </span>
               </div>
             ) : pendingBlob ? (
               <div className="recording-preview">
@@ -1691,11 +1750,17 @@ export default function Interview() {
 
         <div className="interview-complete-next">
           <p className="interview-complete-next-label">{t("completion.whatNext")}</p>
-          <ul className="interview-complete-next-list">
-            <li>{t("completion.nextStep1")}</li>
-            <li>{t("completion.nextStep2")}</li>
-            <li>{t("completion.nextStep3")}</li>
-          </ul>
+          {[t("completion.nextStep1"), t("completion.nextStep2"), t("completion.nextStep3")].some(Boolean) ? (
+            <ul className="interview-complete-next-list">
+              {t("completion.nextStep1") && <li>{t("completion.nextStep1")}</li>}
+              {t("completion.nextStep2") && <li>{t("completion.nextStep2")}</li>}
+              {t("completion.nextStep3") && <li>{t("completion.nextStep3")}</li>}
+            </ul>
+          ) : (
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: 1.6 }}>
+              {t("completion.nextStepFallback")}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -18,7 +18,9 @@
     "sendError": "Failed to send verification link. Please try again.",
     "resendError": "Failed to resend. Please try again.",
     "skipEmail": "Continue without email →",
-    "skipEmailNote": "You won't be able to resume later from a different device."
+    "skipSession": "Skip — complete in one session",
+    "skipEmailNote": "You won't be able to resume later from a different device.",
+    "trustLine": "Your responses are encrypted and stored securely."
   },
   "emailSent": {
     "title": "Check your inbox",
@@ -119,12 +121,16 @@
     "startInterview": "Start interview",
     "permissionDenied": "Microphone access denied",
     "permissionDeniedDesc": "This interview requires microphone access. Please allow it in your browser settings, then refresh.",
-    "permissionDeniedIOS": "On iPhone/iPad, go to Settings > Safari > Microphone and allow access for this website.",
+    "permissionDeniedIOS": "On iPhone/iPad, go to Settings → Safari → Microphone and allow access for this website.",
+    "permissionDeniedChrome": "Click the camera icon in the address bar → Allow microphone, then refresh.",
+    "permissionDeniedSafari": "Go to Settings → Safari → Microphone → Allow for this website, then refresh.",
+    "permissionDeniedFirefox": "Click the lock icon in the address bar → Permissions → Microphone → Allow, then refresh.",
     "refresh": "Refresh & try again"
   },
   "screening": {
     "title": "A few quick questions before we begin",
     "subtitle": "These help ensure the study is a good fit for you.",
+    "progressLabel": "Question {{current}} of {{total}}",
     "back": "Back",
     "next": "Next",
     "submit": "Submit",
@@ -155,9 +161,9 @@
     "unmuteAudio": "Unmute",
     "skipQuestion": "Skip this question",
     "processing": {
-      "transcribing": "Transcribing your answer...",
-      "thinking": "Thinking...",
-      "preparing": "Preparing next question..."
+      "transcribing": "🎙️ Transcribing your answer…",
+      "thinking": "💭 Thinking…",
+      "preparing": "🔊 Preparing next question…"
     },
     "transcript": "We heard:",
     "networkError": "Network error. Your answer is saved — tap Submit to retry.",
@@ -181,6 +187,7 @@
     "answeredCount_plural": "You answered {{count}} questions.",
     "responsesRecorded": "Your responses have been recorded and will help shape the research for <strong>{{projectName}}</strong>.",
     "whatNext": "What happens next?",
+    "nextStepFallback": "Your responses have been recorded. The researcher will be in touch with next steps.",
     "nextStep1": "The research team will review your responses.",
     "nextStep2": "Your answers may be used to improve products or services.",
     "nextStep3": "You can safely close this page.",
@@ -204,6 +211,8 @@
   "loading": "Loading...",
   "linkInactive": {
     "title": "This interview link isn't active",
-    "desc": "The link may have expired or been deactivated. Please contact the researcher for a new link."
+    "desc": "The link may have expired or been deactivated. Please contact the researcher for a new link.",
+    "expiredHelp": "This link may have expired. Please contact the researcher who sent you this link.",
+    "goBack": "Go back"
   }
 }

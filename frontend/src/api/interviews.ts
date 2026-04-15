@@ -92,6 +92,11 @@ export async function getInterviewInfo(token: string): Promise<InterviewInfo> {
   return data;
 }
 
+export async function getDemoLink(): Promise<{ redirect_token: string }> {
+  const { data } = await client.get<{ redirect_token: string }>("/interview/demo");
+  return data;
+}
+
 export interface StartInterviewParams {
   displayName?: string;
   profession?: string;

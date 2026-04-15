@@ -2169,14 +2169,14 @@ select.field-input {
 }
 
 .interview-turn-count {
-  font-size: 0.85rem;
+  font-size: var(--text-sm, 0.875rem);
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .mute-btn {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: none;
   background: var(--bg-white);
@@ -2289,6 +2289,20 @@ select.field-input {
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
+.processing-label {
+  font-size: 1rem;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+/* Step 0: Transcribing — blue */
+.processing-step-0 .processing-label { color: #2563eb; }
+.processing-step-0 .spinner { border-color: #bfdbfe; border-top-color: #2563eb; }
+/* Step 1: Thinking — purple */
+.processing-step-1 .processing-label { color: #7c3aed; }
+.processing-step-1 .spinner { border-color: #ede9fe; border-top-color: #7c3aed; }
+/* Step 2: Preparing — green */
+.processing-step-2 .processing-label { color: #059669; }
+.processing-step-2 .spinner { border-color: #d1fae5; border-top-color: #059669; }
 
 .spinner {
   width: 20px;
@@ -2352,7 +2366,7 @@ select.field-input {
 }
 
 .consent-body p {
-  font-size: 0.9rem;
+  font-size: var(--text-base, 1rem);
   color: var(--text);
   margin-bottom: 10px;
 }
@@ -2534,6 +2548,7 @@ select.field-input {
 
 .profiling-option-btn {
   width: 100%;
+  min-height: 48px;
   padding: 14px 20px;
   text-align: left;
   background: var(--bg);
@@ -3612,6 +3627,21 @@ select.field-input {
   .interview-profiling { padding: 36px 24px; }
 }
 
+/* ── 430px breakpoint (iPhone 14 / SE) ────────────────────────────────── */
+@media (max-width: 430px) {
+  /* Container padding */
+  .interview-container { padding: 16px 12px; margin: 8px; }
+  /* Consent card — prevent CTA buttons from hiding below fold */
+  .consent-card { padding: 24px 16px; }
+  /* Question text — keep readable on small screens */
+  .interview-question-text { font-size: 1.25rem; }
+  /* Button sizing */
+  .btn-lg { padding: 14px 20px; font-size: 15px; }
+  /* Card padding for profiling screens */
+  .interview-profiling { padding: 28px 16px; }
+  .interview-landing { padding: 28px 16px; }
+}
+
 @media (max-width: 375px) {
   .interview-question-text { font-size: 1.05rem; }
   .record-btn { width: 72px; height: 72px; }
@@ -4089,16 +4119,18 @@ select.field-input {
 .mic-test-subtitle { color: var(--text-secondary); font-size: 15px; margin-bottom: 24px; }
 .mic-level-wrap {
   width: 100%;
-  height: 12px;
+  height: 48px;
   background: var(--border);
-  border-radius: 99px;
+  border-radius: 12px;
   overflow: hidden;
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
 }
 .mic-level-bar {
   height: 100%;
   background: linear-gradient(90deg, var(--brand-500), #22c55e);
-  border-radius: 99px;
+  border-radius: 12px;
   transition: width 0.1s ease;
 }
 .mic-test-status { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; min-height: 20px; }

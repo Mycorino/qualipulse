@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.dependencies import get_db
 from app.limiter import limiter
+from app.models.company import Company
 from app.models.interview import InterviewLink, InterviewTurn, Participant
 from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 from app.schemas.interview import (
@@ -202,6 +203,35 @@ def save_panel_profile(
     db.commit()
 
     return {"saved": True}
+
+
+# ---------------------------------------------------------------------------
+# Demo redirect endpoint — must be defined before /{token} catch-all
+# ---------------------------------------------------------------------------
+
+@router.get("/demo")
+@limiter.limit("60/minute")
+def get_demo_link(request: Request, db: Session = Depends(get_db)):
+    """Return the active interview link token for the public demo company.
+
+    The frontend navigates to /i/{redirect_token} so participants always land
+    on a real, active interview link rather than the literal /i/demo URL.
+    """
+    company = db.query(Company).filter(Company.email == "demo@autointerview.com").first()
+    if company is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo not available")
+    link = (
+        db.query(InterviewLink)
+        .join(InterviewLink.project)
+        .filter(
+            InterviewLink.is_active.is_(True),
+            InterviewLink.project.has(company_id=company.id),
+        )
+        .first()
+    )
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demo not available")
+    return {"redirect_token": link.token}
 
 
 # ---------------------------------------------------------------------------
