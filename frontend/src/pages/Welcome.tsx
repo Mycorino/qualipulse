@@ -1113,8 +1113,13 @@ export default function Welcome() {
                 onClick={handleLaunchWorkspace}
                 disabled={saving || recapLoading}
               >
-                {saving ? t("onboarding.saving") : t("onboarding.launchWorkspace")}
+                {saving ? t("onboarding.launchingWorkspace") : t("onboarding.launchWorkspace")}
               </button>
+              {saving && (
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "8px 0 0", textAlign: "center" }}>
+                  {t("onboarding.launchingWorkspaceDesc")}
+                </p>
+              )}
               <button
                 className="btn btn-ghost"
                 onClick={() => setStep(3)}

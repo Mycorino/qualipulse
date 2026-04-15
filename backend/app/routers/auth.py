@@ -1,4 +1,5 @@
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -599,53 +600,91 @@ def complete_onboarding(
     company.onboarding_completed = True
     db.commit()
 
-    # Seed the showcase demo project the first time onboarding completes for
-    # this account. Idempotent: subsequent calls (e.g. user re-opens the
-    # welcome flow after clearing localStorage) skip seeding because
-    # demo_seeded_at is non-null. We swallow seeder errors so a fixture bug
-    # never blocks a real user from finishing onboarding.
+    # Seed the showcase demo project and send the personalised welcome email
+    # in a background thread so the onboarding response returns immediately.
+    # Both operations are idempotent / best-effort — failures are logged but
+    # never surfaced to the user.
     if company.demo_seeded_at is None:
-        try:
-            seed_demo_project(db, company.id)
-            company.demo_seeded_at = datetime.utcnow()
-            db.commit()
-        except Exception:  # pragma: no cover - defensive
-            db.rollback()
-            logger.exception("Failed to seed demo project for %s", company.email)
+        _company_id = company.id
+        _company_snapshot = {
+            "email": company.email,
+            "name": company.name,
+            "first_name": company.first_name,
+            "last_name": company.last_name,
+            "role": company.role,
+            "occupation_description": company.occupation_description,
+            "industry": company.industry,
+            "selected_use_cases": company.selected_use_cases,
+            "preferred_language": company.preferred_language,
+            "slack_webhook_url": company.slack_webhook_url,
+        }
 
-    # Fire-and-forget sales notification to Slack. Never blocks the user.
-    try:
-        from app.services.sales_notify import notify_new_signup
-        notify_new_signup(company)
-    except Exception:  # pragma: no cover - defensive
-        logger.exception("Failed to send sales notification for %s", company.email)
+        def _background_post_onboarding(company_id: str, snapshot: dict) -> None:
+            from app.database import SessionLocal
+            from app.models.company import Company as _Company
 
-    # Fire-and-forget personalised welcome email. Falls back to the generic
-    # welcome internally if Claude generation fails.
-    try:
-        # Parse selected_use_cases from JSON string if stored
-        use_cases_list: list[str] | None = None
-        if company.selected_use_cases:
-            import json as _json
+            # ── 1. Demo seeder + Slack notification (need a live DB session) ──
+            db_bg = SessionLocal()
             try:
-                use_cases_list = _json.loads(company.selected_use_cases)
-            except (ValueError, TypeError):
-                use_cases_list = None
+                bg_company = db_bg.query(_Company).filter(_Company.id == company_id).first()
+                if bg_company:
+                    if bg_company.demo_seeded_at is None:
+                        seed_demo_project(db_bg, company_id)
+                        bg_company.demo_seeded_at = datetime.utcnow()
+                        db_bg.commit()
 
-        send_personalized_welcome(
-            to=company.email,
-            name=company.name,
-            first_name=company.first_name,
-            last_name=company.last_name,
-            company_name=company.name,
-            role_title=company.role,
-            occupation_description=company.occupation_description,
-            industry=company.industry,
-            selected_use_cases=use_cases_list,
-            lang=company.preferred_language,
+                    # Use the freshly-loaded ORM object so all fields are available.
+                    try:
+                        from app.services.sales_notify import notify_new_signup
+                        notify_new_signup(bg_company)
+                    except Exception:  # pragma: no cover - defensive
+                        logger.exception("Background sales notify failed for %s", snapshot["email"])
+            except Exception:  # pragma: no cover - defensive
+                db_bg.rollback()
+                logger.exception("Background demo seeder failed for %s", snapshot["email"])
+            finally:
+                db_bg.close()
+
+            # ── 2. Personalised welcome email (may call Claude) ──────────────
+            try:
+                import json as _json
+                use_cases_list: list[str] | None = None
+                raw_uc = snapshot.get("selected_use_cases")
+                if raw_uc:
+                    try:
+                        use_cases_list = _json.loads(raw_uc)
+                    except (ValueError, TypeError):
+                        use_cases_list = None
+
+                send_personalized_welcome(
+                    to=snapshot["email"],
+                    name=snapshot["name"],
+                    first_name=snapshot.get("first_name"),
+                    last_name=snapshot.get("last_name"),
+                    company_name=snapshot["name"],
+                    role_title=snapshot.get("role"),
+                    occupation_description=snapshot.get("occupation_description"),
+                    industry=snapshot.get("industry"),
+                    selected_use_cases=use_cases_list,
+                    lang=snapshot.get("preferred_language") or "en",
+                )
+            except Exception:  # pragma: no cover - defensive
+                logger.exception("Background welcome email failed for %s", snapshot["email"])
+
+        t = threading.Thread(
+            target=_background_post_onboarding,
+            args=(_company_id, _company_snapshot),
+            daemon=True,
         )
-    except Exception:  # pragma: no cover - defensive
-        logger.exception("Failed to send personalized welcome for %s", company.email)
+        t.start()
+        logger.info("Demo seeder + welcome email dispatched to background for %s", company.email)
+    else:
+        # Already seeded — just fire the Slack notification (fast, no Claude).
+        try:
+            from app.services.sales_notify import notify_new_signup
+            notify_new_signup(company)
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Failed to send sales notification for %s", company.email)
 
     logger.info("Onboarding completed for %s", company.email)
     return CompanyResponse.model_validate(company)
