@@ -625,6 +625,7 @@ export default function Welcome() {
                   placeholder={t("onboarding.roleTitlePlaceholder")}
                   disabled={saving}
                   autoFocus
+                  autoComplete="organization-title"
                 />
               </div>
 
@@ -669,6 +670,14 @@ export default function Welcome() {
               >
                 {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setStep(1)}
+                disabled={saving}
+                style={{ fontSize: 13 }}
+              >
+                ← {t("onboarding.steps.verify")}
+              </button>
             </div>
           </div>
         )}
@@ -689,7 +698,9 @@ export default function Welcome() {
                   </span>
                 </label>
                 <input
-                  type="text"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="url"
                   className="field-input"
                   value={websiteUrl}
                   onChange={(e) => { setWebsiteUrl(e.target.value); setWebsiteHint(null); }}

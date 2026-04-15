@@ -36,7 +36,6 @@ from app.services.email import (
     send_password_reset,
     send_personalized_welcome,
     send_verification_email,
-    send_welcome,
 )
 from app.services.website_intelligence import (
     WebsiteIntelligenceError,
@@ -134,8 +133,12 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     # for deliverability (fewer messages in the first 30 seconds = lower
     # engagement-based spam risk).
     verify_url = f"{settings.APP_BASE_URL}/verify-email?token={verification_token.token}"
+    # Greet the *person* (first name), not the company — "Welcome, Marie"
+    # reads far more human than "Welcome, Acme Research". Fall back to the
+    # company name only if no first name was captured at signup.
+    greet_name = (company.first_name or "").strip() or company.name
     send_verification_email(
-        company.email, company.name, verify_url, lang=company.preferred_language
+        company.email, greet_name, verify_url, lang=company.preferred_language
     )
 
     return TokenResponse(
@@ -203,17 +206,13 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 
     logger.info("Email verified for %s", company.email)
 
-    # Fire the welcome email only once, on the first successful verification.
-    # This used to run at signup alongside the verify email; users confused
-    # the two and missed the verification step entirely. Sending it here
-    # means the welcome always lands *after* the "please verify" flow is
-    # done — it celebrates an action the user just took, rather than
-    # competing with it.
-    if not already_verified:
-        try:
-            send_welcome(company.email, company.name, lang=company.preferred_language)
-        except Exception as exc:  # pragma: no cover - never fail verify on email
-            logger.warning("Failed to send welcome email to %s: %s", company.email, exc)
+    # NOTE: the welcome email is intentionally NOT sent here anymore.
+    # It now fires from POST /auth/onboarding once the user has completed
+    # the 4-step wizard, so it can embed the personalised research brief
+    # (Claude-generated from their role + company + use cases). Sending a
+    # generic "Welcome" here would arrive empty-handed and compete with
+    # the real, brief-carrying welcome that lands a few minutes later.
+    _ = already_verified  # retained for potential future analytics hook
 
     return {"message": "Email verified successfully"}
 
@@ -244,8 +243,12 @@ def resend_verification(
     db.commit()
 
     verify_url = f"{settings.APP_BASE_URL}/verify-email?token={verification_token.token}"
+    # Greet the *person* (first name), not the company — "Welcome, Marie"
+    # reads far more human than "Welcome, Acme Research". Fall back to the
+    # company name only if no first name was captured at signup.
+    greet_name = (company.first_name or "").strip() or company.name
     send_verification_email(
-        company.email, company.name, verify_url, lang=company.preferred_language
+        company.email, greet_name, verify_url, lang=company.preferred_language
     )
 
     logger.info("Verification email resent to %s", company.email)
