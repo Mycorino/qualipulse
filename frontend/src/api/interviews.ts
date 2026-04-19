@@ -66,6 +66,7 @@ export interface PanelTag {
 
 export interface PanelProfileData {
   email: string;
+  session_token: string;
   first_name?: string;
   age_range?: string;
   gender?: string;

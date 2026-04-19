@@ -41,6 +41,7 @@ class VerificationRequest(BaseModel):
 
 class PanelProfileRequest(BaseModel):
     email: str
+    session_token: str
     first_name: str | None = None
     age_range: str | None = None
     gender: str | None = None
@@ -157,8 +158,24 @@ def save_panel_profile(
     body: PanelProfileRequest,
     db: Session = Depends(get_db),
 ):
-    """Upsert a panel profile for a participant who consented."""
+    """Upsert a panel profile for a participant who consented.
+
+    Requires a valid participant session_token (issued by /verify/{magic})
+    matching both the body email and the link token. Without this, anyone
+    with the public link could overwrite the panel profile of any email.
+    """
     _get_active_link_or_404(token, db)
+
+    session_payload = _decode_session_token(body.session_token)
+    if (
+        session_payload is None
+        or session_payload.get("email", "").lower() != body.email.lower()
+        or session_payload.get("link_token") != token
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session for panel profile update.",
+        )
 
     profile = db.query(PanelProfile).filter(PanelProfile.email == body.email).first()
     if profile is None:
