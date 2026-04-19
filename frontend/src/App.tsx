@@ -1,29 +1,34 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth, getCachedOnboarded, setCachedOnboarded } from "./hooks/useAuth";
 import { getMe } from "./api/auth";
 import { ToastProvider } from "./components/Toast";
+// Eager-load the hot path: marketing, login, signup, interview, and dashboard
+// are what 99% of users see first and we don't want a chunk fetch on first
+// paint. Everything else is lazy so the main bundle shrinks from ~1.2MB to
+// the critical shell.
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
-import ProjectDetail from "./pages/ProjectDetail";
 import Interview from "./pages/Interview";
-import InterviewVerify from "./pages/InterviewVerify";
-import CreateProjectWizard from "./pages/CreateProjectWizard";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import AccountSettings from "./pages/AccountSettings";
 import Marketing from "./pages/Marketing";
-import SharedReport from "./pages/SharedReport";
-import Welcome from "./pages/Welcome";
-import VerifyEmail from "./pages/VerifyEmail";
-import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy";
-import Admin from "./pages/Admin";
-import AffiliatePortal from "./pages/AffiliatePortal";
-import Blog from "./pages/Blog";
-import BlogPostPage from "./pages/BlogPost";
-import AcceptInvitation from "./pages/AcceptInvitation";
+
+const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
+const InterviewVerify = lazy(() => import("./pages/InterviewVerify"));
+const CreateProjectWizard = lazy(() => import("./pages/CreateProjectWizard"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AccountSettings = lazy(() => import("./pages/AccountSettings"));
+const SharedReport = lazy(() => import("./pages/SharedReport"));
+const Welcome = lazy(() => import("./pages/Welcome"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Admin = lazy(() => import("./pages/Admin"));
+const AffiliatePortal = lazy(() => import("./pages/AffiliatePortal"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPostPage = lazy(() => import("./pages/BlogPost"));
+const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -85,6 +90,7 @@ function HomeRoute() {
 export default function App() {
   return (
     <ToastProvider>
+    <Suspense fallback={null}>
     <Routes>
       <Route path="/" element={<HomeRoute />} />
       <Route path="/login" element={<Login />} />
@@ -152,6 +158,7 @@ export default function App() {
         }
       />
     </Routes>
+    </Suspense>
     </ToastProvider>
   );
 }

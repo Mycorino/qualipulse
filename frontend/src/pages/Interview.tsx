@@ -1496,7 +1496,7 @@ export default function Interview() {
               />
             </div>
           )}
-          <div className="interview-progress">
+          <div className="interview-progress" role="status" aria-live="polite">
             <span className="interview-turn-count">
               {isFollowUp
                 ? t("interview.followUpLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })
