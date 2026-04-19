@@ -1,3 +1,4 @@
+import hmac
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -36,7 +37,10 @@ def require_admin(authorization: Optional[str] = Header(default=None)) -> None:
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin key required")
     token = authorization[len("Bearer "):]
-    if token != settings.ADMIN_SECRET_KEY:
+    # Use constant-time comparison — a naive `!=` leaks timing info that can
+    # be used to recover the secret key character by character over many
+    # requests. hmac.compare_digest is the stdlib-approved fix.
+    if not hmac.compare_digest(token, settings.ADMIN_SECRET_KEY):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin key")
 
 

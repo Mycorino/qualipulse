@@ -166,7 +166,8 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh_token(body: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit("20/minute")
+def refresh_token(request: Request, body: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
     payload = decode_refresh_token(body.refresh_token)
     company_id: str | None = payload.get("sub")
     if not company_id:
@@ -183,7 +184,8 @@ def refresh_token(body: RefreshRequest, db: Session = Depends(get_db)) -> TokenR
 # ââ Email Verification ââââââââââââââââââââââââââââââââââââââââââââââââ
 
 @router.post("/verify-email")
-def verify_email(token: str, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def verify_email(request: Request, token: str, db: Session = Depends(get_db)):
     """Verify email address using the token from the verification email."""
     token_row = db.query(EmailVerificationToken).filter(
         EmailVerificationToken.token == token,
@@ -691,7 +693,9 @@ def complete_onboarding(
 
 
 @router.post("/change-password")
+@limiter.limit("5/minute")
 def change_password(
+    request: Request,
     body: ChangePasswordRequest,
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),

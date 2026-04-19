@@ -4,12 +4,35 @@ Set STRIPE_SECRET_KEY in .env to enable payments.
 """
 import logging
 from datetime import datetime
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
+
+
+def _validate_redirect_url(url: str, field: str) -> str:
+    """Reject Stripe redirect URLs that don't match our APP_BASE_URL host.
+
+    Without this, an attacker could POST /billing/checkout with a
+    success_url pointing at their own domain and harvest ?session_id
+    query params to phish users post-payment.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid {field}")
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise HTTPException(status_code=400, detail=f"Invalid {field}")
+    expected = urlparse(settings.APP_BASE_URL)
+    if expected.netloc and parsed.netloc != expected.netloc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field} must match the configured app host",
+        )
+    return url
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.models.affiliate import AffiliateReferral, Affiliate
@@ -108,8 +131,8 @@ def create_checkout_session(
             payment_method_types=["card"],
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=body.success_url,
-            cancel_url=body.cancel_url,
+            success_url=_validate_redirect_url(body.success_url, "success_url"),
+            cancel_url=_validate_redirect_url(body.cancel_url, "cancel_url"),
             metadata={"company_id": company.id},
         )
         return {"checkout_url": session.url}
@@ -134,7 +157,7 @@ def create_portal_session(
         stripe.api_key = stripe_key
         session = stripe.billing_portal.Session.create(
             customer=company.stripe_customer_id,
-            return_url=body.return_url,
+            return_url=_validate_redirect_url(body.return_url, "return_url"),
         )
         return {"portal_url": session.url}
     except Exception as e:
