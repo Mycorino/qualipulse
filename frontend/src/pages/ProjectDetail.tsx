@@ -423,7 +423,7 @@ export default function ProjectDetail() {
       // Instead: call delete endpoint via direct API.
       try {
         if (existing.id) {
-          await fetch(`/api/projects/${id}/analysis/annotations/${existing.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } });
+          await fetch(`/api/projects/${id}/analysis/annotations/${existing.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
         }
         setThemeAnnotations((prev) => {
           const next = { ...prev };
