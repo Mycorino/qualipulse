@@ -582,7 +582,7 @@ export default function Interview() {
         setPhase("complete");
         if (audioRef.current) audioRef.current.pause();
         // Save panel profile if consent given
-        if (panelConsent && email) {
+        if (panelConsent && email && sessionToken) {
           savePanelProfile(token!, buildPanelProfileData()).catch(() => {
             setPanelSaveError(true);
           });
@@ -618,6 +618,7 @@ export default function Interview() {
   function buildPanelProfileData(): PanelProfileData {
     return {
       email,
+      session_token: sessionToken || "",
       first_name: profile.firstName || undefined,
       age_range: profile.ageRange || undefined,
       gender: profile.gender || undefined,
@@ -649,7 +650,7 @@ export default function Interview() {
       if (res.is_complete) {
         clearSession();
         setPhase("complete");
-        if (panelConsent && email) {
+        if (panelConsent && email && sessionToken) {
           savePanelProfile(token!, buildPanelProfileData()).catch(() => {
             setPanelSaveError(true);
           });
@@ -1495,7 +1496,7 @@ export default function Interview() {
               />
             </div>
           )}
-          <div className="interview-progress">
+          <div className="interview-progress" role="status" aria-live="polite">
             <span className="interview-turn-count">
               {isFollowUp
                 ? t("interview.followUpLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })

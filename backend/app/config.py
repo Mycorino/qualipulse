@@ -79,3 +79,13 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+# Hard fail in production if SECRET_KEY is still the default placeholder —
+# a predictable signing key means any attacker can mint admin tokens. The
+# development default is intentionally ugly so this check catches it.
+if settings.is_production and settings.SECRET_KEY == "change-me-to-a-random-string":
+    raise RuntimeError(
+        "SECRET_KEY is set to its development default in production. "
+        "Set a strong random value via Secret Manager before starting the service."
+    )

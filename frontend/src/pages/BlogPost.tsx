@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import DOMPurify from "dompurify";
 import { getPublishedPost, type BlogPost } from "../api/blog";
 import { NewsletterCTA } from "./Blog";
 
@@ -189,7 +190,7 @@ export default function BlogPostPage() {
           {/* Content */}
           <div
             className="blog-content"
-            dangerouslySetInnerHTML={{ __html: post.content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
             style={{
               fontSize: "16px",
               lineHeight: 1.75,

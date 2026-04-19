@@ -45,6 +45,14 @@ def create_refresh_token(data: dict) -> str:
 def decode_access_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        # Guard against type-confusion: refresh tokens (30d lifetime) must
+        # never be accepted where an access token (24h) is expected.
+        if payload.get("type") != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         return payload
     except JWTError:
         raise HTTPException(

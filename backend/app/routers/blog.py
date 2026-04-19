@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from typing import Optional
 
+import bleach
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -13,6 +14,42 @@ from app.models.blog import BlogPost
 from app.routers.admin import require_admin
 
 router = APIRouter(tags=["blog"])
+
+
+# ── HTML sanitization (defense in depth for TipTap content) ─────────────────
+# The admin blog editor is trusted, but admin creds can leak and the endpoint
+# accepts raw HTML in the request body (not via the TipTap client). Strip
+# anything dangerous before persisting so /blog/:slug can render via
+# dangerouslySetInnerHTML without giving attackers XSS.
+ALLOWED_TAGS = [
+    "p", "br", "strong", "em", "u", "s", "code", "pre", "blockquote",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li",
+    "a", "img",
+    "hr", "span", "div",
+    "table", "thead", "tbody", "tr", "th", "td",
+]
+ALLOWED_ATTRIBUTES = {
+    "a": ["href", "title", "target", "rel"],
+    "img": ["src", "alt", "title", "width", "height"],
+    "span": ["class"],
+    "div": ["class"],
+    "code": ["class"],
+    "pre": ["class"],
+}
+ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
+
+
+def sanitize_html(html: str | None) -> str:
+    if not html:
+        return ""
+    return bleach.clean(
+        html,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRIBUTES,
+        protocols=ALLOWED_PROTOCOLS,
+        strip=True,
+    )
 
 
 # ── Pydantic schemas ─────────────────────────────────────────────────────────
@@ -192,7 +229,7 @@ def admin_create_post(body: BlogPostCreate, db: Session = Depends(get_db)):
         slug=slug,
         title=body.title,
         subtitle=body.subtitle,
-        content=body.content,
+        content=sanitize_html(body.content),
         excerpt=body.excerpt,
         cover_image_url=body.cover_image_url,
         meta_title=body.meta_title or body.title,
@@ -231,6 +268,10 @@ def admin_update_post(post_id: str, body: BlogPostUpdate, db: Session = Depends(
     # Handle tags serialization
     if "tags" in update_data:
         update_data["tags"] = json.dumps(update_data["tags"]) if update_data["tags"] else None
+
+    # Sanitize HTML content (defense in depth — see sanitize_html above)
+    if "content" in update_data:
+        update_data["content"] = sanitize_html(update_data["content"])
 
     # Handle publish transition
     if "status" in update_data:

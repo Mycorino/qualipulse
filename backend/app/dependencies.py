@@ -63,7 +63,11 @@ def get_current_company_optional(
         return None
     try:
         payload = decode_access_token(credentials.credentials)
-    except Exception:
+    except HTTPException:
+        # decode_access_token raises HTTPException(401) for bad/expired
+        # tokens. We silently fall back to anonymous here — but we
+        # deliberately don't swallow other exceptions (e.g. DB errors) so
+        # they surface to the caller with proper 500s.
         return None
     company_id: str | None = payload.get("sub")
     if company_id is None:

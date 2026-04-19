@@ -5,6 +5,7 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import axios from "axios";
+import DOMPurify from "dompurify";
 
 interface BlogPost {
   id: string;
@@ -344,7 +345,7 @@ function PostEditor({
             </div>
             <div
               className="blog-content"
-              dangerouslySetInnerHTML={{ __html: editor?.getHTML() ?? "" }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(editor?.getHTML() ?? "") }}
               style={{ fontSize: 15, lineHeight: 1.75 }}
             />
           </div>

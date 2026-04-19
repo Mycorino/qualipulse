@@ -5,6 +5,7 @@ import { signup } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import { useToast } from "../components/Toast";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 
 function getPasswordStrength(pw: string, t: (key: string) => string): { label: string; color: string; width: string } {
@@ -112,6 +113,9 @@ export default function Signup() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <LanguageSwitcher />
+        </div>
         <Link to="/" className="auth-logo" style={{ textDecoration: "none", color: "inherit" }}>QualiPulse</Link>
         <h1 className="auth-title">{t("signup.title")}</h1>
         <p className="auth-subtitle">{t("signup.subtitle")}</p>
@@ -233,10 +237,17 @@ export default function Signup() {
             const strength = getPasswordStrength(password, t);
             return (
               <div style={{ marginTop: "6px" }}>
-                <div style={{ height: "3px", background: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
+                <div
+                  role="progressbar"
+                  aria-label={t("signup.passwordLabel")}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={parseInt(strength.width, 10) || 0}
+                  style={{ height: "3px", background: "var(--border)", borderRadius: "2px", overflow: "hidden" }}
+                >
                   <div style={{ height: "100%", width: strength.width, background: strength.color, borderRadius: "2px", transition: "all 0.2s" }} />
                 </div>
-                <span style={{ fontSize: "12px", color: strength.color, marginTop: "2px", display: "block" }}>{strength.label}</span>
+                <span aria-live="polite" style={{ fontSize: "12px", color: strength.color, marginTop: "2px", display: "block" }}>{strength.label}</span>
               </div>
             );
           })()}

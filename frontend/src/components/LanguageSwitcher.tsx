@@ -14,7 +14,7 @@ export default function LanguageSwitcher({ variant = "light", style }: LanguageS
   function toggle() {
     i18n.changeLanguage(next);
     // Persist to backend if logged in (fire-and-forget, ignore errors)
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("token");
     if (token) {
       client.patch("/auth/me", { preferred_language: next }).catch(() => {});
     }

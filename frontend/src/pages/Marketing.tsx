@@ -5,6 +5,7 @@ import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
 const PLAN_IDS = [
+  { id: "free", price: "€0", highlight: false },
   { id: "starter", price: "€49", highlight: false },
   { id: "team", price: "€99", highlight: true },
   { id: "lab", price: "€199", highlight: false },
