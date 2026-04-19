@@ -137,6 +137,18 @@
     "enterpriseCta": "Talk to us about Enterprise",
     "perMonth": "/mo",
     "plans": {
+      "free": {
+        "name": "Free",
+        "desc": "Try QualiPulse end to end — no card required",
+        "features": [
+          "1 project",
+          "5 participants",
+          "AI interview guide builder",
+          "AI themes & quotes analysis",
+          "1 interview link"
+        ],
+        "cta": "Start free"
+      },
       "starter": {
         "name": "Starter",
         "desc": "For individual researchers starting out",

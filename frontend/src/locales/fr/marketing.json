@@ -137,6 +137,18 @@
     "enterpriseCta": "Parlons Enterprise",
     "perMonth": "/mois",
     "plans": {
+      "free": {
+        "name": "Gratuit",
+        "desc": "Essayez QualiPulse de bout en bout — sans carte bancaire",
+        "features": [
+          "1 projet",
+          "5 participants",
+          "Générateur de guide d'entretien IA",
+          "Analyse IA des thèmes et citations",
+          "1 lien d'entretien"
+        ],
+        "cta": "Commencer gratuitement"
+      },
       "starter": {
         "name": "Starter",
         "desc": "Pour les chercheurs individuels qui débutent",
