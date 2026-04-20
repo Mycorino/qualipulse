@@ -442,9 +442,19 @@ export default function CreateProjectWizard() {
   // ── Submit ───────────────────────────────────────────────────────────────
 
   async function handleCreate() {
+    setError("");
+    // Client-side validation: must have a project name and at least one non-blank question
+    if (!name.trim()) {
+      setError(t("wizard.errorNameRequired", { defaultValue: "Please give your project a name." }));
+      return;
+    }
+    const validQuestions = questions.filter((q) => q.main_question.trim());
+    if (validQuestions.length === 0) {
+      setError(t("wizard.errorQuestionRequired", { defaultValue: "Add at least one interview question before creating the project." }));
+      return;
+    }
     setLoading(true);
     setLoadingMsg(t("wizard.loadingCreating"));
-    setError("");
     try {
       const body = {
         name,
@@ -453,7 +463,7 @@ export default function CreateProjectWizard() {
         research_objective: objective || undefined,
         decision_to_inform: decisionToInform.trim() || undefined,
         target_customer_description: targetCustomerDescription.trim() || undefined,
-        questions: questions.filter((q) => q.main_question.trim()),
+        questions: validQuestions,
         screening_questions: screeningQuestions.filter((sq) => sq.question.trim()),
       };
       const project = isEditMode

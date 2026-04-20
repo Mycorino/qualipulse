@@ -136,6 +136,8 @@ export default function Welcome() {
 
   // Auto-poll for email verification
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pollTick, setPollTick] = useState(0);
+  const pollTimeoutHit = pollTick >= 40; // 40 * 3s = 2 minutes
 
   useEffect(() => {
     getMe()
@@ -172,7 +174,16 @@ export default function Welcome() {
       if (pollRef.current) clearInterval(pollRef.current);
       return;
     }
+    setPollTick(0);
     pollRef.current = setInterval(async () => {
+      setPollTick((n) => {
+        // Stop polling after 2 minutes — user can still click manual refresh
+        if (n >= 40) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          return n;
+        }
+        return n + 1;
+      });
       try {
         const data = await getMe();
         if (data.email_verified) {
@@ -582,8 +593,25 @@ export default function Welcome() {
               {t("onboarding.verifyDesc")} <strong>{me?.email}</strong>.
               {" "}{t("onboarding.verifyNote")}
             </p>
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8, marginBottom: 0 }}>
-              {t("onboarding.checkingAutomatically")}
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8, marginBottom: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              {pollTimeoutHit ? (
+                <span>{t("onboarding.pollStopped", { defaultValue: "Still waiting? Click \"I've verified\" after clicking the email link." })}</span>
+              ) : (
+                <>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: "var(--primary)",
+                      animation: "pulse 1.4s ease-in-out infinite",
+                    }}
+                  />
+                  <span>{t("onboarding.checkingAutomatically")}</span>
+                </>
+              )}
             </p>
             <div className="welcome-actions">
               <button className="btn btn-primary btn-lg" onClick={handleRefreshVerification}>

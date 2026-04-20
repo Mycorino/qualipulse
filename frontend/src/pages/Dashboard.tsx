@@ -396,8 +396,17 @@ export default function Dashboard() {
                   style={{ maxWidth: 400 }}
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate(`/projects/${p.id}`)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/projects/${p.id}`); } }}
+                  onClick={() => {
+                    const deepLinkTab = hasResponsesNoAnalysis || p.analysis_status === "ready" ? "?tab=analysis" : "";
+                    navigate(`/projects/${p.id}${deepLinkTab}`);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      const deepLinkTab = hasResponsesNoAnalysis || p.analysis_status === "ready" ? "?tab=analysis" : "";
+                      navigate(`/projects/${p.id}${deepLinkTab}`);
+                    }
+                  }}
                 >
                   <h3 className="project-card-name">{p.name}</h3>
                   <div className="project-card-meta">
@@ -407,22 +416,22 @@ export default function Dashboard() {
                   <div className="project-card-stats">
                     {p.completed_count > 0 && (
                       <span className="project-stat project-stat-completed">
-                        ✓ {t("projectCard.completed", { count: p.completed_count })}
+                        {t("projectCard.completed", { count: p.completed_count })}
                       </span>
                     )}
                     {p.in_progress_count > 0 && (
                       <span className="project-stat project-stat-inprogress">
-                        ● {t("projectCard.inProgress", { count: p.in_progress_count })}
+                        {t("projectCard.inProgress", { count: p.in_progress_count })}
                       </span>
                     )}
                     {p.completed_count === 0 && p.in_progress_count === 0 && (
                       <span className="project-stat project-stat-empty">{t("projectCard.noResponses")}</span>
                     )}
                     {p.analysis_status === "ready" && (
-                      <span className="project-stat project-stat-analysis">✦ {t("projectCard.analysisReady")}</span>
+                      <span className="project-stat project-stat-analysis">{t("projectCard.analysisReady")}</span>
                     )}
                     {p.analysis_status === "generating" && (
-                      <span className="project-stat project-stat-generating">✦ {t("projectCard.analysing")}</span>
+                      <span className="project-stat project-stat-generating">{t("projectCard.analysing")}</span>
                     )}
                   </div>
 
@@ -456,7 +465,7 @@ export default function Dashboard() {
                     >
                       {t("projectCard.nudgeStale", {
                         defaultValue:
-                          "⏸ No new responses in {{count}} days",
+                          "No responses in {{count}} days — try resharing the link or loosening screening",
                         count: daysSinceLastResponse!,
                       })}
                     </p>
