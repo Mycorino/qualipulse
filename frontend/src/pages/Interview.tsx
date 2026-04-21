@@ -607,9 +607,23 @@ export default function Interview() {
       }
     } catch (err: unknown) {
       clearInterval(stepInterval);
-      setPendingBlob(lastBlobRef.current);
-      const msg = err instanceof Error ? err.message : t("interview.uploadError");
-      setError(msg);
+      // Distinguish "we didn't hear you" (422) from transport failures.
+      // Empty-transcript: clear the blob so the participant records fresh;
+      // transport: keep the blob in pending so they can retry the same take.
+      const errWithResp = err as { response?: { status?: number; data?: { detail?: { code?: string } } } };
+      const status = errWithResp?.response?.status;
+      const code = errWithResp?.response?.data?.detail?.code;
+      if (status === 422 && code === "empty_transcript") {
+        setPendingBlob(null);
+        lastBlobRef.current = null;
+        setError(t("interview.emptyTranscript", {
+          defaultValue: "We didn't catch that — please record again in a quieter spot.",
+        }));
+      } else {
+        setPendingBlob(lastBlobRef.current);
+        const msg = err instanceof Error ? err.message : t("interview.uploadError");
+        setError(msg);
+      }
     } finally {
       setProcessing(false);
     }
@@ -1676,6 +1690,23 @@ export default function Interview() {
                 <p className="record-label">
                   {ttsPlaying ? "⏵ " + t("interview.listeningToQuestion") : t("interview.tapToRecord")}
                 </p>
+                {ttsPlaying && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ marginTop: 8, fontSize: 12 }}
+                    onClick={() => {
+                      if (audioRef.current) {
+                        audioRef.current.pause();
+                        audioRef.current.currentTime = 0;
+                      }
+                      setTtsPlaying(false);
+                      setTtsEnded(true);
+                    }}
+                  >
+                    {t("interview.skipAudio", { defaultValue: "Skip audio — I'm ready" })}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1762,6 +1793,34 @@ export default function Interview() {
               {t("completion.nextStepFallback")}
             </p>
           )}
+        </div>
+
+        {/* Privacy / data-rights footer — GDPR transparency for participants */}
+        <div className="interview-complete-footer" style={{
+          marginTop: 24,
+          paddingTop: 16,
+          borderTop: "1px solid var(--border-subtle)",
+          fontSize: 12,
+          color: "var(--text-tertiary)",
+          textAlign: "center",
+          lineHeight: 1.6,
+        }}>
+          {info?.privacy_policy_url && (
+            <a
+              href={info.privacy_policy_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "inherit", textDecoration: "underline" }}
+            >
+              {t("consent.privacyPolicy")}
+            </a>
+          )}
+          {info?.privacy_policy_url && " · "}
+          <span>
+            {t("completion.dataRights", {
+              defaultValue: "To request deletion of your data, contact the researcher who shared this link.",
+            })}
+          </span>
         </div>
       </div>
     </div>
