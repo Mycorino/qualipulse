@@ -66,11 +66,11 @@ i18n
     },
   });
 
-// Default to French if no language detected
+// If the detected locale is neither EN nor FR, fall back to English (the
+// declared `fallbackLng`). Previously this block defaulted everyone to French
+// and the second branch was dead code.
 if (!i18n.language || (!i18n.language.startsWith("fr") && !i18n.language.startsWith("en"))) {
-  i18n.changeLanguage("fr");
-} else if (!i18n.language.startsWith("fr") && !i18n.language.startsWith("en")) {
-  i18n.changeLanguage("fr");
+  i18n.changeLanguage("en");
 }
 
 export default i18n;

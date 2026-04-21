@@ -85,7 +85,14 @@ export default function ProjectDetail() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
-  const [tab, setTabRaw] = useState<Tab>("overview");
+  const [tab, setTabRaw] = useState<Tab>(() => {
+    const t = searchParams.get("tab");
+    return (t === "setup" || t === "responses" || t === "analysis" || t === "overview")
+      ? (t as Tab)
+      : "overview";
+  });
+  // Inline unsaved-changes banner (replaces blocking window.confirm for tab switches)
+  const [pendingTab, setPendingTab] = useState<Tab | null>(null);
   // advancedPromptOpen removed — system prompt hidden from researchers
   const [projects, setProjects] = useState<import("../api/projects").ProjectListItem[]>([]);
 
@@ -195,14 +202,33 @@ export default function ProjectDetail() {
   }
 
   function setTab(next: Tab) {
-    if (next !== tab && tab === "setup" && hasUnsavedSetupEdits()) {
-      if (!window.confirm(tProject("detail.unsavedChanges"))) return;
-      setEditingScreening(false);
-      setEditingQuestionId(null);
-      setEditingNoteId(null);
-      setEditingInterviewNotes(null);
+    if (next === tab) return;
+    if (tab === "setup" && hasUnsavedSetupEdits()) {
+      // Use inline banner instead of blocking confirm dialog
+      setPendingTab(next);
+      return;
     }
+    applyTab(next);
+  }
+
+  function applyTab(next: Tab) {
     setTabRaw(next);
+    // Sync URL so tabs are deep-linkable / shareable / back-button friendly
+    const sp = new URLSearchParams(searchParams);
+    if (next === "overview") sp.delete("tab");
+    else sp.set("tab", next);
+    setSearchParams(sp, { replace: true });
+  }
+
+  function confirmDiscardUnsaved() {
+    if (!pendingTab) return;
+    setEditingScreening(false);
+    setEditingQuestionId(null);
+    setEditingNoteId(null);
+    setEditingInterviewNotes(null);
+    const next = pendingTab;
+    setPendingTab(null);
+    applyTab(next);
   }
 
   useEffect(() => {
@@ -263,7 +289,8 @@ export default function ProjectDetail() {
       setLinks(lnks);
       setParticipants(parts);
       setAnalysis(ana);
-      if (parts.length > 0) setTab("responses");
+      // Only auto-switch to responses if no tab was explicitly requested in URL
+      if (parts.length > 0 && !searchParams.get("tab")) setTab("responses");
       if (ana.filters) {
         setActiveFilterBy(ana.filters.filter_by);
         setActiveFilterValues(ana.filters.filter_values);
@@ -1239,6 +1266,33 @@ export default function ProjectDetail() {
 
       <main className="detail-main">
 
+        {/* ── Unsaved-changes banner (replaces blocking confirm dialog) ── */}
+        {pendingTab && (
+          <div className="unsaved-banner" role="alert" style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: "12px 16px",
+            background: "var(--warning-bg, #fff7ed)",
+            border: "1px solid var(--warning, #f59e0b)",
+            borderRadius: 8,
+            marginBottom: 16,
+          }}>
+            <span style={{ color: "var(--warning-text, #92400e)", fontSize: 14 }}>
+              {tProject("detail.unsavedChanges")}
+            </span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setPendingTab(null)}>
+                {tCommon("cancel")}
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={confirmDiscardUnsaved}>
+                {tCommon("continue") || "Discard & continue"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Demo project banner ── */}
         {project.is_demo && (
           <div className="demo-banner">
@@ -2057,6 +2111,17 @@ export default function ProjectDetail() {
                           <span className="sidebar-panel__count">{codes.length}</span>
                         </summary>
                         <div className="sidebar-panel__body">
+                          <div className="sidebar-panel__howto" style={{
+                            fontSize: 12,
+                            color: "var(--text-tertiary)",
+                            padding: "8px 10px",
+                            marginBottom: 8,
+                            background: "var(--bg-subtle, #f8fafc)",
+                            borderRadius: 6,
+                            lineHeight: 1.5,
+                          }}>
+                            {tProject("responses.codebookHowTo", { defaultValue: "How to tag: highlight any part of a transcript → pick a code from the popup. Codes you create here appear in every participant's transcript." })}
+                          </div>
                           {codes.length === 0 ? (
                             <p className="sidebar-panel__empty">{tProject("responses.noCodes")}</p>
                           ) : (
@@ -2481,8 +2546,20 @@ export default function ProjectDetail() {
                         <div className="researcher-context-box">
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                             <h3 style={{ margin: 0 }}>{tAnalysis("researcherContext")}</h3>
-                            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                              {contextSaving === "saving" ? tCommon("saving") : contextSaving === "saved" ? `${tCommon("save")} ✓` : ""}
+                            <span
+                              aria-live="polite"
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 500,
+                                color: contextSaving === "saved" ? "var(--success-text, #065f46)" : "var(--text-tertiary)",
+                                transition: "opacity 0.2s",
+                              }}
+                            >
+                              {contextSaving === "saving"
+                                ? `… ${tCommon("saving")}`
+                                : contextSaving === "saved"
+                                ? `✓ ${tCommon("saved", { defaultValue: "Saved" })}`
+                                : ""}
                             </span>
                           </div>
                           <textarea
@@ -2673,6 +2750,21 @@ export default function ProjectDetail() {
                   <div className="welcome-modal-tips">
                     <strong>Pro tip:</strong> {tProject("detail.proTip")}
                   </div>
+
+                  <ol className="welcome-modal-nextsteps" style={{
+                    margin: "16px 0 0",
+                    padding: "12px 16px 12px 32px",
+                    background: "var(--bg-subtle, #f8fafc)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    color: "var(--text-secondary)",
+                  }}>
+                    <li>{tProject("detail.nextStep1", { defaultValue: "Share the link with participants" })}</li>
+                    <li>{tProject("detail.nextStep2", { defaultValue: "Monitor replies in the Responses tab" })}</li>
+                    <li>{tProject("detail.nextStep3", { defaultValue: "Run AI Analysis once you have 3+ completed interviews" })}</li>
+                  </ol>
                 </>
               ) : (
                 <div className="welcome-modal-tips">

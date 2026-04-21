@@ -21,7 +21,12 @@ from app.schemas.interview import (
     ResumeSummaryResponse,
 )
 from app.services.feature_gates import require_participant_limit
-from app.services.interview_engine import process_interview_turn, start_interview, skip_question as engine_skip_question
+from app.services.interview_engine import (
+    process_interview_turn,
+    start_interview,
+    skip_question as engine_skip_question,
+    EmptyTranscriptError,
+)
 from app.services.storage import upload_audio
 from app.services.verification import generate_magic_token, verify_magic_token
 
@@ -332,6 +337,15 @@ def check_resume_by_email(
     if not participant:
         return ResumeCheckResponse(found=False)
 
+    # Reject stale sessions (>24h old) — elapsed-time math + topic memory
+    # are no longer meaningful, and the participant is better off starting fresh.
+    if participant.started_at:
+        started = participant.started_at
+        if started.tzinfo is not None:
+            started = started.replace(tzinfo=None)
+        if (datetime.utcnow() - started).total_seconds() > 24 * 3600:
+            return ResumeCheckResponse(found=False)
+
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
     last_turn = turns[-1] if turns else None
     return ResumeCheckResponse(
@@ -498,7 +512,15 @@ async def respond_to_question(
     audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
     upload_audio(audio_data, audio_key)
 
-    result = process_interview_turn(participant_id, audio_key, db)
+    try:
+        result = process_interview_turn(participant_id, audio_key, db)
+    except EmptyTranscriptError as e:
+        # 422 so the frontend can distinguish "bad audio, please retry" from
+        # 5xx transport failures. The frontend preserves the blob for re-submit.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "empty_transcript", "message": str(e)},
+        )
 
     return TurnResponse(
         question_text=result["question_text"],

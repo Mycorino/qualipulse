@@ -17,6 +17,11 @@ from app.services.storage import upload_audio, download_audio
 from app.services.tts import generate_speech
 from app.services.usage_logger import log_claude_usage, log_stt_usage, log_tts_usage
 
+
+class EmptyTranscriptError(Exception):
+    """Raised when Whisper returns no speech in the participant's recording."""
+
+
 INTERVIEWER_SYSTEM_PROMPT = """\
 You are an expert qualitative interviewer conducting a research interview on behalf of a company.
 
@@ -466,6 +471,14 @@ def process_interview_turn(
     audio_data = download_audio(audio_path)
     filename = os.path.basename(audio_path)
     transcript, audio_duration = transcribe_audio(audio_data, filename)
+
+    # 1a. Guard: Whisper sometimes returns an empty or whitespace-only string
+    # for silent/inaudible clips. Saving that and passing it to Claude produces
+    # garbage follow-ups. Signal the caller to prompt a re-record instead.
+    if not transcript or not transcript.strip():
+        raise EmptyTranscriptError(
+            "No speech detected in the recording. Please try again in a quieter environment."
+        )
 
     # 2. Find the last interviewer turn to update with the participant's response
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
