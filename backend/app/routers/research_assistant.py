@@ -113,17 +113,21 @@ async def parse_brief(
         max_tokens=512,
         temperature=0.3,
         system=(
-            "You are a senior UX researcher. Read the project brief and "
-            "summarise the key business context in 2-3 sentences. Focus on: what "
-            "the business does, what problem they want to understand, and what "
-            "decision this research will inform. Return ONLY the summary text, "
-            "no headers or labels."
+            "You are a senior research strategist reading a fresh project brief. "
+            "Extract — do not embellish. The reader is the researcher who will run "
+            "the study; they wrote the brief and want to see whether you understood "
+            "it. Return 2-3 plain sentences covering exactly: (1) what the business "
+            "does, (2) what specific question or problem they want to understand, "
+            "(3) what decision this research will inform. No marketing language "
+            "(banned: \"leverage\", \"unlock\", \"drive\", \"seamless\"). No headers, "
+            "no labels, no preamble. If a piece is missing from the brief, say so "
+            "rather than inventing it."
         ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                f"BRIEF:\n{combined}\n\n"
+                f"<brief>\n{combined}\n</brief>\n\n"
                 f"{lang_directive}"
             ),
         }],
@@ -161,28 +165,43 @@ def suggest_objective(
     response = _claude(1024).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=1024,
-        temperature=0.7,
+        # 0.4: framing requires judgment, not creativity. Lower temperature
+        # produces sharper, more specific objectives — high temp drifts to
+        # generic motherhood statements.
+        temperature=0.4,
         system=(
-            "You are a senior product researcher with expertise in Jobs-to-be-Done "
-            "and qualitative research design. Propose sharp research objectives "
-            "and learning goals from project context."
+            "You are a senior product researcher who designs qualitative studies with "
+            "Jobs-to-be-Done framing. You write objectives that are sharp enough to "
+            "know when they've been answered. You refuse to write generic objectives "
+            "like \"understand user needs\" — they're always grounded in a specific "
+            "decision the team will make."
         ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                "Based on the following project context, propose a sharp research "
-                "objective and exactly 3 secondary learning goals. The objective must be:\n"
-                "- Specific enough to know when it's been answered\n"
-                "- Focused on human behaviour and motivations, not just opinions\n"
-                "- Grounded in what decisions the research will inform\n"
-                "- Realistic for 5–8 qualitative voice interviews of 20–30 minutes\n\n"
-                f"PROJECT CONTEXT:\n{combined}\n\n"
-                f"{lang_directive}\n"
-                "Return ONLY a JSON object with this exact structure:\n"
-                '{"objective": "one clear sentence","learning_goals": ["goal 1","goal 2","goal 3"],'
-                '"study_type": "exploratory|evaluative|generative",'
-                '"rationale": "2 sentences explaining why this framing yields the most useful insights"}'
+                f"<context>\n{combined}\n</context>\n\n"
+                "<rules>\n"
+                "The objective MUST:\n"
+                "- Be ONE sentence, specific enough that you'd know it's been answered.\n"
+                "- Focus on observable behaviour and motivations, not opinions or feature requests.\n"
+                "- Reference the decision this research will inform (build/kill, target which segment, change pricing, etc.).\n"
+                "- Be realistic for 5-8 qualitative voice interviews of 20-30 minutes.\n\n"
+                "Each learning_goal MUST:\n"
+                "- Be a concrete sub-question that contributes to the objective.\n"
+                "- Be answerable from interview data (not from analytics).\n"
+                "- NOT duplicate another goal.\n\n"
+                "BANNED phrasing in objective and goals: \"understand user needs\", "
+                "\"explore\", \"validate\" without naming the hypothesis, \"leverage\", "
+                "\"drive engagement\".\n"
+                "</rules>\n\n"
+                "<output_format>\n"
+                "Return ONLY this JSON, no fences:\n"
+                '{"objective": "...", "learning_goals": ["...", "...", "..."], '
+                '"study_type": "exploratory" | "evaluative" | "generative", '
+                '"rationale": "2 sentences on why this framing best serves the decision"}\n'
+                "</output_format>\n\n"
+                f"{lang_directive}"
             ),
         }],
     )
@@ -222,26 +241,42 @@ def suggest_scope(
     response = _claude(512).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
-        temperature=0.5,
+        # 0.3: scope is a near-deterministic mapping from objective → defaults.
+        temperature=0.3,
         system=(
-            "You are a senior UX researcher. Given a research objective, "
-            "recommend the ideal study scope including audience, duration, "
-            "and participant count."
+            "You are a senior research-ops planner. Given a research objective, you "
+            "recommend the tightest scope that can answer it: who to talk to, how long "
+            "the interview should be, and how many participants. You err toward smaller "
+            "samples and shorter interviews — researchers can always add more later, "
+            "but they can never recover wasted recruits."
         ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                f"OBJECTIVE: {objective}\n"
-                f"LEARNING GOALS:\n{goals_str}\n"
-                f"ADDITIONAL CONTEXT: {context or 'none'}\n\n"
-                f"{lang_directive}\n"
-                "Return ONLY a JSON object:\n"
-                '{"audience": "brief profile of ideal participant (1-2 sentences)",'
-                '"duration_minutes": 20 or 30 or 45,'
-                f'"language": "{language}",'
-                '"participant_count": 5 or 6 or 8,'
-                '"audience_rationale": "one sentence why this audience"}'
+                f"<objective>{objective}</objective>\n"
+                f"<learning_goals>\n{goals_str}\n</learning_goals>\n"
+                f"<context>{context or 'none'}</context>\n\n"
+                "<rules>\n"
+                "- audience: 1-2 sentences, NAMING the segment (role, behaviour, or "
+                "lifecycle stage). \"People who tried our product and stopped using it "
+                "in the last 90 days\" — good. \"Users\" — REJECT.\n"
+                "- duration_minutes: 20 (focused single-question studies), 30 (default), "
+                "or 45 (deep multi-section studies). Bias toward 20 unless the goals "
+                "genuinely require more.\n"
+                "- participant_count: 5 (tight evaluative), 6 (default exploratory), "
+                "or 8 (when 2+ segments need separate signal). Saturation typically "
+                "lands around 6-8 in qualitative research.\n"
+                "- audience_rationale: ONE sentence on why THIS segment yields the "
+                "sharpest signal for the objective.\n"
+                "</rules>\n\n"
+                "<output_format>\n"
+                "Return ONLY this JSON:\n"
+                '{"audience": "...", "duration_minutes": 20|30|45, '
+                f'"language": "{language}", "participant_count": 5|6|8, '
+                '"audience_rationale": "..."}\n'
+                "</output_format>\n\n"
+                f"{lang_directive}"
             ),
         }],
     )
@@ -281,35 +316,57 @@ def suggest_questions(
     response = _claude(2048).messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=2048,
-        temperature=0.6,
+        # 0.4: question phrasing has some variation but discipline matters
+        # more — high temp drifts to leading or double-barrelled questions.
+        temperature=0.4,
         system=(
-            "You are a senior qualitative researcher. Design voice interview "
-            "guides following best product research practices. Open-ended "
-            "questions only. Avoid 'why' — prefer 'walk me through', 'tell me "
-            "about', 'what led you to'."
+            "You are a senior qualitative researcher who designs voice interview guides "
+            "for live AI-led interviews. You write questions that ELICIT STORIES, not "
+            "opinions — concrete examples beat self-reports every time. You refuse to "
+            "write yes/no, leading, double-barrelled, or hypothetical questions."
         ),
         messages=[{
             "role": "user",
             "content": (
                 f"{biz_ctx}"
-                f"RESEARCH OBJECTIVE: {objective}\n"
-                f"LEARNING GOALS:\n{goals_str}\n"
-                f"TARGET AUDIENCE: {audience or 'general users'}\n"
-                f"INTERVIEW DURATION: {duration_minutes} minutes\n"
-                f"ADDITIONAL CONTEXT: {context or 'none'}\n"
-                f"{lang_instruction}\n\n"
-                "Rules:\n"
-                "- Open-ended questions only (never yes/no)\n"
-                "- Funnel from broad to specific within each section\n"
-                "- Start with a warm-up section to build rapport\n"
-                "- Each section: 1-2 questions max to stay within time\n"
-                "- Every question must directly serve a learning goal\n"
-                "- interview_notes: practical probing tips for the interviewer\n"
-                "- desired_learning: what insight this question aims to uncover\n\n"
+                f"<objective>{objective}</objective>\n"
+                f"<learning_goals>\n{goals_str}\n</learning_goals>\n"
+                f"<audience>{audience or 'general users'}</audience>\n"
+                f"<duration_minutes>{duration_minutes}</duration_minutes>\n"
+                f"<context>{context or 'none'}</context>\n\n"
+                "<rules>\n"
+                "- Open-ended ONLY. NEVER yes/no.\n"
+                "- Single concept per question. NEVER double-barrelled "
+                "(\"How did you find it and would you recommend it?\" — REJECT).\n"
+                "- NON-LEADING. \"What was frustrating about X?\" is leading. "
+                "\"Walk me through the last time you used X\" is not.\n"
+                "- AVOID 'why'. Prefer \"walk me through\", \"tell me about the last time\", "
+                "\"what was happening when\", \"what led you to\".\n"
+                "- Past-tense story prompts beat hypothetical or future-tense questions.\n"
+                "- Funnel broad → specific within each section.\n"
+                "- Open with a warm-up section (1 question) to build rapport without "
+                "wasting time.\n"
+                "- Each section: 1-2 questions max. Total questions calibrated to fit "
+                f"{duration_minutes} minutes (rough rule: ~5 minutes per main question "
+                "including follow-ups).\n"
+                "- Every question must directly serve a learning_goal.\n"
+                "- interview_notes: 1-2 concrete probes the interviewer can fall back on. "
+                "Not repetition of the question.\n"
+                "- desired_learning: ONE sentence on what insight this surfaces.\n"
+                "</rules>\n\n"
+                "<examples>\n"
+                "ACCEPT: \"Walk me through the last time you onboarded a new teammate to your tool.\"\n"
+                "REJECT (yes/no): \"Do you find onboarding new teammates difficult?\"\n"
+                "REJECT (leading): \"What's the hardest part of onboarding new teammates?\"\n"
+                "REJECT (double-barrelled): \"How do you onboard new teammates and what do they struggle with?\"\n"
+                "REJECT (hypothetical): \"If you could change one thing about onboarding, what would it be?\"\n"
+                "</examples>\n\n"
+                "<output_format>\n"
                 "Return ONLY a JSON array:\n"
-                '[{"section_index":0,"section_title":"Section Name","question_index":0,'
-                '"main_question":"The question","interview_notes":"Probing tips",'
-                '"desired_learning":"What insight this uncovers"}]'
+                '[{"section_index":0,"section_title":"...","question_index":0,'
+                '"main_question":"...","interview_notes":"...","desired_learning":"..."}]\n'
+                "</output_format>\n\n"
+                f"{lang_instruction}"
             ),
         }],
     )
@@ -429,11 +486,13 @@ def refine_question(
         max_tokens=1024,
         temperature=0.6,
         system=(
-            "You are a senior qualitative researcher helping polish ONE "
-            "question in an interview guide. The rest of the guide is "
-            "shown only as context — you MUST NOT suggest changes to any "
-            "other question. Your entire output is a refined version of "
-            "the single target question."
+            "You are a senior qualitative researcher polishing ONE question in an "
+            "interview guide. The rest of the guide is shown ONLY as context for "
+            "coherence. You MUST NOT suggest changes to any other question — your "
+            "entire output is a refined version of the single target question and "
+            "a short rationale. You write questions that elicit stories, not opinions: "
+            "open-ended, single-concept, non-leading, no 'why', past-tense story "
+            "prompts beat hypotheticals."
         ),
         messages=[{
             "role": "user",

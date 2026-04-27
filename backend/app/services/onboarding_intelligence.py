@@ -58,28 +58,44 @@ def classify_role_and_suggest(
     language_name = _LANGUAGE_NAMES.get(language, "English")
 
     system_msg = (
-        "You are an expert at understanding professional roles and matching "
-        "them to qualitative research needs."
+        "You are a strict role classifier and research-topic suggester for a qualitative "
+        "research SaaS. Output is parsed by code — return ONLY valid JSON."
     )
 
     prompt = (
+        f"<input>\n"
         f"Role title: {role_title or 'Not specified'}\n"
-        f"What they focus on: {occupation_description or 'Not specified'}\n"
+        f"Day-to-day focus: {occupation_description or 'Not specified'}\n"
         f"Industry: {industry or 'Not specified'}\n"
-        f"Company context: {business_summary or 'Not specified'}\n\n"
-        "Return a JSON object with:\n"
-        '1. "canonical_tag": short internal label (e.g. "product_analytics", '
-        '"brand_marketing", "ux_research", "hr_operations", "founder", '
-        '"consultant", "academic")\n'
-        '2. "orientation": "internal" (product/ops/HR), "external" '
-        '(marketing/brand/sales), or "mixed"\n'
-        '3. "suggested_use_cases": 5-7 concrete research topics this SPECIFIC '
-        "person would find relevant. Not generic like \"User research\" -- "
-        'specific like "Why power users plateau after 3 months". '
+        f"Company: {business_summary or 'Not specified'}\n"
+        f"</input>\n\n"
+        f"<canonical_tags>\n"
+        f"product_analytics, product_management, brand_marketing, growth_marketing, "
+        f"ux_research, design, customer_success, hr_operations, founder, consultant, "
+        f"academic, sales, general\n"
+        f"</canonical_tags>\n\n"
+        f"<rules>\n"
+        f"- canonical_tag: pick the closest from the list above. Use \"general\" only when "
+        f"no other clearly fits.\n"
+        f"- orientation: \"internal\" (product/ops/HR/employees), \"external\" "
+        f"(marketing/brand/sales/customers), or \"mixed\".\n"
+        f"- suggested_use_cases: 5-7 SPECIFIC research questions this person could run THIS WEEK. "
+        f"Each must reference their actual focus, not the role title. "
+        f"GOOD: \"Why mid-market customers churn between months 4-6\". "
+        f"REJECT: \"Customer feedback\", \"User research\", \"Market analysis\". "
         f"Write in {language_name}.\n"
-        '4. "research_angle": One sentence describing what insights this '
-        f"person needs. Write in {language_name}.\n\n"
-        "Return valid JSON only."
+        f"- research_angle: ONE sentence describing what kind of insight this person actually "
+        f"needs (not what they could do, but what blocks them). Write in {language_name}.\n"
+        f"</rules>\n\n"
+        f"<output_format>\n"
+        f"Return ONLY this JSON shape, no fences, no preamble:\n"
+        f"{{\n"
+        f'  "canonical_tag": "...",\n'
+        f'  "orientation": "internal" | "external" | "mixed",\n'
+        f'  "suggested_use_cases": ["...", "..."],\n'
+        f'  "research_angle": "..."\n'
+        f"}}\n"
+        f"</output_format>"
     )
 
     try:
@@ -158,12 +174,13 @@ def generate_onboarding_recap(
     use_cases_str = ", ".join(selected_use_cases) if selected_use_cases else "Not specified"
 
     system_msg = (
-        "You are a senior research strategist at a top-tier qualitative "
-        "research consultancy. Write the opening of a strategy brief after "
-        "an intake meeting."
+        "You are a senior research strategist writing the opening of a strategy brief after "
+        "an intake call. Voice: a human consultant who listened — concise, warm, specific, "
+        "no marketing-speak."
     )
 
     prompt = (
+        f"<intake_notes>\n"
         f"Client: {first_name or ''} {last_name or ''}\n"
         f"Role: {role_title or 'Not specified'}\n"
         f"Day-to-day focus: {occupation_description or 'Not specified'}\n"
@@ -171,22 +188,33 @@ def generate_onboarding_recap(
         f"Industry: {industry or 'Not specified'}\n"
         f"Research experience: {research_experience or 'Not specified'}\n"
         f"Business context: {business_summary or 'Not specified'}\n"
-        f"Research priorities: {use_cases_str}\n"
-        f"Additional notes: {goals_freeform or 'None'}\n\n"
-        f"Write a personalized research needs assessment in {language_name}.\n\n"
-        "Use the client's ACTUAL OCCUPATION to frame everything -- their own "
-        "words about what they do, not a generic title.\n\n"
-        "Structure (use light markdown formatting):\n"
-        f"1. Opening paragraph (2-3 sentences) addressing **{first_name or 'the client'}** and "
-        f"**{company_name or 'their company'}**, showing you understand their context. "
-        "Use **bold** for key phrases that show you listened.\n"
-        '2. A section with 3-4 bullet points (use `- ` markdown bullets), each a '
-        "specific research question they probably face, connected to a business "
-        "outcome. Bold the core question within each bullet.\n"
-        "3. Closing paragraph about how AI-driven interviews fit their specific workflow.\n\n"
-        "Under 180 words. Professional, warm. No exclamation marks, no emojis. "
-        "Use **bold** for emphasis and `- ` for bullets. No headers, no code blocks. "
-        f"Write in {language_name}."
+        f"Stated priorities: {use_cases_str}\n"
+        f"Additional notes: {goals_freeform or 'None'}\n"
+        f"</intake_notes>\n\n"
+        f"<task>\n"
+        f"Write a personalised research-needs recap in {language_name}. Frame everything "
+        f"around the client's ACTUAL DAY-TO-DAY FOCUS (their own words), not their job title.\n\n"
+        f"Structure (light markdown):\n"
+        f"1. Opening paragraph (2-3 sentences) addressing **{first_name or 'the client'}** "
+        f"and **{company_name or 'their company'}**. Bold 1-2 phrases from their intake "
+        f"that prove you listened.\n"
+        f"2. 3-4 bullet points (`- ` markdown bullets). Each bullet is ONE specific research "
+        f"question they probably face, connected to a business outcome. Bold the core "
+        f"question within each bullet.\n"
+        f"3. Closing paragraph: how AI-driven interviews fit their specific workflow — "
+        f"reference something concrete from intake, not the platform's generic value prop.\n"
+        f"</task>\n\n"
+        f"<rules>\n"
+        f"- Under 180 words.\n"
+        f"- BANNED vocabulary: \"unlock\", \"empower\", \"leverage\", \"seamless\", "
+        f"\"game-changing\", \"delight\", \"journey\", \"unleash\", \"drive engagement\".\n"
+        f"- No exclamation marks. No emojis. No headers. No code blocks.\n"
+        f"- Use **bold** and `- ` only. No other markdown.\n"
+        f"- Specificity test: each bullet question should be one a colleague could literally "
+        f"start tomorrow. \"Why mid-market churns at month 4\" — good. \"Understand customer "
+        f"needs\" — REJECT.\n"
+        f"</rules>\n\n"
+        f"Write in {language_name}. Return only the recap text."
     )
 
     try:

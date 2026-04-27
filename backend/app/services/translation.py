@@ -81,19 +81,50 @@ def _translate_participant_inner(
             "response": t.response_transcript or "",
         })
 
-    prompt = f"""You are a professional qualitative research translator. Translate the following interview turns into {target_name}.
+    prompt = f"""<role>
+You are a qualitative-research translator. The original transcript IS the data; this \
+translation is a reading aid for a researcher who does not speak the source language. \
+Your single most important job is to preserve the participant's voice so the researcher \
+can feel what the participant felt. You are NOT polishing, summarising, or "improving" \
+their grammar.
+</role>
 
-PRINCIPLES:
-- Preserve the participant's voice: keep hedges ("kind of", "I guess"), fillers when meaningful, colloquialisms, and emotional tone.
-- Do NOT polish or summarize. A researcher needs to feel what the participant felt.
-- Translate idiomatically, not word-for-word. If a phrase has no direct equivalent, use the closest natural {target_name} phrasing.
-- If text is already in {target_name}, return it unchanged.
-- Never add or remove information.
+<rules>
+PRESERVE — these are evidence, not noise:
+- Hedges ("kind of", "I guess", "sort of", "I mean")
+- Fillers when they signal hesitation ("um", "you know", "like" in mid-sentence)
+- Colloquialisms, slang, and informal register
+- Emotional tone (frustration, excitement, resignation, sarcasm)
+- Repetition, self-correction, and trailing-off ("it was just… yeah")
+- Register: a casual speaker stays casual in {target_name}; a formal speaker stays formal.
 
-INPUT (JSON array of turns):
+DO NOT:
+- Fix the speaker's grammar.
+- Make their sentences clearer than they were.
+- Combine fragmented thoughts into a polished sentence.
+- Translate word-for-word at the cost of natural {target_name} — find the equivalent \
+register, not the equivalent dictionary entry.
+- Add or remove any information.
+- "Soften" strong language — if they swore, they swore in {target_name} too.
+
+PASS-THROUGH:
+- If a turn is already in {target_name}, return it byte-identical.
+- Empty strings stay empty.
+
+ANTI-EXAMPLE (REJECT):
+Source (FR): "Bah… je sais pas trop, c'est un peu chiant en fait."
+BAD: "I do not know; it is somewhat unpleasant."
+GOOD: "Eh… I dunno really, it's kind of annoying actually."
+The bad version stripped the hedge ("bah", "un peu"), formalised the register, and lost \
+the emotional flavour ("chiant" is stronger than "unpleasant").
+</rules>
+
+<input>
 {json.dumps(items, ensure_ascii=False)}
+</input>
 
-Return ONLY a JSON array with the same length and order, each item: {{"id": "<id>", "question": "<translated>", "response": "<translated>"}}"""
+Return ONLY a JSON array with the same length and order. Each item:
+{{"id": "<id>", "question": "<translated>", "response": "<translated>"}}"""
 
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
     response = client.messages.create(

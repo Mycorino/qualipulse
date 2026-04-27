@@ -41,25 +41,43 @@ def generate_personalized_welcome(
     use_cases_str = ", ".join(selected_use_cases) if selected_use_cases else "Not specified"
 
     system_msg = (
-        "Write a follow-up email after an onboarding session for QualiPulse, "
-        "an AI qualitative interview platform. Write like a consultant, not a "
-        "marketer."
+        "You write the follow-up email after an onboarding intake for QualiPulse, an AI "
+        "qualitative interview platform. Voice: senior research consultant who has actually "
+        "read the intake notes — concise, specific, no marketing-speak. The reader is a busy "
+        "professional; one wasted line and they bounce."
     )
 
     prompt = (
-        f"Recipient: {first_name or ''} {last_name or ''} "
-        f"({role_title or 'Researcher'}) at {company_name or 'their company'}\n"
-        f"Focus: {occupation_description or 'Not specified'}\n"
+        f"<recipient>\n"
+        f"Name: {first_name or ''} {last_name or ''}\n"
+        f"Role: {role_title or 'Researcher'} at {company_name or 'their company'}\n"
+        f"Day-to-day focus: {occupation_description or 'Not specified'}\n"
         f"Industry: {industry or 'Not specified'}\n"
-        f"Research interests: {use_cases_str}\n\n"
-        f"Write in {language_name}. Structure:\n"
-        f"1. Greet {first_name or 'the user'} by name\n"
-        "2. One sentence about their role/context\n"
-        '3. "Based on your profile, here are three studies you could launch '
-        'this week:" -- 3 specific research questions for their occupation\n'
-        "4. Point to demo project in dashboard\n"
-        '5. Sign off from "The QualiPulse team"\n\n'
-        "Under 150 words. HTML (<p>, <ul>/<li>). No markdown, no emojis."
+        f"Stated research interests: {use_cases_str}\n"
+        f"</recipient>\n\n"
+        f"<task>\n"
+        f"Write a personalised follow-up email body in {language_name}.\n\n"
+        f"Structure:\n"
+        f"1. Open with first name only — no \"Dear\".\n"
+        f"2. One sentence that proves you read their intake (reference their actual focus, "
+        f"not their job title).\n"
+        f"3. \"Based on your profile, here are three studies you could launch this week:\" "
+        f"followed by a <ul> with 3 items. Each item is ONE specific research question tied "
+        f"to their stated use case — not a generic topic.\n"
+        f"4. One short sentence pointing them to the demo project already in their dashboard.\n"
+        f"5. Sign-off from \"The QualiPulse team\".\n"
+        f"</task>\n\n"
+        f"<rules>\n"
+        f"- Under 150 words total.\n"
+        f"- HTML only: <p>, <ul>, <li>. No <h*>, no inline styles, no markdown, no emojis.\n"
+        f"- No marketing vocabulary: BANNED — \"unlock\", \"empower\", \"leverage\", "
+        f"\"seamless\", \"game-changing\", \"delight\", \"journey\", \"unleash\".\n"
+        f"- No exclamation marks.\n"
+        f"- Each study question must be specific enough that a researcher could literally "
+        f"run it tomorrow. \"Why power users plateau after 3 months\" — good. "
+        f"\"Understand user behaviour\" — REJECT.\n"
+        f"</rules>\n\n"
+        f"Return ONLY the HTML body — no <html>/<body> wrapper, no preamble."
     )
 
     try:

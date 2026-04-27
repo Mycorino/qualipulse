@@ -269,21 +269,25 @@ def _generate_ai_headline(
             )
 
         system_msg = (
-            "You write concise study-state headlines for product researchers. "
-            "ONE sentence, max 25 words. Be concrete — reference numbers. "
-            "No preamble, no quotes."
+            "You write the study-state headline a researcher reads on their dashboard. "
+            "Voice: a research-ops colleague glancing at the data and telling them what to "
+            "do next. Concrete, prescriptive, no fluff. ONE sentence, ≤25 words. No "
+            "preamble, no surrounding quotes, no exclamation marks."
         )
 
         prompt = (
             f"{context}"
             f"{latest_block}"
-            f"STUDY STATE:\n"
-            f"- {completed_count} completed interviews\n"
-            f"- {in_progress_count} interviews in progress\n"
-            f"- Last response was {days_since_last if days_since_last is not None else '—'} days ago\n\n"
-            "Tell the researcher at a glance (a) where the study stands and "
-            "(b) the most useful next thing they should do. "
-            "If a refresh or more recruiting is warranted, say so explicitly."
+            f"<state>\n"
+            f"- Completed interviews: {completed_count}\n"
+            f"- In progress: {in_progress_count}\n"
+            f"- Days since last response: {days_since_last if days_since_last is not None else '—'}\n"
+            f"</state>\n\n"
+            "Write ONE sentence that tells the researcher (a) the most important thing about "
+            "where this study stands AND (b) the single most useful next action. Always "
+            "reference at least one concrete number. If analysis is behind the data, say "
+            "\"refresh analysis\". If responses have stalled, say \"recruit\". If too thin "
+            "to analyse yet, say so."
         )
 
         client = anthropic.Anthropic(

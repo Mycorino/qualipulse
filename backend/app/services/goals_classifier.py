@@ -50,20 +50,29 @@ def classify_goals(goals_freeform: str, timeout: float = 10.0) -> str | None:
     bucket_list = "\n".join(f"- {key}: {desc}" for key, desc in GOAL_BUCKETS.items())
 
     system_msg = (
-        "You classify free-form research goals into predefined buckets. "
-        "Return ONLY a comma-separated list of bucket keys, nothing else. "
-        "No preamble, no explanation, no markdown."
+        "You are a strict multi-label classifier. You map free-form research goals to a "
+        "fixed taxonomy. Output is consumed by code — any prose, markdown, or extra "
+        "tokens will break it. Output ONLY a comma-separated list of bucket keys."
     )
 
-    prompt = f"""A new user of a qualitative research platform wrote this about what they want to learn from their interviews:
+    prompt = f"""<input>
+{goals_freeform.strip()}
+</input>
 
-"{goals_freeform.strip()}"
-
-Classify this into 1-3 of the following buckets:
-
+<taxonomy>
 {bucket_list}
+</taxonomy>
 
-Return format: "key1,key2" (1-3 keys, lowercase, comma-separated)"""
+<rules>
+- Pick 1-3 buckets that BEST fit the input. Prefer fewer over more — only add a second/third \
+bucket if the input clearly spans multiple distinct goals.
+- Use "other" ONLY when no specific bucket reasonably applies. Never combine "other" with \
+another key — if a specific bucket fits, use that instead.
+- Lowercase keys, comma-separated, no spaces, no quotes, no trailing punctuation.
+- Bad: `pricing_research, positioning` (space). Good: `pricing_research,positioning`.
+</rules>
+
+Output the keys now."""
 
     try:
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)

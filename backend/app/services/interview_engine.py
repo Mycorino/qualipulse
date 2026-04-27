@@ -23,21 +23,40 @@ class EmptyTranscriptError(Exception):
 
 
 INTERVIEWER_SYSTEM_PROMPT = """\
-You are an expert qualitative interviewer conducting a research interview on behalf of a company.
+You are a senior qualitative interviewer running a live voice interview. You speak like a \
+warm, curious peer — not a survey script and not a therapist. You are time-bounded and the \
+participant can hear silence; aim for one focused question at a time.
 
-Your role:
-- Listen carefully and express genuine interest in what the participant tells you
-- Maintain a friendly, conversational tone — not a strict Q&A
-- Remain neutral: don't approve or disapprove of responses
-- Encourage the participant to expand and give details
-- If answers are brief, use "describe," "tell me about" prompts
-- Don't move to a new topic until you've explored the current one thoroughly
-- Use the participant's own language and terminology
-- Avoid "why" questions (they make people give socially acceptable answers instead of honest ones)
-- Be time-conscious: cover all guide questions within the allotted time
-- When transitioning to a new main guide question (action: "next_question"), open with a one-sentence callback to something specific the participant just said — using their exact words where natural — before introducing the new topic. This makes participants feel genuinely heard.
+Voice & stance:
+- Express genuine interest in what the participant just said. Be brief — they speak more when you speak less.
+- Stay neutral. Never approve or disapprove of an answer.
+- Use the participant's own words and terminology. Mirror their language register.
+- Avoid "why" questions — they invite rationalisation. Prefer "walk me through", "tell me about \
+the last time", "what was happening when".
+- Single concept per question. No double-barrelled questions, no preambles longer than one sentence.
 
-You must respond in JSON format: {"action": "follow_up" or "next_question" or "close", "question": "your question text"}
+Decision rules (you MUST output one of three actions):
+
+1. follow_up — ask a probing question that stays on the current topic. Choose this when ANY of:
+   - The answer was <40 words AND the topic is not yet exhausted.
+   - The participant introduced a concrete claim, story, or emotion that needs unpacking ("it was frustrating", \
+"we just stopped using it", "the team pushed back").
+   - You heard a generic answer ("it's fine", "it works") that hasn't surfaced behaviour or example.
+   - Pacing is on-track or ahead.
+
+2. next_question — move to the next guide question. Choose this when ANY of:
+   - The current topic has yielded a concrete example or behaviour AND you have nothing sharper to ask.
+   - Pacing is behind (the host system will tell you).
+   - You have already asked 2 follow-ups on this topic without new information.
+   When transitioning, OPEN with a one-sentence callback to something specific the participant \
+just said (use their exact words where natural), THEN introduce the new topic. This makes them feel heard.
+
+3. close — wrap up warmly. ONLY available when the host system tells you the close gate is open \
+(time-used ≥ 80% AND all main questions covered, OR time-used ≥ 95%). If the host says close is \
+NOT available, you MUST NOT return "close" no matter how exhausted the conversation feels.
+
+Output: ONE JSON object, nothing else:
+{"action": "follow_up" | "next_question" | "close", "question": "<the question text the participant will hear>"}
 """
 
 # Human-readable language names for prompting Claude. Keep in sync with the
@@ -274,39 +293,46 @@ def decide_next_action(
 
     objective_block = ""
     if research_objective:
-        objective_block = f"""
-RESEARCH OBJECTIVE:
-{research_objective}
+        objective_block = (
+            f"<objective>\n{research_objective}\n\n"
+            "Keep this objective top of mind: probe for the job-to-be-done behind behaviours, "
+            "amplify emotional language, and steer toward concrete examples — without breaking "
+            "the conversational flow.\n</objective>\n\n"
+        )
 
-As a skilled qualitative researcher, keep this objective top of mind. Use proven product marketing techniques:
-- Surface unmet needs, frustrations, and workarounds the participant may not explicitly state
-- Probe for the "job to be done" behind behaviours (why they do something, not just what)
-- Listen for emotional language and amplify it ("you said X frustrates you — can you tell me more?")
-- When an answer hints at insight relevant to the objective, follow up before moving on
-- Gently steer the conversation so the guide questions naturally uncover data that serves the objective
-"""
+    examples_block = """<examples>
+PARTICIPANT: "It was kind of frustrating when the import didn't work."
+DECISION: follow_up
+QUESTION: "Can you tell me what was happening right before you tried that import?"
+WHY: emotional language + concrete claim, no story yet — unpack before moving on.
 
-    user_message = f"""Here is the interview context:
-{objective_block}
-INTERVIEW GUIDE:
-{interview_guide_str}
+PARTICIPANT: "Yeah, I use it every Monday morning. I open the dashboard, scan for anything red, then ping the team in Slack. Takes about ten minutes."
+DECISION: next_question
+QUESTION: "That ten-minute Monday scan is really useful to hear. Shifting gears — could you walk me through the last time you onboarded a new teammate?"
+WHY: concrete behaviour with detail; topic is exhausted; open with a callback ("ten-minute Monday scan") then transition.
 
-CONVERSATION SO FAR:
-{conversation_history}
+PARTICIPANT: "It's fine."
+DECISION: follow_up
+QUESTION: "What does 'fine' look like for you on a typical day with it?"
+WHY: generic answer with no behaviour or example.
+</examples>"""
 
-CURRENT STATE:
-- Questions reached: {questions_answered} of {total_questions}
-- Elapsed time: {elapsed_minutes:.1f} / {total_minutes} minutes ({time_used_pct:.0f}% used, {remaining_minutes:.1f} min remaining)
-- All main questions covered: {all_questions_done}
-
-{pacing_instruction}
-
-Based on the conversation so far and the interview guide, decide what to do next:
-1. "follow_up" — the current topic needs more depth; ask a probing follow-up question
-2. "next_question" — the current topic is well-explored; move to the next main guide question (rephrase naturally)
-{close_instruction}
-
-Return ONLY a JSON object: {{"action": "follow_up" or "next_question" or "close", "question": "your question text"}}"""
+    user_message = (
+        f"{examples_block}\n\n"
+        f"{objective_block}"
+        f"<guide>\n{interview_guide_str}\n</guide>\n\n"
+        f"<conversation>\n{conversation_history}\n</conversation>\n\n"
+        f"<state>\n"
+        f"- Questions reached: {questions_answered} of {total_questions}\n"
+        f"- Elapsed: {elapsed_minutes:.1f} / {total_minutes} min ({time_used_pct:.0f}% used, {remaining_minutes:.1f} min left)\n"
+        f"- All main questions covered: {all_questions_done}\n"
+        f"- {pacing_instruction}\n"
+        f"- Close gate: {'OPEN — you may close' if can_close else close_instruction}\n"
+        f"</state>\n\n"
+        "Decide the next action and write the question the participant will hear. "
+        "Return ONLY: "
+        '{"action": "follow_up" | "next_question" | "close", "question": "..."}'
+    )
 
     # Append language instruction to the system prompt if the project uses a
     # non-English interview language.
@@ -315,7 +341,10 @@ Return ONLY a JSON object: {{"action": "follow_up" or "next_question" or "close"
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=512,
-        temperature=0.7,
+        # 0.4: the action choice is a near-classification task — lower temp
+        # reduces premature "close" decisions and runaway follow-up loops.
+        # Question phrasing still has enough variation to feel human.
+        temperature=0.4,
         system=effective_system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )
@@ -397,8 +426,10 @@ def _get_first_question(
                 "content": (
                     f"You are starting an interview. The first question from the guide is:\n"
                     f'"{first_q.main_question}"\n\n'
-                    f"Rephrase this as a warm, natural opening question in {language_name}. "
-                    f"Return ONLY the question text, no JSON."
+                    f"Rephrase as a warm, natural OPENER in {language_name}. One short sentence "
+                    f"of welcome (no name needed), then the question, phrased conversationally. "
+                    f"Avoid 'why'. Single concept. Under 30 words. "
+                    f"Return ONLY the spoken text — no JSON, no quotes, no preamble."
                 ),
             }
         ],
