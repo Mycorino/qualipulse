@@ -148,6 +148,7 @@ export default function Interview() {
   const [panelSaveError, setPanelSaveError] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pendingFirstTtsRef = useRef<string | null>(null);
   const { isRecording, error: recError, startRecording, stopRecording } =
     useAudioRecorder();
 
@@ -334,6 +335,14 @@ export default function Interview() {
     };
   }, [phase, micTestDone, micPermissionRequested]);
 
+  useEffect(() => {
+    if (micTestDone && pendingFirstTtsRef.current) {
+      const url = pendingFirstTtsRef.current;
+      pendingFirstTtsRef.current = null;
+      playTTS(url);
+    }
+  }, [micTestDone, playTTS]);
+
   // ── Session storage for in-progress interview ────────────────────────────
 
   const sessionKey = token ? `interview_progress_${token}` : null;
@@ -496,7 +505,7 @@ export default function Interview() {
     setElapsedSeconds(0);
     saveSession(res.participant_id, res.first_question, 1);
     setPhase("interview");
-    if (res.tts_audio_url) playTTS(res.tts_audio_url);
+    if (res.tts_audio_url) pendingFirstTtsRef.current = res.tts_audio_url;
     else setTtsEnded(true);
   }
 
