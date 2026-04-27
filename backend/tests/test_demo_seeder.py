@@ -92,10 +92,9 @@ class TestDemoSeeder:
         assert len(participants) == 4
         assert sum(1 for p in participants if p.status == "completed") == 4
 
-        # Bilingual demographics
+        # Demographics: at least two distinct countries among the 4 EN participants
         countries = {p.country for p in participants}
-        assert "France" in countries
-        assert "United Kingdom" in countries
+        assert len(countries) >= 2
 
         # Interview turns (4 turns per participant × 4 = 16 minimum)
         turns = (
@@ -118,7 +117,7 @@ class TestDemoSeeder:
             .filter(Participant.project_id == project.id)
             .all()
         )
-        assert len(tags) >= 6
+        assert len(tags) >= 4
         for tag in tags:
             turn = next(t for t in turns if t.id == tag.turn_id)
             assert turn.response_transcript is not None
@@ -179,10 +178,9 @@ class TestDemoSeeder:
         assert "tension_note" in memo_types
 
     def test_seed_uses_french_scaffolding_for_fr_company(self, db_session):
-        """A company with preferred_language=fr gets the FR project name,
-        welcome, objective, guide and screening question — but the bilingual
-        participant transcripts are still both FR and EN (by design, to
-        demonstrate cross-language capability)."""
+        """A company with preferred_language=fr gets the FR project (online
+        grocery topic) end-to-end: scaffolding, guide, screening, AND
+        participants are all French."""
         company = _make_company(db_session, preferred_language="fr")
         project = seed_demo_project(db_session, company.id)
 
@@ -201,7 +199,8 @@ class TestDemoSeeder:
         )
         assert json.loads(screening.disqualifying_options) == ["Non"]
 
-        # Guide questions should be French, preserving 3 main questions.
+        # Guide questions should be French, preserving 3 main questions,
+        # and on-topic for online grocery shopping.
         questions = (
             db_session.query(InterviewGuideQuestion)
             .filter(InterviewGuideQuestion.project_id == project.id)
@@ -209,18 +208,21 @@ class TestDemoSeeder:
             .all()
         )
         assert len(questions) == 3
-        assert any("maison aura" in q.main_question.lower() for q in questions)
+        joined = " ".join(q.main_question.lower() for q in questions)
+        assert any(word in joined for word in ("course", "livraison", "alimentaire"))
 
-        # Bilingual participants still present — the FR scaffolding shouldn't
-        # affect who gets seeded as a participant.
+        # Participants must all be in French-speaking countries — the FR
+        # demo is now mono-language.
         countries = {
             p.country
             for p in db_session.query(Participant)
             .filter(Participant.project_id == project.id)
             .all()
         }
-        assert "France" in countries
-        assert "United Kingdom" in countries
+        french_speaking = {"France", "Belgique", "Suisse", "Canada"}
+        english_speaking = {"United Kingdom", "United States", "Australia"}
+        assert countries & french_speaking, f"Expected at least one French-speaking country, got {countries}"
+        assert not (countries & english_speaking), f"Did not expect English-speaking countries in FR seed, got {countries}"
 
     def test_seed_populates_quality_assessment_fields(self, db_session):
         """All completed demo participants should have AI-quality assessment
