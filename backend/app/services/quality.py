@@ -134,32 +134,52 @@ def _run_ai_quality_assessment_inner(
         lang_name = lang_names.get(language.lower(), language)
         language_instruction = f"\n\nIMPORTANT: Respond entirely in {lang_name}."
 
-    prompt = f"""You are a qualitative research expert. Assess the quality of the following interview transcript.
+    prompt = f"""<role>
+You are a sceptical research-ops reviewer auditing whether THIS participant's transcript \
+is usable as evidence for a study. Your reader is a researcher deciding whether to weight \
+this participant heavily, lightly, or exclude them. Be honest — inflated scores waste their time.
+</role>
 
-TRANSCRIPT:
+<rubric>
+Score on four dimensions, then combine:
+1. DEPTH — do answers go beyond surface ("it's fine", yes/no) into specific examples, behaviours, stories?
+2. SPECIFICITY — concrete people / times / places / numbers, vs. generic claims ("users", "always", "kind of")?
+3. INTERNAL CONSISTENCY — do later answers reinforce or contradict earlier ones in a coherent way? \
+(Contradiction is OK if it reflects honest complexity; inconsistency that smells like inattention is not.)
+4. ENGAGEMENT — does the participant build on the interviewer's follow-ups, or stonewall / drift?
+
+Calibration:
+- 0.00-0.25 (low): mostly one-word or evasive answers, no concrete example, possible disengagement.
+- 0.25-0.50 (fair): some substance but heavy on generics; usable as background, not as primary evidence.
+- 0.50-0.75 (good): at least one concrete story or behaviour; usable for theme support.
+- 0.75-1.00 (strong): multiple specific examples, emotional authenticity, builds with follow-ups.
+
+Anti-example (REJECT this scoring):
+{{ "quality_score": 0.8, "quality_label": "strong", "summary": "The participant gave engaged answers." }}
+Why rejected: vague summary, no rubric evidence, almost certainly inflated. A "strong" rating must \
+cite at least one specific moment in the transcript that justifies it.
+</rubric>
+
+<transcript>
 {transcript_text}
+</transcript>
 
-STATS:
+<stats>
 - Total responses: {len(responses)}
 - Average words per response: {avg_words:.1f}
-- % of short responses (<10 words): {short_pct:.0f}%
+- Short responses (<10 words): {short_pct:.0f}%
+</stats>
 
-Evaluate the participant's engagement and response quality. Consider:
-- Are responses substantive and detailed, or superficial/evasive?
-- Does the participant give genuine, honest answers or just say yes/no/I don't care?
-- Is there emotional authenticity and personal experience in the responses?
-- Are there any red flags: repeated one-word answers, obvious disengagement, incoherent responses?
-
-Return ONLY a JSON object with this structure:
+<output_format>
+Return ONLY a JSON object — no markdown fences, no preamble:
 {{
   "quality_score": <float 0.0-1.0>,
-  "quality_label": <"low"|"fair"|"good"|"strong">,
-  "summary": "<2-3 sentences overall assessment>",
-  "strengths": ["<strength 1>", "<strength 2>"],
-  "issues": ["<issue 1>", "<issue 2>"]
+  "quality_label": "low" | "fair" | "good" | "strong",
+  "summary": "<2-3 sentences. Cite at least one specific moment from the transcript that drove the score.>",
+  "strengths": ["<concrete strength tied to a moment>", "..."],
+  "issues": ["<concrete issue tied to a moment>", "..."]
 }}
-
-quality_score guide: 0.0-0.25=low, 0.25-0.5=fair, 0.5-0.75=good, 0.75-1.0=strong{language_instruction}"""
+</output_format>{language_instruction}"""
 
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 

@@ -16,16 +16,27 @@ from app.services.business_context import full_context_block
 from app.services.usage_logger import log_claude_usage
 
 ANALYSIS_SYSTEM_PROMPT = """\
-You are a senior qualitative researcher with deep expertise in Jobs-to-be-Done, \
-behavioural psychology, and product research. You analyse interview transcripts and \
-produce sharp, actionable insight reports.
+You are a sceptical senior qualitative researcher reviewing your own work for a hostile PM \
+who has read every transcript and will catch any inflation. Your job is not to summarise \
+the transcripts — it is to extract only what the evidence actually supports, name what it \
+doesn't, and tell the team what to do next.
 
-Be concrete: name specific patterns, use direct quotes with attribution, flag surprises. \
-Avoid generic observations. The report should help a product team make decisions.
+Stance:
+- Treat small samples as small samples. 3-6 participants is anecdotal, not "validated".
+- Every pattern claim needs at least 2 distinct participants. If only 1 person said it, \
+it's a signal worth noting, not a theme.
+- Name participants by identifier when reporting frequency. "Most" without naming is banned.
+- Surface disconfirming evidence. If P3 contradicts the theme, say so in the same paragraph.
+- Recommendations must be actionable AND falsifiable — describe what success looks like and \
+what would prove the recommendation wrong.
 
-Each quote MUST include the participant identifier (e.g. [P1]) as provided in the transcript headers.
+Banned phrasing (REJECT before output):
+- "users want a great experience", "drive engagement", "leverage", "seamless", "delight"
+- Vague frequencies ("many users", "some participants") without naming who
+- Themes built on a single quote
+- Recommendations that read like motherhood statements ("improve onboarding")
 
-Return ONLY valid JSON — no markdown, no preamble."""
+Output: ONE valid JSON object. No markdown fences. No preamble. No trailing commentary."""
 
 
 def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict[str, dict]]:
@@ -47,6 +58,15 @@ def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict
             attrs.append(f"age: {p.age_range}")
         if getattr(p, "country", None):
             attrs.append(f"country: {p.country}")
+        # Surface the quality assessment so the synthesis prompt can flag
+        # thin participants by name and downweight their evidence weight.
+        q_label = getattr(p, "quality_label", None)
+        q_score = getattr(p, "quality_score", None)
+        if q_label:
+            q_str = f"quality: {q_label}"
+            if q_score is not None:
+                q_str += f" ({q_score:.2f})"
+            attrs.append(q_str)
 
         attr_str = f" ({', '.join(attrs)})" if attrs else ""
         header = f"--- [{identifier}] {name}{attr_str} ---"
@@ -67,6 +87,129 @@ def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict
         blocks.append("\n".join(lines))
 
     return "\n\n".join(blocks), participant_map
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Static prompt blocks (declared once at module load so the prompt prefix
+# stays byte-stable across calls — the Anthropic prompt cache rewards a
+# longer stable prefix). Dynamic content (transcripts, objective, filters)
+# is appended LAST in the user message.
+# ───────────────────────────────────────────────────────────────────────────
+
+_ANALYSIS_RULES_BLOCK = """\
+<rules>
+EVIDENCE CALIBRATION (tie confidence to N — do not exceed the ceiling):
+- N=1-2 participants → confidence "low", label findings "anecdotal"
+- N=3-5 → confidence "low" or "medium", label findings "directional"
+- N=6-9 → confidence "medium", label findings "suggestive"
+- N=10+ with thematic saturation → confidence "high"
+Recommendations cannot promise certainty the evidence does not support.
+
+THEME RULES:
+- Each theme MUST cite ≥2 verbatim quotes from ≥2 DISTINCT participants. \
+If only 1 participant supports it, do not call it a theme — drop it or move it \
+to "tensions" as a single-voice signal.
+- "frequency" is one of: "all" / "most" / "some" / "few". When using \
+"most"/"some"/"few", name the supporting participants in the theme summary \
+(e.g. "P1, P3, P5 describe …").
+- Quote text must be a verbatim substring of a participant response. Do not \
+paraphrase, do not stitch sentences together, do not fix grammar.
+- Each quote MUST include the participant identifier (e.g. [P1]) from the \
+transcript header. participant_identifier is the raw token like "P1" \
+(no brackets); participant_display_name is the human name.
+
+JTBD RULES:
+- Strict format: "When I [situation], I want to [motivation], so I can [outcome]."
+- The outcome must be the user's outcome, not the company's metric.
+
+TENSION RULES:
+- A tension is a forced choice or contradiction the participant lives with — \
+not a feature gap. Frame as "X says/does this, BUT also Y" with both halves \
+grounded in transcript evidence.
+
+RECOMMENDATION RULES:
+- Each recommendation must (a) point at a specific decision, (b) name the \
+behaviour or theme it addresses, and (c) include a falsifier — what would \
+prove it wrong (e.g. "If 3+ further interviews show users do X anyway, drop this").
+- No motherhood statements. No "consider", "explore", "leverage".
+
+DATA QUALITY:
+- If a participant's transcript is thin (quality: low/fair, or many one-word \
+answers), DO NOT use them as a primary source for a theme. You may still cite \
+them, but flag the thinness.
+- If the sample is too small or too thin to support themes, return fewer themes \
+(or zero) and explain in confidence_rationale rather than padding.
+</rules>"""
+
+_ANALYSIS_SCHEMA_BLOCK = """\
+<output_format>
+Return ONE JSON object with this exact shape:
+{
+  "summary": "2-3 sentence executive summary. Lead with the most important finding. No marketing language.",
+  "themes": [
+    {
+      "title": "concrete theme name (≤7 words)",
+      "summary": "1-2 sentences. Name supporting participants by identifier (e.g. P1, P3).",
+      "quotes": [
+        {
+          "text": "exact verbatim quote from transcript",
+          "participant_identifier": "P1",
+          "participant_display_name": "participant name",
+          "turn_index": 3,
+          "question_text": "the question that prompted this response"
+        }
+      ],
+      "frequency": "all | most | some | few",
+      "disconfirming_evidence": "Optional. If any participant contradicted or complicated this theme, name them and quote them briefly. Empty string if no contradiction was found."
+    }
+  ],
+  "jobs_to_be_done": [
+    {
+      "job": "When I [situation], I want to [motivation], so I can [outcome].",
+      "insight": "what this reveals about user motivation that wasn't obvious from the literal answer",
+      "frequency": "all | most | some | few"
+    }
+  ],
+  "tensions": [
+    {
+      "tension": "short label (≤6 words)",
+      "detail": "Frame as a forced choice or contradiction grounded in transcript evidence. Name participants."
+    }
+  ],
+  "recommendations": [
+    "Specific decision-oriented recommendation. Include a falsifier ('would be wrong if …')."
+  ],
+  "confidence": "low | medium | high",
+  "confidence_rationale": "1-2 sentences. State N, response depth, sample diversity, and any quality concerns.",
+  "participant_count": <integer>
+}
+</output_format>
+
+<examples>
+ACCEPT (theme):
+{
+  "title": "Trust earned through unboxing, not advertising",
+  "summary": "P1, P3, and P4 describe deciding to repurchase only after a tactile unboxing moment. P2 explicitly disagrees — she repurchased before any package arrived.",
+  "frequency": "most",
+  "disconfirming_evidence": "P2: 'I'd already ordered the second one before the first one even shipped.'"
+}
+
+REJECT (theme — single quote, vague frequency, no participant naming):
+{
+  "title": "Users want a delightful experience",
+  "summary": "Many participants felt the product was great.",
+  "frequency": "most",
+  "quotes": [{"text": "It's nice."}]
+}
+Why rejected: marketing-speak title, single fuzzy quote with no attribution, no disconfirming evidence, "many" without naming.
+
+ACCEPT (recommendation):
+"Move the price-justification copy above the fold on the PDP — three of six participants (P1, P4, P6) bounced when they had to scroll to find it. Falsifier: a follow-up study where 2+ participants ignore the moved copy and still bounce."
+
+REJECT (recommendation):
+"Improve the onboarding experience to drive engagement."
+Why rejected: motherhood statement, no decision, no falsifier, banned vocabulary.
+</examples>"""
 
 
 def _filter_participants(
@@ -153,55 +296,27 @@ def run_analysis(
         if filter_by and filter_values:
             filter_note = f"NOTE: This analysis covers only participants filtered by {filter_by} = {', '.join(filter_values)}.\n\n"
 
-        prompt = f"""{context_block}{objective_block}{filter_note}TRANSCRIPTS ({len(completed)} completed interviews):
-
-{transcripts_block}
-
-Analyse these interviews and return a JSON object with this exact structure:
-{{
-  "summary": "2-3 sentence executive summary of the most important finding",
-  "themes": [
-    {{
-      "title": "short theme name",
-      "summary": "1-2 sentence description",
-      "quotes": [
-        {{
-          "text": "exact verbatim quote from transcript",
-          "participant_identifier": "[P1]",
-          "participant_display_name": "participant name",
-          "turn_index": 3,
-          "question_text": "the question that prompted this response"
-        }}
-      ],
-      "frequency": "all / most / some / few"
-    }}
-  ],
-  "jobs_to_be_done": [
-    {{
-      "job": "When I... I want to... so I can...",
-      "insight": "what this reveals about user motivation",
-      "frequency": "all / most / some / few"
-    }}
-  ],
-  "tensions": [
-    {{
-      "tension": "short label",
-      "detail": "what participants say vs. what they actually do or need"
-    }}
-  ],
-  "recommendations": [
-    "specific, actionable recommendation for the product team"
-  ],
-  "confidence": "low / medium / high",
-  "confidence_rationale": "1-2 sentence explanation of why this confidence level was assigned (e.g. sample size, response depth, thematic saturation, diversity of perspectives)",
-  "participant_count": {len(completed)}
-}}"""
+        # Static blocks first (rules + schema + examples) → cached prefix.
+        # Dynamic blocks last (context, objective, filters, transcripts).
+        prompt = (
+            f"{_ANALYSIS_RULES_BLOCK}\n\n"
+            f"{_ANALYSIS_SCHEMA_BLOCK}\n\n"
+            f"<task>\nSynthesize the interviews below into a research report. "
+            f"Apply the rules above without exception. Confidence MUST be calibrated to N "
+            f"(N={len(completed)} here).\n</task>\n\n"
+            f"{context_block}{objective_block}{filter_note}"
+            f"<transcripts count=\"{len(completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
+            f"Return the JSON object now. participant_count must be {len(completed)}."
+        )
 
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(120.0))
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
-            temperature=0.5,
+            # 0.3: synthesis requires judgment but not creativity. Lower
+            # temperature reduces hallucinated quotes and inflated frequency
+            # claims — the dominant failure mode of analysis at small N.
+            temperature=0.3,
             system=ANALYSIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -362,58 +477,37 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
 
         transcripts_block, _ = _build_transcripts_block(all_completed)
 
-        prompt = f"""{context_block}{objective_block}{annotations_block}
-TRANSCRIPTS ({len(all_completed)} completed interviews):
-
-{transcripts_block}
-
-Analyse these interviews and return a JSON object with this exact structure:
-{{
-  "summary": "2-3 sentence executive summary of the most important finding",
-  "themes": [
-    {{
-      "title": "short theme name",
-      "summary": "1-2 sentence description",
-      "quotes": [
-        {{
-          "text": "exact verbatim quote from transcript",
-          "participant_identifier": "[P1]",
-          "participant_display_name": "participant name",
-          "turn_index": 3,
-          "question_text": "the question that prompted this response"
-        }}
-      ],
-      "frequency": "all / most / some / few"
-    }}
-  ],
-  "jobs_to_be_done": [
-    {{
-      "job": "When I... I want to... so I can...",
-      "insight": "what this reveals about user motivation",
-      "frequency": "all / most / some / few"
-    }}
-  ],
-  "tensions": [
-    {{
-      "tension": "short label",
-      "detail": "what participants say vs. what they actually do or need"
-    }}
-  ],
-  "recommendations": [
-    "specific, actionable recommendation for the product team"
-  ],
-  "confidence": "low / medium / high",
-  "confidence_rationale": "1-2 sentence explanation of why this confidence level was assigned (e.g. sample size, response depth, thematic saturation, diversity of perspectives)",
-  "participant_count": {len(all_completed)}
-}}
-
-For any theme that was disputed and you have reframed, add a "researcher_note" key to that theme object (string, 1-2 sentences explaining what changed). In the summary field, add one sentence noting this is a researcher-refined synthesis."""
+        prompt = (
+            f"{_ANALYSIS_RULES_BLOCK}\n\n"
+            f"{_ANALYSIS_SCHEMA_BLOCK}\n\n"
+            f"<task>\nThis is a REFINED synthesis (v2). A v1 was produced and the researcher "
+            f"reviewed it. Their annotations and notes are below — treat them as expert "
+            f"signals from someone who has read every transcript. Re-synthesize from the "
+            f"transcripts, applying the annotations:\n"
+            f"- CONFIRMED themes: keep, strengthen evidence, do not weaken.\n"
+            f"- DISPUTED themes: re-examine. If you reframe, add a `researcher_note` field "
+            f"to that theme object (1-2 sentences explaining what changed). If transcript "
+            f"evidence still overwhelmingly supports the original framing, keep it AND add "
+            f"`researcher_note` explaining the disagreement with the researcher.\n"
+            f"- NEEDS-EVIDENCE themes: include ONLY if ≥2 quotes from ≥2 distinct participants "
+            f"now support them. Otherwise drop.\n"
+            f"In the `summary` field, add one sentence noting this is a researcher-refined synthesis.\n"
+            f"All other rules (calibration to N={len(all_completed)}, ≥2 distinct participants per theme, "
+            f"named participants in frequency, disconfirming evidence, falsifiable recommendations) "
+            f"still apply without exception.\n</task>\n\n"
+            f"{context_block}{objective_block}{annotations_block}\n"
+            f"<transcripts count=\"{len(all_completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
+            f"Return the JSON object now. participant_count must be {len(all_completed)}."
+        )
 
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(120.0))
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
-            temperature=0.5,
+            # 0.3: synthesis requires judgment but not creativity. Lower
+            # temperature reduces hallucinated quotes and inflated frequency
+            # claims — the dominant failure mode of analysis at small N.
+            temperature=0.3,
             system=ANALYSIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )

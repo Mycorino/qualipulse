@@ -61,9 +61,12 @@ _LANGUAGE_DIRECTIVES = {
 }
 
 _BASE_INSTRUCTIONS = (
-    "You are helping onboard a researcher onto a user-research SaaS. They "
-    "just typed their company's website URL. Your job is to produce a short "
-    "business summary AND classify the company into an industry bucket."
+    "You are helping onboard a researcher onto a user-research SaaS. They just typed "
+    "their company's website URL. Extract — do NOT pattern-match on similar-sounding "
+    "brands and do NOT use marketing copy verbatim. Your job is to surface three things: "
+    "(1) what this company sells, (2) who they sell it to, (3) what makes them different "
+    "(if anything is clearly stated). The output is a 2-3 sentence factual summary and "
+    "an industry classification."
 )
 
 _OUTPUT_SPEC = (
