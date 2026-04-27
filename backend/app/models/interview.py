@@ -63,6 +63,10 @@ class Participant(Base):
     quality_issues: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
     avg_response_words: Mapped[float | None] = mapped_column(Float, nullable=True)
     short_answer_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Interview engine v2 — pacing, planning, fatigue
+    talk_seconds: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    interview_plan: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
+    fatigue_state: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     # Relationships
     link = relationship("InterviewLink", back_populates="participants")
@@ -142,6 +146,8 @@ class InterviewTurn(Base):
     question_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_follow_up: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     follow_up_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # v2: explicit turn classification — main | follow_up | reframe | clarification | skip_skip | closing
+    turn_kind: Mapped[str] = mapped_column(String(16), default="main", nullable=False)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     response_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
     audio_recording_url: Mapped[str | None] = mapped_column(Text, nullable=True)

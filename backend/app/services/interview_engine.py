@@ -1,4 +1,20 @@
-"""Core interview engine: orchestrates STT, Claude decision-making, and TTS."""
+"""Core interview engine: orchestrates STT, Claude decision-making, and TTS.
+
+Engine v2 (Apr 2026) introduces:
+- Pre-flight interview plan (per-question talk-time budgets) — generated once at
+  start_interview and persisted on Participant.interview_plan.
+- Talk-time pacing — pacing math runs on Whisper-reported audio_duration, not
+  wall clock. Wall clock is a hard cap only (1.5x total → force close).
+- Extended decision schema — actions: follow_up | next_question | skip_to |
+  reframe | clarification | close.
+- Hard server-side caps — max follow-ups (per plan), max 1 reframe / clarification
+  per question, premature close override, wall-clock overshoot override.
+- Dead-air detection — short non-answers ("yeah", <3s) trigger a hardcoded
+  clarification re-prompt without burning a Claude call.
+- Rolling fatigue score — early-vs-late answer length ratio. High fatigue opens
+  the close gate at 70%/70% instead of 80%/100%.
+- Turn classification — InterviewTurn.turn_kind tags each row's role.
+"""
 
 import json
 import os
@@ -22,6 +38,9 @@ class EmptyTranscriptError(Exception):
     """Raised when Whisper returns no speech in the participant's recording."""
 
 
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
+
+
 INTERVIEWER_SYSTEM_PROMPT = """\
 You are a senior qualitative interviewer running a live voice interview. You speak like a \
 warm, curious peer — not a survey script and not a therapist. You are time-bounded and the \
@@ -35,29 +54,50 @@ Voice & stance:
 the last time", "what was happening when".
 - Single concept per question. No double-barrelled questions, no preambles longer than one sentence.
 
-Decision rules (you MUST output one of three actions):
+Decision rules — you MUST output exactly one of these actions:
 
-1. follow_up — ask a probing question that stays on the current topic. Choose this when ANY of:
-   - The answer was <40 words AND the topic is not yet exhausted.
-   - The participant introduced a concrete claim, story, or emotion that needs unpacking ("it was frustrating", \
-"we just stopped using it", "the team pushed back").
-   - You heard a generic answer ("it's fine", "it works") that hasn't surfaced behaviour or example.
+1. follow_up — probe deeper on the current topic. Choose when:
+   - Answer was <40 words AND topic isn't exhausted, OR
+   - Participant introduced a concrete claim/story/emotion that needs unpacking, OR
+   - Generic answer ("it's fine", "it works") with no behaviour or example.
    - Pacing is on-track or ahead.
+   The host caps follow-ups per question; if you're at the cap, the host will force next_question.
 
-2. next_question — move to the next guide question. Choose this when ANY of:
-   - The current topic has yielded a concrete example or behaviour AND you have nothing sharper to ask.
-   - Pacing is behind (the host system will tell you).
-   - You have already asked 2 follow-ups on this topic without new information.
+2. next_question — move to the next guide question. Choose when:
+   - Current topic has yielded a concrete example or behaviour, OR
+   - Pacing is behind, OR
+   - You've already asked the planned follow-ups for this topic.
    When transitioning, OPEN with a one-sentence callback to something specific the participant \
-just said (use their exact words where natural), THEN introduce the new topic. This makes them feel heard.
+just said (use their exact words where natural), THEN introduce the new topic.
 
-3. close — wrap up warmly. ONLY available when the host system tells you the close gate is open \
-(time-used ≥ 80% AND all main questions covered, OR time-used ≥ 95%). If the host says close is \
-NOT available, you MUST NOT return "close" no matter how exhausted the conversation feels.
+3. skip_to — jump past one or more guide questions because the participant has \
+already answered them. Choose ONLY when:
+   - The most recent answer clearly and substantively covers a LATER guide \
+     question (not just adjacent topics).
+   Provide skip_to_question_index pointing at the question you want to ask next \
+(must be > current_question_index). Phrase your question with a callback acknowledging \
+that they already touched on the skipped material.
+
+4. reframe — re-ask the SAME question with new wording because the participant \
+misunderstood or went off-topic. Choose ONLY when:
+   - The answer is on-topic-adjacent but misses what the question is actually \
+     asking for (e.g. asked for a story, got a generalisation about the industry).
+   - Do NOT use reframe just because the answer was short — that's follow_up.
+   Host caps reframes at 1 per question.
+
+5. clarification — gently re-prompt because the participant gave a non-answer \
+("yeah", "I dunno", silence). The host detects most of these automatically; you \
+should rarely need to choose this manually. Host caps at 1 per question.
+
+6. close — wrap up warmly. ONLY available when the host says the close gate is \
+open. If the host says close is NOT available, you MUST NOT return "close" no \
+matter how exhausted the conversation feels.
 
 Output: ONE JSON object, nothing else:
-{"action": "follow_up" | "next_question" | "close", "question": "<the question text the participant will hear>"}
+{"action": "<one of the 6 above>", "question": "<text the participant will hear>", \
+"skip_to_question_index": <int or null>, "reason": "<≤12 words, optional>"}
 """
+
 
 # Human-readable language names for prompting Claude. Keep in sync with the
 # LANGUAGES list in frontend/src/pages/CreateProjectWizard.tsx
@@ -89,23 +129,64 @@ CLOSING_MESSAGES: dict[str, str] = {
 }
 
 
+# Hardcoded clarification re-prompts (used by dead-air detection so we don't
+# burn a Claude call on a 2-second "yeah").
+CLARIFICATION_PROMPTS: dict[str, str] = {
+    "en": "Take your time — what comes to mind?",
+    "fr": "Prends ton temps — qu'est-ce qui te vient à l'esprit ?",
+    "es": "Tómate tu tiempo — ¿qué se te ocurre?",
+    "de": "Lass dir Zeit — was fällt dir dazu ein?",
+    "it": "Prendi il tuo tempo — cosa ti viene in mente?",
+    "pt": "Sem pressa — o que lhe vem à cabeça?",
+    "nl": "Neem rustig de tijd — wat komt er bij je op?",
+    "ja": "ゆっくりで大丈夫です — どんなことが思い浮かびますか？",
+    "ko": "천천히 생각하셔도 괜찮습니다 — 어떤 것이 떠오르세요?",
+    "zh": "不用急——您能想到什么？",
+}
+
+
+# Tokens that signal a non-answer (case-insensitive, with optional trailing
+# punctuation). We require both <3s of audio AND ≤3 word transcript AND a
+# match in this set to trigger dead-air handling.
+DEAD_AIR_TOKENS = {
+    "yeah", "yes", "no", "nope", "yep", "sure", "ok", "okay",
+    "hmm", "uh", "um",
+    "i don't know", "i dunno", "dunno", "idk",
+    "ouais", "non", "oui", "bof", "je sais pas", "je ne sais pas",
+}
+
+
 def _closing_message(language_code: str | None) -> str:
     code = (language_code or "en").lower()
     return CLOSING_MESSAGES.get(code, CLOSING_MESSAGES["en"])
 
 
-def _language_instruction(language_code: str | None) -> str:
-    """Build a short system-prompt suffix telling Claude what language to use.
+def _clarification_prompt(language_code: str | None) -> str:
+    code = (language_code or "en").lower()
+    return CLARIFICATION_PROMPTS.get(code, CLARIFICATION_PROMPTS["en"])
 
-    The interview guide may be written in one language while the project
-    language is another — the project language is the source of truth for
-    how the AI interviewer should speak. Whisper transcribes responses
-    automatically; we don't need to translate those back.
-    """
+
+def _is_dead_air(transcript: str, audio_duration: float) -> bool:
+    """Return True if the response is a near-empty non-answer."""
+    if audio_duration >= 3.0:
+        return False
+    text = (transcript or "").strip().lower()
+    # Strip simple trailing punctuation
+    text = text.rstrip(".!?, ").strip()
+    if not text:
+        return True  # whitespace-only counts
+    words = text.split()
+    if len(words) > 3:
+        return False
+    return text in DEAD_AIR_TOKENS or words[0] in DEAD_AIR_TOKENS
+
+
+def _language_instruction(language_code: str | None) -> str:
+    """Build a short system-prompt suffix telling Claude what language to use."""
     code = (language_code or "en").lower()
     name = LANGUAGE_NAMES.get(code, "English")
     if code == "en":
-        return ""  # default, no extra instruction
+        return ""
     return (
         f"\n\nIMPORTANT — Language: You MUST conduct this entire interview in {name}. "
         f"Ask every question in {name}, even if the interview guide questions are "
@@ -116,15 +197,15 @@ def _language_instruction(language_code: str | None) -> str:
     )
 
 
-def _build_interview_guide_str(project: Project) -> str:
-    """Build a formatted string representation of the interview guide.
-
-    Skips questions that have been deprecated by the researcher.
-    """
-    guide_questions: list[InterviewGuideQuestion] = sorted(
+def _sorted_active_questions(project: Project) -> list[InterviewGuideQuestion]:
+    return sorted(
         [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
         key=lambda q: (q.section_index, q.question_index),
     )
+
+
+def _build_interview_guide_str(project: Project) -> str:
+    guide_questions = _sorted_active_questions(project)
     if not guide_questions:
         return "(No interview guide questions configured.)"
 
@@ -143,7 +224,6 @@ def _build_interview_guide_str(project: Project) -> str:
 
 
 def _build_conversation_history(turns: list[InterviewTurn]) -> str:
-    """Build a conversation transcript from turns."""
     lines: list[str] = []
     for turn in sorted(turns, key=lambda t: t.turn_index):
         lines.append(f"Interviewer: {turn.question_text}")
@@ -152,18 +232,186 @@ def _build_conversation_history(turns: list[InterviewTurn]) -> str:
     return "\n".join(lines)
 
 
-def get_interview_context(
-    participant_id: str, db: Session
-) -> dict:
-    """Return conversation history, interview guide, and metadata for a participant.
+# ─── Pre-flight planner ───────────────────────────────────────────────────────
 
-    Returns a dict with keys:
-        conversation_history (str), interview_guide (str),
-        elapsed_minutes (float), current_question_index (int | None),
-        total_minutes (int), all_questions_done (bool),
-        system_prompt (str), project (Project), participant (Participant),
-        turns (list[InterviewTurn]), total_questions (int)
+
+def _uniform_plan(guide_questions: list[InterviewGuideQuestion], total_minutes: int) -> dict:
+    """Fallback plan: even split, 2 follow-ups each, depth=standard."""
+    n = max(1, len(guide_questions))
+    per = max(1.0, total_minutes / n)
+    return {
+        "questions": [
+            {
+                "index": q.question_index,
+                "budget_minutes": round(per, 1),
+                "max_follow_ups": 2,
+                "depth": "standard",
+            }
+            for q in guide_questions
+        ],
+        "total_budget_minutes": total_minutes,
+        "model": "uniform-fallback",
+        "generated_at": datetime.utcnow().isoformat(),
+    }
+
+
+def _generate_interview_plan(
+    project: Project,
+    total_minutes: int,
+    language: str,
+    db: Session | None = None,
+    participant_id: str | None = None,
+) -> dict:
+    """One-shot pre-flight plan: per-question budgets + follow-up caps.
+
+    Returns a JSON-serialisable dict. Falls back to a uniform plan on any error
+    (network, parse failure, no API key, etc.) so we never block the interview
+    from starting.
     """
+    guide_questions = _sorted_active_questions(project)
+    if not guide_questions:
+        return {
+            "questions": [],
+            "total_budget_minutes": total_minutes,
+            "model": "empty-guide",
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+    # If no API key is configured (e.g. in tests) skip the call.
+    if not settings.ANTHROPIC_API_KEY:
+        return _uniform_plan(guide_questions, total_minutes)
+
+    guide_block = "\n".join(
+        f"Q{q.question_index} (depth-hint: {q.desired_learning or 'unspecified'}): {q.main_question}"
+        for q in guide_questions
+    )
+
+    user_msg = (
+        f"Total budget: {total_minutes} minutes of TALK TIME (participant + interviewer combined).\n\n"
+        f"Interview guide ({len(guide_questions)} questions):\n{guide_block}\n\n"
+        "Allocate a talk-time budget (in minutes, can be fractional) to each question. "
+        "Budgets must SUM to the total. Also assign each question:\n"
+        "- depth: \"deep\" (rich-story question, 2 follow-ups) | \"standard\" (1-2 follow-ups) | \"light\" (0-1 follow-ups)\n"
+        "- max_follow_ups: integer 0-3.\n\n"
+        "Bias deep budget toward questions with substantive desired-learning hints "
+        "and toward open-ended exploratory questions; trim from light/factual questions.\n\n"
+        "Output ONLY this JSON, no prose:\n"
+        '{"questions": [{"index": 0, "budget_minutes": 8.0, "max_follow_ups": 2, "depth": "deep"}, ...]}'
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(30.0))
+        response = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=1024,
+            temperature=0.2,
+            system=(
+                "You are an expert qualitative-research interview planner. "
+                "Output strict JSON only — no markdown, no commentary."
+                + _language_instruction(language)
+            ),
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        if db is not None:
+            log_claude_usage(
+                db, response, "interview_plan",
+                company_id=getattr(project, "company_id", None),
+                project_id=getattr(project, "id", None),
+                participant_id=participant_id,
+            )
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = "\n".join(l for l in raw.split("\n") if not l.strip().startswith("```")).strip()
+        parsed = json.loads(raw)
+        questions = parsed.get("questions", [])
+        # Sanity check: must contain every active question_index.
+        active_indices = {q.question_index for q in guide_questions}
+        plan_indices = {q.get("index") for q in questions}
+        if not active_indices.issubset(plan_indices):
+            return _uniform_plan(guide_questions, total_minutes)
+        # Normalise + clamp.
+        normalised: list[dict] = []
+        for entry in questions:
+            normalised.append({
+                "index": int(entry["index"]),
+                "budget_minutes": float(entry.get("budget_minutes", total_minutes / len(guide_questions))),
+                "max_follow_ups": max(0, min(3, int(entry.get("max_follow_ups", 2)))),
+                "depth": entry.get("depth", "standard"),
+            })
+        return {
+            "questions": sorted(normalised, key=lambda x: x["index"]),
+            "total_budget_minutes": total_minutes,
+            "model": CLAUDE_MODEL,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+    except Exception:
+        return _uniform_plan(guide_questions, total_minutes)
+
+
+def _plan_for_question(plan: dict | None, question_index: int) -> dict:
+    """Look up the plan entry for a question_index; return defaults if missing."""
+    default = {"index": question_index, "budget_minutes": 5.0, "max_follow_ups": 2, "depth": "standard"}
+    if not plan:
+        return default
+    for entry in plan.get("questions", []):
+        if entry.get("index") == question_index:
+            return entry
+    return default
+
+
+# ─── Talk-time + fatigue helpers ──────────────────────────────────────────────
+
+
+def _talk_seconds_for_question(turns: list[InterviewTurn], question_index: int) -> float:
+    """Sum recorded audio seconds across all turns belonging to a question.
+
+    We don't have per-turn duration stored, so we estimate from transcript word
+    count (≈150 wpm conversational → 0.4s/word). This is an approximation used
+    only for the per-question pacing signal; total talk time uses real Whisper
+    durations summed onto Participant.talk_seconds.
+    """
+    total = 0.0
+    for t in turns:
+        if t.question_index != question_index or not t.response_transcript:
+            continue
+        words = len(t.response_transcript.split())
+        total += words * 0.4
+    return total
+
+
+def _compute_fatigue_state(turns: list[InterviewTurn]) -> str | None:
+    """Rolling fatigue: late 2-turn avg word-count vs early 2-turn avg.
+
+    Returns "high" | "medium" | "low" | None (when not enough data).
+    Excludes clarification turns and skip_skip turns.
+    """
+    answer_turns = [
+        t for t in sorted(turns, key=lambda x: x.turn_index)
+        if t.response_transcript
+        and getattr(t, "turn_kind", "main") not in ("clarification", "skip_skip")
+        and t.response_transcript.strip() not in ("[Skipped]", "[Implicitly answered in prior response]")
+    ]
+    if len(answer_turns) < 4:
+        return None
+    early = answer_turns[:2]
+    late = answer_turns[-2:]
+    early_avg = sum(len((t.response_transcript or "").split()) for t in early) / 2
+    late_avg = sum(len((t.response_transcript or "").split()) for t in late) / 2
+    if early_avg <= 0:
+        return None
+    ratio = late_avg / early_avg
+    if ratio < 0.5:
+        return "high"
+    if ratio < 0.7:
+        return "medium"
+    return "low"
+
+
+# ─── Context assembly ────────────────────────────────────────────────────────
+
+
+def get_interview_context(participant_id: str, db: Session) -> dict:
+    """Return conversation history, interview guide, and metadata for a participant."""
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
     if participant is None:
         raise ValueError(f"Participant {participant_id} not found")
@@ -171,37 +419,39 @@ def get_interview_context(
     project = participant.project
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
 
-    guide_questions = sorted(
-        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
-        key=lambda q: (q.section_index, q.question_index),
-    )
+    guide_questions = _sorted_active_questions(project)
     total_questions = len(guide_questions)
 
-    # Determine the highest question_index that has been asked
     asked_indices = {t.question_index for t in turns if t.question_index is not None}
     current_question_index = max(asked_indices) if asked_indices else 0
 
-    # all_questions_done is True only when the last guide question has been both
-    # asked AND has a participant response (i.e. it's been answered, not just reached).
     last_index = total_questions - 1
     if total_questions == 0:
         all_questions_done = True
     elif current_question_index < last_index:
         all_questions_done = False
     else:
-        # We are on (or past) the last question — check it has a response
         last_q_turns = [t for t in turns if t.question_index == last_index]
         all_questions_done = any(t.response_transcript for t in last_q_turns)
 
-    # Use naive UTC to match SQLite-stored timestamps (no tzinfo)
     now = datetime.utcnow()
     started = participant.started_at.replace(tzinfo=None) if participant.started_at.tzinfo else participant.started_at
     elapsed = (now - started).total_seconds() / 60.0
+
+    plan = None
+    if getattr(participant, "interview_plan", None):
+        try:
+            plan = json.loads(participant.interview_plan)
+        except (json.JSONDecodeError, TypeError):
+            plan = None
+
+    talk_minutes = (getattr(participant, "talk_seconds", 0.0) or 0.0) / 60.0
 
     return {
         "conversation_history": _build_conversation_history(turns),
         "interview_guide": _build_interview_guide_str(project),
         "elapsed_minutes": elapsed,
+        "talk_minutes": talk_minutes,
         "current_question_index": current_question_index,
         "total_minutes": project.interview_duration_minutes,
         "all_questions_done": all_questions_done,
@@ -211,7 +461,104 @@ def get_interview_context(
         "participant": participant,
         "turns": turns,
         "total_questions": total_questions,
+        "interview_plan": plan,
+        "fatigue_state": getattr(participant, "fatigue_state", None),
     }
+
+
+# ─── Pacing math ──────────────────────────────────────────────────────────────
+
+
+def _compute_pacing(
+    plan: dict | None,
+    turns: list[InterviewTurn],
+    current_question_index: int,
+    talk_minutes: float,
+    elapsed_minutes: float,
+    total_minutes: int,
+    total_questions: int,
+) -> dict:
+    """Compute the pacing block passed to Claude.
+
+    Returns dict with:
+      current_q_pace, overall_pace, wall_clock_overshoot, instruction (str),
+      current_q_budget, current_q_talk_minutes
+    """
+    # Per-question
+    plan_entry = _plan_for_question(plan, current_question_index)
+    current_q_budget = float(plan_entry["budget_minutes"])
+    q_talk_seconds = _talk_seconds_for_question(turns, current_question_index)
+    q_talk_minutes = q_talk_seconds / 60.0
+    q_pct = (q_talk_minutes / current_q_budget * 100.0) if current_q_budget > 0 else 100.0
+    if q_pct > 130:
+        current_q_pace = "behind"  # over the per-q budget
+    elif q_pct < 50:
+        current_q_pace = "ahead"
+    else:
+        current_q_pace = "on_track"
+
+    # Overall (talk-time vs total budget — talk_minutes is participant+interviewer
+    # talk only; total_minutes is the configured budget — this is the canonical
+    # pacing signal under v2)
+    if total_minutes > 0:
+        overall_pct = talk_minutes / total_minutes * 100.0
+        # Expected progress through the questions, given talk-time consumed.
+        if total_questions > 0:
+            expected_q = (talk_minutes / total_minutes) * total_questions
+            delta = current_question_index - expected_q
+            if delta < -1.5:
+                overall_pace = "behind"
+            elif delta > 1.0:
+                overall_pace = "ahead"
+            else:
+                overall_pace = "on_track"
+        else:
+            overall_pace = "on_track"
+    else:
+        overall_pct = 0.0
+        overall_pace = "on_track"
+
+    wall_clock_overshoot = total_minutes > 0 and elapsed_minutes > (1.5 * total_minutes)
+
+    if wall_clock_overshoot:
+        instruction = (
+            "⚠️ HARD CAP: wall-clock has exceeded 150% of the budget. The host will close "
+            "the interview. Do NOT ask another question."
+        )
+    elif overall_pace == "behind":
+        instruction = (
+            "⚠️ PACING: significantly behind on overall talk-time vs questions remaining. "
+            "Move to the NEXT main guide question now. Do not ask a follow-up."
+        )
+    elif overall_pace == "ahead" and current_q_pace != "behind":
+        instruction = (
+            "PACING: ahead of schedule — there is room to probe. A follow-up is welcome "
+            "if it would surface deeper insight."
+        )
+    elif current_q_pace == "behind":
+        instruction = (
+            f"PACING: this question has consumed {q_pct:.0f}% of its planned "
+            f"{current_q_budget:.1f}-min budget. Wrap it and move on."
+        )
+    else:
+        instruction = (
+            "PACING: on schedule. Ask a follow-up only if it genuinely adds value, "
+            "otherwise move on."
+        )
+
+    return {
+        "current_q_pace": current_q_pace,
+        "overall_pace": overall_pace,
+        "wall_clock_overshoot": wall_clock_overshoot,
+        "instruction": instruction,
+        "current_q_budget": current_q_budget,
+        "current_q_talk_minutes": q_talk_minutes,
+        "talk_minutes": talk_minutes,
+        "overall_pct": overall_pct,
+    }
+
+
+# ─── Decision (Claude call) ──────────────────────────────────────────────────
 
 
 def decide_next_action(
@@ -229,66 +576,51 @@ def decide_next_action(
     company_id=None,
     project_id=None,
     participant_id=None,
+    talk_minutes: float | None = None,
+    interview_plan: dict | None = None,
+    fatigue_state: str | None = None,
+    turns: list[InterviewTurn] | None = None,
 ) -> dict:
-    """Call Claude to decide the next interview action.
+    """Call Claude for the next action under the v2 schema.
 
-    Returns a dict with keys: action ("follow_up"|"next_question"|"close"), question (str)
+    Returns dict: {action, question, skip_to_question_index?, reason?}.
     """
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
 
-    # Compute how much of the allotted time has been used and questions answered
-    time_used_pct = (elapsed_minutes / total_minutes * 100) if total_minutes > 0 else 100
-    questions_answered = current_question_index + 1  # 1-based count of questions reached
-    remaining_minutes = max(0.0, total_minutes - elapsed_minutes)
+    # Talk-time pacing math.
+    talk_minutes = talk_minutes if talk_minutes is not None else elapsed_minutes
+    pacing = _compute_pacing(
+        interview_plan,
+        turns or [],
+        current_question_index,
+        talk_minutes,
+        elapsed_minutes,
+        total_minutes,
+        total_questions,
+    )
 
-    # ── Pacing budget ──────────────────────────────────────────────────────
-    # How far ahead/behind are we relative to an even spread of questions?
-    if total_questions > 0 and total_minutes > 0:
-        minutes_per_question = total_minutes / total_questions
-        expected_q_index = elapsed_minutes / minutes_per_question
-        pace_delta = current_question_index - expected_q_index  # positive = ahead
-        questions_remaining = max(0, total_questions - current_question_index - 1)
-        slack_minutes = remaining_minutes - (questions_remaining * minutes_per_question)
-    else:
-        pace_delta = 0.0
-        slack_minutes = remaining_minutes
+    questions_answered = current_question_index + 1
+    talk_pct = pacing["overall_pct"]
+    plan_entry = _plan_for_question(interview_plan, current_question_index)
 
-    if pace_delta < -1.5:
-        pacing_instruction = (
-            "⚠️ PACING ALERT: You are significantly behind schedule. "
-            "Move to the NEXT main guide question immediately. "
-            "Do NOT ask a follow-up under any circumstances."
-        )
-    elif pace_delta < -0.5:
-        pacing_instruction = (
-            "PACING: You are slightly behind schedule. "
-            "Only ask a follow-up if the participant's answer was genuinely too brief or unclear. "
-            "Otherwise move to the next main question now."
-        )
-    elif pace_delta > 1.0:
-        pacing_instruction = (
-            "PACING: You are ahead of schedule — you have time to explore. "
-            "Feel free to ask a follow-up question if it would surface deeper insight."
+    # Close gate (fatigue-aware).
+    if fatigue_state == "high":
+        # Earlier gate: 70% talk time + ≥70% questions covered.
+        questions_pct = (questions_answered / total_questions) if total_questions else 1
+        can_close = (
+            (talk_pct >= 70.0 and questions_pct >= 0.7)
+            or talk_pct >= 95.0
+            or all_questions_done and talk_pct >= 70.0
         )
     else:
-        fu_word = "may" if slack_minutes > 0 else "should not"
-        pacing_instruction = (
-            f"PACING: You are on schedule. "
-            f"You {fu_word} ask one follow-up if it genuinely adds value, then move to the next question."
-        )
-
-    # ── Close gate ─────────────────────────────────────────────────────────
-    can_close = all_questions_done or time_used_pct >= 95.0
-    can_close = can_close and (time_used_pct >= 80.0)
+        can_close = (all_questions_done and talk_pct >= 80.0) or talk_pct >= 95.0
 
     if can_close:
-        close_instruction = '3. "close" — the interview is complete (all questions covered and/or time is up); wrap up warmly'
+        close_instruction = '6. "close" — gate is OPEN. Wrap up warmly when the topic feels exhausted.'
     else:
         close_instruction = (
-            '3. "close" — NOT available yet. '
-            f'Only {elapsed_minutes:.1f} of {total_minutes} minutes have elapsed '
-            f'({questions_answered} of {total_questions} questions reached). '
-            'Keep the conversation going.'
+            f'6. "close" — NOT available. Talk-time used: {talk_pct:.0f}%; '
+            f'questions reached: {questions_answered}/{total_questions}. Keep going.'
         )
 
     objective_block = ""
@@ -302,20 +634,27 @@ def decide_next_action(
 
     examples_block = """<examples>
 PARTICIPANT: "It was kind of frustrating when the import didn't work."
-DECISION: follow_up
-QUESTION: "Can you tell me what was happening right before you tried that import?"
-WHY: emotional language + concrete claim, no story yet — unpack before moving on.
+DECISION: {"action":"follow_up","question":"Can you walk me through what was happening right before you tried that import?","skip_to_question_index":null,"reason":"emotion + concrete claim, no story yet"}
 
 PARTICIPANT: "Yeah, I use it every Monday morning. I open the dashboard, scan for anything red, then ping the team in Slack. Takes about ten minutes."
-DECISION: next_question
-QUESTION: "That ten-minute Monday scan is really useful to hear. Shifting gears — could you walk me through the last time you onboarded a new teammate?"
-WHY: concrete behaviour with detail; topic is exhausted; open with a callback ("ten-minute Monday scan") then transition.
+DECISION: {"action":"next_question","question":"That ten-minute Monday scan is really useful. Shifting gears — could you walk me through the last time you onboarded a new teammate?","skip_to_question_index":null,"reason":"concrete behaviour, topic exhausted"}
 
 PARTICIPANT: "It's fine."
-DECISION: follow_up
-QUESTION: "What does 'fine' look like for you on a typical day with it?"
-WHY: generic answer with no behaviour or example.
+DECISION: {"action":"follow_up","question":"What does 'fine' look like for you on a typical day with it?","skip_to_question_index":null,"reason":"generic, no behaviour"}
+
+[After Q1 'how do you currently handle X', participant explains they use Tool Y AND mentions price made them switch from Z]
+DECISION: {"action":"skip_to","question":"You mentioned price was the trigger to switch from Z. Can you walk me through that decision?","skip_to_question_index":3,"reason":"already covered Q2-Q3 implicitly"}
+
+PARTICIPANT: "I think the industry generally has issues with this."
+DECISION: {"action":"reframe","question":"That makes sense at a high level — and I'd love to ground it in your own experience. Could you tell me about the last time YOU ran into this?","skip_to_question_index":null,"reason":"generalisation; need a personal story"}
 </examples>"""
+
+    pacing_block = pacing["instruction"]
+    fatigue_line = (
+        f"- Fatigue: {fatigue_state} (close gate opens earlier)"
+        if fatigue_state
+        else "- Fatigue: not yet measurable"
+    )
 
     user_message = (
         f"{examples_block}\n\n"
@@ -324,26 +663,24 @@ WHY: generic answer with no behaviour or example.
         f"<conversation>\n{conversation_history}\n</conversation>\n\n"
         f"<state>\n"
         f"- Questions reached: {questions_answered} of {total_questions}\n"
-        f"- Elapsed: {elapsed_minutes:.1f} / {total_minutes} min ({time_used_pct:.0f}% used, {remaining_minutes:.1f} min left)\n"
+        f"- Talk-time: {talk_minutes:.1f} / {total_minutes} min ({talk_pct:.0f}% used)\n"
+        f"- Wall-clock elapsed: {elapsed_minutes:.1f} min\n"
+        f"- Current question budget: {plan_entry['budget_minutes']:.1f} min, depth={plan_entry['depth']}, "
+        f"used {pacing['current_q_talk_minutes']:.1f} min so far ({pacing['current_q_pace']})\n"
+        f"- Max follow-ups for this question: {plan_entry['max_follow_ups']}\n"
         f"- All main questions covered: {all_questions_done}\n"
-        f"- {pacing_instruction}\n"
-        f"- Close gate: {'OPEN — you may close' if can_close else close_instruction}\n"
+        f"{fatigue_line}\n"
+        f"- {pacing_block}\n"
+        f"- Close gate: {'OPEN' if can_close else close_instruction}\n"
         f"</state>\n\n"
-        "Decide the next action and write the question the participant will hear. "
-        "Return ONLY: "
-        '{"action": "follow_up" | "next_question" | "close", "question": "..."}'
+        "Decide the next action. Return ONLY the JSON object specified by the system prompt."
     )
 
-    # Append language instruction to the system prompt if the project uses a
-    # non-English interview language.
     effective_system_prompt = (system_prompt or INTERVIEWER_SYSTEM_PROMPT) + _language_instruction(language)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=CLAUDE_MODEL,
         max_tokens=512,
-        # 0.4: the action choice is a near-classification task — lower temp
-        # reduces premature "close" decisions and runaway follow-up loops.
-        # Question phrasing still has enough variation to feel human.
         temperature=0.4,
         system=effective_system_prompt,
         messages=[{"role": "user", "content": user_message}],
@@ -356,28 +693,28 @@ WHY: generic answer with no behaviour or example.
         )
 
     raw_text = response.content[0].text.strip()
-
-    # Try to parse JSON from the response, handling potential markdown wrapping
     text_to_parse = raw_text
     if text_to_parse.startswith("```"):
-        # Strip markdown code fences
-        lines = text_to_parse.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        text_to_parse = "\n".join(lines).strip()
+        text_to_parse = "\n".join(
+            l for l in text_to_parse.split("\n") if not l.strip().startswith("```")
+        ).strip()
 
     try:
         result = json.loads(text_to_parse)
     except json.JSONDecodeError:
-        # Fallback: treat entire response as a follow-up question
         result = {"action": "follow_up", "question": raw_text}
 
-    # Validate keys
     if "action" not in result:
         result["action"] = "follow_up"
     if "question" not in result:
         result["question"] = raw_text
+    result.setdefault("skip_to_question_index", None)
+    result.setdefault("reason", None)
 
     return result
+
+
+# ─── First-question opener ───────────────────────────────────────────────────
 
 
 def _get_first_question(
@@ -385,11 +722,8 @@ def _get_first_question(
     db=None,
     participant_id=None,
 ) -> tuple[str, int]:
-    """Get the first non-deprecated question from the interview guide, rephrased as an opener."""
-    guide_questions = sorted(
-        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
-        key=lambda q: (q.section_index, q.question_index),
-    )
+    """Get the first non-deprecated question, rephrased as a warm opener."""
+    guide_questions = _sorted_active_questions(project)
     language_code = (getattr(project, "language", None) or "en").lower()
     language_name = LANGUAGE_NAMES.get(language_code, "English")
 
@@ -410,13 +744,14 @@ def _get_first_question(
 
     first_q = guide_questions[0]
 
-    # Use Claude to rephrase the first question as a natural conversation opener
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
+    if not settings.ANTHROPIC_API_KEY:
+        return first_q.main_question, first_q.question_index
 
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
     effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=CLAUDE_MODEL,
         max_tokens=256,
         temperature=0.5,
         system=effective_system_prompt,
@@ -445,14 +780,14 @@ def _get_first_question(
             participant_id=participant_id,
         )
 
-    return question_text, 0
+    return question_text, first_q.question_index
+
+
+# ─── start_interview / process_interview_turn ────────────────────────────────
 
 
 def start_interview(participant_id: str, db: Session) -> dict:
-    """Generate the first question and TTS for a new interview.
-
-    Returns dict with: question_text, tts_audio_url, turn
-    """
+    """Generate the first question + TTS for a new interview, and persist a plan."""
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
     if participant is None:
         raise ValueError(f"Participant {participant_id} not found")
@@ -461,6 +796,18 @@ def start_interview(participant_id: str, db: Session) -> dict:
     company_id = project.company_id
     proj_id = project.id
 
+    # Pre-flight: generate the interview plan.
+    if not getattr(participant, "interview_plan", None):
+        plan = _generate_interview_plan(
+            project,
+            project.interview_duration_minutes or 20,
+            project.language or "en",
+            db=db,
+            participant_id=participant_id,
+        )
+        participant.interview_plan = json.dumps(plan)
+        db.commit()
+
     question_text, q_index = _get_first_question(project, db=db, participant_id=participant_id)
 
     # Generate TTS audio and upload
@@ -468,13 +815,13 @@ def start_interview(participant_id: str, db: Session) -> dict:
     tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
     log_tts_usage(db, question_text, company_id=company_id, project_id=proj_id, participant_id=participant_id)
 
-    # Save the interviewer turn
     turn = InterviewTurn(
         participant_id=participant_id,
         turn_index=0,
         question_index=q_index,
         is_follow_up=False,
         follow_up_index=0,
+        turn_kind="main",
         question_text=question_text,
         tts_audio_url=tts_audio_url,
     )
@@ -489,144 +836,305 @@ def start_interview(participant_id: str, db: Session) -> dict:
     }
 
 
+def _count_kind(turns: list[InterviewTurn], question_index: int, kind: str) -> int:
+    return sum(
+        1 for t in turns
+        if t.question_index == question_index and getattr(t, "turn_kind", "main") == kind
+    )
+
+
+def _save_clarification_turn(
+    participant_id: str,
+    db: Session,
+    last_turn: InterviewTurn | None,
+    turns: list[InterviewTurn],
+    current_question_index: int,
+    language: str,
+    project_company_id,
+    project_id,
+) -> dict:
+    """Hard-coded re-prompt path for dead-air responses. No Claude call."""
+    question_text = _clarification_prompt(language)
+    next_turn_index = (turns[-1].turn_index + 1) if turns else 0
+
+    tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
+    tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
+    log_tts_usage(
+        db, question_text,
+        company_id=project_company_id, project_id=project_id, participant_id=participant_id,
+    )
+
+    new_turn = InterviewTurn(
+        participant_id=participant_id,
+        turn_index=next_turn_index,
+        question_index=current_question_index,
+        is_follow_up=False,
+        follow_up_index=0,
+        turn_kind="clarification",
+        question_text=question_text,
+        tts_audio_url=tts_audio_url,
+    )
+    db.add(new_turn)
+    db.commit()
+    db.refresh(new_turn)
+
+    return {
+        "question_text": question_text,
+        "tts_audio_url": tts_audio_url,
+        "is_complete": False,
+        "is_follow_up": False,
+        "question_index": current_question_index,
+        "elapsed_seconds": 0,
+        "total_seconds": 0,
+    }
+
+
 def process_interview_turn(
     participant_id: str, audio_path: str, db: Session
 ) -> dict:
-    """Process a participant's audio response and generate the next question.
-
-    Orchestrates: transcribe -> save transcript -> get context -> Claude decision -> TTS
-
-    Returns dict with: question_text, tts_audio_url, is_complete
-    """
-    # 1. Transcribe the participant's audio
+    """Process a participant's audio response and generate the next interviewer turn."""
+    # 1. Transcribe.
     audio_data = download_audio(audio_path)
     filename = os.path.basename(audio_path)
     transcript, audio_duration = transcribe_audio(audio_data, filename)
 
-    # 1a. Guard: Whisper sometimes returns an empty or whitespace-only string
-    # for silent/inaudible clips. Saving that and passing it to Claude produces
-    # garbage follow-ups. Signal the caller to prompt a re-record instead.
     if not transcript or not transcript.strip():
         raise EmptyTranscriptError(
             "No speech detected in the recording. Please try again in a quieter environment."
         )
 
-    # 2. Find the last interviewer turn to update with the participant's response
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
     if participant is None:
         raise ValueError(f"Participant {participant_id} not found")
 
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
 
-    # The last turn should be the interviewer's question awaiting a response
+    # 2. Save participant transcript on the last (open) interviewer turn.
     if turns:
         last_turn = turns[-1]
         last_turn.response_transcript = transcript
-        last_turn.audio_recording_url = audio_path  # key; resolved to URL via storage layer
+        last_turn.audio_recording_url = audio_path
+        # Accumulate talk-time on the participant.
+        participant.talk_seconds = (participant.talk_seconds or 0.0) + float(audio_duration or 0.0)
         db.commit()
+        # Re-read turns ordering after commit
+        turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    else:
+        last_turn = None
 
-    # 3. Get context for Claude
-    context = get_interview_context(participant_id, db)
-    _proj = context["project"]
-    _company_id = _proj.company_id
-    _project_id = _proj.id
+    project = participant.project
+    company_id = project.company_id
+    proj_id = project.id
+    language = (project.language or "en").lower()
 
-    # Log STT usage now that we have project/company context
     log_stt_usage(
         db, audio_duration,
-        company_id=_company_id, project_id=_project_id, participant_id=participant_id,
+        company_id=company_id, project_id=proj_id, participant_id=participant_id,
     )
 
-    # 4. Ask Claude for the next action
-    decision = decide_next_action(
-        system_prompt=context["system_prompt"],
-        interview_guide_str=context["interview_guide"],
-        conversation_history=context["conversation_history"],
-        current_question_index=context["current_question_index"],
-        elapsed_minutes=context["elapsed_minutes"],
-        total_minutes=context["total_minutes"],
-        all_questions_done=context["all_questions_done"],
-        total_questions=context["total_questions"],
-        research_objective=_proj.research_objective,
-        language=context["language"],
-        db=db,
-        company_id=_company_id,
-        project_id=_project_id,
-        participant_id=participant_id,
-    )
+    # Determine the active question_index from existing turns BEFORE deciding.
+    asked_indices = {t.question_index for t in turns if t.question_index is not None}
+    current_question_index = max(asked_indices) if asked_indices else 0
 
-    # Server-side safety guard: override a premature "close" decision.
-    # Claude can only close if 80% of the time has elapsed OR all questions are done.
-    if decision["action"] == "close":
-        elapsed = context["elapsed_minutes"]
-        total = context["total_minutes"]
-        time_used_pct = (elapsed / total * 100) if total > 0 else 100
-        if not context["all_questions_done"] and time_used_pct < 80.0:
-            # Force a next_question instead
-            decision["action"] = "next_question"
+    # 3. Dead-air detection — no Claude call needed.
+    if _is_dead_air(transcript, audio_duration):
+        clarification_count = _count_kind(turns, current_question_index, "clarification")
+        if clarification_count < 1:
+            return _save_clarification_turn(
+                participant_id, db, last_turn, turns,
+                current_question_index, language, company_id, proj_id,
+            )
+        # Already used the 1-clarification budget on this question — fall
+        # through to a forced next_question.
+        decision = {"action": "next_question", "question": None, "skip_to_question_index": None}
+    else:
+        # 4. Claude decision call.
+        context = get_interview_context(participant_id, db)
+        # Recompute and persist fatigue.
+        fatigue = _compute_fatigue_state(context["turns"])
+        if fatigue != participant.fatigue_state:
+            participant.fatigue_state = fatigue
+            db.commit()
 
-    # Server-side pace guard: if significantly behind, override follow_up to next_question
-    if decision["action"] == "follow_up":
-        elapsed = context["elapsed_minutes"]
-        total = context["total_minutes"]
-        total_q = context["total_questions"]
-        cur_q = context["current_question_index"]
-        if total_q > 0 and total > 0:
-            minutes_per_q = total / total_q
-            expected_q = elapsed / minutes_per_q
-            if (cur_q - expected_q) < -1.5:
-                decision["action"] = "next_question"
+        decision = decide_next_action(
+            system_prompt=context["system_prompt"],
+            interview_guide_str=context["interview_guide"],
+            conversation_history=context["conversation_history"],
+            current_question_index=context["current_question_index"],
+            elapsed_minutes=context["elapsed_minutes"],
+            total_minutes=context["total_minutes"],
+            all_questions_done=context["all_questions_done"],
+            total_questions=context["total_questions"],
+            research_objective=project.research_objective,
+            language=context["language"],
+            db=db,
+            company_id=company_id,
+            project_id=proj_id,
+            participant_id=participant_id,
+            talk_minutes=context["talk_minutes"],
+            interview_plan=context["interview_plan"],
+            fatigue_state=fatigue,
+            turns=context["turns"],
+        )
 
-    action = decision["action"]
-    question_text = decision["question"]
+    # 5. Server-side overrides on the model decision.
+    context = get_interview_context(participant_id, db)
+    plan = context["interview_plan"]
+    elapsed = context["elapsed_minutes"]
+    talk_minutes = context["talk_minutes"]
+    total_minutes = context["total_minutes"]
+    total_questions = context["total_questions"]
+    all_questions_done = context["all_questions_done"]
+    cur_q = context["current_question_index"]
+    plan_entry = _plan_for_question(plan, cur_q)
+    max_follow_ups = int(plan_entry.get("max_follow_ups", 2))
+
+    action = decision.get("action") or "follow_up"
+
+    # Wall-clock overshoot → force close (hard cap, bypasses close gate).
+    wall_clock_hard_cap = total_minutes > 0 and elapsed > 1.5 * total_minutes
+
+    # Premature close override (preserved from v1) — but skip when the wall-clock
+    # hard cap is in effect.
+    if action == "close" and not wall_clock_hard_cap:
+        talk_pct = (talk_minutes / total_minutes * 100.0) if total_minutes > 0 else 100.0
+        gate_open = (all_questions_done and talk_pct >= 80.0) or talk_pct >= 95.0
+        if context["fatigue_state"] == "high":
+            qpct = (cur_q + 1) / total_questions if total_questions else 1
+            gate_open = gate_open or (talk_pct >= 70.0 and qpct >= 0.7)
+        if not gate_open:
+            action = "next_question"
+
+    if wall_clock_hard_cap:
+        action = "close"
+
+    # Hard cap on follow-ups.
+    if action == "follow_up":
+        existing_fu = _count_kind(context["turns"], cur_q, "follow_up")
+        if existing_fu >= max_follow_ups:
+            action = "next_question"
+
+    # Hard cap on reframes.
+    if action == "reframe":
+        if _count_kind(context["turns"], cur_q, "reframe") >= 1:
+            action = "next_question"
+
+    # Hard cap on clarifications (only path here is when Claude itself asked
+    # for a clarification — dead-air path already gated above).
+    if action == "clarification":
+        if _count_kind(context["turns"], cur_q, "clarification") >= 1:
+            action = "next_question"
+
+    # Validate skip_to.
+    skip_to_idx = decision.get("skip_to_question_index")
+    if action == "skip_to":
+        if (
+            skip_to_idx is None
+            or not isinstance(skip_to_idx, int)
+            or skip_to_idx <= cur_q
+            or skip_to_idx >= total_questions
+        ):
+            action = "next_question"
+
+    # Behind-pace override on follow_up (kept from v1, but now talk-time based).
+    if action == "follow_up" and total_minutes > 0 and total_questions > 0:
+        expected_q = (talk_minutes / total_minutes) * total_questions
+        if (cur_q - expected_q) < -1.5:
+            action = "next_question"
+
     is_complete = action == "close"
 
-    # 5. Generate TTS for the next question / closing and upload
+    # 6. Build the question text we'll actually speak.
+    if is_complete:
+        # If Claude returned its own closing line, use it; else fall back.
+        question_text = decision.get("question") or _closing_message(language)
+    elif action == "next_question":
+        # If Claude provided text, prefer it; otherwise fall back to the next
+        # main guide question.
+        if decision.get("question"):
+            question_text = decision["question"]
+        else:
+            guide = _sorted_active_questions(project)
+            nexts = [q for q in guide if q.question_index > cur_q]
+            question_text = nexts[0].main_question if nexts else _closing_message(language)
+    else:
+        question_text = decision.get("question") or "Could you tell me a bit more?"
+
+    # 7. TTS.
     tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
     tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
-    log_tts_usage(db, question_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
+    log_tts_usage(db, question_text, company_id=company_id, project_id=proj_id, participant_id=participant_id)
 
-    # 6. Determine the new turn metadata
+    # 8. Compute new turn metadata + handle skip_to synthetic skip turns.
     next_turn_index = (turns[-1].turn_index + 1) if turns else 0
 
     if action == "next_question":
-        new_q_index = context["current_question_index"] + 1
+        new_q_index = cur_q + 1
         is_follow_up = False
         follow_up_idx = 0
+        turn_kind = "main"
     elif action == "follow_up":
-        new_q_index = context["current_question_index"]
+        new_q_index = cur_q
         is_follow_up = True
-        # Count existing follow-ups for this question
-        follow_up_idx = sum(
-            1 for t in turns
-            if t.question_index == new_q_index and t.is_follow_up
-        ) + 1
-    else:  # close
-        new_q_index = context["current_question_index"]
+        follow_up_idx = _count_kind(context["turns"], cur_q, "follow_up") + 1
+        turn_kind = "follow_up"
+    elif action == "reframe":
+        new_q_index = cur_q
         is_follow_up = False
         follow_up_idx = 0
+        turn_kind = "reframe"
+    elif action == "clarification":
+        new_q_index = cur_q
+        is_follow_up = False
+        follow_up_idx = 0
+        turn_kind = "clarification"
+    elif action == "skip_to":
+        # Insert synthetic skip_skip rows for every intermediate question, then
+        # land on skip_to_question_index as a "main" ask-turn.
+        for skipped_idx in range(cur_q + 1, skip_to_idx):
+            db.add(
+                InterviewTurn(
+                    participant_id=participant_id,
+                    turn_index=next_turn_index,
+                    question_index=skipped_idx,
+                    is_follow_up=False,
+                    follow_up_index=0,
+                    turn_kind="skip_skip",
+                    question_text="[Skipped — implicitly answered earlier]",
+                    response_transcript="[Implicitly answered in prior response]",
+                )
+            )
+            next_turn_index += 1
+        new_q_index = skip_to_idx
+        is_follow_up = False
+        follow_up_idx = 0
+        turn_kind = "main"
+    else:  # close
+        new_q_index = cur_q
+        is_follow_up = False
+        follow_up_idx = 0
+        turn_kind = "closing"
 
-    # 7. Save the new interviewer turn
     new_turn = InterviewTurn(
         participant_id=participant_id,
         turn_index=next_turn_index,
         question_index=new_q_index,
         is_follow_up=is_follow_up,
         follow_up_index=follow_up_idx,
+        turn_kind=turn_kind,
         question_text=question_text,
         tts_audio_url=tts_audio_url,
     )
     db.add(new_turn)
 
-    # 8. Update participant status if complete
+    # 9. Wrap up bookkeeping.
     if is_complete:
         participant.status = "completed"
         participant.completed_at = datetime.utcnow()
-        # Send completion email if participant provided one
         try:
             from app.services.email import send_email
             if participant.email:
-                project_name = participant.project.name
+                project_name = project.name
                 send_email(
                     to=participant.email,
                     subject=f"Thank you for your interview — {project_name}",
@@ -637,9 +1145,8 @@ def process_interview_turn(
                     """,
                 )
         except Exception:
-            pass  # Never fail the interview flow due to email errors
+            pass
 
-        # Auto-run AI quality assessment in background thread
         try:
             import threading as _threading
             _pid = participant.id
@@ -676,13 +1183,13 @@ def process_interview_turn(
         "is_complete": is_complete,
         "is_follow_up": is_follow_up,
         "question_index": new_q_index,
-        "elapsed_seconds": int(context["elapsed_minutes"] * 60),
-        "total_seconds": context["total_minutes"] * 60,
+        "elapsed_seconds": int(elapsed * 60),
+        "total_seconds": total_minutes * 60,
     }
 
 
 def skip_question(participant_id: str, db) -> dict:
-    """Advance past the current question without a response and return the next question."""
+    """Advance past the current question without a response, return the next question."""
     from app.services.tts import generate_speech
     from app.services.storage import upload_audio as upload_audio_file
 
@@ -694,23 +1201,17 @@ def skip_question(participant_id: str, db) -> dict:
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
     context = get_interview_context(participant_id, db)
 
-    # Mark last unanswered turn as skipped
     unanswered = [t for t in turns if not t.response_transcript]
     if unanswered:
         last = unanswered[-1]
         last.response_transcript = "[Skipped]"
         db.commit()
 
-    # Decide next action — force next_question
     current_q_index = context["current_question_index"]
-    guide_questions = sorted(
-        [q for q in project.guide_questions if not q.deprecated_at],
-        key=lambda q: q.question_index,
-    )
+    guide_questions = _sorted_active_questions(project)
     next_questions = [q for q in guide_questions if q.question_index > current_q_index]
 
     if not next_questions:
-        # No more questions — close
         closing_text = _closing_message(getattr(project, "language", None))
         tts_url = None
         try:
@@ -724,7 +1225,6 @@ def skip_question(participant_id: str, db) -> dict:
         participant.completed_at = datetime.utcnow()
         db.commit()
 
-        # Auto-run AI quality assessment in background thread
         try:
             import threading as _threading
             _pid = participant.id
@@ -752,7 +1252,11 @@ def skip_question(participant_id: str, db) -> dict:
         except Exception:
             pass
 
-        return {"question_text": closing_text, "tts_audio_url": tts_url, "is_complete": True, "is_follow_up": False, "question_index": current_q_index, "elapsed_seconds": 0, "total_seconds": 0}
+        return {
+            "question_text": closing_text, "tts_audio_url": tts_url, "is_complete": True,
+            "is_follow_up": False, "question_index": current_q_index,
+            "elapsed_seconds": 0, "total_seconds": 0,
+        }
 
     next_q = next_questions[0]
     question_text = next_q.main_question
@@ -762,6 +1266,7 @@ def skip_question(participant_id: str, db) -> dict:
         question_index=next_q.question_index,
         is_follow_up=False,
         follow_up_index=0,
+        turn_kind="main",
         question_text=question_text,
     )
     db.add(new_turn)

@@ -736,6 +736,31 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         started = now - timedelta(days=days_ago)
         completed_at = started + timedelta(minutes=22)
         q = quality or {}
+        # Estimate cumulative talk-time from transcript word counts
+        # (~150 wpm conversational → 0.4 s/word).
+        total_words = sum(
+            len((turn.get("response_transcript") or "").split())
+            for turn in data["turns"]
+        )
+        talk_seconds_estimate = round(total_words * 0.4, 1)
+
+        # Plausible plan for the 3-question demo guide.
+        demo_plan = {
+            "questions": [
+                {"index": 0, "budget_minutes": 8.0, "max_follow_ups": 2, "depth": "deep"},
+                {"index": 1, "budget_minutes": 9.0, "max_follow_ups": 2, "depth": "deep"},
+                {"index": 2, "budget_minutes": 8.0, "max_follow_ups": 2, "depth": "standard"},
+            ],
+            "total_budget_minutes": 25,
+            "model": "demo-seed",
+            "generated_at": started.isoformat(),
+        }
+
+        # Map quality label → fatigue: strong/good = "low", fair = "medium",
+        # low = None (not enough good signal). Keep null when label missing.
+        fatigue_by_label = {"strong": "low", "good": "low", "fair": "medium"}
+        fatigue_state = fatigue_by_label.get(q.get("quality_label", "good"))
+
         participant = Participant(
             link_id=link.id,
             project_id=project.id,
@@ -755,6 +780,9 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             quality_issues=json.dumps(q["quality_issues"]) if "quality_issues" in q else None,
             avg_response_words=q.get("avg_response_words"),
             short_answer_pct=q.get("short_answer_pct"),
+            talk_seconds=talk_seconds_estimate,
+            interview_plan=json.dumps(demo_plan),
+            fatigue_state=fatigue_state,
         )
         db.add(participant)
         db.flush()
@@ -762,12 +790,14 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         turns: list[InterviewTurn] = []
         for t_idx, turn in enumerate(data["turns"]):
             q_idx_zero_based = max(0, int(turn.get("question_index", 1)) - 1)
+            is_fu = bool(turn.get("is_follow_up", False))
             interview_turn = InterviewTurn(
                 participant_id=participant.id,
                 turn_index=t_idx,
                 question_index=q_idx_zero_based,
-                is_follow_up=bool(turn.get("is_follow_up", False)),
+                is_follow_up=is_fu,
                 follow_up_index=0,
+                turn_kind="follow_up" if is_fu else "main",
                 question_text=turn["question_text"],
                 response_transcript=turn["response_transcript"],
                 manually_edited=(edit_first_turn and t_idx == 0),
