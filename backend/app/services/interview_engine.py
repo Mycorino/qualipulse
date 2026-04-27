@@ -18,7 +18,6 @@ Engine v2 (Apr 2026) introduces:
 
 import json
 import os
-import uuid
 from datetime import datetime, timezone
 
 import anthropic
@@ -29,9 +28,8 @@ from app.config import settings
 from app.models.interview import InterviewTurn, Participant
 from app.models.project import InterviewGuideQuestion, Project
 from app.services.stt import transcribe_audio
-from app.services.storage import upload_audio, download_audio
-from app.services.tts import generate_speech
-from app.services.usage_logger import log_claude_usage, log_stt_usage, log_tts_usage
+from app.services.storage import download_audio
+from app.services.usage_logger import log_claude_usage, log_stt_usage
 
 
 class EmptyTranscriptError(Exception):
@@ -301,7 +299,7 @@ def _generate_interview_plan(
 
     try:
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(30.0))
-        response = client.messages.create(
+        with client.messages.stream(
             model=CLAUDE_MODEL,
             max_tokens=1024,
             temperature=0.2,
@@ -311,7 +309,8 @@ def _generate_interview_plan(
                 + _language_instruction(language)
             ),
             messages=[{"role": "user", "content": user_msg}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
         if db is not None:
             log_claude_usage(
                 db, response, "interview_plan",
@@ -678,13 +677,14 @@ DECISION: {"action":"reframe","question":"That makes sense at a high level — a
 
     effective_system_prompt = (system_prompt or INTERVIEWER_SYSTEM_PROMPT) + _language_instruction(language)
 
-    response = client.messages.create(
+    with client.messages.stream(
         model=CLAUDE_MODEL,
         max_tokens=512,
         temperature=0.4,
         system=effective_system_prompt,
         messages=[{"role": "user", "content": user_message}],
-    )
+    ) as stream:
+        response = stream.get_final_message()
 
     if db is not None:
         log_claude_usage(
@@ -750,7 +750,7 @@ def _get_first_question(
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
     effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
 
-    response = client.messages.create(
+    with client.messages.stream(
         model=CLAUDE_MODEL,
         max_tokens=256,
         temperature=0.5,
@@ -768,7 +768,8 @@ def _get_first_question(
                 ),
             }
         ],
-    )
+    ) as stream:
+        response = stream.get_final_message()
 
     question_text = response.content[0].text.strip()
 
@@ -810,11 +811,7 @@ def start_interview(participant_id: str, db: Session) -> dict:
 
     question_text, q_index = _get_first_question(project, db=db, participant_id=participant_id)
 
-    # Generate TTS audio and upload
-    tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-    tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
-    log_tts_usage(db, question_text, company_id=company_id, project_id=proj_id, participant_id=participant_id)
-
+    # Persist the turn first; TTS is served on demand from /audio/stream/{turn_id}.
     turn = InterviewTurn(
         participant_id=participant_id,
         turn_index=0,
@@ -823,11 +820,14 @@ def start_interview(participant_id: str, db: Session) -> dict:
         follow_up_index=0,
         turn_kind="main",
         question_text=question_text,
-        tts_audio_url=tts_audio_url,
     )
     db.add(turn)
     db.commit()
     db.refresh(turn)
+
+    tts_audio_url = f"/audio/stream/{turn.id}"
+    turn.tts_audio_url = tts_audio_url
+    db.commit()
 
     return {
         "question_text": question_text,
@@ -857,13 +857,6 @@ def _save_clarification_turn(
     question_text = _clarification_prompt(language)
     next_turn_index = (turns[-1].turn_index + 1) if turns else 0
 
-    tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-    tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
-    log_tts_usage(
-        db, question_text,
-        company_id=project_company_id, project_id=project_id, participant_id=participant_id,
-    )
-
     new_turn = InterviewTurn(
         participant_id=participant_id,
         turn_index=next_turn_index,
@@ -872,11 +865,14 @@ def _save_clarification_turn(
         follow_up_index=0,
         turn_kind="clarification",
         question_text=question_text,
-        tts_audio_url=tts_audio_url,
     )
     db.add(new_turn)
     db.commit()
     db.refresh(new_turn)
+
+    tts_audio_url = f"/audio/stream/{new_turn.id}"
+    new_turn.tts_audio_url = tts_audio_url
+    db.commit()
 
     return {
         "question_text": question_text,
@@ -1060,10 +1056,10 @@ def process_interview_turn(
     else:
         question_text = decision.get("question") or "Could you tell me a bit more?"
 
-    # 7. TTS.
-    tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-    tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
-    log_tts_usage(db, question_text, company_id=company_id, project_id=proj_id, participant_id=participant_id)
+    # 7. TTS — deferred. We persist the turn first, then return a streaming URL
+    # that the participant's browser will GET and that spawns the OpenAI TTS
+    # call as bytes flow through. tts_audio_url is filled in below after we
+    # have the new turn's ID.
 
     # 8. Compute new turn metadata + handle skip_to synthetic skip turns.
     next_turn_index = (turns[-1].turn_index + 1) if turns else 0
@@ -1123,9 +1119,11 @@ def process_interview_turn(
         follow_up_index=follow_up_idx,
         turn_kind=turn_kind,
         question_text=question_text,
-        tts_audio_url=tts_audio_url,
     )
     db.add(new_turn)
+    db.flush()  # need new_turn.id before committing the streaming URL
+    tts_audio_url = f"/audio/stream/{new_turn.id}"
+    new_turn.tts_audio_url = tts_audio_url
 
     # 9. Wrap up bookkeeping.
     if is_complete:
@@ -1190,9 +1188,6 @@ def process_interview_turn(
 
 def skip_question(participant_id: str, db) -> dict:
     """Advance past the current question without a response, return the next question."""
-    from app.services.tts import generate_speech
-    from app.services.storage import upload_audio as upload_audio_file
-
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
     if not participant:
         raise ValueError("Participant not found")
@@ -1213,14 +1208,20 @@ def skip_question(participant_id: str, db) -> dict:
 
     if not next_questions:
         closing_text = _closing_message(getattr(project, "language", None))
-        tts_url = None
-        try:
-            audio_data = generate_speech(closing_text)
-            key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-            upload_audio_file(audio_data, key)
-            tts_url = f"/audio/{key}"
-        except Exception:
-            pass
+        # Persist a closing turn so the streaming endpoint can serve TTS.
+        closing_turn = InterviewTurn(
+            participant_id=participant_id,
+            turn_index=len(turns),
+            question_index=current_q_index,
+            is_follow_up=False,
+            follow_up_index=0,
+            turn_kind="closing",
+            question_text=closing_text,
+        )
+        db.add(closing_turn)
+        db.flush()
+        tts_url = f"/audio/stream/{closing_turn.id}"
+        closing_turn.tts_audio_url = tts_url
         participant.status = "completed"
         participant.completed_at = datetime.utcnow()
         db.commit()
@@ -1270,18 +1271,10 @@ def skip_question(participant_id: str, db) -> dict:
         question_text=question_text,
     )
     db.add(new_turn)
+    db.flush()
+    tts_url = f"/audio/stream/{new_turn.id}"
+    new_turn.tts_audio_url = tts_url
     db.commit()
-
-    tts_url = None
-    try:
-        audio_data = generate_speech(question_text)
-        key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-        upload_audio_file(audio_data, key)
-        new_turn.tts_audio_url = key
-        db.commit()
-        tts_url = f"/audio/{key}"
-    except Exception:
-        pass
 
     total_minutes = project.interview_duration_minutes or 30
     elapsed = context["elapsed_minutes"]
