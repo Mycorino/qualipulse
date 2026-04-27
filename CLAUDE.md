@@ -381,20 +381,25 @@ Idempotent via `Company.demo_seeded_at` — subsequent onboarding completions
 skip seeding. Seeder errors are swallowed so a fixture bug never blocks a
 real user from finishing onboarding.
 
-The showcase project uses a **Maison Aura brand trust study** theme —
-a fictional premium candle/skincare brand — chosen because consumer brand
-trust is universally understandable (not SaaS-specific). Language-aware:
-FR companies get `[Démo] Confiance de marque — Maison Aura`, EN companies
-get `[Demo] Brand trust — Maison Aura`.
+Seeding is **mono-language** — driven entirely by `Company.preferred_language`
+— and uses real, well-known consumer brands so testers immediately recognise
+the topic. EN companies get a **streaming services** study named
+`[Demo] How people choose streaming services` (Netflix, Disney+, Prime Video,
+HBO Max, Apple TV+). FR companies get a **courses alimentaires en ligne**
+study named `[Démo] Courses alimentaires en ligne — habitudes & freins`
+(Carrefour Drive, Picard, Leclerc Drive, Coop@home, Amazon Fresh).
 
-- **Bilingual interviews** — 2 French (Claire M., Thomas R.) + 2 English
-  (Emma W., James P.) completed participants with realistic adaptive
-  follow-ups and demographics (profession / age_range / country)
+- **Four mono-language interviews** with a realistic quality spread (1 low /
+  1 good / 2 strong) and varied demographics. EN: Priya R. (UK), Marcus T.
+  (US), Jen H. (Canada), Alex K. (Australia). FR: Camille D. (France),
+  Romain B. (France), Léa M. (Belgique), Sophie L. (Suisse). Each has 7–9
+  turns mixing main questions and adaptive follow-ups.
 - **Setup content** — 3 main guide questions across 3 sections (Discovery /
-  Experience / Trust & return), 1 screening question with a disqualifying
-  option, 1 active interview link
+  Experience / Loyalty for EN; Découverte / Expérience / Confiance et retour
+  for FR), 1 screening question with a disqualifying option, 1 active
+  interview link, 25-minute target duration
 - **Coding** — 3 manual codes (Trust signal / Friction / Price concern)
-  and 8 tagged quotes with real character offsets computed via `.find()`
+  and 4 tagged quotes with real character offsets computed via `.find()`
 - **Analysis** — 2 versions: `ai_discovery` v1 (with `share_token`) and
   `researcher_refined` v2 parented to v1. 2 annotations (`confirmed`,
   `needs_evidence`) on v2 themes. All analysis quotes are verbatim
@@ -763,7 +768,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Terms of Service + Privacy Policy pages
 - [x] SendGrid email integration (domain-authenticated, branded HTML templates)
 - [x] Getting-started checklist on empty dashboard
-- [x] Auto-seeded showcase demo project on onboarding completion — Maison Aura brand trust study, language-aware (FR/EN), 2 FR + 2 EN participants, 3 guide questions, 3 codes, 8 tagged quotes, 2 analysis versions with annotations, 3 memos. `is_demo=True` exposed in API, never counts against tier quota. Demo CTA banner prompts first real project creation. Idempotent via `Company.demo_seeded_at`.
+- [x] Auto-seeded showcase demo project on onboarding completion — mono-language by `preferred_language` (EN = streaming-services study, FR = online-grocery study, both using real consumer brands). 4 participants in the company's language with a realistic quality spread (1 low / 1 good / 2 strong), 7–9 turns each, 3 guide questions, 3 codes, 4 tagged quotes, 2 analysis versions with annotations, 3 memos. `is_demo=True` exposed in API, never counts against tier quota. Demo CTA banner prompts first real project creation. Idempotent via `Company.demo_seeded_at`.
 - [x] Trial banner on dashboard (visible to solo/free users with active trial)
 - [x] Email verification banner (yellow) when unverified
 - [x] Admin panel (user management, tier changes, trial management, user deletion)
