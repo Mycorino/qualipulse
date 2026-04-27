@@ -153,7 +153,22 @@
     "proTip": "Les 3 premiers participants sont les plus précieux. Recrutez dans votre réseau existant — collègues, clients récents ou membres de communauté — plutôt qu'en approche directe.",
     "noAutoLink": "Nous n'avons pas pu générer automatiquement un lien d'entretien. Rendez-vous dans l'onglet Vue d'ensemble pour en créer un manuellement.",
     "shareLater": "Je partagerai plus tard",
-    "goToProject": "Aller au projet"
+    "goToProject": "Aller au projet",
+    "editingFieldAria": "Modification de {{field}}. Appuyez sur Entrée pour enregistrer ou Échap pour annuler.",
+    "tabPanelLabel": "Panneau {{tab}}"
+  },
+  "switcher": {
+    "active": "Actif",
+    "inactive": "Inactif",
+    "participants": "{{count}} participant",
+    "participants_other": "{{count}} participants",
+    "completed": "{{count}} réponse",
+    "completed_other": "{{count}} réponses",
+    "empty": "Aucun autre projet."
+  },
+  "setupLiveWarning": {
+    "title": "Les modifications sont publiées immédiatement.",
+    "desc": "Les nouveaux participants voient vos changements ; les transcriptions terminées ne sont pas affectées."
   },
   "overview": {
     "totalParticipants": "Participants au total",

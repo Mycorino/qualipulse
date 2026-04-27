@@ -153,7 +153,22 @@
     "proTip": "The first 3 participants are the most valuable. Aim to recruit from inside your existing network — teammates, recent customers, or community members — rather than cold outreach.",
     "noAutoLink": "We couldn't auto-generate an interview link. Head to the Overview tab to create one manually.",
     "shareLater": "I'll share later",
-    "goToProject": "Go to project"
+    "goToProject": "Go to project",
+    "editingFieldAria": "Editing {{field}}. Press Enter to save or Escape to cancel.",
+    "tabPanelLabel": "{{tab}} panel"
+  },
+  "switcher": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "participants": "{{count}} participant",
+    "participants_other": "{{count}} participants",
+    "completed": "{{count}} response",
+    "completed_other": "{{count}} responses",
+    "empty": "No other projects."
+  },
+  "setupLiveWarning": {
+    "title": "Edits go live immediately.",
+    "desc": "New participants see your changes; completed transcripts are unaffected."
   },
   "overview": {
     "totalParticipants": "Total participants",

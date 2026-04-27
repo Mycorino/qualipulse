@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { ProjectSwitcher, AccountMenu } from "../components/HeaderControls";
 import { useAuth } from "../hooks/useAuth";
 import {
   getProject,
@@ -70,6 +71,15 @@ export default function ProjectDetail() {
   const { t: tCommon } = useTranslation("common");
   const { logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // ── Header / coachmarks / overflow menu ───────────────────────────────
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const COACHMARK_KEY = "coachmark-analysis-iteration:dismissed";
+  const [coachmarkDismissed, setCoachmarkDismissed] = useState<boolean>(
+    () => localStorage.getItem(COACHMARK_KEY) === "true"
+  );
+  const [editAnnouncement, setEditAnnouncement] = useState("");
 
   // ── First-run welcome modal (shown after project creation) ──────────────
   const [welcomeOpen, setWelcomeOpen] = useState(() => searchParams.get("created") === "1");
@@ -195,6 +205,20 @@ export default function ProjectDetail() {
   const [heatmapLoading, setHeatmapLoading] = useState(false);
 
   // Quality assessment is now auto-run on interview completion and stored in participant fields
+
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!exportMenuRef.current?.contains(e.target as Node)) setExportMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setExportMenuOpen(false); }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [exportMenuOpen]);
 
   // Guard tab switches when there are unsaved edits in Setup
   function hasUnsavedSetupEdits(): boolean {
@@ -1209,35 +1233,51 @@ export default function ProjectDetail() {
       {/* ── Branded header (matches Dashboard) ── */}
       <header className="dashboard-header" style={{ flexWrap: "wrap" }}>
         <span className="logo">QualiPulse</span>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <LanguageSwitcher variant="light" />
-          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
-            {tCommon("account")}
-          </button>
-          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={logout}>
-            {tCommon("signOut")}
-          </button>
-        </div>
+        <nav className="dashboard-nav dashboard-nav--with-avatar" aria-label="Account">
+          <span className="nav-only-mobile" style={{ display: "contents" } as React.CSSProperties}>
+            <LanguageSwitcher variant="light" />
+            <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
+              {tCommon("account")}
+            </button>
+            <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={logout}>
+              {tCommon("signOut")}
+            </button>
+          </span>
+          <AccountMenu
+            initial={(project?.name || "?").trim().charAt(0).toUpperCase()}
+            onSignOut={logout}
+          />
+        </nav>
       </header>
 
-      {/* ── Breadcrumb + actions ── */}
+      {/* Visually-hidden a11y announcer for inline-edit state */}
+      <div aria-live="polite" className="sr-only" role="status">{editAnnouncement}</div>
+
+      {/* ── Breadcrumb + project switcher + actions ── */}
       <div className="detail-header">
         <div className="detail-header-left">
           <div className="detail-breadcrumb">
             <a href="/dashboard">{tProject("detail.backToDashboard").replace("← ", "")}</a>
             <span className="detail-breadcrumb-sep">/</span>
-            <span>{project.name}</span>
-            {projects.length > 1 && (
-              <select
-                style={{ marginLeft: 8, fontSize: "0.8rem", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer" }}
-                value={id}
-                onChange={(e) => navigate(`/projects/${e.target.value}`)}
-              >
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            )}
+            <ProjectSwitcher
+              currentId={id}
+              currentName={project.name}
+              projects={projects.length > 0 ? projects : [{
+                id: project.id,
+                name: project.name,
+                language: project.language,
+                created_at: project.created_at,
+                archived_at: null,
+                question_count: project.questions.length,
+                completed_count: completedCount,
+                in_progress_count: participants.length - completedCount,
+                analysis_status: analysis?.status ?? null,
+                last_response_at: null,
+                is_demo: project.is_demo,
+              }]}
+              participantCount={participants.length}
+              isActive={links.some((l) => l.is_active)}
+            />
           </div>
         </div>
         <div className="detail-header-actions">
@@ -1247,16 +1287,19 @@ export default function ProjectDetail() {
       </div>
 
       {/* ── Tabs — ordered by researcher workflow ── */}
-      <div className="detail-tabs" role="tablist">
+      <div className="detail-tabs" role="tablist" aria-label="Project sections">
         {(["overview", "setup", "responses", "analysis"] as Tab[]).map((tabKey) => (
           <button
             key={tabKey}
+            id={`tab-${tabKey}`}
             role="tab"
             aria-selected={tab === tabKey}
+            aria-controls={`tabpanel-${tabKey}`}
+            tabIndex={tab === tabKey ? 0 : -1}
             className={`detail-tab ${tab === tabKey ? "active" : ""}`}
             onClick={() => setTab(tabKey)}
           >
-            {tabKey === "responses" && (<>{tProject("detail.tabResponses")} {participants.length > 0 && <span className="tab-count">{completedCount}/{participants.length}</span>}</>)}
+            {tabKey === "responses" && (<>{tProject("detail.tabResponses")} {participants.length > 0 && <span className="count-badge">{completedCount}/{participants.length}</span>}</>)}
             {tabKey === "analysis" && (<>{tProject("detail.tabAnalysis")} {analysis?.status === "generating" && <span className="tab-dot tab-dot-pulse" />}</>)}
             {tabKey === "overview" && tProject("detail.tabOverview")}
             {tabKey === "setup" && tProject("detail.tabSetup")}
@@ -1305,7 +1348,7 @@ export default function ProjectDetail() {
 
         {/* ══ OVERVIEW ══ */}
         {tab === "overview" && (
-          <div className="tab-content">
+          <div className="tab-content" role="tabpanel" id="tabpanel-overview" aria-labelledby="tab-overview">
             <div className="stats-row">
               <div className="stat-card"><div className="stat-value">{participants.length}</div><div className="stat-label">{tProject("overview.totalParticipants")}</div></div>
               <div className="stat-card stat-card--success"><div className="stat-value">{completedCount}</div><div className="stat-label">{tProject("overview.completed")}</div></div>
@@ -1348,7 +1391,11 @@ export default function ProjectDetail() {
               <div className="section-header-row">
                 <h2>{tProject("overview.researchObjective")}</h2>
                 {!editingObjective && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setObjectiveDraft(project.research_objective ?? ""); setEditingObjective(true); }}>{tCommon("edit")}</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => {
+                    setObjectiveDraft(project.research_objective ?? "");
+                    setEditingObjective(true);
+                    setEditAnnouncement(tProject("detail.editingFieldAria", { field: tProject("overview.researchObjective") }));
+                  }}>{tCommon("edit")}</button>
                 )}
               </div>
               {editingObjective ? (
@@ -1378,7 +1425,11 @@ export default function ProjectDetail() {
               <div className="section-header-row">
                 <h2>{tProject("overview.welcomeMessageLabel")} <span className="optional-tag">{tProject("overview.welcomeMessageHint")}</span></h2>
                 {!editingWelcome && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setWelcomeDraft(project.welcome_message ?? ""); setEditingWelcome(true); }}>{tCommon("edit")}</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => {
+                    setWelcomeDraft(project.welcome_message ?? "");
+                    setEditingWelcome(true);
+                    setEditAnnouncement(tProject("detail.editingFieldAria", { field: tProject("overview.welcomeMessageLabel") }));
+                  }}>{tCommon("edit")}</button>
                 )}
               </div>
               {editingWelcome ? (
@@ -1447,7 +1498,23 @@ export default function ProjectDetail() {
 
         {/* ══ SETUP ══ */}
         {tab === "setup" && (
-          <div className="tab-content">
+          <div className="tab-content" role="tabpanel" id="tabpanel-setup" aria-labelledby="tab-setup">
+            {/* Live-study warning: edits affect future participants */}
+            {(() => {
+              const hasInProgress = participants.some((p) => p.status === "in_progress");
+              const hasActiveLink = links.some((l) => l.is_active);
+              const hasCompleted = participants.some((p) => p.status === "completed");
+              if (!hasInProgress && !(hasActiveLink && hasCompleted)) return null;
+              return (
+                <div className="setup-live-warning" role="status">
+                  <span className="setup-live-warning__icon" aria-hidden="true">⚠</span>
+                  <div>
+                    <strong>{tProject("setupLiveWarning.title")}</strong>{" "}
+                    <span>{tProject("setupLiveWarning.desc")}</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Screening Questions */}
             <section className="detail-section">
@@ -1781,7 +1848,7 @@ export default function ProjectDetail() {
           }
 
           return (
-          <div className="tab-content" style={{ padding: 0 }}>
+          <div className="tab-content" role="tabpanel" id="tabpanel-responses" aria-labelledby="tab-responses" style={{ padding: 0 }}>
             <div className="responses-layout">
               {/* ── Left column: filter + list ── */}
               <div className="responses-list-col">
@@ -1791,15 +1858,21 @@ export default function ProjectDetail() {
                 </div>
 
                 {/* Status filter pills */}
-                <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                <div role="group" aria-label="Filter by status" style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
                   {(["all", "completed", "in_progress"] as const).map(f => {
-                    const label = f === "all" ? `${tProject("responses.allFilter")} (${participants.length})` : f === "completed" ? `${tProject("responses.doneFilter")} (${completedCount})` : `${tProject("responses.inProgressFilter")} (${inProgressCount})`;
+                    const label = f === "all" ? tProject("responses.allFilter") : f === "completed" ? tProject("responses.doneFilter") : tProject("responses.inProgressFilter");
+                    const count = f === "all" ? participants.length : f === "completed" ? completedCount : inProgressCount;
+                    const active = responseStatusFilter === f;
                     return (
                       <button
                         key={f}
-                        className={`filter-pill ${responseStatusFilter === f ? "filter-pill--active" : ""}`}
+                        className={`filter-pill ${active ? "filter-pill--active" : ""}`}
+                        aria-pressed={active}
                         onClick={() => setResponseStatusFilter(f)}
-                      >{label}</button>
+                      >
+                        {label}
+                        <span className={`count-badge${active ? " count-badge--active" : ""}`}>{count}</span>
+                      </button>
                     );
                   })}
                 </div>
@@ -2200,7 +2273,7 @@ export default function ProjectDetail() {
 
         {/* ══ ANALYSIS ══ */}
         {tab === "analysis" && analysis && (
-          <div className="tab-content">
+          <div className="tab-content" role="tabpanel" id="tabpanel-analysis" aria-labelledby="tab-analysis">
             <section className="detail-section">
               {/* Stale banner — above actions so it's seen before clicking Regenerate */}
               {analysis.report && analysis.completed_count > analysis.participant_count && (
@@ -2208,21 +2281,54 @@ export default function ProjectDetail() {
                   ⚠ {tAnalysis("staleWarning", { count: analysis.completed_count - analysis.participant_count })}
                 </div>
               )}
+              {/* One-time coachmark: surfaces the v1→v2 iteration loop */}
+              {analysis.status === "ready" && analysis.report && !coachmarkDismissed && (
+                <div className="coachmark" role="status">
+                  <span className="coachmark__icon" aria-hidden="true">💡</span>
+                  <div>
+                    <strong>{tAnalysis("iterationCoachmarkTitle")}</strong>{" "}
+                    <span>{tAnalysis("iterationCoachmarkDesc")}</span>
+                  </div>
+                  <button
+                    className="coachmark__close"
+                    aria-label={tAnalysis("iterationCoachmarkDismiss")}
+                    onClick={() => {
+                      localStorage.setItem(COACHMARK_KEY, "true");
+                      setCoachmarkDismissed(true);
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
               <div className="section-header-row">
                 <h2>{tAnalysis("aiAnalysis")}</h2>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   {analysis.report && (
-                    <>
-                      <button className="btn btn-ghost btn-sm" onClick={handleCopyMarkdown}>
-                        {exportCopied ? `✓ ${tCommon("copied")}` : tAnalysis("copyMd")}
+                    <div className="overflow-menu" ref={exportMenuRef}>
+                      <button
+                        className="overflow-menu__trigger"
+                        aria-haspopup="menu"
+                        aria-expanded={exportMenuOpen}
+                        aria-label={tAnalysis("exportMenuLabel")}
+                        onClick={() => setExportMenuOpen((v) => !v)}
+                      >
+                        ⋯
                       </button>
-                      <button className="btn btn-ghost btn-sm" onClick={handleDownloadJSON}>
-                        {tAnalysis("downloadJson")}
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={handleShareAnalysis}>
-                        🔗 {tAnalysis("shareBtn")}
-                      </button>
-                    </>
+                      {exportMenuOpen && (
+                        <div className="overflow-menu__dropdown" role="menu">
+                          <button role="menuitem" className="overflow-menu__item" onClick={() => { setExportMenuOpen(false); handleCopyMarkdown(); }}>
+                            {exportCopied ? `✓ ${tCommon("copied")}` : tAnalysis("copyMd")}
+                          </button>
+                          <button role="menuitem" className="overflow-menu__item" onClick={() => { setExportMenuOpen(false); handleDownloadJSON(); }}>
+                            {tAnalysis("downloadJson")}
+                          </button>
+                          <button role="menuitem" className="overflow-menu__item" onClick={() => { setExportMenuOpen(false); handleShareAnalysis(); }}>
+                            🔗 {tAnalysis("shareBtn")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                   {analysis.completed_count > 0 && (
                     <button className="btn btn-ai btn-sm" onClick={handleTriggerAnalysis} disabled={analysis.status === "generating"}>

@@ -3,7 +3,13 @@
   "createProject": "+ Create Project",
   "loadError": "Failed to load projects. Please refresh the page.",
   "projectCount": "{{count}} of {{max}} projects",
+  "handoffHint": {
+    "title": "Next: invite your first participant.",
+    "desc": "Share an interview link from your study to start collecting responses.",
+    "cta": "Open my study"
+  },
   "trialBanner": {
+    "dismissAria": "Dismiss trial banner",
     "title": "14-day trial active",
     "desc": "You have full Team features until {{date}}.",
     "viewPlans": "View plans",
