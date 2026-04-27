@@ -132,7 +132,8 @@ auto-interview/
 │   │       ├── 0015_current_priority.py
 │   │       ├── 0016_onboarding_redesign_fields.py
 │   │       ├── 0017_quality_assessment_columns.py
-│   │       └── 0018_transcript_translation_columns.py
+│   │       ├── 0018_transcript_translation_columns.py
+│   │       └── 0019_interview_engine_v2.py
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
@@ -249,7 +250,7 @@ DATABASE_URL="sqlite:///:memory:" SECRET_KEY="test-secret" \
   ANTHROPIC_API_KEY="" OPENAI_API_KEY="" \
   python -m pytest tests/ -v
 ```
-- 57 tests covering auth, email verification, projects CRUD, and all feature gates
+- 81 tests covering auth, email verification, projects CRUD, all feature gates, demo seeder, and the interview engine v2 (talk-time pacing, plan, recovery actions, fatigue, hard caps)
 - Rate limiter is disabled in tests (see `tests/conftest.py`)
 - Uses in-memory SQLite with `StaticPool` for full test isolation
 
@@ -470,16 +471,32 @@ Landing (name + profession + age_range + country + email)
 - Demographics (profession, age_range, country) power the segment heatmap in Analysis
 - Session-storage resume (same device) + email-based resume (cross-device)
 
-### Claude Interview Engine
-Claude decides after each response whether to:
-- `follow_up` — ask a follow-up on the current topic
-- `next_question` — move to the next guide question
-- `close` — wrap up warmly when all questions are covered or time is up
+### Claude Interview Engine (v2)
+Claude returns one of six actions per turn:
+- `follow_up` — probe the current topic (max 2 per `question_index`, server-enforced)
+- `next_question` — move to the next guide question (with a one-sentence callback to what the participant just said)
+- `skip_to` — jump forward when an answer implicitly covered later questions (creates synthetic `skip_skip` turns marked `[Implicitly answered in prior response]`)
+- `reframe` — re-ask the current question with new wording when the participant didn't engage with it (max 1 per question)
+- `clarification` — softening re-prompt for dead-air / non-answers (max 1 per question; triggered by Python heuristic, doesn't call Claude)
+- `close` — wrap up warmly (only when the close gate is open)
 
-Pacing safety guards:
-- Forces `next_question` if behind schedule
-- Close gate: requires 80% time elapsed + all questions covered
-- System prompt customizable per project
+**Pre-flight interview plan**: at `start_interview`, Claude generates a per-question plan (`{index, budget_minutes, max_follow_ups, depth}`) sized to fit the total budget. Persisted on `Participant.interview_plan` (JSON). Subsequent turns revise from the plan rather than re-deriving.
+
+**Talk-time pacing**: pacing math uses cumulative Whisper `audio_duration` (`Participant.talk_seconds`), not wall-clock. A thoughtful slow responder isn't punished for taking 5 min/answer. Wall-clock only triggers a hard-cap force-close at >1.5× total_minutes.
+
+**Per-question pacing signal**: the current question's talk-time vs *its* plan budget (not a uniform `total / total_questions` spread).
+
+**Fatigue detection**: rolling answer-length ratio (recent 2 vs first 2 turns). When `fatigue_state="high"`, the close gate opens early at 70% time + 70% questions covered (instead of the standard 80%/100%). `fatigue_state` persisted on `Participant`.
+
+**Dead-air clarification**: if `audio_duration < 3s` AND transcript ≤ 3 words AND matches a stop-word list (`yeah|no|sure|i dunno|ouais|bof|je sais pas|...`), the server emits a hardcoded language-aware softening prompt without calling Claude. Saves a follow-up budget and round-trip latency.
+
+**Server-side overrides**:
+- Hard cap: 2 follow-ups, 1 reframe, 1 clarification per `question_index`
+- Premature `close` → forced `next_question` (close gate not yet open)
+- `skip_to_question_index` validation (must be > current and ≤ last)
+- Wall-clock overshoot (> 1.5× total_minutes) → forced `close`
+
+System prompt customizable per project. Interview language is whatever `Project.language` says — Claude translates guide questions on the fly if needed.
 
 ### Analysis Pipeline
 1. Researcher triggers analysis (optional demographic filters)
@@ -831,12 +848,12 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] CI/CD: GitHub Actions (pytest + tsc + build), Cloud Build (auto-deploy on push)
 - [x] Health checks: `GET /` (shallow) + `GET /health` (deep, DB-aware)
 - [x] Secret Manager integration (secrets injected at deploy, not in .env)
-- [x] Test suite: 57 tests (auth, email verification, feature gates, project CRUD)
+- [x] Test suite: 81 tests (auth, email verification, feature gates, project CRUD, demo seeder, interview engine v2)
 - [x] Rate limiting (SlowAPI): public/auth/default tiers
 - [x] Security headers middleware
 - [x] JSON structured logging (python-json-logger)
 - [x] Sentry integration (optional, configurable via SENTRY_DSN)
-- [x] Alembic migrations (9 versions)
+- [x] Alembic migrations (19 versions)
 - [x] SendGrid email delivery (domain-authenticated, 6 email templates)
 - [ ] GDPR tooling (data export, participant deletion)
 - [ ] Prometheus metrics / APM dashboards
@@ -862,10 +879,10 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `project_id`, `token` (unique, urlsafe), `is_active`, `created_at`
 
 ### Participant
-`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `started_at`, `completed_at`
+`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `started_at`, `completed_at`, `talk_seconds` (cumulative Whisper-reported participant audio), `interview_plan` (JSON pre-flight plan), `fatigue_state` (low/medium/high/null)
 
 ### InterviewTurn
-`id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `translated_response`, `translated_question`, `translation_language`, `translation_source_language`, `created_at`
+`id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `translated_response`, `translated_question`, `translation_language`, `translation_source_language`, `turn_kind` (main/follow_up/reframe/clarification/skip_skip/closing), `created_at`
 
 ### ProjectAnalysis
 `id`, `project_id`, `version`, `status` (generating/ready/failed), `participant_count`, `report` (JSON), `filters` (JSON), `researcher_context`, `version_label` (ai_discovery/researcher_refined), `parent_version_id`, `share_token`, `generated_at`, `error`
