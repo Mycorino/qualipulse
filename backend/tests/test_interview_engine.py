@@ -120,6 +120,28 @@ def _claude_decision(payload: dict):
     return msg
 
 
+def _wire_stream(client, *messages):
+    """Wire a MagicMock anthropic client so that consecutive
+    messages.stream(...) ctx-manager calls yield the supplied final messages.
+    Each `messages` element can be a dict (auto-wrapped via _claude_decision)
+    or a pre-built mock message object.
+    """
+    msgs = [_claude_decision(m) if isinstance(m, dict) else m for m in messages]
+
+    def stream_factory(*args, **kwargs):
+        ctx = MagicMock()
+        if msgs:
+            final = msgs.pop(0)
+        else:
+            final = _claude_decision({"action": "next_question", "question": "next"})
+        ctx.__enter__.return_value.get_final_message.return_value = final
+        ctx.__exit__.return_value = False
+        return ctx
+
+    client.messages.stream.side_effect = stream_factory
+    return client
+
+
 # ─── Tests ───────────────────────────────────────────────────────────────────
 
 
@@ -142,12 +164,10 @@ class TestTalkTimeAndPlan:
         ]
         with patch("app.services.interview_engine.transcribe_audio") as stt, \
              patch("app.services.interview_engine.download_audio", return_value=b""), \
-             patch("app.services.interview_engine.upload_audio", return_value="url"), \
-             patch("app.services.interview_engine.generate_speech", return_value=b""), \
              patch("app.services.interview_engine.anthropic.Anthropic") as anth:
             stt.side_effect = [(f"answer with eight words here right now ok", d) for d in durations]
             client = MagicMock()
-            client.messages.create.side_effect = [_claude_decision(d) for d in decisions]
+            _wire_stream(client, *decisions)
             anth.return_value = client
 
             for _ in range(3):
@@ -161,9 +181,7 @@ class TestTalkTimeAndPlan:
         _, project, link = _make_project(db_session)
         p = _make_participant(db_session, project, link)
         # No ANTHROPIC_API_KEY set in test env → falls back to uniform plan.
-        with patch("app.services.interview_engine.upload_audio", return_value="url"), \
-             patch("app.services.interview_engine.generate_speech", return_value=b""):
-            ie.start_interview(p.id, db_session)
+        ie.start_interview(p.id, db_session)
         db_session.refresh(p)
         assert p.interview_plan is not None
         plan = json.loads(p.interview_plan)
@@ -184,13 +202,9 @@ class TestTalkTimeAndPlan:
 
         with patch("app.services.interview_engine.transcribe_audio", return_value=("nice answer with several words here", 6.0)), \
              patch("app.services.interview_engine.download_audio", return_value=b""), \
-             patch("app.services.interview_engine.upload_audio", return_value="url"), \
-             patch("app.services.interview_engine.generate_speech", return_value=b""), \
              patch("app.services.interview_engine.anthropic.Anthropic") as anth:
             client = MagicMock()
-            client.messages.create.return_value = _claude_decision(
-                {"action": "next_question", "question": "Q1"}
-            )
+            _wire_stream(client, {"action": "next_question", "question": "Q1"})
             anth.return_value = client
 
             result = ie.process_interview_turn(p.id, "fake/path.webm", db_session)
@@ -224,14 +238,10 @@ class TestHardCaps:
 
         with patch("app.services.interview_engine.transcribe_audio", return_value=("third answer right here", 6.0)), \
              patch("app.services.interview_engine.download_audio", return_value=b""), \
-             patch("app.services.interview_engine.upload_audio", return_value="url"), \
-             patch("app.services.interview_engine.generate_speech", return_value=b""), \
              patch("app.services.interview_engine.anthropic.Anthropic") as anth:
             client = MagicMock()
             # Model wants ANOTHER follow_up — server must override to next_question
-            client.messages.create.return_value = _claude_decision(
-                {"action": "follow_up", "question": "yet another follow up?"}
-            )
+            _wire_stream(client, {"action": "follow_up", "question": "yet another follow up?"})
             anth.return_value = client
 
             result = ie.process_interview_turn(p.id, "f.webm", db_session)
@@ -260,11 +270,9 @@ class TestHardCaps:
         with patch("app.services.interview_engine.transcribe_audio", return_value=(
                 "I already use Tool X and it covers what you'd ask in Q1 too", 9.0)), \
              patch("app.services.interview_engine.download_audio", return_value=b""), \
-             patch("app.services.interview_engine.upload_audio", return_value="url"), \
-             patch("app.services.interview_engine.generate_speech", return_value=b""), \
              patch("app.services.interview_engine.anthropic.Anthropic") as anth:
             client = MagicMock()
-            client.messages.create.return_value = _claude_decision({
+            _wire_stream(client, {
                 "action": "skip_to",
                 "question": "On Q2 — walk me through that",
                 "skip_to_question_index": 2,
@@ -305,13 +313,9 @@ class TestHardCaps:
 
         with patch("app.services.interview_engine.transcribe_audio", return_value=("yeah", 1.5)), \
              patch("app.services.interview_engine.download_audio", return_value=b""), \
-             patch("app.services.interview_engine.upload_audio", return_value="url"), \
-             patch("app.services.interview_engine.generate_speech", return_value=b""), \
              patch("app.services.interview_engine.anthropic.Anthropic") as anth:
             client = MagicMock()
-            client.messages.create.return_value = _claude_decision(
-                {"action": "next_question", "question": "Q1"}
-            )
+            _wire_stream(client, {"action": "next_question", "question": "Q1"})
             anth.return_value = client
 
             ie.process_interview_turn(p.id, "f.webm", db_session)
@@ -334,8 +338,6 @@ class TestDeadAir:
         anth_mock = MagicMock()
         with patch("app.services.interview_engine.transcribe_audio", return_value=("Yeah.", 1.5)), \
              patch("app.services.interview_engine.download_audio", return_value=b""), \
-             patch("app.services.interview_engine.upload_audio", return_value="url"), \
-             patch("app.services.interview_engine.generate_speech", return_value=b""), \
              patch("app.services.interview_engine.anthropic.Anthropic", anth_mock):
             ie.process_interview_turn(p.id, "f.webm", db_session)
 
@@ -389,9 +391,7 @@ class TestFatigue:
         # a "close-allowed" prompt.
         with patch("app.services.interview_engine.anthropic.Anthropic") as anth:
             client = MagicMock()
-            client.messages.create.return_value = _claude_decision(
-                {"action": "close", "question": "wrap"}
-            )
+            _wire_stream(client, {"action": "close", "question": "wrap"})
             anth.return_value = client
             decision = ie.decide_next_action(
                 system_prompt="",
@@ -409,7 +409,7 @@ class TestFatigue:
             )
         # The model was allowed to close — verify the user message contained
         # the open close gate.
-        sent = client.messages.create.call_args.kwargs["messages"][0]["content"]
+        sent = client.messages.stream.call_args.kwargs["messages"][0]["content"]
         assert "Close gate: OPEN" in sent
         assert decision["action"] == "close"
 
@@ -456,13 +456,9 @@ class TestPacingOverrides:
 
         with patch("app.services.interview_engine.transcribe_audio", return_value=("answer here ok", 4.0)), \
              patch("app.services.interview_engine.download_audio", return_value=b""), \
-             patch("app.services.interview_engine.upload_audio", return_value="url"), \
-             patch("app.services.interview_engine.generate_speech", return_value=b""), \
              patch("app.services.interview_engine.anthropic.Anthropic") as anth:
             client = MagicMock()
-            client.messages.create.return_value = _claude_decision(
-                {"action": "next_question", "question": "Q1"}
-            )
+            _wire_stream(client, {"action": "next_question", "question": "Q1"})
             anth.return_value = client
 
             result = ie.process_interview_turn(p.id, "f.webm", db_session)

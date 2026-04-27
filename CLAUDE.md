@@ -250,7 +250,7 @@ DATABASE_URL="sqlite:///:memory:" SECRET_KEY="test-secret" \
   ANTHROPIC_API_KEY="" OPENAI_API_KEY="" \
   python -m pytest tests/ -v
 ```
-- 81 tests covering auth, email verification, projects CRUD, all feature gates, demo seeder, and the interview engine v2 (talk-time pacing, plan, recovery actions, fatigue, hard caps)
+- 89 tests covering auth, email verification, projects CRUD, all feature gates, demo seeder, the interview engine v2, and the streaming TTS path
 - Rate limiter is disabled in tests (see `tests/conftest.py`)
 - Uses in-memory SQLite with `StaticPool` for full test isolation
 
@@ -497,6 +497,23 @@ Claude returns one of six actions per turn:
 - Wall-clock overshoot (> 1.5× total_minutes) → forced `close`
 
 System prompt customizable per project. Interview language is whatever `Project.language` says — Claude translates guide questions on the fly if needed.
+
+### Streaming voice pipeline (Levels 1+2)
+
+Per-turn audio is streamed end-to-end to cut dead-air from ~7-13s to ~2-3s.
+
+- **Claude streaming**: `decide_next_action`, `_get_first_question`, `_generate_interview_plan` use `client.messages.stream(...)` instead of `messages.create(...)`. The full message is parsed after the stream closes; the win is reduced TTFT (~300-500ms) and overlap with TTS playback.
+- **TTS streaming**: `generate_speech_streaming(text)` yields MP3 chunks from OpenAI's `audio.speech.with_streaming_response.create(...)`. First audio bytes arrive in ~300-500ms vs ~2-3s for the full file.
+- **Frontend playback**: unchanged — `new Audio(url); audio.play()` on `<audio>` natively consumes HTTP chunked MP3 from the streaming endpoint.
+- **Streaming endpoint**: `GET /audio/stream/{turn_id}` returns `audio/mpeg` with `Cache-Control: no-store`. Looks up `InterviewTurn.question_text`, opens the OpenAI streaming response, and pipes chunks to the client. Tees bytes to a buffer; on clean stream completion a daemon thread uploads the buffer to R2 via `upload_audio` and updates `turn.tts_audio_url` to the persistent URL (so future replays hit R2 instead of re-streaming from OpenAI). On client abort or stream error, partial bytes are discarded.
+- **Per-turn flow** (after STT):
+  1. Stream Claude → parse decision JSON
+  2. Persist `InterviewTurn` with `question_text` and `tts_audio_url = /audio/stream/{turn_id}` (no synchronous TTS call)
+  3. Return JSON to client; client immediately GETs the streaming URL
+  4. Streaming endpoint serves OpenAI bytes → client `<audio>` plays as bytes arrive → background thread uploads buffer to R2 once stream ends
+- **Cost tracking**: Claude usage logged on `stream.get_final_message()`; TTS usage logged in the streaming endpoint's background thread after R2 upload completes.
+
+Deferred (Phase 1.5): early-extraction of `question_text` from the Claude stream to start TTS in parallel before Claude finishes. Would save another ~500-1000ms but requires a tolerant streaming JSON parser and a per-turn buffer registry.
 
 ### Analysis Pipeline
 1. Researcher triggers analysis (optional demographic filters)
@@ -848,7 +865,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] CI/CD: GitHub Actions (pytest + tsc + build), Cloud Build (auto-deploy on push)
 - [x] Health checks: `GET /` (shallow) + `GET /health` (deep, DB-aware)
 - [x] Secret Manager integration (secrets injected at deploy, not in .env)
-- [x] Test suite: 81 tests (auth, email verification, feature gates, project CRUD, demo seeder, interview engine v2)
+- [x] Test suite: 89 tests (auth, email verification, feature gates, project CRUD, demo seeder, interview engine v2, streaming voice)
 - [x] Rate limiting (SlowAPI): public/auth/default tiers
 - [x] Security headers middleware
 - [x] JSON structured logging (python-json-logger)
