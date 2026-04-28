@@ -14,6 +14,7 @@ import type { CompanyResponse } from "../api/auth";
 
 import DashboardInsights from "../components/DashboardInsights";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { AccountMenu } from "../components/HeaderControls";
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation(["dashboard", "common"]);
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const [seedingDemo, setSeedingDemo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "responses" | "name">("newest");
+  const [trialBannerDismissed, setTrialBannerDismissed] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -165,14 +167,20 @@ export default function Dashboard() {
           <span className="dashboard-hamburger-bar" />
           <span className="dashboard-hamburger-bar" />
         </button>
-        <nav className={`dashboard-nav${menuOpen ? " dashboard-nav--open" : ""}`}>
-          <LanguageSwitcher variant="light" />
-          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { setMenuOpen(false); navigate("/account"); }}>
-            {t("common:account")}
-          </button>
-          <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { setMenuOpen(false); logout(); }}>
-            {t("common:signOut")}
-          </button>
+        <nav className={`dashboard-nav dashboard-nav--with-avatar${menuOpen ? " dashboard-nav--open" : ""}`}>
+          <span className="nav-only-mobile" style={{ display: "contents" } as React.CSSProperties}>
+            <LanguageSwitcher variant="light" />
+            <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { setMenuOpen(false); navigate("/account"); }}>
+              {t("common:account")}
+            </button>
+            <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { setMenuOpen(false); logout(); }}>
+              {t("common:signOut")}
+            </button>
+          </span>
+          <AccountMenu
+            initial={(me?.name || me?.email || "?").trim().charAt(0).toUpperCase()}
+            onSignOut={logout}
+          />
         </nav>
       </header>
 
@@ -220,6 +228,10 @@ export default function Dashboard() {
           const msLeft = trialEnd.getTime() - Date.now();
           const daysLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
           const endingSoon = daysLeft <= 3;
+          // Per-trial-end-date dismissal key. Ignored when ≤3 days left.
+          const dismissKey = `trial-banner-dismissed-${trialEnd.toISOString().slice(0, 10)}`;
+          const wasDismissed = trialBannerDismissed || localStorage.getItem(dismissKey) === "true";
+          if (wasDismissed && !endingSoon) return null;
           const formattedDate = trialEnd.toLocaleDateString(undefined, {
             day: "numeric",
             month: "short",
@@ -252,6 +264,48 @@ export default function Dashboard() {
                 style={{ whiteSpace: "nowrap", flexShrink: 0 }}
               >
                 {endingSoon ? t("trialBanner.upgradeCta") : t("trialBanner.viewPlans")}
+              </button>
+              {!endingSoon && (
+                <button
+                  type="button"
+                  className="gs-trial-banner-dismiss"
+                  aria-label={t("trialBanner.dismissAria")}
+                  onClick={() => {
+                    localStorage.setItem(dismissKey, "true");
+                    setTrialBannerDismissed(true);
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Onboarding hand-off hint: real project exists but zero responses */}
+        {!loading && (() => {
+          const realProjectsList = projects.filter((p) => !p.is_demo);
+          if (realProjectsList.length === 0) return null;
+          const totalResponses = realProjectsList.reduce(
+            (acc, p) => acc + (p.completed_count || 0) + (p.in_progress_count || 0),
+            0
+          );
+          if (totalResponses > 0) return null;
+          const newest = [...realProjectsList].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )[0];
+          return (
+            <div className="handoff-hint" role="status">
+              <span aria-hidden="true">→</span>
+              <div className="handoff-hint__body">
+                <strong>{t("handoffHint.title")}</strong>{" "}
+                <span>{t("handoffHint.desc")}</span>
+              </div>
+              <button
+                className="btn btn-primary btn-sm handoff-hint__cta"
+                onClick={() => navigate(`/projects/${newest.id}`)}
+              >
+                {t("handoffHint.cta")}
               </button>
             </div>
           );

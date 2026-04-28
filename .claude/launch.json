@@ -2,16 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Backend (FastAPI)",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "cd /Users/corinofontana/Desktop/auto-interview/.claude/worktrees/sleepy-cerf/backend && /opt/anaconda3/bin/uvicorn app.main:app --reload --port 8000"],
-      "port": 8000
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5173"],
+      "port": 5173,
+      "cwd": "frontend"
     },
     {
-      "name": "Frontend (Vite)",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "cd /Users/corinofontana/Desktop/auto-interview/frontend && /opt/homebrew/bin/npm run dev -- --port 5173"],
-      "port": 5173
+      "name": "backend",
+      "runtimeExecutable": "/opt/anaconda3/bin/uvicorn",
+      "runtimeArgs": ["app.main:app", "--port", "8000"],
+      "port": 8000,
+      "cwd": "backend"
     }
   ]
 }

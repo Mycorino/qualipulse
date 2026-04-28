@@ -1,5 +1,9 @@
 {
   "title": "Analysis",
+  "iterationCoachmarkTitle": "This is v1.",
+  "iterationCoachmarkDesc": "Tag themes as confirmed, disputed, or needs more evidence — then click Refine for v2.",
+  "iterationCoachmarkDismiss": "Dismiss tip",
+  "exportMenuLabel": "More export options",
   "noAnalysis": "No analysis yet. Run an AI synthesis to get themes, JTBDs, tensions, and recommendations.",
   "runAnalysis": "Run AI analysis",
   "running": "Generating analysis...",

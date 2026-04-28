@@ -3,7 +3,13 @@
   "createProject": "+ Créer un projet",
   "loadError": "Impossible de charger les projets. Veuillez rafraîchir la page.",
   "projectCount": "{{count}} sur {{max}} projets",
+  "handoffHint": {
+    "title": "Étape suivante : invitez votre premier participant.",
+    "desc": "Partagez le lien d'entretien de votre étude pour commencer à collecter des réponses.",
+    "cta": "Ouvrir mon étude"
+  },
   "trialBanner": {
+    "dismissAria": "Masquer la bannière d'essai",
     "title": "Essai de 14 jours actif",
     "desc": "Vous bénéficiez de toutes les fonctionnalités Team jusqu'au {{date}}.",
     "viewPlans": "Voir les plans",
