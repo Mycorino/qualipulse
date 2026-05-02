@@ -104,6 +104,11 @@
   "nInterviews_one": "n={{count}} entretien",
   "nInterviews_other": "n={{count}} entretiens",
   "confidenceBadge": "Confiance {{level}}",
+  "confidenceLevel": {
+    "high": "élevée",
+    "medium": "moyenne",
+    "low": "faible"
+  },
   "filteredBadge": "Filtré : {{filterBy}} ({{values}})",
   "aiDiscovery": "Découverte IA",
   "viewingVersion": "Version v{{version}} — {{label}}.",

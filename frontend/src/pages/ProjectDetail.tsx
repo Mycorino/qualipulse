@@ -75,6 +75,8 @@ export default function ProjectDetail() {
   // ── Header / coachmarks / overflow menu ───────────────────────────────
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
   const COACHMARK_KEY = "coachmark-analysis-iteration:dismissed";
   const [coachmarkDismissed, setCoachmarkDismissed] = useState<boolean>(
     () => localStorage.getItem(COACHMARK_KEY) === "true"
@@ -207,18 +209,21 @@ export default function ProjectDetail() {
   // Quality assessment is now auto-run on interview completion and stored in participant fields
 
   useEffect(() => {
-    if (!exportMenuOpen) return;
+    if (!exportMenuOpen && !headerMenuOpen) return;
     function onDoc(e: MouseEvent) {
       if (!exportMenuRef.current?.contains(e.target as Node)) setExportMenuOpen(false);
+      if (!headerMenuRef.current?.contains(e.target as Node)) setHeaderMenuOpen(false);
     }
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setExportMenuOpen(false); }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") { setExportMenuOpen(false); setHeaderMenuOpen(false); }
+    }
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [exportMenuOpen]);
+  }, [exportMenuOpen, headerMenuOpen]);
 
   // Guard tab switches when there are unsaved edits in Setup
   function hasUnsavedSetupEdits(): boolean {
@@ -1281,8 +1286,31 @@ export default function ProjectDetail() {
           </div>
         </div>
         <div className="detail-header-actions">
-          <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>{tProject("responses.exportCSV")}</button>
-          <button className="btn btn-ghost btn-sm" onClick={handleArchive}>{tProject("detail.archiveProject")}</button>
+          {/* Desktop: inline actions */}
+          <button className="btn btn-ghost btn-sm detail-header-actions__inline" onClick={handleExportCSV}>{tProject("responses.exportCSV")}</button>
+          <button className="btn btn-ghost btn-sm detail-header-actions__inline" onClick={handleArchive}>{tProject("detail.archiveProject")}</button>
+          {/* Mobile: overflow menu (<768px) */}
+          <div className="overflow-menu detail-header-actions__overflow" ref={headerMenuRef}>
+            <button
+              className="overflow-menu__trigger"
+              aria-haspopup="menu"
+              aria-expanded={headerMenuOpen}
+              aria-label={tProject("detail.moreActions")}
+              onClick={() => setHeaderMenuOpen((v) => !v)}
+            >
+              ⋯
+            </button>
+            {headerMenuOpen && (
+              <div className="overflow-menu__dropdown" role="menu">
+                <button role="menuitem" className="overflow-menu__item" onClick={() => { setHeaderMenuOpen(false); handleExportCSV(); }}>
+                  {tProject("responses.exportCSV")}
+                </button>
+                <button role="menuitem" className="overflow-menu__item" onClick={() => { setHeaderMenuOpen(false); handleArchive(); }}>
+                  {tProject("detail.archiveProject")}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1887,7 +1915,7 @@ export default function ProjectDetail() {
 
           return (
           <div className="tab-content" role="tabpanel" id="tabpanel-responses" aria-labelledby="tab-responses" style={{ padding: 0 }}>
-            <div className="responses-layout">
+            <div className={`responses-layout${selectedParticipant && transcript !== null ? " responses-layout--detail-active" : ""}`}>
               {/* ── Left column: filter + list ── */}
               <div className="responses-list-col">
                 {/* Header row */}
@@ -2103,8 +2131,31 @@ export default function ProjectDetail() {
                                   ) : isHighlighted && highlightTarget
                                     ? renderWithQuoteHighlight(t.response_transcript, highlightTarget.quoteText, t.id)
                                     : renderTaggedText(t.response_transcript, t.id)}
-                                  <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
+                                  <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle", flexWrap: "wrap" }}>
                                     <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>{tCommon("edit")}</button>
+                                    {/* Mobile-only: tag the whole turn (text-selection popup is unreliable on touch). */}
+                                    {transcriptViewMode === "original" && t.response_transcript && (
+                                      <button
+                                        className="btn btn-ghost btn-xs turn-tag-btn"
+                                        style={{ fontSize: 10 }}
+                                        onClick={(e) => {
+                                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                          setSelectionInfo({
+                                            turnId: t.id,
+                                            text: t.response_transcript || "",
+                                            start: 0,
+                                            end: (t.response_transcript || "").length,
+                                            x: Math.min(rect.left + rect.width / 2, window.innerWidth - 110),
+                                            y: rect.top + window.scrollY - 44,
+                                            fromTranslation: false,
+                                          });
+                                          setShowNewCode(false);
+                                        }}
+                                        title={tProject("responses.tagWholeTurn", { defaultValue: "Tag whole response" })}
+                                      >
+                                        🏷 {tProject("responses.tagTurn")}
+                                      </button>
+                                    )}
                                     {transcriptViewMode === "translated" && t.response_transcript && (
                                       <button
                                         className="btn btn-ghost btn-xs"
@@ -2268,9 +2319,10 @@ export default function ProjectDetail() {
               </div>
             </div>
 
-            {/* Floating tag popup */}
+            {/* Floating tag popup. Clamp top so it stays in viewport on touch
+                devices where rect.top can be near 0 after scrollIntoView. */}
             {selectionInfo && (
-              <div style={{ position: "fixed", left: selectionInfo.x - 90, top: selectionInfo.y, zIndex: 1000, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)", padding: 8, minWidth: 180 }}>
+              <div style={{ position: "fixed", left: Math.max(8, Math.min(selectionInfo.x - 90, window.innerWidth - 196)), top: Math.max(8, selectionInfo.y - window.scrollY), zIndex: 1000, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)", padding: 8, minWidth: 180, maxWidth: "min(280px, calc(100vw - 16px))" }}>
                 {!showNewCode ? (
                   <div>
                     <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>{tProject("responses.tagAs")}</div>
@@ -2478,7 +2530,7 @@ export default function ProjectDetail() {
                         title={r.confidence_rationale || tAnalysis("sharedReport.confidenceTooltip")}
                         style={{ cursor: "help" }}
                       >
-                        {tAnalysis("confidenceBadge", { level: r.confidence })}
+                        {tAnalysis("confidenceBadge", { level: tAnalysis(`confidenceLevel.${r.confidence || "medium"}`) })}
                       </span>
                       {(isViewingPastVersion ? activeVersionReport!.filters : analysis.filters) && (
                         <span className="badge" style={{ background: "var(--brand-50)", color: "var(--brand-700)" }}>
