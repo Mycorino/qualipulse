@@ -1,5 +1,5 @@
 {
-  "title": "Account Settings",
+  "title": "Account settings",
   "hubHeader": {
     "aria": "Account overview",
     "eyebrow": "Account & workspace",
@@ -15,7 +15,7 @@
     "profile": "Profile",
     "team": "Team",
     "integrations": "Integrations",
-    "billing": "Plan & Billing"
+    "billing": "Plan & billing"
   },
   "profile": {
     "title": "Profile",
@@ -23,15 +23,15 @@
     "emailLabel": "Email",
     "emailReadOnly": "read-only",
     "saveChanges": "Save profile",
-    "saving": "Saving...",
+    "saving": "Saving…",
     "saved": "✓ Profile updated",
-    "changePassword": "Change Password",
+    "changePassword": "Change password",
     "currentPasswordLabel": "Current password",
     "newPasswordLabel": "New password",
     "newPasswordPlaceholder": "At least 8 characters",
-    "updatePassword": "Update my password",
+    "updatePassword": "Update password",
     "passwordUpdated": "✓ Password updated",
-    "passwordError": "Failed to update password. Check your current password.",
+    "passwordError": "We couldn't update your password. Check your current password and try again.",
     "languageTitle": "Language",
     "languageWarning": "Changing language updates menus and new content only. Existing studies, interview guides, and analysis reports will not be retranslated."
   },
@@ -66,11 +66,11 @@
     "sendInvite": "Send invite",
     "inviting": "Sending…",
     "inviteSent": "Invitation sent to {{email}}.",
-    "inviteError": "Couldn't send the invitation. Try again.",
+    "inviteError": "We couldn't send the invitation. Please try again.",
     "membersTitle": "Workspace members",
     "pendingTitle": "Pending invitations",
     "remove": "Remove",
-    "removeConfirm": "Remove this member from the workspace?",
+    "removeConfirm": "Remove this member? They'll lose access to all projects in this workspace.",
     "revoke": "Revoke",
     "invitedAs": "Invited as {{role}}",
     "expiresOn": "expires {{date}}",
@@ -92,7 +92,7 @@
       "createAccount": "Create account",
       "missingToken": "This invitation link is incomplete.",
       "invalidToken": "This invitation link is invalid or has expired.",
-      "failed": "Couldn't accept the invitation."
+      "failed": "We couldn't accept this invitation. Please try again."
     }
   },
   "integrations": {
@@ -110,8 +110,8 @@
       "saved": "✓ Slack webhook saved.",
       "cleared": "Slack notifications disabled.",
       "testSent": "✓ Test message sent — check your Slack channel.",
-      "testFailed": "Could not reach Slack. Double-check the URL and try again.",
-      "saveError": "Could not save the webhook URL."
+      "testFailed": "We couldn't reach Slack. Double-check the URL and try again.",
+      "saveError": "We couldn't save your webhook URL. Please try again."
     }
   }
 }

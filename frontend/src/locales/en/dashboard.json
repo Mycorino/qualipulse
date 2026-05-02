@@ -1,6 +1,6 @@
 {
   "title": "Projects",
-  "createProject": "+ Create Project",
+  "createProject": "+ Create project",
   "hubHeader": {
     "aria": "Workspace overview",
     "eyebrow": "Your research workspace",
@@ -17,7 +17,7 @@
     "pillAnalysesReady": "ready to read",
     "pillAnalysesReady_other": "ready to read"
   },
-  "loadError": "Failed to load projects. Please refresh the page.",
+  "loadError": "We couldn't load your projects. Please refresh the page.",
   "projectCount": "{{count}} of {{max}} projects",
   "handoffHint": {
     "title": "Next: invite your first participant.",
@@ -39,16 +39,16 @@
   },
   "gettingStarted": {
     "welcome": "Welcome, {{name}}! Let's set up your first study.",
-    "subtitle": "Follow these steps to run your first AI-powered interview.",
+    "subtitle": "Three steps to run your first AI-led interview.",
     "step1Title": "Create a project",
-    "step1Desc": "Describe your research goals and let AI build your interview guide.",
+    "step1Desc": "Describe your research goals and let the AI draft your interview guide.",
     "step1Cta": "Create project →",
     "demoCta": "Or explore a demo project",
     "demoLoading": "Preparing demo…",
     "step2Title": "Share your interview link",
-    "step2Desc": "Generate a link and send it to participants. They'll complete the interview in their browser.",
-    "step3Title": "Review AI analysis",
-    "step3Desc": "Once you have responses, trigger an AI analysis to get themes, quotes, and recommendations."
+    "step2Desc": "Generate a link and send it to participants. They complete the interview in their browser.",
+    "step3Title": "Review the AI analysis",
+    "step3Desc": "Once responses come in, run an AI analysis to get themes, quotes, and recommendations."
   },
   "projectCard": {
     "questions": "{{count}} questions",

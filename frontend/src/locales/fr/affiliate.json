@@ -1,6 +1,6 @@
 {
   "apply": {
-    "title": "Devenez Affilié QualiPulse",
+    "title": "Devenez affilié QualiPulse",
     "subtitle": "Gagnez jusqu'à 20 % de commission récurrente sur vos recommandations",
     "nameLabel": "Votre nom",
     "required": "*",
@@ -10,23 +10,23 @@
     "websiteLabel": "Site web",
     "optional": "(facultatif)",
     "howFoundLabel": "Comment nous avez-vous trouvés ?",
-    "howFoundPlaceholder": "Parlez-nous de votre audience...",
+    "howFoundPlaceholder": "Parlez-nous de votre audience…",
     "submit": "Envoyer ma candidature",
-    "submitting": "Envoi en cours...",
+    "submitting": "Envoi…",
     "alreadyApplied": "Déjà candidat·e ?",
     "signInHere": "Connectez-vous ici",
     "successTitle": "Candidature reçue",
     "successSubtitle": "Merci ! Nous examinerons votre candidature et vous répondrons sous 2 à 3 jours ouvrés.",
-    "successRedirect": "Redirection vers la connexion dans un instant...",
-    "failedSubmit": "Échec de l'envoi de la candidature."
+    "successRedirect": "Redirection vers la connexion dans un instant…",
+    "failedSubmit": "Nous n'avons pas pu envoyer votre candidature. Veuillez réessayer."
   },
   "login": {
-    "title": "Connexion Affilié",
+    "title": "Connexion affilié",
     "subtitle": "Accédez à votre tableau de bord affilié",
     "emailLabel": "Email",
     "codeLabel": "Code affilié",
     "signIn": "Se connecter",
-    "signingIn": "Connexion...",
+    "signingIn": "Connexion…",
     "noAccount": "Pas encore de compte ?",
     "applyHere": "Postuler ici",
     "failedLogin": "Email ou code affilié invalide."
@@ -60,8 +60,8 @@
     "tableStatus": "Statut",
     "tableCommission": "Commission",
     "tableDate": "Date",
-    "loading": "Chargement...",
-    "failedLoad": "Impossible de charger les données affilié.",
-    "failedDashboard": "Échec du chargement du tableau de bord."
+    "loading": "Chargement…",
+    "failedLoad": "Nous n'avons pas pu charger vos données affilié. Veuillez rafraîchir la page.",
+    "failedDashboard": "Nous n'avons pas pu charger votre tableau de bord. Veuillez rafraîchir la page."
   }
 }

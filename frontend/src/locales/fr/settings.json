@@ -15,7 +15,7 @@
     "profile": "Profil",
     "team": "Équipe",
     "integrations": "Intégrations",
-    "billing": "Plan & Facturation"
+    "billing": "Plan & facturation"
   },
   "profile": {
     "title": "Profil",
@@ -23,15 +23,15 @@
     "emailLabel": "Email",
     "emailReadOnly": "lecture seule",
     "saveChanges": "Enregistrer le profil",
-    "saving": "Enregistrement...",
+    "saving": "Enregistrement…",
     "saved": "✓ Profil mis à jour",
     "changePassword": "Changer le mot de passe",
     "currentPasswordLabel": "Mot de passe actuel",
     "newPasswordLabel": "Nouveau mot de passe",
     "newPasswordPlaceholder": "Au moins 8 caractères",
-    "updatePassword": "Mettre à jour mon mot de passe",
+    "updatePassword": "Mettre à jour le mot de passe",
     "passwordUpdated": "✓ Mot de passe mis à jour",
-    "passwordError": "Échec de la mise à jour. Vérifiez votre mot de passe actuel.",
+    "passwordError": "Nous n'avons pas pu mettre à jour votre mot de passe. Vérifiez votre mot de passe actuel et réessayez.",
     "languageTitle": "Langue",
     "languageWarning": "Seuls les menus et les nouveaux contenus seront traduits. Vos études existantes, guides d'entretien et rapports d'analyse ne seront pas retraduits."
   },
@@ -66,11 +66,11 @@
     "sendInvite": "Envoyer l'invitation",
     "inviting": "Envoi…",
     "inviteSent": "Invitation envoyée à {{email}}.",
-    "inviteError": "Impossible d'envoyer l'invitation. Réessayez.",
+    "inviteError": "Nous n'avons pas pu envoyer l'invitation. Veuillez réessayer.",
     "membersTitle": "Membres de l'espace",
     "pendingTitle": "Invitations en attente",
     "remove": "Retirer",
-    "removeConfirm": "Retirer ce membre de l'espace ?",
+    "removeConfirm": "Retirer ce membre ? Il perdra l'accès à tous les projets de cet espace.",
     "revoke": "Révoquer",
     "invitedAs": "Invité(e) en tant que {{role}}",
     "expiresOn": "expire le {{date}}",
@@ -92,7 +92,7 @@
       "createAccount": "Créer un compte",
       "missingToken": "Ce lien d'invitation est incomplet.",
       "invalidToken": "Ce lien d'invitation est invalide ou expiré.",
-      "failed": "Impossible d'accepter l'invitation."
+      "failed": "Nous n'avons pas pu accepter cette invitation. Veuillez réessayer."
     }
   },
   "integrations": {
@@ -110,8 +110,8 @@
       "saved": "✓ Webhook Slack enregistré.",
       "cleared": "Notifications Slack désactivées.",
       "testSent": "✓ Message test envoyé — vérifiez votre canal Slack.",
-      "testFailed": "Impossible de contacter Slack. Vérifiez l'URL et réessayez.",
-      "saveError": "Échec de l'enregistrement du webhook."
+      "testFailed": "Nous n'avons pas pu joindre Slack. Vérifiez l'URL et réessayez.",
+      "saveError": "Nous n'avons pas pu enregistrer votre webhook. Veuillez réessayer."
     }
   }
 }
