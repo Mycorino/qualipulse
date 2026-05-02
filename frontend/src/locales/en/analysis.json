@@ -104,6 +104,11 @@
   "nInterviews_one": "n={{count}} interview",
   "nInterviews_other": "n={{count}} interviews",
   "confidenceBadge": "{{level}} confidence",
+  "confidenceLevel": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
   "filteredBadge": "Filtered: {{filterBy}} ({{values}})",
   "aiDiscovery": "AI Discovery",
   "viewingVersion": "Viewing v{{version}} — {{label}}.",

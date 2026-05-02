@@ -235,6 +235,12 @@ a:hover {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* Primary buttons stay readable when disabled — opacity 0.6 + lighter shadow.
+   Avoids the "washed out" look at 0.5 while still signaling unavailability. */
+.btn-primary:disabled {
+  opacity: 0.7;
+  box-shadow: none;
+}
 
 .btn-primary {
   background: var(--brand-500);
@@ -1121,7 +1127,11 @@ select.field-input {
 .detail-header-actions {
   display: flex;
   gap: var(--space-2);
+  align-items: center;
 }
+/* Default (>=768px): show inline buttons, hide overflow trigger */
+.detail-header-actions .detail-header-actions__overflow { display: none; }
+.detail-header-actions__inline { display: inline-flex; }
 
 .detail-breadcrumb {
   display: flex;
@@ -6080,4 +6090,63 @@ select.field-input {
   color: var(--brand-600);
   position: relative;
   z-index: 1;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Mobile bug fixes (B1–B6) — surgical mobile overrides at <768px.
+   ──────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* B1: collapse Export CSV / Archive into "..." overflow menu */
+  .detail-header-actions .detail-header-actions__inline { display: none !important; }
+  .detail-header-actions .detail-header-actions__overflow { display: inline-block !important; }
+
+  /* B2: long interview URL — truncate from the start so the unique tail
+     stays visible (RTL trick + plaintext bidi keeps "https://" lhs). */
+  .link-url {
+    direction: rtl;
+    text-align: left;
+    unicode-bidi: plaintext;
+    max-width: none;
+    flex: 1;
+    min-width: 0;
+  }
+  .link-row-main { width: 100%; }
+  .link-row-actions { width: 100%; flex-wrap: wrap; }
+
+  /* B3: annotation pill row — wrap instead of horizontal-scroll-clip */
+  .analysis-theme-header > div {
+    flex-wrap: wrap;
+    overflow: visible !important;
+  }
+  .annotation-pill {
+    padding: 4px 10px;
+    font-size: 11.5px;
+  }
+
+  /* B4: version-tabs already wrap; ensure they cannot push past viewport */
+  .version-tabs { overflow-x: visible; }
+  .version-tab {
+    padding: 4px 10px;
+    font-size: 11.5px;
+    max-width: 100%;
+  }
+
+  /* B5: master/detail (iOS Mail style). When detail is active on mobile,
+     hide the participant list entirely — user taps "Back to participants"
+     in the dark card to return. */
+  .responses-layout--detail-active .responses-list-col { display: none; }
+  .responses-transcript-col { padding: var(--space-3); }
+  .transcript-tools-layout { display: block; }
+  .transcript-sidebar { margin-top: var(--space-4); }
+
+  /* B6: hide the floating selection popup on touch (handleTranscriptMouseUp
+     no-ops on touch since onMouseUp doesn't fire reliably). The per-turn
+     "Tag turn" button (m-tag-turn) replaces it. */
+  .selection-popup-mobile-hide { display: none !important; }
+  .turn-tag-btn { display: inline-flex !important; }
+}
+@media (min-width: 769px) {
+  /* B6: hide the per-turn mobile tagger button on desktop (selection
+     popup handles tagging there). */
+  .turn-tag-btn { display: none !important; }
 }

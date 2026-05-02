@@ -119,10 +119,10 @@ export default function SharedReport() {
               <span
                 className="badge"
                 title={report.confidence_rationale || t("sharedReport.confidenceTooltip")}
-                aria-label={`${t("sharedReport.confidence", { level: report.confidence })} — ${report.confidence_rationale || t("sharedReport.confidenceTooltip")}`}
+                aria-label={`${t("sharedReport.confidence", { level: t(`confidenceLevel.${report.confidence}`) })} — ${report.confidence_rationale || t("sharedReport.confidenceTooltip")}`}
                 style={{ cursor: "help" }}
               >
-                {t("sharedReport.confidence", { level: report.confidence })}
+                {t("sharedReport.confidence", { level: t(`confidenceLevel.${report.confidence}`) })}
               </span>
             )}
           </div>

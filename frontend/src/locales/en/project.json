@@ -150,6 +150,7 @@
     "backToDashboard": "← Dashboard",
     "archiveProject": "Archive project",
     "unarchiveProject": "Restore project",
+    "moreActions": "More actions",
     "archivedBadge": "Archived",
     "demoBannerText": "This is a sample project to show you what QualiPulse can do. Ready to run your own study?",
     "demoBannerCta": "Create your first project",
