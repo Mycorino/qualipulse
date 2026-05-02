@@ -7,7 +7,7 @@
     "welcomeBack": "Bon retour",
     "welcomeBackName": "Bon retour, {{name}}",
     "firstStudy": "Prêt à lancer votre première étude ?",
-    "firstStudySubtitle": "Configurez un entretien piloté par l'IA en quelques minutes — partagez un lien, écoutez ce que les gens ont dit.",
+    "firstStudySubtitle": "Configurez un entretien piloté par l'IA en quelques minutes — partagez un lien, écoutez ce que vos participants ont à dire.",
     "contextLine": "{{projects}} projet · {{completed}} entretien complété",
     "contextLine_other": "{{projects}} projets · {{completed}} entretiens complétés",
     "pillProjects": "projet",
@@ -17,7 +17,7 @@
     "pillAnalysesReady": "à lire",
     "pillAnalysesReady_other": "à lire"
   },
-  "loadError": "Impossible de charger les projets. Veuillez rafraîchir la page.",
+  "loadError": "Nous n'avons pas pu charger vos projets. Veuillez rafraîchir la page.",
   "projectCount": "{{count}} sur {{max}} projets",
   "handoffHint": {
     "title": "Étape suivante : invitez votre premier participant.",
@@ -39,16 +39,16 @@
   },
   "gettingStarted": {
     "welcome": "Bienvenue, {{name}} ! Configurons votre première étude.",
-    "subtitle": "Suivez ces étapes pour lancer votre premier entretien IA.",
+    "subtitle": "Trois étapes pour lancer votre premier entretien piloté par l'IA.",
     "step1Title": "Créer un projet",
-    "step1Desc": "Décrivez vos objectifs de recherche et laissez l'IA construire votre guide d'entretien.",
+    "step1Desc": "Décrivez vos objectifs de recherche et laissez l'IA rédiger votre guide d'entretien.",
     "step1Cta": "Créer un projet →",
     "demoCta": "Ou explorer un projet de démo",
     "demoLoading": "Préparation de la démo…",
     "step2Title": "Partager votre lien d'entretien",
-    "step2Desc": "Générez un lien et envoyez-le aux participants. Ils complèteront l'entretien dans leur navigateur.",
+    "step2Desc": "Générez un lien et envoyez-le à vos participants. Ils répondent dans leur navigateur.",
     "step3Title": "Consulter l'analyse IA",
-    "step3Desc": "Une fois les réponses reçues, déclenchez une analyse IA pour obtenir des thèmes, des citations et des recommandations."
+    "step3Desc": "Une fois les réponses collectées, lancez une analyse IA pour obtenir thèmes, citations et recommandations."
   },
   "projectCard": {
     "questions": "{{count}} questions",
