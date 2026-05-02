@@ -281,6 +281,11 @@ export async function createDemoProject(): Promise<ProjectResponse> {
   return data;
 }
 
+export async function resetDemoProject(): Promise<ProjectResponse> {
+  const { data } = await client.post<ProjectResponse>("/projects/demo/reset");
+  return data;
+}
+
 export async function updateProject(id: string, body: ProjectCreate): Promise<ProjectResponse> {
   const { data } = await client.put<ProjectResponse>(`/projects/${id}`, body);
   return data;

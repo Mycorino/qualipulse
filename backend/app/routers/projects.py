@@ -2,10 +2,20 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
+from sqlalchemy import delete as sql_delete
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
+from app.models.coding import ManualCode, QuoteTag
 from app.models.company import Company
+from app.models.interview import (
+    AnalysisThemeAnnotation,
+    InterviewLink,
+    InterviewTurn,
+    Participant,
+    ProjectAnalysis,
+)
+from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.schemas.project import (
     ProjectCreate,
@@ -112,6 +122,102 @@ def create_demo_project(
     # Deliberately bypass project/question limits for the demo so a free-tier user
     # can always try it. We cap at one demo per company via the name check above.
     project = seed_demo_project(db, company.id)
+    return _project_to_response(project)
+
+
+@router.post("/demo/reset", response_model=ProjectResponse)
+def reset_demo_project(
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ProjectResponse:
+    """Re-seed the showcase demo project with fresh content.
+
+    Removes the company's existing demo project (and all of its participants,
+    transcript turns, tag annotations, memos, analyses, etc.) and runs the
+    seeder again so the user picks up the latest fixture content. Useful for
+    accounts seeded before later content changes (Maison Aura → real brands)
+    where `Company.demo_seeded_at` would otherwise prevent a re-seed.
+
+    Scope is limited to projects flagged `is_demo=True` for the current
+    company — real projects are never touched.
+    """
+    demo_project_ids = [
+        row[0]
+        for row in db.query(Project.id)
+        .filter(Project.company_id == company.id, Project.is_demo == True)  # noqa: E712
+        .all()
+    ]
+
+    if demo_project_ids:
+        participant_ids = [
+            row[0]
+            for row in db.query(Participant.id)
+            .filter(Participant.project_id.in_(demo_project_ids))
+            .all()
+        ]
+        if participant_ids:
+            turn_ids = [
+                row[0]
+                for row in db.query(InterviewTurn.id)
+                .filter(InterviewTurn.participant_id.in_(participant_ids))
+                .all()
+            ]
+            if turn_ids:
+                db.execute(sql_delete(QuoteTag).where(QuoteTag.turn_id.in_(turn_ids)))
+            db.execute(
+                sql_delete(InterviewTurn).where(
+                    InterviewTurn.participant_id.in_(participant_ids)
+                )
+            )
+        db.execute(
+            sql_delete(Participant).where(Participant.project_id.in_(demo_project_ids))
+        )
+
+        analysis_ids = [
+            row[0]
+            for row in db.query(ProjectAnalysis.id)
+            .filter(ProjectAnalysis.project_id.in_(demo_project_ids))
+            .all()
+        ]
+        if analysis_ids:
+            db.execute(
+                sql_delete(AnalysisThemeAnnotation).where(
+                    AnalysisThemeAnnotation.analysis_id.in_(analysis_ids)
+                )
+            )
+        db.execute(
+            sql_delete(ProjectAnalysis).where(
+                ProjectAnalysis.project_id.in_(demo_project_ids)
+            )
+        )
+        db.execute(sql_delete(ManualCode).where(ManualCode.project_id.in_(demo_project_ids)))
+        db.execute(sql_delete(ProjectMemo).where(ProjectMemo.project_id.in_(demo_project_ids)))
+        db.execute(
+            sql_delete(InterviewGuideQuestion).where(
+                InterviewGuideQuestion.project_id.in_(demo_project_ids)
+            )
+        )
+        db.execute(
+            sql_delete(ScreeningQuestion).where(
+                ScreeningQuestion.project_id.in_(demo_project_ids)
+            )
+        )
+        db.execute(
+            sql_delete(InterviewLink).where(InterviewLink.project_id.in_(demo_project_ids))
+        )
+        db.execute(
+            sql_delete(Project).where(
+                Project.company_id == company.id,
+                Project.is_demo == True,  # noqa: E712
+            )
+        )
+        db.flush()
+
+    company.demo_seeded_at = None
+    project = seed_demo_project(db, company.id)
+    company.demo_seeded_at = datetime.utcnow()
+    db.commit()
+    db.refresh(project)
     return _project_to_response(project)
 
 

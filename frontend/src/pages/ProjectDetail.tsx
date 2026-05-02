@@ -53,7 +53,7 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript, translateTranscript } from "../api/projects";
+import { getTranscript, translateTranscript, resetDemoProject } from "../api/projects";
 
 type Tab = "overview" | "setup" | "responses" | "analysis";
 
@@ -1368,9 +1368,31 @@ export default function ProjectDetail() {
         {project.is_demo && (
           <div className="demo-banner">
             <p>{tProject("detail.demoBannerText")}</p>
-            <Link to="/projects/new" className="btn btn-primary btn-sm" style={{ whiteSpace: "nowrap", textDecoration: "none", flexShrink: 0 }}>
-              {tProject("detail.demoBannerCta")}
-            </Link>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0, flexWrap: "wrap" }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ whiteSpace: "nowrap" }}
+                onClick={async () => {
+                  if (!confirm(tProject("detail.demoResetConfirm"))) return;
+                  try {
+                    const fresh = await resetDemoProject();
+                    toast(tProject("detail.demoResetSuccess"), "success");
+                    if (fresh.id !== id) {
+                      navigate(`/projects/${fresh.id}`, { replace: true });
+                    } else {
+                      window.location.reload();
+                    }
+                  } catch {
+                    toast(tProject("detail.demoResetError"), "error");
+                  }
+                }}
+              >
+                {tProject("detail.demoResetCta")}
+              </button>
+              <Link to="/projects/new" className="btn btn-primary btn-sm" style={{ whiteSpace: "nowrap", textDecoration: "none" }}>
+                {tProject("detail.demoBannerCta")}
+              </Link>
+            </div>
           </div>
         )}
 
