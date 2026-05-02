@@ -13,6 +13,9 @@
 :root {
   color-scheme: light;
 
+  /* ── Participant flow ────────────────────────── */
+  --participant-card-max-w: 560px;
+
   /* ── Brand ───────────────────────────────────── */
   --brand-50:  #f0f4ff;
   --brand-100: #e0e9ff;
@@ -5666,4 +5669,160 @@ select.field-input {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ── Participant flow: shared helpers (audit fixes) ────────────────── */
+
+/* Initials avatar (researcher identity fallback when no logo) */
+.researcher-initials-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--brand-500);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  margin: 0 auto 8px;
+  text-transform: uppercase;
+}
+
+/* "Why we ask for your email" expander */
+.why-email-expander {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+}
+.why-email-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--brand-600);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.why-email-toggle:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.why-email-body {
+  margin-top: 6px;
+  line-height: 1.5;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* Screening error block (rebuilt) */
+.screening-error-card {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.screening-error-card__title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #991b1b;
+  margin: 0;
+}
+.screening-error-card__body {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+  line-height: 1.5;
+}
+.screening-error-card__escalate {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+  font-style: italic;
+}
+.screening-error-card__retry {
+  align-self: flex-start;
+}
+
+/* Disqualified screen contact bits */
+.disqualified-future-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 16px;
+  color: var(--brand-600);
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.disqualified-future-note {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.5;
+}
+.disqualified-mistake {
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+}
+
+/* Skip-question button: fade-in after 5s */
+.skip-question-btn--fade {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease-in;
+}
+.skip-question-btn--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skip-question-btn--fade { transition: none; }
+}
+
+/* Persistent transcript flash with dismiss */
+.transcript-flash {
+  position: relative;
+}
+.transcript-flash__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0 4px;
+  font-size: 16px;
+  line-height: 1;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.transcript-flash__close:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+.transcript-flash__readmore {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 6px;
+  cursor: pointer;
+  color: var(--brand-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 13px;
+  font-style: normal;
+}
+
+/* Recording timer warning glyph */
+.recording-timer__glyph {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 4px;
 }
