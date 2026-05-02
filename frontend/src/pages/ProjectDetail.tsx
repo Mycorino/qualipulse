@@ -1072,6 +1072,25 @@ export default function ProjectDetail() {
   // Wraps each sentence in a tappable span (mobile sentence-level tagging).
   // CSS .sentence-tap activates the affordance on touch viewports and is a
   // no-op on desktop where native text selection still drives tagging.
+  // Opens the tag picker for a sentence range. Used by both the click handler
+  // attached to the sentence-tap span and the keyboard handler. Gated by
+  // matchMedia so desktop keeps native text-selection (mouseup → handleTranscriptMouseUp).
+  function openSentencePicker(turnId: string, text: string, start: number, end: number, anchorEl: HTMLElement) {
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 768px)").matches) return;
+    if (end <= start) return;
+    const rect = anchorEl.getBoundingClientRect();
+    setSelectionInfo({
+      turnId,
+      text: text.slice(start, end),
+      start,
+      end,
+      x: Math.min(rect.left + rect.width / 2, window.innerWidth - 110),
+      y: rect.top + window.scrollY - 44,
+      fromTranslation: false,
+    });
+    setShowNewCode(false);
+  }
+
   function renderTaggedText(text: string, turnId: string): React.ReactNode {
     const turnTags = tags.filter((t) => t.turn_id === turnId);
     const sentences = splitSentences(text);
@@ -1084,13 +1103,28 @@ export default function ProjectDetail() {
       if (sent.start > cursor) {
         out.push(<React.Fragment key={`gap-${idx}`}>{text.slice(cursor, sent.start)}</React.Fragment>);
       }
+      // role=button + tabIndex + direct onClick on every sentence span so iOS
+      // Safari fires the click reliably (event delegation on the parent div
+      // didn't always reach the inner span on real-device touch).
       out.push(
         <span
           key={`sent-${idx}`}
           className="sentence-tap"
+          role="button"
+          tabIndex={0}
           data-sentence-start={sent.start}
           data-sentence-end={sent.end}
           data-turn-id={turnId}
+          onClick={(e) => {
+            e.stopPropagation();
+            openSentencePicker(turnId, text, sent.start, sent.end, e.currentTarget as HTMLElement);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openSentencePicker(turnId, text, sent.start, sent.end, e.currentTarget as HTMLElement);
+            }
+          }}
         >
           {renderTaggedRange(text, sent.start, sent.end, turnTags, `sent-${idx}`)}
         </span>
@@ -2210,32 +2244,6 @@ export default function ProjectDetail() {
                                 <div
                                   className={`transcript-a${transcriptViewMode === "translated" && t.translated_response ? " transcript-a--translated" : ""}`}
                                   onMouseUp={() => transcriptViewMode === "original" && handleTranscriptMouseUp(t.id)}
-                                  onClick={(e) => {
-                                    // Mobile-only sentence tap → open tag picker for that sentence range.
-                                    // Desktop keeps native text selection (gated by matchMedia).
-                                    if (transcriptViewMode !== "original") return;
-                                    if (typeof window === "undefined" || !window.matchMedia("(max-width: 768px)").matches) return;
-                                    const target = (e.target as HTMLElement).closest("[data-sentence-start]") as HTMLElement | null;
-                                    if (!target) return;
-                                    const startAttr = target.getAttribute("data-sentence-start");
-                                    const endAttr = target.getAttribute("data-sentence-end");
-                                    const turnIdAttr = target.getAttribute("data-turn-id");
-                                    if (!startAttr || !endAttr || !turnIdAttr) return;
-                                    const start = parseInt(startAttr, 10);
-                                    const end = parseInt(endAttr, 10);
-                                    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return;
-                                    const rect = target.getBoundingClientRect();
-                                    setSelectionInfo({
-                                      turnId: turnIdAttr,
-                                      text: (t.response_transcript || "").slice(start, end),
-                                      start,
-                                      end,
-                                      x: Math.min(rect.left + rect.width / 2, window.innerWidth - 110),
-                                      y: rect.top + window.scrollY - 44,
-                                      fromTranslation: false,
-                                    });
-                                    setShowNewCode(false);
-                                  }}
                                   style={{ userSelect: "text" }}
                                 >
                                   {transcriptViewMode === "translated" && t.translated_response ? (

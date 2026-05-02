@@ -5047,9 +5047,25 @@ select.field-input {
   -webkit-tap-highlight-color: transparent;
   border-radius: 3px;
   transition: background-color 0.12s;
+  /* touch-action: manipulation removes the iOS 300ms double-tap-zoom delay so
+     the tap fires synchronously, and keeps double-tap-to-zoom out of the way
+     for users zooming on the transcript. */
+  touch-action: manipulation;
+}
+.sentence-tap:focus-visible {
+  outline: 2px solid var(--brand-500, #6366f1);
+  outline-offset: 1px;
 }
 @media (max-width: 768px) {
-  .sentence-tap { cursor: pointer; }
+  .sentence-tap {
+    cursor: pointer;
+    /* iOS Safari requires `user-select: none` on the tap target itself
+       (not just the parent) so a quick tap doesn't trigger word-selection
+       and swallow the click event. The parent .transcript-a keeps
+       user-select: text for desktop. */
+    -webkit-user-select: none;
+    user-select: none;
+  }
   .sentence-tap:active {
     background-color: var(--brand-100, rgba(99, 102, 241, 0.12));
   }
