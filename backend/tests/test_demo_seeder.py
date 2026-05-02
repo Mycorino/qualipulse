@@ -341,3 +341,51 @@ class TestDemoProjectExcludedFromQuota:
             headers=auth_headers,
         )
         assert resp.status_code == 403
+
+
+class TestDemoProjectReset:
+    def test_reset_replaces_existing_demo_with_fresh_seed(
+        self, client, auth_headers, db_session
+    ):
+        company = db_session.query(Company).filter(Company.email == "test@example.com").one()
+
+        original = seed_demo_project(db_session, company.id)
+        original_id = original.id
+        company.demo_seeded_at = original.created_at
+        db_session.commit()
+
+        # Add a real project alongside — must survive the reset.
+        real = Project(company_id=company.id, name="Real Study", language="en", is_demo=False)
+        db_session.add(real)
+        db_session.commit()
+        real_id = real.id
+
+        resp = client.post("/projects/demo/reset", headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+        fresh = resp.json()
+
+        # Same company, new project ID, still flagged as demo
+        assert fresh["id"] != original_id
+        assert fresh["is_demo"] is True
+
+        # Old demo (and all its participants/turns/etc.) is gone
+        old_still_there = db_session.query(Project).filter(Project.id == original_id).first()
+        assert old_still_there is None
+
+        # Real project untouched
+        real_still_there = db_session.query(Project).filter(Project.id == real_id).first()
+        assert real_still_there is not None
+        assert real_still_there.name == "Real Study"
+
+        # New demo has full relationship graph (participants, turns, codes, analyses)
+        new_participants = (
+            db_session.query(Participant).filter(Participant.project_id == fresh["id"]).count()
+        )
+        assert new_participants > 0
+
+    def test_reset_is_safe_when_no_demo_exists(self, client, auth_headers):
+        # Calling reset before any demo exists should still seed one (the
+        # endpoint is "ensure latest demo is present", not "must have one to reset").
+        resp = client.post("/projects/demo/reset", headers=auth_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["is_demo"] is True
