@@ -1,5 +1,16 @@
 {
   "title": "Account Settings",
+  "hubHeader": {
+    "aria": "Account overview",
+    "eyebrow": "Account & workspace",
+    "trialBadge": "Trial · {{count}} day left",
+    "trialBadge_other": "Trial · {{count}} days left",
+    "usageProjects": "projects max",
+    "usageParticipants": "participants/study",
+    "usageTeam": "team seats",
+    "usageAi": "AI analysis",
+    "usageExport": "CSV export"
+  },
   "tabs": {
     "profile": "Profile",
     "team": "Team",
@@ -11,14 +22,14 @@
     "nameLabel": "Name",
     "emailLabel": "Email",
     "emailReadOnly": "read-only",
-    "saveChanges": "Save changes",
+    "saveChanges": "Save profile",
     "saving": "Saving...",
     "saved": "✓ Profile updated",
     "changePassword": "Change Password",
     "currentPasswordLabel": "Current password",
     "newPasswordLabel": "New password",
     "newPasswordPlaceholder": "At least 8 characters",
-    "updatePassword": "Update password",
+    "updatePassword": "Update my password",
     "passwordUpdated": "✓ Password updated",
     "passwordError": "Failed to update password. Check your current password.",
     "languageTitle": "Language",

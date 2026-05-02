@@ -1349,6 +1349,44 @@ export default function ProjectDetail() {
         {/* ══ OVERVIEW ══ */}
         {tab === "overview" && (
           <div className="tab-content" role="tabpanel" id="tabpanel-overview" aria-labelledby="tab-overview">
+            {/* Project hero strip — brand band with eyebrow + state */}
+            {(() => {
+              const isReady = analysis?.status === "ready";
+              const isGenerating = analysis?.status === "generating";
+              const hasResponses = participants.length > 0;
+              let stateClass = "eyebrow-tag eyebrow-tag--info";
+              let stateLabel = tProject("hero.stateSetup", { defaultValue: "Setup" });
+              if (isReady) {
+                stateClass = "eyebrow-tag eyebrow-tag--success pulse-soft";
+                stateLabel = tProject("hero.stateAnalysisReady", { defaultValue: "Analysis ready" });
+              } else if (isGenerating) {
+                stateClass = "eyebrow-tag eyebrow-tag--info";
+                stateLabel = tProject("hero.stateAnalysing", { defaultValue: "Analysing…" });
+              } else if (hasResponses) {
+                stateClass = "eyebrow-tag eyebrow-tag--info";
+                stateLabel = tProject("hero.stateCollecting", { defaultValue: "Collecting responses" });
+              }
+              const eyebrowLabel = project.is_demo
+                ? tProject("hero.eyebrowDemo", { defaultValue: "Demo project" })
+                : tProject("hero.eyebrowActive", { defaultValue: "Active study" });
+              const eyebrowClass = project.is_demo
+                ? "eyebrow-tag eyebrow-tag--warning"
+                : "eyebrow-tag";
+              return (
+                <section className="project-hero-strip" aria-label={tProject("hero.aria", { defaultValue: "Study overview" })}>
+                  <div className="project-hero-strip__body">
+                    <span className={`${eyebrowClass} project-hero-strip__eyebrow`}>{eyebrowLabel}</span>
+                    <h2 className="project-hero-strip__title">{project.name}</h2>
+                    {project.research_objective && (
+                      <p className="project-hero-strip__objective">{project.research_objective}</p>
+                    )}
+                  </div>
+                  <div className="project-hero-strip__state">
+                    <span className={stateClass}>{stateLabel}</span>
+                  </div>
+                </section>
+              );
+            })()}
             <div className="stats-row">
               <div className="stat-card"><div className="stat-value">{participants.length}</div><div className="stat-label">{tProject("overview.totalParticipants")}</div></div>
               <div className="stat-card stat-card--success"><div className="stat-value">{completedCount}</div><div className="stat-label">{tProject("overview.completed")}</div></div>
@@ -1395,7 +1433,7 @@ export default function ProjectDetail() {
                     setObjectiveDraft(project.research_objective ?? "");
                     setEditingObjective(true);
                     setEditAnnouncement(tProject("detail.editingFieldAria", { field: tProject("overview.researchObjective") }));
-                  }}>{tCommon("edit")}</button>
+                  }}>{tProject("overview.editObjective", { defaultValue: "Edit objective" })}</button>
                 )}
               </div>
               {editingObjective ? (
@@ -1429,7 +1467,7 @@ export default function ProjectDetail() {
                     setWelcomeDraft(project.welcome_message ?? "");
                     setEditingWelcome(true);
                     setEditAnnouncement(tProject("detail.editingFieldAria", { field: tProject("overview.welcomeMessageLabel") }));
-                  }}>{tCommon("edit")}</button>
+                  }}>{tProject("overview.editWelcome", { defaultValue: "Edit welcome message" })}</button>
                 )}
               </div>
               {editingWelcome ? (

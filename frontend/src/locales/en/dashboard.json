@@ -1,6 +1,22 @@
 {
   "title": "Projects",
   "createProject": "+ Create Project",
+  "hubHeader": {
+    "aria": "Workspace overview",
+    "eyebrow": "Your research workspace",
+    "welcomeBack": "Welcome back",
+    "welcomeBackName": "Welcome back, {{name}}",
+    "firstStudy": "Ready to run your first study?",
+    "firstStudySubtitle": "Set up an AI-led interview in a few minutes — share a link, listen back to what people said.",
+    "contextLine": "{{projects}} project · {{completed}} completed interview",
+    "contextLine_other": "{{projects}} projects · {{completed}} completed interviews",
+    "pillProjects": "project",
+    "pillProjects_other": "projects",
+    "pillCompleted": "completed",
+    "pillInProgress": "in progress",
+    "pillAnalysesReady": "ready to read",
+    "pillAnalysesReady_other": "ready to read"
+  },
   "loadError": "Failed to load projects. Please refresh the page.",
   "projectCount": "{{count}} of {{max}} projects",
   "handoffHint": {
@@ -45,7 +61,9 @@
     "nudgeAnalyse": "✦ Ready to analyse — you have {{count}} completed interviews",
     "nudgeAnalyse_one": "✦ Ready to analyse — you have {{count}} completed interview",
     "nudgeStale": "⏸ No new responses in {{count}} days",
-    "nudgeStale_one": "⏸ No new responses in {{count}} day"
+    "nudgeStale_one": "⏸ No new responses in {{count}} day",
+    "lastActivity": "Last response {{date}}",
+    "created": "Created {{date}}"
   },
   "archive": {
     "title": "Archived projects",

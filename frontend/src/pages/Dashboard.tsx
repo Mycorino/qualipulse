@@ -185,42 +185,99 @@ export default function Dashboard() {
       </header>
 
       <main className="dashboard-main">
-        <div className="dashboard-top-row">
-          <h1 style={{ fontSize: "inherit", fontWeight: "inherit", margin: 0 }}>{t("title")}</h1>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {!loading && me && (
-              <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-                {t("projectCount", { count: realProjects.length, max: getProjectMax(me.subscription_tier) })}
+        {/* Hub identity header — brand-tinted band with greeting + metric pills */}
+        {(() => {
+          const completedTotal = realProjects.reduce((acc, p) => acc + (p.completed_count || 0), 0);
+          const inProgressTotal = realProjects.reduce((acc, p) => acc + (p.in_progress_count || 0), 0);
+          const analysesReady = realProjects.filter((p) => p.analysis_status === "ready").length;
+          const firstName = (me?.name || "").trim().split(" ")[0];
+          const hasProjects = realProjects.length > 0;
+          return (
+            <section className="hub-header" aria-label={t("hubHeader.aria", "Workspace overview")}>
+              <span className="eyebrow-tag eyebrow-tag--ghost hub-header__eyebrow">
+                {t("hubHeader.eyebrow", "Your research workspace")}
               </span>
-            )}
-            {projects.length > 1 && (
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                style={{
-                  fontSize: 13,
-                  padding: "4px 8px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border, #e5e7eb)",
-                  background: "white",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                }}
-              >
-                <option value="newest">{t("sort.newest", "Newest first")}</option>
-                <option value="oldest">{t("sort.oldest", "Oldest first")}</option>
-                <option value="responses">{t("sort.responses", "Most responses")}</option>
-                <option value="name">{t("sort.name", "Name A–Z")}</option>
-              </select>
-            )}
-            <button
-              className="btn btn-primary"
-              onClick={() => navigate("/projects/new")}
-            >
-              {t("createProject")}
-            </button>
-          </div>
-        </div>
+              <h1 className="hub-header__title">
+                {hasProjects
+                  ? (firstName ? t("hubHeader.welcomeBackName", { name: firstName }) : t("hubHeader.welcomeBack"))
+                  : t("hubHeader.firstStudy")}
+              </h1>
+              {!loading && me && (
+                <p className="hub-header__subtitle">
+                  {hasProjects
+                    ? t("hubHeader.contextLine", {
+                        projects: realProjects.length,
+                        completed: completedTotal,
+                      })
+                    : t("hubHeader.firstStudySubtitle")}
+                </p>
+              )}
+              <div className="hub-header__row">
+                <div className="hub-header__pills" aria-hidden={!hasProjects}>
+                  {hasProjects && (
+                    <>
+                      <span className="hub-header__pill">
+                        <strong>{realProjects.length}</strong>{" "}
+                        {t("hubHeader.pillProjects", { count: realProjects.length })}
+                      </span>
+                      {completedTotal > 0 && (
+                        <span className="hub-header__pill hub-header__pill--success">
+                          <strong>{completedTotal}</strong>{" "}
+                          {t("hubHeader.pillCompleted", { count: completedTotal })}
+                        </span>
+                      )}
+                      {inProgressTotal > 0 && (
+                        <span className="hub-header__pill hub-header__pill--info">
+                          <strong>{inProgressTotal}</strong>{" "}
+                          {t("hubHeader.pillInProgress", { count: inProgressTotal })}
+                        </span>
+                      )}
+                      {analysesReady > 0 && (
+                        <span className="hub-header__pill hub-header__pill--success pulse-soft">
+                          ✦ <strong>{analysesReady}</strong>{" "}
+                          {t("hubHeader.pillAnalysesReady", { count: analysesReady })}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="hub-header__cta" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  {!loading && me && (
+                    <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+                      {t("projectCount", { count: realProjects.length, max: getProjectMax(me.subscription_tier) })}
+                    </span>
+                  )}
+                  {projects.length > 1 && (
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                      style={{
+                        fontSize: 13,
+                        padding: "6px 10px",
+                        borderRadius: 6,
+                        border: "1px solid var(--border-subtle)",
+                        background: "white",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="newest">{t("sort.newest", "Newest first")}</option>
+                      <option value="oldest">{t("sort.oldest", "Oldest first")}</option>
+                      <option value="responses">{t("sort.responses", "Most responses")}</option>
+                      <option value="name">{t("sort.name", "Name A–Z")}</option>
+                    </select>
+                  )}
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => navigate("/projects/new")}
+                  >
+                    {t("createProject")}
+                  </button>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
 
         {/* Global banners */}
         {!loading && me?.trial_ends_at && new Date(me.trial_ends_at) > new Date() && (() => {
@@ -482,7 +539,7 @@ export default function Dashboard() {
                       <span className="project-stat project-stat-empty">{t("projectCard.noResponses")}</span>
                     )}
                     {p.analysis_status === "ready" && (
-                      <span className="project-stat project-stat-analysis">{t("projectCard.analysisReady")}</span>
+                      <span className="project-stat project-stat-analysis pulse-soft">{t("projectCard.analysisReady")}</span>
                     )}
                     {p.analysis_status === "generating" && (
                       <span className="project-stat project-stat-generating">{t("projectCard.analysing")}</span>
@@ -526,7 +583,15 @@ export default function Dashboard() {
                   ) : null}
 
                   <p className="project-card-date">
-                    {new Date(p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                    {p.last_response_at
+                      ? t("projectCard.lastActivity", {
+                          date: new Date(p.last_response_at).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+                          defaultValue: "Last response {{date}}",
+                        })
+                      : t("projectCard.created", {
+                          date: new Date(p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+                          defaultValue: "Created {{date}}",
+                        })}
                   </p>
                 </div>
               );

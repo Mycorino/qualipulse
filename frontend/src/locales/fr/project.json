@@ -133,6 +133,15 @@
     "briefAndObjectiveTitle": "Cadrage de recherche",
     "briefAndObjectiveSubtitle": "Décrivez votre projet et définissez ce que vous voulez apprendre. L'IA vous aidera à structurer les deux."
   },
+  "hero": {
+    "aria": "Aperçu de l'étude",
+    "eyebrowActive": "Étude active",
+    "eyebrowDemo": "Projet de démo",
+    "stateSetup": "Configuration",
+    "stateCollecting": "Collecte de réponses",
+    "stateAnalysing": "Analyse en cours…",
+    "stateAnalysisReady": "Analyse disponible"
+  },
   "detail": {
     "tabOverview": "Vue d'ensemble",
     "tabSetup": "Configuration",
@@ -194,6 +203,8 @@
     "generateInsights": "Générer des insights →",
     "refreshAnalysis": "Actualiser l'analyse →",
     "researchObjective": "Objectif de recherche",
+    "editObjective": "Modifier l'objectif",
+    "editWelcome": "Modifier le message d'accueil",
     "objectivePlaceholder": "Que cherchez-vous à apprendre de cette recherche ?",
     "noObjective": "Aucun objectif défini — cliquez sur Modifier pour en ajouter un.",
     "welcomeMessageLabel": "Message d'accueil",

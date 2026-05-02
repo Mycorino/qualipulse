@@ -1,5 +1,16 @@
 {
   "title": "Paramètres du compte",
+  "hubHeader": {
+    "aria": "Aperçu du compte",
+    "eyebrow": "Compte & espace de travail",
+    "trialBadge": "Essai · {{count}} jour restant",
+    "trialBadge_other": "Essai · {{count}} jours restants",
+    "usageProjects": "projets max",
+    "usageParticipants": "participants/étude",
+    "usageTeam": "sièges équipe",
+    "usageAi": "analyse IA",
+    "usageExport": "export CSV"
+  },
   "tabs": {
     "profile": "Profil",
     "team": "Équipe",
@@ -11,14 +22,14 @@
     "nameLabel": "Nom",
     "emailLabel": "Email",
     "emailReadOnly": "lecture seule",
-    "saveChanges": "Enregistrer les modifications",
+    "saveChanges": "Enregistrer le profil",
     "saving": "Enregistrement...",
     "saved": "✓ Profil mis à jour",
     "changePassword": "Changer le mot de passe",
     "currentPasswordLabel": "Mot de passe actuel",
     "newPasswordLabel": "Nouveau mot de passe",
     "newPasswordPlaceholder": "Au moins 8 caractères",
-    "updatePassword": "Mettre à jour le mot de passe",
+    "updatePassword": "Mettre à jour mon mot de passe",
     "passwordUpdated": "✓ Mot de passe mis à jour",
     "passwordError": "Échec de la mise à jour. Vérifiez votre mot de passe actuel.",
     "languageTitle": "Langue",
