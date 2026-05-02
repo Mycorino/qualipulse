@@ -133,6 +133,15 @@
     "briefAndObjectiveTitle": "Research Focus",
     "briefAndObjectiveSubtitle": "Describe your project and define what you want to learn. The AI will help structure both."
   },
+  "hero": {
+    "aria": "Study overview",
+    "eyebrowActive": "Active study",
+    "eyebrowDemo": "Demo project",
+    "stateSetup": "Setup",
+    "stateCollecting": "Collecting responses",
+    "stateAnalysing": "Analysing…",
+    "stateAnalysisReady": "Analysis ready"
+  },
   "detail": {
     "tabOverview": "Overview",
     "tabSetup": "Setup",
@@ -194,6 +203,8 @@
     "generateInsights": "Generate insights →",
     "refreshAnalysis": "Refresh analysis →",
     "researchObjective": "Research Objective",
+    "editObjective": "Edit objective",
+    "editWelcome": "Edit welcome message",
     "objectivePlaceholder": "What are you trying to learn from this research?",
     "noObjective": "No objective set — click Edit to add one.",
     "welcomeMessageLabel": "Welcome Message",

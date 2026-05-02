@@ -1,6 +1,22 @@
 {
   "title": "Projets",
   "createProject": "+ Créer un projet",
+  "hubHeader": {
+    "aria": "Aperçu de l'espace de travail",
+    "eyebrow": "Votre espace de recherche",
+    "welcomeBack": "Bon retour",
+    "welcomeBackName": "Bon retour, {{name}}",
+    "firstStudy": "Prêt à lancer votre première étude ?",
+    "firstStudySubtitle": "Configurez un entretien piloté par l'IA en quelques minutes — partagez un lien, écoutez ce que les gens ont dit.",
+    "contextLine": "{{projects}} projet · {{completed}} entretien complété",
+    "contextLine_other": "{{projects}} projets · {{completed}} entretiens complétés",
+    "pillProjects": "projet",
+    "pillProjects_other": "projets",
+    "pillCompleted": "complétés",
+    "pillInProgress": "en cours",
+    "pillAnalysesReady": "à lire",
+    "pillAnalysesReady_other": "à lire"
+  },
   "loadError": "Impossible de charger les projets. Veuillez rafraîchir la page.",
   "projectCount": "{{count}} sur {{max}} projets",
   "handoffHint": {
@@ -45,7 +61,9 @@
     "nudgeAnalyse": "✦ Prêt à analyser — vous avez {{count}} entretiens complétés",
     "nudgeAnalyse_one": "✦ Prêt à analyser — vous avez {{count}} entretien complété",
     "nudgeStale": "⏸ Aucune nouvelle réponse depuis {{count}} jours",
-    "nudgeStale_one": "⏸ Aucune nouvelle réponse depuis {{count}} jour"
+    "nudgeStale_one": "⏸ Aucune nouvelle réponse depuis {{count}} jour",
+    "lastActivity": "Dernière réponse le {{date}}",
+    "created": "Créé le {{date}}"
   },
   "archive": {
     "title": "Projets archivés",

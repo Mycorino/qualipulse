@@ -261,19 +261,88 @@ export default function AccountSettings() {
 
   if (loading) return <div className="dashboard-page"><p className="muted-text">{t("common:loading")}</p></div>;
 
+  // Tier badge rendering — picks an appropriate semantic colour
+  const tier = billing?.tier ?? "starter";
+  const isTrialing = billing?.status === "trialing";
+  const trialEndsAt = (me as unknown as { trial_ends_at?: string | null })?.trial_ends_at ?? null;
+  const trialDaysLeft = trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
+  let tierBadgeClass = "eyebrow-tag eyebrow-tag--info";
+  let tierBadgeText: string = billing?.tier_name ?? tier;
+  if (isTrialing && trialDaysLeft !== null) {
+    if (trialDaysLeft < 3) tierBadgeClass = "eyebrow-tag eyebrow-tag--warning";
+    tierBadgeText = t("hubHeader.trialBadge", { count: trialDaysLeft, defaultValue: "Trial · {{count}} days left" });
+  } else if (billing?.status === "active") {
+    tierBadgeClass = "eyebrow-tag eyebrow-tag--success";
+  }
+
+  // Strip bracket-tags and take first 2 letters for the avatar
+  const cleanedName = (me?.name || me?.email || "").replace(/\[.*?\]/g, "").trim();
+  const initials = cleanedName
+    .split(/\s+/)
+    .map((p) => p.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "?";
+
   return (
     <div className="dashboard-page">
       <div style={{ maxWidth: "960px", margin: "0 auto" }}>
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">{t("title")}</h1>
-          <p className="dashboard-subtitle">{me?.email}</p>
-        </div>
+      <div className="dashboard-header" style={{ background: "transparent", borderBottom: "none", padding: "16px 0", height: "auto" }}>
+        <h2 className="logo" style={{ margin: 0 }}>QualiPulse</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <LanguageSwitcher variant="light" />
           <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}>← {t("common:dashboard")}</button>
         </div>
       </div>
+
+      {/* Hub identity band */}
+      <section className="hub-header" aria-label={t("hubHeader.aria", "Account overview")}>
+        <span className="eyebrow-tag eyebrow-tag--ghost hub-header__eyebrow">
+          {t("hubHeader.eyebrow", "Account & workspace")}
+        </span>
+        <div className="hub-header__identity">
+          <div className="hub-header__avatar" aria-hidden="true">{initials}</div>
+          <div className="hub-header__identity-text">
+            <h1 className="hub-header__title">{me?.name || t("title")}</h1>
+            <p className="hub-header__subtitle" style={{ marginTop: 4 }}>{me?.email}</p>
+            {billing && (
+              <div style={{ marginTop: 10 }}>
+                <span className={tierBadgeClass}>{tierBadgeText}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        {billing && (
+          <div className="hub-header__usage-strip">
+            <span className="hub-header__pill">
+              <strong>
+                {billing.limits.max_projects === -1 ? "∞" : billing.limits.max_projects}
+              </strong>{" "}
+              {t("hubHeader.usageProjects", { defaultValue: "projects" })}
+            </span>
+            <span className="hub-header__pill">
+              <strong>
+                {billing.limits.max_participants_per_project === -1 ? "∞" : billing.limits.max_participants_per_project}
+              </strong>{" "}
+              {t("hubHeader.usageParticipants", { defaultValue: "participants/study" })}
+            </span>
+            <span className="hub-header__pill">
+              <strong>
+                {billing.limits.team_members === -1 ? "∞" : billing.limits.team_members}
+              </strong>{" "}
+              {t("hubHeader.usageTeam", { defaultValue: "team seats" })}
+            </span>
+            <span className={`hub-header__pill ${billing.limits.ai_analysis ? "hub-header__pill--success" : ""}`}>
+              {billing.limits.ai_analysis ? "✓" : "—"} {t("hubHeader.usageAi", { defaultValue: "AI analysis" })}
+            </span>
+            <span className={`hub-header__pill ${billing.limits.export_csv ? "hub-header__pill--success" : ""}`}>
+              {billing.limits.export_csv ? "✓" : "—"} {t("hubHeader.usageExport", { defaultValue: "CSV export" })}
+            </span>
+          </div>
+        )}
+      </section>
 
       <div className="settings-tabs">
         <button className={`settings-tab ${tab === "profile" ? "active" : ""}`} onClick={() => setTab("profile")}>{t("tabs.profile")}</button>
