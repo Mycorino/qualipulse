@@ -12,15 +12,17 @@
     "duration": "Environ {{minutes}} minutes",
     "enterEmailDesc": "Entrez votre email pour recevoir un lien sécurisé afin de démarrer votre entretien. Aucun mot de passe requis.",
     "yourEmail": "Votre adresse email",
-    "sendLink": "Envoyer mon lien d'entretien",
+    "sendLink": "Envoyer mon lien",
     "sendingLink": "Envoi en cours...",
     "emailNote": "Nous vous enverrons un lien pour commencer. Votre email est utilisé pour sauvegarder votre progression et vous permettre de reprendre plus tard.",
     "sendError": "Impossible d'envoyer le lien de vérification. Veuillez réessayer.",
     "resendError": "Impossible de renvoyer le lien. Veuillez réessayer.",
     "skipEmail": "Continuer sans email →",
-    "skipSession": "Passer — terminer en une seule session",
-    "skipEmailNote": "Vous ne pourrez pas reprendre plus tard depuis un autre appareil.",
-    "trustLine": "Vos réponses sont chiffrées et stockées de manière sécurisée."
+    "skipSession": "Continuer sans email",
+    "skipEmailNote": "Vous ne pourrez pas reprendre depuis un autre appareil.",
+    "trustLine": "Vos réponses sont chiffrées et stockées de manière sécurisée.",
+    "whyEmailToggle": "Pourquoi nous demandons votre email",
+    "whyEmailBody": "Nous utilisons votre email pour vous permettre de mettre en pause et de reprendre l'entretien depuis n'importe quel appareil. Nous ne vous ajouterons à aucune liste."
   },
   "emailSent": {
     "title": "Vérifiez votre boîte de réception",
@@ -39,7 +41,7 @@
     "privacyPolicy": "Consulter notre politique de confidentialité",
     "consentLabel": "J'accepte de participer et que mes réponses soient enregistrées",
     "panelConsentLabel": "Je souhaite rejoindre le panel de recherche pour être invité·e à de futures études",
-    "accept": "J'accepte — continuer",
+    "accept": "Je suis prêt·e — commencer",
     "decline": "Refuser",
     "starting": "Démarrage en cours...",
     "declinedTitle": "Pas de problème",
@@ -77,10 +79,34 @@
     "employmentOther": "Autre",
     "jobFunctionLabel": "Fonction",
     "jobFunctionPlaceholder": "Sélectionner...",
+    "jobFunctionOptions": {
+      "engineering": "Ingénierie",
+      "product": "Produit",
+      "marketing": "Marketing",
+      "design": "Design",
+      "finance": "Finance",
+      "operations": "Opérations",
+      "hr": "RH",
+      "executive": "Direction",
+      "other": "Autre"
+    },
     "industryLabel": "Secteur d'activité",
     "industryPlaceholder": "ex. Technologie, Santé, Finance...",
     "companySizeLabel": "Taille de l'entreprise",
     "companySizeJustMe": "Juste moi",
+    "companySizeOptions": {
+      "smallTeam": "2–10",
+      "midTeam": "11–50",
+      "largeTeam": "51–200",
+      "enterprise": "200+"
+    },
+    "ageRangeOptions": {
+      "18-24": "18–24",
+      "25-34": "25–34",
+      "35-44": "35–44",
+      "45-54": "45–54",
+      "55+": "55+"
+    },
     "seniorityLabel": "Niveau d'ancienneté",
     "seniorityJunior": "Junior",
     "seniorityMid": "Intermédiaire",
@@ -94,9 +120,9 @@
     "behaviorsTab": "Comportements",
     "cityLabel": "Ville",
     "cityPlaceholder": "ex. Paris, Lyon...",
-    "continue": "Accéder à l'entretien",
+    "continue": "Continuer",
     "starting": "Démarrage en cours...",
-    "skip": "Passer",
+    "skip": "Passer ces questions",
     "sectionAboutYou": "À propos de vous",
     "sectionWorkExperience": "Expérience professionnelle",
     "sectionLocation": "Localisation",
@@ -133,16 +159,22 @@
     "progressLabel": "Question {{current}} sur {{total}}",
     "back": "Précédent",
     "next": "Suivant",
-    "submit": "Valider",
+    "submit": "Valider ma réponse",
     "checking": "Vérification en cours...",
     "submissionError": "Une erreur est survenue. Veuillez réessayer.",
+    "submissionErrorNetwork": "Impossible de joindre notre serveur — vérifiez votre connexion et réessayez.",
+    "submissionErrorServer": "Une erreur est survenue de notre côté. Veuillez réessayer — si le problème persiste, contactez votre chercheur.",
+    "submissionEscalation": "Toujours en difficulté ? Répondez à l'email qui vous a amené·e ici.",
     "retry": "Réessayer",
     "disqualified": {
       "title": "Merci pour votre temps",
       "desc": "Cette étude recherche un profil d'audience spécifique — vous ne correspondez pas au profil recherché pour <strong>{{projectName}}</strong> pour le moment.",
       "desc2": "C'est tout à fait normal. Vos réponses nous ont aidés à confirmer que nous atteignons les bons participants.",
       "emailNote": "Si d'autres études correspondant à votre profil s'ouvrent, nous pourrons vous contacter à l'adresse <strong>{{email}}</strong>.",
-      "close": "Vous pouvez fermer cette page en toute sécurité."
+      "close": "Vous pouvez fermer cette page en toute sécurité.",
+      "futureStudies": "Me parler de futures études",
+      "futureStudiesNote": "Répondez à l'email qui vous a amené·e ici et nous vous garderons en tête.",
+      "contactMistake": "Vous pensez qu'il y a une erreur ? Répondez à l'email qui vous a amené·e ici."
     }
   },
   "interview": {
@@ -166,6 +198,9 @@
       "preparing": "🔊 Préparation de la prochaine question…"
     },
     "transcript": "Nous avons entendu :",
+    "transcriptDismiss": "Fermer",
+    "transcriptReadMore": "Lire la suite",
+    "transcriptReadLess": "Réduire",
     "networkError": "Erreur réseau. Votre réponse est sauvegardée — appuyez sur Soumettre pour réessayer.",
     "ttsFailedWarning": "Impossible de lire l'audio de la question. Vous pouvez lire la question ci-dessus et enregistrer votre réponse.",
     "ttsReplay": "Réécouter",
@@ -194,6 +229,8 @@
     "panelJoined": "Vous faites désormais partie de la communauté de recherche QualiPulse",
     "panelJoinedDesc": "Nous vous proposerons de futures études pertinentes en fonction de votre profil.",
     "panelSaveError": "Votre profil de panel n'a pas pu être sauvegardé. Veuillez contacter le support si vous souhaitez rejoindre la communauté de recherche.",
+    "futureStudiesTitle": "Envie d'être invité·e à de futures études ?",
+    "futureStudiesBody": "Répondez à l'email qui vous a amené·e ici et nous vous garderons en tête.",
     "close": "Fermer"
   },
   "resume": {

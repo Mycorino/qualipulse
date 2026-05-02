@@ -14,13 +14,11 @@ import {
   skipQuestion,
   requestVerification,
   getPanelTags,
-  savePanelProfile,
   InterviewInfo,
   ScreeningQuestion,
   ResumeCheck,
   ResumeSummary,
   PanelTag,
-  PanelProfileData,
 } from "../api/interviews";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
@@ -92,7 +90,6 @@ export default function Interview() {
   // Consent
   const [consentGiven, setConsentGiven] = useState(false);
   const [consentDeclined, setConsentDeclined] = useState(false);
-  const [panelConsent, setPanelConsent] = useState(false);
 
   // Panel profile
   const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
@@ -134,7 +131,7 @@ export default function Interview() {
   const [processingStep, setProcessingStep] = useState(0);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingStartTimeRef = useRef<number | null>(null);
-  const MAX_RECORDING_SECONDS = 180;
+  const MAX_RECORDING_SECONDS = 240;
   const [micTestDone, setMicTestDone] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -145,7 +142,17 @@ export default function Interview() {
   const [micPermissionRequested, setMicPermissionRequested] = useState(false);
 
   const [ttsFailedWarning, setTtsFailedWarning] = useState(false);
-  const [panelSaveError, setPanelSaveError] = useState(false);
+
+  // Audit-fix UI state
+  const [whyEmailOpen, setWhyEmailOpen] = useState(false);
+  const [screeningErrorKind, setScreeningErrorKind] = useState<"network" | "server" | null>(null);
+  const [screeningRetryCount, setScreeningRetryCount] = useState(0);
+  const [transcriptDismissed, setTranscriptDismissed] = useState(false);
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+  const [skipBtnReady, setSkipBtnReady] = useState(false);
+  const skipBtnTimerRef = useRef<number | null>(null);
+  const beepFiredRef = useRef(false);
+  const [showFutureStudies, setShowFutureStudies] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pendingFirstTtsRef = useRef<string | null>(null);
@@ -232,6 +239,18 @@ export default function Interview() {
     return () => clearTimeout(t);
   }, [resendCountdown]);
 
+  // ── Skip-button gating: 5s grace period after each question ──────────────
+  useEffect(() => {
+    if (phase !== "interview") return;
+    setSkipBtnReady(false);
+    if (skipBtnTimerRef.current) window.clearTimeout(skipBtnTimerRef.current);
+    if (!currentQuestion) return;
+    skipBtnTimerRef.current = window.setTimeout(() => setSkipBtnReady(true), 5000);
+    return () => {
+      if (skipBtnTimerRef.current) window.clearTimeout(skipBtnTimerRef.current);
+    };
+  }, [currentQuestion, phase]);
+
   // ── Live countdown during interview ──────────────────────────────────────
 
   useEffect(() => {
@@ -293,9 +312,33 @@ export default function Interview() {
       return;
     }
     recordingStartTimeRef.current = Date.now();
+    beepFiredRef.current = false;
     const interval = setInterval(() => {
       if (!recordingStartTimeRef.current) return;
       const elapsed = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
+      const remaining = MAX_RECORDING_SECONDS - elapsed;
+      // 30s-remaining cue: beep + vibrate (respect prefers-reduced-motion for beep)
+      if (!beepFiredRef.current && remaining === 30) {
+        beepFiredRef.current = true;
+        try {
+          const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          if (!reduced) {
+            const AC = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+            const ctx = new AC();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = 440;
+            gain.gain.value = 0.05;
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.1);
+            setTimeout(() => ctx.close().catch(() => {}), 200);
+          }
+        } catch { /* no-op */ }
+        try {
+          if (typeof navigator.vibrate === "function") navigator.vibrate(200);
+        } catch { /* no-op */ }
+      }
       if (elapsed >= MAX_RECORDING_SECONDS) {
         handleStopAndPreview();
         setRecordingSeconds(MAX_RECORDING_SECONDS);
@@ -404,12 +447,7 @@ export default function Interview() {
 
   function handleConsentAccept() {
     setConsentGiven(true);
-    const panelEnabled = info?.panel_collection_enabled !== false;
-    if (panelEnabled && panelConsent) {
-      setPhase("profile");
-    } else {
-      proceedFromConsent();
-    }
+    proceedFromConsent();
   }
 
   async function proceedFromConsent() {
@@ -542,6 +580,7 @@ export default function Interview() {
     } else {
       setScreeningLoading(true);
       setScreeningError("");
+      setScreeningErrorKind(null);
       try {
         const result = await submitScreening(token!, updated);
         if (result.qualified) {
@@ -550,8 +589,21 @@ export default function Interview() {
           setDisqualifiedOn(result.disqualified_on ?? "");
           setPhase("disqualified");
         }
-      } catch {
-        setScreeningError(t("screening.submissionError"));
+      } catch (err: unknown) {
+        // Distinguish network/timeout vs server error so we can show
+        // tailored copy. Axios sets `response` only when the server
+        // actually answered.
+        const e = err as { response?: { status?: number }; message?: string };
+        const isNetwork = !e?.response || e?.message === "Network Error";
+        setScreeningErrorKind(isNetwork ? "network" : "server");
+        setScreeningError(
+          isNetwork
+            ? t("screening.submissionErrorNetwork")
+            : t("screening.submissionErrorServer"),
+        );
+        setScreeningRetryCount((c) => c + 1);
+        // Important: do NOT clear `screeningAnswers[questionId]` — keep
+        // the participant's selection so the retry is one click away.
       } finally {
         setScreeningLoading(false);
       }
@@ -591,11 +643,10 @@ export default function Interview() {
         setPhase("complete");
         if (audioRef.current) audioRef.current.pause();
         // Save panel profile if consent given
-        if (panelConsent && email && sessionToken) {
-          savePanelProfile(token!, buildPanelProfileData()).catch(() => {
-            setPanelSaveError(true);
-          });
-        }
+        // Panel-join surface was removed from consent; participants no
+        // longer opt into the panel during the interview flow. Leave the
+        // hook in place so it's a one-line restore if we add a panel
+        // surface elsewhere — but never call it without consent.
       } else if (res.question_text) {
         const nextTurn = turnCount + 1;
         setCurrentQuestion(res.question_text);
@@ -607,7 +658,8 @@ export default function Interview() {
         if (res.transcript) {
           setLastTranscript(res.transcript);
           setShowTranscript(true);
-          setTimeout(() => setShowTranscript(false), 4000);
+          setTranscriptDismissed(false);
+          setTranscriptExpanded(false);
         }
         setTtsEnded(false);
         saveSession(participantId, res.question_text, nextTurn);
@@ -638,25 +690,6 @@ export default function Interview() {
     }
   }
 
-  function buildPanelProfileData(): PanelProfileData {
-    return {
-      email,
-      session_token: sessionToken || "",
-      first_name: profile.firstName || undefined,
-      age_range: profile.ageRange || undefined,
-      gender: profile.gender || undefined,
-      country: country || profile.city || undefined,
-      city: profile.city || undefined,
-      employment_status: profile.employment || undefined,
-      job_function: profile.jobFunction || undefined,
-      seniority: profile.seniority || undefined,
-      industry: profile.industry || undefined,
-      company_size: profile.companySize || undefined,
-      panel_consent: true,
-      tag_ids: profile.selectedTagIds,
-    };
-  }
-
   function handleReRecord() {
     setPendingBlob(null);
     lastBlobRef.current = null;
@@ -673,11 +706,10 @@ export default function Interview() {
       if (res.is_complete) {
         clearSession();
         setPhase("complete");
-        if (panelConsent && email && sessionToken) {
-          savePanelProfile(token!, buildPanelProfileData()).catch(() => {
-            setPanelSaveError(true);
-          });
-        }
+        // Panel-join surface was removed from consent; participants no
+        // longer opt into the panel during the interview flow. Leave the
+        // hook in place so it's a one-line restore if we add a panel
+        // surface elsewhere — but never call it without consent.
       } else if (res.question_text) {
         const nextTurn = turnCount + 1;
         setCurrentQuestion(res.question_text);
@@ -715,10 +747,45 @@ export default function Interview() {
 
   // ── Render helpers ─────────────────────────────────────────────────────
 
-  const panelEnabled = info?.panel_collection_enabled !== false;
-
   const interestTags = panelTags.filter((t) => t.category === "interest");
   const behaviorTags = panelTags.filter((t) => t.category === "behavior");
+
+  // Conservative-but-tolerant email regex: must look like an address.
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isEmailValid = emailRegex.test(verificationEmail.trim());
+
+  // Researcher identity: prefer logo, fall back to initials avatar.
+  // Strip leading bracket-tags (e.g. "[Demo] How people…" → "How people…") and
+  // non-letter prefixes so initials reflect the actual name, not punctuation.
+  function researcherInitials(): string {
+    const source = (info?.researcher_name || info?.project_name || "")
+      .replace(/^\s*\[[^\]]*\]\s*/, "")
+      .replace(/^[^\p{L}]+/u, "");
+    return source
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w.match(/\p{L}/u)?.[0] ?? "")
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  }
+  function ResearcherIdentity() {
+    if (info?.researcher_logo_url) {
+      return (
+        <div className="landing-researcher-logo">
+          <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher"} />
+        </div>
+      );
+    }
+    const initials = researcherInitials();
+    if (!initials) return null;
+    return (
+      <div className="researcher-initials-avatar" aria-hidden="true">
+        {initials}
+      </div>
+    );
+  }
 
   // ── Loading / error states ──────────────────────────────────────────────
 
@@ -772,21 +839,17 @@ export default function Interview() {
   if (phase === "email_entry") {
     return (
       <div className="interview-page">
-        <div className="interview-container" style={{ maxWidth: 680 }}>
+        <div className="interview-container" style={{ maxWidth: "var(--participant-card-max-w)" }}>
         <div style={{
           background: "#fff",
           borderRadius: "var(--radius-lg)",
           padding: "48px 36px",
           boxShadow: "var(--shadow-md)",
-          maxWidth: "680px",
+          maxWidth: "var(--participant-card-max-w)",
           width: "100%",
           margin: "0 auto",
         }}>
-          {info?.researcher_logo_url && (
-            <div className="landing-researcher-logo">
-              <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher"} />
-            </div>
-          )}
+          <ResearcherIdentity />
           <h1 className="interview-project-name" style={{ marginBottom: 8, textAlign: "center" }}>{info?.project_name}</h1>
           {info?.researcher_name && (
             <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24, textAlign: "center" }} dangerouslySetInnerHTML={{ __html: t("emailEntry.studyBy", { name: info.researcher_name }) }} />
@@ -816,14 +879,34 @@ export default function Interview() {
             <button
               className="btn btn-primary btn-lg"
               onClick={handleSendVerification}
-              disabled={sendingVerification || !verificationEmail.trim()}
-              style={{ width: "100%", marginTop: 8, minHeight: 44 }}
+              disabled={sendingVerification || !isEmailValid}
+              style={{
+                width: "100%",
+                marginTop: 8,
+                minHeight: 44,
+                opacity: !isEmailValid ? 0.55 : 1,
+              }}
             >
               {sendingVerification ? t("emailEntry.sendingLink") : t("emailEntry.sendLink")}
             </button>
             <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5 }}>
               {t("emailEntry.emailNote")}
             </p>
+
+            {/* "Why we ask for your email" expander — addresses the trust ask */}
+            <div className="why-email-expander">
+              <button
+                type="button"
+                className="why-email-toggle"
+                aria-expanded={whyEmailOpen}
+                onClick={() => setWhyEmailOpen((v) => !v)}
+              >
+                {whyEmailOpen ? "▾" : "▸"} {t("emailEntry.whyEmailToggle")}
+              </button>
+              {whyEmailOpen && (
+                <p className="why-email-body">{t("emailEntry.whyEmailBody")}</p>
+              )}
+            </div>
           </div>
 
           {/* Trust signal */}
@@ -907,12 +990,11 @@ export default function Interview() {
   if (phase === "consent" && info) {
     return (
       <div className="interview-page">
-        <div className="interview-container consent-card">
-          {info.researcher_logo_url && (
-            <div className="consent-researcher-logo">
-              <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher logo"} />
-            </div>
-          )}
+        <div
+          className="interview-container consent-card"
+          style={{ maxWidth: "var(--participant-card-max-w)" }}
+        >
+          <ResearcherIdentity />
           {info.researcher_name && (
             <p className="consent-researcher-name">{info.researcher_name}</p>
           )}
@@ -948,42 +1030,10 @@ export default function Interview() {
             )}
           </div>
 
-          {panelEnabled && (
-            <div
-              style={{
-                borderTop: "1px solid var(--border, #e2e8f0)",
-                marginTop: 20,
-                paddingTop: 20,
-              }}
-            >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 12,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={panelConsent}
-                  onChange={(e) => setPanelConsent(e.target.checked)}
-                  style={{ marginTop: 3, flexShrink: 0 }}
-                />
-                <div>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>
-                    {t("consent.panelJoinTitle")}
-                  </span>
-                  <span style={{ color: "var(--text-secondary, #6b7280)", fontSize: 13 }}>
-                    {" "}— {t("consent.panelJoinDesc")}
-                  </span>
-                  <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 12, margin: "4px 0 0" }}>
-                    {t("consent.panelJoinNote")}
-                  </p>
-                </div>
-              </label>
-            </div>
-          )}
+          {/* Panel-join surface intentionally not shown on consent.
+              The completion screen carries the panel CTA — keeping
+              consent purely about agreement to participate reduces
+              cognitive load and keeps the screen high-trust. */}
 
           {starting && <p className="muted-text" style={{ marginTop: 12 }}>{t("consent.starting")}</p>}
           {error && <div className="error-banner" role="alert">{error}</div>}
@@ -1047,13 +1097,13 @@ export default function Interview() {
           <div className="interview-name-field">
             <label className="field-label">{t("profile.ageRangeLabel")}</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-              {["18-24", "25-34", "35-44", "45-54", "55+"].map((opt) => (
+              {(["18-24", "25-34", "35-44", "45-54", "55+"] as const).map((opt) => (
                 <button
                   key={opt}
                   className={`profiling-option-btn${profile.ageRange === opt ? " selected" : ""}`}
                   onClick={() => setProfile((p) => ({ ...p, ageRange: p.ageRange === opt ? "" : opt }))}
                 >
-                  {opt}
+                  {t(`profile.ageRangeOptions.${opt}`)}
                 </button>
               ))}
             </div>
@@ -1118,8 +1168,8 @@ export default function Interview() {
               onChange={(e) => setProfile((p) => ({ ...p, jobFunction: e.target.value }))}
             >
               <option value="">{t("profile.jobFunctionPlaceholder")}</option>
-              {["Engineering", "Product", "Marketing", "Design", "Finance", "Operations", "HR", "Executive", "Other"].map((f) => (
-                <option key={f} value={f.toLowerCase()}>{f}</option>
+              {(["engineering", "product", "marketing", "design", "finance", "operations", "hr", "executive", "other"] as const).map((value) => (
+                <option key={value} value={value}>{t(`profile.jobFunctionOptions.${value}`)}</option>
               ))}
             </select>
           </div>
@@ -1143,10 +1193,10 @@ export default function Interview() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
               {[
                 { value: "1", label: t("profile.companySizeJustMe") },
-                { value: "2-10", label: "2–10" },
-                { value: "11-50", label: "11–50" },
-                { value: "51-200", label: "51–200" },
-                { value: "201+", label: "200+" },
+                { value: "2-10", label: t("profile.companySizeOptions.smallTeam") },
+                { value: "11-50", label: t("profile.companySizeOptions.midTeam") },
+                { value: "51-200", label: t("profile.companySizeOptions.largeTeam") },
+                { value: "201+", label: t("profile.companySizeOptions.enterprise") },
               ].map(({ value, label }) => (
                 <button
                   key={value}
@@ -1350,29 +1400,42 @@ export default function Interview() {
             <p className="profiling-step-label">{t("screening.progressLabel", { current: screeningStep + 1, total: screeningQuestions.length })}</p>
           </div>
           <div className="profiling-question">
-            <h2 className="profiling-label">{sq.question}</h2>
+            <h2 className="profiling-label" aria-live="polite">{sq.question}</h2>
             <div className="profiling-options">
-              {sq.options.map((opt) => (
-                <button
-                  key={opt}
-                  className="profiling-option-btn"
-                  onClick={() => !screeningLoading && handleScreeningAnswer(sq.id, opt)}
-                  disabled={screeningLoading}
-                >
-                  {screeningLoading && screeningAnswers[sq.id] === opt ? t("screening.checking") : opt}
-                </button>
-              ))}
+              {sq.options.map((opt) => {
+                const isSelected = screeningAnswers[sq.id] === opt;
+                return (
+                  <button
+                    key={opt}
+                    className={`profiling-option-btn${isSelected ? " selected" : ""}`}
+                    onClick={() => !screeningLoading && handleScreeningAnswer(sq.id, opt)}
+                    disabled={screeningLoading}
+                  >
+                    {screeningLoading && isSelected ? t("screening.checking") : opt}
+                  </button>
+                );
+              })}
             </div>
           </div>
           {screeningError && (
-            <div className="error-banner" role="alert" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <span>{screeningError}</span>
+            <div className="screening-error-card" role="alert">
+              <p className="screening-error-card__title">
+                {screeningErrorKind === "network"
+                  ? t("screening.submissionErrorNetwork")
+                  : t("screening.submissionErrorServer")}
+              </p>
+              {screeningRetryCount >= 2 && (
+                <p className="screening-error-card__escalate">
+                  {t("screening.submissionEscalation")}
+                </p>
+              )}
               <button
-                className="btn btn-ghost btn-sm"
-                style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+                className="btn btn-primary screening-error-card__retry"
                 onClick={() => {
                   setScreeningError("");
-                  handleScreeningAnswer(sq.id, screeningAnswers[sq.id]);
+                  setScreeningErrorKind(null);
+                  const last = screeningAnswers[sq.id];
+                  if (last) handleScreeningAnswer(sq.id, last);
                 }}
               >
                 {t("screening.retry")}
@@ -1408,6 +1471,24 @@ export default function Interview() {
           {email && (
             <p className="disqualified-email-note" dangerouslySetInnerHTML={{ __html: t("screening.disqualified.emailNote", { email }) }} />
           )}
+
+          <button
+            type="button"
+            className="disqualified-future-toggle"
+            aria-expanded={showFutureStudies}
+            onClick={() => setShowFutureStudies((v) => !v)}
+          >
+            {t("screening.disqualified.futureStudies")}
+          </button>
+          {showFutureStudies && (
+            <p className="disqualified-future-note">
+              {t("screening.disqualified.futureStudiesNote")}
+            </p>
+          )}
+
+          <p className="disqualified-mistake">
+            {t("screening.disqualified.contactMistake")}
+          </p>
           <p className="muted-text" style={{ marginTop: 24 }}>{t("screening.disqualified.close")}</p>
         </div>
       </div>
@@ -1564,7 +1645,11 @@ export default function Interview() {
             </div>
           </div>
 
-          <div className="interview-question-area">
+          <div
+            className="interview-question-area"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {!currentQuestion ? (
               <div style={{ textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>
                 <div className="spinner" style={{ margin: "0 auto 12px" }} />
@@ -1642,12 +1727,36 @@ export default function Interview() {
             <div className="error-banner" role="alert">{recError}</div>
           ) : null}
 
-          {showTranscript && lastTranscript && (
-            <div className="transcript-flash">
-              <span className="transcript-flash-label">{t("interview.transcript")}</span>
-              <span className="transcript-flash-text">"{lastTranscript}"</span>
-            </div>
-          )}
+          {showTranscript && !transcriptDismissed && lastTranscript && (() => {
+            const TRUNCATE = 200;
+            const isLong = lastTranscript.length > TRUNCATE;
+            const display = isLong && !transcriptExpanded
+              ? lastTranscript.slice(0, TRUNCATE).trimEnd() + "…"
+              : lastTranscript;
+            return (
+              <div className="transcript-flash">
+                <span className="transcript-flash-label">{t("interview.transcript")}</span>
+                <span className="transcript-flash-text">"{display}"</span>
+                {isLong && (
+                  <button
+                    type="button"
+                    className="transcript-flash__readmore"
+                    onClick={() => setTranscriptExpanded((v) => !v)}
+                  >
+                    {transcriptExpanded ? t("interview.transcriptReadLess") : t("interview.transcriptReadMore")}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="transcript-flash__close"
+                  aria-label={t("interview.transcriptDismiss")}
+                  onClick={() => setTranscriptDismissed(true)}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })()}
 
           <div className="interview-controls">
             {processing ? (
@@ -1678,12 +1787,33 @@ export default function Interview() {
                   <div className="record-btn-inner recording-pulse" />
                 </button>
                 <p className="record-label">{t("interview.tapToStop")}</p>
-                {recordingSeconds > 0 && (
-                  <p className={`recording-timer ${recordingSeconds >= MAX_RECORDING_SECONDS - 30 ? "recording-timer--warning" : ""}`}>
-                    {Math.floor((MAX_RECORDING_SECONDS - recordingSeconds) / 60)}:
-                    {String((MAX_RECORDING_SECONDS - recordingSeconds) % 60).padStart(2, "0")} {t("interview.remaining")}
-                  </p>
-                )}
+                {recordingSeconds > 0 && (() => {
+                  const isWarning = recordingSeconds >= MAX_RECORDING_SECONDS - 30;
+                  return (
+                    <p className={`recording-timer ${isWarning ? "recording-timer--warning" : ""}`}>
+                      {isWarning && (
+                        <svg
+                          className="recording-timer__glyph"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <circle cx="12" cy="13" r="8" />
+                          <path d="M12 9v4l2 2" />
+                          <path d="M9 2h6" />
+                        </svg>
+                      )}
+                      {Math.floor((MAX_RECORDING_SECONDS - recordingSeconds) / 60)}:
+                      {String((MAX_RECORDING_SECONDS - recordingSeconds) % 60).padStart(2, "0")} {t("interview.remaining")}
+                    </p>
+                  );
+                })()}
               </>
             ) : (
               <>
@@ -1721,7 +1851,13 @@ export default function Interview() {
           </div>
 
           {!processing && !isRecording && !pendingBlob && (
-            <button className="skip-question-btn" onClick={handleSkip} aria-label={t("interview.skipQuestion")}>
+            <button
+              className={`skip-question-btn skip-question-btn--fade${skipBtnReady ? " skip-question-btn--visible" : ""}`}
+              onClick={handleSkip}
+              aria-label={t("interview.skipQuestion")}
+              aria-hidden={!skipBtnReady}
+              tabIndex={skipBtnReady ? 0 : -1}
+            >
               {t("interview.skipQuestion")}
             </button>
           )}
@@ -1753,42 +1889,6 @@ export default function Interview() {
           </p>
         )}
 
-        {panelConsent && (
-          <div
-            style={{
-              background: "linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%)",
-              borderRadius: 12,
-              padding: "20px 24px",
-              margin: "24px 0",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: 28, marginBottom: 8 }}><span aria-hidden="true">🎉</span></div>
-            <p style={{ fontWeight: 700, color: "#4f46e5", marginBottom: 4 }}>
-              {t("completion.panelJoined")}
-            </p>
-            <p style={{ color: "#6b7280", fontSize: 13 }}>
-              {t("completion.panelJoinedDesc")}
-            </p>
-          </div>
-        )}
-
-        {/* Fix 3: Panel profile save failure warning */}
-        {panelSaveError && (
-          <div style={{
-            background: "#fef3c7",
-            color: "#92400e",
-            border: "1px solid #fcd34d",
-            borderRadius: 8,
-            padding: "12px 16px",
-            margin: "0 0 16px",
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}>
-            {t("completion.panelSaveError")}
-          </div>
-        )}
-
         <div className="interview-complete-next">
           <p className="interview-complete-next-label">{t("completion.whatNext")}</p>
           {[t("completion.nextStep1"), t("completion.nextStep2"), t("completion.nextStep3")].some(Boolean) ? (
@@ -1802,6 +1902,22 @@ export default function Interview() {
               {t("completion.nextStepFallback")}
             </p>
           )}
+        </div>
+
+        {/* Future-studies opt-in — zero-backend, mirrors the disqualified-flow pattern */}
+        <div className="interview-complete-future" style={{
+          marginTop: 16,
+          padding: 12,
+          background: "var(--bg-sunken)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "var(--radius)",
+          textAlign: "center",
+          fontSize: "0.95rem",
+          color: "var(--text-secondary)",
+          lineHeight: 1.5,
+        }}>
+          <strong style={{ color: "var(--text-primary)" }}>{t("completion.futureStudiesTitle")}</strong>{" "}
+          {t("completion.futureStudiesBody")}
         </div>
 
         {/* Privacy / data-rights footer — GDPR transparency for participants */}

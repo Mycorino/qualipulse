@@ -12,15 +12,17 @@
     "duration": "Approximately {{minutes}} minutes",
     "enterEmailDesc": "Enter your email to receive a secure link to start your interview. No password needed.",
     "yourEmail": "Your email address",
-    "sendLink": "Send my interview link",
+    "sendLink": "Send my link",
     "sendingLink": "Sending...",
     "emailNote": "We'll send you a link to start. Your email is used to save progress and let you resume later.",
     "sendError": "Failed to send verification link. Please try again.",
     "resendError": "Failed to resend. Please try again.",
     "skipEmail": "Continue without email →",
-    "skipSession": "Skip — complete in one session",
-    "skipEmailNote": "You won't be able to resume later from a different device.",
-    "trustLine": "Your responses are encrypted and stored securely."
+    "skipSession": "Continue without email",
+    "skipEmailNote": "You won't be able to resume on a different device.",
+    "trustLine": "Your responses are encrypted and stored securely.",
+    "whyEmailToggle": "Why we ask for your email",
+    "whyEmailBody": "We use your email so you can pause and resume the interview from any device. We won't add you to any list."
   },
   "emailSent": {
     "title": "Check your inbox",
@@ -39,7 +41,7 @@
     "privacyPolicy": "Read our privacy policy",
     "consentLabel": "I agree to participate and have my responses recorded",
     "panelConsentLabel": "I'd like to join the research panel to be invited to future studies",
-    "accept": "I agree — continue",
+    "accept": "I'm ready — start",
     "decline": "Decline",
     "starting": "Starting...",
     "declinedTitle": "No problem",
@@ -77,10 +79,34 @@
     "employmentOther": "Other",
     "jobFunctionLabel": "Job function",
     "jobFunctionPlaceholder": "Select...",
+    "jobFunctionOptions": {
+      "engineering": "Engineering",
+      "product": "Product",
+      "marketing": "Marketing",
+      "design": "Design",
+      "finance": "Finance",
+      "operations": "Operations",
+      "hr": "HR",
+      "executive": "Executive",
+      "other": "Other"
+    },
     "industryLabel": "Industry",
     "industryPlaceholder": "e.g. Technology, Healthcare, Finance...",
     "companySizeLabel": "Company size",
     "companySizeJustMe": "Just me",
+    "companySizeOptions": {
+      "smallTeam": "2–10",
+      "midTeam": "11–50",
+      "largeTeam": "51–200",
+      "enterprise": "200+"
+    },
+    "ageRangeOptions": {
+      "18-24": "18–24",
+      "25-34": "25–34",
+      "35-44": "35–44",
+      "45-54": "45–54",
+      "55+": "55+"
+    },
     "seniorityLabel": "Seniority",
     "seniorityJunior": "Junior",
     "seniorityMid": "Mid",
@@ -94,9 +120,9 @@
     "behaviorsTab": "Behaviors",
     "cityLabel": "City",
     "cityPlaceholder": "e.g. London, New York...",
-    "continue": "Continue to interview",
+    "continue": "Continue",
     "starting": "Starting...",
-    "skip": "Skip",
+    "skip": "Skip these questions",
     "sectionAboutYou": "About You",
     "sectionWorkExperience": "Work Experience",
     "sectionLocation": "Location",
@@ -133,16 +159,22 @@
     "progressLabel": "Question {{current}} of {{total}}",
     "back": "Back",
     "next": "Next",
-    "submit": "Submit",
+    "submit": "Submit my answer",
     "checking": "Checking...",
     "submissionError": "Something went wrong. Please try again.",
+    "submissionErrorNetwork": "We couldn't reach our server — please check your connection and try again.",
+    "submissionErrorServer": "Something went wrong on our end. Please try again — if this keeps happening, reach out to your researcher.",
+    "submissionEscalation": "Still having trouble? Reply to the email that brought you here.",
     "retry": "Try again",
     "disqualified": {
       "title": "Thank you for your time",
       "desc": "This particular study is looking for a specific audience profile — you're not the right fit for <strong>{{projectName}}</strong> right now.",
       "desc2": "That's completely okay. Your answers helped us confirm we're reaching the right participants.",
       "emailNote": "If other studies open up that match your profile, we may reach out to <strong>{{email}}</strong>.",
-      "close": "You can safely close this page."
+      "close": "You can safely close this page.",
+      "futureStudies": "Tell me about future studies",
+      "futureStudiesNote": "Reply to the email that brought you here and we'll keep you in mind.",
+      "contactMistake": "Think this is a mistake? Reply to the email that brought you here."
     }
   },
   "interview": {
@@ -166,6 +198,9 @@
       "preparing": "🔊 Preparing next question…"
     },
     "transcript": "We heard:",
+    "transcriptDismiss": "Dismiss",
+    "transcriptReadMore": "Read more",
+    "transcriptReadLess": "Read less",
     "networkError": "Network error. Your answer is saved — tap Submit to retry.",
     "ttsFailedWarning": "Could not play the question audio. You can read the question above and record your answer.",
     "ttsReplay": "Replay",
@@ -194,6 +229,8 @@
     "panelJoined": "You're now part of the QualiPulse Research Community",
     "panelJoinedDesc": "We'll match you with relevant future studies based on your profile.",
     "panelSaveError": "Your panel profile could not be saved. Please contact support if you'd like to join the research community.",
+    "futureStudiesTitle": "Want to be invited to future studies?",
+    "futureStudiesBody": "Reply to the email that brought you here and we'll keep you in mind.",
     "close": "Close"
   },
   "resume": {
