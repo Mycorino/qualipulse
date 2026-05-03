@@ -668,11 +668,14 @@ def start_interview(participant_id: str, db: Session) -> dict:
 
 
 def process_interview_turn(
-    participant_id: str, audio_path: str, db: Session
+    participant_id: str, audio_path: str, audio_url: str, db: Session
 ) -> dict:
     """Process a participant's audio response and generate the next question.
 
     Orchestrates: transcribe -> save transcript -> get context -> Claude decision -> TTS
+
+    audio_path is the storage key (for STT download); audio_url is the public
+    playback URL persisted on the turn so researchers can replay the recording.
 
     Returns dict with: question_text, tts_audio_url, is_complete
     """
@@ -700,7 +703,7 @@ def process_interview_turn(
     if turns:
         last_turn = turns[-1]
         last_turn.response_transcript = transcript
-        last_turn.audio_recording_url = audio_path  # key; resolved to URL via storage layer
+        last_turn.audio_recording_url = audio_url
         db.commit()
 
     # 3. Get context for Claude
