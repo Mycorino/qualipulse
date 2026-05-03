@@ -51,6 +51,7 @@ def create_project(
         decision_to_inform=body.decision_to_inform or None,
         target_customer_description=body.target_customer_description or None,
         panel_collection_enabled=body.panel_collection_enabled,
+        warmup_enabled=body.warmup_enabled,
     )
     db.add(project)
     db.flush()
@@ -266,6 +267,7 @@ def update_project(
     project.decision_to_inform = body.decision_to_inform or None
     project.target_customer_description = body.target_customer_description or None
     project.panel_collection_enabled = body.panel_collection_enabled
+    project.warmup_enabled = body.warmup_enabled
     if body.system_prompt is not None:
         project.system_prompt = body.system_prompt
 
@@ -314,6 +316,8 @@ def patch_project_settings(
     project = _get_project_or_404(project_id, company.id, db)
     if body.panel_collection_enabled is not None:
         project.panel_collection_enabled = body.panel_collection_enabled
+    if body.warmup_enabled is not None:
+        project.warmup_enabled = body.warmup_enabled
     db.commit()
     db.refresh(project)
     return _project_to_response(project)
@@ -471,6 +475,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
         research_objective=project.research_objective,
         welcome_message=project.welcome_message,
         panel_collection_enabled=getattr(project, "panel_collection_enabled", True),
+        warmup_enabled=getattr(project, "warmup_enabled", True),
         decision_to_inform=getattr(project, "decision_to_inform", None),
         target_customer_description=getattr(project, "target_customer_description", None),
         is_demo=getattr(project, "is_demo", False),

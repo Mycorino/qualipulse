@@ -30,6 +30,8 @@ export interface StartInterviewResponse {
   participant_id: string;
   first_question: string;
   tts_audio_url?: string;
+  /** True when the engine is opening with a warm-up turn (PF-3). */
+  is_warmup?: boolean;
 }
 
 export interface SubmitAudioResponse {
@@ -41,6 +43,12 @@ export interface SubmitAudioResponse {
   elapsed_seconds?: number;
   total_seconds?: number;
   transcript?: string;
+  /**
+   * PF-3: gentle in-flight tip when the participant's last answers
+   * trended short. Null when no nudge is warranted. Frontend renders
+   * as a soft, dismissable inline banner above the record button.
+   */
+  coaching_hint?: string | null;
 }
 
 export interface ResumeCheck {

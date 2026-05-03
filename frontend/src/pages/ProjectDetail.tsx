@@ -53,7 +53,7 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript, translateTranscript } from "../api/projects";
+import { getTranscript, translateTranscript, patchProjectSettings } from "../api/projects";
 
 type Tab = "overview" | "setup" | "responses" | "analysis";
 
@@ -1586,6 +1586,50 @@ export default function ProjectDetail() {
                 </div>
               );
             })()}
+
+            {/* PF-3: Conversation style — per-project toggles for the AI moderator's
+                opening behaviour. Currently just the warm-up; future flags
+                (live-coaching tips, short-answer adaptation, etc.) slot in here. */}
+            <section className="detail-section">
+              <div className="section-header-row">
+                <div>
+                  <h2>{tProject("setup.conversationStyleTitle", { defaultValue: "Conversation style" })}</h2>
+                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>
+                    {tProject("setup.conversationStyleSubtitle", { defaultValue: "How the AI moderator opens and paces the interview." })}
+                  </p>
+                </div>
+              </div>
+              <label className="setting-toggle-row" htmlFor="warmup-toggle">
+                <input
+                  id="warmup-toggle"
+                  type="checkbox"
+                  checked={project.warmup_enabled !== false}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    try {
+                      const updated = await patchProjectSettings(project.id, { warmup_enabled: next });
+                      setProject(updated);
+                      toast(
+                        tProject(next ? "setup.warmupOnSaved" : "setup.warmupOffSaved", {
+                          defaultValue: next ? "Warm-up enabled" : "Warm-up disabled",
+                        }),
+                        "success"
+                      );
+                    } catch {
+                      toast(tProject("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
+                    }
+                  }}
+                />
+                <div className="setting-toggle-row__copy">
+                  <strong>{tProject("setup.warmupLabel", { defaultValue: "Open with a warm-up question" })}</strong>
+                  <span className="muted-text" style={{ fontSize: 12 }}>
+                    {tProject("setup.warmupHelp", {
+                      defaultValue: "A low-stakes icebreaker before the real research questions. Recommended.",
+                    })}
+                  </span>
+                </div>
+              </label>
+            </section>
 
             {/* Screening Questions */}
             <section className="detail-section">

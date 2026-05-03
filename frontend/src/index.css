@@ -4267,6 +4267,42 @@ select.field-input {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* PF-3: gentle in-flight coaching hint when answers go short. Soft brand-
+   tinted card, dismissable, never blocks the recording controls. */
+.coaching-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--brand-50, rgba(99, 102, 241, 0.08));
+  border: 1px solid var(--brand-200, rgba(99, 102, 241, 0.18));
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  animation: fadeInUp 0.3s ease;
+  width: 100%;
+  max-width: 560px;
+}
+.coaching-hint__icon { font-size: 16px; line-height: 1.4; flex-shrink: 0; }
+.coaching-hint__text { flex: 1; }
+.coaching-hint__close {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.12s;
+}
+.coaching-hint__close:hover { color: var(--text-primary); }
+@media (prefers-reduced-motion: reduce) {
+  .coaching-hint { animation: none; }
+}
+
 /* ── Complete screen ─────────────────────────────────────────────────────── */
 .interview-complete-meta {
   font-size: 14px;
@@ -5619,6 +5655,29 @@ select.field-input {
   line-height: 1.5;
 }
 .setup-live-warning__icon { font-size: 16px; line-height: 1; flex-shrink: 0; }
+
+/* PF-3: project-level setting toggle row (warm-up, etc.) */
+.setting-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  margin-top: var(--space-2);
+}
+.setting-toggle-row:hover { border-color: var(--border-default); }
+.setting-toggle-row input[type=checkbox] {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--brand-500);
+}
+.setting-toggle-row__copy { display: flex; flex-direction: column; gap: 2px; }
+.setting-toggle-row__copy strong { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 
 /* Onboarding hand-off hint card */
 .handoff-hint {

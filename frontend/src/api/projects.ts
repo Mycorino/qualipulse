@@ -62,6 +62,8 @@ export interface ProjectResponse {
   target_customer_description?: string | null;
   welcome_message?: string;
   panel_collection_enabled?: boolean;
+  /** PF-3: when true (default), engine opens with a warm-up turn before the first guide question. */
+  warmup_enabled?: boolean;
   is_demo?: boolean;
   created_at: string;
   questions: QuestionResponse[];
@@ -288,7 +290,7 @@ export async function updateProject(id: string, body: ProjectCreate): Promise<Pr
 
 export async function patchProjectSettings(
   id: string,
-  settings: { panel_collection_enabled?: boolean }
+  settings: { panel_collection_enabled?: boolean; warmup_enabled?: boolean }
 ): Promise<ProjectResponse> {
   const { data } = await client.patch<ProjectResponse>(`/projects/${id}/settings`, settings);
   return data;

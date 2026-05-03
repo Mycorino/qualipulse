@@ -109,6 +109,11 @@ export default function Interview() {
   const [turnCount, setTurnCount] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isFollowUp, setIsFollowUp] = useState(false);
+  // PF-3: live coaching tip surfaced when the engine detects a short-answer
+  // run. Persists between turns until the user dismisses or the engine clears
+  // it because the participant elaborated again.
+  const [coachingHint, setCoachingHint] = useState<string | null>(null);
+  const [coachingHintDismissed, setCoachingHintDismissed] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [resumeCheck, setResumeCheck] = useState<ResumeCheck | null>(null);
@@ -698,6 +703,15 @@ export default function Interview() {
           setShowTranscript(true);
           setTranscriptDismissed(false);
           setTranscriptExpanded(false);
+        }
+        // PF-3: surface the engine's coaching hint (or clear it if Claude
+        // decided the participant is back on track). Stays dismissed if the
+        // user explicitly closed the previous one for this turn.
+        if (res.coaching_hint) {
+          setCoachingHint(res.coaching_hint);
+          setCoachingHintDismissed(false);
+        } else {
+          setCoachingHint(null);
         }
         setTtsEnded(false);
         saveSession(participantId, res.question_text, nextTurn);
@@ -1520,6 +1534,21 @@ export default function Interview() {
           ) : recError ? (
             <div className="error-banner" role="alert">{recError}</div>
           ) : null}
+
+          {coachingHint && !coachingHintDismissed && (
+            <div className="coaching-hint" role="status" aria-live="polite">
+              <span className="coaching-hint__icon" aria-hidden="true">💡</span>
+              <span className="coaching-hint__text">{coachingHint}</span>
+              <button
+                type="button"
+                className="coaching-hint__close"
+                aria-label={t("interview.transcriptDismiss")}
+                onClick={() => setCoachingHintDismissed(true)}
+              >
+                ×
+              </button>
+            </div>
+          )}
 
           {showTranscript && !transcriptDismissed && lastTranscript && (() => {
             const TRUNCATE = 200;
