@@ -1107,6 +1107,78 @@ export default function Interview() {
     );
   }
 
+  // ── Resume confirm ───────────────────────────────────────────────────────
+  // Shown when checkResume returned an in-progress participant (cross-device
+  // resume via email). Restored after PR #71 accidentally removed it; without
+  // this block, proceedFromConsent would set resumeCheck state but render
+  // nothing, leaving the user stuck on the consent screen.
+
+  if (resumeCheck?.found && resumeCheck.participant_id) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container resume-confirm-card">
+          <h1 className="consent-title">{t("resume.title")}</h1>
+          <p className="resume-confirm-subtitle" dangerouslySetInnerHTML={{ __html: t("resume.desc", { projectName: info?.project_name ?? "" }) }} />
+          {loadingResumeSummary ? (
+            <p className="muted-text">{t("resume.loadingProgress")}</p>
+          ) : resumeSummary && resumeSummary.questions_covered.length > 0 ? (
+            <div className="resume-summary-panel">
+              <p className="resume-summary-label">{t("resume.coveredTopics")}</p>
+              <ul className="resume-summary-list">
+                {resumeSummary.questions_covered.map((q, i) => (
+                  <li key={i} className="resume-summary-item">
+                    <span className="resume-summary-check">✓</span>
+                    <span>{q}</span>
+                  </li>
+                ))}
+              </ul>
+              {resumeSummary.elapsed_minutes > 0 && (
+                <p className="muted-text" style={{ marginTop: 8, fontSize: 13 }}>
+                  {info?.interview_duration_minutes
+                    ? t("resume.elapsedOf", { elapsed: Math.round(resumeSummary.elapsed_minutes), total: info.interview_duration_minutes })
+                    : t("resume.elapsed", { minutes: Math.round(resumeSummary.elapsed_minutes) })}
+                </p>
+              )}
+            </div>
+          ) : null}
+          {resumeCheck.last_question && (
+            <div className="resume-last-question">
+              <p className="resume-last-label">{t("resume.lastQuestion")}</p>
+              <p className="resume-last-text">"{resumeCheck.last_question}"</p>
+            </div>
+          )}
+          <div className="consent-actions">
+            <button className="btn btn-primary" onClick={handleConfirmResume}>
+              {t("resume.resume")} →
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={async () => {
+                setResumeCheck(null);
+                setResumeSummary(null);
+                try {
+                  const questions = await getScreeningQuestions(token!);
+                  if (questions.length > 0) {
+                    setScreeningQuestions(questions);
+                    setScreeningStep(0);
+                    setScreeningAnswers({});
+                    setPhase("screening");
+                  } else {
+                    await doStartInterview();
+                  }
+                } catch {
+                  setError(t("consent.startError"));
+                }
+              }}
+            >
+              {t("resume.startOver")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Profile collection phase ──────────────────────────────────────────────
   // Minimal "what's your first name?" capture. Heavier demographics + interest
   // tagging happen in the post-completion panel funnel (PF-4), not here —
