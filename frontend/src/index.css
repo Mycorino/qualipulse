@@ -3988,14 +3988,19 @@ select.field-input {
   display: inline-flex;
   align-items: center;
   padding: 8px 16px;
-  border-radius: 100px;
+  border-radius: 18px;
   border: 1.5px solid var(--border);
   background: var(--bg-surface);
   font-size: 13px;
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.15s ease;
-  white-space: nowrap;
+  text-align: left;
+  line-height: 1.35;
+  max-width: 100%;
+}
+@media (min-width: 769px) {
+  .use-case-chip { white-space: nowrap; border-radius: 100px; }
 }
 
 .use-case-chip:hover {

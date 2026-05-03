@@ -160,9 +160,20 @@ export default function CreateProjectWizard() {
 
   const carouselText = carouselMessages.current[carouselIdx] || loadingMsg;
 
-  // Auto-save draft (only in create mode)
+  // Auto-save draft (only in create mode). Skip when all fields are at their
+  // initial empty state — otherwise the state-reset inside "Supprimer le
+  // brouillon" re-creates the draft immediately via this effect.
   useEffect(() => {
     if (isEditMode) return;
+    const isEmpty =
+      !name && !context && !briefSummary && !objective &&
+      !rationale && !decisionToInform && !targetCustomerDescription &&
+      !audience && questions.length === 0 && screeningQuestions.length === 0 &&
+      learningGoals.every((g: string) => !g);
+    if (isEmpty) {
+      localStorage.removeItem(DRAFT_KEY);
+      return;
+    }
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       step, name, context, briefSummary,
       objective, learningGoals, studyType, rationale,

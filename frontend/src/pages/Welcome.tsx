@@ -401,6 +401,20 @@ export default function Welcome() {
       return;
     }
 
+    // Flush any pending custom use-case input the user typed but didn't
+    // explicitly add — otherwise their own research question is silently
+    // dropped and the personalised brief reflects only the suggestions.
+    const pendingCustom = newUseCaseInput.trim();
+    const augmentedUseCases =
+      pendingCustom && !useCases.includes(pendingCustom)
+        ? [...useCases, pendingCustom]
+        : useCases;
+    if (pendingCustom && augmentedUseCases !== useCases) {
+      setUseCases(augmentedUseCases);
+      setNewUseCaseInput("");
+    }
+    const finalActiveUseCases = augmentedUseCases.filter((uc) => !deselectedUseCases.has(uc));
+
     setSaving(true);
     setError("");
     try {
@@ -409,7 +423,7 @@ export default function Welcome() {
         business_summary: businessSummary.trim() || undefined,
         industry: industry || undefined,
         primary_region: primaryRegion || undefined,
-        selected_use_cases: activeUseCases.length > 0 ? activeUseCases.join(",") : undefined,
+        selected_use_cases: finalActiveUseCases.length > 0 ? finalActiveUseCases.join(",") : undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
       setStep(4);
