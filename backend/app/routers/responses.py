@@ -55,6 +55,9 @@ def update_turn_transcript(
     turn.response_transcript = body.response_transcript
     turn.manually_edited = True
     turn.edited_at = datetime.utcnow()
+    # Edit invalidates segment offsets; nulling out is better than wrong
+    # highlighting. Audio file is untouched.
+    turn.response_segments = None
     db.commit()
     db.refresh(turn)
 
