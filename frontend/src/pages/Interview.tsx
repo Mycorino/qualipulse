@@ -142,6 +142,11 @@ export default function Interview() {
   const [micPermissionRequested, setMicPermissionRequested] = useState(false);
 
   const [ttsFailedWarning, setTtsFailedWarning] = useState(false);
+  // Has any audio successfully played in this session? Until then, an
+  // onerror/play-rejection is almost always a transient autoplay-policy
+  // glitch on the very first <audio> element rather than a real failure
+  // — we suppress the warning until we've heard at least one full clip.
+  const hasEverPlayedRef = useRef(false);
 
   // Audit-fix UI state
   const [whyEmailOpen, setWhyEmailOpen] = useState(false);
@@ -286,17 +291,23 @@ export default function Interview() {
       if (!muted) {
         setTtsPlaying(true);
         setTtsEnded(false);
-        audio.onended = () => { setTtsPlaying(false); setTtsEnded(true); };
+        audio.onended = () => {
+          setTtsPlaying(false);
+          setTtsEnded(true);
+          hasEverPlayedRef.current = true;
+        };
         audio.onerror = () => {
           setTtsPlaying(false);
           setTtsEnded(true);
-          // Fix 2: Show visible warning so user knows audio failed
-          setTtsFailedWarning(true);
+          // Only surface the warning once we've successfully played at least
+          // one clip — first-mount races / autoplay quirks shouldn't startle
+          // the participant with a yellow banner before the interview starts.
+          if (hasEverPlayedRef.current) setTtsFailedWarning(true);
         };
         audio.play().catch(() => {
           setTtsPlaying(false);
           setTtsEnded(true);
-          setTtsFailedWarning(true);
+          if (hasEverPlayedRef.current) setTtsFailedWarning(true);
         });
       }
     },
@@ -480,7 +491,32 @@ export default function Interview() {
         setStarting(false);
         return;
       }
-      // Proceed to screening or interview
+      // Ask for first name before screening/interview unless we already have one
+      // (eg. from session-restored state). The AI moderator addresses the
+      // participant by name in the warm-up so this is meaningful even when no
+      // demographics are collected here.
+      if (!profile.firstName.trim()) {
+        setPhase("profile");
+        setStarting(false);
+        return;
+      }
+      await routeAfterProfile();
+    } catch {
+      setError(t("consent.startError"));
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  // ── Profile ───────────────────────────────────────────────────────────────
+
+  /** Routes from profile (or skip) to screening/interview. Shared by the
+   *  "Continue" and "Skip" buttons on the minimal profile screen. */
+  async function routeAfterProfile() {
+    if (!token) return;
+    setStarting(true);
+    setError("");
+    try {
       const questions = await getScreeningQuestions(token);
       if (questions.length > 0) {
         setScreeningQuestions(questions);
@@ -497,14 +533,16 @@ export default function Interview() {
     }
   }
 
-  // ── Profile ───────────────────────────────────────────────────────────────
+  async function proceedFromProfile() {
+    await routeAfterProfile();
+  }
 
   async function handleProfileContinue() {
-    await proceedFromConsent();
+    await routeAfterProfile();
   }
 
   function handleSkipProfile() {
-    proceedFromConsent();
+    routeAfterProfile();
   }
 
   function toggleTag(id: number) {
@@ -1056,327 +1094,67 @@ export default function Interview() {
   }
 
   // ── Profile collection phase ──────────────────────────────────────────────
+  // Minimal "what's your first name?" capture. Heavier demographics + interest
+  // tagging happen in the post-completion panel funnel (PF-4), not here —
+  // pre-interview should stay near-frictionless.
 
   if (phase === "profile") {
+    const trimmed = profile.firstName.trim();
     return (
       <div className="interview-page">
         <div className="interview-container" style={{ maxWidth: 560 }}>
-          <div style={{
-            background: "#fff",
-            borderRadius: "var(--radius-lg)",
-            padding: "48px 36px",
-            boxShadow: "var(--shadow-md)",
-            maxWidth: "560px",
-            width: "100%",
-            margin: "0 auto",
-          }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>{t("profile.title")}</h1>
-          <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6 }}>
-            {t("profile.subtitle")}
-          </p>
-
-          {/* Section: About You */}
-          <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginBottom: 4 }}>
-            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>{t("profile.sectionAboutYou")}</p>
-          </div>
-
-          {/* First name */}
-          <div className="interview-name-field">
-            <label className="field-label" htmlFor="profile-first-name">{t("profile.firstNameLabel")} <span className="optional-tag">{t("profile.optional")}</span></label>
-            <input
-              id="profile-first-name"
-              type="text"
-              className="field-input"
-              value={profile.firstName}
-              onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))}
-              placeholder={t("profile.firstNamePlaceholder")}
-            />
-          </div>
-
-          {/* Age range */}
-          <div className="interview-name-field">
-            <label className="field-label">{t("profile.ageRangeLabel")}</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-              {(["18-24", "25-34", "35-44", "45-54", "55+"] as const).map((opt) => (
-                <button
-                  key={opt}
-                  className={`profiling-option-btn${profile.ageRange === opt ? " selected" : ""}`}
-                  onClick={() => setProfile((p) => ({ ...p, ageRange: p.ageRange === opt ? "" : opt }))}
-                >
-                  {t(`profile.ageRangeOptions.${opt}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Gender */}
-          <div className="interview-name-field">
-            <label className="field-label">{t("profile.genderLabel")}</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-              {[
-                { value: "male", label: t("profile.genderMan") },
-                { value: "female", label: t("profile.genderWoman") },
-                { value: "non_binary", label: t("profile.genderNonBinary") },
-                { value: "prefer_not", label: t("profile.genderPreferNot") },
-              ].map(({ value, label }) => (
-                <button
-                  key={value}
-                  className={`profiling-option-btn${profile.gender === value ? " selected" : ""}`}
-                  onClick={() => setProfile((p) => ({ ...p, gender: p.gender === value ? "" : value }))}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Section: Work Experience */}
-          <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginTop: 8, marginBottom: 4 }}>
-            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>{t("profile.sectionWorkExperience")}</p>
-          </div>
-
-          {/* Employment */}
-          <div className="interview-name-field">
-            <label className="field-label">{t("profile.employmentLabel")}</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-              {[
-                { value: "full_time", label: t("profile.employmentFullTime") },
-                { value: "part_time", label: t("profile.employmentPartTime") },
-                { value: "freelance", label: t("profile.employmentFreelance") },
-                { value: "student", label: t("profile.employmentStudent") },
-                { value: "retired", label: t("profile.employmentRetired") },
-                { value: "other", label: t("profile.employmentOther") },
-              ].map(({ value, label }) => (
-                <button
-                  key={value}
-                  className={`profiling-option-btn${profile.employment === value ? " selected" : ""}`}
-                  onClick={() => setProfile((p) => ({ ...p, employment: p.employment === value ? "" : value }))}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Job function */}
-          <div className="interview-name-field">
-            <label className="field-label" htmlFor="profile-job-function">{t("profile.jobFunctionLabel")} <span className="optional-tag">{t("profile.optional")}</span></label>
-            <select
-              id="profile-job-function"
-              className="field-input"
-              value={profile.jobFunction}
-              onChange={(e) => setProfile((p) => ({ ...p, jobFunction: e.target.value }))}
-            >
-              <option value="">{t("profile.jobFunctionPlaceholder")}</option>
-              {(["engineering", "product", "marketing", "design", "finance", "operations", "hr", "executive", "other"] as const).map((value) => (
-                <option key={value} value={value}>{t(`profile.jobFunctionOptions.${value}`)}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Industry */}
-          <div className="interview-name-field">
-            <label className="field-label" htmlFor="profile-industry">{t("profile.industryLabel")} <span className="optional-tag">{t("profile.optional")}</span></label>
-            <input
-              id="profile-industry"
-              type="text"
-              className="field-input"
-              value={profile.industry}
-              onChange={(e) => setProfile((p) => ({ ...p, industry: e.target.value }))}
-              placeholder={t("profile.industryPlaceholder")}
-            />
-          </div>
-
-          {/* Company size */}
-          <div className="interview-name-field">
-            <label className="field-label">{t("profile.companySizeLabel")}</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-              {[
-                { value: "1", label: t("profile.companySizeJustMe") },
-                { value: "2-10", label: t("profile.companySizeOptions.smallTeam") },
-                { value: "11-50", label: t("profile.companySizeOptions.midTeam") },
-                { value: "51-200", label: t("profile.companySizeOptions.largeTeam") },
-                { value: "201+", label: t("profile.companySizeOptions.enterprise") },
-              ].map(({ value, label }) => (
-                <button
-                  key={value}
-                  className={`profiling-option-btn${profile.companySize === value ? " selected" : ""}`}
-                  onClick={() => setProfile((p) => ({ ...p, companySize: p.companySize === value ? "" : value }))}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Seniority */}
-          <div className="interview-name-field">
-            <label className="field-label">{t("profile.seniorityLabel")}</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-              {[
-                { value: "junior", label: t("profile.seniorityJunior") },
-                { value: "mid", label: t("profile.seniorityMid") },
-                { value: "senior", label: t("profile.senioritySenior") },
-                { value: "manager", label: t("profile.seniorityManager") },
-                { value: "director", label: t("profile.seniorityDirector") },
-                { value: "c_suite", label: t("profile.seniorityCSuite") },
-              ].map(({ value, label }) => (
-                <button
-                  key={value}
-                  className={`profiling-option-btn${profile.seniority === value ? " selected" : ""}`}
-                  onClick={() => setProfile((p) => ({ ...p, seniority: p.seniority === value ? "" : value }))}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Interests & behaviors */}
-          {panelTags.length > 0 && (
+          <div
+            className="profile-min-card"
+            style={{
+              background: "var(--bg-surface, #fff)",
+              borderRadius: "var(--radius-lg)",
+              padding: "40px 32px",
+              boxShadow: "var(--shadow-md)",
+              maxWidth: 480,
+              width: "100%",
+              margin: "0 auto",
+            }}
+          >
+            <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
+              {t("profile.minTitle")}
+            </h1>
+            <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 24, lineHeight: 1.55 }}>
+              {t("profile.minSubtitle")}
+            </p>
             <div className="interview-name-field">
-              <label className="field-label">
-                {t("profile.interestsLabel")}{" "}
-                <span className="optional-tag">({t("profile.interestsMax")})</span>
+              <label className="field-label" htmlFor="profile-min-first-name">
+                {t("profile.firstNameLabel")}
               </label>
-              {interestTags.length > 0 && (
-                <>
-                  <p style={{ fontSize: 12, color: "var(--text-secondary, #6b7280)", margin: "8px 0 6px" }}>{t("profile.interestsTab")}</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {interestTags.map((tag) => (
-                      <button
-                        key={tag.id}
-                        className={`profiling-option-btn${profile.selectedTagIds.includes(tag.id) ? " selected" : ""}`}
-                        onClick={() => toggleTag(tag.id)}
-                        disabled={!profile.selectedTagIds.includes(tag.id) && profile.selectedTagIds.length >= 5}
-                      >
-                        {tag.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              {behaviorTags.length > 0 && (
-                <>
-                  <p style={{ fontSize: 12, color: "var(--text-secondary, #6b7280)", margin: "10px 0 6px" }}>{t("profile.behaviorsTab")}</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {behaviorTags.map((tag) => (
-                      <button
-                        key={tag.id}
-                        className={`profiling-option-btn${profile.selectedTagIds.includes(tag.id) ? " selected" : ""}`}
-                        onClick={() => toggleTag(tag.id)}
-                        disabled={!profile.selectedTagIds.includes(tag.id) && profile.selectedTagIds.length >= 5}
-                      >
-                        {tag.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+              <input
+                id="profile-min-first-name"
+                type="text"
+                className="field-input"
+                value={profile.firstName}
+                onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))}
+                placeholder={t("profile.firstNamePlaceholder")}
+                autoFocus
+                autoComplete="given-name"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && trimmed) proceedFromProfile();
+                }}
+              />
             </div>
-          )}
-
-          {/* Section: Location */}
-          <div style={{ borderTop: "2px solid var(--border, #e2e8f0)", paddingTop: 20, marginTop: 8, marginBottom: 4 }}>
-            <p style={{ fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary, #6b7280)", marginBottom: 16 }}>{t("profile.sectionLocation")}</p>
-          </div>
-
-          {/* City */}
-          <div className="interview-name-field">
-            <label className="field-label" htmlFor="profile-city">{t("profile.cityLabel")} <span className="optional-tag">{t("profile.optional")}</span></label>
-            <input
-              id="profile-city"
-              type="text"
-              className="field-input"
-              value={profile.city}
-              onChange={(e) => setProfile((p) => ({ ...p, city: e.target.value }))}
-              placeholder={t("profile.cityPlaceholder")}
-            />
-          </div>
-
-          {error && <div className="error-banner" role="alert">{error}</div>}
-
-          <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-            <button
-              className="btn btn-primary"
-              onClick={handleProfileContinue}
-              disabled={starting}
-              style={{ flex: 1 }}
-            >
-              {starting ? t("profile.starting") : t("profile.continue")}
-            </button>
-            <button className="btn btn-ghost" onClick={handleSkipProfile} disabled={starting}>
-              {t("profile.skip")}
-            </button>
-          </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Resume confirm ───────────────────────────────────────────────────────
-
-  if (resumeCheck?.found && resumeCheck.participant_id) {
-    return (
-      <div className="interview-page">
-        <div className="interview-container resume-confirm-card">
-          <h1 className="consent-title">{t("resume.title")}</h1>
-          <p className="resume-confirm-subtitle" dangerouslySetInnerHTML={{ __html: t("resume.desc", { projectName: info?.project_name ?? "" }) }} />
-          {loadingResumeSummary ? (
-            <p className="muted-text">{t("resume.loadingProgress")}</p>
-          ) : resumeSummary && resumeSummary.questions_covered.length > 0 ? (
-            <div className="resume-summary-panel">
-              <p className="resume-summary-label">{t("resume.coveredTopics")}</p>
-              <ul className="resume-summary-list">
-                {resumeSummary.questions_covered.map((q, i) => (
-                  <li key={i} className="resume-summary-item">
-                    <span className="resume-summary-check">✓</span>
-                    <span>{q}</span>
-                  </li>
-                ))}
-              </ul>
-              {resumeSummary.elapsed_minutes > 0 && (
-                <p className="muted-text" style={{ marginTop: 8, fontSize: 13 }}>
-                  {info?.interview_duration_minutes
-                    ? t("resume.elapsedOf", { elapsed: Math.round(resumeSummary.elapsed_minutes), total: info.interview_duration_minutes })
-                    : t("resume.elapsed", { minutes: Math.round(resumeSummary.elapsed_minutes) })}
-                </p>
-              )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
+              <button
+                className="btn btn-primary"
+                disabled={!trimmed || starting}
+                onClick={proceedFromProfile}
+              >
+                {starting ? t("profile.starting") : t("profile.continue")} →
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={proceedFromProfile}
+                style={{ alignSelf: "center", color: "var(--text-tertiary)", fontSize: 13 }}
+              >
+                {t("profile.skip")}
+              </button>
             </div>
-          ) : null}
-          {resumeCheck.last_question && (
-            <div className="resume-last-question">
-              <p className="resume-last-label">{t("resume.lastQuestion")}</p>
-              <p className="resume-last-text">"{resumeCheck.last_question}"</p>
-            </div>
-          )}
-          <div className="consent-actions">
-            <button className="btn btn-primary" onClick={handleConfirmResume}>
-              {t("resume.resume")} →
-            </button>
-            <button
-              className="btn btn-ghost"
-              onClick={async () => {
-                setResumeCheck(null);
-                setResumeSummary(null);
-                try {
-                  const questions = await getScreeningQuestions(token!);
-                  if (questions.length > 0) {
-                    setScreeningQuestions(questions);
-                    setScreeningStep(0);
-                    setScreeningAnswers({});
-                    setPhase("screening");
-                  } else {
-                    await doStartInterview();
-                  }
-                } catch {
-                  setError(t("consent.startError"));
-                }
-              }}
-            >
-              {t("resume.startOver")}
-            </button>
           </div>
         </div>
       </div>
@@ -1535,18 +1313,34 @@ export default function Interview() {
   // ── Mic test phase ────────────────────────────────────────────────────────
 
   if (phase === "interview" && !micTestDone) {
+    // Three visual states so the participant always knows where they are:
+    //   waiting   → no signal yet, mic icon pulses, "Say a few words"
+    //   listening → small signal but below threshold, level bar coloured
+    //   ready     → above threshold, big green check, big primary CTA
+    const micState: "waiting" | "listening" | "ready" =
+      micLevel > 20 ? "ready" : micLevel > 4 ? "listening" : "waiting";
     return (
       <div className="interview-page">
         <div className="interview-container mic-test-card">
-          <h2 className="mic-test-title">{t("micTest.title")}</h2>
-          <p className="mic-test-subtitle">{t("micTest.desc")}</p>
-          <div className="mic-level-wrap">
-            <div className="mic-level-bar" style={{ width: `${micLevel}%` }} />
+          <div className={`mic-test-icon mic-test-icon--${micState}`} aria-hidden="true">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+              <path d="M19 11a7 7 0 0 1-14 0" />
+              <line x1="12" y1="18" x2="12" y2="22" />
+              <line x1="8" y1="22" x2="16" y2="22" />
+            </svg>
           </div>
-          {micLevel > 20 ? (
+          <h2 className="mic-test-title">{t("micTest.title")}</h2>
+          <p className="mic-test-subtitle">{t("micTest.descClear")}</p>
+          <div className="mic-level-wrap">
+            <div className={`mic-level-bar mic-level-bar--${micState}`} style={{ width: `${micLevel}%` }} />
+          </div>
+          {micState === "ready" ? (
             <p className="mic-test-status mic-test-ok">✓ {t("micTest.autoPass")}</p>
+          ) : micState === "listening" ? (
+            <p className="mic-test-status">{t("micTest.listening")}</p>
           ) : (
-            <p className="mic-test-status">{t("micTest.speakPrompt")}</p>
+            <p className="mic-test-status">{t("micTest.speakPromptClear")}</p>
           )}
           <div className="mic-test-actions" style={{ flexDirection: "column", gap: 10 }}>
             {micLevel > 20 && (

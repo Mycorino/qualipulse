@@ -62,6 +62,8 @@
   "profile": {
     "title": "Présentez-vous",
     "subtitle": "Ces informations nous aident à vous proposer des études pertinentes à l'avenir. Tous les champs sont facultatifs.",
+    "minTitle": "Comment vous appeler ?",
+    "minSubtitle": "Juste votre prénom — votre modérateur IA s'en sert pour vous parler naturellement pendant l'entretien.",
     "firstNameLabel": "Prénom",
     "firstNamePlaceholder": "ex. Alex",
     "ageRangeLabel": "Tranche d'âge",
@@ -141,8 +143,11 @@
   "micTest": {
     "title": "Test rapide du micro",
     "desc": "Dites quelque chose pour tester votre microphone avant de commencer.",
-    "autoPass": "Microphone détecté — vous êtes prêt·e !",
+    "descClear": "Dites quelques mots à voix haute — juste pour qu'on vérifie votre micro.",
+    "autoPass": "Parfait — c'est prêt",
     "speakPrompt": "Parlez pour voir le niveau de votre micro…",
+    "speakPromptClear": "En attente de votre voix…",
+    "listening": "On vous entend — continuez",
     "skip": "Passer le test",
     "startInterview": "Démarrer l'entretien",
     "permissionDenied": "Accès au microphone refusé",
