@@ -47,6 +47,7 @@ class ProjectCreate(BaseModel):
     research_objective: str | None = None
     welcome_message: str | None = None
     panel_collection_enabled: bool = True
+    warmup_enabled: bool = True
     # Study grounding — used by AI analysis + interview engine
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
@@ -56,6 +57,7 @@ class ProjectCreate(BaseModel):
 
 class ProjectSettingsPatch(BaseModel):
     panel_collection_enabled: bool | None = None
+    warmup_enabled: bool | None = None
 
 
 class QuestionResponse(BaseModel):
@@ -82,6 +84,7 @@ class ProjectResponse(BaseModel):
     research_objective: str | None = None
     welcome_message: str | None = None
     panel_collection_enabled: bool = True
+    warmup_enabled: bool = True
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
     is_demo: bool = False

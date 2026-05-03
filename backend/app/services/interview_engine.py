@@ -225,6 +225,7 @@ def decide_next_action(
     total_questions: int = 0,
     research_objective: str | None = None,
     language: str | None = None,
+    short_answer_state: dict | None = None,
     db=None,
     company_id=None,
     project_id=None,
@@ -329,6 +330,26 @@ WHY: generic answer with no behaviour or example.
         f"- {pacing_instruction}\n"
         f"- Close gate: {'OPEN — you may close' if can_close else close_instruction}\n"
         f"</state>\n\n"
+    )
+
+    # PF-3: when the participant has been giving short answers, nudge Claude
+    # to ask a more open / specific follow-up rather than rushing on. Pacing
+    # alerts still take precedence — we only widen the follow-up bias when
+    # the engine isn't already behind schedule.
+    if short_answer_state and short_answer_state.get("is_short_run") and pace_delta >= -0.5:
+        run = short_answer_state.get("run_length", 0)
+        last_w = short_answer_state.get("last_words")
+        prompt += (
+            f"<engagement>\n"
+            f"The participant's last {run} answer(s) were short "
+            f"(most recent: ~{last_w} words). "
+            f"Prefer a more open, specific follow-up that invites a story or example "
+            f"(e.g. 'Walk me through the last time…', 'Tell me about a moment when…') "
+            f"instead of moving to the next question.\n"
+            f"</engagement>\n\n"
+        )
+
+    prompt += (
         "Decide the next action and write the question the participant will hear. "
         "Return ONLY: "
         '{"action": "follow_up" | "next_question" | "close", "question": "..."}'
@@ -378,6 +399,150 @@ WHY: generic answer with no behaviour or example.
         result["question"] = raw_text
 
     return result
+
+
+# Sentinel used in InterviewTurn.question_index to mark the warm-up turn
+# (which isn't part of the guide). The next turn after a warm-up always
+# advances to guide question 0 — the AI's decide-next-action step is
+# skipped because the warm-up isn't a research probe.
+WARMUP_QUESTION_INDEX = -1
+
+# PF-3 thresholds. Tuned for typical interview pacing — anything tighter
+# fires on legitimate short answers ("yes", "every day"), anything looser
+# misses the actual signal of a disengaging participant.
+SHORT_ANSWER_WORDS = 15
+SHORT_ANSWER_RUN = 2  # need this many short answers in a row to flag
+
+
+def _detect_short_answers(turns: list) -> dict:
+    """Inspect the most recent N participant responses for engagement drop.
+
+    Returns a dict with::
+
+      {
+        "is_short_run": bool,        # last `RUN` answers all under threshold
+        "last_words":   int | None,  # word count of the most recent answer
+        "run_length":   int,         # how many short answers in a row
+      }
+
+    Used downstream by ``decide_next_action`` (to bias Claude toward more
+    open follow-ups instead of advancing) and by ``process_interview_turn``
+    (to surface a gentle ``coaching_hint`` to the participant). All
+    thresholds are best-effort — silence/skips are excluded.
+    """
+    answered = [t for t in turns if t.response_transcript and t.response_transcript.strip() and t.response_transcript.strip() != "[Skipped]"]
+    if not answered:
+        return {"is_short_run": False, "last_words": None, "run_length": 0}
+
+    def _wc(t):
+        return len((t.response_transcript or "").split())
+
+    last_words = _wc(answered[-1])
+    run = 0
+    for t in reversed(answered):
+        if _wc(t) <= SHORT_ANSWER_WORDS:
+            run += 1
+        else:
+            break
+    return {
+        "is_short_run": run >= SHORT_ANSWER_RUN,
+        "last_words": last_words,
+        "run_length": run,
+    }
+
+
+def _coaching_hint_for(state: dict, language: str) -> str | None:
+    """Build a soft, non-prescriptive coaching tip when the run is short.
+
+    Returns None when no nudge is warranted. We only surface a tip after
+    SHORT_ANSWER_RUN consecutive short answers so we don't pester
+    participants who happen to answer one yes/no question tersely.
+    """
+    if not state.get("is_short_run"):
+        return None
+    lang = (language or "en")[:2].lower()
+    hints = {
+        "en": "Researchers learn most from specific moments. If a story or example comes to mind, take your time to share it.",
+        "fr": "Les chercheurs apprennent surtout des moments concrets. Si un exemple ou une anecdote vous vient, n'hésitez pas à prendre le temps de la raconter.",
+        "es": "Los investigadores aprenden más de momentos específicos. Si te viene a la mente un ejemplo, tómate tu tiempo para contarlo.",
+        "de": "Forscher lernen am meisten aus konkreten Momenten. Wenn dir eine Geschichte oder ein Beispiel einfällt, nimm dir Zeit, sie zu teilen.",
+    }
+    return hints.get(lang, hints["en"])
+
+
+def _get_warmup_question(
+    project: Project,
+    db=None,
+    participant_id=None,
+) -> str:
+    """Generate a warm-up opener — a low-stakes invitation to start talking.
+
+    The warm-up isn't from the guide. It's framed around the project topic
+    so the participant can ease into the conversation before the research
+    questions arrive. Falls back to a generic opener in the project language
+    if Claude is unreachable.
+    """
+    language_code = (getattr(project, "language", None) or "en").lower()
+    language_name = LANGUAGE_NAMES.get(language_code, "English")
+
+    fallbacks = {
+        "en": "Welcome! Before we dive into the questions, could you tell me a bit about your typical week — just so we ease in?",
+        "fr": "Bienvenue ! Avant d'entrer dans les questions, pourriez-vous me parler un peu de votre semaine type — juste pour démarrer en douceur ?",
+        "es": "¡Bienvenido! Antes de entrar en las preguntas, ¿podría contarme un poco de su semana típica para empezar con calma?",
+        "de": "Willkommen! Bevor wir zu den Fragen kommen, könnten Sie mir kurz von Ihrer typischen Woche erzählen — einfach zum Einstieg?",
+        "it": "Benvenuto! Prima di entrare nelle domande, può raccontarmi un po' della sua settimana tipo, giusto per iniziare?",
+        "pt": "Bem-vindo! Antes de entrar nas perguntas, poderia me contar um pouco sobre sua semana típica — só para começar?",
+    }
+    fallback = fallbacks.get(language_code, fallbacks["en"])
+
+    # Best-effort topic extraction so the warm-up references what the
+    # participant is here to talk about. Falls through silently to the
+    # generic fallback if anything goes wrong.
+    topic_hint = (
+        getattr(project, "research_objective", None)
+        or getattr(project, "research_context", None)
+        or getattr(project, "name", None)
+        or ""
+    ).strip()
+
+    if not topic_hint or not settings.ANTHROPIC_API_KEY:
+        return fallback
+
+    try:
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
+        effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=180,
+            temperature=0.6,
+            system=effective_system_prompt,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"You are about to start a research interview about this topic:\n"
+                        f'"{topic_hint[:400]}"\n\n'
+                        f"Write a WARM-UP opener in {language_name}. The goal is to put the "
+                        f"participant at ease before the real questions begin. One short sentence "
+                        f"of welcome, then ONE simple, low-stakes question that gently touches the "
+                        f"topic — something they can answer without thinking hard. Avoid 'why'. "
+                        f"Avoid asking for opinions or evaluations. Under 28 words. "
+                        f"Return ONLY the spoken text — no JSON, no quotes, no preamble."
+                    ),
+                }
+            ],
+        )
+        text = response.content[0].text.strip()
+        if db is not None:
+            log_claude_usage(
+                db, response, "interview_warmup",
+                company_id=getattr(project, "company_id", None),
+                project_id=getattr(project, "id", None),
+                participant_id=participant_id,
+            )
+        return text or fallback
+    except Exception:
+        return fallback
 
 
 def _get_first_question(
@@ -451,7 +616,13 @@ def _get_first_question(
 def start_interview(participant_id: str, db: Session) -> dict:
     """Generate the first question and TTS for a new interview.
 
-    Returns dict with: question_text, tts_audio_url, turn
+    PF-3: when ``project.warmup_enabled`` is True (default), the very first
+    turn is a warm-up — a low-stakes invitation to get the participant
+    talking before the research questions arrive. Marked via
+    ``question_index = WARMUP_QUESTION_INDEX``; ``process_interview_turn``
+    detects it and routes the next turn directly to guide question 0.
+
+    Returns dict with: question_text, tts_audio_url, turn, is_warmup
     """
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
     if participant is None:
@@ -461,7 +632,13 @@ def start_interview(participant_id: str, db: Session) -> dict:
     company_id = project.company_id
     proj_id = project.id
 
-    question_text, q_index = _get_first_question(project, db=db, participant_id=participant_id)
+    use_warmup = bool(getattr(project, "warmup_enabled", True))
+
+    if use_warmup:
+        question_text = _get_warmup_question(project, db=db, participant_id=participant_id)
+        q_index = WARMUP_QUESTION_INDEX
+    else:
+        question_text, q_index = _get_first_question(project, db=db, participant_id=participant_id)
 
     # Generate TTS audio and upload
     tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
@@ -486,6 +663,7 @@ def start_interview(participant_id: str, db: Session) -> dict:
         "question_text": question_text,
         "tts_audio_url": tts_audio_url,
         "turn": turn,
+        "is_warmup": use_warmup,
     }
 
 
@@ -537,6 +715,47 @@ def process_interview_turn(
         company_id=_company_id, project_id=_project_id, participant_id=participant_id,
     )
 
+    # PF-3: warm-up handoff. If the turn the participant just answered was the
+    # warm-up (question_index = -1), short-circuit Claude entirely and play
+    # the first real guide question. The warm-up is a courtesy turn — we don't
+    # want it consuming the AI's pacing budget or spawning follow-ups.
+    last_was_warmup = bool(turns) and turns[-1].question_index == WARMUP_QUESTION_INDEX
+    if last_was_warmup:
+        first_q_text, _ = _get_first_question(_proj, db=db, participant_id=participant_id)
+        first_tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
+        first_tts_url = upload_audio(generate_speech(first_q_text), first_tts_key)
+        log_tts_usage(db, first_q_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
+        next_turn_idx = (turns[-1].turn_index + 1) if turns else 0
+        new_turn = InterviewTurn(
+            participant_id=participant_id,
+            turn_index=next_turn_idx,
+            question_index=0,
+            is_follow_up=False,
+            follow_up_index=0,
+            question_text=first_q_text,
+            tts_audio_url=first_tts_url,
+        )
+        db.add(new_turn)
+        db.commit()
+        db.refresh(new_turn)
+        return {
+            "question_text": first_q_text,
+            "tts_audio_url": first_tts_url,
+            "is_complete": False,
+            "is_follow_up": False,
+            "question_index": 0,
+            "elapsed_seconds": int(context["elapsed_minutes"] * 60),
+            "total_seconds": context["total_minutes"] * 60,
+            "coaching_hint": None,
+            "transcript": transcript,
+        }
+
+    # PF-3: short-answer detection for the AI prompt + participant coaching.
+    # Walks the most recent participant responses and flags when the engagement
+    # is dropping. Used both to nudge Claude (engine adapts) and to surface a
+    # gentle hint to the participant (coaching tip).
+    short_answer_state = _detect_short_answers(turns)
+
     # 4. Ask Claude for the next action
     decision = decide_next_action(
         system_prompt=context["system_prompt"],
@@ -549,6 +768,7 @@ def process_interview_turn(
         total_questions=context["total_questions"],
         research_objective=_proj.research_objective,
         language=context["language"],
+        short_answer_state=short_answer_state,
         db=db,
         company_id=_company_id,
         project_id=_project_id,
@@ -678,6 +898,8 @@ def process_interview_turn(
         "question_index": new_q_index,
         "elapsed_seconds": int(context["elapsed_minutes"] * 60),
         "total_seconds": context["total_minutes"] * 60,
+        "coaching_hint": _coaching_hint_for(short_answer_state, context["language"]) if not is_complete else None,
+        "transcript": transcript,
     }
 
 

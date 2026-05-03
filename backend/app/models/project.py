@@ -46,6 +46,11 @@ class Project(Base):
     target_customer_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     panel_collection_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # PF-3: when True (default), the AI moderator opens the interview with a
+    # warm-up turn before the first guide question — a low-stakes invitation
+    # to get the participant talking. When False, the engine jumps straight
+    # to the first guide question (legacy behaviour).
+    warmup_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
     # True when this project was auto-seeded by the onboarding flow as a
     # showcase/example. Demo projects are excluded from the tier project
     # count so they never block a user from creating their real first

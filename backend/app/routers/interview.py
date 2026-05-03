@@ -470,6 +470,7 @@ def start_interview_session(
         participant_id=participant.id,
         first_question=result["question_text"],
         tts_audio_url=result["tts_audio_url"],
+        is_warmup=bool(result.get("is_warmup", False)),
     )
 
 
@@ -530,6 +531,8 @@ async def respond_to_question(
         question_index=result.get("question_index", 0),
         elapsed_seconds=result.get("elapsed_seconds", 0),
         total_seconds=result.get("total_seconds", 0),
+        coaching_hint=result.get("coaching_hint"),
+        is_warmup=False,
     )
 
 

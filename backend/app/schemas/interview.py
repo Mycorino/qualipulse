@@ -30,6 +30,10 @@ class StartInterviewResponse(BaseModel):
     participant_id: str
     first_question: str
     tts_audio_url: str | None = None
+    # PF-3: True when the engine is opening with a warm-up turn (low-stakes
+    # icebreaker) before the first guide question. Frontend uses this to
+    # soften the chrome on turn 0 — no progress count, no skip button.
+    is_warmup: bool = False
 
 
 class TurnResponse(BaseModel):
@@ -40,6 +44,14 @@ class TurnResponse(BaseModel):
     question_index: int = 0
     elapsed_seconds: int = 0
     total_seconds: int = 0
+    # PF-3: gentle in-flight tip rendered to the participant when their last
+    # answers go short. Null when no coaching is needed. Frontend renders as a
+    # dismissable inline banner above the record button.
+    coaching_hint: str | None = None
+    # PF-3: marks the warm-up turn (turn_index=0) so the frontend can soften
+    # the chrome (no progress count, no skip button) and the engine knows not
+    # to count it against the time budget.
+    is_warmup: bool = False
 
 
 class ParticipantResponse(BaseModel):
