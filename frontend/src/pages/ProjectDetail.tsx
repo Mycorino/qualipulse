@@ -167,6 +167,11 @@ export default function ProjectDetail() {
   const [screeningSaving, setScreeningSaving] = useState(false);
   const [expandedSQ, setExpandedSQ] = useState<number | null>(null);
 
+  // Mobile sentence-tap coachmark (dismissable, persisted in localStorage)
+  const [sentenceTapHintDismissed, setSentenceTapHintDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem("qp.sentenceTapHint.v1") === "1"; } catch { return false; }
+  });
+
   // ── P1: Transcript editing ─────────────────────────────────────────────────
   const [editingTurnId, setEditingTurnId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
@@ -1029,35 +1034,140 @@ export default function ProjectDetail() {
     );
   }
 
-  function renderTaggedText(text: string, turnId: string): React.ReactNode {
-    const turnTags = tags.filter((t) => t.turn_id === turnId).sort((a, b) => a.start_index - b.start_index);
-    if (!turnTags.length) return <span data-turn-text="">{text}</span>;
-
-    const parts: React.ReactNode[] = [];
-    let cursor = 0;
-    for (const tag of turnTags) {
-      if (tag.start_index > cursor) parts.push(text.slice(cursor, tag.start_index));
-      const color = tag.code_color || "#6366f1";
-      parts.push(
+  // Renders one [a, b) sub-range of `text` with overlap-safe tag highlights.
+  // Stacks per-tag underline bars via box-shadow so overlapping tags don't
+  // duplicate the text on screen (the previous bug).
+  function renderTaggedRange(text: string, a: number, b: number, turnTags: QuoteTag[], keyPrefix: string): React.ReactNode[] {
+    if (b <= a) return [];
+    if (!turnTags.length) return [<React.Fragment key={keyPrefix}>{text.slice(a, b)}</React.Fragment>];
+    const boundarySet = new Set<number>([a, b]);
+    for (const t of turnTags) {
+      const s = Math.max(a, Math.min(b, t.start_index));
+      const e = Math.max(a, Math.min(b, t.end_index));
+      if (e > s) { boundarySet.add(s); boundarySet.add(e); }
+    }
+    const boundaries = Array.from(boundarySet).sort((x, y) => x - y);
+    const out: React.ReactNode[] = [];
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const segStart = boundaries[i];
+      const segEnd = boundaries[i + 1];
+      if (segEnd <= segStart) continue;
+      const segText = text.slice(segStart, segEnd);
+      const covering = turnTags.filter((t) => t.start_index <= segStart && t.end_index >= segEnd);
+      if (!covering.length) {
+        out.push(<React.Fragment key={`${keyPrefix}-${i}`}>{segText}</React.Fragment>);
+        continue;
+      }
+      const shadow = covering
+        .map((t, idx) => `inset 0 -${2 + idx * 3}px 0 0 ${(t.code_color || "#6366f1")}`)
+        .join(", ");
+      const bg = covering.length === 1 ? `${covering[0].code_color || "#6366f1"}22` : "transparent";
+      const title = covering.map((t) => t.code_name).join(" · ");
+      out.push(
         <span
-          key={tag.id}
-          style={{ borderBottom: `2.5px solid ${color}`, background: `${color}22`, borderRadius: 2, cursor: "default", position: "relative" }}
-          title={`Tagged: ${tag.code_name}`}
+          key={`${keyPrefix}-${i}`}
           className="tagged-text"
+          style={{ background: bg, boxShadow: shadow, paddingBottom: `${covering.length * 3}px`, borderRadius: 2 }}
+          title={`Tagged: ${title}`}
         >
-          {text.slice(tag.start_index, tag.end_index)}
-          <button
-            className="tag-pill-remove tag-inline-remove"
-            onClick={(e) => { e.stopPropagation(); if (confirm(`Remove "${tag.code_name}" tag?`)) handleDeleteTag(tag.id); }}
-            aria-label={`Remove tag ${tag.code_name}`}
-            title="Remove tag"
-          >×</button>
+          {segText}
         </span>
       );
-      cursor = tag.end_index;
     }
-    if (cursor < text.length) parts.push(text.slice(cursor));
-    return <span data-turn-text="">{parts}</span>;
+    return out;
+  }
+
+  // Wraps each sentence in a tappable span (mobile sentence-level tagging).
+  // CSS .sentence-tap activates the affordance on touch viewports and is a
+  // no-op on desktop where native text selection still drives tagging.
+  // Opens the tag picker for a sentence range. Used by both the click handler
+  // attached to the sentence-tap span and the keyboard handler. Gated by
+  // matchMedia so desktop keeps native text-selection (mouseup → handleTranscriptMouseUp).
+  function openSentencePicker(turnId: string, text: string, start: number, end: number, anchorEl: HTMLElement) {
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 768px)").matches) return;
+    if (end <= start) return;
+    const rect = anchorEl.getBoundingClientRect();
+    setSelectionInfo({
+      turnId,
+      text: text.slice(start, end),
+      start,
+      end,
+      x: Math.min(rect.left + rect.width / 2, window.innerWidth - 110),
+      y: rect.top + window.scrollY - 44,
+      fromTranslation: false,
+    });
+    setShowNewCode(false);
+  }
+
+  function renderTaggedText(text: string, turnId: string): React.ReactNode {
+    const turnTags = tags.filter((t) => t.turn_id === turnId);
+    const sentences = splitSentences(text);
+    if (sentences.length <= 1) {
+      return <span data-turn-text="">{renderTaggedRange(text, 0, text.length, turnTags, "r")}</span>;
+    }
+    const out: React.ReactNode[] = [];
+    let cursor = 0;
+    sentences.forEach((sent, idx) => {
+      if (sent.start > cursor) {
+        out.push(<React.Fragment key={`gap-${idx}`}>{text.slice(cursor, sent.start)}</React.Fragment>);
+      }
+      // role=button + tabIndex + direct onClick on every sentence span so iOS
+      // Safari fires the click reliably (event delegation on the parent div
+      // didn't always reach the inner span on real-device touch).
+      out.push(
+        <span
+          key={`sent-${idx}`}
+          className="sentence-tap"
+          role="button"
+          tabIndex={0}
+          data-sentence-start={sent.start}
+          data-sentence-end={sent.end}
+          data-turn-id={turnId}
+          onClick={(e) => {
+            e.stopPropagation();
+            openSentencePicker(turnId, text, sent.start, sent.end, e.currentTarget as HTMLElement);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openSentencePicker(turnId, text, sent.start, sent.end, e.currentTarget as HTMLElement);
+            }
+          }}
+        >
+          {renderTaggedRange(text, sent.start, sent.end, turnTags, `sent-${idx}`)}
+        </span>
+      );
+      cursor = sent.end;
+    });
+    if (cursor < text.length) {
+      out.push(<React.Fragment key="tail">{text.slice(cursor)}</React.Fragment>);
+    }
+    return <span data-turn-text="">{out}</span>;
+  }
+
+  // ── Sentence splitter for mobile sentence-level tagging ───────────────────
+  // Returns character ranges (start, end) of each sentence in the input. Trailing
+  // whitespace is excluded from each range so tag boundaries line up cleanly.
+  function splitSentences(text: string): Array<{ start: number; end: number }> {
+    const result: Array<{ start: number; end: number }> = [];
+    const len = text.length;
+    if (!len) return result;
+    let start = 0;
+    for (let i = 0; i < len; i++) {
+      const c = text[i];
+      if (c === "." || c === "!" || c === "?" || c === "…") {
+        let j = i + 1;
+        while (j < len && /["')\]’”]/.test(text[j])) j++;
+        if (j >= len || /\s/.test(text[j])) {
+          if (j > start) result.push({ start, end: j });
+          while (j < len && /\s/.test(text[j])) j++;
+          start = j;
+          i = j - 1;
+        }
+      }
+    }
+    if (start < len) result.push({ start, end: len });
+    return result;
   }
 
   function renderAttributedQuote(q: AttributedQuote | string, idx: number): React.ReactNode {
@@ -2134,6 +2244,21 @@ export default function ProjectDetail() {
                       <p className="muted-text">{tProject("responses.noTranscript")}</p>
                     ) : (
                       <div className="transcript-list" ref={transcriptListRef}>
+                        {!sentenceTapHintDismissed && transcriptViewMode === "original" && (
+                          <div className="sentence-tap-hint" role="note">
+                            <span aria-hidden="true">💡</span>
+                            <span>{tProject("responses.sentenceTapHint")}</span>
+                            <button
+                              type="button"
+                              className="sentence-tap-hint__close"
+                              aria-label={tCommon("dismiss")}
+                              onClick={() => {
+                                setSentenceTapHintDismissed(true);
+                                try { localStorage.setItem("qp.sentenceTapHint.v1", "1"); } catch {}
+                              }}
+                            >×</button>
+                          </div>
+                        )}
                         {transcript.map((t) => {
                           const turnTags = tags.filter((tg) => tg.turn_id === t.id);
                           const isHighlighted = highlightTarget?.turnIndex === t.turn_index;

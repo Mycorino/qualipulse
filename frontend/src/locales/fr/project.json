@@ -350,8 +350,9 @@
     "viewTranslated": "{{lang}} Aide à la lecture",
     "translating": "Traduction en cours…",
     "translationFailed": "Nous n'avons pas pu traduire cette transcription. Veuillez réessayer.",
-    "tagTurn": "Annoter la réponse",
-    "tagWholeTurn": "Annoter toute la réponse (sélection précise indisponible en vue traduite)"
+    "tagTurn": "Annoter toute la réponse",
+    "tagWholeTurn": "Annoter toute la réponse (sélection précise indisponible en vue traduite)",
+    "sentenceTapHint": "Touchez une phrase pour l'annoter. Le bouton sous chaque réponse annote la réponse entière."
   },
   "transcript": {
     "title": "Transcription",

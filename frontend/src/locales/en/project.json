@@ -350,8 +350,9 @@
     "viewTranslated": "{{lang}} Reading aid",
     "translating": "Translating…",
     "translationFailed": "We couldn't translate this transcript. Please try again.",
-    "tagTurn": "Tag turn",
-    "tagWholeTurn": "Tag the whole answer (precise selection unavailable in translated view)"
+    "tagTurn": "Tag whole response",
+    "tagWholeTurn": "Tag the whole answer (precise selection unavailable in translated view)",
+    "sentenceTapHint": "Tap a sentence to tag it. Tap the button below any answer to tag the whole thing."
   },
   "transcript": {
     "title": "Transcript",
