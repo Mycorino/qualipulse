@@ -35,6 +35,9 @@
   },
   "consent": {
     "title": "Before you begin",
+    "welcomeBackTitle": "Welcome back, {{name}}",
+    "welcomeBackRecent": "We've got your profile from {{days}} days ago — feel free to jump straight in.",
+    "welcomeBackGeneric": "We've got your profile on file — feel free to jump straight in.",
     "projectName": "{{name}}",
     "desc": "This interview is conducted by AI. Your responses will be recorded and analysed to help improve products and services.",
     "dataUse": "Your data will be processed according to the",

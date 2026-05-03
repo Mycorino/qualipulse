@@ -35,6 +35,9 @@
   },
   "consent": {
     "title": "Avant de commencer",
+    "welcomeBackTitle": "Bon retour, {{name}}",
+    "welcomeBackRecent": "Nous avons votre profil d'il y a {{days}} jours — n'hésitez pas à enchaîner directement.",
+    "welcomeBackGeneric": "Nous avons votre profil — n'hésitez pas à enchaîner directement.",
     "projectName": "{{name}}",
     "desc": "Cet entretien est conduit par une IA. Vos réponses seront enregistrées et analysées afin d'aider à améliorer des produits et services.",
     "dataUse": "Vos données seront traitées conformément à la",

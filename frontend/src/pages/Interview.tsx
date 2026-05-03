@@ -14,6 +14,8 @@ import {
   skipQuestion,
   requestVerification,
   getPanelTags,
+  recognizeParticipant,
+  RecognizeResponse,
   InterviewInfo,
   ScreeningQuestion,
   ResumeCheck,
@@ -94,6 +96,12 @@ export default function Interview() {
   // Panel profile
   const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
   const [panelTags, setPanelTags] = useState<PanelTag[]>([]);
+
+  // PF-2: returning-panelist recognition. Populated only after the magic-link
+  // session JWT has been verified — we never echo profile data based on an
+  // attacker-supplied email. `null` means recognition hasn't run yet,
+  // `{recognized: false}` means it ran and the email isn't on file.
+  const [recognized, setRecognized] = useState<RecognizeResponse | null>(null);
   const [panelProfileSaving, setPanelProfileSaving] = useState(false);
 
   // Interview state
@@ -181,6 +189,17 @@ export default function Interview() {
         setSessionToken(sessionParam);
         sessionStorage.setItem(`interview_session_${token}`, sessionParam);
         navigate(`/i/${token}`, { replace: true });
+        // Fire recognition before showing consent so the consent screen can
+        // greet returning panelists by name. Failures are silent — recognition
+        // is an optimisation, never a blocker.
+        recognizeParticipant(token, sessionParam)
+          .then((res) => {
+            setRecognized(res);
+            if (res.recognized && res.profile?.first_name) {
+              setProfile((p) => ({ ...p, firstName: p.firstName || res.profile!.first_name! }));
+            }
+          })
+          .catch(() => setRecognized({ recognized: false }));
         setPhase("consent");
         return;
       }
@@ -193,6 +212,14 @@ export default function Interview() {
       if (payload?.email) {
         setEmail(String(payload.email));
         setSessionToken(saved);
+        recognizeParticipant(token, saved)
+          .then((res) => {
+            setRecognized(res);
+            if (res.recognized && res.profile?.first_name) {
+              setProfile((p) => ({ ...p, firstName: p.firstName || res.profile!.first_name! }));
+            }
+          })
+          .catch(() => setRecognized({ recognized: false }));
         setPhase("consent");
         return;
       }
@@ -1035,6 +1062,19 @@ export default function Interview() {
           <ResearcherIdentity />
           {info.researcher_name && (
             <p className="consent-researcher-name">{info.researcher_name}</p>
+          )}
+          {recognized?.recognized && recognized.profile?.first_name && (
+            <div className="welcome-back-banner" role="status">
+              <span className="welcome-back-banner__wave" aria-hidden="true">👋</span>
+              <div>
+                <strong>{t("consent.welcomeBackTitle", { name: recognized.profile.first_name })}</strong>
+                <p>
+                  {recognized.profile.last_active_days_ago != null && recognized.profile.last_active_days_ago < 60
+                    ? t("consent.welcomeBackRecent", { days: recognized.profile.last_active_days_ago })
+                    : t("consent.welcomeBackGeneric")}
+                </p>
+              </div>
+            </div>
           )}
           <h1 className="consent-title">{t("consent.title")}</h1>
           <p className="consent-project">{info.project_name}</p>

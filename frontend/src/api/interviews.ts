@@ -185,6 +185,38 @@ export async function getPanelTags(): Promise<PanelTag[]> {
   return data;
 }
 
+export interface RecognizeResponse {
+  recognized: boolean;
+  reason?: string;
+  profile?: {
+    first_name?: string | null;
+    age_range?: string | null;
+    country?: string | null;
+    city?: string | null;
+    education?: string | null;
+    employment_status?: string | null;
+    interviews_completed?: number;
+    last_active_days_ago?: number | null;
+    interests_count?: number;
+  };
+}
+
+/**
+ * Look up a returning panelist by their *verified* email. Requires a
+ * magic-link session JWT (Authorization header). Returns recognized:false
+ * silently if there's no profile or no panel consent on file.
+ */
+export async function recognizeParticipant(
+  linkToken: string,
+  sessionToken: string
+): Promise<RecognizeResponse> {
+  const { data } = await client.get<RecognizeResponse>(
+    `/interview/${linkToken}/recognize`,
+    { headers: { Authorization: `Bearer ${sessionToken}` } }
+  );
+  return data;
+}
+
 export async function savePanelProfile(
   linkToken: string,
   profile: PanelProfileData

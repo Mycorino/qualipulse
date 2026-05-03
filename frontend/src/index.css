@@ -2371,6 +2371,38 @@ select.field-input {
   max-width: 560px;
 }
 
+/* PF-2: returning-panelist banner. Renders above the consent title when the
+   magic-link session unlocks a known PanelProfile. Soft brand-tinted card,
+   not loud — the consent itself is still the primary action. */
+.welcome-back-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--brand-50, rgba(99, 102, 241, 0.08));
+  border: 1px solid var(--brand-200, rgba(99, 102, 241, 0.18));
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+.welcome-back-banner__wave {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.welcome-back-banner strong {
+  display: block;
+  font-size: 14px;
+  color: var(--brand-700, var(--text-primary));
+  margin-bottom: 2px;
+}
+.welcome-back-banner p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 .consent-title {
   font-size: 1.6rem;
   margin-bottom: 4px;

@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 
 from app.models.coding import ManualCode, QuoteTag
 from app.models.company import Company
+from app.models.panel import PanelProfile
 from app.models.interview import (
     AnalysisThemeAnnotation,
     InterviewLink,
@@ -869,6 +870,88 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             )
         )
 
+    # PF-2: seed two PanelProfile rows so the magic-link recognition flow has
+    # something to recognise out of the box. These are NOT linked to the
+    # demo participants above (those already completed an interview without
+    # a panel opt-in). They're stand-alone test panelists with realistic-but-
+    # fictional emails — the user can hit /i/{link}, type one of these
+    # emails, click the magic link in console, and see "Welcome back".
+    _seed_demo_panel_profiles(db, lang)
+
     db.commit()
     db.refresh(project)
     return project
+
+
+# Stand-alone test panelists for the magic-link recognition flow. Idempotent
+# via email uniqueness — running the seeder multiple times across tenants
+# only ever creates these rows once.
+_DEMO_PANEL_PROFILES_EN = [
+    {
+        "email": "alex.demo@qualipulse.test",
+        "first_name": "Alex",
+        "age_range": "25-34",
+        "country": "United Kingdom",
+        "city": "London",
+        "education": "bachelors",
+        "employment_status": "full_time",
+        "interviews_completed": 2,
+    },
+    {
+        "email": "morgan.demo@qualipulse.test",
+        "first_name": "Morgan",
+        "age_range": "35-44",
+        "country": "United States",
+        "city": "Austin",
+        "education": "masters",
+        "employment_status": "freelance",
+        "interviews_completed": 1,
+    },
+]
+
+_DEMO_PANEL_PROFILES_FR = [
+    {
+        "email": "alex.demo@qualipulse.test",
+        "first_name": "Alex",
+        "age_range": "25-34",
+        "country": "France",
+        "city": "Paris",
+        "education": "masters",
+        "employment_status": "full_time",
+        "interviews_completed": 2,
+    },
+    {
+        "email": "marie.demo@qualipulse.test",
+        "first_name": "Marie",
+        "age_range": "35-44",
+        "country": "Belgique",
+        "city": "Bruxelles",
+        "education": "bachelors",
+        "employment_status": "part_time",
+        "interviews_completed": 1,
+    },
+]
+
+
+def _seed_demo_panel_profiles(db: Session, lang: str) -> None:
+    profiles = _DEMO_PANEL_PROFILES_FR if lang == "fr" else _DEMO_PANEL_PROFILES_EN
+    now = datetime.now(timezone.utc)
+    for p in profiles:
+        existing = db.query(PanelProfile).filter(PanelProfile.email == p["email"]).first()
+        if existing is not None:
+            continue  # already seeded for another tenant — leave it alone
+        db.add(
+            PanelProfile(
+                email=p["email"],
+                first_name=p["first_name"],
+                age_range=p["age_range"],
+                country=p["country"],
+                city=p["city"],
+                education=p["education"],
+                employment_status=p["employment_status"],
+                interviews_completed=p["interviews_completed"],
+                panel_consent=True,
+                consent_at=now - timedelta(days=14),
+                last_active=now - timedelta(days=12),
+            )
+        )

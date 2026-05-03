@@ -155,6 +155,83 @@ def verify_participant_token(
     }
 
 
+@router.get("/{token}/recognize")
+@limiter.limit("30/minute")
+def recognize_returning_participant(
+    request: Request,
+    token: str,
+    authorization: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Look up a returning panel participant by their *verified* email.
+
+    Gated behind the magic-link session JWT so we never echo profile data
+    based on an attacker-supplied email — the participant must have proven
+    they own this address by clicking the link in their inbox.
+
+    Returns:
+      ``{recognized: false}`` if no panel profile exists for this email,
+      or if the panel profile was created without ``panel_consent=True``
+      (we can't reuse the data without consent on file).
+
+      ``{recognized: true, profile: {...}}`` with prefill-friendly fields
+      otherwise. Updates ``last_active`` so we have a fresh signal for
+      researcher re-recruitment queries.
+    """
+    # FastAPI accepts the Authorization header via the Header(...) dependency,
+    # but we want a soft-fail (return recognized:false) rather than 401 when
+    # missing — recognition is an optional optimisation.
+    auth_header = request.headers.get("authorization") or authorization or ""
+    if not auth_header.lower().startswith("bearer "):
+        return {"recognized": False, "reason": "missing_session"}
+    session_jwt = auth_header.split(" ", 1)[1].strip()
+    payload = _decode_session_token(session_jwt)
+    if not payload:
+        return {"recognized": False, "reason": "invalid_session"}
+
+    # Defence in depth: refuse if the JWT was issued for a different interview
+    # link. Stops one project's session from unlocking another project's
+    # recognition response.
+    if payload.get("link_token") != token:
+        return {"recognized": False, "reason": "token_mismatch"}
+
+    email = (payload.get("email") or "").strip().lower()
+    if not email:
+        return {"recognized": False, "reason": "missing_email"}
+
+    profile = (
+        db.query(PanelProfile).filter(PanelProfile.email == email).first()
+    )
+    if profile is None or not profile.panel_consent:
+        return {"recognized": False}
+
+    # Refresh last_active so re-recruitment queries see a recent signal.
+    profile.last_active = datetime.utcnow()
+    db.commit()
+
+    last_active_days_ago: int | None = None
+    if profile.last_active:
+        delta = datetime.utcnow() - profile.last_active
+        last_active_days_ago = max(0, delta.days)
+
+    interest_count = len(profile.tags) if profile.tags is not None else 0
+
+    return {
+        "recognized": True,
+        "profile": {
+            "first_name": profile.first_name,
+            "age_range": profile.age_range,
+            "country": profile.country,
+            "city": profile.city,
+            "education": profile.education,
+            "employment_status": profile.employment_status,
+            "interviews_completed": profile.interviews_completed or 0,
+            "last_active_days_ago": last_active_days_ago,
+            "interests_count": interest_count,
+        },
+    }
+
+
 @router.post("/{token}/panel-profile")
 @limiter.limit("10/minute")
 def save_panel_profile(
