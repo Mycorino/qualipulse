@@ -339,7 +339,7 @@ WHY: generic answer with no behaviour or example.
     if short_answer_state and short_answer_state.get("is_short_run") and pace_delta >= -0.5:
         run = short_answer_state.get("run_length", 0)
         last_w = short_answer_state.get("last_words")
-        prompt += (
+        user_message += (
             f"<engagement>\n"
             f"The participant's last {run} answer(s) were short "
             f"(most recent: ~{last_w} words). "
@@ -349,7 +349,7 @@ WHY: generic answer with no behaviour or example.
             f"</engagement>\n\n"
         )
 
-    prompt += (
+    user_message += (
         "Decide the next action and write the question the participant will hear. "
         "Return ONLY: "
         '{"action": "follow_up" | "next_question" | "close", "question": "..."}'
