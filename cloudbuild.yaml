@@ -72,8 +72,8 @@ steps:
       - --max-instances=10
       - --timeout=300s
       - --concurrency=80
-      - --set-secrets=SECRET_KEY=secret-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,DATABASE_URL=database-url:latest,SENDGRID_API_KEY=sendgrid-api-key:latest,ADMIN_SECRET_KEY=admin-secret-key:latest
-      - --set-env-vars=ENVIRONMENT=production,UPLOAD_DIR=/tmp/uploads,ALLOWED_ORIGINS=https://app.qualipulse.com,APP_BASE_URL=https://app.qualipulse.com
+      - --set-secrets=SECRET_KEY=secret-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,DATABASE_URL=database-url:latest,SENDGRID_API_KEY=sendgrid-api-key:latest,ADMIN_SECRET_KEY=admin-secret-key:latest,R2_ACCOUNT_ID=r2-account-id:latest,R2_ACCESS_KEY_ID=r2-access-key-id:latest,R2_SECRET_ACCESS_KEY=r2-secret-access-key:latest,R2_BUCKET=r2-bucket:latest,R2_PUBLIC_URL=r2-public-url:latest
+      - --set-env-vars=ENVIRONMENT=production,UPLOAD_DIR=/tmp/uploads,ALLOWED_ORIGINS=https://app.qualipulse.com,APP_BASE_URL=https://app.qualipulse.com,R2_JURISDICTION=eu
 
   # ── Deploy frontend to Cloud Run ─────────────────────────────────────
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
