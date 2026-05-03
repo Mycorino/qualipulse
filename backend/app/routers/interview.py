@@ -511,10 +511,10 @@ async def respond_to_question(
     audio_data = await audio.read()
     ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
     audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
-    upload_audio(audio_data, audio_key)
+    audio_url = upload_audio(audio_data, audio_key)
 
     try:
-        result = process_interview_turn(participant_id, audio_key, db)
+        result = process_interview_turn(participant_id, audio_key, audio_url, db)
     except EmptyTranscriptError as e:
         # 422 so the frontend can distinguish "bad audio, please retry" from
         # 5xx transport failures. The frontend preserves the blob for re-submit.
