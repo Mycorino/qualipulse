@@ -27,6 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.billing import (
     CreditBalance,
     CreditLedger,
@@ -411,7 +412,87 @@ def consume_interview_credit(
     )
     db.commit()
 
+    # PR 3: usage-warning emails. Fires once per period at the 80% and 100%
+    # thresholds. Idempotency is enforced by inspecting the usage_events
+    # table for an existing matching event in the current period — no
+    # spamming the admin if multiple participants complete in quick
+    # succession around the threshold boundary.
+    try:
+        _maybe_send_usage_warning(db, workspace_id, balance)
+    except Exception:  # pragma: no cover — never fail consumption on email
+        logger.exception("Usage warning trigger failed for workspace %s", workspace_id)
+
     return ledger
+
+
+def _maybe_send_usage_warning(db: Session, workspace_id: str, balance: CreditBalance) -> None:
+    """Send the 80%/100% warning email if we just crossed the threshold.
+
+    Idempotent: skips the send if a usage_event of the same threshold
+    already exists for this period.
+    """
+    total = (balance.included_credits or 0) + (balance.purchased_credits or 0) + (balance.rollover_credits or 0)
+    if total <= 0:
+        return
+    used = balance.used_credits or 0
+    percent = int(round((used / total) * 100))
+
+    threshold: int | None = None
+    if percent >= 100:
+        threshold = 100
+    elif percent >= 80:
+        threshold = 80
+    if threshold is None:
+        return
+
+    event_name = f"usage_warning_{threshold}"
+    already_sent = (
+        db.query(UsageEvent)
+        .filter(
+            UsageEvent.workspace_id == workspace_id,
+            UsageEvent.event_name == event_name,
+            UsageEvent.created_at >= balance.period_start,
+        )
+        .first()
+    )
+    if already_sent is not None:
+        return
+
+    company = db.query(Company).filter(Company.id == workspace_id).first()
+    if company is None or not company.email:
+        return
+    lang = (company.preferred_language or "en")[:2].lower()
+    period_end_str = (
+        balance.period_end.strftime("%d %b %Y") if balance.period_end else ""
+    )
+    billing_url = f"{settings.APP_BASE_URL.rstrip('/')}/account?tab=billing"
+
+    try:
+        from app.services.email import send_usage_warning
+        send_usage_warning(
+            to=company.email,
+            percent=percent,
+            used=used,
+            total=total,
+            period_end=period_end_str,
+            billing_url=billing_url,
+            lang=lang,
+        )
+    except Exception:
+        logger.exception("send_usage_warning failed for %s", company.email)
+        return
+
+    db.add(
+        UsageEvent(
+            id=str(uuid.uuid4()),
+            workspace_id=workspace_id,
+            event_name=event_name,
+            quantity=1,
+            billable=False,
+            event_metadata={"percent": percent, "used": used, "total": total},
+        )
+    )
+    db.commit()
 
 
 # ── Initial subscription bootstrap (signup) ──────────────────────────────────
@@ -618,6 +699,73 @@ def grant_period_credits(
     db.commit()
     db.refresh(balance)
     return balance
+
+
+def grant_purchased_credits(
+    db: Session,
+    workspace_id: str,
+    *,
+    credits: int,
+    stripe_session_id: str,
+    pack_id: str | None = None,
+) -> CreditBalance | None:
+    """Top up a workspace's active credit balance with a prepaid pack.
+
+    Idempotent per ``stripe_session_id`` — webhook replays don't double
+    grant. Returns the updated balance, or None if no active balance
+    exists (the workspace would need an active subscription first).
+    """
+    if credits <= 0:
+        return None
+
+    # Idempotency: bail if a grant_purchased ledger row already exists for
+    # this Stripe session. Cheap query, exact match.
+    existing = (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.workspace_id == workspace_id,
+            CreditLedger.event_type == EVT_GRANT_PURCHASED,
+            CreditLedger.event_metadata.like(f'%"{stripe_session_id}"%'),
+        )
+        .first()
+    )
+    if existing is not None:
+        return billing_get_active_balance_for_workspace(db, workspace_id)
+
+    balance = get_active_balance(db, workspace_id)
+    if balance is None:
+        logger.warning(
+            "grant_purchased_credits: no active balance for workspace %s; pack credit dropped",
+            workspace_id,
+        )
+        return None
+
+    balance.purchased_credits = (balance.purchased_credits or 0) + credits
+    balance.updated_at = _utcnow()
+
+    db.add(
+        CreditLedger(
+            id=str(uuid.uuid4()),
+            workspace_id=workspace_id,
+            balance_id=balance.id,
+            event_type=EVT_GRANT_PURCHASED,
+            credits_delta=credits,
+            balance_after=balance.available,
+            source="stripe_checkout",
+            event_metadata={
+                "stripe_session_id": stripe_session_id,
+                "pack_id": pack_id,
+            },
+        )
+    )
+    db.commit()
+    db.refresh(balance)
+    return balance
+
+
+# Alias the existing helper to keep the call-site readable above. The duplicate
+# binding is purely cosmetic — both names resolve to the same function.
+billing_get_active_balance_for_workspace = get_active_balance
 
 
 def cancel_subscription(

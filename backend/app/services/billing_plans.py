@@ -350,3 +350,77 @@ def billing_interval_for_stripe_price(price_id: str) -> str:
         settings.STRIPE_PRICE_AGENCY_ANNUAL,
     }
     return "annual" if price_id in annual_ids and price_id else "monthly"
+
+
+# ── Prepaid credit packs ─────────────────────────────────────────────────────
+# One-time Stripe payments that top up a workspace's balance. Listed in the
+# billing settings UI; consumed via ``checkout.session.completed`` webhook.
+
+
+@dataclass(frozen=True)
+class CreditPackSpec:
+    id: str
+    public_name: str
+    credits: int
+    price_cents: int
+    currency: str = "EUR"
+    description: str = ""
+
+
+CREDIT_PACKS: tuple[CreditPackSpec, ...] = (
+    CreditPackSpec(
+        id="pack_25",
+        public_name="25 credits",
+        credits=25,
+        price_cents=15000,  # €150
+        description="Top-up for Exploration workspaces.",
+    ),
+    CreditPackSpec(
+        id="pack_50",
+        public_name="50 credits",
+        credits=50,
+        price_cents=30000,  # €300
+        description="Top-up for Team workspaces.",
+    ),
+    CreditPackSpec(
+        id="pack_100",
+        public_name="100 credits",
+        credits=100,
+        price_cents=50000,  # €500
+        description="Top-up for Agency workspaces.",
+    ),
+)
+
+
+def get_credit_pack(pack_id: str) -> CreditPackSpec | None:
+    for p in CREDIT_PACKS:
+        if p.id == pack_id:
+            return p
+    return None
+
+
+def stripe_price_id_for_pack(pack_id: str) -> str | None:
+    """Return the Stripe price id configured for a credit pack."""
+    from app.config import settings
+
+    table = {
+        "pack_25":  settings.STRIPE_PRICE_PACK_25,
+        "pack_50":  settings.STRIPE_PRICE_PACK_50,
+        "pack_100": settings.STRIPE_PRICE_PACK_100,
+    }
+    val = table.get(pack_id, "") or ""
+    return val if val else None
+
+
+def credit_pack_for_stripe_price(price_id: str) -> CreditPackSpec | None:
+    """Inverse of ``stripe_price_id_for_pack`` — used by the webhook to
+    figure out how many credits a one-time checkout earned."""
+    from app.config import settings
+
+    table = {
+        settings.STRIPE_PRICE_PACK_25:  "pack_25",
+        settings.STRIPE_PRICE_PACK_50:  "pack_50",
+        settings.STRIPE_PRICE_PACK_100: "pack_100",
+    }
+    pack_id = table.get(price_id) if price_id else None
+    return get_credit_pack(pack_id) if pack_id else None

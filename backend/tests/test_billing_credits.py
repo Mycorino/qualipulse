@@ -417,3 +417,150 @@ class TestStripeLifecycle:
         assert result is not None
         assert result.id == sub.id
         assert result.status == "canceled"
+
+
+# ── PR 3: credit packs + admin adjustment + usage warnings ──────────────────
+
+
+class TestCreditPackGrant:
+    def test_grant_purchased_credits_idempotent_per_session(self, db_session):
+        from datetime import datetime, timedelta
+        from app.services.billing_service import (
+            grant_period_credits,
+            grant_purchased_credits,
+            upsert_subscription_from_stripe,
+        )
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        now = datetime.utcnow()
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id="cus_pack",
+            stripe_subscription_id="sub_pack",
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        grant_period_credits(db_session, sub)
+
+        bal = grant_purchased_credits(
+            db_session, c.id, credits=50, stripe_session_id="cs_test_1", pack_id="pack_50"
+        )
+        assert bal is not None
+        assert bal.purchased_credits == 50
+
+        # Replay with same Stripe session id — no double grant.
+        bal2 = grant_purchased_credits(
+            db_session, c.id, credits=50, stripe_session_id="cs_test_1", pack_id="pack_50"
+        )
+        assert bal2 is not None
+        assert bal2.purchased_credits == 50  # unchanged
+
+        # Different session id → adds again.
+        bal3 = grant_purchased_credits(
+            db_session, c.id, credits=25, stripe_session_id="cs_test_2", pack_id="pack_25"
+        )
+        assert bal3 is not None
+        assert bal3.purchased_credits == 75
+
+    def test_grant_purchased_credits_no_balance_returns_none(self, db_session):
+        from app.services.billing_service import grant_purchased_credits
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        result = grant_purchased_credits(
+            db_session, c.id, credits=25, stripe_session_id="cs_orphan", pack_id="pack_25"
+        )
+        assert result is None
+
+
+class TestUsageWarningEmails:
+    def test_no_warning_under_80_percent(self, db_session, monkeypatch):
+        from app.services.billing_service import (
+            _maybe_send_usage_warning,
+            bootstrap_trial_subscription,
+            get_active_balance,
+        )
+
+        sent: list[dict] = []
+        def fake_send(**kwargs):
+            sent.append(kwargs)
+            return True
+        from app.services import email as email_module
+        monkeypatch.setattr(email_module, "send_usage_warning", fake_send)
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        bootstrap_trial_subscription(db_session, c)
+        bal = get_active_balance(db_session, c.id)
+        bal.used_credits = 5  # 50%
+        db_session.commit()
+
+        _maybe_send_usage_warning(db_session, c.id, bal)
+        assert sent == []
+
+    def test_fires_at_80_percent_then_idempotent(self, db_session, monkeypatch):
+        from app.services.billing_service import (
+            _maybe_send_usage_warning,
+            bootstrap_trial_subscription,
+            get_active_balance,
+        )
+        from app.models.billing import UsageEvent
+
+        sent: list[dict] = []
+        def fake_send(**kwargs):
+            sent.append(kwargs)
+            return True
+        from app.services import email as email_module
+        monkeypatch.setattr(email_module, "send_usage_warning", fake_send)
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        bootstrap_trial_subscription(db_session, c)
+        bal = get_active_balance(db_session, c.id)
+        bal.used_credits = 8  # 80%
+        db_session.commit()
+
+        _maybe_send_usage_warning(db_session, c.id, bal)
+        assert len(sent) == 1
+        assert sent[0]["percent"] == 80
+
+        _maybe_send_usage_warning(db_session, c.id, bal)
+        assert len(sent) == 1
+
+        assert (
+            db_session.query(UsageEvent)
+            .filter(UsageEvent.workspace_id == c.id, UsageEvent.event_name == "usage_warning_80")
+            .count()
+            == 1
+        )
+
+    def test_fires_at_100_percent(self, db_session, monkeypatch):
+        from app.services.billing_service import (
+            _maybe_send_usage_warning,
+            bootstrap_trial_subscription,
+            get_active_balance,
+        )
+
+        sent: list[dict] = []
+        def fake_send(**kwargs):
+            sent.append(kwargs)
+            return True
+        from app.services import email as email_module
+        monkeypatch.setattr(email_module, "send_usage_warning", fake_send)
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        bootstrap_trial_subscription(db_session, c)
+        bal = get_active_balance(db_session, c.id)
+        bal.used_credits = 10  # 100%
+        db_session.commit()
+
+        _maybe_send_usage_warning(db_session, c.id, bal)
+        assert len(sent) == 1
+        assert sent[0]["percent"] == 100

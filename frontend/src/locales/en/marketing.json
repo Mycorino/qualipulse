@@ -131,59 +131,53 @@
   },
   "pricing": {
     "title": "Simple, transparent pricing",
-    "subtitle": "14-day free trial on all plans. No credit card required to start.",
+    "subtitle": "Every plan includes a 14-day trial — no card required.",
     "recommended": "Recommended",
     "enterprise": "Running a large research program?",
     "enterpriseCta": "Talk to us about Enterprise",
     "perMonth": "/mo",
+    "perYear": "/yr",
+    "billingToggleLabel": "Billing interval",
+    "billingMonthly": "Monthly",
+    "billingAnnual": "Annual",
+    "billingAnnualSave": "Save 17%",
+    "billedAnnuallyAs": "Billed €{{amount}} per year",
+    "creditsPerMonth": "interview credits / month",
+    "creditDefinition": "1 credit = 1 completed participant interview, up to 15 minutes — including AI questioning, transcription, analysis and storage.",
     "plans": {
-      "free": {
-        "name": "Free",
-        "desc": "Try QualiPulse end to end — no card required",
+      "exploration": {
+        "name": "Exploration",
+        "desc": "For solo researchers running a few studies a month",
         "features": [
-          "1 project",
-          "5 participants",
-          "AI interview guide builder",
-          "AI themes & quotes analysis",
-          "1 interview link"
-        ],
-        "cta": "Start free"
-      },
-      "starter": {
-        "name": "Starter",
-        "desc": "For individual researchers starting out",
-        "features": [
-          "1 project",
-          "10 participants per project",
-          "AI interview guide builder",
-          "AI themes & quotes analysis",
-          "2 interview links per project"
+          "25 interview credits / month",
+          "Up to 3 active projects",
+          "AI interview guide & analysis",
+          "CSV & PDF export",
+          "Public report sharing"
         ],
         "cta": "Start 14-day free trial"
       },
       "team": {
         "name": "Team",
-        "desc": "For in-house research teams running regular studies",
+        "desc": "For research teams running studies in parallel",
         "features": [
-          "5 projects",
-          "50 participants per project",
-          "Full AI synthesis memo",
-          "Demographic segments & heatmaps",
-          "CSV export",
-          "3 team members"
+          "100 interview credits / month",
+          "Up to 20 active projects",
+          "3 editors + unlimited viewers",
+          "Team workspace & permissions",
+          "Everything in Exploration"
         ],
         "cta": "Start 14-day free trial"
       },
-      "lab": {
-        "name": "Lab",
-        "desc": "For research programs and agencies",
+      "agency": {
+        "name": "Agency",
+        "desc": "For agencies running research for multiple clients",
         "features": [
+          "300 interview credits / month",
           "Unlimited projects",
-          "500 participants per project",
-          "Everything in Team",
-          "Custom branding on interviews",
-          "10 team members",
-          "Priority support"
+          "8 editors + unlimited viewers",
+          "Client workspaces & custom branding",
+          "API access"
         ],
         "cta": "Start 14-day free trial"
       }

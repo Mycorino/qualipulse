@@ -4,16 +4,38 @@ import { useTranslation } from "react-i18next";
 import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
-const PLAN_IDS = [
-  { id: "free", price: "€0", highlight: false },
-  { id: "starter", price: "€49", highlight: false },
-  { id: "team", price: "€99", highlight: true },
-  { id: "lab", price: "€199", highlight: false },
+// Credits-based plan catalogue (PR 3). Prices match the plans seeded in the
+// backend ``billing_plans.py`` — keep in sync if either side changes.
+// Trial isn't shown on the public pricing page (it's automatic on signup).
+const MARKETING_PLANS = [
+  {
+    id: "exploration",
+    monthlyEur: 89,
+    annualEur: 890,  // 12-month savings handled in copy
+    credits: 25,
+    highlight: false,
+  },
+  {
+    id: "team",
+    monthlyEur: 299,
+    annualEur: 2990,
+    credits: 100,
+    highlight: true,
+  },
+  {
+    id: "agency",
+    monthlyEur: 799,
+    annualEur: 7990,
+    credits: 300,
+    highlight: false,
+  },
 ] as const;
 
 export default function Marketing() {
   const { t } = useTranslation("marketing");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Pricing toggle (PR 3) — defaults to annual since the savings are noticeable.
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("annual");
   const menuRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
 
@@ -239,19 +261,59 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing — credits-based plans (PR 3 rebuild) */}
       <section className="mkt-section" id="pricing">
         <h2 className="mkt-section-title">{t("pricing.title")}</h2>
         <p className="mkt-section-sub">{t("pricing.subtitle")}</p>
+
+        {/* Monthly / annual toggle. Uses the existing .mkt-billing-toggle
+            shape (pill group with .active state) — see Marketing.css. */}
+        <div className="mkt-billing-toggle" role="tablist" aria-label={t("pricing.billingToggleLabel", { defaultValue: "Billing interval" })}>
+          <button
+            role="tab"
+            aria-selected={billingInterval === "monthly"}
+            className={billingInterval === "monthly" ? "active" : ""}
+            onClick={() => setBillingInterval("monthly")}
+          >
+            {t("pricing.billingMonthly", { defaultValue: "Monthly" })}
+          </button>
+          <button
+            role="tab"
+            aria-selected={billingInterval === "annual"}
+            className={billingInterval === "annual" ? "active" : ""}
+            onClick={() => setBillingInterval("annual")}
+          >
+            {t("pricing.billingAnnual", { defaultValue: "Annual" })}{" "}
+            <span className="mkt-billing-toggle-save">
+              {t("pricing.billingAnnualSave", { defaultValue: "Save 17%" })}
+            </span>
+          </button>
+        </div>
+
         <div className="mkt-plans">
-          {PLAN_IDS.map((p) => {
+          {MARKETING_PLANS.map((p) => {
             const features = t(`pricing.plans.${p.id}.features`, { returnObjects: true }) as string[];
+            const monthlyAmount = p.monthlyEur;
+            const annualAmount = p.annualEur;
+            const isAnnual = billingInterval === "annual";
+            const display = isAnnual
+              ? Math.round(annualAmount / 12)  // monthly equivalent of annual price
+              : monthlyAmount;
             return (
               <div key={p.id} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
                 {p.highlight && <div className="mkt-plan-badge">{t("pricing.recommended")}</div>}
                 <div className="mkt-plan-name">{t(`pricing.plans.${p.id}.name`)}</div>
                 <div className="mkt-plan-price">
-                  {p.price}<span className="mkt-plan-period">{t("pricing.perMonth")}</span>
+                  €{display}
+                  <span className="mkt-plan-period">{t("pricing.perMonth")}</span>
+                </div>
+                {isAnnual && (
+                  <div className="mkt-plan-billed-as">
+                    {t("pricing.billedAnnuallyAs", { amount: annualAmount, defaultValue: "Billed €{{amount}} per year" })}
+                  </div>
+                )}
+                <div className="mkt-plan-credits">
+                  <strong>{p.credits}</strong> {t("pricing.creditsPerMonth", { defaultValue: "interview credits / month" })}
                 </div>
                 <div className="mkt-plan-desc">{t(`pricing.plans.${p.id}.desc`)}</div>
                 <ul className="mkt-plan-features">
@@ -262,7 +324,7 @@ export default function Marketing() {
                   ))}
                 </ul>
                 <Link
-                  to={`/signup?plan=${p.id}`}
+                  to={`/signup?plan=${p.id}&interval=${billingInterval}`}
                   className={`btn ${p.highlight ? "btn-primary" : "btn-secondary"} mkt-plan-cta`}
                 >
                   {t(`pricing.plans.${p.id}.cta`)}
@@ -271,6 +333,11 @@ export default function Marketing() {
             );
           })}
         </div>
+        <p className="mkt-plans-credit-note">
+          {t("pricing.creditDefinition", {
+            defaultValue: "1 credit = 1 completed participant interview, up to 15 minutes."
+          })}
+        </p>
         <p className="mkt-plans-enterprise">
           {t("pricing.enterprise")}{" "}
           <a href="mailto:hello@qualipulse.com">{t("pricing.enterpriseCta")}</a>
