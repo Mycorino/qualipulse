@@ -682,7 +682,7 @@ def process_interview_turn(
     # 1. Transcribe the participant's audio
     audio_data = download_audio(audio_path)
     filename = os.path.basename(audio_path)
-    transcript, audio_duration = transcribe_audio(audio_data, filename)
+    transcript, audio_duration, segments = transcribe_audio(audio_data, filename)
 
     # 1a. Guard: Whisper sometimes returns an empty or whitespace-only string
     # for silent/inaudible clips. Saving that and passing it to Claude produces
@@ -704,6 +704,7 @@ def process_interview_turn(
         last_turn = turns[-1]
         last_turn.response_transcript = transcript
         last_turn.audio_recording_url = audio_url
+        last_turn.response_segments = json.dumps(segments) if segments else None
         db.commit()
 
     # 3. Get context for Claude

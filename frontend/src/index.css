@@ -5116,6 +5116,22 @@ select.field-input {
   opacity: 1;
 }
 
+/* Sentence-level audio sync — segments are clickable, the active one
+   highlights softly in sync with playback. The colour is intentionally
+   subtle so it sits underneath researcher-created tag highlights. */
+.transcript-segment {
+  cursor: pointer;
+  transition: background-color 150ms ease;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.transcript-segment:hover {
+  background-color: var(--brand-50, rgba(99, 102, 241, 0.06));
+}
+.transcript-segment--active {
+  background-color: var(--brand-100, rgba(99, 102, 241, 0.18));
+}
+
 .quote-tag-instruction {
   font-size: 0.8rem;
   color: var(--text-tertiary);

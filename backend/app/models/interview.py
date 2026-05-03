@@ -144,6 +144,10 @@ class InterviewTurn(Base):
     follow_up_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     response_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Whisper segment timestamps as JSON: [{"start": float, "end": float, "text": str}]
+    # Powers sentence-level highlighting in the researcher transcript view.
+    # Cleared on manual edit because character offsets no longer match.
+    response_segments: Mapped[str | None] = mapped_column(Text, nullable=True)
     audio_recording_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     tts_audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     manually_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

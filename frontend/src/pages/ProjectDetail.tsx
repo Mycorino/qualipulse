@@ -126,6 +126,11 @@ export default function ProjectDetail() {
   const [transcriptViewMode, setTranscriptViewMode] = useState<"original" | "translated">("original");
   const [translating, setTranslating] = useState(false);
 
+  // ── Synced-segment audio playback ─────────────────────────────────────────
+  // Map of turnId → recording <audio> element so transcript spans can seek
+  // playback by clicking a segment.
+  const recordingAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
+
   // ── Iterative analysis state ───────────────────────────────────────────────
   const [themeAnnotations, setThemeAnnotations] = useState<Record<string, ThemeAnnotation>>({});
   const [researcherContext, setResearcherContext] = useState("");
@@ -1027,6 +1032,109 @@ export default function ProjectDetail() {
         {after}
       </span>
     );
+  }
+
+  // Compute char offsets for each segment by scanning the transcript
+  // sequentially. Whisper segment text is usually a verbatim substring of the
+  // full transcript; if not, we fall back to a proportional split so the
+  // segment span still lines up roughly. The proportional fallback matters
+  // because Whisper occasionally normalises whitespace differently between
+  // the segment list and the joined .text.
+  function computeSegmentRanges(
+    text: string,
+    segments: import("../api/projects").TranscriptSegment[]
+  ): Array<{ start: number; end: number; idx: number; timeStart: number; timeEnd: number }> {
+    const ranges = [];
+    let cursor = 0;
+    for (let i = 0; i < segments.length; i++) {
+      const segText = (segments[i].text || "").trim();
+      let start = -1;
+      let end = -1;
+      if (segText) {
+        const idx = text.indexOf(segText, cursor);
+        if (idx !== -1) {
+          start = idx;
+          end = idx + segText.length;
+          cursor = end;
+        }
+      }
+      if (start === -1) {
+        // Proportional fallback so the segment still has a visual home
+        start = Math.floor((text.length * i) / segments.length);
+        end = i + 1 < segments.length
+          ? Math.floor((text.length * (i + 1)) / segments.length)
+          : text.length;
+      }
+      ranges.push({
+        start, end, idx: i,
+        timeStart: segments[i].start,
+        timeEnd: segments[i].end,
+      });
+    }
+    return ranges;
+  }
+
+  // Render transcript text split by both quote-tag and segment boundaries.
+  // Each emitted span is a "minimal range" that has at most one tag and one
+  // segment associated with it, so tags and segments coexist visually
+  // without nesting issues. Tags stay the louder visual signal (researcher
+  // intent); segment highlighting is the ambient sync layer.
+  function renderTranscriptWithSegments(
+    text: string,
+    turnId: string,
+    segments: import("../api/projects").TranscriptSegment[]
+  ): React.ReactNode {
+    const turnTags = tags.filter((t) => t.turn_id === turnId)
+      .sort((a, b) => a.start_index - b.start_index);
+    const segRanges = computeSegmentRanges(text, segments);
+
+    const boundaries = new Set<number>([0, text.length]);
+    for (const s of segRanges) { boundaries.add(s.start); boundaries.add(s.end); }
+    for (const t of turnTags) { boundaries.add(t.start_index); boundaries.add(t.end_index); }
+    const points = Array.from(boundaries).filter(p => p >= 0 && p <= text.length).sort((a, b) => a - b);
+
+    const parts: React.ReactNode[] = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const start = points[i];
+      const end = points[i + 1];
+      if (end <= start) continue;
+      const piece = text.slice(start, end);
+      if (!piece) continue;
+
+      const seg = segRanges.find(s => s.start <= start && end <= s.end);
+      const tag = turnTags.find(t => t.start_index <= start && end <= t.end_index);
+
+      const tagColor = tag?.code_color || "#6366f1";
+      const className = [
+        seg ? "transcript-segment" : "",
+        tag ? "transcript-tagged" : "",
+      ].filter(Boolean).join(" ");
+
+      parts.push(
+        <span
+          key={`${turnId}-${i}`}
+          className={className || undefined}
+          data-segment-idx={seg ? seg.idx : undefined}
+          data-segment-start={seg ? seg.timeStart : undefined}
+          style={tag ? {
+            borderBottom: `2.5px solid ${tagColor}`,
+            background: `${tagColor}22`,
+            borderRadius: 2,
+          } : undefined}
+          title={tag ? `Tagged: ${tag.code_name}` : undefined}
+          onClick={seg ? () => {
+            const audio = recordingAudioRefs.current[turnId];
+            if (audio) {
+              audio.currentTime = seg.timeStart;
+              audio.play().catch(() => {});
+            }
+          } : undefined}
+        >
+          {piece}
+        </span>
+      );
+    }
+    return <span data-turn-text="" data-turn-id={turnId}>{parts}</span>;
   }
 
   function renderTaggedText(text: string, turnId: string): React.ReactNode {
@@ -2188,7 +2296,9 @@ export default function ProjectDetail() {
                                     </>
                                   ) : isHighlighted && highlightTarget
                                     ? renderWithQuoteHighlight(t.response_transcript, highlightTarget.quoteText, t.id)
-                                    : renderTaggedText(t.response_transcript, t.id)}
+                                    : t.response_segments && t.response_segments.length > 0
+                                      ? renderTranscriptWithSegments(t.response_transcript, t.id, t.response_segments)
+                                      : renderTaggedText(t.response_transcript, t.id)}
                                   <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle", flexWrap: "wrap" }}>
                                     <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>{tCommon("edit")}</button>
                                     {/* Mobile-only: tag the whole turn (text-selection popup is unreliable on touch). */}
@@ -2242,11 +2352,58 @@ export default function ProjectDetail() {
                                   </span>
                                   {t.audio_recording_url && (
                                     <audio
+                                      ref={(el) => {
+                                        recordingAudioRefs.current[t.id] = el;
+                                      }}
                                       controls
                                       src={t.audio_recording_url}
                                       className="transcript-audio"
                                       aria-label={`Participant recording — turn ${t.turn_index}`}
                                       onError={(e) => { (e.currentTarget as HTMLAudioElement).style.display = "none"; }}
+                                      onTimeUpdate={(e) => {
+                                        const segs = t.response_segments;
+                                        if (!segs || segs.length === 0) return;
+                                        const time = (e.currentTarget as HTMLAudioElement).currentTime;
+                                        // Linear scan is fine — typical turn has <30 segments.
+                                        let activeIdx = -1;
+                                        for (let i = 0; i < segs.length; i++) {
+                                          if (time >= segs[i].start && time < segs[i].end) {
+                                            activeIdx = i;
+                                            break;
+                                          }
+                                        }
+                                        const container = document.querySelector(
+                                          `[data-turn-id="${t.id}"]`
+                                        );
+                                        if (!container) return;
+                                        // Toggle is-active only on segments whose state changed.
+                                        const desired = String(activeIdx);
+                                        const prev = container.querySelectorAll(
+                                          ".transcript-segment--active"
+                                        );
+                                        prev.forEach((el) => {
+                                          if (el.getAttribute("data-segment-idx") !== desired) {
+                                            el.classList.remove("transcript-segment--active");
+                                          }
+                                        });
+                                        if (activeIdx !== -1) {
+                                          const next = container.querySelectorAll(
+                                            `[data-segment-idx="${activeIdx}"]`
+                                          );
+                                          next.forEach((el) =>
+                                            el.classList.add("transcript-segment--active")
+                                          );
+                                        }
+                                      }}
+                                      onEnded={() => {
+                                        document
+                                          .querySelectorAll(
+                                            `[data-turn-id="${t.id}"] .transcript-segment--active`
+                                          )
+                                          .forEach((el) =>
+                                            el.classList.remove("transcript-segment--active")
+                                          );
+                                      }}
                                     />
                                   )}
                                 </div>

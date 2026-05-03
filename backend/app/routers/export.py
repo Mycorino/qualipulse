@@ -177,6 +177,7 @@ def get_transcript(
                 turn_index=t.turn_index,
                 question_text=t.question_text,
                 response_transcript=t.response_transcript,
+                response_segments=json.loads(t.response_segments) if t.response_segments else None,
                 is_follow_up=t.is_follow_up,
                 manually_edited=t.manually_edited,
                 edited_at=t.edited_at,

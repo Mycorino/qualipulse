@@ -75,11 +75,18 @@ class ParticipantResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TranscriptSegment(BaseModel):
+    start: float
+    end: float
+    text: str
+
+
 class TranscriptTurnResponse(BaseModel):
     id: str
     turn_index: int
     question_text: str
     response_transcript: str | None = None
+    response_segments: list[TranscriptSegment] | None = None
     is_follow_up: bool
     manually_edited: bool = False
     edited_at: datetime | None = None
