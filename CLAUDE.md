@@ -409,9 +409,9 @@ and technically-failed participants never consume.
 boot, no-ops after the first.
 
 **State of the rollout:**
-- ✅ PR 1 (this) — schema, plan catalogue, `BillingService`, quota check + idempotent consumption hooked into the engine, backfill on startup. No new accounts on credit plans yet.
-- ⏳ PR 2 — Stripe products/prices/checkout/webhook for new plans, trial auto-bootstrap from signup, frontend pricing page rebuild + billing settings UI.
-- ⏳ PR 3 — admin credit-adjustment endpoint, rollover, automatic overage, prepaid credit packs, usage emails (80% / 100% warnings).
+- ✅ PR 1 — schema, plan catalogue, `BillingService` (seed/backfill/quota/consume), engine hooks, backfill on startup.
+- ✅ PR 2 (this) — Stripe price-id resolver for new plans, `/billing/plans` returns the public catalogue, `/billing/status` exposes both legacy + new shape, `GET /billing/usage` returns credit balance, `/billing/checkout` accepts new plan ids + intervals, webhook routes to credit-plan or legacy path based on Stripe `price_id`, `customer.subscription.created/updated` upsert + grant credits, `customer.subscription.deleted` marks canceled, `invoice.payment_succeeded` re-grants on renewal. Trial auto-bootstrap on onboarding completion. Credits usage card in AccountSettings billing tab.
+- ⏳ PR 3 — frontend pricing page rebuild, admin credit-adjustment endpoint, rollover, automatic overage, prepaid credit packs, usage emails (80% / 100% warnings).
 
 ### Onboarding Flow
 After signup, users are redirected to `/welcome` (4-step onboarding):

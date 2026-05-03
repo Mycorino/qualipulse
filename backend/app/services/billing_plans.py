@@ -286,3 +286,67 @@ LEGACY_TIER_TO_PLAN_ID: dict[str, str] = {
     "pro": "legacy_lab",
     "enterprise": "enterprise",
 }
+
+
+# ── Stripe price-id resolution ───────────────────────────────────────────────
+
+
+def stripe_price_id_for(plan_id: str, interval: str) -> str | None:
+    """Return the Stripe price ID configured for a (plan, interval) pair.
+
+    Reads the ``STRIPE_PRICE_*`` env settings. Returns ``None`` if nothing
+    is configured for that plan — the caller (checkout endpoint) treats
+    that as 503-not-configured.
+    """
+    from app.config import settings  # local import to avoid circular dep
+
+    interval = interval.lower()
+    table: dict[tuple[str, str], str] = {
+        ("exploration", "monthly"): settings.STRIPE_PRICE_EXPLORATION_MONTHLY,
+        ("exploration", "annual"):  settings.STRIPE_PRICE_EXPLORATION_ANNUAL,
+        ("team",        "monthly"): settings.STRIPE_PRICE_TEAM_MONTHLY,
+        ("team",        "annual"):  settings.STRIPE_PRICE_TEAM_ANNUAL,
+        ("agency",      "monthly"): settings.STRIPE_PRICE_AGENCY_MONTHLY,
+        ("agency",      "annual"):  settings.STRIPE_PRICE_AGENCY_ANNUAL,
+        # Legacy-tier price IDs are still respected so /checkout for
+        # existing customers continues to work during the rollout.
+        ("legacy_team", "monthly"): settings.STRIPE_PRICE_STARTER,
+        ("legacy_lab",  "monthly"): settings.STRIPE_PRICE_PRO,
+    }
+    val = table.get((plan_id, interval), "") or ""
+    return val if val else None
+
+
+def plan_id_for_stripe_price(price_id: str) -> str | None:
+    """Inverse of ``stripe_price_id_for`` — used by the webhook to map
+    a Stripe ``price_id`` back to its plan."""
+    from app.config import settings
+
+    if not price_id:
+        return None
+    table = {
+        settings.STRIPE_PRICE_EXPLORATION_MONTHLY: "exploration",
+        settings.STRIPE_PRICE_EXPLORATION_ANNUAL:  "exploration",
+        settings.STRIPE_PRICE_TEAM_MONTHLY:        "team",
+        settings.STRIPE_PRICE_TEAM_ANNUAL:         "team",
+        settings.STRIPE_PRICE_AGENCY_MONTHLY:      "agency",
+        settings.STRIPE_PRICE_AGENCY_ANNUAL:       "agency",
+        # Legacy aliases kept so a Stripe webhook for a grandfathered
+        # subscription still routes back to the right legacy plan.
+        settings.STRIPE_PRICE_STARTER:             "legacy_team",
+        settings.STRIPE_PRICE_PRO:                 "legacy_lab",
+    }
+    return table.get(price_id)
+
+
+def billing_interval_for_stripe_price(price_id: str) -> str:
+    """Return 'monthly' / 'annual' for a configured Stripe price id, or
+    'monthly' as a safe default."""
+    from app.config import settings
+
+    annual_ids = {
+        settings.STRIPE_PRICE_EXPLORATION_ANNUAL,
+        settings.STRIPE_PRICE_TEAM_ANNUAL,
+        settings.STRIPE_PRICE_AGENCY_ANNUAL,
+    }
+    return "annual" if price_id in annual_ids and price_id else "monthly"

@@ -31,6 +31,33 @@ interface BillingStatus {
     interview_count: number;
     storage_bytes: number;
   };
+  // Credits-aware fields (PR 2). Null for accounts that haven't been
+  // backfilled yet — fall back to the legacy tier shape.
+  plan?: {
+    id: string;
+    name: string;
+    is_legacy: boolean;
+    is_custom: boolean;
+    monthly_price_cents: number | null;
+    annual_price_cents: number | null;
+    billing_interval: string | null;
+    subscription_status: string;
+    current_period_start: string | null;
+    current_period_end: string | null;
+    trial_end: string | null;
+    cancel_at_period_end: boolean;
+    overage_enabled: boolean;
+  } | null;
+  credits?: {
+    included_credits: number;
+    purchased_credits: number;
+    rollover_credits: number;
+    used_credits: number;
+    overage_credits: number;
+    available_credits: number;
+    period_start: string | null;
+    period_end: string | null;
+  } | null;
 }
 
 interface Plan {
@@ -613,6 +640,54 @@ export default function AccountSettings() {
 
       {tab === "billing" && (
         <div className="settings-section">
+          {/* PR 2: credits-aware usage card. Only renders for accounts on a
+              non-legacy plan with a known credit balance. Legacy accounts
+              continue to see the participant-count usage in the card below. */}
+          {billing?.plan && !billing.plan.is_legacy && billing.credits && (
+            <div className="settings-card">
+              <h2 className="settings-section-title">{t("billing.usageThisPeriod", { defaultValue: "Usage this period" })}</h2>
+              <div className="billing-current-plan">
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+                  <span className={`plan-badge plan-badge--${billing.plan.id}`}>{billing.plan.name}</span>
+                  <span className="billing-status-badge">{billing.plan.subscription_status}</span>
+                  {billing.plan.trial_end && billing.plan.subscription_status === "trialing" && (
+                    <span className="muted-text" style={{ fontSize: 13 }}>
+                      {t("billing.trialEndsOn", { defaultValue: "Trial ends" })} {new Date(billing.plan.trial_end).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                  <div className="billing-credit-stat">
+                    <div style={{ fontSize: 28, fontWeight: 700 }}>{billing.credits.available_credits}</div>
+                    <div className="muted-text" style={{ fontSize: 13 }}>{t("billing.creditsRemaining", { defaultValue: "Credits remaining" })}</div>
+                  </div>
+                  <div className="billing-credit-stat">
+                    <div style={{ fontSize: 22, fontWeight: 600 }}>
+                      {billing.credits.used_credits} / {billing.credits.included_credits + billing.credits.purchased_credits + billing.credits.rollover_credits}
+                    </div>
+                    <div className="muted-text" style={{ fontSize: 13 }}>{t("billing.creditsUsed", { defaultValue: "Credits used" })}</div>
+                  </div>
+                  {billing.credits.overage_credits > 0 && (
+                    <div className="billing-credit-stat">
+                      <div style={{ fontSize: 22, fontWeight: 600, color: "var(--warning-text)" }}>
+                        {billing.credits.overage_credits}
+                      </div>
+                      <div className="muted-text" style={{ fontSize: 13 }}>{t("billing.overageCredits", { defaultValue: "Overage" })}</div>
+                    </div>
+                  )}
+                </div>
+                {billing.credits.period_end && (
+                  <div className="muted-text" style={{ fontSize: 12, marginTop: 12 }}>
+                    {t("billing.periodEndsOn", { defaultValue: "Period ends" })} {new Date(billing.credits.period_end).toLocaleDateString()}
+                    {billing.plan.cancel_at_period_end && (
+                      <> · {t("billing.cancelAtPeriodEnd", { defaultValue: "subscription will cancel at period end" })}</>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {billing && (
             <div className="settings-card">
               <h2 className="settings-section-title">{t("billing.currentPlan")}</h2>

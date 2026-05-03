@@ -417,25 +417,51 @@ def consume_interview_credit(
 # ── Initial subscription bootstrap (signup) ──────────────────────────────────
 
 
-def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubscription:
-    """Create the trial subscription + initial credit balance for a new company.
+def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubscription | None:
+    """Place ``company`` on the 14-day trial plan with an initial 10-credit balance.
 
-    Called from the auth signup flow once we move new accounts to the
-    credits model. For now it's available but not auto-invoked from signup
-    — the existing legacy_starter backfill covers all signups until we
-    flip the toggle in PR 2 (auth wiring).
+    Behaviour matrix:
+
+    - **No existing subscription** → create a trial sub + balance.
+    - **Existing legacy_* sub from the startup backfill** → replace its
+      plan + status with trial and create the credit balance. The legacy
+      row is updated in place rather than deleted so any inbound Stripe
+      webhook with the old subscription id still resolves.
+    - **Existing paid sub** (anything not legacy_*, not trial) → no-op.
+      We never downgrade a paying customer.
+    - **Existing trial sub** → no-op (idempotent for replayed signups).
+
+    Returns the resulting trial subscription, or ``None`` if we declined
+    to bootstrap.
     """
     now = _utcnow()
-    sub = WorkspaceSubscription(
-        id=str(uuid.uuid4()),
-        workspace_id=company.id,
-        plan_id="trial",
-        status="trialing",
-        billing_interval=None,
-        trial_start=now,
-        trial_end=now + timedelta(days=14),
-    )
-    db.add(sub)
+    existing = get_current_subscription(db, company.id)
+
+    if existing is not None and existing.plan_id == "trial":
+        return existing  # already trialing, nothing to do
+    if existing is not None and not existing.plan_id.startswith("legacy_"):
+        # Paid or enterprise — never downgrade.
+        return None
+
+    if existing is None:
+        sub = WorkspaceSubscription(
+            id=str(uuid.uuid4()),
+            workspace_id=company.id,
+            plan_id="trial",
+            status="trialing",
+            billing_interval=None,
+            trial_start=now,
+            trial_end=now + timedelta(days=14),
+        )
+        db.add(sub)
+    else:
+        sub = existing
+        sub.plan_id = "trial"
+        sub.status = "trialing"
+        sub.billing_interval = None
+        sub.trial_start = now
+        sub.trial_end = now + timedelta(days=14)
+        sub.updated_at = now
     db.flush()
 
     bal = CreditBalance(
@@ -460,6 +486,161 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
             source="trial_signup",
         )
     )
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+
+# ── Subscription lifecycle (Stripe webhook handlers) ────────────────────────
+
+
+def upsert_subscription_from_stripe(
+    db: Session,
+    *,
+    workspace_id: str,
+    plan_id: str,
+    stripe_customer_id: str,
+    stripe_subscription_id: str,
+    stripe_price_id: str | None,
+    status: str,
+    billing_interval: str,
+    current_period_start: datetime,
+    current_period_end: datetime,
+) -> WorkspaceSubscription:
+    """Create or update a WorkspaceSubscription from a Stripe webhook event.
+
+    Called from ``customer.subscription.created`` and
+    ``customer.subscription.updated`` webhook handlers. Idempotent — if a
+    subscription with the same ``stripe_subscription_id`` already exists,
+    its mutable fields are updated in place (so plan changes / status
+    flips / period rolls all land cleanly). Otherwise a new row is
+    inserted and the prior 'legacy' row (if any) is left in place for
+    audit history.
+
+    Granting credits for the new period is the caller's job — call
+    ``grant_period_credits`` separately after this returns. Splitting them
+    keeps the webhook flow readable and lets us re-grant credits without
+    re-creating the subscription row on renewals.
+    """
+    sub = (
+        db.query(WorkspaceSubscription)
+        .filter(WorkspaceSubscription.stripe_subscription_id == stripe_subscription_id)
+        .first()
+    )
+    if sub is None:
+        sub = WorkspaceSubscription(
+            id=str(uuid.uuid4()),
+            workspace_id=workspace_id,
+            plan_id=plan_id,
+            status=status,
+            billing_interval=billing_interval,
+            stripe_customer_id=stripe_customer_id,
+            stripe_subscription_id=stripe_subscription_id,
+            stripe_price_id=stripe_price_id,
+            current_period_start=current_period_start,
+            current_period_end=current_period_end,
+        )
+        db.add(sub)
+    else:
+        sub.workspace_id = workspace_id
+        sub.plan_id = plan_id
+        sub.status = status
+        sub.billing_interval = billing_interval
+        sub.stripe_customer_id = stripe_customer_id
+        sub.stripe_price_id = stripe_price_id
+        sub.current_period_start = current_period_start
+        sub.current_period_end = current_period_end
+        sub.updated_at = _utcnow()
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+
+def grant_period_credits(
+    db: Session,
+    subscription: WorkspaceSubscription,
+    *,
+    source: str = "subscription_renewal",
+    metadata: dict[str, Any] | None = None,
+) -> CreditBalance | None:
+    """Grant ``plan.included_credits`` for the subscription's current period.
+
+    Idempotent per ``(workspace_id, period_start, period_end)`` — re-running
+    on a webhook replay returns the existing balance instead of double-
+    granting. Returns ``None`` when the plan is legacy or has no credits.
+    """
+    plan = subscription.plan if subscription.plan_id else None
+    if plan is None:
+        plan = get_plan(db, subscription.plan_id)
+    if plan is None or plan.is_legacy or not plan.included_credits:
+        return None
+    if subscription.current_period_start is None or subscription.current_period_end is None:
+        logger.warning(
+            "grant_period_credits: subscription %s has no period bounds", subscription.id
+        )
+        return None
+
+    existing = (
+        db.query(CreditBalance)
+        .filter(
+            CreditBalance.workspace_id == subscription.workspace_id,
+            CreditBalance.period_start == subscription.current_period_start,
+            CreditBalance.period_end == subscription.current_period_end,
+        )
+        .first()
+    )
+    if existing is not None:
+        return existing  # webhook replay — never double-grant
+
+    balance = CreditBalance(
+        id=str(uuid.uuid4()),
+        workspace_id=subscription.workspace_id,
+        subscription_id=subscription.id,
+        period_start=subscription.current_period_start,
+        period_end=subscription.current_period_end,
+        included_credits=plan.included_credits,
+    )
+    db.add(balance)
+    db.flush()
+
+    db.add(
+        CreditLedger(
+            id=str(uuid.uuid4()),
+            workspace_id=subscription.workspace_id,
+            balance_id=balance.id,
+            event_type=EVT_GRANT_INCLUDED,
+            credits_delta=plan.included_credits,
+            balance_after=plan.included_credits,
+            source=source,
+            event_metadata=metadata or {"plan_id": plan.id, "stripe_subscription_id": subscription.stripe_subscription_id},
+        )
+    )
+    db.commit()
+    db.refresh(balance)
+    return balance
+
+
+def cancel_subscription(
+    db: Session,
+    *,
+    stripe_subscription_id: str,
+    canceled_status: str = "canceled",
+) -> WorkspaceSubscription | None:
+    """Mark a subscription as canceled in response to ``subscription.deleted``.
+
+    The data isn't deleted — the workspace stays read-only on the cancelled
+    plan until a new subscription is created. Existing credit balance is
+    preserved so anything in flight can complete.
+    """
+    sub = (
+        db.query(WorkspaceSubscription)
+        .filter(WorkspaceSubscription.stripe_subscription_id == stripe_subscription_id)
+        .first()
+    )
+    if sub is None:
+        return None
+    sub.status = canceled_status
+    sub.updated_at = _utcnow()
     db.commit()
     db.refresh(sub)
     return sub

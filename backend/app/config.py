@@ -42,8 +42,19 @@ class Settings(BaseSettings):
     # Stripe (billing)
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+    # Legacy tier price IDs (kept so existing subscriptions still resolve).
     STRIPE_PRICE_STARTER: str = ""
     STRIPE_PRICE_PRO: str = ""
+    # Credits-based plan price IDs. Configure these in Stripe and set them
+    # in .env / Secret Manager. Leave blank in dev — the checkout endpoint
+    # returns 503 if a requested plan has no price configured, so legacy
+    # flows keep working without these vars.
+    STRIPE_PRICE_EXPLORATION_MONTHLY: str = ""
+    STRIPE_PRICE_EXPLORATION_ANNUAL: str = ""
+    STRIPE_PRICE_TEAM_MONTHLY: str = ""
+    STRIPE_PRICE_TEAM_ANNUAL: str = ""
+    STRIPE_PRICE_AGENCY_MONTHLY: str = ""
+    STRIPE_PRICE_AGENCY_ANNUAL: str = ""
 
     # Sentry
     SENTRY_DSN: str = ""
