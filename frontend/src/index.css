@@ -6155,3 +6155,145 @@ select.field-input {
      popup handles tagging there). */
   .turn-tag-btn { display: none !important; }
 }
+
+/* ── Analysis sub-tabs (Overview / Deep dive) ───────────────────────────────
+   The analysis tab now splits into two sub-tabs so stakeholders get a fast
+   answer-in-10-seconds view (Overview), while researchers retain the full
+   themes/JTBDs/tensions/recs/memos surface in Deep dive. */
+
+.analysis-subtabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-sunken);
+  border-radius: var(--radius);
+  margin: var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--border-subtle);
+}
+.analysis-subtab {
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: calc(var(--radius) - 2px);
+  transition: background 0.12s, color 0.12s;
+}
+.analysis-subtab:hover { color: var(--text-primary); }
+.analysis-subtab--active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-xs);
+  font-weight: 600;
+}
+
+/* Overview sub-tab — KPIs + spotlight */
+.analysis-overview { display: flex; flex-direction: column; gap: var(--space-4); }
+.analysis-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--brand-gradient-soft, linear-gradient(135deg, var(--brand-50) 0%, var(--bg-surface) 100%));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.analysis-kpi {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+}
+.analysis-kpi__num {
+  font-size: 28px; font-weight: 700; line-height: 1;
+  color: var(--brand-700, var(--text-primary));
+  letter-spacing: -0.02em;
+}
+.analysis-kpi__num--small { font-size: 16px; font-weight: 600; line-height: 1.2; padding-top: 8px; }
+.analysis-kpi__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.analysis-theme--spotlight {
+  background: var(--bg-surface);
+  border-left-width: 4px;
+  box-shadow: var(--shadow-xs);
+}
+.analysis-overview__cta {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4); border-top: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+  .analysis-kpis { grid-template-columns: 1fr 1fr; padding: var(--space-3); gap: var(--space-2); }
+  .analysis-kpi__num { font-size: 22px; }
+}
+
+/* Deep dive — sticky TOC on desktop, accordion on mobile */
+.analysis-deep {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+.analysis-toc {
+  display: none;  /* hidden by default; mobile gets a stripped-down inline pill row instead */
+}
+.analysis-deep__main { min-width: 0; }
+
+@media (min-width: 1024px) {
+  .analysis-deep { grid-template-columns: minmax(0, 1fr) 220px; }
+  .analysis-toc {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: sticky;
+    top: var(--space-4);
+    max-height: calc(100vh - var(--space-8));
+    overflow-y: auto;
+    padding: var(--space-3);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    align-self: start;
+    order: 2;
+  }
+  .analysis-deep__main { order: 1; }
+  .analysis-toc__title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+  .analysis-toc__link {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: var(--radius-sm, 4px);
+    transition: background 0.12s, color 0.12s;
+  }
+  .analysis-toc__link:hover { background: var(--bg-sunken); color: var(--text-primary); }
+  .analysis-toc__count {
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg-sunken);
+    color: var(--text-tertiary);
+    padding: 1px 6px;
+    border-radius: 999px;
+    min-width: 20px;
+    text-align: center;
+  }
+  /* Anchor offset so TOC jumps don't hide the heading under sticky chrome */
+  .analysis-block[id] { scroll-margin-top: var(--space-6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .analysis-subtab { transition: none; }
+  .analysis-toc__link { transition: none; }
+}

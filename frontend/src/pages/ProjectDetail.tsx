@@ -135,6 +135,11 @@ export default function ProjectDetail() {
   const [refining, setRefining] = useState(false);
   const [annotationPanelOpen, setAnnotationPanelOpen] = useState(false);
 
+  // Analysis sub-tabs: Overview (snapshot for stakeholders) vs Deep dive
+  // (full themes / JTBDs / tensions / recommendations / memos / refine /
+  // heatmap, with sticky TOC on desktop and accordions on mobile).
+  const [analysisSubTab, setAnalysisSubTab] = useState<"overview" | "deep">("overview");
+
   // ── Codebook persistence ───────────────────────────────────────────────────
   const codebookPrefKey = "qp_codebook_open";
   const codebookInitial = localStorage.getItem(codebookPrefKey) !== "false";
@@ -2588,9 +2593,151 @@ export default function ProjectDetail() {
                       </div>
                     )}
 
+                    {/* ─── Analysis sub-tabs ─── */}
+                    <div className="analysis-subtabs" role="tablist" aria-label={tAnalysis("subtabsLabel")}>
+                      <button
+                        role="tab"
+                        aria-selected={analysisSubTab === "overview"}
+                        className={`analysis-subtab${analysisSubTab === "overview" ? " analysis-subtab--active" : ""}`}
+                        onClick={() => setAnalysisSubTab("overview")}
+                      >
+                        {tAnalysis("subtabOverview")}
+                      </button>
+                      <button
+                        role="tab"
+                        aria-selected={analysisSubTab === "deep"}
+                        className={`analysis-subtab${analysisSubTab === "deep" ? " analysis-subtab--active" : ""}`}
+                        onClick={() => setAnalysisSubTab("deep")}
+                      >
+                        {tAnalysis("subtabDeepDive")}
+                      </button>
+                    </div>
+
+                    {/* ─── OVERVIEW SUB-TAB ─── */}
+                    {analysisSubTab === "overview" && (
+                      <div className="analysis-overview">
+                        {/* KPI strip */}
+                        <div className="analysis-kpis">
+                          <div className="analysis-kpi">
+                            <div className="analysis-kpi__num">{r.themes.length}</div>
+                            <div className="analysis-kpi__label">{tAnalysis("kpiThemes")}</div>
+                          </div>
+                          <div className="analysis-kpi">
+                            <div className="analysis-kpi__num">{r.jobs_to_be_done.length}</div>
+                            <div className="analysis-kpi__label">{tAnalysis("kpiJtbds")}</div>
+                          </div>
+                          <div className="analysis-kpi">
+                            <div className="analysis-kpi__num">{r.recommendations.length}</div>
+                            <div className="analysis-kpi__label">{tAnalysis("kpiRecs")}</div>
+                          </div>
+                          <div className="analysis-kpi">
+                            <div className="analysis-kpi__num analysis-kpi__num--small">
+                              {tAnalysis(`confidenceLevel.${r.confidence || "medium"}`)}
+                            </div>
+                            <div className="analysis-kpi__label">{tAnalysis("kpiConfidence")}</div>
+                          </div>
+                        </div>
+
+                        {/* Top recommendations — first 3, the answer-in-10-seconds payload */}
+                        {r.recommendations.length > 0 && (
+                          <div className="analysis-block">
+                            <h3>{tAnalysis("topRecommendations")}</h3>
+                            <ol className="analysis-recommendations">
+                              {r.recommendations.slice(0, 3).map((rec, i) => <li key={i}>{rec}</li>)}
+                            </ol>
+                            {r.recommendations.length > 3 && (
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                style={{ marginTop: 8 }}
+                                onClick={() => setAnalysisSubTab("deep")}
+                              >
+                                {tAnalysis("seeAllRecs", { count: r.recommendations.length })} →
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Spotlight: top theme (first one) with one quote */}
+                        {r.themes.length > 0 && (
+                          <div className="analysis-block">
+                            <h3>
+                              {tAnalysis("topTheme")}
+                              {r.themes.length > 1 && (
+                                <span className="muted-text" style={{ fontWeight: 400, fontSize: 13, marginLeft: 8 }}>
+                                  {tAnalysis("ofN", { n: r.themes.length })}
+                                </span>
+                              )}
+                            </h3>
+                            <div className="analysis-theme analysis-theme--spotlight">
+                              <div className="analysis-theme-header" style={{ flexWrap: "wrap" }}>
+                                <strong>{r.themes[0].title}</strong>
+                                <span className="badge">{r.themes[0].frequency}</span>
+                              </div>
+                              <p>{r.themes[0].summary}</p>
+                              {r.themes[0].quotes.length > 0 && (
+                                <div className="analysis-quotes">
+                                  {renderAttributedQuote(r.themes[0].quotes[0], 0)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* CTA into deep dive */}
+                        <div className="analysis-overview__cta">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => setAnalysisSubTab("deep")}
+                          >
+                            {tAnalysis("openDeepDive")} →
+                          </button>
+                          <span className="muted-text" style={{ fontSize: 12 }}>
+                            {tAnalysis("openDeepDiveHint")}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ─── DEEP DIVE SUB-TAB ─── */}
+                    {analysisSubTab === "deep" && (
+                      <div className="analysis-deep">
+                        {/* Sticky TOC (desktop) — anchors to sections below */}
+                        <nav className="analysis-toc" aria-label={tAnalysis("tocLabel")}>
+                          <span className="analysis-toc__title">{tAnalysis("tocTitle")}</span>
+                          {r.themes.length > 0 && (
+                            <a className="analysis-toc__link" href="#analysis-themes">
+                              {tAnalysis("tocThemes")} <span className="analysis-toc__count">{r.themes.length}</span>
+                            </a>
+                          )}
+                          {r.jobs_to_be_done.length > 0 && (
+                            <a className="analysis-toc__link" href="#analysis-jtbds">
+                              {tAnalysis("tocJtbds")} <span className="analysis-toc__count">{r.jobs_to_be_done.length}</span>
+                            </a>
+                          )}
+                          {r.tensions.length > 0 && (
+                            <a className="analysis-toc__link" href="#analysis-tensions">
+                              {tAnalysis("tocTensions")} <span className="analysis-toc__count">{r.tensions.length}</span>
+                            </a>
+                          )}
+                          {r.recommendations.length > 0 && (
+                            <a className="analysis-toc__link" href="#analysis-recommendations">
+                              {tAnalysis("tocRecs")} <span className="analysis-toc__count">{r.recommendations.length}</span>
+                            </a>
+                          )}
+                          <a className="analysis-toc__link" href="#analysis-notes">{tAnalysis("tocNotes")}</a>
+                          {!isViewingPastVersion && (
+                            <a className="analysis-toc__link" href="#analysis-refine">{tAnalysis("tocRefine")}</a>
+                          )}
+                          <a className="analysis-toc__link" href="#analysis-heatmap">{tAnalysis("tocHeatmap")}</a>
+                        </nav>
+
+                        <div className="analysis-deep__main">
+
                     {/* Themes */}
                     {r.themes.length > 0 && (
-                      <div className="analysis-block">
+                      <div className="analysis-block" id="analysis-themes">
                         <h3>{tAnalysis("keyThemesCount", { count: r.themes.length })}</h3>
                         {r.themes.map((t, i) => {
                           const ann = themeAnnotations[t.title];
@@ -2651,7 +2798,7 @@ export default function ProjectDetail() {
 
                     {/* JTBD */}
                     {r.jobs_to_be_done.length > 0 && (
-                      <div className="analysis-block">
+                      <div className="analysis-block" id="analysis-jtbds">
                         <h3>{tAnalysis("jtbdCount", { count: r.jobs_to_be_done.length })}</h3>
                         {r.jobs_to_be_done.map((j, i) => (
                           <div key={i} className="analysis-jtbd">
@@ -2669,7 +2816,7 @@ export default function ProjectDetail() {
 
                     {/* Tensions */}
                     {r.tensions.length > 0 && (
-                      <div className="analysis-block">
+                      <div className="analysis-block" id="analysis-tensions">
                         <h3>{tAnalysis("tensionsCount", { count: r.tensions.length })}</h3>
                         {r.tensions.map((t, i) => (
                           <div key={i} className="analysis-tension">
@@ -2686,7 +2833,7 @@ export default function ProjectDetail() {
 
                     {/* Recommendations */}
                     {r.recommendations.length > 0 && (
-                      <div className="analysis-block">
+                      <div className="analysis-block" id="analysis-recommendations">
                         <h3>{tAnalysis("recommendations")}</h3>
                         <ol className="analysis-recommendations">
                           {r.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
@@ -2695,7 +2842,7 @@ export default function ProjectDetail() {
                     )}
 
                     {/* General memos */}
-                    <div className="analysis-block">
+                    <div className="analysis-block" id="analysis-notes">
                       <h3>{tAnalysis("generalNotes")}</h3>
                       {memos.filter((m) => m.linked_key === null && m.type === "general").map((m) => (
                         <div key={m.id} className="memo-card">
@@ -2738,7 +2885,7 @@ export default function ProjectDetail() {
 
                     {/* Researcher context + Refine */}
                     {!isViewingPastVersion && (
-                      <div className="analysis-block">
+                      <div className="analysis-block" id="analysis-refine">
                         <div className="researcher-context-box">
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                             <h3 style={{ margin: 0 }}>{tAnalysis("researcherContext")}</h3>
@@ -2805,7 +2952,7 @@ export default function ProjectDetail() {
                     )}
 
                     {/* P7: Heatmap */}
-                    <div className="analysis-block">
+                    <div className="analysis-block" id="analysis-heatmap">
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                         <h3 style={{ margin: 0 }}>{tAnalysis("segmentHeatmap")}</h3>
                         <button className="btn btn-ghost btn-sm" onClick={() => { if (!heatmapExpanded) loadHeatmap(); else setHeatmapExpanded(false); }}>
@@ -2852,6 +2999,10 @@ export default function ProjectDetail() {
                         </div>
                       )}
                     </div>
+
+                        </div>{/* /.analysis-deep__main */}
+                      </div>
+                    )}{/* /Deep dive sub-tab */}
                   </div>
                 );
               })()}
