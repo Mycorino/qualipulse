@@ -122,11 +122,18 @@ export interface QualityAssessment {
   short_answer_pct: number;
 }
 
+export interface TranscriptSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface TranscriptTurn {
   id: string;
   turn_index: number;
   question_text: string;
   response_transcript: string | null;
+  response_segments: TranscriptSegment[] | null;
   is_follow_up: boolean;
   manually_edited: boolean;
   edited_at: string | null;
