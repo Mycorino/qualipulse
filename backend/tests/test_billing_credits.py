@@ -245,3 +245,175 @@ class TestEntitlements:
         assert ents["csv_export"] is True
         assert ents["custom_branding"] is False
         assert ents["legacy_tier"] == "team"
+
+
+# ── PR 2: trial bootstrap + Stripe lifecycle ───────────────────────────────
+
+
+class TestTrialBootstrap:
+    def test_bootstraps_fresh_company_to_trial(self, db_session):
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+
+        sub = bootstrap_trial_subscription(db_session, c)
+        assert sub is not None
+        assert sub.plan_id == "trial"
+        assert sub.status == "trialing"
+        assert sub.trial_end is not None
+
+        bal = get_active_balance(db_session, c.id)
+        assert bal is not None
+        assert bal.included_credits == 10
+        assert bal.available == 10
+
+    def test_replaces_legacy_starter_from_backfill(self, db_session):
+        """Common path: company exists, startup created legacy_starter,
+        onboarding upgrades it to trial in-place."""
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session, tier="starter")
+        backfill_legacy_subscriptions(db_session)
+        before = get_current_subscription(db_session, c.id)
+        assert before.plan_id == "legacy_starter"
+
+        sub = bootstrap_trial_subscription(db_session, c)
+        assert sub is not None
+        assert sub.id == before.id  # same row, replaced in place
+        assert sub.plan_id == "trial"
+        assert sub.status == "trialing"
+
+    def test_idempotent_when_already_trialing(self, db_session):
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        first = bootstrap_trial_subscription(db_session, c)
+        second = bootstrap_trial_subscription(db_session, c)
+        assert second is not None
+        assert second.id == first.id
+
+        from app.models.billing import CreditBalance
+        assert db_session.query(CreditBalance).filter(CreditBalance.workspace_id == c.id).count() == 1
+
+    def test_does_not_downgrade_paid_plan(self, db_session):
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        sub = bootstrap_trial_subscription(db_session, c)
+        sub.plan_id = "team"
+        sub.status = "active"
+        db_session.commit()
+
+        result = bootstrap_trial_subscription(db_session, c)
+        assert result is None
+        cur = get_current_subscription(db_session, c.id)
+        assert cur.plan_id == "team"
+
+
+class TestStripeLifecycle:
+    def test_upsert_subscription_inserts_then_updates(self, db_session):
+        from datetime import datetime, timedelta
+        from app.services.billing_service import upsert_subscription_from_stripe
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+
+        now = datetime.utcnow()
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id="cus_test",
+            stripe_subscription_id="sub_test",
+            stripe_price_id="price_test",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        assert sub.plan_id == "team"
+        assert sub.status == "active"
+
+        # Replay — same row, status updated.
+        sub2 = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id="cus_test",
+            stripe_subscription_id="sub_test",
+            stripe_price_id="price_test",
+            status="past_due",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        assert sub2.id == sub.id
+        assert sub2.status == "past_due"
+
+    def test_grant_period_credits_idempotent(self, db_session):
+        from datetime import datetime, timedelta
+        from app.services.billing_service import (
+            EVT_GRANT_INCLUDED,
+            grant_period_credits,
+            upsert_subscription_from_stripe,
+        )
+        from app.models.billing import CreditBalance, CreditLedger
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+
+        now = datetime.utcnow()
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id="cus_x",
+            stripe_subscription_id="sub_x",
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        bal1 = grant_period_credits(db_session, sub)
+        assert bal1 is not None
+        assert bal1.included_credits == 100  # team plan default
+
+        # Replay → same balance, no double grant.
+        bal2 = grant_period_credits(db_session, sub)
+        assert bal2 is not None
+        assert bal2.id == bal1.id
+
+        assert db_session.query(CreditBalance).filter(CreditBalance.workspace_id == c.id).count() == 1
+        assert (
+            db_session.query(CreditLedger)
+            .filter(
+                CreditLedger.workspace_id == c.id,
+                CreditLedger.event_type == EVT_GRANT_INCLUDED,
+            )
+            .count()
+            == 1
+        )
+
+    def test_cancel_subscription_marks_canceled(self, db_session):
+        from datetime import datetime, timedelta
+        from app.services.billing_service import (
+            cancel_subscription,
+            upsert_subscription_from_stripe,
+        )
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        now = datetime.utcnow()
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id="cus_z",
+            stripe_subscription_id="sub_z",
+            stripe_price_id="price_z",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        result = cancel_subscription(db_session, stripe_subscription_id="sub_z")
+        assert result is not None
+        assert result.id == sub.id
+        assert result.status == "canceled"

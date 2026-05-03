@@ -4102,6 +4102,14 @@ select.field-input {
   background: #dcfce7;
   color: #166534;
 }
+/* PR 2: per-stat tile in the credits usage card. */
+.billing-credit-stat {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
 .billing-limits { margin-top: 16px; display: flex; flex-direction: column; gap: 0; }
 .billing-limit-row {
   display: flex;

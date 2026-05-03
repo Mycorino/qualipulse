@@ -99,7 +99,9 @@ auto-interview/
 │   │       ├── interview_engine.py  # Core AI orchestration (Claude)
 │   │       ├── analysis.py          # AI synthesis + refined analysis
 │   │       ├── quality.py           # Heuristic quality scoring
-│   │       ├── feature_gates.py     # Tier-based feature + limit enforcement
+│   │       ├── feature_gates.py     # Legacy tier-based limits (used by legacy plans only)
+│   │       ├── billing_plans.py     # Credits-based plan catalogue (8 plans, 76 entitlements)
+│   │       ├── billing_service.py   # Credits-based billing: seed/backfill/quota/consume
 │   │       ├── auth.py              # JWT + bcrypt helpers
 │   │       ├── email.py             # SendGrid + dev console fallback
 │   │       ├── stt.py               # Whisper transcription
@@ -132,12 +134,17 @@ auto-interview/
 │   │       ├── 0015_current_priority.py
 │   │       ├── 0016_onboarding_redesign_fields.py
 │   │       ├── 0017_quality_assessment_columns.py
-│   │       └── 0018_transcript_translation_columns.py
+│   │       ├── 0018_transcript_translation_columns.py
+│   │       ├── 0019_warmup_enabled.py
+│   │       ├── 0020_fix_audio_recording_urls.py
+│   │       ├── 0021_response_segments.py
+│   │       └── 0022_credits_system.py
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
 │   │   ├── test_projects.py     # CRUD, auth isolation, archive, tier limits
-│   │   ├── test_feature_gates.py # All tier limits + feature gates
+│   │   ├── test_feature_gates.py # All tier limits + feature gates (legacy plans)
+│   │   ├── test_billing_credits.py # Credits-based billing (PR 1: foundation)
 │   │   └── test_demo_seeder.py  # Showcase demo project seeding + quota exclusion
 │   ├── Dockerfile               # Python 3.11, runs alembic + uvicorn
 │   ├── pytest.ini
@@ -336,11 +343,19 @@ See `.env.example` at repo root for Docker/production template.
 - Alembic migrations run on startup in Docker (`alembic upgrade head`)
 - Datetime: use `datetime.utcnow()` (SQLite stores naive UTC — `datetime.now(timezone.utc)` causes issues)
 
-### Feature Gates (Subscription Tiers)
-Enforced on all create endpoints. Defined in `services/feature_gates.py`.
+### Billing — dual-track (legacy tiers + credits)
 
-Canonical tier names: `starter`, `team`, `lab`, `enterprise`.
-Legacy aliases still work in DB: `free` → starter, `solo` → starter, `pro` → lab.
+The product runs **two billing tracks side by side**. Existing accounts stay
+on legacy tiers (no behavioural change); new accounts will move to
+credits-based plans once PR 2 (Stripe + UI) lands. The `Plan.is_legacy`
+flag in the `plans` table is the routing switch — `BillingService.can_start_interview`
+delegates to the legacy gate when true and runs credit checks otherwise.
+
+#### Legacy tiers (existing accounts)
+
+Defined in `services/feature_gates.py`. Canonical tier names: `starter`,
+`team`, `lab`, `enterprise`. Legacy aliases still work in DB: `free` →
+starter, `solo` → starter, `pro` → lab.
 
 | Gate | Starter (€49) | Team (€99) | Lab (€199) | Enterprise |
 |---|---|---|---|---|
@@ -353,16 +368,50 @@ Legacy aliases still work in DB: `free` → starter, `solo` → starter, `pro` �
 | Custom Branding | No | No | Yes | Yes |
 | Team Members | 1 | 3 | 10 | Unlimited |
 
-**14-day trial:** New signups on Starter tier get `trial_ends_at` set 14 days ahead.
-While trial is active, `get_effective_limits()` returns Team-level limits.
-After trial expires, limits revert to Starter.
+**14-day trial:** New signups on Starter tier get `trial_ends_at` set 14
+days ahead. While the trial is active, `get_effective_limits()` returns
+Team-level limits. After expiry, limits revert to Starter.
 
-**Where gates are enforced:**
+**Where the legacy gates run:**
 - `projects.py` → `create_project`, `import_project_from_csv` (project limit + question limit)
 - `links.py` → `create_link` (link limit per project)
-- `interview.py` → `start_interview_session` (participant limit)
+- `interview.py` → `start_interview_session` calls `BillingService.can_start_interview` first; for legacy plans (`is_legacy=True`) it falls through to `require_participant_limit`
 - `analysis.py` → `trigger_analysis`, `trigger_refined_analysis` (ai_analysis feature)
 - `export.py` → `export_transcripts_csv` (export_csv feature), `ai_quality_assessment` (ai_analysis)
+
+#### Credits-based plans (V1 foundation, schema only)
+
+Catalogued in `services/billing_plans.py` and synced to the DB on every
+API startup via `BillingService.ensure_plans_seeded`. The credit balance
+lives on `credit_balances`; every credit movement is appended to
+`credit_ledger` (idempotent per participant via a partial unique index).
+
+| Plan | Monthly | Annual | Credits/period | Editors | Active projects | Overage |
+|---|---|---|---|---|---|---|
+| Trial | €0 | — | 10 / 14 days total | 1 | 1 | — |
+| Exploration | €89 | €890 | 25 / month | 1 | 3 | €7/credit |
+| Team | €299 | €2,990 | 100 / month | 3 | 20 | €6/credit |
+| Agency | €799 | €7,990 | 300 / month | 8 | unlimited | €5/credit |
+| Enterprise | custom | custom | custom annual | custom | unlimited | per contract |
+
+**1 credit = 1 completed participant interview (≤15 min).** Consumed
+when `participant.status` flips to `"completed"` in
+`process_interview_turn`. Idempotent per participant — replayed or
+concurrent completions never double-charge. Screened-out, abandoned,
+and technically-failed participants never consume.
+
+**Plan name collision:** new plan `team` (€299) ≠ legacy plan `legacy_team` (€99). The legacy plans are prefixed `legacy_*` in the catalogue.
+
+**Backfill on startup:** every existing Company without a
+`WorkspaceSubscription` row gets one mapping to its legacy plan
+(`Company.subscription_tier` → `legacy_starter` / `legacy_team` /
+`legacy_lab` per `LEGACY_TIER_TO_PLAN_ID`). Idempotent — runs every
+boot, no-ops after the first.
+
+**State of the rollout:**
+- ✅ PR 1 — schema, plan catalogue, `BillingService` (seed/backfill/quota/consume), engine hooks, backfill on startup.
+- ✅ PR 2 (this) — Stripe price-id resolver for new plans, `/billing/plans` returns the public catalogue, `/billing/status` exposes both legacy + new shape, `GET /billing/usage` returns credit balance, `/billing/checkout` accepts new plan ids + intervals, webhook routes to credit-plan or legacy path based on Stripe `price_id`, `customer.subscription.created/updated` upsert + grant credits, `customer.subscription.deleted` marks canceled, `invoice.payment_succeeded` re-grants on renewal. Trial auto-bootstrap on onboarding completion. Credits usage card in AccountSettings billing tab.
+- ⏳ PR 3 — frontend pricing page rebuild, admin credit-adjustment endpoint, rollover, automatic overage, prepaid credit packs, usage emails (80% / 100% warnings).
 
 ### Onboarding Flow
 After signup, users are redirected to `/welcome` (4-step onboarding):
@@ -911,6 +960,24 @@ gcloud builds list --region=europe-west1 --limit=5
 
 ### BlogPost
 `id` (str), `slug` (unique, indexed), `title`, `subtitle`, `content` (HTML from TipTap), `excerpt`, `cover_image_url`, `meta_title`, `meta_description`, `og_image_url`, `author_name`, `tags` (JSON text), `status` (draft/published, indexed), `published_at`, `created_at`, `updated_at`
+
+### Plan (credits-based billing)
+`id` (str PK, eg. `team`, `legacy_starter`), `public_name`, `description`, `is_public`, `is_legacy`, `is_custom`, `monthly_price_cents`, `annual_price_cents`, `currency`, `included_credits`, `credit_period` (`trial_total` | `monthly` | `annual` | `custom` | `legacy_none`), `max_editors`, `max_viewers`, `max_active_projects`, `overage_price_cents`, `overage_enabled_default`, `stripe_monthly_price_id`, `stripe_annual_price_id`, `sort_order`, `created_at`, `updated_at`
+
+### PlanEntitlement
+`id`, `plan_id` (FK Plan, indexed), `key` (eg. `csv_export`, `custom_branding`, `credit_rollover_days`), `value` (JSON), `created_at`. Unique on `(plan_id, key)`. Catalogue source: `services/billing_plans.py`.
+
+### WorkspaceSubscription
+`id` (uuid str), `workspace_id` (FK Company, indexed — the workspace owner's company), `plan_id` (FK Plan), `status` (`trialing` | `active` | `past_due` | `canceled` | `unpaid` | `enterprise_custom` | `legacy`), `billing_interval` (`monthly` | `annual` | `custom` | `legacy`), `current_period_start`, `current_period_end`, `trial_start`, `trial_end`, `stripe_customer_id`, `stripe_subscription_id` (indexed), `stripe_price_id`, `overage_enabled`, `cancel_at_period_end`, `created_at`, `updated_at`
+
+### CreditBalance
+`id` (uuid str), `workspace_id` (FK Company, indexed), `subscription_id` (FK WorkspaceSubscription, nullable), `period_start`, `period_end`, `included_credits`, `purchased_credits`, `rollover_credits`, `used_credits`, `overage_credits`, `created_at`, `updated_at`. Unique on `(workspace_id, period_start, period_end)`. The `available` property = `included + purchased + rollover − used`.
+
+### CreditLedger
+Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), `balance_id` (FK CreditBalance, nullable), `participant_id` (str, indexed — not FK because participants can be deleted), `project_id` (str, nullable), `event_type` (`grant_included` | `grant_purchased` | `grant_rollover` | `consume_interview` | `overage_interview` | `refund_interview` | `adjustment_admin` | `expire_credits`, indexed), `credits_delta`, `balance_after`, `source`, `event_metadata` (JSON), `created_at`. **Idempotency:** partial unique index `uq_credit_consumed_per_participant ON (participant_id) WHERE event_type IN ('consume_interview', 'overage_interview')` — both Postgres and SQLite (≥3.8) support the partial index syntax.
+
+### UsageEvent
+`id` (uuid str), `workspace_id` (FK Company, indexed), `project_id` (nullable), `participant_id` (nullable), `event_name` (indexed), `quantity`, `billable`, `event_metadata` (JSON), `created_at` (indexed). Distinct from CreditLedger — ledger is the canonical source of truth for balances; usage events are an event-sourced stream for dashboards / alerts / finance reports.
 
 ---
 

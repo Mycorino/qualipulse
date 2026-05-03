@@ -602,6 +602,15 @@ def complete_onboarding(
     company.onboarding_completed = True
     db.commit()
 
+    # Place the new account on the credits-based trial plan. Idempotent —
+    # subsequent onboarding completions (replays, reset flows) no-op when
+    # the workspace is already trialing or on a paid plan.
+    try:
+        from app.services.billing_service import bootstrap_trial_subscription
+        bootstrap_trial_subscription(db, company)
+    except Exception:  # pragma: no cover — never block onboarding on billing
+        logger.exception("Trial bootstrap failed for %s; legacy backfill remains in place", company.email)
+
     # Seed the showcase demo project and send the personalised welcome email
     # in a background thread so the onboarding response returns immediately.
     # Both operations are idempotent / best-effort — failures are logged but
