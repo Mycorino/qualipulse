@@ -86,6 +86,18 @@
   --info-text:      #1e3a8a;
   --info-border:    #bfdbfe;
 
+  /* ── Interview processing palette ─────────────────
+     Each step in the interview turn (transcribing → thinking → preparing)
+     gets a distinct hue so participants feel forward motion. These are
+     semantic tokens — don't substitute them for brand colours and don't
+     hardcode the hex values inline. */
+  --processing-stt:        #2563eb;  /* blue */
+  --processing-stt-soft:   #bfdbfe;
+  --processing-think:      #7c3aed;  /* purple */
+  --processing-think-soft: #ede9fe;
+  --processing-tts:        #059669;  /* green */
+  --processing-tts-soft:   #d1fae5;
+
   /* ── Radius ──────────────────────────────────── */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -114,9 +126,14 @@
   /* ── Easing ──────────────────────────────────── */
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-linear: linear;
   --dur-fast:  100ms;
   --dur-base:  160ms;
   --dur-slow:  240ms;
+  --dur-entrance:  300ms;  /* fade-up / banner entrances */
+  --dur-spinner:   650ms;  /* loading spinner cycle */
+  --dur-pulse:    1500ms;  /* recording dot / mic listening */
+  --dur-pulse-slow:1800ms; /* expanding ring on record button */
 
   /* ── Typography scale ─────────────────────────── */
   --text-xs: 0.733rem;
@@ -761,9 +778,16 @@ select.field-input {
   color: var(--danger);
   border: 1px solid var(--danger-border);
   border-radius: var(--radius);
-  padding: 10px 14px;
-  font-size: 0.88rem;
-  margin-bottom: 12px;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-base);
+  margin-bottom: var(--space-3);
+}
+/* Warning tone for the same banner shape — used for "save your interview"
+   nudges and similar non-destructive reminders. */
+.error-banner--warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
 }
 
 .mic-permission-error {
@@ -2086,38 +2110,52 @@ select.field-input {
   font-size: 1rem;
 }
 
+/* Resume banner — extends the .brand-notice primitive (see further down).
+   This rule only carries layout overrides specific to the resume banner
+   (justify-between for the side actions). All colour/padding/radius come
+   from the primitive. */
 .resume-banner {
-  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
-
 .resume-banner strong {
-  font-size: 0.9rem;
-  color: #3730a3;
+  font-size: var(--text-base);
+  color: var(--brand-700);
   display: block;
   margin-bottom: 2px;
 }
-
 .resume-banner p {
-  font-size: 0.82rem;
-  color: #4338ca;
+  font-size: var(--text-sm);
+  color: var(--brand-700);
   margin: 0;
 }
 
-/* Landing */
-.interview-landing {
-  background: var(--bg-white);
+/* ── Surface card (system primitive) ────────────────────────────────────────
+   The white-card-with-shadow surface used for full-screen participant
+   moments: landing, consent, profiling, complete. One primitive +
+   compound selector list so the existing bespoke classes pick up the same
+   styles without rewriting every JSX site. Mobile breakpoints (≤480px)
+   override padding via the existing rules later in this file.
+   Note: 36px horizontal padding is a deliberate off-scale value chosen
+   for body-text width balance — kept as a literal here so the choice
+   is visible. */
+.surface-card,
+.interview-landing,
+.consent-card,
+.interview-profiling,
+.interview-complete {
+  background: var(--bg-surface);
   border-radius: var(--radius-lg);
-  padding: 48px 36px;
+  padding: var(--space-12) 36px;
   box-shadow: var(--shadow-md);
 }
+.surface-card--narrow,
+.interview-profiling { max-width: 480px; }
+.surface-card--wide,
+.consent-card { max-width: 560px; }
+.surface-card--celebrate,
+.interview-complete { padding: var(--space-16) 36px; }
 
 .interview-project-name {
   font-size: 1.6rem;
@@ -2255,7 +2293,7 @@ select.field-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: transform var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
   box-shadow: var(--shadow-md);
 }
 .record-btn:hover {
@@ -2265,7 +2303,7 @@ select.field-input {
 
 .record-btn.recording {
   border-color: var(--danger);
-  animation: record-ring 1.8s var(--ease-in-out) infinite;
+  animation: record-ring var(--dur-pulse-slow) var(--ease-in-out) infinite;
 }
 @keyframes record-ring {
   0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0), var(--shadow-lg); }
@@ -2277,57 +2315,52 @@ select.field-input {
   height: 32px;
   border-radius: 50%;
   background: var(--danger);
-  transition: all 0.2s;
+  transition: width var(--dur-base) var(--ease-out), height var(--dur-base) var(--ease-out), border-radius var(--dur-base) var(--ease-out);
 }
 
 .record-btn.recording .record-btn-inner {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .recording-pulse {
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: pulse var(--dur-pulse) var(--ease-in-out) infinite;
 }
 
 @keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
 }
 
 .record-label {
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   color: var(--text-muted);
 }
 
-/* Processing */
+/* Processing — three sequential steps (transcribing / thinking / preparing).
+   Per-step palette is deliberately distinct (not in the brand scale) so
+   participants can feel progress across phases. The colours are stable and
+   should be treated as system semantics, not ad-hoc hex. */
 .processing-indicator {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 .processing-label {
-  font-size: 1rem;
+  font-size: var(--text-md);
   font-weight: 500;
-  transition: color 0.3s;
+  transition: color var(--dur-entrance) var(--ease-out);
 }
-/* Step 0: Transcribing — blue */
-.processing-step-0 .processing-label { color: #2563eb; }
-.processing-step-0 .spinner { border-color: #bfdbfe; border-top-color: #2563eb; }
-/* Step 1: Thinking — purple */
-.processing-step-1 .processing-label { color: #7c3aed; }
-.processing-step-1 .spinner { border-color: #ede9fe; border-top-color: #7c3aed; }
-/* Step 2: Preparing — green */
-.processing-step-2 .processing-label { color: #059669; }
-.processing-step-2 .spinner { border-color: #d1fae5; border-top-color: #059669; }
+.processing-step-0 .processing-label { color: var(--processing-stt); }
+.processing-step-0 .spinner { border-color: var(--processing-stt-soft); border-top-color: var(--processing-stt); }
+.processing-step-1 .processing-label { color: var(--processing-think); }
+.processing-step-1 .spinner { border-color: var(--processing-think-soft); border-top-color: var(--processing-think); }
+.processing-step-2 .processing-label { color: var(--processing-tts); }
+.processing-step-2 .spinner { border-color: var(--processing-tts-soft); border-top-color: var(--processing-tts); }
 
 .spinner {
   width: 20px;
@@ -2335,7 +2368,7 @@ select.field-input {
   border: 2px solid var(--brand-100);
   border-top-color: var(--brand-500);
   border-radius: 50%;
-  animation: spin 0.65s linear infinite;
+  animation: spin var(--dur-spinner) var(--ease-linear) infinite;
 }
 
 @keyframes spin {
@@ -2345,12 +2378,7 @@ select.field-input {
 }
 
 /* Complete */
-.interview-complete {
-  background: var(--bg-white);
-  border-radius: var(--radius-lg);
-  padding: 64px 36px;
-  box-shadow: var(--shadow-md);
-}
+.interview-complete { /* extends .surface-card .surface-card--celebrate */ }
 
 .complete-icon {
   margin-bottom: 20px;
@@ -2362,32 +2390,26 @@ select.field-input {
   color: var(--text);
 }
 
-/* Consent screen */
-.consent-card {
-  background: var(--bg-white);
-  border-radius: var(--radius-lg);
-  padding: 48px 36px;
-  box-shadow: var(--shadow-md);
-  max-width: 560px;
-}
+/* Consent screen — extends .surface-card.surface-card--wide */
+.consent-card { /* extends .surface-card .surface-card--wide */ }
 
 .consent-title {
   font-size: 1.6rem;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .consent-project {
-  font-size: 1rem;
+  font-size: var(--text-md);
   color: var(--text-secondary);
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
 }
 
 .consent-body {
-  background: #f8fafc;
+  background: var(--bg-sunken);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px 18px;
-  margin-bottom: 24px;
+  padding: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 .consent-body p {
@@ -2508,11 +2530,7 @@ select.field-input {
    Interview – Screening / Profiling Phase
    ============================================ */
 
-.interview-profiling {
-  background: var(--bg-white);
-  border-radius: var(--radius-lg);
-  padding: 48px 36px;
-  box-shadow: var(--shadow-md);
+.interview-profiling { /* extends .surface-card.surface-card--narrow */
   max-width: 480px;
   width: 100%;
 }
@@ -4144,33 +4162,35 @@ select.field-input {
 
 /* ── Mic Test ───────────────────────────────────────────────────────────── */
 .mic-test-card { max-width: 480px; text-align: center; }
-.mic-test-title { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
-.mic-test-subtitle { color: var(--text-secondary); font-size: 15px; margin-bottom: 24px; }
+.mic-test-title { font-size: var(--text-xl); font-weight: 700; color: var(--text-primary); margin-bottom: var(--space-2); }
+.mic-test-subtitle { color: var(--text-secondary); font-size: var(--text-md); margin-bottom: var(--space-6); }
 
 /* Animated mic icon — pulses while waiting for input, glows green once detected.
    Three explicit states make the test self-explanatory without copy gymnastics. */
 .mic-test-icon {
-  width: 72px; height: 72px; margin: 0 auto 16px;
+  width: 72px; height: 72px; margin: 0 auto var(--space-4);
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
   color: var(--text-tertiary);
   background: var(--bg-sunken);
-  transition: background 0.2s, color 0.2s, transform 0.2s;
+  transition: background var(--dur-base) var(--ease-out),
+              color var(--dur-base) var(--ease-out),
+              transform var(--dur-base) var(--ease-out);
 }
-.mic-test-icon--waiting { animation: mic-pulse 1.6s ease-in-out infinite; }
+.mic-test-icon--waiting { animation: mic-pulse var(--dur-pulse) var(--ease-in-out) infinite; }
 .mic-test-icon--listening {
   color: var(--brand-600);
-  background: var(--brand-50, rgba(99, 102, 241, 0.08));
+  background: var(--brand-50);
 }
 .mic-test-icon--ready {
-  color: #16a34a;
-  background: rgba(22, 163, 74, 0.1);
+  color: var(--success);
+  background: var(--success-bg);
   transform: scale(1.05);
   animation: none;
 }
 @keyframes mic-pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.18); }
-  50%      { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(99, 102, 241, 0); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(67, 105, 245, 0.18); }
+  50%      { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(67, 105, 245, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .mic-test-icon--waiting, .mic-test-icon--ready { animation: none; transform: none; }
@@ -4180,26 +4200,27 @@ select.field-input {
   width: 100%;
   height: 48px;
   background: var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   display: flex;
   align-items: center;
 }
 .mic-level-bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--brand-500), #22c55e);
-  border-radius: 12px;
-  transition: width 0.1s ease, background 0.2s ease;
+  background: linear-gradient(90deg, var(--brand-500), var(--success));
+  border-radius: var(--radius-md);
+  transition: width var(--dur-fast) var(--ease-out),
+              background var(--dur-base) var(--ease-out);
 }
 /* Per-state bar colour — desaturated while waiting so people don't think
    their mic is broken when the bar is at 0. */
 .mic-level-bar--waiting   { background: linear-gradient(90deg, var(--text-disabled), var(--border)); }
 .mic-level-bar--listening { background: linear-gradient(90deg, var(--brand-400), var(--brand-500)); }
-.mic-level-bar--ready     { background: linear-gradient(90deg, var(--brand-500), #22c55e); }
+.mic-level-bar--ready     { background: linear-gradient(90deg, var(--brand-500), var(--success)); }
 
-.mic-test-status { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; min-height: 20px; }
-.mic-test-ok { color: #16a34a; font-weight: 600; }
+.mic-test-status { font-size: var(--text-base); color: var(--text-secondary); margin-bottom: var(--space-6); min-height: 20px; }
+.mic-test-ok { color: var(--success); font-weight: 600; }
 .mic-test-actions { display: flex; justify-content: center; }
 
 /* ── Recording preview (re-record) ──────────────────────────────────────── */
@@ -4207,25 +4228,25 @@ select.field-input {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 24px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 16px;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius-lg);
   width: 100%;
 }
-.recording-preview-icon { font-size: 32px; color: #16a34a; }
-.recording-preview-label { font-size: 15px; font-weight: 600; color: #166534; margin: 0; }
-.recording-preview-actions { display: flex; gap: 12px; }
+.recording-preview-icon { font-size: 32px; color: var(--success); }
+.recording-preview-label { font-size: var(--text-md); font-weight: 600; color: var(--success-text); margin: 0; }
+.recording-preview-actions { display: flex; gap: var(--space-3); }
 
 /* ── Recording timer ─────────────────────────────────────────────────────── */
 .recording-timer {
-  font-size: 13px;
+  font-size: var(--text-base);
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
-.recording-timer--warning { color: #dc2626; font-weight: 600; }
+.recording-timer--warning { color: var(--danger); font-weight: 600; }
 
 /* ── Record button states ────────────────────────────────────────────────── */
 .record-btn--waiting { opacity: 0.5; cursor: not-allowed; }
@@ -4236,71 +4257,99 @@ select.field-input {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-base);
   cursor: pointer;
-  padding: 8px;
-  margin-top: 8px;
-  transition: color 0.15s;
+  padding: var(--space-2);
+  margin-top: var(--space-2);
+  transition: color var(--dur-fast) var(--ease-out);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .skip-question-btn:hover { color: var(--text-secondary); }
 
-/* ── Transcript flash ────────────────────────────────────────────────────── */
-.transcript-flash {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-size: 13px;
-  color: #64748b;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  animation: fadeInUp 0.3s ease;
-  width: 100%;
-}
-.transcript-flash-label { font-weight: 600; flex-shrink: 0; }
-.transcript-flash-text { font-style: italic; }
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* PF-3: gentle in-flight coaching hint when answers go short. Soft brand-
-   tinted card, dismissable, never blocks the recording controls. */
-.coaching-hint {
+/* ── Brand-notice (system primitive) ─────────────────────────────────────────
+   Soft brand-tinted card used for non-blocking participant feedback:
+   coaching tips, returning-panelist welcome-back, resume banner, transcript
+   flash. One canonical pattern + tone modifiers. */
+.brand-notice {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  background: var(--brand-50, rgba(99, 102, 241, 0.08));
-  border: 1px solid var(--brand-200, rgba(99, 102, 241, 0.18));
-  border-radius: 10px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-  font-size: 13px;
+  gap: var(--space-3);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
   color: var(--text-secondary);
-  line-height: 1.5;
-  animation: fadeInUp 0.3s ease;
+  line-height: var(--leading-normal, 1.5);
   width: 100%;
   max-width: 560px;
+  animation: brand-notice-enter var(--dur-entrance) var(--ease-out);
 }
-.coaching-hint__icon { font-size: 16px; line-height: 1.4; flex-shrink: 0; }
-.coaching-hint__text { flex: 1; }
-.coaching-hint__close {
+.brand-notice--neutral {
+  background: var(--bg-sunken);
+  border-color: var(--border-subtle);
+}
+.brand-notice--success {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+.brand-notice--warning {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+.brand-notice__icon {
+  font-size: 16px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.brand-notice__body { flex: 1; }
+.brand-notice__title {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--brand-700);
+  margin-bottom: 2px;
+}
+.brand-notice__text {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.brand-notice__close {
   background: none;
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
-  padding: 0 4px;
+  padding: 0 var(--space-1);
   font-size: 18px;
   line-height: 1;
   flex-shrink: 0;
-  transition: color 0.12s;
+  transition: color var(--dur-fast) var(--ease-out);
 }
-.coaching-hint__close:hover { color: var(--text-primary); }
+.brand-notice__close:hover { color: var(--text-primary); }
+
+@keyframes brand-notice-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .coaching-hint { animation: none; }
+  .brand-notice { animation: none; }
+}
+
+/* Transcript flash — neutral tone variant of brand-notice. The italic body
+   text is the only thing the transcript flash needs on top of the primitive. */
+.transcript-flash-text { font-style: italic; }
+.transcript-flash-label { font-weight: 600; flex-shrink: 0; }
+
+/* Backwards-compat: keep the old fadeInUp keyframe as an alias for any
+   selectors elsewhere that still reference it. New code uses
+   `brand-notice-enter` and the duration tokens. */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Complete screen ─────────────────────────────────────────────────────── */
@@ -5899,16 +5948,15 @@ select.field-input {
   .skip-question-btn--fade { transition: none; }
 }
 
-/* Persistent transcript flash with dismiss */
-.transcript-flash {
-  position: relative;
-}
+/* Persistent transcript flash with dismiss — extends .brand-notice (neutral
+   variant, see primitive). Only the inline read-more button is bespoke. */
+.transcript-flash { position: relative; }
 .transcript-flash__close {
   background: none;
   border: none;
   cursor: pointer;
-  color: #64748b;
-  padding: 0 4px;
+  color: var(--text-tertiary);
+  padding: 0 var(--space-1);
   font-size: 16px;
   line-height: 1;
   margin-left: auto;
@@ -5927,7 +5975,7 @@ select.field-input {
   color: var(--brand-600);
   text-decoration: underline;
   text-underline-offset: 2px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-style: normal;
 }
 

@@ -855,16 +855,16 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container" style={{ textAlign: "center", paddingTop: 60 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #6366f1)", marginBottom: 32 }}>QualiPulse</div>
-          <div style={{ fontSize: 48, marginBottom: 16 }}><span aria-hidden="true">🔗</span></div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>{t("linkInactive.title")}</h1>
-          <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 15, maxWidth: 380, margin: "0 auto 20px" }}>
+          <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--primary)", marginBottom: "var(--space-8)" }}>QualiPulse</div>
+          <div style={{ fontSize: 48, marginBottom: "var(--space-4)" }}><span aria-hidden="true">🔗</span></div>
+          <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, marginBottom: "var(--space-2)" }}>{t("linkInactive.title")}</h1>
+          <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-md)", maxWidth: 380, margin: "0 auto var(--space-5)" }}>
             {t("linkInactive.expiredHelp")}
           </p>
           <button
             className="btn btn-ghost"
             onClick={() => window.history.back()}
-            style={{ fontSize: 14 }}
+            style={{ fontSize: "var(--text-base)" }}
           >
             ← {t("linkInactive.goBack")}
           </button>
@@ -892,10 +892,10 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container" style={{ maxWidth: "var(--participant-card-max-w)" }}>
-        <div style={{
-          background: "#fff",
+        <div className="surface-card" style={{
+          background: "var(--bg-surface)",
           borderRadius: "var(--radius-lg)",
-          padding: "48px 36px",
+          padding: "var(--space-12) 36px",
           boxShadow: "var(--shadow-md)",
           maxWidth: "var(--participant-card-max-w)",
           width: "100%",
@@ -904,12 +904,12 @@ export default function Interview() {
           <ResearcherIdentity />
           <h1 className="interview-project-name" style={{ marginBottom: 8, textAlign: "center" }}>{info?.project_name}</h1>
           {info?.researcher_name && (
-            <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24, textAlign: "center" }} dangerouslySetInnerHTML={{ __html: t("emailEntry.studyBy", { name: info.researcher_name }) }} />
+            <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 24, textAlign: "center" }} dangerouslySetInnerHTML={{ __html: t("emailEntry.studyBy", { name: info.researcher_name }) }} />
           )}
           {info?.interview_duration_minutes && (
             <p className="interview-duration" style={{ textAlign: "center" }}>⏱ {t("emailEntry.duration", { minutes: info.interview_duration_minutes })}</p>
           )}
-          <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6, textAlign: "center" }}>
+          <p style={{ color: "var(--text-secondary)", marginBottom: 28, lineHeight: 1.6, textAlign: "center" }}>
             {t("emailEntry.enterEmailDesc")}
           </p>
           {/* Form fields left-aligned for better readability */}
@@ -941,7 +941,7 @@ export default function Interview() {
             >
               {sendingVerification ? t("emailEntry.sendingLink") : t("emailEntry.sendLink")}
             </button>
-            <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
               {t("emailEntry.emailNote")}
             </p>
 
@@ -962,7 +962,7 @@ export default function Interview() {
           </div>
 
           {/* Trust signal */}
-          <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted)", marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             {t("emailEntry.trustLine")}
           </p>
@@ -975,7 +975,7 @@ export default function Interview() {
             style={{
               marginTop: 20,
               paddingTop: 16,
-              borderTop: "1px dashed var(--border, #e5e7eb)",
+              borderTop: "1px dashed var(--border)",
               textAlign: "center",
             }}
           >
@@ -990,7 +990,7 @@ export default function Interview() {
             <p
               style={{
                 fontSize: 11,
-                color: "var(--text-muted, #9ca3af)",
+                color: "var(--text-muted)",
                 marginTop: 6,
                 lineHeight: 1.5,
               }}
@@ -1012,8 +1012,8 @@ export default function Interview() {
         <div className="interview-container" style={{ textAlign: "center", maxWidth: 440 }}>
           <div style={{ fontSize: 52, marginBottom: 16 }}><span aria-hidden="true">📬</span></div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{t("emailSent.title")}</h1>
-          <p style={{ color: "var(--text-secondary, #6b7280)", lineHeight: 1.6, marginBottom: 8 }} dangerouslySetInnerHTML={{ __html: t("emailSent.desc", { email: verificationEmail }) }} />
-          <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 13, marginBottom: 24 }}>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: 8 }} dangerouslySetInnerHTML={{ __html: t("emailSent.desc", { email: verificationEmail }) }} />
+          <p style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 24 }}>
             {t("emailSent.expiry")}
           </p>
           {error && <div className="error-banner" role="alert">{error}</div>}
@@ -1118,13 +1118,9 @@ export default function Interview() {
       <div className="interview-page">
         <div className="interview-container" style={{ maxWidth: 560 }}>
           <div
-            className="profile-min-card"
+            className="surface-card surface-card--narrow profile-min-card"
             style={{
-              background: "var(--bg-surface, #fff)",
-              borderRadius: "var(--radius-lg)",
-              padding: "40px 32px",
-              boxShadow: "var(--shadow-md)",
-              maxWidth: 480,
+              padding: "var(--space-10) var(--space-8)",
               width: "100%",
               margin: "0 auto",
             }}
@@ -1132,7 +1128,7 @@ export default function Interview() {
             <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
               {t("profile.minTitle")}
             </h1>
-            <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 24, lineHeight: 1.55 }}>
+            <p style={{ color: "var(--text-secondary)", marginBottom: 24, lineHeight: 1.55 }}>
               {t("profile.minSubtitle")}
             </p>
             <div className="interview-name-field">
@@ -1470,7 +1466,7 @@ export default function Interview() {
 
           {/* Fix 2: TTS audio failure warning */}
           {ttsFailedWarning && (
-            <div className="error-banner" role="alert" style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div className="error-banner error-banner--warning" role="alert" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)", flexWrap: "wrap" }}>
               <span>
                 {t("interview.ttsFailedWarning")}
               </span>
@@ -1492,7 +1488,7 @@ export default function Interview() {
           {error && <div className="error-banner" role="alert">{error}</div>}
           {recError === "PERMISSION_DENIED" ? (
             <div className="mic-permission-error">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="1" y1="1" x2="23" y2="23" />
                 <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
                 <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.36 2.18" />
@@ -1557,7 +1553,7 @@ export default function Interview() {
               ? lastTranscript.slice(0, TRUNCATE).trimEnd() + "…"
               : lastTranscript;
             return (
-              <div className="transcript-flash">
+              <div className="brand-notice brand-notice--neutral transcript-flash">
                 <span className="transcript-flash-label">{t("interview.transcript")}</span>
                 <span className="transcript-flash-text">"{display}"</span>
                 {isLong && (
@@ -1697,7 +1693,7 @@ export default function Interview() {
     <div className="interview-page">
       <div className="interview-container interview-complete">
         <div className="complete-icon">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
             <polyline points="22 4 12 14.01 9 11.01" />
           </svg>
