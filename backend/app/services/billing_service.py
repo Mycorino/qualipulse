@@ -1,0 +1,469 @@
+"""Central billing service for the credits-based pricing system.
+
+Ground rules
+------------
+* ``workspace_id == company_id``. The ``WorkspaceSubscription`` model uses
+  ``workspace_id`` as its FK column for forward compat; the values are
+  always Company UUIDs.
+* The ``plans`` row's ``is_legacy`` flag drives the quota strategy:
+  legacy plans defer to the existing ``feature_gates`` participant-limit
+  check; non-legacy plans run the credit-based flow defined here.
+* Credit consumption is **idempotent** per participant. Enforced both
+  application-side (we check the ledger before inserting) and at the DB
+  via a partial unique index — concurrent calls fail fast.
+* Credits are consumed when the participant's status flips to
+  ``completed``. Screened-out, abandoned, or technically-failed
+  participants do not consume credits.
+"""
+from __future__ import annotations
+
+import logging
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.models.billing import (
+    CreditBalance,
+    CreditLedger,
+    Plan,
+    PlanEntitlement,
+    UsageEvent,
+    WorkspaceSubscription,
+)
+from app.models.company import Company
+from app.services.billing_plans import (
+    ALL_PLANS,
+    LEGACY_TIER_TO_PLAN_ID,
+    PlanSpec,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# Event types — kept as constants so typos get caught at import time.
+EVT_GRANT_INCLUDED = "grant_included"
+EVT_GRANT_PURCHASED = "grant_purchased"
+EVT_GRANT_ROLLOVER = "grant_rollover"
+EVT_CONSUME_INTERVIEW = "consume_interview"
+EVT_OVERAGE_INTERVIEW = "overage_interview"
+EVT_REFUND_INTERVIEW = "refund_interview"
+EVT_ADJUSTMENT_ADMIN = "adjustment_admin"
+EVT_EXPIRE_CREDITS = "expire_credits"
+
+
+# ── Public dataclasses ────────────────────────────────────────────────────────
+
+
+@dataclass
+class CanStartResult:
+    """Outcome of a pre-interview quota check."""
+
+    allowed: bool
+    reason: str  # 'ok' | 'no_subscription' | 'quota_exceeded' | 'trial_expired' | 'past_due'
+    plan_id: str | None = None
+    available_credits: int | None = None
+    overage_will_apply: bool = False
+    is_legacy: bool = False  # if true, caller falls through to feature_gates
+
+
+# ── Plan + entitlement seeding ───────────────────────────────────────────────
+
+
+def ensure_plans_seeded(db: Session) -> None:
+    """Idempotently sync ``plans`` + ``plan_entitlements`` from the catalogue.
+
+    Safe to call on every API startup. Creates missing rows and updates
+    mutable fields (price, included_credits, entitlements) on existing
+    rows. Does not delete plans that are no longer in the catalogue —
+    we never want to orphan a workspace_subscription.
+    """
+    for spec in ALL_PLANS:
+        existing = db.query(Plan).filter(Plan.id == spec.id).first()
+        if existing is None:
+            db.add(_plan_from_spec(spec))
+        else:
+            _update_plan_from_spec(existing, spec)
+        _sync_entitlements(db, spec)
+    db.commit()
+
+
+def _plan_from_spec(spec: PlanSpec) -> Plan:
+    return Plan(
+        id=spec.id,
+        public_name=spec.public_name,
+        description=spec.description,
+        is_public=spec.is_public,
+        is_legacy=spec.is_legacy,
+        is_custom=spec.is_custom,
+        monthly_price_cents=spec.monthly_price_cents,
+        annual_price_cents=spec.annual_price_cents,
+        currency=spec.currency,
+        included_credits=spec.included_credits,
+        credit_period=spec.credit_period,
+        max_editors=spec.max_editors,
+        max_viewers=spec.max_viewers,
+        max_active_projects=spec.max_active_projects,
+        overage_price_cents=spec.overage_price_cents,
+        overage_enabled_default=spec.overage_enabled_default,
+        sort_order=spec.sort_order,
+    )
+
+
+def _update_plan_from_spec(plan: Plan, spec: PlanSpec) -> None:
+    plan.public_name = spec.public_name
+    plan.description = spec.description
+    plan.is_public = spec.is_public
+    plan.is_legacy = spec.is_legacy
+    plan.is_custom = spec.is_custom
+    plan.monthly_price_cents = spec.monthly_price_cents
+    plan.annual_price_cents = spec.annual_price_cents
+    plan.currency = spec.currency
+    plan.included_credits = spec.included_credits
+    plan.credit_period = spec.credit_period
+    plan.max_editors = spec.max_editors
+    plan.max_viewers = spec.max_viewers
+    plan.max_active_projects = spec.max_active_projects
+    plan.overage_price_cents = spec.overage_price_cents
+    plan.overage_enabled_default = spec.overage_enabled_default
+    plan.sort_order = spec.sort_order
+    plan.updated_at = _utcnow()
+
+
+def _sync_entitlements(db: Session, spec: PlanSpec) -> None:
+    existing = {e.key: e for e in db.query(PlanEntitlement).filter(PlanEntitlement.plan_id == spec.id).all()}
+    for key, value in spec.entitlements.items():
+        row = existing.pop(key, None)
+        if row is None:
+            db.add(PlanEntitlement(plan_id=spec.id, key=key, value=value))
+        elif row.value != value:
+            row.value = value
+    # Drop entitlements that are no longer in the spec — keeps the table tidy
+    # when we deprecate a flag.
+    for stale in existing.values():
+        db.delete(stale)
+
+
+# ── Existing-account backfill ────────────────────────────────────────────────
+
+
+def backfill_legacy_subscriptions(db: Session) -> int:
+    """For every Company without a WorkspaceSubscription, create one.
+
+    Maps the existing ``Company.subscription_tier`` to the matching legacy
+    plan. Returns the number of subscriptions created (0 on subsequent runs).
+    Idempotent and safe to call from startup.
+    """
+    created = 0
+    company_ids_with_sub = {
+        row[0] for row in db.query(WorkspaceSubscription.workspace_id).all()
+    }
+    for company in db.query(Company).all():
+        if company.id in company_ids_with_sub:
+            continue
+        tier = (company.subscription_tier or "starter").lower()
+        plan_id = LEGACY_TIER_TO_PLAN_ID.get(tier, "legacy_starter")
+        sub = WorkspaceSubscription(
+            id=str(uuid.uuid4()),
+            workspace_id=company.id,
+            plan_id=plan_id,
+            status="legacy" if plan_id != "enterprise" else "enterprise_custom",
+            billing_interval="legacy",
+            stripe_customer_id=company.stripe_customer_id,
+            stripe_subscription_id=company.stripe_subscription_id,
+            trial_start=None,
+            trial_end=company.trial_ends_at,
+        )
+        db.add(sub)
+        created += 1
+    db.commit()
+    return created
+
+
+# ── Read helpers ─────────────────────────────────────────────────────────────
+
+
+def get_current_subscription(db: Session, workspace_id: str) -> WorkspaceSubscription | None:
+    """Return the workspace's most recent (active) subscription row."""
+    return (
+        db.query(WorkspaceSubscription)
+        .filter(WorkspaceSubscription.workspace_id == workspace_id)
+        .order_by(WorkspaceSubscription.created_at.desc())
+        .first()
+    )
+
+
+def get_plan(db: Session, plan_id: str) -> Plan | None:
+    return db.query(Plan).filter(Plan.id == plan_id).first()
+
+
+def get_entitlements(db: Session, workspace_id: str) -> dict[str, Any]:
+    """Return the merged entitlement map for a workspace.
+
+    Falls back to the legacy_starter entitlements if the workspace has no
+    subscription yet (shouldn't happen post-backfill, but defensive).
+    """
+    sub = get_current_subscription(db, workspace_id)
+    plan_id = sub.plan_id if sub else "legacy_starter"
+    rows = db.query(PlanEntitlement).filter(PlanEntitlement.plan_id == plan_id).all()
+    return {row.key: row.value for row in rows}
+
+
+def get_active_balance(db: Session, workspace_id: str) -> CreditBalance | None:
+    """Return the credit_balance row covering 'now', or the most recent one."""
+    now = _utcnow()
+    bal = (
+        db.query(CreditBalance)
+        .filter(
+            CreditBalance.workspace_id == workspace_id,
+            CreditBalance.period_start <= now,
+            CreditBalance.period_end > now,
+        )
+        .order_by(CreditBalance.period_start.desc())
+        .first()
+    )
+    if bal is not None:
+        return bal
+    # No current period — return the latest if any (e.g. expired trial).
+    return (
+        db.query(CreditBalance)
+        .filter(CreditBalance.workspace_id == workspace_id)
+        .order_by(CreditBalance.period_end.desc())
+        .first()
+    )
+
+
+# ── Quota check (interview start) ────────────────────────────────────────────
+
+
+def can_start_interview(db: Session, workspace_id: str) -> CanStartResult:
+    """Decide whether a new participant may start the interview right now.
+
+    Legacy plans: returns ``allowed=True`` with ``is_legacy=True`` — the
+    caller is responsible for running ``feature_gates.require_participant_limit``.
+
+    New plans: checks the active credit balance. Allows the interview if
+    ``available > 0``. Allows overage if ``available <= 0`` AND
+    ``subscription.overage_enabled``. Otherwise blocks.
+    """
+    sub = get_current_subscription(db, workspace_id)
+    if sub is None:
+        return CanStartResult(allowed=False, reason="no_subscription")
+
+    plan = get_plan(db, sub.plan_id)
+    if plan is None:
+        # Plan was deleted out from under us (shouldn't happen) — fail open
+        # for legacy preservation.
+        return CanStartResult(allowed=True, reason="ok", plan_id=sub.plan_id, is_legacy=True)
+
+    if plan.is_legacy:
+        return CanStartResult(
+            allowed=True,
+            reason="ok",
+            plan_id=plan.id,
+            is_legacy=True,
+        )
+
+    # Trial that's expired
+    if sub.status == "trialing" and sub.trial_end and sub.trial_end <= _utcnow():
+        return CanStartResult(allowed=False, reason="trial_expired", plan_id=plan.id)
+
+    if sub.status in ("canceled", "unpaid"):
+        return CanStartResult(allowed=False, reason="past_due", plan_id=plan.id)
+
+    balance = get_active_balance(db, workspace_id)
+    available = balance.available if balance else 0
+
+    if available > 0:
+        return CanStartResult(
+            allowed=True,
+            reason="ok",
+            plan_id=plan.id,
+            available_credits=available,
+        )
+
+    # Out of credits — overage path?
+    if sub.overage_enabled and plan.overage_price_cents:
+        return CanStartResult(
+            allowed=True,
+            reason="ok",
+            plan_id=plan.id,
+            available_credits=0,
+            overage_will_apply=True,
+        )
+
+    return CanStartResult(
+        allowed=False,
+        reason="quota_exceeded",
+        plan_id=plan.id,
+        available_credits=available,
+    )
+
+
+# ── Credit consumption (interview completion) ───────────────────────────────
+
+
+def consume_interview_credit(
+    db: Session,
+    workspace_id: str,
+    participant_id: str,
+    project_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> CreditLedger | None:
+    """Idempotently consume one credit for ``participant_id``.
+
+    Returns:
+        The new CreditLedger row on first call.
+        ``None`` if a consume/overage row already exists for this
+        participant (the idempotency case — quietly do nothing).
+
+    Behaviour:
+        - Legacy plan workspaces: no-op (returns None).
+        - Available credits > 0: regular consume; ``balance.used_credits += 1``.
+        - Available credits <= 0 with overage enabled: overage_interview row;
+          ``balance.overage_credits += 1``.
+        - Available credits <= 0 with no overage: no-op (returns None) — we
+          already let the interview start because ``can_start_interview``
+          allowed it; charging at completion would surprise the workspace.
+    """
+    sub = get_current_subscription(db, workspace_id)
+    if sub is None:
+        logger.info("consume_interview_credit: no subscription for workspace %s", workspace_id)
+        return None
+
+    plan = get_plan(db, sub.plan_id)
+    if plan is None or plan.is_legacy:
+        return None  # legacy = old participant-limit gate, no credits
+
+    # Idempotency guard — pre-check before insert so concurrent calls fail
+    # fast on the application side rather than crashing on the DB constraint.
+    existing = (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.participant_id == participant_id,
+            CreditLedger.event_type.in_((EVT_CONSUME_INTERVIEW, EVT_OVERAGE_INTERVIEW)),
+        )
+        .first()
+    )
+    if existing is not None:
+        return None
+
+    balance = get_active_balance(db, workspace_id)
+    if balance is None:
+        # Shouldn't happen on credit plans — we always grant a balance at
+        # checkout. Log loudly and bail.
+        logger.warning(
+            "consume_interview_credit: no balance for workspace=%s plan=%s participant=%s",
+            workspace_id, plan.id, participant_id,
+        )
+        return None
+
+    is_overage = balance.available <= 0
+    if is_overage and not sub.overage_enabled:
+        # We let the interview start — don't double-back at completion.
+        return None
+
+    event_type = EVT_OVERAGE_INTERVIEW if is_overage else EVT_CONSUME_INTERVIEW
+    if is_overage:
+        balance.overage_credits = (balance.overage_credits or 0) + 1
+    else:
+        balance.used_credits = (balance.used_credits or 0) + 1
+
+    ledger = CreditLedger(
+        id=str(uuid.uuid4()),
+        workspace_id=workspace_id,
+        balance_id=balance.id,
+        participant_id=participant_id,
+        project_id=project_id,
+        event_type=event_type,
+        credits_delta=-1,
+        balance_after=balance.available,
+        source="interview_completed",
+        event_metadata=metadata or {},
+    )
+    db.add(ledger)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Concurrent insert lost the race — the DB-level unique index caught
+        # it. Roll back, re-fetch the winning row, return None.
+        db.rollback()
+        return None
+
+    db.refresh(ledger)
+
+    # Fire-and-forget usage event for analytics dashboards.
+    db.add(
+        UsageEvent(
+            id=str(uuid.uuid4()),
+            workspace_id=workspace_id,
+            project_id=project_id,
+            participant_id=participant_id,
+            event_name="credit_consumed" if not is_overage else "credit_overage",
+            quantity=1,
+            billable=is_overage,
+            event_metadata=metadata or {},
+        )
+    )
+    db.commit()
+
+    return ledger
+
+
+# ── Initial subscription bootstrap (signup) ──────────────────────────────────
+
+
+def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubscription:
+    """Create the trial subscription + initial credit balance for a new company.
+
+    Called from the auth signup flow once we move new accounts to the
+    credits model. For now it's available but not auto-invoked from signup
+    — the existing legacy_starter backfill covers all signups until we
+    flip the toggle in PR 2 (auth wiring).
+    """
+    now = _utcnow()
+    sub = WorkspaceSubscription(
+        id=str(uuid.uuid4()),
+        workspace_id=company.id,
+        plan_id="trial",
+        status="trialing",
+        billing_interval=None,
+        trial_start=now,
+        trial_end=now + timedelta(days=14),
+    )
+    db.add(sub)
+    db.flush()
+
+    bal = CreditBalance(
+        id=str(uuid.uuid4()),
+        workspace_id=company.id,
+        subscription_id=sub.id,
+        period_start=now,
+        period_end=now + timedelta(days=14),
+        included_credits=10,
+    )
+    db.add(bal)
+    db.flush()
+
+    db.add(
+        CreditLedger(
+            id=str(uuid.uuid4()),
+            workspace_id=company.id,
+            balance_id=bal.id,
+            event_type=EVT_GRANT_INCLUDED,
+            credits_delta=10,
+            balance_after=10,
+            source="trial_signup",
+        )
+    )
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)

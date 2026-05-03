@@ -1,9 +1,12 @@
 """Core interview engine: orchestrates STT, Claude decision-making, and TTS."""
 
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 import anthropic
 import httpx
@@ -846,6 +849,29 @@ def process_interview_turn(
     if is_complete:
         participant.status = "completed"
         participant.completed_at = datetime.utcnow()
+
+        # Consume one credit for the workspace that owns this project. No-op
+        # for legacy plans (defer to old participant-limit gate) and
+        # idempotent per participant — concurrent or replayed completions
+        # never double-charge.
+        try:
+            from app.services.billing_service import consume_interview_credit
+            consume_interview_credit(
+                db,
+                workspace_id=participant.project.company_id,
+                participant_id=participant.id,
+                project_id=participant.project_id,
+                metadata={
+                    "duration_seconds": int((participant.completed_at - participant.started_at).total_seconds()) if participant.started_at else None,
+                    "language": participant.project.language if participant.project else None,
+                },
+            )
+        except Exception:  # pragma: no cover — never fail an interview on billing
+            logger.exception(
+                "Credit consumption failed for participant %s; interview still completed",
+                participant.id,
+            )
+
         # Send completion email if participant provided one
         try:
             from app.services.email import send_email

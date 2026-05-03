@@ -40,6 +40,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Base.metadata.create_all(bind=engine)
     if not settings.R2_ACCOUNT_ID:
         os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+
+    # Credits-system bootstrap: keep the plans catalogue in sync with code,
+    # then ensure every existing Company has a WorkspaceSubscription on the
+    # appropriate legacy plan. Both are idempotent and cheap.
+    try:
+        from app.database import SessionLocal
+        from app.services.billing_service import (
+            backfill_legacy_subscriptions,
+            ensure_plans_seeded,
+        )
+        with SessionLocal() as bootstrap_db:
+            ensure_plans_seeded(bootstrap_db)
+            created = backfill_legacy_subscriptions(bootstrap_db)
+            if created:
+                logger.info("Backfilled %d legacy subscription rows", created)
+    except Exception:  # pragma: no cover — never block startup on billing
+        logger.exception("Billing bootstrap failed; continuing with degraded billing")
+
     logger.info("AutoInterview API starting (env=%s)", settings.ENVIRONMENT)
     yield
     logger.info("AutoInterview API shutting down")
