@@ -429,15 +429,31 @@ def start_interview_session(
                 detail="Session token does not match this interview link",
             )
 
-    # Enforce participant limit for this project
-    current_count = db.query(Participant).filter(
-        Participant.project_id == link.project_id,
-        Participant.status == "completed",
-    ).count()
+    # Enforce participant limit for this project. The new BillingService
+    # handles legacy plans by deferring back to the existing
+    # ``require_participant_limit`` gate (``is_legacy=True``); for credits-
+    # based plans it checks the current credit balance.
     from app.models.project import Project as ProjectModel
+    from app.services.billing_service import can_start_interview
     project = db.query(ProjectModel).filter(ProjectModel.id == link.project_id).first()
     if project and project.company:
-        require_participant_limit(project.company, project, current_count)
+        decision = can_start_interview(db, project.company_id)
+        if not decision.allowed:
+            # Translate to the participant-facing message — never reveal
+            # credit-balance details on the public endpoint.
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "study_unavailable",
+                    "message": "This study is not accepting new responses right now. Please reach out to the researcher.",
+                },
+            )
+        if decision.is_legacy:
+            current_count = db.query(Participant).filter(
+                Participant.project_id == link.project_id,
+                Participant.status == "completed",
+            ).count()
+            require_participant_limit(project.company, project, current_count)
 
     # Use email from session token if we have one. Otherwise fall back to
     # whatever the participant typed in the landing form (or nothing).

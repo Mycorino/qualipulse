@@ -8,6 +8,14 @@ from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 from app.models.blog import BlogPost
 from app.models.team import WorkspaceInvitation, WorkspaceMember
+from app.models.billing import (
+    CreditBalance,
+    CreditLedger,
+    Plan,
+    PlanEntitlement,
+    UsageEvent,
+    WorkspaceSubscription,
+)
 
 __all__ = [
     "AIUsageLog",
@@ -16,6 +24,8 @@ __all__ = [
     "AffiliatePayout",
     "BlogPost",
     "Company",
+    "CreditBalance",
+    "CreditLedger",
     "InterviewGuideQuestion",
     "InterviewLink",
     "InterviewTurn",
@@ -25,11 +35,15 @@ __all__ = [
     "PanelTag",
     "ParticipantMagicToken",
     "PasswordResetToken",
+    "Plan",
+    "PlanEntitlement",
     "Project",
     "ProjectAnalysis",
     "ScreeningQuestion",
     "ProjectMemo",
     "QuoteTag",
+    "UsageEvent",
     "WorkspaceInvitation",
     "WorkspaceMember",
+    "WorkspaceSubscription",
 ]
