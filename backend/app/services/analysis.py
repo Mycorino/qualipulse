@@ -296,6 +296,14 @@ def run_analysis(
         if filter_by and filter_values:
             filter_note = f"NOTE: This analysis covers only participants filtered by {filter_by} = {', '.join(filter_values)}.\n\n"
 
+        lang = getattr(company, "preferred_language", None) or "en"
+        lang_instruction = (
+            f"\n\nIMPORTANT — OUTPUT LANGUAGE: Write ALL text fields (summary, theme titles, "
+            f"theme summaries, JTBD jobs/insights, tension labels/details, recommendations, "
+            f"confidence_rationale) in {'French' if lang == 'fr' else 'English'}. "
+            f"Verbatim quotes must stay in the original transcript language — never translate quotes."
+        ) if lang != "en" else ""
+
         # Static blocks first (rules + schema + examples) → cached prefix.
         # Dynamic blocks last (context, objective, filters, transcripts).
         prompt = (
@@ -303,7 +311,7 @@ def run_analysis(
             f"{_ANALYSIS_SCHEMA_BLOCK}\n\n"
             f"<task>\nSynthesize the interviews below into a research report. "
             f"Apply the rules above without exception. Confidence MUST be calibrated to N "
-            f"(N={len(completed)} here).\n</task>\n\n"
+            f"(N={len(completed)} here).{lang_instruction}\n</task>\n\n"
             f"{context_block}{objective_block}{filter_note}"
             f"<transcripts count=\"{len(completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
             f"Return the JSON object now. participant_count must be {len(completed)}."
@@ -477,6 +485,14 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
 
         transcripts_block, _ = _build_transcripts_block(all_completed)
 
+        lang = getattr(company, "preferred_language", None) or "en"
+        lang_instruction = (
+            f"\n\nIMPORTANT — OUTPUT LANGUAGE: Write ALL text fields (summary, theme titles, "
+            f"theme summaries, JTBD jobs/insights, tension labels/details, recommendations, "
+            f"confidence_rationale) in {'French' if lang == 'fr' else 'English'}. "
+            f"Verbatim quotes must stay in the original transcript language — never translate quotes."
+        ) if lang != "en" else ""
+
         prompt = (
             f"{_ANALYSIS_RULES_BLOCK}\n\n"
             f"{_ANALYSIS_SCHEMA_BLOCK}\n\n"
@@ -494,7 +510,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
             f"In the `summary` field, add one sentence noting this is a researcher-refined synthesis.\n"
             f"All other rules (calibration to N={len(all_completed)}, ≥2 distinct participants per theme, "
             f"named participants in frequency, disconfirming evidence, falsifiable recommendations) "
-            f"still apply without exception.\n</task>\n\n"
+            f"still apply without exception.{lang_instruction}\n</task>\n\n"
             f"{context_block}{objective_block}{annotations_block}\n"
             f"<transcripts count=\"{len(all_completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
             f"Return the JSON object now. participant_count must be {len(all_completed)}."

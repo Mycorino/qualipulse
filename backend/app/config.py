@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     R2_SECRET_ACCESS_KEY: str = ""
     R2_BUCKET: str = ""
     R2_PUBLIC_URL: str = ""
+    R2_JURISDICTION: str = ""  # "" (default) or "eu" / "fedramp" for region-locked buckets
 
     # Admin
     ADMIN_SECRET_KEY: str = ""  # If empty, admin routes return 403

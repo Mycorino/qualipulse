@@ -6,6 +6,7 @@ import { SkeletonTable } from "../components/Skeleton";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { ProjectSwitcher, AccountMenu } from "../components/HeaderControls";
 import { useAuth } from "../hooks/useAuth";
+import { getMe } from "../api/auth";
 import {
   getProject,
   listProjects,
@@ -107,6 +108,7 @@ export default function ProjectDetail() {
   const [pendingTab, setPendingTab] = useState<Tab | null>(null);
   // advancedPromptOpen removed — system prompt hidden from researchers
   const [projects, setProjects] = useState<import("../api/projects").ProjectListItem[]>([]);
+  const [accountName, setAccountName] = useState<string>("");
 
   // ── Responses tab filters/sort ─────────────────────────────────────────────
   const [responseStatusFilter, setResponseStatusFilter] = useState<"all" | "completed" | "in_progress">("all");
@@ -348,6 +350,7 @@ export default function ProjectDetail() {
       getTags(id!).then(setTags).catch(() => {}),
       getMemos(id!).then(setMemos).catch(() => {}),
       listProjects().then(setProjects).catch(() => {}),
+      getMe().then((m) => setAccountName(m.name || m.email || "")).catch(() => {}),
       getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {}),
     ]);
   }
@@ -1254,7 +1257,7 @@ export default function ProjectDetail() {
             </button>
           </span>
           <AccountMenu
-            initial={(project?.name || "?").trim().charAt(0).toUpperCase()}
+            initial={(accountName || "?").trim().charAt(0).toUpperCase()}
             onSignOut={logout}
           />
         </nav>
@@ -2104,7 +2107,13 @@ export default function ProjectDetail() {
                                   <div className="transcript-q__original">{t.question_text}</div>
                                 )}
                                 {t.tts_audio_url && (
-                                  <audio controls src={t.tts_audio_url} className="transcript-audio" aria-label={`AI question audio — turn ${t.turn_index}`} />
+                                  <audio
+                                    controls
+                                    src={t.tts_audio_url}
+                                    className="transcript-audio"
+                                    aria-label={`AI question audio — turn ${t.turn_index}`}
+                                    onError={(e) => { (e.currentTarget as HTMLAudioElement).style.display = "none"; }}
+                                  />
                                 )}
                               </div>
                               {t.response_transcript && editingTurnId === t.id ? (
@@ -2188,7 +2197,13 @@ export default function ProjectDetail() {
                                     )}
                                   </span>
                                   {t.audio_recording_url && (
-                                    <audio controls src={t.audio_recording_url} className="transcript-audio" aria-label={`Participant recording — turn ${t.turn_index}`} />
+                                    <audio
+                                      controls
+                                      src={t.audio_recording_url}
+                                      className="transcript-audio"
+                                      aria-label={`Participant recording — turn ${t.turn_index}`}
+                                      onError={(e) => { (e.currentTarget as HTMLAudioElement).style.display = "none"; }}
+                                    />
                                   )}
                                 </div>
                               ) : null}

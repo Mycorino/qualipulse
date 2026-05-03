@@ -23,9 +23,12 @@ def _r2_enabled() -> bool:
 
 
 def _r2_client():
+    jurisdiction = (settings.R2_JURISDICTION or "").strip().lower()
+    host = f"{settings.R2_ACCOUNT_ID}.{jurisdiction}.r2.cloudflarestorage.com" if jurisdiction \
+        else f"{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
     return boto3.client(
         "s3",
-        endpoint_url=f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+        endpoint_url=f"https://{host}",
         aws_access_key_id=settings.R2_ACCESS_KEY_ID,
         aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
         config=Config(signature_version="s3v4"),
