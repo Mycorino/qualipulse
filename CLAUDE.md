@@ -410,8 +410,9 @@ boot, no-ops after the first.
 
 **State of the rollout:**
 - ✅ PR 1 — schema, plan catalogue, `BillingService` (seed/backfill/quota/consume), engine hooks, backfill on startup.
-- ✅ PR 2 (this) — Stripe price-id resolver for new plans, `/billing/plans` returns the public catalogue, `/billing/status` exposes both legacy + new shape, `GET /billing/usage` returns credit balance, `/billing/checkout` accepts new plan ids + intervals, webhook routes to credit-plan or legacy path based on Stripe `price_id`, `customer.subscription.created/updated` upsert + grant credits, `customer.subscription.deleted` marks canceled, `invoice.payment_succeeded` re-grants on renewal. Trial auto-bootstrap on onboarding completion. Credits usage card in AccountSettings billing tab.
-- ⏳ PR 3 — frontend pricing page rebuild, admin credit-adjustment endpoint, rollover, automatic overage, prepaid credit packs, usage emails (80% / 100% warnings).
+- ✅ PR 2 — Stripe price-id resolver, `/billing/plans` + `/billing/status` + `GET /billing/usage`, credit-plan webhook routing, trial auto-bootstrap on onboarding, AccountSettings credits usage card.
+- ✅ PR 3 (this) — marketing pricing page rebuilt for the credits model with monthly/annual toggle ("Save 17%"), prepaid credit packs (`pack_25` / `pack_50` / `pack_100`) with `GET /billing/credit-packs` + `POST /billing/checkout/credits` (one-time Stripe `mode=payment`) + `checkout.session.completed` webhook handler granting via `grant_purchased_credits` (idempotent per Stripe session id), admin `POST /admin/workspaces/{id}/credits/adjust` for support-led top-ups/clawbacks (auditable in `credit_ledger` with `event_type='adjustment_admin'`), `PATCH /billing/overage` toggle, usage-warning emails fire at 80% + 100% credits used (idempotent per period via `usage_events`).
+- ⏳ Future — admin credit-adjustment frontend UI, credit-pack purchase UI in AccountSettings, rollover (V2 spec), metered overage billing, frontend display for warning banners.
 
 ### Onboarding Flow
 After signup, users are redirected to `/welcome` (4-step onboarding):

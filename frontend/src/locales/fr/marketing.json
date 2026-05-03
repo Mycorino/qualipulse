@@ -131,59 +131,53 @@
   },
   "pricing": {
     "title": "Des tarifs simples et transparents",
-    "subtitle": "Essai gratuit de 14 jours sur tous les plans. Aucune carte de crédit requise pour commencer.",
+    "subtitle": "Essai de 14 jours inclus sur tous les plans — sans carte bancaire.",
     "recommended": "Recommandé",
     "enterprise": "Vous gérez un programme de recherche important ?",
     "enterpriseCta": "Parlons Enterprise",
     "perMonth": "/mois",
+    "perYear": "/an",
+    "billingToggleLabel": "Fréquence de facturation",
+    "billingMonthly": "Mensuel",
+    "billingAnnual": "Annuel",
+    "billingAnnualSave": "Économisez 17%",
+    "billedAnnuallyAs": "Facturé {{amount}} € par an",
+    "creditsPerMonth": "crédits d'entretien / mois",
+    "creditDefinition": "1 crédit = 1 entretien participant complété, jusqu'à 15 minutes — incluant questions IA, transcription, analyse et stockage.",
     "plans": {
-      "free": {
-        "name": "Gratuit",
-        "desc": "Essayez QualiPulse de bout en bout — sans carte bancaire",
+      "exploration": {
+        "name": "Exploration",
+        "desc": "Pour les chercheurs en solo qui mènent quelques études par mois",
         "features": [
-          "1 projet",
-          "5 participants",
-          "Générateur de guide d'entretien IA",
-          "Analyse IA des thèmes et citations",
-          "1 lien d'entretien"
-        ],
-        "cta": "Commencer gratuitement"
-      },
-      "starter": {
-        "name": "Starter",
-        "desc": "Pour les chercheurs individuels qui débutent",
-        "features": [
-          "1 projet",
-          "10 participants par projet",
-          "Générateur de guide d'entretien IA",
-          "Analyse IA des thèmes et citations",
-          "2 liens d'entretien par projet"
+          "25 crédits d'entretien / mois",
+          "Jusqu'à 3 projets actifs",
+          "Guide d'entretien et analyse IA",
+          "Export CSV et PDF",
+          "Partage public des rapports"
         ],
         "cta": "Essai gratuit de 14 jours"
       },
       "team": {
         "name": "Team",
-        "desc": "Pour les équipes recherche internes menant des études régulières",
+        "desc": "Pour les équipes de recherche menant plusieurs études en parallèle",
         "features": [
-          "5 projets",
-          "50 participants par projet",
-          "Mémo de synthèse IA complet",
-          "Segments démographiques et heatmaps",
-          "Export CSV",
-          "3 membres d'équipe"
+          "100 crédits d'entretien / mois",
+          "Jusqu'à 20 projets actifs",
+          "3 éditeurs + viewers illimités",
+          "Espace de travail équipe et permissions",
+          "Tout ce qui est dans Exploration"
         ],
         "cta": "Essai gratuit de 14 jours"
       },
-      "lab": {
-        "name": "Lab",
-        "desc": "Pour les programmes de recherche et agences",
+      "agency": {
+        "name": "Agency",
+        "desc": "Pour les agences qui mènent des études pour plusieurs clients",
         "features": [
+          "300 crédits d'entretien / mois",
           "Projets illimités",
-          "500 participants par projet",
-          "Tout ce qui est dans Team",
-          "Branding personnalisé sur les entretiens",
-          "10 membres d'équipe",
-          "Support prioritaire"
+          "8 éditeurs + viewers illimités",
+          "Workspaces clients et branding personnalisé",
+          "Accès API"
         ],
         "cta": "Essai gratuit de 14 jours"
       }

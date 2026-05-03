@@ -960,6 +960,44 @@
   background: var(--primary);
   color: #fff;
 }
+.mkt-billing-toggle-save {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--success-bg, #f0fdf4);
+  color: var(--success, #16a34a);
+  border-radius: 999px;
+}
+.mkt-billing-toggle button.active .mkt-billing-toggle-save {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* PR 3: credit pill + plan body extras */
+.mkt-plan-credits {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  margin: 4px 0 12px;
+}
+.mkt-plan-credits strong {
+  color: var(--text-primary);
+  font-size: 1.05rem;
+}
+.mkt-plan-billed-as {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
+.mkt-plans-credit-note {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 24px auto 0;
+  max-width: 640px;
+}
 .mkt-plans-4 {
   grid-template-columns: repeat(4, 1fr);
 }

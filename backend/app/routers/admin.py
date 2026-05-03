@@ -13,8 +13,10 @@ from app.dependencies import get_db
 from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
+from app.models.billing import CreditLedger
 from app.models.coding import ManualCode, QuoteTag
 from app.models.company import Company, EmailVerificationToken, PasswordResetToken
+from app.services import billing_service
 from app.models.interview import (
     AnalysisThemeAnnotation,
     InterviewLink,
@@ -79,6 +81,17 @@ class TierUpdate(BaseModel):
 
 class TrialUpdate(BaseModel):
     action: str  # "extend_7" | "extend_14" | "extend_30" | "reset" | "expire"
+
+
+class CreditAdjustment(BaseModel):
+    """Manual credit adjustment from the admin panel.
+
+    ``credits_delta`` can be positive (goodwill grant, refund) or negative
+    (clawback). Always recorded in ``credit_ledger`` with
+    ``event_type='adjustment_admin'`` and the reason in metadata.
+    """
+    credits_delta: int
+    reason: str
 
 
 class AdminStats(BaseModel):
@@ -247,6 +260,96 @@ def update_trial(
     db.commit()
     db.refresh(company)
     return _build_user_summary(company, db)
+
+
+@router.post("/workspaces/{workspace_id}/credits/adjust")
+@limiter.limit("30/minute")
+def adjust_credits(
+    request: Request,
+    workspace_id: str,
+    body: CreditAdjustment,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Manually grant or claw back credits for a workspace.
+
+    Used for support cases (failed interview refund, goodwill grant,
+    legacy migration top-up). Always writes a ``credit_ledger`` row with
+    ``event_type='adjustment_admin'`` and the reason in metadata so the
+    movement is auditable. Returns the updated balance snapshot.
+
+    Refuses to adjust workspaces on legacy plans — those don't track
+    credits and the adjustment would be meaningless. Returns 400 in
+    that case.
+    """
+    if body.credits_delta == 0:
+        raise HTTPException(status_code=422, detail="credits_delta must be non-zero")
+    if not body.reason or not body.reason.strip():
+        raise HTTPException(status_code=422, detail="reason is required")
+
+    company = db.query(Company).filter(Company.id == workspace_id).first()
+    if company is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    sub = billing_service.get_current_subscription(db, workspace_id)
+    plan = billing_service.get_plan(db, sub.plan_id) if sub else None
+    if plan is None or plan.is_legacy:
+        raise HTTPException(
+            status_code=400,
+            detail="Workspace is on a legacy plan; credits don't apply.",
+        )
+
+    balance = billing_service.get_active_balance(db, workspace_id)
+    if balance is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No active credit balance to adjust.",
+        )
+
+    # Apply the adjustment to the balance. Positive deltas grow the
+    # ``purchased`` bucket so they survive rollover; negative deltas
+    # increment ``used`` so the available math stays simple.
+    if body.credits_delta > 0:
+        balance.purchased_credits = (balance.purchased_credits or 0) + body.credits_delta
+    else:
+        balance.used_credits = (balance.used_credits or 0) + abs(body.credits_delta)
+    balance.updated_at = datetime.utcnow()
+
+    db.add(
+        CreditLedger(
+            id=str(__import__("uuid").uuid4()),
+            workspace_id=workspace_id,
+            balance_id=balance.id,
+            event_type=billing_service.EVT_ADJUSTMENT_ADMIN,
+            credits_delta=body.credits_delta,
+            balance_after=balance.available,
+            source="admin_manual",
+            event_metadata={"reason": body.reason.strip()},
+        )
+    )
+    db.commit()
+    db.refresh(balance)
+
+    logger.info(
+        "ADMIN_CREDIT_ADJUSTMENT: workspace=%s delta=%d reason=%r balance_after=%d",
+        workspace_id, body.credits_delta, body.reason, balance.available,
+    )
+
+    return {
+        "workspace_id": workspace_id,
+        "credits_delta": body.credits_delta,
+        "reason": body.reason,
+        "balance": {
+            "included_credits": balance.included_credits,
+            "purchased_credits": balance.purchased_credits,
+            "rollover_credits": balance.rollover_credits,
+            "used_credits": balance.used_credits,
+            "overage_credits": balance.overage_credits,
+            "available_credits": balance.available,
+            "period_start": balance.period_start.isoformat() if balance.period_start else None,
+            "period_end": balance.period_end.isoformat() if balance.period_end else None,
+        },
+    }
 
 
 @router.delete("/users/{company_id}", status_code=status.HTTP_204_NO_CONTENT)

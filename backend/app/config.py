@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     STRIPE_PRICE_TEAM_ANNUAL: str = ""
     STRIPE_PRICE_AGENCY_MONTHLY: str = ""
     STRIPE_PRICE_AGENCY_ANNUAL: str = ""
+    # One-time prepaid credit pack price IDs (PR 3).
+    STRIPE_PRICE_PACK_25: str = ""
+    STRIPE_PRICE_PACK_50: str = ""
+    STRIPE_PRICE_PACK_100: str = ""
 
     # Sentry
     SENTRY_DSN: str = ""

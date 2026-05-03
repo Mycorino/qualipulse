@@ -315,6 +315,109 @@ def create_checkout_session(
         raise HTTPException(status_code=500, detail="Failed to create checkout session")
 
 
+class OverageToggleRequest(BaseModel):
+    overage_enabled: bool
+
+
+@router.patch("/overage")
+def update_overage_setting(
+    body: OverageToggleRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Toggle automatic overage billing for the workspace.
+
+    When enabled, interviews can start even after the credit balance is
+    exhausted; each extra interview is charged at the plan's
+    ``overage_price_cents`` rate (billed at the end of the period via
+    Stripe metered billing — wired in PR 3+ but not yet enforced).
+
+    Unavailable for legacy plans.
+    """
+    sub = billing_service.get_current_subscription(db, company.id)
+    plan = billing_service.get_plan(db, sub.plan_id) if sub else None
+    if not sub or not plan or plan.is_legacy:
+        raise HTTPException(status_code=400, detail="Overage is not available on this plan.")
+    sub.overage_enabled = body.overage_enabled
+    sub.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(sub)
+    return {"overage_enabled": sub.overage_enabled}
+
+
+@router.get("/credit-packs")
+def list_credit_packs():
+    """Return the available prepaid credit packs (PR 3)."""
+    from app.services.billing_plans import CREDIT_PACKS, stripe_price_id_for_pack
+
+    return [
+        {
+            "id": p.id,
+            "name": p.public_name,
+            "credits": p.credits,
+            "price_cents": p.price_cents,
+            "currency": p.currency,
+            "description": p.description,
+            "available": stripe_price_id_for_pack(p.id) is not None,
+        }
+        for p in CREDIT_PACKS
+    ]
+
+
+class CreditPackCheckoutRequest(BaseModel):
+    pack_id: str = Field(..., description="One of pack_25 | pack_50 | pack_100")
+    success_url: str
+    cancel_url: str
+
+
+@router.post("/checkout/credits")
+def create_credit_pack_checkout(
+    body: CreditPackCheckoutRequest,
+    company: Company = Depends(get_current_company),
+):
+    """Create a one-time Stripe Checkout for a prepaid credit pack."""
+    from app.services.billing_plans import get_credit_pack, stripe_price_id_for_pack
+
+    stripe_key = settings.STRIPE_SECRET_KEY
+    if not stripe_key:
+        raise HTTPException(status_code=503, detail="Billing is not configured.")
+
+    pack = get_credit_pack(body.pack_id)
+    if pack is None:
+        raise HTTPException(status_code=400, detail=f"Unknown credit pack: {body.pack_id}")
+    price_id = stripe_price_id_for_pack(pack.id)
+    if not price_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No Stripe price configured for {pack.id}",
+        )
+
+    try:
+        import stripe  # type: ignore
+        stripe.api_key = stripe_key
+
+        session = stripe.checkout.Session.create(
+            customer_email=company.email,
+            payment_method_types=["card"],
+            mode="payment",  # one-time, not subscription
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=_validate_redirect_url(body.success_url, "success_url"),
+            cancel_url=_validate_redirect_url(body.cancel_url, "cancel_url"),
+            metadata={
+                "company_id": company.id,
+                "workspace_id": company.id,
+                "pack_id": pack.id,
+                "credits": str(pack.credits),
+            },
+        )
+        return {"checkout_url": session.url}
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Stripe library not installed")
+    except Exception as e:  # pragma: no cover
+        logger.error("Stripe credit-pack checkout error: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create credit-pack checkout")
+
+
 @router.post("/portal")
 def create_portal_session(
     body: PortalRequest,
@@ -369,7 +472,52 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         _handle_subscription_deleted(db, event["data"]["object"])
     elif event_type == "invoice.payment_succeeded":
         _handle_invoice_payment_succeeded(db, event["data"]["object"])
+    elif event_type == "checkout.session.completed":
+        _handle_checkout_session_completed(db, event["data"]["object"])
     return {"received": True}
+
+
+def _handle_checkout_session_completed(db: Session, session: dict) -> None:
+    """Fulfilment for one-time prepaid credit-pack checkouts.
+
+    Subscription checkouts also fire this event but we already handle
+    them via ``customer.subscription.created`` — short-circuit when the
+    session mode isn't ``payment``.
+    """
+    if session.get("mode") != "payment":
+        return
+    workspace_id = session.get("metadata", {}).get("workspace_id") or session.get("metadata", {}).get("company_id")
+    if not workspace_id:
+        logger.warning("Credit pack checkout session %s missing workspace metadata", session.get("id"))
+        return
+    pack_id = session.get("metadata", {}).get("pack_id")
+    credits_str = session.get("metadata", {}).get("credits")
+    try:
+        credits = int(credits_str) if credits_str else 0
+    except (TypeError, ValueError):
+        credits = 0
+    # Defensive: if metadata didn't carry the credits, look up by line item.
+    if credits <= 0:
+        from app.services.billing_plans import credit_pack_for_stripe_price
+        line_items = session.get("display_items") or session.get("line_items", {}).get("data", [])
+        for line in line_items:
+            price_id = (line.get("price", {}) or {}).get("id", "")
+            pack = credit_pack_for_stripe_price(price_id)
+            if pack:
+                credits = pack.credits
+                pack_id = pack.id
+                break
+    if credits <= 0:
+        logger.warning("Credit pack checkout session %s resolved zero credits", session.get("id"))
+        return
+
+    billing_service.grant_purchased_credits(
+        db,
+        workspace_id,
+        credits=credits,
+        stripe_session_id=session.get("id", ""),
+        pack_id=pack_id,
+    )
 
 
 def _handle_subscription_event(db: Session, event_type: str, sub: dict) -> None:

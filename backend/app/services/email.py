@@ -302,6 +302,34 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "reason": "Vous recevez cet email parce que vous vous êtes inscrit·e ou avez été invité·e sur QualiPulse.",
         },
     },
+    "usage_warning_80": {
+        "en": {
+            "subject": "{percent}% of your QualiPulse credits used",
+            "heading": "You've used {percent}% of this month's credits",
+            "body": "You've used <strong>{used} of {total}</strong> interview credits in your current period (ends {period_end}). Plan ahead so a great study doesn't run out of room.",
+            "cta": "Manage billing",
+        },
+        "fr": {
+            "subject": "{percent} % de vos crédits QualiPulse utilisés",
+            "heading": "Vous avez utilisé {percent} % de vos crédits du mois",
+            "body": "Vous avez utilisé <strong>{used} sur {total}</strong> crédits d'entretien sur la période en cours (jusqu'au {period_end}). Anticipez pour qu'une étude qui décolle ne soit pas bloquée.",
+            "cta": "Gérer la facturation",
+        },
+    },
+    "usage_warning_100": {
+        "en": {
+            "subject": "Your QualiPulse credits are exhausted",
+            "heading": "Out of interview credits",
+            "body": "You've used all <strong>{total}</strong> credits in your current period. New participants won't be able to start interviews until you upgrade or buy a credit pack.",
+            "cta": "Buy more credits",
+        },
+        "fr": {
+            "subject": "Vos crédits QualiPulse sont épuisés",
+            "heading": "Plus de crédits d'entretien",
+            "body": "Vous avez utilisé l'ensemble des <strong>{total}</strong> crédits sur la période en cours. Les nouveaux participants ne pourront pas démarrer d'entretien tant que vous n'aurez pas mis à niveau votre plan ou acheté un pack.",
+            "cta": "Acheter des crédits",
+        },
+    },
 }
 
 
@@ -540,6 +568,38 @@ def send_analysis_ready(to: str, project_name: str, project_url: str, lang: str 
     return send_email(
         to=to,
         subject=_c("analysis_ready", lang, "subject", project_name=project_name),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_usage_warning(
+    to: str,
+    *,
+    percent: int,
+    used: int,
+    total: int,
+    period_end: str,
+    billing_url: str,
+    lang: str = "en",
+) -> bool:
+    """Send the 80% or 100% credit-usage warning email.
+
+    ``percent`` selects the template (any value < 100 → ``usage_warning_80``,
+    100+ → ``usage_warning_100``). ``period_end`` should already be a
+    locale-friendly date string (the caller formats it).
+    """
+    lang = _normalise_lang(lang)
+    template_key = "usage_warning_100" if percent >= 100 else "usage_warning_80"
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c(template_key, lang, "heading", percent=percent, used=used, total=total, period_end=period_end)}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c(template_key, lang, "body", percent=percent, used=used, total=total, period_end=period_end)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{billing_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c(template_key, lang, "cta")}</a>
+      </div>
+    """
+    return send_email(
+        to=to,
+        subject=_c(template_key, lang, "subject", percent=percent, used=used, total=total, period_end=period_end),
         body_html=_wrap_email(content, lang),
     )
 
