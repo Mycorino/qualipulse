@@ -37,6 +37,14 @@
     "upgradeCta": "Passer à Team",
     "upgradeCtaShort": "Passer à l'offre payante"
   },
+  "creditsBanner": {
+    "warningTitle": "{{percent}} % de vos crédits utilisés",
+    "warningDesc": "{{used}} crédits sur {{total}} utilisés ce mois-ci. Rechargez pour éviter toute interruption.",
+    "criticalTitle": "Vous n'avez plus de crédits",
+    "criticalDesc": "Les nouveaux entretiens seront bloqués jusqu'à l'achat d'un pack ou le début de la prochaine période.",
+    "cta": "Acheter des crédits",
+    "dismissAria": "Fermer la bannière de crédits"
+  },
   "gettingStarted": {
     "welcome": "Bienvenue, {{name}} ! Configurons votre première étude.",
     "subtitle": "Trois étapes pour lancer votre premier entretien piloté par l'IA.",

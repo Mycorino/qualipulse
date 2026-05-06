@@ -37,6 +37,14 @@
     "upgradeCta": "Upgrade to Team",
     "upgradeCtaShort": "Upgrade now"
   },
+  "creditsBanner": {
+    "warningTitle": "{{percent}}% of your credits used",
+    "warningDesc": "{{used}} of {{total}} credits used this period. Top up to avoid interruption.",
+    "criticalTitle": "You're out of credits",
+    "criticalDesc": "New interviews will be blocked until you buy a credit pack or your next billing period begins.",
+    "cta": "Buy credits",
+    "dismissAria": "Dismiss credits banner"
+  },
   "gettingStarted": {
     "welcome": "Welcome, {{name}}! Let's set up your first study.",
     "subtitle": "Three steps to run your first AI-led interview.",

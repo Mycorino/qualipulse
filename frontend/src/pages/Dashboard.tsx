@@ -11,6 +11,18 @@ import {
 } from "../api/projects";
 import { getMe, resendVerification } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
+import client from "../api/client";
+
+interface CreditsUsage {
+  included_credits: number;
+  purchased_credits: number;
+  rollover_credits: number;
+  used_credits: number;
+  overage_credits: number;
+  available_credits: number;
+  period_start: string | null;
+  period_end: string | null;
+}
 
 import DashboardInsights from "../components/DashboardInsights";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -32,6 +44,8 @@ export default function Dashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "responses" | "name">("newest");
   const [trialBannerDismissed, setTrialBannerDismissed] = useState(false);
+  const [credits, setCredits] = useState<CreditsUsage | null>(null);
+  const [creditsBannerDismissed, setCreditsBannerDismissed] = useState(false);
   const navigate = useNavigate();
   const { logout } = useAuth();
 
@@ -54,6 +68,10 @@ export default function Dashboard() {
         }
       })
       .catch(() => {});
+    // Credits usage — 404 for legacy plans, that's fine; we just won't show the banner.
+    client.get<CreditsUsage>("/billing/usage")
+      .then((r) => setCredits(r.data))
+      .catch(() => setCredits(null));
   }, []);
 
   async function loadProjects() {
@@ -330,6 +348,78 @@ export default function Dashboard() {
                   onClick={() => {
                     localStorage.setItem(dismissKey, "true");
                     setTrialBannerDismissed(true);
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Credits usage banner: fires at ≥80%, becomes critical at 100%.
+            Only renders for accounts on a credit plan (404 from /billing/usage
+            means legacy account — banner is silently skipped). */}
+        {!loading && credits && (() => {
+          const total =
+            credits.included_credits +
+            credits.purchased_credits +
+            credits.rollover_credits;
+          if (total === 0) return null;
+          const percent = Math.min(100, Math.round((credits.used_credits / total) * 100));
+          if (percent < 80) return null;
+          const isCritical = percent >= 100;
+          // Per-period dismissal so the banner returns when the new period starts.
+          const periodKey = credits.period_end?.slice(0, 10) ?? "no-period";
+          const dismissKey = `credits-banner-dismissed-${periodKey}`;
+          const wasDismissed =
+            creditsBannerDismissed || localStorage.getItem(dismissKey) === "true";
+          // 100% banner cannot be dismissed — they need to act.
+          if (wasDismissed && !isCritical) return null;
+          return (
+            <div
+              className={`gs-trial-banner${isCritical ? " gs-trial-banner--urgent" : ""}`}
+              style={{ marginBottom: 16 }}
+            >
+              <span aria-hidden="true">{isCritical ? "🚫" : "⚠️"}</span>
+              <div style={{ flex: 1 }}>
+                <strong>
+                  {isCritical
+                    ? t("creditsBanner.criticalTitle", { defaultValue: "You're out of credits" })
+                    : t("creditsBanner.warningTitle", {
+                        defaultValue: "{{percent}}% of your credits used",
+                        percent,
+                      })}
+                </strong>
+                <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.5 }}>
+                  {isCritical
+                    ? t("creditsBanner.criticalDesc", {
+                        defaultValue:
+                          "New interviews will be blocked until you buy a credit pack or your next billing period begins.",
+                      })
+                    : t("creditsBanner.warningDesc", {
+                        defaultValue:
+                          "{{used}} of {{total}} credits used this period. Top up to avoid interruption.",
+                        used: credits.used_credits,
+                        total,
+                      })}
+                </div>
+              </div>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => navigate("/account?tab=billing")}
+                style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+              >
+                {t("creditsBanner.cta", { defaultValue: "Buy credits" })}
+              </button>
+              {!isCritical && (
+                <button
+                  type="button"
+                  className="gs-trial-banner-dismiss"
+                  aria-label={t("creditsBanner.dismissAria", { defaultValue: "Dismiss" })}
+                  onClick={() => {
+                    localStorage.setItem(dismissKey, "true");
+                    setCreditsBannerDismissed(true);
                   }}
                 >
                   ×
