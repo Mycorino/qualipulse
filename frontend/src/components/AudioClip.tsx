@@ -7,6 +7,10 @@ interface AudioClipProps {
   onEnded?: (e: React.SyntheticEvent<HTMLAudioElement>) => void;
 }
 
+// Module-level registry: only one AudioClip plays at a time. When one starts,
+// any other currently-playing element is paused.
+let currentlyPlaying: HTMLAudioElement | null = null;
+
 function formatTime(s: number): string {
   if (!isFinite(s) || s < 0) return "0:00";
   const m = Math.floor(s / 60);
@@ -21,6 +25,9 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [errored, setErrored] = useState(false);
+    // Tracks our progress through the seek-to-end workaround for WebM files
+    // recorded by MediaRecorder (which report duration: Infinity until played).
+    const durationProbeRef = useRef<"idle" | "seeking" | "done">("idle");
 
     useImperativeHandle(ref, () => audioRef.current as HTMLAudioElement, []);
 
@@ -29,12 +36,16 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
       setPlaying(false);
       setCurrentTime(0);
       setDuration(0);
+      durationProbeRef.current = "idle";
     }, [src]);
 
     const togglePlay = () => {
       const a = audioRef.current;
       if (!a) return;
       if (a.paused) {
+        if (currentlyPlaying && currentlyPlaying !== a) {
+          currentlyPlaying.pause();
+        }
         a.play().catch(() => setErrored(true));
       } else {
         a.pause();
@@ -123,16 +134,47 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
           ref={audioRef}
           src={src}
           preload="metadata"
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
+          onPlay={(e) => {
+            currentlyPlaying = e.currentTarget as HTMLAudioElement;
+            setPlaying(true);
+          }}
+          onPause={(e) => {
+            if (currentlyPlaying === e.currentTarget) currentlyPlaying = null;
+            setPlaying(false);
+          }}
           onEnded={(e) => {
+            if (currentlyPlaying === e.currentTarget) currentlyPlaying = null;
             setPlaying(false);
             setCurrentTime(0);
             onEnded?.(e);
           }}
-          onLoadedMetadata={(e) => setDuration((e.currentTarget as HTMLAudioElement).duration)}
+          onLoadedMetadata={(e) => {
+            const a = e.currentTarget as HTMLAudioElement;
+            // WebM files recorded by MediaRecorder report Infinity until we
+            // seek to the end — then `durationchange` fires with the real value.
+            if (!isFinite(a.duration) && durationProbeRef.current === "idle") {
+              durationProbeRef.current = "seeking";
+              a.currentTime = 1e101;
+            } else {
+              setDuration(a.duration);
+            }
+          }}
+          onDurationChange={(e) => {
+            const a = e.currentTarget as HTMLAudioElement;
+            if (isFinite(a.duration)) {
+              setDuration(a.duration);
+              if (durationProbeRef.current === "seeking") {
+                a.currentTime = 0;
+                durationProbeRef.current = "done";
+              }
+            }
+          }}
           onTimeUpdate={(e) => {
-            setCurrentTime((e.currentTarget as HTMLAudioElement).currentTime);
+            // Suppress UI updates while the seek-to-end probe is in flight,
+            // otherwise the scrubber jumps to the end before snapping back.
+            if (durationProbeRef.current !== "seeking") {
+              setCurrentTime((e.currentTarget as HTMLAudioElement).currentTime);
+            }
             onTimeUpdate?.(e);
           }}
           onError={() => setErrored(true)}
