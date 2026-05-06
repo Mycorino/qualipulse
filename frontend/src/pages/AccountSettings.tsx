@@ -71,12 +71,24 @@ interface Plan {
   team_members: number;
 }
 
+interface CreditPack {
+  id: string;
+  name: string;
+  credits: number;
+  price_cents: number;
+  currency: string;
+  description: string;
+  available: boolean;
+}
+
 export default function AccountSettings() {
   const { t, i18n } = useTranslation(["settings", "common"]);
   const navigate = useNavigate();
   const [me, setMe] = useState<{ name: string; email: string; preferred_language?: string; slack_webhook_url?: string | null } | null>(null);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [packs, setPacks] = useState<CreditPack[]>([]);
+  const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"profile" | "team" | "integrations" | "billing">("profile");
   const [savingProfile, setSavingProfile] = useState(false);
@@ -108,18 +120,35 @@ export default function AccountSettings() {
       client.get("/auth/me").then(r => r.data),
       client.get("/billing/status").then(r => r.data).catch(() => null),
       client.get("/billing/plans").then(r => r.data).catch(() => []),
-    ]).then(([meData, billingData, plansData]) => {
+      client.get("/billing/credit-packs").then(r => r.data).catch(() => []),
+    ]).then(([meData, billingData, plansData, packsData]) => {
       setMe(meData);
       setName(meData.name);
       setSlackUrl(meData.slack_webhook_url ?? "");
       setBilling(billingData);
       setPlans(plansData);
+      setPacks(packsData);
       // Sync UI language with user's stored preference
       if (meData.preferred_language && meData.preferred_language !== i18n.language?.slice(0, 2)) {
         i18n.changeLanguage(meData.preferred_language);
       }
     }).finally(() => setLoading(false));
   }, []);
+
+  async function handleBuyPack(packId: string) {
+    setBuyingPackId(packId);
+    try {
+      const { data } = await client.post("/billing/checkout/credits", {
+        pack_id: packId,
+        success_url: window.location.origin + "/account?credits=purchased",
+        cancel_url: window.location.origin + "/account",
+      });
+      window.location.href = data.checkout_url;
+    } catch {
+      setBuyingPackId(null);
+      alert(t("common:contactSupport"));
+    }
+  }
 
   async function handleUpgrade(tierId: string) {
     try {
@@ -684,6 +713,59 @@ export default function AccountSettings() {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Credit packs — only for non-legacy plans. Lets users top up
+              without changing their subscription. */}
+          {billing?.plan && !billing.plan.is_legacy && packs.length > 0 && (
+            <div className="settings-card" style={{ marginTop: 20 }}>
+              <h2 className="settings-section-title">
+                {t("billing.packsTitle", { defaultValue: "Buy extra credits" })}
+              </h2>
+              <p className="muted-text" style={{ fontSize: 14, marginTop: -4, marginBottom: 16 }}>
+                {t("billing.packsSubtitle", {
+                  defaultValue: "One-off top-ups. Purchased credits roll over until used.",
+                })}
+              </p>
+              <div className="plans-grid">
+                {packs.map(pack => {
+                  const priceEur = (pack.price_cents / 100).toFixed(0);
+                  const perCredit = (pack.price_cents / pack.credits / 100).toFixed(2);
+                  const isBuying = buyingPackId === pack.id;
+                  return (
+                    <div key={pack.id} className="plan-card">
+                      <div className="plan-card-header">
+                        <h3 className="plan-name">{pack.name}</h3>
+                        <p className="plan-price">€{priceEur}</p>
+                      </div>
+                      <ul className="plan-features">
+                        <li>
+                          <strong>{pack.credits}</strong>{" "}
+                          {t("billing.creditsLabel", { defaultValue: "credits" })}
+                        </li>
+                        <li className="muted-text">
+                          {t("billing.perCreditPrice", {
+                            defaultValue: "€{{price}} per credit",
+                            price: perCredit,
+                          })}
+                        </li>
+                      </ul>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        disabled={!pack.available || isBuying}
+                        onClick={() => handleBuyPack(pack.id)}
+                      >
+                        {isBuying
+                          ? t("common:loading", { defaultValue: "Loading…" })
+                          : !pack.available
+                          ? t("billing.packUnavailable", { defaultValue: "Unavailable" })
+                          : t("billing.buyPack", { defaultValue: "Buy pack" })}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

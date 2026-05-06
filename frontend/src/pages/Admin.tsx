@@ -229,6 +229,12 @@ export default function Admin() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
 
+  const [creditDialog, setCreditDialog] = useState<AdminUser | null>(null);
+  const [creditDelta, setCreditDelta] = useState("");
+  const [creditReason, setCreditReason] = useState("");
+  const [creditDialogError, setCreditDialogError] = useState<string | null>(null);
+  const [creditDialogSubmitting, setCreditDialogSubmitting] = useState(false);
+
   const [costs, setCosts] = useState<CostsReport | null>(null);
 
   // Affiliates management
@@ -376,6 +382,36 @@ export default function Admin() {
       setError("Failed to update trial");
     } finally {
       setActionLoading(null);
+    }
+  }
+
+  async function handleAdjustCredits() {
+    if (!creditDialog) return;
+    const delta = parseInt(creditDelta, 10);
+    if (Number.isNaN(delta) || delta === 0) {
+      setCreditDialogError("Enter a non-zero integer");
+      return;
+    }
+    if (!creditReason.trim()) {
+      setCreditDialogError("Reason is required");
+      return;
+    }
+    setCreditDialogSubmitting(true);
+    setCreditDialogError(null);
+    try {
+      await client().post(`/admin/workspaces/${creditDialog.id}/credits/adjust`, {
+        credits_delta: delta,
+        reason: creditReason.trim(),
+      });
+      showSuccess(`${delta > 0 ? "Granted" : "Clawed back"} ${Math.abs(delta)} credit${Math.abs(delta) !== 1 ? "s" : ""}`);
+      setCreditDialog(null);
+      setCreditDelta("");
+      setCreditReason("");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setCreditDialogError(detail ?? "Failed to adjust credits");
+    } finally {
+      setCreditDialogSubmitting(false);
     }
   }
 
@@ -1097,6 +1133,31 @@ export default function Admin() {
                     );
                   })()}
 
+                  {/* Manual credit adjust — only meaningful for non-legacy plans, but
+                      we show it always; the endpoint refuses with a 400 for legacy. */}
+                  <div style={{ marginBottom: 12 }}>
+                    <button
+                      onClick={() => {
+                        setCreditDialog(user);
+                        setCreditDelta("");
+                        setCreditReason("");
+                        setCreditDialogError(null);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "1px solid var(--border)",
+                        color: "var(--text-primary)",
+                        borderRadius: "var(--radius-xs)",
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Adjust credits
+                    </button>
+                  </div>
+
                   {users.find((u) => u.id === expandedId)?.business_summary && (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
@@ -1159,6 +1220,124 @@ export default function Admin() {
 
         {/* Blog management tab */}
         {tab === "blog" && <AdminBlog adminKey={adminKey} />}
+
+      {/* Credit adjustment dialog */}
+      {creditDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+          onClick={() => !creditDialogSubmitting && setCreditDialog(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: 24,
+              width: 420,
+              maxWidth: "100%",
+              boxShadow: "var(--shadow-lg)",
+            }}
+          >
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+              Adjust credits
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+              {creditDialog.name} · {creditDialog.email}
+            </p>
+            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              Credits delta (positive = grant, negative = claw back)
+            </label>
+            <input
+              type="number"
+              value={creditDelta}
+              onChange={(e) => setCreditDelta(e.target.value)}
+              placeholder="e.g. 10 or -5"
+              disabled={creditDialogSubmitting}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                fontSize: 13,
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-xs)",
+                marginBottom: 12,
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+              }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              Reason (logged for audit)
+            </label>
+            <textarea
+              value={creditReason}
+              onChange={(e) => setCreditReason(e.target.value)}
+              placeholder="e.g. Goodwill grant after failed interview"
+              disabled={creditDialogSubmitting}
+              rows={2}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                fontSize: 13,
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-xs)",
+                marginBottom: 12,
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                fontFamily: "inherit",
+                resize: "vertical",
+              }}
+            />
+            {creditDialogError && (
+              <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 12 }}>
+                {creditDialogError}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setCreditDialog(null)}
+                disabled={creditDialogSubmitting}
+                style={{
+                  background: "none",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-primary)",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdjustCredits}
+                disabled={creditDialogSubmitting}
+                style={{
+                  background: "var(--primary)",
+                  border: "none",
+                  color: "white",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "6px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  opacity: creditDialogSubmitting ? 0.6 : 1,
+                }}
+              >
+                {creditDialogSubmitting ? "Applying…" : "Apply"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm delete dialog */}
       {confirmDelete && (

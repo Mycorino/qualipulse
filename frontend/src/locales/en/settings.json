@@ -38,6 +38,12 @@
   "billing": {
     "currentPlan": "Current plan",
     "upgradePlan": "Upgrade plan",
+    "packsTitle": "Buy extra credits",
+    "packsSubtitle": "One-off top-ups. Purchased credits roll over until used.",
+    "creditsLabel": "credits",
+    "perCreditPrice": "€{{price}} per credit",
+    "buyPack": "Buy pack",
+    "packUnavailable": "Unavailable",
     "manageBilling": "Manage billing →",
     "contactUs": "Contact us",
     "currentPlanLabel": "Current plan",

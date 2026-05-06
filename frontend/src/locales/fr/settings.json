@@ -38,6 +38,12 @@
   "billing": {
     "currentPlan": "Plan actuel",
     "upgradePlan": "Changer de plan",
+    "packsTitle": "Acheter des crédits supplémentaires",
+    "packsSubtitle": "Recharges ponctuelles. Les crédits achetés se reportent jusqu'à utilisation.",
+    "creditsLabel": "crédits",
+    "perCreditPrice": "{{price}} € par crédit",
+    "buyPack": "Acheter le pack",
+    "packUnavailable": "Indisponible",
     "manageBilling": "Gérer la facturation →",
     "contactUs": "Nous contacter",
     "currentPlanLabel": "Plan actuel",
