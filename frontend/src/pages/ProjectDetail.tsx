@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom"
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
+import { AudioClip } from "../components/AudioClip";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { ProjectSwitcher, AccountMenu } from "../components/HeaderControls";
 import { useAuth } from "../hooks/useAuth";
@@ -2259,12 +2260,9 @@ export default function ProjectDetail() {
                                   <div className="transcript-q__original">{t.question_text}</div>
                                 )}
                                 {t.tts_audio_url && (
-                                  <audio
-                                    controls
+                                  <AudioClip
                                     src={t.tts_audio_url}
-                                    className="transcript-audio"
-                                    aria-label={`AI question audio — turn ${t.turn_index}`}
-                                    onError={(e) => { (e.currentTarget as HTMLAudioElement).style.display = "none"; }}
+                                    label={`AI question audio — turn ${t.turn_index}`}
                                   />
                                 )}
                               </div>
@@ -2351,15 +2349,12 @@ export default function ProjectDetail() {
                                     )}
                                   </span>
                                   {t.audio_recording_url && (
-                                    <audio
+                                    <AudioClip
                                       ref={(el) => {
                                         recordingAudioRefs.current[t.id] = el;
                                       }}
-                                      controls
                                       src={t.audio_recording_url}
-                                      className="transcript-audio"
-                                      aria-label={`Participant recording — turn ${t.turn_index}`}
-                                      onError={(e) => { (e.currentTarget as HTMLAudioElement).style.display = "none"; }}
+                                      label={`Participant recording — turn ${t.turn_index}`}
                                       onTimeUpdate={(e) => {
                                         const segs = t.response_segments;
                                         if (!segs || segs.length === 0) return;
