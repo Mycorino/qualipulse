@@ -4642,15 +4642,75 @@ select.field-input {
   border: 1px solid var(--border-subtle);
 }
 
-/* ── Transcript audio players ───────────────────────────────────────────────── */
-.transcript-audio {
-  width: 100%;
-  height: 32px;
+/* ── AudioClip — compact inline player ──────────────────────────────────────── */
+.audio-clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 6px;
-  border-radius: 6px;
-}
-.transcript-audio::-webkit-media-controls-panel {
+  padding: 4px 10px 4px 4px;
+  height: 28px;
+  max-width: 280px;
+  width: fit-content;
   background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  outline: none;
+  transition: border-color 120ms var(--ease-out, ease);
+}
+.audio-clip:focus-visible {
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px rgba(67, 105, 245, 0.18);
+}
+.audio-clip__play {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: var(--brand-500);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 120ms var(--ease-out, ease), transform 80ms var(--ease-out, ease);
+}
+.audio-clip__play:hover { background: var(--brand-700, #2f4fcc); }
+.audio-clip__play:active { transform: scale(0.94); }
+.audio-clip__play:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+.audio-clip__track {
+  flex: 1 1 auto;
+  min-width: 80px;
+  height: 3px;
+  background: var(--border-subtle);
+  border-radius: 999px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.audio-clip__progress {
+  height: 100%;
+  background: var(--brand-500);
+  border-radius: 999px;
+  transition: width 80ms linear;
+}
+.audio-clip__time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  min-width: 32px;
+  text-align: right;
+}
+.audio-clip--error {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-style: italic;
+  padding: 4px 10px;
 }
 
 /* ── Toast notifications ─────────────────────────────────────────────────────── */
