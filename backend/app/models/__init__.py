@@ -16,6 +16,14 @@ from app.models.billing import (
     UsageEvent,
     WorkspaceSubscription,
 )
+from app.models.study import ConsentAcknowledgment, Study, StudyParticipant
+from app.models.survey import (
+    Survey,
+    SurveyLink,
+    SurveyQuestion,
+    SurveyResponse,
+    SurveyResponseAnswer,
+)
 
 __all__ = [
     "AIUsageLog",
@@ -24,6 +32,7 @@ __all__ = [
     "AffiliatePayout",
     "BlogPost",
     "Company",
+    "ConsentAcknowledgment",
     "CreditBalance",
     "CreditLedger",
     "InterviewGuideQuestion",
@@ -42,6 +51,13 @@ __all__ = [
     "ScreeningQuestion",
     "ProjectMemo",
     "QuoteTag",
+    "Study",
+    "StudyParticipant",
+    "Survey",
+    "SurveyLink",
+    "SurveyQuestion",
+    "SurveyResponse",
+    "SurveyResponseAnswer",
     "UsageEvent",
     "WorkspaceInvitation",
     "WorkspaceMember",
