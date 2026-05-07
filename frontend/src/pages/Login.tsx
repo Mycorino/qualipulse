@@ -1,7 +1,7 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { login, getMe } from "../api/auth";
+import { login, getMe, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -17,6 +17,21 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const resetSuccess = searchParams.get("reset") === "success";
+  const googleErrorParam = searchParams.get("google_error");
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { i18n } = useTranslation();
+
+  async function handleGoogleSignIn() {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      const url = await getGoogleAuthorizeUrl("/dashboard", i18n.language);
+      window.location.href = url;
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t("login.googleError")));
+      setGoogleLoading(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -69,7 +84,45 @@ export default function Login() {
         {resetSuccess && (
           <div className="success-banner">{t("login.resetSuccess")}</div>
         )}
+        {googleErrorParam && !error && (
+          <div className="error-banner" role="alert">{t("login.googleError")}</div>
+        )}
         {error && <div className="error-banner" role="alert">{error}</div>}
+
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading}
+          className="btn btn-secondary btn-block google-btn"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            marginBottom: 12,
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+            <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.49h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A8.99 8.99 0 0 0 9 18z"/>
+            <path fill="#FBBC05" d="M3.97 10.71a5.4 5.4 0 0 1 0-3.42V4.96H.96a9 9 0 0 0 0 8.08l3.01-2.33z"/>
+            <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A8.96 8.96 0 0 0 9 0 8.99 8.99 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+          </svg>
+          {googleLoading ? t("login.googleStarting") : t("login.google")}
+        </button>
+
+        <div className="auth-divider" style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          margin: "16px 0",
+          color: "var(--text-muted)",
+          fontSize: "var(--text-xs)",
+        }}>
+          <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+          <span>{t("login.or")}</span>
+          <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+        </div>
 
         <form onSubmit={handleSubmit}>
           <label className="field-label" htmlFor="login-email">{t("login.emailLabel")}</label>

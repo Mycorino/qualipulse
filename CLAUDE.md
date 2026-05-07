@@ -300,6 +300,12 @@ STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_STARTER=
 STRIPE_PRICE_PRO=
 
+# Google Sign-In (optional — disables /auth/google/* if any are blank).
+# Register the redirect URI in Google Cloud Console → Auth Platform → Clients.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
+
 # Sentry (optional)
 SENTRY_DSN=
 
@@ -497,6 +503,7 @@ quota exclusion).
 - Security headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, HSTS (production)
 - CORS configurable via `ALLOWED_ORIGINS`
 - Audio endpoint: directory traversal protection
+- **Google Sign-In** (OAuth2 authorization-code flow): `GET /auth/google/login` returns a Google consent URL with a 15-min signed-state JWT (CSRF nonce + sanitized post-login path + UI lang); `GET /auth/google/callback` exchanges the code via `httpx`, fetches `/userinfo`, then upserts the Company (matches by `google_sub` first, then by email — so existing password accounts auto-link on first Google login). New Google signups get `email_verified=True` and the same 14-day starter trial as paid signups. Tokens are returned to the frontend via URL fragment to `/auth/google/finish`, which persists them, clears the fragment from history, and routes to `/welcome` (new) or `/dashboard` (returning). `password_hash` is now nullable for OAuth-only accounts; password login + change-password guard against null. Disabled (returns 503) when `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` are unset. Schema: Alembic 0023 adds `companies.google_sub` (unique index) and makes `password_hash` nullable.
 
 ### Audio Recording (Safari Compatibility)
 - `MediaRecorder.start(250)` — timeslice fires `ondataavailable` every 250ms
@@ -990,6 +997,8 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | POST | `/auth/signup` | No | Create account, send nominative verification email, set 14-day trial (welcome-with-brief fires later on onboarding completion) |
 | POST | `/auth/login` | No | Login, get access + refresh tokens |
 | POST | `/auth/refresh` | No | Refresh access token |
+| GET | `/auth/google/login` | No | Returns Google OAuth authorize URL (signed state with next path + lang) |
+| GET | `/auth/google/callback` | No | Google redirect: exchange code, upsert account, bounce to `/auth/google/finish#access_token=...` |
 | POST | `/auth/verify-email?token=` | No | Verify email address |
 | POST | `/auth/resend-verification` | Yes | Resend verification email (3/min) |
 | POST | `/auth/password-reset/request` | No | Request password reset (always 200) |

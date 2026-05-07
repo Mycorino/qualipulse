@@ -106,6 +106,16 @@ export async function login(
   return data;
 }
 
+export async function getGoogleAuthorizeUrl(
+  next: string = "/dashboard",
+  lang: string = ""
+): Promise<string> {
+  const { data } = await client.get<{ authorize_url: string }>("/auth/google/login", {
+    params: { next, lang },
+  });
+  return data.authorize_url;
+}
+
 export async function getMe(): Promise<CompanyResponse> {
   const { data } = await client.get<CompanyResponse>("/auth/me");
   return data;
