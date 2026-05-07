@@ -564,3 +564,227 @@ class TestUsageWarningEmails:
         _maybe_send_usage_warning(db_session, c.id, bal)
         assert len(sent) == 1
         assert sent[0]["percent"] == 100
+
+
+# ── V2.2: rollover policy ────────────────────────────────────────────────────
+
+
+class TestRolloverPolicy:
+    """Period-transition rollover. Policy: purchased + prior-rollover credits
+    roll forever; included credits expire at period end. Consumption is
+    attributed to buckets in this order: included → rollover → purchased."""
+
+    def _setup_subscription(self, db_session, *, period_start, period_end):
+        from app.services.billing_service import upsert_subscription_from_stripe
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id=f"cus_{uuid.uuid4().hex[:8]}",
+            stripe_subscription_id=f"sub_{uuid.uuid4().hex[:8]}",
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=period_start,
+            current_period_end=period_end,
+        )
+        return c, sub
+
+    def test_no_prior_balance_means_zero_rollover(self, db_session):
+        from app.services.billing_service import grant_period_credits
+
+        now = datetime.utcnow()
+        _, sub = self._setup_subscription(
+            db_session, period_start=now, period_end=now + timedelta(days=30)
+        )
+        bal = grant_period_credits(db_session, sub)
+        assert bal.rollover_credits == 0
+        assert bal.included_credits == 100  # team plan default
+
+    def test_unused_purchased_rolls_forward_unused_included_expires(self, db_session):
+        from app.services.billing_service import (
+            EVT_EXPIRE_CREDITS,
+            EVT_GRANT_ROLLOVER,
+            grant_period_credits,
+            upsert_subscription_from_stripe,
+        )
+
+        now = datetime.utcnow()
+        c, sub = self._setup_subscription(
+            db_session, period_start=now - timedelta(days=30), period_end=now
+        )
+        bal1 = grant_period_credits(db_session, sub)
+        bal1.purchased_credits = 25
+        bal1.used_credits = 30
+        db_session.commit()
+
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id=sub.stripe_customer_id,
+            stripe_subscription_id=sub.stripe_subscription_id,
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        bal2 = grant_period_credits(db_session, sub)
+        assert bal2.id != bal1.id
+        assert bal2.included_credits == 100
+        assert bal2.rollover_credits == 25
+        assert bal2.purchased_credits == 0
+
+        rollover_events = (
+            db_session.query(CreditLedger)
+            .filter(
+                CreditLedger.workspace_id == c.id,
+                CreditLedger.event_type == EVT_GRANT_ROLLOVER,
+            )
+            .all()
+        )
+        assert len(rollover_events) == 1
+        assert rollover_events[0].credits_delta == 25
+        expire_events = (
+            db_session.query(CreditLedger)
+            .filter(
+                CreditLedger.workspace_id == c.id,
+                CreditLedger.event_type == EVT_EXPIRE_CREDITS,
+            )
+            .all()
+        )
+        assert len(expire_events) == 1
+        assert expire_events[0].credits_delta == -70
+
+    def test_consumption_drains_included_first_then_rollover_then_purchased(self, db_session):
+        from app.services.billing_service import (
+            grant_period_credits,
+            upsert_subscription_from_stripe,
+        )
+
+        now = datetime.utcnow()
+        c, sub = self._setup_subscription(
+            db_session, period_start=now - timedelta(days=30), period_end=now
+        )
+        bal1 = grant_period_credits(db_session, sub)
+        bal1.purchased_credits = 50
+        bal1.used_credits = 130
+        db_session.commit()
+
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id=sub.stripe_customer_id,
+            stripe_subscription_id=sub.stripe_subscription_id,
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        bal2 = grant_period_credits(db_session, sub)
+        assert bal2.rollover_credits == 20
+
+    def test_rollover_of_rollover(self, db_session):
+        from app.services.billing_service import (
+            grant_period_credits,
+            upsert_subscription_from_stripe,
+        )
+
+        now = datetime.utcnow()
+        c, sub = self._setup_subscription(
+            db_session, period_start=now - timedelta(days=30), period_end=now
+        )
+        bal1 = grant_period_credits(db_session, sub)
+        bal1.rollover_credits = 40
+        bal1.used_credits = 100
+        db_session.commit()
+
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id=sub.stripe_customer_id,
+            stripe_subscription_id=sub.stripe_subscription_id,
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        bal2 = grant_period_credits(db_session, sub)
+        assert bal2.rollover_credits == 40
+
+    def test_zero_rollover_when_everything_consumed(self, db_session):
+        from app.services.billing_service import (
+            grant_period_credits,
+            upsert_subscription_from_stripe,
+        )
+
+        now = datetime.utcnow()
+        c, sub = self._setup_subscription(
+            db_session, period_start=now - timedelta(days=30), period_end=now
+        )
+        bal1 = grant_period_credits(db_session, sub)
+        bal1.purchased_credits = 25
+        bal1.used_credits = 125
+        db_session.commit()
+
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id=sub.stripe_customer_id,
+            stripe_subscription_id=sub.stripe_subscription_id,
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        bal2 = grant_period_credits(db_session, sub)
+        assert bal2.rollover_credits == 0
+
+    def test_idempotent_no_duplicate_rollover_on_replay(self, db_session):
+        from app.services.billing_service import (
+            EVT_GRANT_ROLLOVER,
+            grant_period_credits,
+            upsert_subscription_from_stripe,
+        )
+
+        now = datetime.utcnow()
+        c, sub = self._setup_subscription(
+            db_session, period_start=now - timedelta(days=30), period_end=now
+        )
+        bal1 = grant_period_credits(db_session, sub)
+        bal1.purchased_credits = 25
+        db_session.commit()
+
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id=sub.stripe_customer_id,
+            stripe_subscription_id=sub.stripe_subscription_id,
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        grant_period_credits(db_session, sub)
+        grant_period_credits(db_session, sub)
+        rollover_events = (
+            db_session.query(CreditLedger)
+            .filter(
+                CreditLedger.workspace_id == c.id,
+                CreditLedger.event_type == EVT_GRANT_ROLLOVER,
+            )
+            .all()
+        )
+        assert len(rollover_events) == 1
