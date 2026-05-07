@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     STRIPE_PRICE_PACK_50: str = ""
     STRIPE_PRICE_PACK_100: str = ""
 
+    # Google OAuth (Sign in with Google). Leave blank to disable —
+    # /auth/google/login returns 503 when unconfigured. The redirect URI
+    # registered in Google Cloud Console must match
+    # ``{API_BASE_URL}/auth/google/callback``.
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""
+
     # Sentry
     SENTRY_DSN: str = ""
 

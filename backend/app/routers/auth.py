@@ -1,9 +1,14 @@
 import logging
+import secrets
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import urlencode
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -152,7 +157,10 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
 @limiter.limit("10/minute")
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     company = db.query(Company).filter(Company.email == body.email.lower().strip()).first()
-    if not company or not verify_password(body.password, company.password_hash):
+    if not company or not company.password_hash or not verify_password(body.password, company.password_hash):
+        # Google-only accounts (no password_hash) hit this branch — same
+        # generic message as a wrong password to avoid leaking which
+        # identity providers a given email is registered with.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -710,7 +718,7 @@ def change_password(
     db: Session = Depends(get_db),
 ):
     """Change password â requires current password verification."""
-    if not verify_password(body.current_password, company.password_hash):
+    if not company.password_hash or not verify_password(body.current_password, company.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
@@ -779,6 +787,247 @@ def test_slack_webhook(
             detail="Slack webhook call failed. Double-check the URL and try again.",
         )
     return {"message": "Test message sent"}
+
+
+# ── Google OAuth ──────────────────────────────────────────────────────
+#
+# Authorization-code flow:
+#   1. Frontend calls GET /auth/google/login → returns Google's consent URL
+#      (state is a short-lived signed JWT carrying CSRF nonce + post-login
+#      redirect path + UI language).
+#   2. User consents on Google → Google redirects back to
+#      GET /auth/google/callback?code=...&state=... .
+#   3. Backend exchanges the code for an id_token + access_token, fetches
+#      userinfo, then creates or links the local Company. New accounts get
+#      email_verified=True (Google has already verified the address) and
+#      the same 14-day starter trial as password signups.
+#   4. Backend redirects to {APP_BASE_URL}/auth/google/finish with our JWT
+#      access + refresh tokens in the URL fragment, plus the onboarded flag
+#      so the frontend can route to /welcome vs /dashboard.
+
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+
+
+def _google_redirect_uri() -> str:
+    """The redirect URI we register with Google + receive callbacks at.
+
+    Configurable via ``GOOGLE_REDIRECT_URI`` so dev (FastAPI on :8000) and
+    prod (api.qualipulse.com) can each use their own host. Falls back to a
+    sensible default built off the request — but in practice Google requires
+    an exact pre-registered match, so this should always be set explicitly.
+    """
+    return settings.GOOGLE_REDIRECT_URI.strip()
+
+
+def _google_configured() -> bool:
+    return bool(
+        settings.GOOGLE_CLIENT_ID
+        and settings.GOOGLE_CLIENT_SECRET
+        and _google_redirect_uri()
+    )
+
+
+def _encode_oauth_state(payload: dict) -> str:
+    """Sign the OAuth state blob with SECRET_KEY (CSRF + redirect carrier)."""
+    to_encode = {
+        **payload,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+        "nonce": secrets.token_urlsafe(16),
+    }
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
+
+
+def _decode_oauth_state(token: str) -> dict:
+    try:
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+    except JWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OAuth state",
+        ) from exc
+
+
+@router.get("/google/login")
+def google_login(
+    request: Request,
+    next: str = "/dashboard",
+    lang: str = "",
+):
+    """Return the Google authorization URL the frontend should redirect to."""
+    if not _google_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured on this environment.",
+        )
+
+    # Whitelist the post-login path so an attacker can't open-redirect us
+    # off-site through the state parameter.
+    safe_next = next if next.startswith("/") and not next.startswith("//") else "/dashboard"
+    safe_lang = lang.strip().lower()[:2] if lang else ""
+
+    state = _encode_oauth_state({"next": safe_next, "lang": safe_lang})
+
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": _google_redirect_uri(),
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "online",
+        "prompt": "select_account",
+        "state": state,
+    }
+    return {"authorize_url": f"{GOOGLE_AUTH_URL}?{urlencode(params)}"}
+
+
+def _redirect_to_frontend_with_error(error: str, next_path: str = "/login") -> RedirectResponse:
+    target = f"{settings.APP_BASE_URL}{next_path}?google_error={error}"
+    return RedirectResponse(url=target, status_code=302)
+
+
+@router.get("/google/callback")
+def google_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    error: str = "",
+    db: Session = Depends(get_db),
+):
+    """Exchange Google's auth code → upsert account → bounce to frontend."""
+    if not _google_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured on this environment.",
+        )
+
+    if error:
+        # User clicked "Cancel" on Google's consent screen, etc.
+        return _redirect_to_frontend_with_error(error)
+
+    if not code or not state:
+        return _redirect_to_frontend_with_error("missing_code")
+
+    state_payload = _decode_oauth_state(state)
+    next_path = state_payload.get("next") or "/dashboard"
+    lang = state_payload.get("lang") or ""
+
+    # Exchange the authorization code for tokens (server-to-server).
+    try:
+        with httpx.Client(timeout=10.0) as http:
+            token_resp = http.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": _google_redirect_uri(),
+                    "grant_type": "authorization_code",
+                },
+                headers={"Accept": "application/json"},
+            )
+            if token_resp.status_code != 200:
+                logger.warning(
+                    "Google token exchange failed: %s %s",
+                    token_resp.status_code,
+                    token_resp.text[:200],
+                )
+                return _redirect_to_frontend_with_error("token_exchange_failed")
+            tokens = token_resp.json()
+
+            access_token_g = tokens.get("access_token")
+            if not access_token_g:
+                return _redirect_to_frontend_with_error("no_access_token")
+
+            userinfo_resp = http.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token_g}"},
+            )
+            if userinfo_resp.status_code != 200:
+                return _redirect_to_frontend_with_error("userinfo_failed")
+            userinfo = userinfo_resp.json()
+    except httpx.HTTPError:
+        logger.exception("Network error talking to Google")
+        return _redirect_to_frontend_with_error("network_error")
+
+    google_sub = userinfo.get("sub")
+    email = (userinfo.get("email") or "").lower().strip()
+    email_verified_g = bool(userinfo.get("email_verified"))
+    given_name = userinfo.get("given_name")
+    family_name = userinfo.get("family_name")
+    full_name = userinfo.get("name") or email.split("@")[0] if email else None
+
+    if not google_sub or not email:
+        return _redirect_to_frontend_with_error("incomplete_profile")
+
+    # Match by google_sub first (covers users who later changed email on
+    # Google), then by email (covers existing password accounts linking
+    # their Google identity for the first time).
+    company = db.query(Company).filter(Company.google_sub == google_sub).first()
+    if company is None:
+        company = db.query(Company).filter(Company.email == email).first()
+
+    is_new_account = company is None
+
+    if company is None:
+        # Brand-new signup via Google — same trial behaviour as a paid-tier
+        # password signup (14-day team-level trial on starter tier).
+        signup_lang = lang if lang in ("en", "fr") else "en"
+        company = Company(
+            name=full_name or email.split("@")[0],
+            email=email,
+            password_hash=None,
+            google_sub=google_sub,
+            email_verified=email_verified_g,
+            subscription_tier="starter",
+            trial_ends_at=datetime.utcnow() + timedelta(days=14),
+            preferred_language=signup_lang,
+            first_name=given_name,
+            last_name=family_name,
+        )
+        db.add(company)
+        db.commit()
+        db.refresh(company)
+        logger.info("New Google signup: %s", company.email)
+    else:
+        # Link Google to existing account (idempotent) and trust Google's
+        # verified flag to mark the email as verified if it wasn't already.
+        changed = False
+        if company.google_sub != google_sub:
+            company.google_sub = google_sub
+            changed = True
+        if email_verified_g and not company.email_verified:
+            company.email_verified = True
+            changed = True
+        if not company.first_name and given_name:
+            company.first_name = given_name
+            changed = True
+        if not company.last_name and family_name:
+            company.last_name = family_name
+            changed = True
+        if changed:
+            db.commit()
+            db.refresh(company)
+        logger.info("Google login: %s (linked=%s)", company.email, changed)
+
+    access = create_access_token({"sub": company.id})
+    refresh = create_refresh_token({"sub": company.id})
+
+    # Send tokens back via URL fragment so they don't appear in server logs
+    # / Referer headers. The frontend's /auth/google/finish route reads
+    # window.location.hash, stores tokens, then routes to next_path or
+    # /welcome based on the onboarded flag.
+    frag_params = urlencode({
+        "access_token": access,
+        "refresh_token": refresh,
+        "onboarded": "1" if company.onboarding_completed else "0",
+        "is_new": "1" if is_new_account else "0",
+        "next": next_path,
+    })
+    return RedirectResponse(
+        url=f"{settings.APP_BASE_URL}/auth/google/finish#{frag_params}",
+        status_code=302,
+    )
 
 
 class NewsletterSubscribe(BaseModel):
