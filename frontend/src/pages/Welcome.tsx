@@ -87,6 +87,7 @@ export default function Welcome() {
   const [researchExperience, setResearchExperience] = useState<string>("");
 
   // Step 3 — Your company
+  const [companyNameInput, setCompanyNameInput] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [websiteLoading, setWebsiteLoading] = useState(false);
   const [websiteProgressStep, setWebsiteProgressStep] = useState(0);
@@ -132,7 +133,18 @@ export default function Welcome() {
   ];
 
   const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
-  const companyName = me?.name ?? "";
+  // For Google signups we seed Company.name from the email domain (or
+  // the local part for free-mail addresses), but it can still match the
+  // person's name (e.g. corino@corino.com). When it's clearly a person
+  // we drop it from the role label so it reads "Your role" not
+  // "Your role at Corino Fontana".
+  const rawCompanyName = me?.name ?? "";
+  const looksLikePerson =
+    !!me?.first_name &&
+    !!me?.last_name &&
+    rawCompanyName.trim().toLowerCase() ===
+      `${me.first_name} ${me.last_name}`.trim().toLowerCase();
+  const companyName = looksLikePerson ? "" : rawCompanyName;
 
   // Auto-poll for email verification
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -155,6 +167,7 @@ export default function Welcome() {
         if (data.role) setRoleTitle(data.role);
         if (data.occupation_description) setOccupationDescription(data.occupation_description);
         if (data.research_experience) setResearchExperience(data.research_experience);
+        if (data.name) setCompanyNameInput(data.name);
         if (data.website_url) setWebsiteUrl(data.website_url);
         if (data.business_summary) setBusinessSummary(data.business_summary);
         if (data.industry) setIndustry(data.industry);
@@ -419,6 +432,7 @@ export default function Welcome() {
     setError("");
     try {
       await saveOnboardingProfile({
+        name: companyNameInput.trim() || undefined,
         website_url: trimmed || undefined,
         business_summary: businessSummary.trim() || undefined,
         industry: industry || undefined,
@@ -426,6 +440,11 @@ export default function Welcome() {
         selected_use_cases: finalActiveUseCases.length > 0 ? finalActiveUseCases.join(",") : undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
+      // Reflect the corrected workspace name locally so step 4's recap
+      // ("Welcome at <company>") doesn't still show the old placeholder.
+      if (companyNameInput.trim()) {
+        setMe((prev) => (prev ? { ...prev, name: companyNameInput.trim() } : prev));
+      }
       setStep(4);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("onboarding.failedSave")));
@@ -731,6 +750,23 @@ export default function Welcome() {
             <p className="welcome-subtitle">{t("onboarding.businessSubtitle")}</p>
 
             <div className="onboarding-form">
+              {/* Company name */}
+              <div className="onboarding-field">
+                <label className="field-label" htmlFor="onboarding-company-name">
+                  {t("onboarding.companyNameLabel")}
+                </label>
+                <input
+                  id="onboarding-company-name"
+                  type="text"
+                  className="field-input"
+                  value={companyNameInput}
+                  onChange={(e) => setCompanyNameInput(e.target.value)}
+                  placeholder={t("onboarding.companyNamePlaceholder")}
+                  disabled={saving}
+                  autoComplete="organization"
+                />
+              </div>
+
               {/* Website URL */}
               <div className="onboarding-field">
                 <label className="field-label">
