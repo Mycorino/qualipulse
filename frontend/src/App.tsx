@@ -30,6 +30,8 @@ const AffiliatePortal = lazy(() => import("./pages/AffiliatePortal"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPostPage = lazy(() => import("./pages/BlogPost"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
+const QuantiShowcase = lazy(() => import("./pages/QuantiShowcase"));
+const QuantiReportDemo = lazy(() => import("./pages/QuantiReportDemo"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -151,6 +153,8 @@ export default function App() {
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPostPage />} />
       <Route path="/admin" element={<Admin />} />
+      <Route path="/design-system/quanti" element={<QuantiShowcase />} />
+      <Route path="/design-system/quanti/report" element={<QuantiReportDemo />} />
       <Route
         path="/account"
         element={

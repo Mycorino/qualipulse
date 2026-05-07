@@ -5,6 +5,45 @@ interface AudioClipProps {
   label: string;
   onTimeUpdate?: (e: React.SyntheticEvent<HTMLAudioElement>) => void;
   onEnded?: (e: React.SyntheticEvent<HTMLAudioElement>) => void;
+  /**
+   * Visual treatment of the progress track.
+   * - "bar" (default): horizontal progress bar — used inside transcripts and turns.
+   * - "waveform": procedural waveform bars — used inside VerbatimCard on the
+   *   quanti surface. The waveform shape is deterministic per `src` so the
+   *   same clip always renders identically.
+   */
+  variant?: "bar" | "waveform";
+  /** Number of bars in the waveform variant. Defaults to 48. */
+  waveformBars?: number;
+}
+
+/**
+ * Deterministic pseudo-waveform — a stable hash of the src produces a
+ * varying amplitude pattern so each clip looks distinct without requiring
+ * real Web Audio API decoding (which is expensive on first paint).
+ *
+ * Real waveform decoding will land in a follow-up that decodes the audio
+ * once via OfflineAudioContext and caches the peak buffer per src.
+ */
+function buildWaveformAmplitudes(src: string, n: number): number[] {
+  let h = 2166136261;
+  for (let i = 0; i < src.length; i++) {
+    h ^= src.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const amps: number[] = [];
+  for (let i = 0; i < n; i++) {
+    h ^= h << 13;
+    h ^= h >>> 17;
+    h ^= h << 5;
+    const r = ((h >>> 0) % 1000) / 1000;
+    // Bell-shape envelope so the middle is louder than the edges, like
+    // most natural speech clips end up looking.
+    const envelope = Math.sin((Math.PI * (i + 0.5)) / n);
+    const amp = 0.18 + 0.82 * r * envelope;
+    amps.push(amp);
+  }
+  return amps;
 }
 
 // Module-level registry: only one AudioClip plays at a time. When one starts,
@@ -19,7 +58,7 @@ function formatTime(s: number): string {
 }
 
 export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
-  ({ src, label, onTimeUpdate, onEnded }, ref) => {
+  ({ src, label, onTimeUpdate, onEnded, variant = "bar", waveformBars = 48 }, ref) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [playing, setPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
@@ -82,7 +121,10 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
       }
     };
 
-    if (errored) {
+    // For the waveform variant we keep the shell visible even on load
+    // failure — a missing clip in a list shouldn't reflow the layout.
+    // The bar variant retains the original error fallback for transcript views.
+    if (errored && variant === "bar") {
       return (
         <div className="audio-clip audio-clip--error" aria-label={label}>
           Audio unavailable
@@ -91,10 +133,11 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
     }
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+    const amps = variant === "waveform" ? buildWaveformAmplitudes(src, waveformBars) : null;
 
     return (
       <div
-        className={`audio-clip${playing ? " audio-clip--playing" : ""}`}
+        className={`audio-clip${playing ? " audio-clip--playing" : ""}${variant === "waveform" ? " audio-clip--waveform" : ""}${errored ? " audio-clip--errored" : ""}`}
         role="group"
         aria-label={`${label}, ${formatTime(duration)}`}
         onKeyDown={handleKey}
@@ -104,6 +147,7 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
           type="button"
           className="audio-clip__play"
           onClick={togglePlay}
+          disabled={errored}
           aria-label={playing ? "Pause" : "Play"}
           aria-pressed={playing}
         >
@@ -118,17 +162,54 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
             </svg>
           )}
         </button>
-        <div
-          className="audio-clip__track"
-          onClick={handleSeek}
-          role="slider"
-          aria-label="Seek"
-          aria-valuemin={0}
-          aria-valuemax={Math.round(duration)}
-          aria-valuenow={Math.round(currentTime)}
-        >
-          <div className="audio-clip__progress" style={{ width: `${progress}%` }} />
-        </div>
+        {amps ? (
+          <div
+            className="audio-clip__track audio-clip__track--waveform"
+            onClick={handleSeek}
+            role="slider"
+            aria-label="Seek"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration)}
+            aria-valuenow={Math.round(currentTime)}
+          >
+            <svg
+              className="audio-clip__waveform"
+              viewBox={`0 0 ${amps.length * 3} 32`}
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              {amps.map((a, i) => {
+                const h = Math.max(2, a * 32);
+                const y = (32 - h) / 2;
+                const fillProgress = ((i + 0.5) / amps.length) * 100;
+                const filled = fillProgress <= progress;
+                return (
+                  <rect
+                    key={i}
+                    x={i * 3}
+                    y={y}
+                    width={2}
+                    height={h}
+                    rx={1}
+                    className={filled ? "audio-clip__bar audio-clip__bar--filled" : "audio-clip__bar"}
+                  />
+                );
+              })}
+            </svg>
+          </div>
+        ) : (
+          <div
+            className="audio-clip__track"
+            onClick={handleSeek}
+            role="slider"
+            aria-label="Seek"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration)}
+            aria-valuenow={Math.round(currentTime)}
+          >
+            <div className="audio-clip__progress" style={{ width: `${progress}%` }} />
+          </div>
+        )}
         <span className="audio-clip__time">{formatTime(duration - currentTime)}</span>
         <audio
           ref={audioRef}
