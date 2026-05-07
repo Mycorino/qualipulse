@@ -37,7 +37,18 @@ const DRAFT_KEY = "wizard_draft";
 function loadDraft() {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    const hasMeaningfulContent =
+      d.name || d.context || d.briefSummary || d.objective ||
+      d.rationale || d.decisionToInform || d.targetCustomerDescription ||
+      d.audience || (d.questions?.length > 0) || (d.screeningQuestions?.length > 0) ||
+      (d.learningGoals?.some((g: string) => g));
+    if (!hasMeaningfulContent) {
+      localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    return d;
   } catch {
     return null;
   }
@@ -138,6 +149,17 @@ export default function CreateProjectWizard() {
   const [carouselIdx, setCarouselIdx] = useState(0);
   const carouselMessages = useRef<string[]>([]);
   const carouselTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function resetWizardState() {
+    localStorage.removeItem(DRAFT_KEY);
+    setHasDraft(false);
+    setStep(1);
+    setName(""); setContext(""); setBriefSummary("");
+    setObjective(""); setLearningGoals(["", ""]); setStudyType("exploratory"); setRationale("");
+    setDecisionToInform(""); setTargetCustomerDescription("");
+    setAudience(""); setDurationMinutes(20); setLanguage(accountLang);
+    setQuestions([]); setScreeningQuestions([]);
+  }
 
   function startCarousel(messages: string[]) {
     stopCarousel();
@@ -861,19 +883,27 @@ export default function CreateProjectWizard() {
         {hasDraft && (
         <div className="draft-banner" style={{ background: "var(--brand-50)", color: "var(--brand-700)", borderColor: "var(--brand-200)" }}>
           <span>{t("wizard.draftRestored")}</span>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => {
-              if (!window.confirm(t("wizard.confirmDiscardDraft"))) return;
-              localStorage.removeItem(DRAFT_KEY);
-              setHasDraft(false);
-              setStep(1); setName(""); setContext(""); setBriefSummary("");
-              setObjective(""); setLearningGoals(["", "", ""]); setStudyType("exploratory"); setRationale("");
-              setAudience(""); setDurationMinutes(20); setLanguage("en"); setQuestions([]);
-            }}
-          >
-            {t("wizard.discardDraft")}
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                if (!window.confirm(t("wizard.confirmDiscardDraft"))) return;
+                resetWizardState();
+              }}
+            >
+              {t("wizard.discardDraft")}
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                if (!window.confirm(t("wizard.confirmDiscardForTemplates"))) return;
+                resetWizardState();
+                setShowTemplatePicker(true);
+              }}
+            >
+              {t("wizard.discardAndBrowseTemplates")}
+            </button>
+          </div>
         </div>
       )}
       {error && <div className="error-banner">{error}</div>}
@@ -884,6 +914,21 @@ export default function CreateProjectWizard() {
             <div className="wizard-card-header">
               <h2>{t("wizard.briefAndObjectiveTitle")}</h2>
               <p className="muted-text">{t("wizard.briefAndObjectiveSubtitle")}</p>
+              {!isEditMode && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginTop: 8 }}
+                  onClick={() => {
+                    const hasContent = name || context || briefSummary || objective ||
+                      questions.length > 0 || screeningQuestions.length > 0;
+                    if (hasContent && !window.confirm(t("wizard.confirmDiscardForTemplates"))) return;
+                    resetWizardState();
+                    setShowTemplatePicker(true);
+                  }}
+                >
+                  {t("wizard.browseTemplates")}
+                </button>
+              )}
             </div>
 
             {/* ── Brief section ── */}
