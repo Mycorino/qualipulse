@@ -810,6 +810,38 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
 
+_FREEMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com",
+    "yahoo.com", "yahoo.fr", "yahoo.co.uk", "icloud.com", "me.com", "mac.com",
+    "proton.me", "protonmail.com", "aol.com", "gmx.com", "gmx.fr",
+    "free.fr", "orange.fr", "wanadoo.fr", "laposte.net", "sfr.fr",
+}
+
+
+def _company_name_from_email(email: str) -> str:
+    """Friendlier placeholder workspace name than the user's full name.
+
+    Google profiles ship a person's name, not a company name. Stuffing
+    "Corino Fontana" into ``Company.name`` makes the onboarding read
+    "Your role at Corino Fontana", which sounds wrong. We derive a
+    workspace placeholder from the email domain instead — the user can
+    (and should) override it on the onboarding "Your company" step.
+
+    For corporate domains we capitalise the second-level label
+    (``corino@qualipulse.com`` → "Qualipulse"). Free-mail domains
+    (gmail, yahoo, …) carry no signal so we fall back to the local part
+    of the address.
+    """
+    if "@" not in email:
+        return email or "My workspace"
+    local, _, domain = email.partition("@")
+    domain = domain.lower().strip()
+    if domain in _FREEMAIL_DOMAINS or not domain:
+        return (local or "My workspace").capitalize()
+    label = domain.split(".")[0]
+    return label.capitalize() if label else (local or "My workspace").capitalize()
+
+
 def _google_redirect_uri() -> str:
     """The redirect URI we register with Google + receive callbacks at.
 
@@ -955,7 +987,6 @@ def google_callback(
     email_verified_g = bool(userinfo.get("email_verified"))
     given_name = userinfo.get("given_name")
     family_name = userinfo.get("family_name")
-    full_name = userinfo.get("name") or email.split("@")[0] if email else None
 
     if not google_sub or not email:
         return _redirect_to_frontend_with_error("incomplete_profile")
@@ -972,9 +1003,15 @@ def google_callback(
     if company is None:
         # Brand-new signup via Google — same trial behaviour as a paid-tier
         # password signup (14-day team-level trial on starter tier).
+        # Don't use Google's full name (e.g. "Corino Fontana") as the
+        # workspace name — the onboarding wizard then says "Your role at
+        # Corino Fontana" which is awkward. Derive a placeholder from the
+        # email domain (corino@qualipulse.com → "Qualipulse"); the user
+        # corrects it on the "Your company" onboarding step before any AI
+        # prompts get grounded in the wrong name.
         signup_lang = lang if lang in ("en", "fr") else "en"
         company = Company(
-            name=full_name or email.split("@")[0],
+            name=_company_name_from_email(email),
             email=email,
             password_hash=None,
             google_sub=google_sub,
