@@ -6476,3 +6476,2252 @@ select.field-input {
   .analysis-subtab { transition: none; }
   .analysis-toc__link { transition: none; }
 }
+
+/* ============================================
+   Quanti — Tokens (Sprint 1)
+   ============================================
+   Editorial typography pair, data-viz palette, and report-grid tokens for
+   the surveys + dashboards + mixed-methods report surfaces. Purely additive
+   — existing tokens are untouched. The serif is for *editorial headlines
+   only* (finding action-titles, exec-summary, report cover) — never UI.
+   ============================================ */
+
+:root {
+  /* ── Typography (editorial pair) ───────────────────── */
+  --font-sans: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Source Serif 4", "Tiempos Headline", "GT Sectra", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Editorial type scale — only on report/finding surfaces */
+  --text-display: 2.667rem;   /* report cover (~40px) */
+  --text-headline: 2.133rem;  /* finding action-title (~32px) */
+  --text-eyebrow: 0.733rem;   /* uppercase label above headline */
+
+  /* ── Data-viz palette (3-color rule) ───────────────── */
+  --viz-positive:    var(--brand-500);    /* agree, promoter, gain */
+  --viz-negative:    #e85d4a;             /* disagree, detractor, loss */
+  --viz-neutral:     #9ca3af;             /* passive, baseline */
+  --viz-positive-soft: var(--brand-100);
+  --viz-negative-soft: #fde4e0;
+  --viz-neutral-soft:  #e5e7eb;
+
+  /* Sequential scale — heatmaps, low → high */
+  --viz-seq-1: var(--brand-50);
+  --viz-seq-2: var(--brand-200);
+  --viz-seq-3: var(--brand-400);
+  --viz-seq-4: var(--brand-600);
+  --viz-seq-5: var(--brand-800);
+
+  /* Diverging Likert — strong-neg → neutral → strong-pos */
+  --viz-div-strong-neg: #c63d2e;
+  --viz-div-neg:        var(--viz-negative);
+  --viz-div-mid:        var(--viz-neutral);
+  --viz-div-pos:        var(--viz-positive);
+  --viz-div-strong-pos: var(--brand-700);
+
+  /* Annotation/callout — sparingly */
+  --viz-annotation: #b45309;
+
+  /* ── Report layout ───────────────────────────────── */
+  --report-canvas-max-w: 1120px;
+  --report-canvas-pad-x: clamp(24px, 6vw, 96px);
+  --report-section-gap: var(--space-16);
+  --report-page-min-h: 88vh;
+  --dashboard-sidebar-w: 280px;
+}
+
+/* Tabular numerals — required on all chart axes, table cells, stat values */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "cv11";
+}
+
+/* ============================================
+   Quanti — ChartCard
+   ============================================
+   The dashboard atom. Wraps every chart with the takeaway-sentence-above
+   rule and a sample-size footer. Composition over configuration: the chart
+   itself is a child; this component just enforces the editorial frame.
+   ============================================ */
+
+.chart-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-xs);
+}
+
+.chart-card__eyebrow {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  font-feature-settings: "cv11";
+}
+
+.chart-card__takeaway {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.chart-card__chart {
+  min-height: 200px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-card__footer-divider {
+  color: var(--border-strong);
+  user-select: none;
+}
+
+.chart-card__warning {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  font-weight: var(--weight-medium);
+}
+
+/* ============================================
+   Quanti — VerbatimCard
+   ============================================
+   The signature interaction. A pull-quote with optional audio playback,
+   segment attribution (never name by default — privacy-first), and an
+   editorial frame. Falls back gracefully when no audio is attached.
+   ============================================ */
+
+.verbatim-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--brand-500);
+  border-radius: var(--radius-md);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.verbatim-card__quote {
+  font-family: var(--font-serif);
+  font-size: var(--text-md);
+  font-style: italic;
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  margin: 0;
+  /* Subtle quote glyph; uses :before to avoid extra DOM */
+}
+
+.verbatim-card__quote::before {
+  content: "“";
+  font-size: 1.4em;
+  line-height: 0;
+  vertical-align: -0.15em;
+  margin-right: 0.05em;
+  color: var(--brand-400);
+  font-style: normal;
+}
+
+.verbatim-card__quote::after {
+  content: "”";
+  font-size: 1.4em;
+  line-height: 0;
+  vertical-align: -0.25em;
+  margin-left: 0.02em;
+  color: var(--brand-400);
+  font-style: normal;
+}
+
+.verbatim-card__attribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.verbatim-card__segment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border-radius: 999px;
+  font-weight: var(--weight-medium);
+  font-size: var(--text-xs);
+}
+
+.verbatim-card__audio {
+  margin-top: var(--space-1);
+}
+
+.verbatim-card--compact {
+  padding: var(--space-4);
+  gap: var(--space-2);
+}
+
+.verbatim-card--compact .verbatim-card__quote {
+  font-size: var(--text-sm);
+}
+
+/* ============================================
+   Quanti — MethodologyBox
+   ============================================
+   Required on every shared report — credibility anchor. Compact, slate,
+   sans-only. Rendered at the top of each report and again expanded in the
+   appendix. Inline variant doubles as the small-n warning in dashboards.
+   ============================================ */
+
+.methodology-box {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-5) var(--space-6);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4) var(--space-6);
+}
+
+.methodology-box__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.methodology-box__label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.methodology-box__value {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-normal);
+  word-break: break-word;
+}
+
+.methodology-box__note {
+  grid-column: 1 / -1;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  line-height: var(--leading-normal);
+}
+
+.methodology-box--inline {
+  display: inline-flex;
+  flex-direction: row;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   Quanti — Showcase (preview-only)
+   ============================================
+   Layout primitives used by /design-system/quanti to preview Sprint 1
+   components. Not used in production surfaces.
+   ============================================ */
+
+.quanti-showcase {
+  max-width: var(--report-canvas-max-w);
+  margin: 0 auto;
+  padding: var(--space-12) var(--report-canvas-pad-x);
+  display: flex;
+  flex-direction: column;
+  gap: var(--report-section-gap);
+}
+
+.quanti-showcase__hero {
+  text-align: left;
+}
+
+.quanti-showcase__eyebrow {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-600);
+  margin-bottom: var(--space-3);
+}
+
+.quanti-showcase__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.quanti-showcase__subtitle {
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  max-width: 640px;
+  line-height: var(--leading-normal);
+}
+
+.quanti-showcase__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.quanti-showcase__section-title {
+  font-family: var(--font-serif);
+  font-size: var(--text-headline);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+}
+
+.quanti-showcase__section-meta {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin-top: -8px;
+}
+
+.quanti-showcase__grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+
+@media (max-width: 720px) {
+  .quanti-showcase__grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   Quanti — AudioClip waveform variant (Sprint 2)
+   ============================================
+   Procedural-waveform progress track. Shape is deterministic per src so
+   the same clip always renders the same bars. As `currentTime` advances,
+   bars to the left of the cursor swap from neutral → positive. Reuses the
+   existing AudioClip play button and time formatting; only the track
+   changes.
+   ============================================ */
+
+.audio-clip--waveform {
+  align-items: center;
+}
+
+.audio-clip__track--waveform {
+  flex: 1;
+  height: 32px;
+  background: transparent;
+  border-radius: 0;
+  position: relative;
+  cursor: pointer;
+  padding: 0 2px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.audio-clip__waveform {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.audio-clip__bar {
+  fill: var(--viz-neutral-soft);
+  transition: fill var(--dur-fast) var(--ease-out);
+}
+
+.audio-clip__bar--filled {
+  fill: var(--viz-positive);
+}
+
+.audio-clip--playing .audio-clip__bar--filled {
+  /* Subtle pulse on the most recently filled bars to telegraph "playing". */
+  animation: audio-clip-pulse 1.6s var(--ease-in-out) infinite;
+}
+
+@keyframes audio-clip-pulse {
+  0%, 100% { fill: var(--viz-positive); }
+  50% { fill: var(--brand-700); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-clip--playing .audio-clip__bar--filled { animation: none; }
+}
+
+/* ============================================
+   Quanti — StatHero (Sprint 2)
+   ============================================
+   60/40 stat-left, verbatim-right page unit. The default composition for
+   "stat + voice" pages. Stack at <720px with the stat first (always
+   anchors the page).
+   ============================================ */
+
+.stat-hero {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: var(--space-8);
+  align-items: stretch;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-xs);
+}
+
+.stat-hero__main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.stat-hero__eyebrow {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-600);
+}
+
+.stat-hero__stat {
+  font-family: var(--font-serif);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--brand-700);
+  margin: 0;
+}
+
+.stat-hero__description {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  margin: 0;
+  max-width: 38ch;
+}
+
+.stat-hero__meta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--space-2);
+}
+
+.stat-hero__quote {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.stat-hero__quote .verbatim-card {
+  width: 100%;
+  height: fit-content;
+}
+
+@media (max-width: 720px) {
+  .stat-hero {
+    grid-template-columns: 1fr;
+    padding: var(--space-6);
+    gap: var(--space-5);
+  }
+  .stat-hero__stat {
+    font-size: 2.4rem;
+  }
+}
+
+/* ============================================
+   Quanti — CompareChips (Sprint 2)
+   ============================================
+   Multi-select segment filter. Grouped by dimension. Dense, scannable,
+   horizontally scrollable on mobile so 20 chips don't blow out the layout.
+   ============================================ */
+
+.compare-chips {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.compare-chips__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.compare-chips__label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-right: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.compare-chips__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.compare-chips__chip:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+.compare-chips__chip:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.compare-chips__chip--active {
+  background: var(--brand-500);
+  color: #fff;
+  border-color: var(--brand-600);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 2px rgba(67, 105, 245, 0.3);
+}
+
+.compare-chips__chip--active:hover {
+  background: var(--brand-600);
+  color: #fff;
+}
+
+.compare-chips__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 6px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+  border-radius: 999px;
+}
+
+.compare-chips__chip:not(.compare-chips__chip--active) .compare-chips__count {
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-subtle);
+}
+
+/* ============================================
+   Quanti — DashboardShell + DashboardStrip (Sprint 2)
+   ============================================
+   The two layout primitives for every quanti dashboard surface. Shell is
+   sticky-sidebar + scrolling-canvas. Strip is the 3-up summary row that
+   anchors the canvas at the top.
+   ============================================ */
+
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: var(--dashboard-sidebar-w) 1fr;
+  min-height: 480px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.dashboard-shell__sidebar {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-default);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+}
+
+.dashboard-shell__canvas {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  overflow-y: auto;
+}
+
+@media (max-width: 960px) {
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-shell__sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border-default);
+    flex-direction: row;
+    overflow-x: auto;
+  }
+}
+
+.dashboard-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-1);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.dashboard-strip__item {
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.dashboard-strip__item:last-child {
+  border-right: none;
+}
+
+.dashboard-strip__label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.dashboard-strip__value {
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+}
+
+.dashboard-strip__delta {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-strip__delta--positive { color: var(--success-text); }
+.dashboard-strip__delta--negative { color: var(--danger-text); }
+.dashboard-strip__delta--neutral { color: var(--text-tertiary); }
+
+@media (max-width: 720px) {
+  .dashboard-strip__item {
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .dashboard-strip__item:last-child {
+    border-bottom: none;
+  }
+}
+
+/* Sidebar nav primitive used inside dashboard-shell sidebar slot. */
+.dashboard-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--space-3);
+}
+
+.dashboard-nav__group-label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 0 var(--space-3) var(--space-1);
+}
+
+.dashboard-nav__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.dashboard-nav__item:hover { background: var(--bg-overlay); color: var(--text-primary); }
+
+.dashboard-nav__item--active {
+  background: var(--brand-50);
+  color: var(--brand-700);
+  font-weight: var(--weight-semibold);
+}
+
+.dashboard-nav__count {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-nav__item--active .dashboard-nav__count { color: var(--brand-600); }
+
+/* ============================================
+   Quanti — QuestionTypeCard (Sprint 3)
+   ============================================
+   Selectable tile for picking survey question types. Carries up to two
+   methodological-guardrail badges so users see at picker time that we'll
+   randomize order, balance scales, etc. Disabled state for v2 types
+   (MaxDiff, conjoint).
+   ============================================ */
+
+.question-type-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  text-align: left;
+  padding: var(--space-5);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.question-type-card:hover:not(:disabled) {
+  border-color: var(--brand-300);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.question-type-card:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.question-type-card--selected {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+  box-shadow: var(--glow-brand);
+}
+
+.question-type-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.question-type-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.question-type-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-50);
+  color: var(--brand-600);
+  flex: 0 0 auto;
+}
+
+.question-type-card--selected .question-type-card__icon {
+  background: var(--brand-500);
+  color: #fff;
+}
+
+.question-type-card__name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.question-type-card__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--brand-500);
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.question-type-card__pill {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  padding: 2px var(--space-2);
+  background: var(--bg-sunken);
+  color: var(--text-tertiary);
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.question-type-card__description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+
+.question-type-card__best-for {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.question-type-card__guardrails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.question-type-card__guardrail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+}
+
+.question-type-card__guardrail--info {
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border-color: var(--brand-200);
+}
+
+.question-type-card__guardrail--neutral {
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+/* ============================================
+   Quanti — SurveyQuestionEditor (Sprint 3)
+   ============================================
+   The question-being-built editor. Type-specific configs live inside a
+   shared shell so the editor shape stays consistent. Real-time prompt
+   guardrails (double-barreled detection, leading wording) appear inline
+   under the prompt input.
+   ============================================ */
+
+.survey-q-editor {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.survey-q-editor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.survey-q-editor__type-pill {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+  background: var(--brand-50);
+  padding: 4px var(--space-3);
+  border-radius: 999px;
+  border: 1px solid var(--brand-200);
+}
+
+.survey-q-editor__id {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.survey-q-editor__prompt-label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.survey-q-editor__prompt {
+  width: 100%;
+  font-family: inherit;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  resize: vertical;
+  min-height: 64px;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.survey-q-editor__prompt:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: var(--glow-brand);
+}
+
+.survey-q-editor__guardrails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.survey-q-editor__guardrail {
+  font-size: var(--text-xs);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  line-height: var(--leading-normal);
+}
+
+.survey-q-editor__guardrail--warn {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+.survey-q-editor__guardrail--info {
+  background: var(--info-bg);
+  border-color: var(--info-border);
+  color: var(--info-text);
+}
+
+.survey-q-editor__divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: var(--space-2) 0;
+}
+
+.survey-q-editor__config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.survey-q-editor__config-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.survey-q-editor__config-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.survey-q-editor__config-flag {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  padding: 2px var(--space-2);
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius-sm);
+}
+
+.survey-q-editor__config-note {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+/* Likert anchor row */
+.survey-q-editor__likert-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-3);
+}
+
+.survey-q-editor__likert-anchor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.survey-q-editor__likert-pill {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--viz-neutral-soft);
+}
+
+.survey-q-editor__likert-anchor--strong-neg .survey-q-editor__likert-pill { background: var(--viz-div-strong-neg); }
+.survey-q-editor__likert-anchor--neg .survey-q-editor__likert-pill { background: var(--viz-div-neg); }
+.survey-q-editor__likert-anchor--mid .survey-q-editor__likert-pill { background: var(--viz-div-mid); }
+.survey-q-editor__likert-anchor--pos .survey-q-editor__likert-pill { background: var(--viz-div-pos); }
+.survey-q-editor__likert-anchor--strong-pos .survey-q-editor__likert-pill { background: var(--viz-div-strong-pos); }
+
+.survey-q-editor__likert-anchor-label {
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.survey-q-editor__likert-input {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: 6px var(--space-2);
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  width: 100%;
+  min-width: 0;
+}
+
+.survey-q-editor__likert-input:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: var(--glow-brand);
+}
+
+@media (max-width: 720px) {
+  .survey-q-editor__likert-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Multi-choice option list */
+.survey-q-editor__option-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+}
+
+.survey-q-editor__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.survey-q-editor__option-handle {
+  color: var(--text-tertiary);
+  cursor: grab;
+  user-select: none;
+  font-size: var(--text-md);
+  padding: 0 var(--space-1);
+}
+
+.survey-q-editor__option-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  padding: var(--space-1);
+}
+
+.survey-q-editor__option-input:focus {
+  outline: none;
+}
+
+.survey-q-editor__option-anchor {
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text-tertiary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.survey-q-editor__option-anchor:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+}
+
+.survey-q-editor__option-anchor--on {
+  background: var(--brand-50);
+  color: var(--brand-700);
+  border-color: var(--brand-200);
+}
+
+.survey-q-editor__add-option {
+  align-self: flex-start;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  color: var(--brand-600);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.survey-q-editor__add-option:hover {
+  background: var(--brand-50);
+  border-color: var(--brand-300);
+  border-style: solid;
+}
+
+.survey-q-editor__inline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.survey-q-editor__inline-input {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: 4px var(--space-2);
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  width: 90px;
+}
+
+.survey-q-editor__inline-input:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: var(--glow-brand);
+}
+
+/* ============================================
+   Quanti — ScreenerBridge (Sprint 3)
+   ============================================
+   The wedge — survey-to-interview conversion CTA. Always-visible on a
+   filtered-results dashboard view. Brand-tinted background so it never
+   blends into chrome. Shows credit cost upfront for transparency.
+   ============================================ */
+
+.screener-bridge {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-5);
+  align-items: center;
+  padding: var(--space-5) var(--space-6);
+  background: var(--brand-gradient-soft);
+  border: 1.5px solid var(--brand-300);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+
+.screener-bridge__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--brand-500);
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.screener-bridge__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.screener-bridge__headline {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  line-height: var(--leading-tight);
+}
+
+.screener-bridge__headline strong {
+  font-family: var(--font-serif);
+  font-weight: var(--weight-bold);
+  color: var(--brand-700);
+  font-size: 1.1em;
+}
+
+.screener-bridge__filter {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.screener-bridge__meta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--space-1);
+  line-height: var(--leading-normal);
+}
+
+.screener-bridge__warning {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  border-radius: var(--radius-sm);
+}
+
+.screener-bridge__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .screener-bridge {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+  .screener-bridge__actions {
+    flex-direction: row;
+  }
+  .screener-bridge__actions .btn {
+    flex: 1;
+  }
+}
+
+/* ============================================
+   Quanti — FindingCard (Sprint 4)
+   ============================================
+   The MBB action-title page unit. Eyebrow → serif headline → context →
+   evidence row (chart + verbatims) → implication "so what" line →
+   confidence pill + sample note. Three layout variants by composition.
+   ============================================ */
+
+.finding-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  box-shadow: var(--shadow-xs);
+  scroll-margin-top: var(--space-6);
+}
+
+.finding-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.finding-card__index {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-600);
+  font-variant-numeric: tabular-nums;
+}
+
+.finding-card__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-headline);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  margin: 0;
+  max-width: 36ch;
+}
+
+.finding-card__context {
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 64ch;
+}
+
+.finding-card__body {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.finding-card--evidence-right .finding-card__body {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+}
+
+.finding-card--evidence-left .finding-card__body {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+}
+
+.finding-card--evidence-left .finding-card__evidence {
+  order: 2;
+}
+
+.finding-card--evidence-grid .finding-card__body {
+  grid-template-columns: 1fr;
+}
+
+.finding-card__evidence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.finding-card__verbatims {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.finding-card__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.finding-card__implication {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.finding-card__implication-label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-600);
+  padding-top: 4px;
+}
+
+.finding-card__implication-text {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  margin: 0;
+  max-width: 56ch;
+}
+
+.finding-card__sample-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.finding-card__sample {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 720px) {
+  .finding-card { padding: var(--space-6); }
+  .finding-card--evidence-right .finding-card__body,
+  .finding-card--evidence-left .finding-card__body {
+    grid-template-columns: 1fr;
+  }
+  .finding-card__implication {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+  .finding-card__title { font-size: 1.6rem; }
+}
+
+/* ── Confidence pill ─────────────────────────── */
+
+.confidence-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
+  border: 1px solid;
+}
+
+.confidence-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.confidence-pill--directional {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+.confidence-pill--supported {
+  background: var(--info-bg);
+  border-color: var(--info-border);
+  color: var(--info-text);
+}
+
+.confidence-pill--strong {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+
+/* ============================================
+   Quanti — Segment2x2 (Sprint 4)
+   ============================================
+   The MECE-forcing 2x2 with auto-tinted cells (sequential viz scale based
+   on volume share). Equal-height cells, never asymmetric. Top axis label
+   sits above; left axis label is rotated and pinned to the row gutter.
+   ============================================ */
+
+.segment-2x2 {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: var(--space-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-xs);
+}
+
+.segment-2x2__top-axis {
+  grid-column: 2;
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-1);
+}
+
+.segment-2x2__axis-label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.segment-2x2__axis-label--y {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  align-self: center;
+  justify-self: center;
+}
+
+.segment-2x2__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--space-3);
+  grid-column: 2;
+}
+
+.segment-2x2__cell {
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 180px;
+}
+
+.segment-2x2__cell-label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+
+.segment-2x2__quote {
+  font-family: var(--font-serif);
+  font-size: var(--text-sm);
+  font-style: italic;
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  margin: 0;
+  flex: 1;
+  position: relative;
+  padding-left: var(--space-2);
+}
+
+.segment-2x2__quote::before {
+  content: "“";
+  font-size: 1.4em;
+  font-style: normal;
+  color: var(--brand-400);
+  margin-right: 0.05em;
+}
+
+.segment-2x2__quote::after {
+  content: "”";
+  font-size: 1.4em;
+  font-style: normal;
+  color: var(--brand-400);
+  margin-left: 0.02em;
+}
+
+.segment-2x2__cell-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed rgba(13, 15, 26, 0.08);
+}
+
+.segment-2x2__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(13, 15, 26, 0.06);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.segment-2x2__count {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-medium);
+}
+
+@media (max-width: 720px) {
+  .segment-2x2 { grid-template-columns: 1fr; }
+  .segment-2x2__top-axis,
+  .segment-2x2__axis-label--y { display: none; }
+  .segment-2x2__grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-column: 1;
+  }
+}
+
+/* ============================================
+   Quanti — CrossTabTable (Sprint 4)
+   ============================================
+   Dense theme × segment table with sequential-tint conditional formatting.
+   Cells below `minN` show counts and get a muted background so percentages
+   never lie at small samples. Sticky header row when the table scrolls
+   inside its parent.
+   ============================================ */
+
+.cross-tab {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cross-tab__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.cross-tab__row-header,
+.cross-tab__column-header {
+  background: var(--bg-sunken);
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-default);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.cross-tab__column-header { text-align: center; }
+
+.cross-tab__column-n {
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  color: var(--text-tertiary);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-top: 2px;
+}
+
+.cross-tab__row-name {
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.cross-tab__cell {
+  padding: var(--space-3) var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.cross-tab__cell-strong {
+  color: #fff;
+  font-weight: var(--weight-semibold);
+}
+
+.cross-tab__cell--empty {
+  color: var(--text-disabled);
+  background: var(--bg-base);
+}
+
+.cross-tab__cell--small-n {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bg-sunken),
+    var(--bg-sunken) 6px,
+    var(--bg-base) 6px,
+    var(--bg-base) 12px
+  );
+  color: var(--warning-text);
+  font-weight: var(--weight-medium);
+  cursor: help;
+}
+
+.cross-tab__note {
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+
+/* ============================================
+   Quanti — PrioritizationMatrix (Sprint 5)
+   ============================================
+   Impact × feasibility 2D plot. Top-right quadrant tinted as "do now".
+   Bubbles are positioned absolutely over the SVG plot; cards extend to
+   the right of each bubble with a connector line. Legend below for
+   scanability and screen-reader access.
+   ============================================ */
+
+.prio-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-xs);
+}
+
+.prio-matrix__plot {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-left: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  margin: var(--space-3) 0 var(--space-6) var(--space-6);
+  padding: 0;
+}
+
+.prio-matrix__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.prio-matrix__quadrant-label {
+  font-size: 3px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.35px;
+  fill: var(--text-tertiary);
+  text-transform: uppercase;
+  font-family: var(--font-sans);
+}
+
+.prio-matrix__rec {
+  position: absolute;
+  transform: translate(calc(var(--bubble-size) / -2), calc(var(--bubble-size) / -2));
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  z-index: 1;
+}
+
+.prio-matrix__bubble {
+  width: var(--bubble-size);
+  height: var(--bubble-size);
+  border-radius: 50%;
+  background: var(--brand-500);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  box-shadow: 0 1px 2px rgba(67, 105, 245, 0.4), 0 0 0 2px var(--bg-surface);
+  flex: 0 0 auto;
+}
+
+.prio-matrix__rec--quick .prio-matrix__bubble { background: var(--success-text); box-shadow: 0 1px 2px rgba(6, 95, 70, 0.3), 0 0 0 2px var(--bg-surface); }
+.prio-matrix__rec--medium .prio-matrix__bubble { background: var(--brand-500); }
+.prio-matrix__rec--large .prio-matrix__bubble { background: var(--brand-700); box-shadow: 0 2px 6px rgba(30, 63, 212, 0.4), 0 0 0 2px var(--bg-surface); }
+
+.prio-matrix__card {
+  display: none;
+  position: absolute;
+  left: calc(var(--bubble-size) + 6px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 4px var(--space-2);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+  z-index: 2;
+}
+
+.prio-matrix__rec:hover .prio-matrix__card,
+.prio-matrix__rec:focus-within .prio-matrix__card {
+  display: block;
+}
+
+.prio-matrix__card-title {
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.prio-matrix__card-ref {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.prio-matrix__axis {
+  position: absolute;
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.prio-matrix__axis--x {
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.prio-matrix__axis--y {
+  left: -32px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: center;
+  white-space: nowrap;
+}
+
+.prio-matrix__legend {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.prio-matrix__legend-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.prio-matrix__legend-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand-500);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.prio-matrix__legend-dot--quick { background: var(--success-text); }
+.prio-matrix__legend-dot--large { background: var(--brand-700); }
+
+.prio-matrix__legend-text strong {
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+}
+
+.prio-matrix__legend-ref { color: var(--text-tertiary); }
+
+/* ============================================
+   Quanti — ExecutiveSummary (Sprint 5)
+   ============================================
+   The standalone-argument scaffold. Headline + 3-5 governing thoughts.
+   Numbered, serif, generously spaced — meant to feel like the first page
+   of a deck, not a summary card.
+   ============================================ */
+
+.exec-summary {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12) var(--space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  scroll-margin-top: var(--space-6);
+}
+
+.exec-summary__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 56ch;
+}
+
+.exec-summary__eyebrow {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-600);
+}
+
+.exec-summary__headline {
+  font-family: var(--font-serif);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.exec-summary__subheadline {
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.exec-summary__thoughts {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  counter-reset: thought;
+}
+
+.exec-summary__thought {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.exec-summary__thought:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.exec-summary__thought-num {
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--brand-500);
+  line-height: 1;
+}
+
+.exec-summary__thought-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.exec-summary__thought-thesis {
+  font-family: var(--font-serif);
+  font-size: var(--text-headline);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  margin: 0;
+  max-width: 36ch;
+}
+
+.exec-summary__thought-elab {
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 64ch;
+}
+
+.exec-summary__thought-ref {
+  font-size: var(--text-xs);
+  color: var(--brand-600);
+  text-decoration: none;
+  align-self: flex-start;
+  padding: var(--space-1) 0;
+}
+
+.exec-summary__thought-ref:hover { text-decoration: underline; }
+
+.exec-summary__author {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.exec-summary__author-name {
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.exec-summary__author-role { color: var(--text-secondary); }
+
+.exec-summary__author-date { margin-left: auto; }
+
+@media (max-width: 720px) {
+  .exec-summary { padding: var(--space-8) var(--space-5); }
+  .exec-summary__thought {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+  .exec-summary__thought-thesis { font-size: 1.5rem; }
+  .exec-summary__headline { font-size: 2rem; }
+}
+
+/* ============================================
+   Quanti — ReportScroll (Sprint 5)
+   ============================================
+   Scrollytelling layout for shared mixed-methods reports. Cover hero,
+   sticky right-rail TOC, snap-aligned sections. Each section can opt
+   into a print-only page break for the PDF export.
+   ============================================ */
+
+.report-scroll {
+  background: var(--bg-base);
+  min-height: 100vh;
+}
+
+.report-scroll__cover {
+  background: var(--surface-emphasis);
+  color: var(--surface-emphasis-text);
+  padding: var(--space-16) var(--report-canvas-pad-x);
+  margin-bottom: var(--report-section-gap);
+}
+
+.report-scroll__layout {
+  /* Center a max-width canvas with a fixed-width TOC anchored to its right.
+     Using a 12-col CSS grid keeps the canvas alignment consistent regardless
+     of viewport width, while the TOC reserves its own 220px slot. */
+  display: grid;
+  grid-template-columns: 1fr minmax(0, var(--report-canvas-max-w)) 220px 1fr;
+  gap: var(--space-6);
+  padding: 0 var(--space-5);
+}
+
+.report-scroll__main {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--report-section-gap);
+  padding: 0 0 var(--space-16);
+  scroll-snap-type: y proximity;
+  min-width: 0;
+}
+
+.report-scroll__section {
+  scroll-margin-top: var(--space-6);
+  scroll-snap-align: start;
+}
+
+.report-scroll__toc {
+  grid-column: 3;
+  position: sticky;
+  top: var(--space-8);
+  align-self: start;
+  padding: var(--space-5) 0;
+  font-size: var(--text-sm);
+  max-height: calc(100vh - var(--space-12));
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.report-scroll__toc-group {
+  margin-bottom: var(--space-5);
+}
+
+.report-scroll__toc-group-label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+.report-scroll__toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.report-scroll__toc-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.report-scroll__toc-link:hover {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.report-scroll__toc-link--active {
+  color: var(--brand-700);
+  border-left-color: var(--brand-500);
+  font-weight: var(--weight-medium);
+}
+
+@media (max-width: 1180px) {
+  .report-scroll__layout {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+  .report-scroll__main { grid-column: 1; padding: 0 var(--report-canvas-pad-x) var(--space-12); }
+  .report-scroll__toc { display: none; }
+}
+
+/* ============================================
+   Quanti — Print stylesheet (Sprint 5)
+   ============================================
+   PDF export discipline. Hide nav, sidebar, sticky chrome. Expand each
+   FindingCard / Segment2x2 / etc to its own page. Force light theme
+   regardless of the screen state.
+   ============================================ */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+  }
+
+  body { background: #fff; }
+
+  /* Hide all sticky/screen-only chrome. */
+  .report-scroll__toc,
+  .compare-chips,
+  .dashboard-shell__sidebar,
+  .audio-clip,
+  nav, header[role="banner"], footer[role="contentinfo"] {
+    display: none !important;
+  }
+
+  /* Expand the canvas and remove decorative shadows. */
+  .report-scroll__layout { grid-template-columns: 1fr; }
+  .report-scroll__main { grid-column: 1; padding: 0; }
+  .chart-card,
+  .stat-hero,
+  .exec-summary,
+  .finding-card,
+  .segment-2x2,
+  .cross-tab,
+  .methodology-box,
+  .prio-matrix {
+    box-shadow: none !important;
+    border-color: #d8dce6 !important;
+    page-break-inside: avoid;
+  }
+
+  /* Page breaks. */
+  .report-scroll__section--page-break,
+  .finding-card,
+  .exec-summary {
+    page-break-before: always;
+  }
+
+  /* Restore underlines on TOC links for print readers. */
+  a { color: inherit; text-decoration: underline; }
+
+  /* Avoid splitting verbatims across pages. */
+  .verbatim-card,
+  .segment-2x2__cell,
+  .finding-card__implication { page-break-inside: avoid; }
+
+  /* Quote audio waveform — replace with a small note. */
+  .verbatim-card__audio::after {
+    content: "(Audio available in the web version.)";
+    font-size: 10px;
+    color: #6c7386;
+  }
+
+  /* Cover page on its own sheet. */
+  .report-scroll__cover {
+    background: #fff !important;
+    color: #0d0f1a !important;
+    page-break-after: always;
+    padding: 24mm 0 !important;
+    margin: 0 !important;
+  }
+}
+
