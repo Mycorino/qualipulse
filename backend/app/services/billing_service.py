@@ -637,6 +637,33 @@ def upsert_subscription_from_stripe(
     return sub
 
 
+def _compute_rollover_from_prior_balance(prior: CreditBalance) -> int:
+    """How many credits roll forward from a prior period.
+
+    Policy (V2.2): purchased + prior-rollover credits roll forever; included
+    credits expire at period end (use-it-or-lose-it). Consumption is
+    attributed to buckets in this order: included → rollover → purchased,
+    so unused purchased credits survive even when usage exceeds the
+    included grant.
+    """
+    used = prior.used_credits or 0
+    inc  = prior.included_credits or 0
+    rol  = prior.rollover_credits or 0
+    pur  = prior.purchased_credits or 0
+
+    # Consume included first.
+    used_after_included = max(0, used - inc)
+    # Then rollover.
+    consumed_from_rollover = min(used_after_included, rol)
+    used_after_rollover = used_after_included - consumed_from_rollover
+    # Finally purchased.
+    consumed_from_purchased = min(used_after_rollover, pur)
+
+    unused_rollover  = rol - consumed_from_rollover
+    unused_purchased = pur - consumed_from_purchased
+    return max(0, unused_rollover + unused_purchased)
+
+
 def grant_period_credits(
     db: Session,
     subscription: WorkspaceSubscription,
@@ -649,6 +676,10 @@ def grant_period_credits(
     Idempotent per ``(workspace_id, period_start, period_end)`` — re-running
     on a webhook replay returns the existing balance instead of double-
     granting. Returns ``None`` when the plan is legacy or has no credits.
+
+    Also rolls unused **purchased** credits (and prior rollover) forward
+    from the most recent prior balance, per the V2.2 policy. Included
+    credits expire — they are not carried.
     """
     plan = subscription.plan if subscription.plan_id else None
     if plan is None:
@@ -673,6 +704,22 @@ def grant_period_credits(
     if existing is not None:
         return existing  # webhook replay — never double-grant
 
+    # Find the most recent prior balance for this workspace. We use
+    # ``period_end <= new period_start`` so an exact-touch period chain
+    # (common for monthly subs) is treated as adjacent. Anything older
+    # than that is still eligible — purchased credits never expire under
+    # the V2.2 policy.
+    prior = (
+        db.query(CreditBalance)
+        .filter(
+            CreditBalance.workspace_id == subscription.workspace_id,
+            CreditBalance.period_end <= subscription.current_period_start,
+        )
+        .order_by(CreditBalance.period_end.desc())
+        .first()
+    )
+    rollover_amount = _compute_rollover_from_prior_balance(prior) if prior else 0
+
     balance = CreditBalance(
         id=str(uuid.uuid4()),
         workspace_id=subscription.workspace_id,
@@ -680,6 +727,7 @@ def grant_period_credits(
         period_start=subscription.current_period_start,
         period_end=subscription.current_period_end,
         included_credits=plan.included_credits,
+        rollover_credits=rollover_amount,
     )
     db.add(balance)
     db.flush()
@@ -691,11 +739,47 @@ def grant_period_credits(
             balance_id=balance.id,
             event_type=EVT_GRANT_INCLUDED,
             credits_delta=plan.included_credits,
-            balance_after=plan.included_credits,
+            balance_after=plan.included_credits + rollover_amount,
             source=source,
             event_metadata=metadata or {"plan_id": plan.id, "stripe_subscription_id": subscription.stripe_subscription_id},
         )
     )
+    if rollover_amount > 0 and prior is not None:
+        db.add(
+            CreditLedger(
+                id=str(uuid.uuid4()),
+                workspace_id=subscription.workspace_id,
+                balance_id=balance.id,
+                event_type=EVT_GRANT_ROLLOVER,
+                credits_delta=rollover_amount,
+                balance_after=plan.included_credits + rollover_amount,
+                source="period_rollover",
+                event_metadata={
+                    "from_balance_id": prior.id,
+                    "from_period_start": prior.period_start.isoformat(),
+                    "from_period_end": prior.period_end.isoformat(),
+                },
+            )
+        )
+        # Emit an explicit expiry event for the unused-included portion so
+        # ledger consumers can reconcile period transitions without having
+        # to recompute the policy themselves.
+        prior_used = prior.used_credits or 0
+        prior_inc = prior.included_credits or 0
+        unused_included = max(0, prior_inc - prior_used)
+        if unused_included > 0:
+            db.add(
+                CreditLedger(
+                    id=str(uuid.uuid4()),
+                    workspace_id=subscription.workspace_id,
+                    balance_id=prior.id,
+                    event_type=EVT_EXPIRE_CREDITS,
+                    credits_delta=-unused_included,
+                    balance_after=prior.available,
+                    source="period_rollover",
+                    event_metadata={"reason": "included_credits_expire_at_period_end"},
+                )
+            )
     db.commit()
     db.refresh(balance)
     return balance
