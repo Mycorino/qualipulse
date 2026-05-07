@@ -27,6 +27,12 @@ class Project(Base):
     company_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
     )
+    # Nullable in 0024 to allow safe backfill; one Study is auto-created per
+    # existing Project. Will become non-nullable in a follow-up migration once
+    # all reads have been verified — see roadmap risk #10.
+    study_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("studies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     interview_duration_minutes: Mapped[int] = mapped_column(
@@ -63,6 +69,7 @@ class Project(Base):
 
     # Relationships
     company = relationship("Company", back_populates="projects")
+    study = relationship("Study", back_populates="projects")
     guide_questions = relationship(
         "InterviewGuideQuestion", back_populates="project", cascade="all, delete-orphan"
     )
