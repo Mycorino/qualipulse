@@ -10,13 +10,13 @@ export default defineConfig({
     https: isLan ? {} : false,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: process.env.VITE_BACKEND_URL ?? "http://localhost:8000",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
         secure: false,
       },
       "/audio": {
-        target: "http://localhost:8000",
+        target: process.env.VITE_BACKEND_URL ?? "http://localhost:8000",
         changeOrigin: true,
         secure: false,
       },

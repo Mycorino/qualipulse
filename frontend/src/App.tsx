@@ -32,6 +32,9 @@ const BlogPostPage = lazy(() => import("./pages/BlogPost"));
 const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
 const QuantiShowcase = lazy(() => import("./pages/QuantiShowcase"));
 const QuantiReportDemo = lazy(() => import("./pages/QuantiReportDemo"));
+const SurveyList = lazy(() => import("./pages/SurveyList"));
+const SurveyEditor = lazy(() => import("./pages/SurveyEditor"));
+const SurveyPreview = lazy(() => import("./pages/SurveyPreview"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -155,6 +158,30 @@ export default function App() {
       <Route path="/admin" element={<Admin />} />
       <Route path="/design-system/quanti" element={<QuantiShowcase />} />
       <Route path="/design-system/quanti/report" element={<QuantiReportDemo />} />
+      <Route
+        path="/surveys"
+        element={
+          <OnboardedRoute>
+            <SurveyList />
+          </OnboardedRoute>
+        }
+      />
+      <Route
+        path="/surveys/:id/edit"
+        element={
+          <OnboardedRoute>
+            <SurveyEditor />
+          </OnboardedRoute>
+        }
+      />
+      <Route
+        path="/surveys/:id/preview"
+        element={
+          <OnboardedRoute>
+            <SurveyPreview />
+          </OnboardedRoute>
+        }
+      />
       <Route
         path="/account"
         element={
