@@ -118,8 +118,12 @@ def validate_question_config(question_type: str, config: dict[str, Any]) -> dict
 
 
 class QuestionCreate(BaseModel):
+    # `prompt` allows empty during draft authoring — the editor creates a
+    # blank question and the researcher fills the prompt as they go.
+    # Non-empty enforcement happens at publish time (Sprint 8 wires the
+    # status-transition validator).
     type: QuestionType
-    prompt: str = Field(..., min_length=1)
+    prompt: str = ""
     is_required: bool = False
     sort_order: int = 0
     config: dict[str, Any] = Field(default_factory=dict)

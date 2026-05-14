@@ -1,0 +1,625 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
+import {
+  QuestionType,
+  Survey,
+  SurveyQuestion,
+  createQuestion,
+  defaultConfigForType,
+  deprecateQuestion,
+  getSurvey,
+  listLinks,
+  createLink,
+  listQuestions,
+  patchQuestion,
+  patchSurvey,
+  SurveyLink,
+} from "../api/surveys";
+import { QuestionTypeCard } from "../components/QuestionTypeCard";
+import { useToast } from "../components/Toast";
+
+/**
+ * SurveyEditor — wires the existing QuestionTypeCard + the inline question
+ * editor surface to the /surveys API shipped in Sprint 6.
+ *
+ * Layout: 3-column.
+ *   - Left rail: question list with drag-reorder + add-new button.
+ *   - Centre: active question editor (prompt + type-specific config).
+ *   - Right rail: type picker (when adding) or survey settings (otherwise).
+ *
+ * Autosave fires on prompt/config changes with a 600ms debounce. Question
+ * order changes commit immediately because reorder is rare and a debounce
+ * would risk losing a fast click.
+ */
+
+const TYPE_LABELS: Record<QuestionType, string> = {
+  likert: "Likert · 5-point",
+  mc_single: "Multiple choice · single",
+  mc_multi: "Multiple choice · multi",
+  nps: "Net Promoter Score",
+  open_text: "Open text",
+  short_text: "Short text",
+};
+
+const TYPE_DESCRIPTIONS: Record<QuestionType, string> = {
+  likert: "Measure agreement on a balanced scale.",
+  mc_single: "Pick one of N options.",
+  mc_multi: "Pick one or more from a list.",
+  nps: "Validated 0–10 recommendation scale.",
+  open_text: "Free-form responses, AI-clustered into themes.",
+  short_text: "One-line text answer.",
+};
+
+export default function SurveyEditor() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [survey, setSurvey] = useState<Survey | null>(null);
+  const [questions, setQuestions] = useState<SurveyQuestion[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [links, setLinks] = useState<SurveyLink[]>([]);
+
+  // Track in-flight autosave so we don't fire two for the same diff.
+  const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    if (!id) return;
+    getSurvey(id).then(setSurvey).catch(() => toast("Survey not found", "error"));
+    listQuestions(id)
+      .then((qs) => {
+        setQuestions(qs);
+        if (qs.length > 0) setActiveId(qs[0].id);
+        else setShowTypePicker(true);
+      })
+      .catch(() => toast("Failed to load questions", "error"));
+    listLinks(id).then(setLinks).catch(() => undefined);
+  }, [id, toast]);
+
+  const activeQuestion = useMemo(
+    () => questions.find((q) => q.id === activeId) ?? null,
+    [questions, activeId],
+  );
+
+  /** Adds a question of the chosen type at the end of the list. */
+  const onAddQuestion = useCallback(
+    async (type: QuestionType) => {
+      if (!id) return;
+      try {
+        const created = await createQuestion(id, {
+          type,
+          prompt: "",
+          is_required: false,
+          config: defaultConfigForType(type),
+        });
+        setQuestions((prev) => [...prev, created]);
+        setActiveId(created.id);
+        setShowTypePicker(false);
+      } catch {
+        toast("Could not add question", "error");
+      }
+    },
+    [id, toast],
+  );
+
+  /** Debounced autosave for prompt or config edits to a single question. */
+  const queueAutosave = useCallback(
+    (questionId: string, payload: Parameters<typeof patchQuestion>[2]) => {
+      if (!id) return;
+      const existing = saveTimers.current.get(questionId);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(async () => {
+        try {
+          const updated = await patchQuestion(id, questionId, payload);
+          setQuestions((prev) =>
+            prev.map((q) => (q.id === questionId ? updated : q)),
+          );
+        } catch {
+          toast("Save failed — your edit didn't stick", "error");
+        }
+      }, 600);
+      saveTimers.current.set(questionId, timer);
+    },
+    [id, toast],
+  );
+
+  const onDelete = async (questionId: string) => {
+    if (!id) return;
+    try {
+      await deprecateQuestion(id, questionId);
+      setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+      if (activeId === questionId) {
+        const remaining = questions.filter((q) => q.id !== questionId);
+        setActiveId(remaining[0]?.id ?? null);
+        if (remaining.length === 0) setShowTypePicker(true);
+      }
+    } catch {
+      toast("Could not remove question", "error");
+    }
+  };
+
+  /** Drag-reorder via plain HTML5 drag — no extra dependency. */
+  const dragSourceRef = useRef<string | null>(null);
+  const onDragStart = (qid: string) => () => {
+    dragSourceRef.current = qid;
+  };
+  const onDragOver: React.DragEventHandler = (e) => e.preventDefault();
+  const onDropOn = (targetId: string) => async (e: React.DragEvent) => {
+    e.preventDefault();
+    const sourceId = dragSourceRef.current;
+    dragSourceRef.current = null;
+    if (!sourceId || sourceId === targetId || !id) return;
+
+    const source = questions.find((q) => q.id === sourceId);
+    const target = questions.find((q) => q.id === targetId);
+    if (!source || !target) return;
+
+    // Compute the reordered list optimistically.
+    const reordered = [...questions];
+    reordered.splice(reordered.indexOf(source), 1);
+    reordered.splice(reordered.indexOf(target), 0, source);
+    const renumbered = reordered.map((q, i) => ({ ...q, sort_order: (i + 1) * 10 }));
+    setQuestions(renumbered);
+
+    // Persist source's new sort_order (the one that actually changed).
+    try {
+      await patchQuestion(id, sourceId, {
+        sort_order: renumbered.find((q) => q.id === sourceId)!.sort_order,
+      });
+    } catch {
+      toast("Reorder didn't save", "error");
+    }
+  };
+
+  const onTogglePublish = async () => {
+    if (!survey) return;
+    const next = survey.status === "live" ? "closed" : "live";
+    try {
+      const updated = await patchSurvey(survey.id, { status: next });
+      setSurvey(updated);
+      toast(
+        next === "live" ? "Survey is live" : "Survey closed",
+        "success",
+      );
+    } catch {
+      toast("Status change failed", "error");
+    }
+  };
+
+  const onCreatePublicLink = async () => {
+    if (!survey) return;
+    try {
+      const link = await createLink(survey.id, { is_anonymous: false });
+      setLinks((prev) => [...prev, link]);
+      toast("Link created", "success");
+    } catch {
+      toast("Could not create link", "error");
+    }
+  };
+
+  if (!survey) {
+    return (
+      <div className="quanti-showcase">
+        <p className="quanti-showcase__section-meta">Loading…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="survey-editor">
+      <header className="survey-editor__topbar">
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => navigate("/surveys")}
+          aria-label="Back to surveys"
+        >
+          ← Surveys
+        </button>
+        <div className="survey-editor__title-block">
+          <input
+            type="text"
+            className="survey-editor__title-input"
+            value={survey.name}
+            onChange={(e) => setSurvey({ ...survey, name: e.target.value })}
+            onBlur={() =>
+              patchSurvey(survey.id, { name: survey.name }).catch(() =>
+                toast("Save failed", "error"),
+              )
+            }
+            aria-label="Survey name"
+          />
+          <span
+            className={`confidence-pill confidence-pill--${
+              survey.status === "live"
+                ? "strong"
+                : survey.status === "closed"
+                  ? "directional"
+                  : "supported"
+            }`}
+          >
+            <span className="confidence-pill__dot" aria-hidden="true" />
+            {survey.status.toUpperCase()}
+          </span>
+        </div>
+        <div className="survey-editor__actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => navigate(`/surveys/${survey.id}/preview`)}
+          >
+            Preview
+          </button>
+          <button type="button" className="btn btn-primary" onClick={onTogglePublish}>
+            {survey.status === "live" ? "Close survey" : "Publish"}
+          </button>
+        </div>
+      </header>
+
+      <div className="survey-editor__layout">
+        {/* ── Left rail: question list ───────────────────────────────── */}
+        <aside className="survey-editor__rail survey-editor__rail--left">
+          <div className="survey-editor__rail-head">
+            <span className="dashboard-nav__group-label">Questions</span>
+            <span className="dashboard-nav__count tabular">{questions.length}</span>
+          </div>
+          <ol className="survey-editor__qlist">
+            {questions.map((q, i) => (
+              <li
+                key={q.id}
+                className={`survey-editor__qitem${activeId === q.id ? " survey-editor__qitem--active" : ""}`}
+                draggable
+                onDragStart={onDragStart(q.id)}
+                onDragOver={onDragOver}
+                onDrop={onDropOn(q.id)}
+                onClick={() => {
+                  setActiveId(q.id);
+                  setShowTypePicker(false);
+                }}
+              >
+                <span className="survey-editor__qitem-num tabular">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="survey-editor__qitem-body">
+                  <span className="survey-editor__qitem-type">{TYPE_LABELS[q.type]}</span>
+                  <span className="survey-editor__qitem-prompt">
+                    {q.prompt || <em style={{ color: "var(--text-tertiary)" }}>Untitled question</em>}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className="survey-editor__qitem-delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(q.id);
+                  }}
+                  aria-label="Remove question"
+                  title="Remove"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ol>
+          <button
+            type="button"
+            className="survey-editor__add"
+            onClick={() => {
+              setShowTypePicker(true);
+              setActiveId(null);
+            }}
+          >
+            + Add question
+          </button>
+        </aside>
+
+        {/* ── Centre: editor or type picker ─────────────────────────── */}
+        <main className="survey-editor__centre">
+          {showTypePicker || !activeQuestion ? (
+            <TypePickerPane onPick={onAddQuestion} />
+          ) : (
+            <ActiveQuestionEditor
+              key={activeQuestion.id}
+              question={activeQuestion}
+              onChange={(payload) => {
+                setQuestions((prev) =>
+                  prev.map((q) =>
+                    q.id === activeQuestion.id ? { ...q, ...payload } : q,
+                  ),
+                );
+                queueAutosave(activeQuestion.id, payload);
+              }}
+            />
+          )}
+        </main>
+
+        {/* ── Right rail: settings ──────────────────────────────────── */}
+        <aside className="survey-editor__rail survey-editor__rail--right">
+          <div className="survey-editor__rail-head">
+            <span className="dashboard-nav__group-label">Public links</span>
+          </div>
+          {links.length === 0 ? (
+            <p className="quanti-showcase__section-meta" style={{ marginTop: 0 }}>
+              No links yet. Publish + create a link to share.
+            </p>
+          ) : (
+            <ul className="survey-editor__link-list">
+              {links.map((link) => {
+                const url = `${window.location.origin}/r/${link.token}`;
+                return (
+                  <li key={link.id} className="survey-editor__link">
+                    <code className="survey-editor__link-token">{url}</code>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(url);
+                        toast("Link copied", "success");
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onCreatePublicLink}
+            disabled={survey.status !== "live"}
+          >
+            + Create public link
+          </button>
+          {survey.status !== "live" && (
+            <p className="quanti-showcase__section-meta" style={{ marginTop: "var(--space-2)" }}>
+              Publish first to create a sharable link.
+            </p>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Sub-components
+   ──────────────────────────────────────────────────────────────────── */
+
+function TypePickerPane({
+  onPick,
+}: {
+  onPick: (type: QuestionType) => void;
+}) {
+  const types: QuestionType[] = ["likert", "mc_single", "mc_multi", "nps", "open_text", "short_text"];
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <h2 className="quanti-showcase__section-title">Add a question</h2>
+      <p className="quanti-showcase__section-meta">Pick a type — you can change config after.</p>
+      <div className="quanti-showcase__grid-2" style={{ marginTop: "var(--space-5)" }}>
+        {types.map((t) => (
+          <QuestionTypeCard
+            key={t}
+            name={TYPE_LABELS[t]}
+            description={TYPE_DESCRIPTIONS[t]}
+            onSelect={() => onPick(t)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActiveQuestionEditor({
+  question,
+  onChange,
+}: {
+  question: SurveyQuestion;
+  onChange: (
+    payload: Partial<{ prompt: string; is_required: boolean; config: Record<string, unknown> }>,
+  ) => void;
+}) {
+  return (
+    <div className="survey-q-editor" style={{ maxWidth: 720, margin: "0 auto" }}>
+      <div className="survey-q-editor__head">
+        <span className="survey-q-editor__type-pill">{TYPE_LABELS[question.type]}</span>
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            fontSize: "var(--text-xs)",
+            color: "var(--text-secondary)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={question.is_required}
+            onChange={(e) => onChange({ is_required: e.target.checked })}
+          />
+          Required
+        </label>
+      </div>
+      <label className="survey-q-editor__prompt-label">Question prompt</label>
+      <textarea
+        className="survey-q-editor__prompt"
+        value={question.prompt}
+        onChange={(e) => onChange({ prompt: e.target.value })}
+        placeholder="Type your question…"
+        rows={2}
+      />
+
+      <div className="survey-q-editor__divider" />
+
+      <ConfigEditor
+        type={question.type}
+        config={question.config}
+        onChange={(c) => onChange({ config: c })}
+      />
+    </div>
+  );
+}
+
+function ConfigEditor({
+  type,
+  config,
+  onChange,
+}: {
+  type: QuestionType;
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+}) {
+  if (type === "likert") {
+    const scale = (config.scale as number) ?? 5;
+    return (
+      <div className="survey-q-editor__config">
+        <div className="survey-q-editor__config-head">
+          <span className="survey-q-editor__config-title">Scale</span>
+          <span className="survey-q-editor__config-flag">Balance enforced</span>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-3)" }}>
+          {[5, 7].map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`compare-chips__chip${scale === s ? " compare-chips__chip--active" : ""}`}
+              onClick={() => onChange({ ...config, scale: s })}
+            >
+              {s}-point
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (type === "mc_single" || type === "mc_multi") {
+    const choices = (config.choices as { id: string; label: string }[]) ?? [];
+    const updateChoice = (i: number, label: string) => {
+      const next = [...choices];
+      next[i] = { ...next[i], label };
+      onChange({ ...config, choices: next });
+    };
+    const addChoice = () => {
+      const newId = String.fromCharCode(97 + choices.length);
+      onChange({ ...config, choices: [...choices, { id: newId, label: `Option ${newId.toUpperCase()}` }] });
+    };
+    const removeChoice = (i: number) => {
+      if (choices.length <= 2) return;
+      onChange({ ...config, choices: choices.filter((_, j) => j !== i) });
+    };
+    return (
+      <div className="survey-q-editor__config">
+        <div className="survey-q-editor__config-head">
+          <span className="survey-q-editor__config-title">Options</span>
+          <span className="survey-q-editor__config-flag">Order randomized</span>
+        </div>
+        <ul className="survey-q-editor__option-list">
+          {choices.map((c, i) => (
+            <li key={c.id} className="survey-q-editor__option">
+              <span className="survey-q-editor__option-handle">⋮⋮</span>
+              <input
+                type="text"
+                className="survey-q-editor__option-input"
+                value={c.label}
+                onChange={(e) => updateChoice(i, e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs"
+                onClick={() => removeChoice(i)}
+                disabled={choices.length <= 2}
+                aria-label="Remove option"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+        <button type="button" className="survey-q-editor__add-option" onClick={addChoice}>
+          + Add option
+        </button>
+      </div>
+    );
+  }
+  if (type === "open_text") {
+    const maxChars = (config.max_chars as number) ?? 500;
+    const aiCluster = (config.ai_cluster as boolean) ?? false;
+    return (
+      <div className="survey-q-editor__config">
+        <div className="survey-q-editor__config-head">
+          <span className="survey-q-editor__config-title">Response settings</span>
+        </div>
+        <label className="survey-q-editor__inline-label">
+          Max length
+          <input
+            type="number"
+            className="survey-q-editor__inline-input tabular"
+            value={maxChars}
+            min={50}
+            max={5000}
+            step={50}
+            onChange={(e) => onChange({ ...config, max_chars: Number(e.target.value) })}
+          />
+          characters
+        </label>
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            fontSize: "var(--text-sm)",
+            color: "var(--text-secondary)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={aiCluster}
+            onChange={(e) => onChange({ ...config, ai_cluster: e.target.checked })}
+          />
+          Recommended: AI-cluster open responses (first run free)
+        </label>
+      </div>
+    );
+  }
+  if (type === "short_text") {
+    const maxChars = (config.max_chars as number) ?? 120;
+    return (
+      <div className="survey-q-editor__config">
+        <div className="survey-q-editor__config-head">
+          <span className="survey-q-editor__config-title">Response settings</span>
+        </div>
+        <label className="survey-q-editor__inline-label">
+          Max length
+          <input
+            type="number"
+            className="survey-q-editor__inline-input tabular"
+            value={maxChars}
+            min={10}
+            max={500}
+            step={10}
+            onChange={(e) => onChange({ ...config, max_chars: Number(e.target.value) })}
+          />
+          characters
+        </label>
+      </div>
+    );
+  }
+  if (type === "nps") {
+    return (
+      <div className="survey-q-editor__config">
+        <div className="survey-q-editor__config-head">
+          <span className="survey-q-editor__config-title">Scale</span>
+          <span className="survey-q-editor__config-flag">Standard 0–10</span>
+        </div>
+        <p className="survey-q-editor__config-note">
+          NPS uses the validated 0–10 scale with fixed Detractor / Passive / Promoter buckets.
+          Anchor wording is locked: 0 = "Not at all likely", 10 = "Extremely likely".
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
