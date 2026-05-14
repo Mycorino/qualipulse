@@ -909,11 +909,14 @@ select.field-input {
     right: 0;
     left: 0;
     flex-direction: column;
-    background: var(--surface);
+    /* Was var(--surface) — a token that doesn't exist in the design
+       system, so the menu opened transparent. The canonical surface
+       token is --bg-surface. */
+    background: var(--bg-surface);
     border-bottom: 1px solid var(--border-subtle);
     padding: 8px 16px;
     gap: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-md);
     z-index: 49;
   }
   .dashboard-nav--open { display: flex; }
@@ -7179,21 +7182,29 @@ select.field-input {
   }
 }
 
-/* Sidebar nav primitive used inside dashboard-shell sidebar slot. */
-.dashboard-nav {
+/* Sidebar nav primitive used inside dashboard-shell sidebar slot.
+ *
+ * Renamed from `.dashboard-nav*` (Sprint 2) to `.shell-nav*` after a
+ * collision with the existing Dashboard.tsx / ProjectDetail.tsx header
+ * navigation (which uses `.dashboard-nav` + `.dashboard-nav--open` for
+ * the mobile hamburger). The Sprint 2 column-flex rule was overriding
+ * the row-flex header behavior because it came later in the file —
+ * mobile menu stopped collapsing and lost its background.
+ */
+.shell-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.dashboard-nav__group {
+.shell-nav__group {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding-bottom: var(--space-3);
 }
 
-.dashboard-nav__group-label {
+.shell-nav__group-label {
   font-size: var(--text-eyebrow);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.08em;
@@ -7202,7 +7213,7 @@ select.field-input {
   padding: 0 var(--space-3) var(--space-1);
 }
 
-.dashboard-nav__item {
+.shell-nav__item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7219,21 +7230,21 @@ select.field-input {
   transition: background var(--dur-fast) var(--ease-out);
 }
 
-.dashboard-nav__item:hover { background: var(--bg-overlay); color: var(--text-primary); }
+.shell-nav__item:hover { background: var(--bg-overlay); color: var(--text-primary); }
 
-.dashboard-nav__item--active {
+.shell-nav__item--active {
   background: var(--brand-50);
   color: var(--brand-700);
   font-weight: var(--weight-semibold);
 }
 
-.dashboard-nav__count {
+.shell-nav__count {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
-.dashboard-nav__item--active .dashboard-nav__count { color: var(--brand-600); }
+.shell-nav__item--active .shell-nav__count { color: var(--brand-600); }
 
 /* ============================================
    Quanti — QuestionTypeCard (Sprint 3)
