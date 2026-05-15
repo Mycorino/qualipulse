@@ -275,6 +275,26 @@ export async function getDashboard(surveyId: string): Promise<SurveyDashboard> {
   return resp.data;
 }
 
+/* ── Templates ─────────────────────────────────────────────────────── */
+
+export interface SurveyTemplate {
+  id: string;
+  name: string;
+  summary: string;
+  role: SurveyRole;
+  question_count: number;
+}
+
+export async function listTemplates(): Promise<SurveyTemplate[]> {
+  const resp = await client.get<SurveyTemplate[]>("/surveys/templates");
+  return resp.data;
+}
+
+export async function createFromTemplate(templateId: string): Promise<Survey> {
+  const resp = await client.post<Survey>(`/surveys/from-template/${templateId}`);
+  return resp.data;
+}
+
 /* ── Default config helpers (used by the editor when adding a question) */
 
 export function defaultConfigForType(type: QuestionType): Record<string, unknown> {

@@ -492,6 +492,44 @@ def test_dashboard_below_min_n_suppresses_percentages(
         assert bucket["ci_high"] is None
 
 
+# ── Templates ────────────────────────────────────────────────────────
+
+
+def test_templates_list_is_workspace_safe(client, auth_headers):
+    resp = client.get("/surveys/templates", headers=auth_headers)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) >= 1
+    ids = {item["id"] for item in items}
+    assert "churn_pricing_onboarding" in ids
+
+
+def test_create_from_template_seeds_questions(client, auth_headers, db_session):
+    resp = client.post(
+        "/surveys/from-template/churn_pricing_onboarding", headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    survey = resp.json()
+    assert survey["name"].startswith("Why new users churn")
+    assert survey["role"] == "screener"
+    assert survey["question_count"] == 5
+
+    qs = client.get(
+        f"/surveys/{survey['id']}/questions", headers=auth_headers
+    ).json()
+    assert len(qs) == 5
+    types = [q["type"] for q in qs]
+    assert "likert" in types and "nps" in types and "mc_multi" in types
+    # First question is a Likert about pricing-page clarity.
+    assert "pricing page" in qs[0]["prompt"].lower()
+    assert qs[0]["is_required"] is True
+
+
+def test_create_from_unknown_template_returns_404(client, auth_headers):
+    resp = client.post("/surveys/from-template/nope", headers=auth_headers)
+    assert resp.status_code == 404
+
+
 def test_response_only_visible_to_owner_workspace(client, auth_headers, db_session):
     """Auth isolation — a survey created by company A is not listable by B."""
 

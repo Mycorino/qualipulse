@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Survey, createSurvey, listSurveys } from "../api/surveys";
+import {
+  Survey,
+  SurveyTemplate,
+  createFromTemplate,
+  createSurvey,
+  listSurveys,
+  listTemplates,
+} from "../api/surveys";
 import { useToast } from "../components/Toast";
 
 /**
@@ -13,7 +20,9 @@ import { useToast } from "../components/Toast";
  */
 export default function SurveyList() {
   const [surveys, setSurveys] = useState<Survey[] | null>(null);
+  const [templates, setTemplates] = useState<SurveyTemplate[]>([]);
   const [creating, setCreating] = useState(false);
+  const [seeding, setSeeding] = useState<string | null>(null);
   const [name, setName] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -22,7 +31,22 @@ export default function SurveyList() {
     listSurveys()
       .then(setSurveys)
       .catch(() => toast("Failed to load surveys", "error"));
+    listTemplates()
+      .then(setTemplates)
+      .catch(() => undefined);
   }, [toast]);
+
+  const onUseTemplate = async (templateId: string) => {
+    try {
+      setSeeding(templateId);
+      const survey = await createFromTemplate(templateId);
+      navigate(`/surveys/${survey.id}/edit`);
+    } catch {
+      toast("Could not create survey from template", "error");
+    } finally {
+      setSeeding(null);
+    }
+  };
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +74,41 @@ export default function SurveyList() {
         </p>
       </header>
 
+      {templates.length > 0 && (
+        <section className="quanti-showcase__section">
+          <h2 className="quanti-showcase__section-title">Start from a template</h2>
+          <p className="quanti-showcase__section-meta">
+            Pre-built surveys to test the flow end-to-end. The questions are editable after
+            creation — change anything, then publish to start collecting responses.
+          </p>
+          <div className="quanti-showcase__grid-2">
+            {templates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="chart-card"
+                style={{ textAlign: "left", cursor: "pointer", border: "1px solid var(--border-default)" }}
+                onClick={() => onUseTemplate(t.id)}
+                disabled={seeding !== null}
+              >
+                <div className="chart-card__eyebrow">{t.role.toUpperCase()}</div>
+                <div className="chart-card__takeaway">{t.name}</div>
+                <div className="chart-card__footer tabular">
+                  <span>{t.question_count} questions</span>
+                  <span className="chart-card__footer-divider">·</span>
+                  <span>{t.summary}</span>
+                </div>
+                <div style={{ marginTop: "var(--space-3)", color: "var(--brand-600)", fontSize: "var(--text-sm)", fontWeight: 500 }}>
+                  {seeding === t.id ? "Creating…" : "Use this template →"}
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="quanti-showcase__section">
+        <h2 className="quanti-showcase__section-title">Or start from scratch</h2>
         <form onSubmit={onCreate} style={{ display: "flex", gap: "var(--space-3)", maxWidth: 560 }}>
           <input
             type="text"

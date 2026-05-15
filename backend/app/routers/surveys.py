@@ -52,6 +52,7 @@ from app.schemas.survey import (
     validate_question_config,
 )
 from app.services.survey_analytics import build_dashboard
+from app.services.survey_templates import get_template, list_templates
 
 router = APIRouter(prefix="/surveys", tags=["surveys"])
 
@@ -145,6 +146,62 @@ def _survey_to_response(db: Session, survey: Survey) -> SurveyResponseSchema:
         response_count=response_count,
         completed_count=completed_count,
     )
+
+
+# ── Templates ─────────────────────────────────────────────────────────
+
+
+@router.get("/templates")
+def get_templates(company: Company = Depends(get_current_company)) -> list[dict]:
+    """Curated survey templates the researcher can spin up with one click."""
+
+    return list_templates()
+
+
+@router.post(
+    "/from-template/{template_id}",
+    response_model=SurveyResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_from_template(
+    template_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> SurveyResponseSchema:
+    """Create a new survey + its questions in one transaction from a template."""
+
+    template = get_template(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    study = _get_or_create_implicit_study(db, company, name=template.name)
+    survey = Survey(
+        study_id=study.id,
+        company_id=company.id,
+        name=template.name,
+        description=template.description,
+        role=template.role,
+    )
+    db.add(survey)
+    db.flush()
+
+    for idx, q in enumerate(template.questions):
+        # Validate config against the same Pydantic schema as user-authored questions.
+        validated = validate_question_config(q.type, q.config)
+        db.add(
+            SurveyQuestion(
+                survey_id=survey.id,
+                sort_order=(idx + 1) * 10,
+                type=q.type,
+                prompt=q.prompt,
+                is_required=q.is_required,
+                config=json.dumps(validated),
+            )
+        )
+
+    db.commit()
+    db.refresh(survey)
+    return _survey_to_response(db, survey)
 
 
 # ── Survey CRUD ───────────────────────────────────────────────────────
