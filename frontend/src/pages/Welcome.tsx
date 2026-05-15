@@ -102,7 +102,7 @@ export default function Welcome() {
   const analyseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Use cases
   const [useCases, setUseCases] = useState<string[]>([]);
-  const [deselectedUseCases, setDeselectedUseCases] = useState<Set<string>>(new Set());
+  const [selectedUseCases, setSelectedUseCases] = useState<Set<string>>(new Set());
   const [useCasesLoading, setUseCasesLoading] = useState(false);
   const [useCasesFetched, setUseCasesFetched] = useState(false);
   const [newUseCaseInput, setNewUseCaseInput] = useState("");
@@ -432,9 +432,11 @@ export default function Welcome() {
         : useCases;
     if (pendingCustom && augmentedUseCases !== useCases) {
       setUseCases(augmentedUseCases);
+      setSelectedUseCases((prev) => new Set(prev).add(pendingCustom));
       setNewUseCaseInput("");
     }
-    const finalActiveUseCases = augmentedUseCases.filter((uc) => !deselectedUseCases.has(uc));
+    const augmentedSelected = pendingCustom ? new Set([...selectedUseCases, pendingCustom]) : selectedUseCases;
+    const finalActiveUseCases = augmentedUseCases.filter((uc) => augmentedSelected.has(uc));
 
     setSaving(true);
     setError("");
@@ -511,7 +513,7 @@ export default function Welcome() {
   }
 
   function toggleUseCase(uc: string) {
-    setDeselectedUseCases((prev) => {
+    setSelectedUseCases((prev) => {
       const next = new Set(prev);
       if (next.has(uc)) next.delete(uc);
       else next.add(uc);
@@ -519,8 +521,7 @@ export default function Welcome() {
     });
   }
 
-  // Active use cases = all chips minus deselected ones
-  const activeUseCases = useCases.filter((uc) => !deselectedUseCases.has(uc));
+  const activeUseCases = useCases.filter((uc) => selectedUseCases.has(uc));
 
   function addCustomUseCase() {
     const trimmed = newUseCaseInput.trim();
@@ -528,6 +529,7 @@ export default function Welcome() {
     if (!useCases.includes(trimmed)) {
       setUseCases((prev) => [...prev, trimmed]);
     }
+    setSelectedUseCases((prev) => new Set(prev).add(trimmed));
     setNewUseCaseInput("");
   }
 
@@ -1046,7 +1048,7 @@ export default function Welcome() {
                     <>
                       <div className="use-case-chips">
                         {useCases.map((uc) => {
-                          const selected = !deselectedUseCases.has(uc);
+                          const selected = selectedUseCases.has(uc);
                           return (
                             <button
                               key={uc}

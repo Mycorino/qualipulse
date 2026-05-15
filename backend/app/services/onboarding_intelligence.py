@@ -29,11 +29,11 @@ _FALLBACK_CLASSIFY = {
     "canonical_tag": "general",
     "orientation": "mixed",
     "suggested_use_cases": [
-        "User discovery",
-        "Customer feedback",
-        "Product validation",
-        "Market research",
-        "Competitor analysis",
+        "Why do users drop off before completing signup?",
+        "What frustrations drive customers to competitors?",
+        "How do users decide which features matter most?",
+        "What unmet needs do our best customers have?",
+        "Why do trial users not convert to paid?",
     ],
     "research_angle": "Understanding your users and market through qualitative interviews.",
 }
@@ -79,10 +79,13 @@ def classify_role_and_suggest(
         f"no other clearly fits.\n"
         f"- orientation: \"internal\" (product/ops/HR/employees), \"external\" "
         f"(marketing/brand/sales/customers), or \"mixed\".\n"
-        f"- suggested_use_cases: 5-7 SPECIFIC research questions this person could run THIS WEEK. "
-        f"Each must reference their actual focus, not the role title. "
-        f"GOOD: \"Why mid-market customers churn between months 4-6\". "
-        f"REJECT: \"Customer feedback\", \"User research\", \"Market analysis\". "
+        f"- suggested_use_cases: exactly 5 short research questions (max 12 words each). "
+        f"Each must be a concrete question this person would care about, phrased as a "
+        f"curiosity they can explore through interviews. "
+        f"NEVER invent specific numbers, percentages, timeframes, or metrics you don't know. "
+        f"GOOD: \"Why do customers drop off during checkout?\", \"What competitors are users switching to?\". "
+        f"BAD: \"Why are EMEA conversion rates 3% lower than NA\" (you don't know real numbers). "
+        f"BAD: \"Customer feedback\", \"User research\" (too vague, not a question). "
         f"Write in {language_name}.\n"
         f"- research_angle: ONE sentence describing what kind of insight this person actually "
         f"needs (not what they could do, but what blocks them). Write in {language_name}.\n"
