@@ -134,7 +134,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 from app.routers import (
     auth, projects, links, interview, export, audio,
     research_assistant, analysis, responses, coding, memos, billing, admin, affiliate, blog,
-    templates, team, surveys,
+    templates, team, surveys, public_surveys,
 )
 
 app.include_router(auth.router)
@@ -155,6 +155,7 @@ app.include_router(blog.router)
 app.include_router(templates.router)
 app.include_router(team.router)
 app.include_router(surveys.router)
+app.include_router(public_surveys.router)
 
 
 @app.get("/", tags=["health"])

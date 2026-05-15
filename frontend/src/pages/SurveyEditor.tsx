@@ -252,6 +252,13 @@ export default function SurveyEditor() {
           >
             Preview
           </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => navigate(`/surveys/${survey.id}/dashboard`)}
+          >
+            Dashboard
+          </button>
           <button type="button" className="btn btn-primary" onClick={onTogglePublish}>
             {survey.status === "live" ? "Close survey" : "Publish"}
           </button>
@@ -262,8 +269,8 @@ export default function SurveyEditor() {
         {/* ── Left rail: question list ───────────────────────────────── */}
         <aside className="survey-editor__rail survey-editor__rail--left">
           <div className="survey-editor__rail-head">
-            <span className="dashboard-nav__group-label">Questions</span>
-            <span className="dashboard-nav__count tabular">{questions.length}</span>
+            <span className="shell-nav__group-label">Questions</span>
+            <span className="shell-nav__count tabular">{questions.length}</span>
           </div>
           <ol className="survey-editor__qlist">
             {questions.map((q, i) => (
@@ -338,7 +345,7 @@ export default function SurveyEditor() {
         {/* ── Right rail: settings ──────────────────────────────────── */}
         <aside className="survey-editor__rail survey-editor__rail--right">
           <div className="survey-editor__rail-head">
-            <span className="dashboard-nav__group-label">Public links</span>
+            <span className="shell-nav__group-label">Public links</span>
           </div>
           {links.length === 0 ? (
             <p className="quanti-showcase__section-meta" style={{ marginTop: 0 }}>

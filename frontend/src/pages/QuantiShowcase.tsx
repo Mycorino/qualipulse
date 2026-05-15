@@ -281,63 +281,63 @@ export default function QuantiShowcase() {
         </div>
         <DashboardShell
           sidebar={
-            <nav className="dashboard-nav" aria-label="Study sections">
-              <div className="dashboard-nav__group">
-                <span className="dashboard-nav__group-label">Overview</span>
+            <nav className="shell-nav" aria-label="Study sections">
+              <div className="shell-nav__group">
+                <span className="shell-nav__group-label">Overview</span>
                 <button
                   type="button"
-                  className={`dashboard-nav__item${activeNav === "summary" ? " dashboard-nav__item--active" : ""}`}
+                  className={`shell-nav__item${activeNav === "summary" ? " shell-nav__item--active" : ""}`}
                   onClick={() => setActiveNav("summary")}
                 >
                   Summary
                 </button>
                 <button
                   type="button"
-                  className={`dashboard-nav__item${activeNav === "segments" ? " dashboard-nav__item--active" : ""}`}
+                  className={`shell-nav__item${activeNav === "segments" ? " shell-nav__item--active" : ""}`}
                   onClick={() => setActiveNav("segments")}
                 >
                   Segments
                 </button>
               </div>
-              <div className="dashboard-nav__group">
-                <span className="dashboard-nav__group-label">Per question</span>
+              <div className="shell-nav__group">
+                <span className="shell-nav__group-label">Per question</span>
                 <button
                   type="button"
-                  className={`dashboard-nav__item${activeNav === "nps" ? " dashboard-nav__item--active" : ""}`}
+                  className={`shell-nav__item${activeNav === "nps" ? " shell-nav__item--active" : ""}`}
                   onClick={() => setActiveNav("nps")}
                 >
-                  Q1 — Net promoter <span className="dashboard-nav__count">247</span>
+                  Q1 — Net promoter <span className="shell-nav__count">247</span>
                 </button>
                 <button
                   type="button"
-                  className={`dashboard-nav__item${activeNav === "onboarding" ? " dashboard-nav__item--active" : ""}`}
+                  className={`shell-nav__item${activeNav === "onboarding" ? " shell-nav__item--active" : ""}`}
                   onClick={() => setActiveNav("onboarding")}
                 >
-                  Q2 — Onboarding friction <span className="dashboard-nav__count">241</span>
+                  Q2 — Onboarding friction <span className="shell-nav__count">241</span>
                 </button>
                 <button
                   type="button"
-                  className={`dashboard-nav__item${activeNav === "pricing" ? " dashboard-nav__item--active" : ""}`}
+                  className={`shell-nav__item${activeNav === "pricing" ? " shell-nav__item--active" : ""}`}
                   onClick={() => setActiveNav("pricing")}
                 >
-                  Q3 — Pricing clarity <span className="dashboard-nav__count">236</span>
+                  Q3 — Pricing clarity <span className="shell-nav__count">236</span>
                 </button>
                 <button
                   type="button"
-                  className={`dashboard-nav__item${activeNav === "features" ? " dashboard-nav__item--active" : ""}`}
+                  className={`shell-nav__item${activeNav === "features" ? " shell-nav__item--active" : ""}`}
                   onClick={() => setActiveNav("features")}
                 >
-                  Q4 — Feature priorities <span className="dashboard-nav__count">232</span>
+                  Q4 — Feature priorities <span className="shell-nav__count">232</span>
                 </button>
               </div>
-              <div className="dashboard-nav__group">
-                <span className="dashboard-nav__group-label">Raw</span>
+              <div className="shell-nav__group">
+                <span className="shell-nav__group-label">Raw</span>
                 <button
                   type="button"
-                  className={`dashboard-nav__item${activeNav === "responses" ? " dashboard-nav__item--active" : ""}`}
+                  className={`shell-nav__item${activeNav === "responses" ? " shell-nav__item--active" : ""}`}
                   onClick={() => setActiveNav("responses")}
                 >
-                  All responses <span className="dashboard-nav__count">247</span>
+                  All responses <span className="shell-nav__count">247</span>
                 </button>
               </div>
             </nav>

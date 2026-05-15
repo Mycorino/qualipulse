@@ -909,11 +909,14 @@ select.field-input {
     right: 0;
     left: 0;
     flex-direction: column;
-    background: var(--surface);
+    /* Was var(--surface) — a token that doesn't exist in the design
+       system, so the menu opened transparent. The canonical surface
+       token is --bg-surface. */
+    background: var(--bg-surface);
     border-bottom: 1px solid var(--border-subtle);
     padding: 8px 16px;
     gap: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-md);
     z-index: 49;
   }
   .dashboard-nav--open { display: flex; }
@@ -7179,21 +7182,29 @@ select.field-input {
   }
 }
 
-/* Sidebar nav primitive used inside dashboard-shell sidebar slot. */
-.dashboard-nav {
+/* Sidebar nav primitive used inside dashboard-shell sidebar slot.
+ *
+ * Renamed from `.dashboard-nav*` (Sprint 2) to `.shell-nav*` after a
+ * collision with the existing Dashboard.tsx / ProjectDetail.tsx header
+ * navigation (which uses `.dashboard-nav` + `.dashboard-nav--open` for
+ * the mobile hamburger). The Sprint 2 column-flex rule was overriding
+ * the row-flex header behavior because it came later in the file —
+ * mobile menu stopped collapsing and lost its background.
+ */
+.shell-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.dashboard-nav__group {
+.shell-nav__group {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding-bottom: var(--space-3);
 }
 
-.dashboard-nav__group-label {
+.shell-nav__group-label {
   font-size: var(--text-eyebrow);
   font-weight: var(--weight-semibold);
   letter-spacing: 0.08em;
@@ -7202,7 +7213,7 @@ select.field-input {
   padding: 0 var(--space-3) var(--space-1);
 }
 
-.dashboard-nav__item {
+.shell-nav__item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7219,21 +7230,21 @@ select.field-input {
   transition: background var(--dur-fast) var(--ease-out);
 }
 
-.dashboard-nav__item:hover { background: var(--bg-overlay); color: var(--text-primary); }
+.shell-nav__item:hover { background: var(--bg-overlay); color: var(--text-primary); }
 
-.dashboard-nav__item--active {
+.shell-nav__item--active {
   background: var(--brand-50);
   color: var(--brand-700);
   font-weight: var(--weight-semibold);
 }
 
-.dashboard-nav__count {
+.shell-nav__count {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
-.dashboard-nav__item--active .dashboard-nav__count { color: var(--brand-600); }
+.shell-nav__item--active .shell-nav__count { color: var(--brand-600); }
 
 /* ============================================
    Quanti — QuestionTypeCard (Sprint 3)
@@ -8959,4 +8970,330 @@ select.field-input {
   .survey-editor__rail {
     position: static;
   }
+}
+
+/* ============================================
+   Quanti — PublicResponse (Sprint 8)
+   ============================================
+   The respondent-facing survey form at /r/:token. Mobile-first; works
+   without auth. No design-system chrome — just a clean editorial layout.
+   ============================================ */
+
+.public-response {
+  background: var(--bg-base);
+  min-height: 100vh;
+  padding: var(--space-8) var(--space-5);
+}
+
+.public-response__container {
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-10) var(--space-8);
+  box-shadow: var(--shadow-xs);
+}
+
+@media (max-width: 720px) {
+  .public-response {
+    padding: var(--space-3) 0;
+  }
+  .public-response__container {
+    padding: var(--space-6) var(--space-5);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+.public-response__head {
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.public-response__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-headline);
+  font-weight: var(--weight-bold);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-3);
+}
+
+.public-response__description {
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.public-response__anon-note {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  color: var(--info-text);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.public-response__qlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.public-response__qitem {
+  display: block;
+}
+
+.public-response__qhead {
+  margin-bottom: var(--space-4);
+}
+
+.public-response__qhead--error .public-response__qprompt {
+  color: var(--danger);
+}
+
+.public-response__qnum {
+  display: block;
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+.public-response__qprompt {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: 1.4;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* Likert / NPS scale buttons */
+.public-response__scale {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.public-response__scale-btn,
+.public-response__nps-btn {
+  flex: 1;
+  min-height: 48px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.public-response__scale-btn:hover,
+.public-response__nps-btn:hover {
+  border-color: var(--brand-300);
+  background: var(--brand-50);
+}
+
+.public-response__scale-btn--selected,
+.public-response__nps-btn--selected {
+  background: var(--brand-500);
+  color: #fff;
+  border-color: var(--brand-600);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 3px rgba(67, 105, 245, 0.35);
+}
+
+.public-response__nps {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.public-response__scale-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* MC choices */
+.public-response__choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.public-response__choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--text-md);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.public-response__choice:hover {
+  border-color: var(--brand-300);
+  background: var(--brand-50);
+}
+
+.public-response__choice--selected {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+  color: var(--brand-800);
+}
+
+.public-response__choice-marker {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  position: relative;
+}
+
+.public-response__choice-marker--on {
+  border-color: var(--brand-500);
+  background: var(--brand-500);
+}
+
+.public-response__choice-marker--on::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+/* Text inputs */
+.public-response__textarea,
+.public-response__text-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.public-response__text-input {
+  min-height: 48px;
+}
+
+.public-response__textarea:focus,
+.public-response__text-input:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: var(--glow-brand);
+}
+
+/* Email block + submit */
+.public-response__email-block {
+  margin-top: var(--space-8);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.public-response__email-label {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.public-response__email-input {
+  width: 100%;
+  min-height: 48px;
+  font-family: inherit;
+  font-size: var(--text-md);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.public-response__email-input:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: var(--glow-brand);
+}
+
+.public-response__email-help {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.public-response__validation {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-text);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.public-response__submit-row {
+  margin-top: var(--space-6);
+}
+
+.public-response__submit-row .btn {
+  width: 100%;
+  min-height: 52px;
+  font-size: var(--text-md);
+}
+
+.public-response__thanks,
+.public-response__error {
+  text-align: center;
+}
+
+.public-response__thanks h1 {
+  font-family: var(--font-serif);
+  font-size: var(--text-headline);
+  font-weight: var(--weight-bold);
+  margin: 0 0 var(--space-3);
+  color: var(--text-primary);
+}
+
+.public-response__error h1 {
+  font-size: var(--text-xl);
+  color: var(--text-primary);
 }

@@ -224,3 +224,65 @@ class ResponseAck(BaseModel):
     study_participant_id: str | None
     is_complete: bool
     received_at: datetime
+
+
+# ── Dashboard / analytics ─────────────────────────────────────────────
+
+
+class QuestionAnalyticsSchema(BaseModel):
+    """Per-question dashboard analytics. Shape varies by `type` via `breakdown`."""
+
+    question_id: str
+    type: QuestionType
+    prompt: str
+    is_required: bool
+    sort_order: int
+    n_answered: int
+    min_n_threshold: int
+    breakdown: dict[str, Any]
+    mean: float | None = None
+    takeaway: str | None = None
+
+
+class SurveyDashboardSchema(BaseModel):
+    """Top-level /surveys/{id}/dashboard payload."""
+
+    survey_id: str
+    name: str
+    role: SurveyRole
+    status: SurveyStatus
+    fielding_started_at: str | None
+    fielding_ended_at: str | None
+    n_started: int
+    n_completed: int
+    completion_rate_percentage: float | None
+    min_n_threshold: int
+    questions: list[QuestionAnalyticsSchema]
+
+
+# ── Public survey shape (no-auth view of a live link) ────────────────
+
+
+class PublicQuestion(BaseModel):
+    """Subset of SurveyQuestion safe to return to anonymous respondents."""
+
+    id: str
+    sort_order: int
+    type: QuestionType
+    prompt: str
+    is_required: bool
+    config: dict[str, Any]
+
+
+class PublicSurvey(BaseModel):
+    """No-auth payload describing a live survey to a respondent.
+
+    Returned by GET /r/{token}. Does NOT include workspace ids, internal
+    company_id, or any methodology metadata. Constant-time "not available"
+    for any unhappy state (closed, capped, draft).
+    """
+
+    name: str
+    description: str | None
+    is_anonymous: bool
+    questions: list[PublicQuestion]
