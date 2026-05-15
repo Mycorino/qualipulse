@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.models.interview import InterviewLink
@@ -42,6 +43,11 @@ from app.schemas.survey import (
     QuestionResponse,
     ResponseAck,
     ResponseSubmission,
+    SegmentFilterClause,
+    SegmentInviteRequest,
+    SegmentInviteResult,
+    SegmentPreviewRequest,
+    SegmentPreviewResponse,
     SurveyCreate,
     SurveyDashboardSchema,
     SurveyLinkCreate,
@@ -51,7 +57,15 @@ from app.schemas.survey import (
     QuestionAnalyticsSchema,
     validate_question_config,
 )
+from app.models.interview import InterviewLink
+from app.models.project import Project
+from app.services.email import send_interview_invite
 from app.services.survey_analytics import build_dashboard
+from app.services.survey_segments import (
+    FilterClause,
+    invitable_participants,
+    resolve_segment,
+)
 from app.services.survey_templates import get_template, list_templates
 
 router = APIRouter(prefix="/surveys", tags=["surveys"])
@@ -497,6 +511,145 @@ def list_links(
     survey = _get_survey_or_404(db, survey_id, company)
     links = db.query(SurveyLink).filter(SurveyLink.survey_id == survey.id).all()
     return [SurveyLinkResponse.model_validate(link) for link in links]
+
+
+# ── Screener bridge (the wedge) ──────────────────────────────────────
+
+
+def _resolve_target_project_for_invite(db: Session, survey: Survey) -> Project | None:
+    """Pick the interview track to invite respondents into.
+
+    Logic:
+      1. Look for a sibling Project on the same Study.
+      2. If none, fall back to the most-recently-created Project in the
+         same workspace (best-effort default — the researcher can change it
+         later via project picker once Sprint 11 wires it).
+    """
+
+    if survey.study_id:
+        project = (
+            db.query(Project)
+            .filter(Project.study_id == survey.study_id, Project.archived_at.is_(None))
+            .first()
+        )
+        if project:
+            return project
+
+    project = (
+        db.query(Project)
+        .filter(Project.company_id == survey.company_id, Project.archived_at.is_(None))
+        .order_by(Project.created_at.desc())
+        .first()
+    )
+    return project
+
+
+@router.post(
+    "/{survey_id}/segment/preview",
+    response_model=SegmentPreviewResponse,
+)
+def preview_segment(
+    survey_id: str,
+    body: SegmentPreviewRequest,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> SegmentPreviewResponse:
+    """Resolve filter clauses → match count + invitable count + sample.
+
+    Match count = unique StudyParticipants who completed the survey and
+    match every clause. Invitable = subset with an email. Skipped =
+    anonymous responses (no email). Sample is up to 8 emails for the
+    draft+review modal — gives the researcher a sanity check before
+    they commit credits.
+    """
+
+    survey = _get_survey_or_404(db, survey_id, company)
+    clauses = [FilterClause(c.question_id, c.operator, c.value) for c in body.filters]
+    participants = resolve_segment(db, survey, clauses)
+    invitable, skipped = invitable_participants(participants)
+
+    sample = [
+        {"email": p.email_normalized or "", "display_name": p.display_name or ""}
+        for p in invitable[:8]
+    ]
+    return SegmentPreviewResponse(
+        match_count=len(participants),
+        invitable_count=len(invitable),
+        skipped_anonymous_count=len(skipped),
+        sample_invitees=sample,
+    )
+
+
+@router.post(
+    "/{survey_id}/segment/invite",
+    response_model=SegmentInviteResult,
+)
+def invite_segment_to_interview(
+    survey_id: str,
+    body: SegmentInviteRequest,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> SegmentInviteResult:
+    """Create per-invitee interview links + send invitation emails.
+
+    Decision 1: draft+review means the FRONTEND gates the action behind a
+    confirmation modal. The backend assumes the user confirmed and just
+    fires. Credit consumption happens at interview-completion time via the
+    existing `consume_interview` ledger event — no changes to billing.
+
+    One interview_link per invitee (so the link binds 1:1 to the
+    StudyParticipant on first use — Sprint 11 wires this association
+    fully when participant creation flows through study_participant_id).
+    """
+
+    survey = _get_survey_or_404(db, survey_id, company)
+    target_project = _resolve_target_project_for_invite(db, survey)
+    if not target_project:
+        raise HTTPException(
+            status_code=400,
+            detail="No interview project available in this workspace. Create one first.",
+        )
+
+    clauses = [FilterClause(c.question_id, c.operator, c.value) for c in body.filters]
+    participants = resolve_segment(db, survey, clauses)
+    invitable, skipped = invitable_participants(participants)
+
+    invited = 0
+    failed: list[str] = []
+    tokens: list[str] = []
+    base_url = settings.APP_BASE_URL or "http://localhost:5173"
+
+    for participant in invitable:
+        token = _generate_link_token(db)
+        link = InterviewLink(project_id=target_project.id, token=token)
+        db.add(link)
+        # Flush per-iteration so the in-loop token uniqueness check stays correct.
+        db.flush()
+        tokens.append(token)
+
+        interview_url = f"{base_url.rstrip('/')}/i/{token}"
+        try:
+            ok = send_interview_invite(
+                to=participant.email_normalized,  # type: ignore[arg-type]
+                project_name=target_project.name,
+                interview_url=interview_url,
+                sender_name=company.name or "Your researcher",
+            )
+            if ok:
+                invited += 1
+            else:
+                failed.append(participant.email_normalized or "(unknown)")
+        except Exception:  # noqa: BLE001 — email service may be unconfigured in dev
+            failed.append(participant.email_normalized or "(unknown)")
+
+    db.commit()
+
+    return SegmentInviteResult(
+        invited_count=invited,
+        skipped_count=len(skipped),
+        failed_emails=failed,
+        interview_link_tokens=tokens,
+    )
 
 
 # ── Dashboard (workspace-scoped) ──────────────────────────────────────

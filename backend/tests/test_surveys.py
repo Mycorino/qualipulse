@@ -530,6 +530,141 @@ def test_create_from_unknown_template_returns_404(client, auth_headers):
     assert resp.status_code == 404
 
 
+# ── Sprint 9: screener-bridge segment filtering + invite ─────────────
+
+
+def _seed_responses_for_segment(client, auth_headers, db_session):
+    """Helper: build a live NPS survey with 6 completed responses spanning
+    detractors / passives / promoters so segment filters have something
+    to slice."""
+
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "Segment test"}
+    ).json()
+    q = client.post(
+        f"/surveys/{survey['id']}/questions",
+        headers=auth_headers,
+        json={"type": "nps", "prompt": "Recommend?", "config": {}},
+    ).json()
+    link = client.post(
+        f"/surveys/{survey['id']}/links",
+        headers=auth_headers,
+        json={"is_anonymous": False},
+    ).json()
+    client.patch(f"/surveys/{survey['id']}", headers=auth_headers, json={"status": "live"})
+
+    # 2 detractors, 2 passives, 2 promoters.
+    scores = [3, 4, 7, 8, 9, 10]
+    for i, score in enumerate(scores):
+        client.post(
+            f"/r/{link['token']}/responses",
+            json={
+                "link_token": link["token"],
+                "email": f"resp-{i}@example.com",
+                "answers": [{"question_id": q["id"], "value_numeric": score}],
+                "is_complete": True,
+            },
+        )
+
+    return survey, q, link
+
+
+def test_segment_preview_lte_returns_detractors(client, auth_headers, db_session):
+    survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/preview",
+        headers=auth_headers,
+        json={"filters": [{"question_id": q["id"], "operator": "lte", "value": 6}]},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    # 2 detractors qualify (scores 3 and 4).
+    assert data["match_count"] == 2
+    assert data["invitable_count"] == 2
+    assert data["skipped_anonymous_count"] == 0
+    assert len(data["sample_invitees"]) == 2
+
+
+def test_segment_preview_gte_returns_promoters(client, auth_headers, db_session):
+    survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/preview",
+        headers=auth_headers,
+        json={"filters": [{"question_id": q["id"], "operator": "gte", "value": 9}]},
+    ).json()
+    assert resp["match_count"] == 2
+
+
+def test_segment_preview_empty_filters_returns_all_completed(
+    client, auth_headers, db_session
+):
+    survey, _, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/preview",
+        headers=auth_headers,
+        json={"filters": []},
+    ).json()
+    assert resp["match_count"] == 6
+
+
+def test_segment_invite_creates_interview_links_for_matched(
+    client, auth_headers, db_session
+):
+    """The wedge: matching respondents -> interview links.
+
+    Email sending is disabled in tests (no SENDGRID_API_KEY), so
+    `invited_count` will be 0 and the failed list will hold the matched
+    emails. The actual link creation still happens, which is the part of
+    the contract we care about here.
+    """
+
+    survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    # Need a project to invite into — survey's company has none yet, so create one.
+    client.post(
+        "/projects/",
+        headers=auth_headers,
+        json={
+            "name": "Follow-up interviews",
+            "language": "en",
+            "questions": [
+                {
+                    "section_index": 0,
+                    "section_title": "Intro",
+                    "question_index": 0,
+                    "main_question": "Tell me about your experience.",
+                }
+            ],
+        },
+    )
+
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/invite",
+        headers=auth_headers,
+        json={"filters": [{"question_id": q["id"], "operator": "lte", "value": 6}]},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    # 2 detractors → 2 tokens created.
+    assert len(data["interview_link_tokens"]) == 2
+    # invited_count counts successful EMAIL sends. With email disabled it's 0
+    # and the 2 emails land in failed_emails. The links still got created
+    # in the DB — that's what makes the wedge real.
+    assert data["invited_count"] + len(data["failed_emails"]) == 2
+
+
+def test_segment_invite_400_without_project(client, auth_headers, db_session):
+    """No interview track available → can't invite."""
+
+    survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/invite",
+        headers=auth_headers,
+        json={"filters": [{"question_id": q["id"], "operator": "lte", "value": 6}]},
+    )
+    assert resp.status_code == 400
+    assert "interview project" in resp.json()["detail"].lower()
+
+
 def test_response_only_visible_to_owner_workspace(client, auth_headers, db_session):
     """Auth isolation — a survey created by company A is not listable by B."""
 

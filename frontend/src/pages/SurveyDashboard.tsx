@@ -1,10 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { QuestionAnalytics, SurveyDashboard, getDashboard } from "../api/surveys";
+import {
+  QuestionAnalytics,
+  SegmentFilter,
+  SegmentOperator,
+  SegmentPreview,
+  SurveyDashboard,
+  getDashboard,
+  inviteSegment,
+  previewSegment,
+} from "../api/surveys";
 import { ChartCard } from "../components/ChartCard";
 import { DashboardShell, DashboardStrip } from "../components/DashboardShell";
 import { MethodologyBox, SmallNWarning } from "../components/MethodologyBox";
+import { ScreenerBridge } from "../components/ScreenerBridge";
+import { useToast } from "../components/Toast";
 
 /**
  * SurveyDashboard — `/surveys/:id/dashboard`.
@@ -21,8 +32,15 @@ import { MethodologyBox, SmallNWarning } from "../components/MethodologyBox";
 export default function SurveyDashboardPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [data, setData] = useState<SurveyDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Segment filter state ────────────────────────────────────────
+  const [filters, setFilters] = useState<SegmentFilter[]>([]);
+  const [preview, setPreview] = useState<SegmentPreview | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -30,6 +48,44 @@ export default function SurveyDashboardPage() {
       .then(setData)
       .catch(() => setError("Could not load dashboard"));
   }, [id]);
+
+  // Re-preview whenever filters change. Debounce keeps backend chatter sane.
+  useEffect(() => {
+    if (!id) return;
+    const timer = setTimeout(() => {
+      previewSegment(id, filters)
+        .then(setPreview)
+        .catch(() => setPreview(null));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [id, filters]);
+
+  const filterDescription = useMemo(() => {
+    if (!data || filters.length === 0) return "All completed respondents";
+    return filters.map((f) => describeFilter(f, data.questions)).join(" AND ");
+  }, [filters, data]);
+
+  const onConfirmInvite = async () => {
+    if (!id) return;
+    setInviting(true);
+    try {
+      const result = await inviteSegment(id, filters);
+      toast(
+        `${result.invited_count} invite${result.invited_count === 1 ? "" : "s"} sent` +
+          (result.failed_emails.length > 0
+            ? ` · ${result.failed_emails.length} email failure${result.failed_emails.length === 1 ? "" : "s"}`
+            : ""),
+        result.failed_emails.length === 0 ? "success" : "info",
+      );
+      setReviewOpen(false);
+    } catch (e: any) {
+      // Backend returns 400 with detail on "no project to invite into"
+      const detail = e?.response?.data?.detail;
+      toast(detail || "Invites failed to send", "error");
+    } finally {
+      setInviting(false);
+    }
+  };
 
   if (error) {
     return (
@@ -112,6 +168,21 @@ export default function SurveyDashboardPage() {
 
         <div style={{ marginTop: "var(--space-6)" }}>
           <DashboardShell sidebar={<QuestionNav questions={data.questions} />}>
+            <SegmentFilterRail
+              questions={data.questions}
+              filters={filters}
+              onChange={setFilters}
+            />
+            {preview && preview.match_count > 0 && (
+              <ScreenerBridge
+                matchCount={preview.invitable_count}
+                filterDescription={filterDescription}
+                onInvite={() => setReviewOpen(true)}
+                onSaveSegment={() =>
+                  toast("Saved segments ship in Sprint 10 — for now, click 'Invite to AI interview'.", "info")
+                }
+              />
+            )}
             <DashboardStrip
               items={[
                 { label: "Respondents", value: String(data.n_started) },
@@ -139,6 +210,299 @@ export default function SurveyDashboardPage() {
               ))
             )}
           </DashboardShell>
+        </div>
+      </div>
+
+      {reviewOpen && preview && (
+        <InviteReviewModal
+          preview={preview}
+          filterDescription={filterDescription}
+          inviting={inviting}
+          onCancel={() => setReviewOpen(false)}
+          onConfirm={onConfirmInvite}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Sprint 9 sub-components: segment filter rail + draft-review modal
+   ──────────────────────────────────────────────────────────────────── */
+
+function describeFilter(filter: SegmentFilter, questions: QuestionAnalytics[]): string {
+  const q = questions.find((x) => x.question_id === filter.question_id);
+  const label = q?.prompt?.slice(0, 40) || "Question";
+  if (filter.operator === "lte") return `${label} ≤ ${filter.value}`;
+  if (filter.operator === "gte") return `${label} ≥ ${filter.value}`;
+  if (filter.operator === "eq") return `${label} = ${filter.value}`;
+  if (filter.operator === "between") {
+    const [lo, hi] = filter.value as [number, number];
+    return `${label} between ${lo} and ${hi}`;
+  }
+  if (filter.operator === "in") {
+    const ids = (filter.value as string[]) || [];
+    return `${label} in [${ids.join(", ")}]`;
+  }
+  return label;
+}
+
+function SegmentFilterRail({
+  questions,
+  filters,
+  onChange,
+}: {
+  questions: QuestionAnalytics[];
+  filters: SegmentFilter[];
+  onChange: (next: SegmentFilter[]) => void;
+}) {
+  const filterable = questions.filter(
+    (q) => q.type === "likert" || q.type === "nps" || q.type === "mc_single" || q.type === "mc_multi",
+  );
+  if (filterable.length === 0) return null;
+
+  const upsert = (next: SegmentFilter) => {
+    const others = filters.filter((f) => f.question_id !== next.question_id);
+    onChange([...others, next]);
+  };
+  const removeFor = (questionId: string) => {
+    onChange(filters.filter((f) => f.question_id !== questionId));
+  };
+
+  return (
+    <section
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)",
+        padding: "var(--space-4) var(--space-5)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-3)",
+      }}
+    >
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+        <span style={{ fontSize: "var(--text-eyebrow)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>
+          Filter respondents
+        </span>
+        {filters.length > 0 && (
+          <button type="button" className="btn btn-ghost btn-xs" onClick={() => onChange([])}>
+            Clear all
+          </button>
+        )}
+      </header>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        {filterable.map((q) => (
+          <QuestionFilterRow
+            key={q.question_id}
+            question={q}
+            filter={filters.find((f) => f.question_id === q.question_id)}
+            onSet={upsert}
+            onClear={() => removeFor(q.question_id)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function QuestionFilterRow({
+  question,
+  filter,
+  onSet,
+  onClear,
+}: {
+  question: QuestionAnalytics;
+  filter: SegmentFilter | undefined;
+  onSet: (next: SegmentFilter) => void;
+  onClear: () => void;
+}) {
+  const isLikertOrNps = question.type === "likert" || question.type === "nps";
+  if (isLikertOrNps) {
+    const op = (filter?.operator as SegmentOperator) ?? "lte";
+    const value = typeof filter?.value === "number" ? (filter.value as number) : 6;
+    const max = question.type === "nps" ? 10 : (((question.breakdown.histogram as any[])?.length) || 5);
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto", gap: "var(--space-2)", alignItems: "center" }}>
+        <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {question.prompt || "Untitled question"}
+        </span>
+        <select
+          value={filter ? op : ""}
+          onChange={(e) => {
+            const val = e.target.value as SegmentOperator | "";
+            if (val === "") onClear();
+            else onSet({ question_id: question.question_id, operator: val, value });
+          }}
+          style={{ fontFamily: "inherit", fontSize: "var(--text-sm)", padding: "4px 6px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", background: "var(--bg-surface)" }}
+        >
+          <option value="">No filter</option>
+          <option value="lte">≤</option>
+          <option value="gte">≥</option>
+          <option value="eq">=</option>
+        </select>
+        {filter && (
+          <input
+            type="number"
+            className="tabular"
+            value={value}
+            min={question.type === "nps" ? 0 : 1}
+            max={max}
+            onChange={(e) => onSet({ question_id: question.question_id, operator: op, value: Number(e.target.value) })}
+            style={{ width: 64, fontFamily: "inherit", fontSize: "var(--text-sm)", padding: "4px 8px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", background: "var(--bg-surface)" }}
+          />
+        )}
+        {filter && (
+          <button type="button" className="btn btn-ghost btn-xs" onClick={onClear} aria-label="Clear filter">
+            ×
+          </button>
+        )}
+        {!filter && <span />}
+        {!filter && <span />}
+      </div>
+    );
+  }
+
+  // mc_single / mc_multi → list checkboxes for choice IDs
+  const choices = (question.breakdown.choices as Array<{ choice_id: string; label: string }>) ?? [];
+  const selected = new Set<string>((filter?.value as string[]) ?? []);
+  const toggle = (cid: string) => {
+    const next = new Set(selected);
+    if (next.has(cid)) next.delete(cid);
+    else next.add(cid);
+    if (next.size === 0) onClear();
+    else onSet({ question_id: question.question_id, operator: "in", value: Array.from(next) });
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+      <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+        {question.prompt || "Untitled question"}
+      </span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+        {choices.map((c) => {
+          const isOn = selected.has(c.choice_id);
+          return (
+            <button
+              key={c.choice_id}
+              type="button"
+              className={`compare-chips__chip${isOn ? " compare-chips__chip--active" : ""}`}
+              onClick={() => toggle(c.choice_id)}
+              aria-pressed={isOn}
+            >
+              {c.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function InviteReviewModal({
+  preview,
+  filterDescription,
+  inviting,
+  onCancel,
+  onConfirm,
+}: {
+  preview: SegmentPreview;
+  filterDescription: string;
+  inviting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Review and confirm interview invites"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(13, 15, 26, 0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "var(--space-5)",
+        zIndex: 100,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--bg-surface)",
+          borderRadius: "var(--radius-lg)",
+          maxWidth: 560,
+          width: "100%",
+          padding: "var(--space-6)",
+          boxShadow: "var(--shadow-lg)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-4)",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: "var(--text-eyebrow)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--brand-600)" }}>
+            Review before sending
+          </div>
+          <h2 style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-xl)", letterSpacing: "-0.015em", marginTop: "var(--space-2)" }}>
+            <span className="tabular">{preview.invitable_count}</span> invite{preview.invitable_count === 1 ? "" : "s"} ready to send
+          </h2>
+          <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
+            {filterDescription}
+          </p>
+        </div>
+
+        {preview.sample_invitees.length > 0 && (
+          <div>
+            <div style={{ fontSize: "var(--text-eyebrow)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: "var(--space-2)" }}>
+              Sample recipients
+            </div>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+              {preview.sample_invitees.map((p) => (
+                <li
+                  key={p.email}
+                  style={{
+                    padding: "var(--space-1) var(--space-2)",
+                    background: "var(--bg-base)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "var(--radius-sm)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--text-xs)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  {p.email}
+                </li>
+              ))}
+              {preview.invitable_count > preview.sample_invitees.length && (
+                <li style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", paddingLeft: "var(--space-2)" }}>
+                  …and {preview.invitable_count - preview.sample_invitees.length} more.
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        {preview.skipped_anonymous_count > 0 && (
+          <div className="methodology-box methodology-box--inline">
+            ⚠ {preview.skipped_anonymous_count} matching respondent{preview.skipped_anonymous_count === 1 ? "" : "s"} can't be invited (anonymous, no email)
+          </div>
+        )}
+
+        <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+          Each interview consumes one credit when it completes. Anonymous-link respondents and
+          partial responses are excluded from this count automatically.
+        </p>
+
+        <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={inviting}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={inviting}>
+            {inviting ? "Sending…" : `Send ${preview.invitable_count} invite${preview.invitable_count === 1 ? "" : "s"}`}
+          </button>
         </div>
       </div>
     </div>
