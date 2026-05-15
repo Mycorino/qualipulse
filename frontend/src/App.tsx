@@ -35,6 +35,8 @@ const QuantiReportDemo = lazy(() => import("./pages/QuantiReportDemo"));
 const SurveyList = lazy(() => import("./pages/SurveyList"));
 const SurveyEditor = lazy(() => import("./pages/SurveyEditor"));
 const SurveyPreview = lazy(() => import("./pages/SurveyPreview"));
+const SurveyDashboardPage = lazy(() => import("./pages/SurveyDashboard"));
+const PublicResponse = lazy(() => import("./pages/PublicResponse"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -182,6 +184,15 @@ export default function App() {
           </OnboardedRoute>
         }
       />
+      <Route
+        path="/surveys/:id/dashboard"
+        element={
+          <OnboardedRoute>
+            <SurveyDashboardPage />
+          </OnboardedRoute>
+        }
+      />
+      <Route path="/r/:token" element={<PublicResponse />} />
       <Route
         path="/account"
         element={

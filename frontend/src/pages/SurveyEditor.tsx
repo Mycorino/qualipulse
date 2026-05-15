@@ -252,6 +252,13 @@ export default function SurveyEditor() {
           >
             Preview
           </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => navigate(`/surveys/${survey.id}/dashboard`)}
+          >
+            Dashboard
+          </button>
           <button type="button" className="btn btn-primary" onClick={onTogglePublish}>
             {survey.status === "live" ? "Close survey" : "Publish"}
           </button>

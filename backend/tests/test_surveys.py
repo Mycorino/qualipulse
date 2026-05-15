@@ -352,6 +352,146 @@ def test_email_match_within_study_reuses_participant(
     assert db_session.query(StudyParticipant).count() == 1
 
 
+# ── Sprint 8: public response endpoint + dashboard ──────────────────
+
+
+def test_public_get_returns_survey_by_token(client, auth_headers, db_session):
+    survey, link, (q1, q2) = _build_live_survey(client, auth_headers, db_session)
+    resp = client.get(f"/r/{link['token']}")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["name"] == "Live"
+    assert data["is_anonymous"] is False
+    assert len(data["questions"]) == 2
+    assert data["questions"][0]["id"] == q1["id"]
+
+
+def test_public_get_404_for_draft_survey(client, auth_headers, db_session):
+    """Draft-status surveys are never publicly visible."""
+
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "Drafty"}
+    ).json()
+    link = client.post(
+        f"/surveys/{survey['id']}/links",
+        headers=auth_headers,
+        json={"is_anonymous": False},
+    ).json()
+    # No PATCH to live — survey stays in draft.
+    resp = client.get(f"/r/{link['token']}")
+    assert resp.status_code == 404
+    assert "not available" in resp.json()["detail"].lower()
+
+
+def test_public_post_via_r_token_endpoint(client, auth_headers, db_session):
+    survey, link, (q1, q2) = _build_live_survey(client, auth_headers, db_session)
+    resp = client.post(
+        f"/r/{link['token']}/responses",
+        json={
+            "link_token": "",
+            "email": "publicpost@example.com",
+            "answers": [
+                {"question_id": q1["id"], "value_numeric": 8},
+                {"question_id": q2["id"], "value_text": "It's good."},
+            ],
+            "is_complete": True,
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["is_complete"] is True
+    assert data["study_participant_id"]
+
+
+def test_dashboard_nps_histogram_and_score(client, auth_headers, db_session):
+    """End-to-end: drop 30 NPS scores → dashboard returns histogram + NPS."""
+
+    # Set up a live survey with a single NPS question.
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "NPS"}
+    ).json()
+    q = client.post(
+        f"/surveys/{survey['id']}/questions",
+        headers=auth_headers,
+        json={"type": "nps", "prompt": "Recommend?", "config": {}},
+    ).json()
+    link = client.post(
+        f"/surveys/{survey['id']}/links",
+        headers=auth_headers,
+        json={"is_anonymous": False},
+    ).json()
+    client.patch(f"/surveys/{survey['id']}", headers=auth_headers, json={"status": "live"})
+
+    # Submit 30 responses to clear the min_n threshold:
+    # 6 detractors (0-6 scored as 3), 4 passives (7), 20 promoters (10).
+    for i in range(30):
+        if i < 6:
+            score = 3
+        elif i < 10:
+            score = 7
+        else:
+            score = 10
+        client.post(
+            f"/r/{link['token']}/responses",
+            json={
+                "link_token": link["token"],
+                "email": f"resp-{i}@example.com",
+                "answers": [{"question_id": q["id"], "value_numeric": score}],
+                "is_complete": True,
+            },
+        )
+
+    # Now fetch the dashboard.
+    resp = client.get(f"/surveys/{survey['id']}/dashboard", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["n_started"] == 30
+    assert data["n_completed"] == 30
+    assert data["completion_rate_percentage"] == 100.0
+    q_payload = data["questions"][0]
+    assert q_payload["n_answered"] == 30
+    # NPS score: (20 promoters - 6 detractors) / 30 * 100 = 46-47
+    nps = q_payload["breakdown"]["nps_score"]
+    assert 46 <= nps <= 47
+    # Histogram has 11 buckets (0-10).
+    assert len(q_payload["breakdown"]["histogram"]) == 11
+    # Bucket 10 has count 20.
+    bucket_10 = next(b for b in q_payload["breakdown"]["histogram"] if b["bucket"] == 10)
+    assert bucket_10["count"] == 20
+
+
+def test_dashboard_below_min_n_suppresses_percentages(
+    client, auth_headers, db_session
+):
+    """The methodology contract: n<30 → percentage is None."""
+
+    survey, link, (q1, _) = _build_live_survey(client, auth_headers, db_session)
+    # Send only 5 responses — far below min_n.
+    for i in range(5):
+        client.post(
+            f"/r/{link['token']}/responses",
+            json={
+                "link_token": link["token"],
+                "email": f"small-n-{i}@example.com",
+                "answers": [{"question_id": q1["id"], "value_numeric": 9}],
+                "is_complete": True,
+            },
+        )
+
+    resp = client.get(f"/surveys/{survey['id']}/dashboard", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["n_completed"] == 5
+    # Completion rate is suppressed because total is below min_n.
+    assert data["completion_rate_percentage"] is None
+    # All histogram percentages are None.
+    histogram = data["questions"][0]["breakdown"]["histogram"]
+    for bucket in histogram:
+        assert bucket["percentage"] is None, f"bucket {bucket['bucket']} leaked a percentage"
+        assert bucket["ci_low"] is None
+        assert bucket["ci_high"] is None
+
+
 def test_response_only_visible_to_owner_workspace(client, auth_headers, db_session):
     """Auth isolation — a survey created by company A is not listable by B."""
 

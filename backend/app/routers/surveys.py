@@ -35,18 +35,23 @@ from app.models.survey import (
 )
 from app.schemas.survey import (
     AnswerSubmission,
+    PublicQuestion,
+    PublicSurvey,
     QuestionCreate,
     QuestionPatch,
     QuestionResponse,
     ResponseAck,
     ResponseSubmission,
     SurveyCreate,
+    SurveyDashboardSchema,
     SurveyLinkCreate,
     SurveyLinkResponse,
     SurveyPatch,
     SurveyResponse as SurveyResponseSchema,
+    QuestionAnalyticsSchema,
     validate_question_config,
 )
+from app.services.survey_analytics import build_dashboard
 
 router = APIRouter(prefix="/surveys", tags=["surveys"])
 
@@ -435,6 +440,53 @@ def list_links(
     survey = _get_survey_or_404(db, survey_id, company)
     links = db.query(SurveyLink).filter(SurveyLink.survey_id == survey.id).all()
     return [SurveyLinkResponse.model_validate(link) for link in links]
+
+
+# ── Dashboard (workspace-scoped) ──────────────────────────────────────
+
+
+@router.get("/{survey_id}/dashboard", response_model=SurveyDashboardSchema)
+def get_dashboard(
+    survey_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> SurveyDashboardSchema:
+    """Per-question analytics for the researcher dashboard view.
+
+    Returns Wilson-CI proportions for likert/nps/MC questions; sampled raw
+    texts for open-text. Below-min-N segments return `percentage=None` so
+    the frontend has no path to render forbidden percentages.
+    """
+
+    survey = _get_survey_or_404(db, survey_id, company)
+    payload = build_dashboard(db, survey)
+    return SurveyDashboardSchema(
+        survey_id=payload.survey_id,
+        name=payload.name,
+        role=payload.role,  # type: ignore[arg-type]
+        status=payload.status,  # type: ignore[arg-type]
+        fielding_started_at=payload.fielding_started_at,
+        fielding_ended_at=payload.fielding_ended_at,
+        n_started=payload.n_started,
+        n_completed=payload.n_completed,
+        completion_rate_percentage=payload.completion_rate_percentage,
+        min_n_threshold=payload.min_n_threshold,
+        questions=[
+            QuestionAnalyticsSchema(
+                question_id=q.question_id,
+                type=q.type,  # type: ignore[arg-type]
+                prompt=q.prompt,
+                is_required=q.is_required,
+                sort_order=q.sort_order,
+                n_answered=q.n_answered,
+                min_n_threshold=q.min_n_threshold,
+                breakdown=q.breakdown,
+                mean=q.mean,
+                takeaway=q.takeaway,
+            )
+            for q in payload.questions
+        ],
+    )
 
 
 # ── Public response collection ────────────────────────────────────────

@@ -163,6 +163,118 @@ export async function listLinks(surveyId: string): Promise<SurveyLink[]> {
   return resp.data;
 }
 
+/* ── Public response page (no auth) ─────────────────────────────── */
+
+export interface PublicQuestion {
+  id: string;
+  sort_order: number;
+  type: QuestionType;
+  prompt: string;
+  is_required: boolean;
+  config: Record<string, unknown>;
+}
+
+export interface PublicSurvey {
+  name: string;
+  description: string | null;
+  is_anonymous: boolean;
+  questions: PublicQuestion[];
+}
+
+export interface AnswerSubmission {
+  question_id: string;
+  value_numeric?: number;
+  value_text?: string;
+  value_choice_ids?: string[];
+  time_to_answer_ms?: number;
+}
+
+export interface ResponseAck {
+  response_id: string;
+  study_participant_id: string | null;
+  is_complete: boolean;
+  received_at: string;
+}
+
+export async function getPublicSurvey(token: string): Promise<PublicSurvey> {
+  const resp = await client.get<PublicSurvey>(`/r/${token}`);
+  return resp.data;
+}
+
+export async function submitPublicResponse(
+  token: string,
+  payload: {
+    answers: AnswerSubmission[];
+    email?: string;
+    display_name?: string;
+    magic_token?: string;
+    is_complete?: boolean;
+    submission_metadata?: Record<string, unknown>;
+  },
+): Promise<ResponseAck> {
+  const resp = await client.post<ResponseAck>(`/r/${token}/responses`, {
+    link_token: token,
+    answers: payload.answers,
+    email: payload.email,
+    display_name: payload.display_name,
+    magic_token: payload.magic_token,
+    is_complete: payload.is_complete ?? true,
+    submission_metadata: payload.submission_metadata ?? {},
+  });
+  return resp.data;
+}
+
+/* ── Dashboard analytics ─────────────────────────────────────────── */
+
+export interface DashboardBucket {
+  bucket: number;
+  count: number;
+  percentage: number | null;
+  ci_low: number | null;
+  ci_high: number | null;
+}
+
+export interface DashboardChoice {
+  choice_id: string;
+  label: string;
+  count: number;
+  percentage: number | null;
+  ci_low: number | null;
+  ci_high: number | null;
+}
+
+export interface QuestionAnalytics {
+  question_id: string;
+  type: QuestionType;
+  prompt: string;
+  is_required: boolean;
+  sort_order: number;
+  n_answered: number;
+  min_n_threshold: number;
+  breakdown: Record<string, unknown>;
+  mean: number | null;
+  takeaway: string | null;
+}
+
+export interface SurveyDashboard {
+  survey_id: string;
+  name: string;
+  role: SurveyRole;
+  status: SurveyStatus;
+  fielding_started_at: string | null;
+  fielding_ended_at: string | null;
+  n_started: number;
+  n_completed: number;
+  completion_rate_percentage: number | null;
+  min_n_threshold: number;
+  questions: QuestionAnalytics[];
+}
+
+export async function getDashboard(surveyId: string): Promise<SurveyDashboard> {
+  const resp = await client.get<SurveyDashboard>(`/surveys/${surveyId}/dashboard`);
+  return resp.data;
+}
+
 /* ── Default config helpers (used by the editor when adding a question) */
 
 export function defaultConfigForType(type: QuestionType): Record<string, unknown> {
