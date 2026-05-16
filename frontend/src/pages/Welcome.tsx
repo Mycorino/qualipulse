@@ -427,6 +427,12 @@ export default function Welcome() {
       await completeOnboarding({
         onboarding_recap: studyDraft.brief_summary || undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
+        // Persist the AI's other research directions as "use cases" so
+        // the personalised welcome email surfaces them as 3 study ideas
+        // (matching what we showed on Step 4).
+        selected_use_cases: (studyDraft.other_directions || []).length > 0
+          ? (studyDraft.other_directions || []).join(",")
+          : undefined,
       });
       setCachedOnboarded(true);
       onboardingDone = true;
@@ -468,6 +474,11 @@ export default function Welcome() {
       await completeOnboarding({
         onboarding_recap: studyDraft?.brief_summary || undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
+        // Still pass other_directions so the welcome email gets the
+        // same 3 ideas even when the user opts to start from blank.
+        selected_use_cases: (studyDraft?.other_directions || []).length > 0
+          ? (studyDraft!.other_directions || []).join(",")
+          : undefined,
       });
       setCachedOnboarded(true);
       navigate("/projects/new", { replace: true });
@@ -1137,6 +1148,36 @@ export default function Welcome() {
                     ))}
                   </ol>
                 </div>
+              </div>
+            )}
+
+            {/* Other research directions the AI noticed alongside the main
+                study. Shown so the user knows the breadth — and reassured
+                that the lite study isn't the only thing on the table.
+                These also seed the 3 suggestions in the welcome email. */}
+            {!studyLoading && !studyError && studyDraft && (studyDraft.other_directions?.length ?? 0) > 0 && (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: "16px 18px",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-surface)",
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                  {t("onboarding.studyOtherDirectionsLabel")}
+                </div>
+                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "0 0 10px", lineHeight: 1.5 }}>
+                  {t("onboarding.studyOtherDirectionsHint")}
+                </p>
+                <ul style={{ paddingLeft: 20, margin: 0 }}>
+                  {studyDraft.other_directions!.map((dir, i) => (
+                    <li key={i} style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 4 }}>
+                      {dir}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 

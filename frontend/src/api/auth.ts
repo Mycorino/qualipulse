@@ -210,6 +210,10 @@ export interface StudyDraft {
   duration_minutes: number;
   sample_size: number;
   questions: StudyDraftQuestion[];
+  // 3 alternative research directions the AI noticed alongside the main
+  // study. Shown on Step 4 as "Other directions" + reused as the email's
+  // 3 study suggestions so the inbox matches the in-app experience.
+  other_directions?: string[];
 }
 
 export interface StudyDraftResponse {
