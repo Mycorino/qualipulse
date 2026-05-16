@@ -191,56 +191,7 @@ export async function updateCurrentPriority(
   return data;
 }
 
-// ── Role classification (onboarding step 3) ──
-
-export interface RoleClassificationResponse {
-  canonical_tag: string;
-  orientation: string;
-  suggested_use_cases: string[];
-  research_angle: string;
-}
-
-export async function classifyRole(payload: {
-  role_title?: string;
-  occupation_description?: string;
-  industry?: string;
-  business_summary?: string;
-  language?: string;
-}): Promise<RoleClassificationResponse> {
-  const { data } = await client.post<RoleClassificationResponse>(
-    "/auth/onboarding/classify-role",
-    payload,
-  );
-  return data;
-}
-
-// ── Personalized recap (onboarding step 4) ──
-
-export interface RecapResponse {
-  recap: string;
-}
-
-export async function generateRecap(payload: {
-  first_name?: string;
-  last_name?: string;
-  company_name?: string;
-  role_title?: string;
-  occupation_description?: string;
-  research_experience?: string;
-  industry?: string;
-  business_summary?: string;
-  selected_use_cases?: string[];
-  goals_freeform?: string;
-  language?: string;
-}): Promise<RecapResponse> {
-  const { data } = await client.post<RecapResponse>(
-    "/auth/onboarding/generate-recap",
-    payload,
-  );
-  return data;
-}
-
-// ── Study draft (onboarding step 4 — hybrid redesign) ──
+// ── Study draft (onboarding step 4) ──
 
 export interface StudyDraftQuestion {
   section_index: number;
