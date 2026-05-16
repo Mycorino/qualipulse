@@ -64,14 +64,22 @@ export default function SurveyList() {
 
   return (
     <div className="quanti-showcase" style={{ padding: "var(--space-10) var(--report-canvas-pad-x)" }}>
-      <header className="quanti-showcase__hero">
-        <div className="quanti-showcase__eyebrow">Quanti · Surveys</div>
-        <h1 className="quanti-showcase__title">Your surveys</h1>
-        <p className="quanti-showcase__subtitle">
-          Build a screener, share a link, or validate themes from a finished interview round.
-          New surveys auto-create the parent Study; you'll see it in the mixed-methods report once
-          the first response lands.
-        </p>
+      <header
+        className="quanti-showcase__hero"
+        style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="quanti-showcase__eyebrow">Quanti · Surveys</div>
+          <h1 className="quanti-showcase__title">Your surveys</h1>
+          <p className="quanti-showcase__subtitle">
+            Build a screener, share a link, or validate themes from a finished interview round.
+            Each survey lives inside a <strong>Study</strong> — the workspace that joins survey
+            answers, interviews, and reports for the same research effort.
+          </p>
+        </div>
+        <button type="button" className="btn btn-secondary" onClick={() => navigate("/studies")}>
+          View all studies →
+        </button>
       </header>
 
       {templates.length > 0 && (
