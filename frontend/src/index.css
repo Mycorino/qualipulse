@@ -3979,53 +3979,6 @@ select.field-input {
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Use-case chips ───────────────────── */
-
-.use-case-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.use-case-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 16px;
-  border-radius: 18px;
-  border: 1.5px solid var(--border);
-  background: var(--bg-surface);
-  font-size: 13px;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  text-align: left;
-  line-height: 1.35;
-  max-width: 100%;
-}
-@media (min-width: 769px) {
-  .use-case-chip { white-space: nowrap; border-radius: 100px; }
-}
-
-.use-case-chip:hover {
-  border-color: var(--primary, #4369f5);
-  background: var(--brand-50, #f0f4ff);
-}
-
-.use-case-chip:not(.use-case-chip--selected) {
-  opacity: 0.55;
-}
-
-.use-case-chip--selected {
-  border-color: var(--primary, #4369f5);
-  background: var(--brand-50, #f0f4ff);
-  color: var(--primary, #4369f5);
-  font-weight: 600;
-}
-
-.add-use-case-input {
-  font-size: 13px;
-}
-
 /* ── Recap card ───────────────────────── */
 
 .recap-card {
@@ -4040,7 +3993,6 @@ select.field-input {
   .welcome-title { font-size: 22px; }
   .welcome-step { padding: 16px; }
   .onboarding-chip { padding: 6px 12px; font-size: 12px; }
-  .use-case-chip { padding: 6px 12px; font-size: 12px; }
 }
 
 /* ── Legal pages (Terms, Privacy) ────────────────────────────────────────── */

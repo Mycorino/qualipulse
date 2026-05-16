@@ -7,46 +7,12 @@ import {
   saveOnboardingProfile,
   resendVerification,
   analyseWebsite,
-  classifyRole,
-  generateRecap,
+  generateStudyDraft,
 } from "../api/auth";
-import type { CompanyResponse } from "../api/auth";
+import type { CompanyResponse, StudyDraft } from "../api/auth";
+import { createProject } from "../api/projects";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
-
-// ── Lightweight markdown renderer (bold + bullets + paragraphs) ──
-
-function renderLightMarkdown(text: string): React.ReactNode[] {
-  const paragraphs = text.split(/\n{2,}/);
-  return paragraphs.map((para, pi) => {
-    const lines = para.split("\n");
-    const isBulletBlock = lines.every((l) => l.startsWith("- ") || l.trim() === "");
-    if (isBulletBlock) {
-      const items = lines.filter((l) => l.startsWith("- ")).map((l) => l.slice(2));
-      return (
-        <ul key={pi} style={{ paddingLeft: 20, margin: "12px 0", listStyleType: "disc" }}>
-          {items.map((item, li) => (
-            <li key={li} style={{ marginBottom: 6, lineHeight: 1.7 }}>{renderInline(item)}</li>
-          ))}
-        </ul>
-      );
-    }
-    return (
-      <p key={pi} style={{ margin: "10px 0", lineHeight: 1.7 }}>{renderInline(para.replace(/\n/g, " "))}</p>
-    );
-  });
-}
-
-function renderInline(text: string): React.ReactNode[] {
-  // Split on **bold** markers
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
 
 const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Other"];
 
@@ -100,19 +66,14 @@ export default function Welcome() {
   const [manualMode, setManualMode] = useState(false);
   const [websiteHint, setWebsiteHint] = useState<string | null>(null);
   const analyseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Use cases
-  const [useCases, setUseCases] = useState<string[]>([]);
-  const [selectedUseCases, setSelectedUseCases] = useState<Set<string>>(new Set());
-  const [useCasesLoading, setUseCasesLoading] = useState(false);
-  const [useCasesFetched, setUseCasesFetched] = useState(false);
-  const [newUseCaseInput, setNewUseCaseInput] = useState("");
   const [goalsFreeform, setGoalsFreeform] = useState("");
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   // Step 4 — Brief
-  const [recap, setRecap] = useState("");
-  const [recapLoading, setRecapLoading] = useState(false);
-  const [recapError, setRecapError] = useState(false);
-  const [recapEditing, setRecapEditing] = useState(false);
+  // Step 4 — Study draft (replaces standalone brief)
+  const [studyDraft, setStudyDraft] = useState<StudyDraft | null>(null);
+  const [studyLoading, setStudyLoading] = useState(false);
+  const [studyError, setStudyError] = useState(false);
 
   // Translated option arrays
   const industryLabels = t("onboarding.industries", { returnObjects: true }) as string[];
@@ -121,9 +82,9 @@ export default function Welcome() {
   // Step labels — 4 steps
   const STEP_LABELS = [
     t("onboarding.steps.verify"),
-    t("onboarding.steps.aboutYou"),
+    t("onboarding.steps.researchGoal"),
     t("onboarding.steps.yourCompany"),
-    t("onboarding.steps.yourBrief"),
+    t("onboarding.steps.yourStudy"),
   ];
 
   const experienceOptions = [
@@ -180,7 +141,6 @@ export default function Welcome() {
         if (data.business_summary) setBusinessSummary(data.business_summary);
         if (data.industry) setIndustry(data.industry);
         if (data.primary_region) setPrimaryRegion(data.primary_region);
-        if (data.selected_use_cases) setUseCases(data.selected_use_cases);
         if (data.goals_freeform) setGoalsFreeform(data.goals_freeform);
         setLoading(false);
       })
@@ -254,7 +214,7 @@ export default function Welcome() {
 
   // Step 2 -> 3
   async function handleAboutYouContinue() {
-    if (!roleTitle.trim() || !researchExperience) return;
+    if (!roleTitle.trim() || !occupationDescription.trim() || !researchExperience) return;
     setSaving(true);
     setError("");
     try {
@@ -381,39 +341,6 @@ export default function Welcome() {
     return () => clearInterval(id);
   }, [websiteLoading]);
 
-  // Fetch use-case suggestions when industry becomes available
-  const classifyTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (!industry) return;
-    if (classifyTriggeredRef.current) return;
-    if (useCasesFetched) return;
-
-    classifyTriggeredRef.current = true;
-    setUseCasesLoading(true);
-    classifyRole({
-      role_title: roleTitle.trim() || undefined,
-      occupation_description: occupationDescription.trim() || undefined,
-      industry,
-      business_summary: businessSummary.trim() || undefined,
-      language: uiLang,
-    })
-      .then((res) => {
-        if (res.suggested_use_cases && res.suggested_use_cases.length > 0) {
-          setUseCases(res.suggested_use_cases);
-        }
-        setUseCasesFetched(true);
-      })
-      .catch(() => {
-        // Fail silently — user can add their own
-        setUseCasesFetched(true);
-      })
-      .finally(() => {
-        setUseCasesLoading(false);
-        classifyTriggeredRef.current = false;
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [industry]);
-
   // Step 3 -> 4
   async function handleCompanyContinue() {
     const trimmed = websiteUrl.trim();
@@ -421,22 +348,6 @@ export default function Welcome() {
       handleAnalyseWebsite();
       return;
     }
-
-    // Flush any pending custom use-case input the user typed but didn't
-    // explicitly add — otherwise their own research question is silently
-    // dropped and the personalised brief reflects only the suggestions.
-    const pendingCustom = newUseCaseInput.trim();
-    const augmentedUseCases =
-      pendingCustom && !useCases.includes(pendingCustom)
-        ? [...useCases, pendingCustom]
-        : useCases;
-    if (pendingCustom && augmentedUseCases !== useCases) {
-      setUseCases(augmentedUseCases);
-      setSelectedUseCases((prev) => new Set(prev).add(pendingCustom));
-      setNewUseCaseInput("");
-    }
-    const augmentedSelected = pendingCustom ? new Set([...selectedUseCases, pendingCustom]) : selectedUseCases;
-    const finalActiveUseCases = augmentedUseCases.filter((uc) => augmentedSelected.has(uc));
 
     setSaving(true);
     setError("");
@@ -447,7 +358,6 @@ export default function Welcome() {
         business_summary: businessSummary.trim() || undefined,
         industry: industry || undefined,
         primary_region: primaryRegion || undefined,
-        selected_use_cases: finalActiveUseCases.length > 0 ? finalActiveUseCases.join(",") : undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
       // Reflect the corrected workspace name locally so step 4's recap
@@ -463,74 +373,100 @@ export default function Welcome() {
     }
   }
 
-  // Step 4 — generate recap on enter
+  // Step 4 — generate study draft on enter
   useEffect(() => {
     if (step !== 4) return;
-    setRecapLoading(true);
-    setRecapError(false);
-    generateRecap({
+    setStudyLoading(true);
+    setStudyError(false);
+    generateStudyDraft({
       first_name: me?.first_name || undefined,
-      last_name: me?.last_name || undefined,
       company_name: companyName || undefined,
       role_title: roleTitle.trim() || undefined,
-      occupation_description: occupationDescription.trim() || undefined,
+      research_intent: occupationDescription.trim() || undefined,
       research_experience: researchExperience || undefined,
       industry: industry || undefined,
       business_summary: businessSummary.trim() || undefined,
-      selected_use_cases: activeUseCases.length > 0 ? activeUseCases : undefined,
       goals_freeform: goalsFreeform.trim() || undefined,
       language: uiLang,
     })
       .then((res) => {
-        setRecap(res.recap);
+        if (res.draft) {
+          setStudyDraft(res.draft);
+        } else {
+          setStudyError(true);
+        }
       })
       .catch(() => {
-        setRecapError(true);
+        setStudyError(true);
       })
       .finally(() => {
-        setRecapLoading(false);
+        setStudyLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  // Step 4 — Launch workspace
-  async function handleLaunchWorkspace() {
+  // Step 4 — Create the study from the draft + complete onboarding
+  async function handleCreateStudy() {
+    if (!studyDraft) return;
     setSaving(true);
     setError("");
+    // Mark onboarding complete first (idempotent — if project creation
+    // fails the user still lands on the dashboard rather than being
+    // trapped in the wizard).
+    let onboardingDone = false;
     try {
       await completeOnboarding({
-        onboarding_recap: recap || undefined,
-        selected_use_cases: activeUseCases.length > 0 ? activeUseCases.join(",") : undefined,
+        onboarding_recap: studyDraft.brief_summary || undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
       setCachedOnboarded(true);
-      navigate("/dashboard", { replace: true });
+      onboardingDone = true;
+
+      const project = await createProject({
+        name: studyDraft.study_title,
+        language: uiLang,
+        interview_duration_minutes: studyDraft.duration_minutes,
+        research_objective: studyDraft.research_objective,
+        target_customer_description: studyDraft.target_audience,
+        questions: studyDraft.questions.map((q) => ({
+          section_index: q.section_index,
+          section_title: q.section_title,
+          question_index: q.question_index,
+          main_question: q.main_question,
+          interview_notes: q.interview_notes,
+          desired_learning: q.desired_learning,
+        })),
+        screening_questions: [],
+      });
+      navigate(`/projects/${project.id}`, { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("onboarding.failedSave")));
+      if (onboardingDone) {
+        // Onboarding succeeded but project creation failed — send the user
+        // to the dashboard rather than leaving them stuck in the wizard.
+        navigate("/dashboard", { replace: true });
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  function toggleUseCase(uc: string) {
-    setSelectedUseCases((prev) => {
-      const next = new Set(prev);
-      if (next.has(uc)) next.delete(uc);
-      else next.add(uc);
-      return next;
-    });
-  }
-
-  const activeUseCases = useCases.filter((uc) => selectedUseCases.has(uc));
-
-  function addCustomUseCase() {
-    const trimmed = newUseCaseInput.trim();
-    if (!trimmed) return;
-    if (!useCases.includes(trimmed)) {
-      setUseCases((prev) => [...prev, trimmed]);
+  // Step 4 — Start from scratch (skip the AI study, but still complete onboarding)
+  async function handleStartFromBlank() {
+    setSaving(true);
+    setError("");
+    try {
+      await completeOnboarding({
+        onboarding_recap: studyDraft?.brief_summary || undefined,
+        goals_freeform: goalsFreeform.trim() || undefined,
+      });
+      setCachedOnboarded(true);
+      navigate("/projects/new", { replace: true });
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t("onboarding.failedSave")));
+    } finally {
+      setSaving(false);
     }
-    setSelectedUseCases((prev) => new Set(prev).add(trimmed));
-    setNewUseCaseInput("");
   }
 
   if (loading) {
@@ -585,20 +521,8 @@ export default function Welcome() {
     </div>
   );
 
-  // Carousel messages for use-case loading
-  const useCaseCarouselMessages = t("onboarding.useCasesCarousel", { returnObjects: true }) as string[];
-  // Carousel messages for recap loading
-  const recapCarouselMessages = (t("onboarding.briefCarousel", {
-    returnObjects: true,
-    firstName: me?.first_name || "",
-    roleTitle: roleTitle || "",
-    industry: industry || "",
-  }) as string[]).map((msg) =>
-    msg
-      .replace("{{firstName}}", me?.first_name || "")
-      .replace("{{roleTitle}}", roleTitle || "")
-      .replace("{{industry}}", industry || ""),
-  );
+  // Carousel messages for study-draft loading
+  const studyCarouselMessages = t("onboarding.studyCarousel", { returnObjects: true }) as string[];
 
   return (
     <div className="welcome-page">
@@ -676,11 +600,11 @@ export default function Welcome() {
           </div>
         )}
 
-        {/* ── Step 2: About you ── */}
+        {/* ── Step 2: What do you want to learn? ── */}
         {step === 2 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">{t("onboarding.aboutTitle")}</h1>
-            <p className="welcome-subtitle">{t("onboarding.aboutSubtitle")}</p>
+            <h1 className="welcome-title">{t("onboarding.researchIntentTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.researchIntentSubtitle")}</p>
 
             <div className="onboarding-form">
               <div className="onboarding-field">
@@ -704,15 +628,15 @@ export default function Welcome() {
 
               <div className="onboarding-field">
                 <label className="field-label" htmlFor="onb-occupation">
-                  {t("onboarding.occupationLabel")}
+                  {t("onboarding.researchIntentLabel")}
                 </label>
                 <textarea
                   id="onb-occupation"
                   className="field-input"
                   value={occupationDescription}
                   onChange={(e) => setOccupationDescription(e.target.value)}
-                  placeholder={t("onboarding.occupationPlaceholder")}
-                  rows={2}
+                  placeholder={t("onboarding.researchIntentPlaceholder")}
+                  rows={3}
                   style={{ resize: "vertical", lineHeight: 1.6 }}
                   disabled={saving}
                 />
@@ -739,7 +663,7 @@ export default function Welcome() {
               <button
                 className="btn btn-primary btn-lg"
                 onClick={handleAboutYouContinue}
-                disabled={saving || !roleTitle.trim() || !researchExperience}
+                disabled={saving || !roleTitle.trim() || !occupationDescription.trim() || !researchExperience}
               >
                 {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
@@ -908,8 +832,34 @@ export default function Welcome() {
                 )}
               </div>
 
-              {/* Business summary textarea */}
-              {(businessSummary || manualMode) && (
+              {/* Business summary — collapsed when AI-drafted, inline when manual */}
+              {businessSummary && analysedUrl && !manualMode && !summaryExpanded && (
+                <div className="onboarding-field">
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "var(--text-secondary)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span>✨ {t("onboarding.websiteAutoFilled")}</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setSummaryExpanded(true)}
+                      disabled={saving}
+                      style={{ fontSize: 13, padding: "2px 0", textDecoration: "underline" }}
+                    >
+                      {t("onboarding.editAiSummary")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(manualMode || summaryExpanded) && (businessSummary || manualMode) && (
                 <div className="onboarding-field">
                   <label className="field-label">
                     {t("onboarding.businessSummaryLabel")}{" "}
@@ -917,26 +867,11 @@ export default function Welcome() {
                       {t("onboarding.websiteOptional")}
                     </span>
                   </label>
-                  {businessSummary && analysedUrl && (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "var(--text-muted)",
-                        marginBottom: 6,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <span>✨</span>
-                      <span>{t("onboarding.websiteAutoFilled")}</span>
-                    </div>
-                  )}
                   <textarea
                     className="field-input"
                     value={businessSummary}
                     onChange={(e) => setBusinessSummary(e.target.value)}
-                    rows={4}
+                    rows={manualMode ? 3 : 4}
                     placeholder={t("onboarding.businessSummaryPlaceholder")}
                     style={{ resize: "vertical", lineHeight: 1.6 }}
                     disabled={saving}
@@ -951,6 +886,15 @@ export default function Welcome() {
                         style={{ fontSize: 13 }}
                       >
                         ↻ {t("onboarding.websiteTryAgain")}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setSummaryExpanded(false)}
+                        disabled={saving}
+                        style={{ fontSize: 13 }}
+                      >
+                        {t("onboarding.hideAiSummary")}
                       </button>
                     </div>
                   )}
@@ -1017,75 +961,6 @@ export default function Welcome() {
                 </div>
               )}
 
-              {/* Use-case chips */}
-              {(industry || manualMode) && (
-                <div className="onboarding-field">
-                  <label className="field-label">{t("onboarding.useCasesLabel")}</label>
-                  <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
-                    {t("onboarding.useCasesHint")}
-                  </p>
-
-                  {useCasesLoading ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
-                      <span
-                        className="spinner"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          border: "2px solid var(--primary)",
-                          borderTopColor: "transparent",
-                          borderRadius: "50%",
-                          display: "inline-block",
-                          animation: "spin 0.6s linear infinite",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <LoadingCarousel
-                        messages={Array.isArray(useCaseCarouselMessages) ? useCaseCarouselMessages : ["Analyzing your profile..."]}
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="use-case-chips">
-                        {useCases.map((uc) => {
-                          const selected = selectedUseCases.has(uc);
-                          return (
-                            <button
-                              key={uc}
-                              type="button"
-                              className={`use-case-chip${selected ? " use-case-chip--selected" : ""}`}
-                              onClick={() => toggleUseCase(uc)}
-                              disabled={saving}
-                              aria-pressed={selected}
-                            >
-                              <span style={{ marginRight: 6, fontSize: 13 }}>{selected ? "✓" : "+"}</span>
-                              {uc}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <input
-                          type="text"
-                          className="field-input add-use-case-input"
-                          value={newUseCaseInput}
-                          onChange={(e) => setNewUseCaseInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addCustomUseCase();
-                            }
-                          }}
-                          placeholder={t("onboarding.addUseCasePlaceholder")}
-                          disabled={saving}
-                          style={{ flex: 1 }}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
               {/* Anything else */}
               {(industry || manualMode) && (
                 <div className="onboarding-field">
@@ -1117,18 +992,19 @@ export default function Welcome() {
                 {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
               <button className="btn btn-ghost" onClick={() => setStep(2)} disabled={saving}>
-                ← {t("onboarding.steps.aboutYou")}
+                ← {t("onboarding.steps.researchGoal")}
               </button>
             </div>
           </div>
         )}
 
-        {/* ── Step 4: Your brief ── */}
+        {/* ── Step 4: Your first study ── */}
         {step === 4 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">{t("onboarding.briefTitle")}</h1>
+            <h1 className="welcome-title">{t("onboarding.studyTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.studySubtitle")}</p>
 
-            {recapLoading && (
+            {studyLoading && (
               <div style={{ padding: "40px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
                 <span
                   className="spinner"
@@ -1143,78 +1019,106 @@ export default function Welcome() {
                   }}
                 />
                 <LoadingCarousel
-                  messages={Array.isArray(recapCarouselMessages) && recapCarouselMessages.length > 0
-                    ? recapCarouselMessages
-                    : ["Preparing your brief..."]
+                  messages={Array.isArray(studyCarouselMessages) && studyCarouselMessages.length > 0
+                    ? studyCarouselMessages
+                    : ["Designing your study..."]
                   }
                 />
               </div>
             )}
 
-            {!recapLoading && recapError && (
+            {!studyLoading && studyError && (
               <div className="recap-card" style={{ marginTop: 24 }}>
-                <p style={{ whiteSpace: "pre-line", color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>
-                  {t("onboarding.briefFallback")}
+                <p style={{ color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>
+                  {t("onboarding.studyFallback")}
                 </p>
               </div>
             )}
 
-            {!recapLoading && !recapError && recap && (
+            {!studyLoading && !studyError && studyDraft && (
               <div className="recap-card" style={{ marginTop: 24 }}>
-                {recapEditing ? (
-                  <>
-                    <textarea
-                      className="field-input"
-                      value={recap}
-                      onChange={(e) => setRecap(e.target.value)}
-                      rows={8}
-                      style={{ resize: "vertical", lineHeight: 1.7, width: "100%", border: "none", background: "transparent", fontSize: 14 }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => setRecapEditing(false)}
-                      style={{ fontSize: 13, marginTop: 8 }}
-                    >
-                      {t("onboarding.briefDoneEditing")}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ color: "var(--text-secondary)", fontSize: 14 }}>
-                      {renderLightMarkdown(recap)}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => setRecapEditing(true)}
-                      style={{ fontSize: 13, marginTop: 12, color: "var(--text-muted)" }}
-                    >
-                      {t("onboarding.briefEdit")}
-                    </button>
-                  </>
-                )}
+                {/* Brief summary */}
+                <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6, margin: "0 0 20px" }}>
+                  {studyDraft.brief_summary}
+                </p>
+
+                {/* Study title */}
+                <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 16px" }}>
+                  {studyDraft.study_title}
+                </h2>
+
+                {/* Objective */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
+                    {t("onboarding.studyObjective")}
+                  </div>
+                  <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
+                    {studyDraft.research_objective}
+                  </div>
+                </div>
+
+                {/* Audience */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
+                    {t("onboarding.studyAudience")}
+                  </div>
+                  <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
+                    {studyDraft.target_audience}
+                  </div>
+                </div>
+
+                {/* Duration + sample size chips */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                    ⏱ {t("onboarding.studyDuration", { minutes: studyDraft.duration_minutes })}
+                  </span>
+                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                    👥 {t("onboarding.studySampleSize", { count: studyDraft.sample_size })}
+                  </span>
+                </div>
+
+                {/* Questions */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                    {t("onboarding.studyQuestions")}
+                  </div>
+                  <ol style={{ paddingLeft: 22, margin: 0 }}>
+                    {studyDraft.questions.map((q, i) => (
+                      <li key={i} style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5, marginBottom: 6 }}>
+                        {q.main_question}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </div>
             )}
 
             <div className="welcome-actions" style={{ marginTop: 32 }}>
               <button
                 className="btn btn-primary btn-lg"
-                onClick={handleLaunchWorkspace}
-                disabled={saving || recapLoading}
+                onClick={handleCreateStudy}
+                disabled={saving || studyLoading || !studyDraft}
               >
-                {saving ? t("onboarding.launchingWorkspace") : t("onboarding.launchWorkspace")}
+                {saving ? t("onboarding.creatingStudy") : t("onboarding.createThisStudy")}
               </button>
               {saving && (
                 <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "8px 0 0", textAlign: "center" }}>
-                  {t("onboarding.launchingWorkspaceDesc")}
+                  {t("onboarding.creatingStudyDesc")}
                 </p>
               )}
               <button
                 className="btn btn-ghost"
+                onClick={handleStartFromBlank}
+                disabled={saving || studyLoading}
+                style={{ fontSize: 13 }}
+              >
+                {t("onboarding.startFromBlank")}
+              </button>
+              <button
+                className="btn btn-ghost"
                 onClick={() => setStep(3)}
                 disabled={saving}
-                style={{ fontSize: 13 }}
+                style={{ fontSize: 13, color: "var(--text-muted)" }}
               >
                 ← {t("onboarding.goBackAdjust")}
               </button>
