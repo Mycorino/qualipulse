@@ -134,3 +134,50 @@ export async function listAnalyses(studyId: string): Promise<StudyAnalysis[]> {
   const resp = await client.get<StudyAnalysis[]>(`/studies/${studyId}/analyses`);
   return resp.data;
 }
+
+/* ── Sprint 14: Validation surveys ────────────────────────────── */
+
+export interface GeneratedValidationSurvey {
+  survey_id: string;
+  study_id: string;
+  name: string;
+  question_count: number;
+}
+
+export interface ThemeValidationSnapshot {
+  theme_index: number;
+  n_answered: number;
+  agreement_pct: number | null;
+  ci_low: number | null;
+  ci_high: number | null;
+  distribution: Record<string, number>;
+}
+
+export interface ValidationSummary {
+  survey_id: string;
+  survey_name: string;
+  survey_status: string;
+  n_responses: number;
+  n_completed: number;
+  per_theme: Record<string, ThemeValidationSnapshot>;
+}
+
+export async function createValidationSurvey(
+  studyId: string,
+  analysisId: string,
+): Promise<GeneratedValidationSurvey> {
+  const resp = await client.post<GeneratedValidationSurvey>(
+    `/studies/${studyId}/analyses/${analysisId}/validation-survey`,
+  );
+  return resp.data;
+}
+
+export async function getValidationSummary(
+  studyId: string,
+  analysisId: string,
+): Promise<ValidationSummary | null> {
+  const resp = await client.get<ValidationSummary | null>(
+    `/studies/${studyId}/analyses/${analysisId}/validation`,
+  );
+  return resp.data;
+}

@@ -30,6 +30,7 @@ from app.models.project import Project
 from app.models.study import Study, StudyAnalysis, StudyParticipant
 from app.models.survey import Survey, SurveyQuestion, SurveyResponse
 from app.schemas.study import (
+    GeneratedValidationSurvey,
     ProjectMini,
     QuantifiedThemeReport,
     StudyAnalysisDetail,
@@ -38,8 +39,14 @@ from app.schemas.study import (
     StudyProgress,
     StudySummary,
     SurveyMini,
+    ThemeValidationSnapshotSchema,
+    ValidationSummarySchema,
 )
 from app.services.study_analysis import trigger_study_analysis
+from app.services.validation_surveys import (
+    compute_validation_summary,
+    generate_validation_survey,
+)
 
 router = APIRouter(prefix="/studies", tags=["studies"])
 
@@ -426,3 +433,103 @@ def get_analysis(
     if not a:
         raise HTTPException(status_code=404, detail="Analysis not found")
     return _analysis_to_detail(a)
+
+
+# ── Sprint 14: Validation surveys (closing the loop) ─────────────────
+
+
+def _get_analysis_or_404(
+    db: Session, study: Study, analysis_id: str
+) -> StudyAnalysis:
+    a = (
+        db.query(StudyAnalysis)
+        .filter(
+            StudyAnalysis.id == analysis_id,
+            StudyAnalysis.study_id == study.id,
+        )
+        .first()
+    )
+    if not a:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return a
+
+
+@router.post(
+    "/{study_id}/analyses/{analysis_id}/validation-survey",
+    response_model=GeneratedValidationSurvey,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_validation_survey(
+    study_id: str,
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> GeneratedValidationSurvey:
+    """Spawn a validation micro-survey from a ready analysis.
+
+    Each theme in the analysis report becomes one Likert question. The
+    survey lands in draft status — researcher edits + publishes
+    manually (Decision 4: no auto-send).
+    """
+
+    study = _get_study_or_404(db, study_id, company)
+    analysis = _get_analysis_or_404(db, study, analysis_id)
+    if analysis.status != "ready":
+        raise HTTPException(
+            status_code=400,
+            detail="Analysis is not ready — wait for generation to finish.",
+        )
+
+    try:
+        survey = generate_validation_survey(db, analysis)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return GeneratedValidationSurvey(
+        survey_id=survey.id,
+        study_id=survey.study_id,
+        name=survey.name,
+        question_count=len(survey.questions),
+    )
+
+
+@router.get(
+    "/{study_id}/analyses/{analysis_id}/validation",
+    response_model=ValidationSummarySchema | None,
+)
+def get_validation_summary(
+    study_id: str,
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ValidationSummarySchema | None:
+    """Per-theme agreement for the validation survey spawned from this analysis.
+
+    Returns null when no validation survey has been generated yet. When
+    one exists but has no responses, returns the summary with an empty
+    per_theme dict so the UI can render the awaiting-responses state.
+    """
+
+    study = _get_study_or_404(db, study_id, company)
+    analysis = _get_analysis_or_404(db, study, analysis_id)
+    summary = compute_validation_summary(db, analysis)
+    if summary is None:
+        return None
+    return ValidationSummarySchema(
+        survey_id=summary.survey_id,
+        survey_name=summary.survey_name,
+        survey_status=summary.survey_status,
+        n_responses=summary.n_responses,
+        n_completed=summary.n_completed,
+        per_theme={
+            idx: ThemeValidationSnapshotSchema(
+                theme_index=snap.theme_index,
+                n_answered=snap.n_answered,
+                agreement_pct=snap.agreement_pct,
+                ci_low=snap.ci_low,
+                ci_high=snap.ci_high,
+                distribution=snap.distribution,
+            )
+            for idx, snap in summary.per_theme.items()
+        },
+    )

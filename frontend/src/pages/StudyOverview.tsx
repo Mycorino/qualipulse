@@ -5,8 +5,12 @@ import {
   QuantifiedTheme,
   StudyAnalysis,
   StudyDetail,
+  ThemeValidationSnapshot,
+  ValidationSummary,
+  createValidationSurvey,
   getLatestAnalysis,
   getStudy,
+  getValidationSummary,
   triggerAnalysis,
 } from "../api/studies";
 import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
@@ -326,9 +330,13 @@ function ReportTab({
   progress: StudyDetail["progress"];
 }) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [analysis, setAnalysis] = useState<StudyAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  // Sprint 14: per-analysis validation summary
+  const [validation, setValidation] = useState<ValidationSummary | null>(null);
+  const [spawningValidation, setSpawningValidation] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -337,6 +345,34 @@ function ReportTab({
       .catch(() => setAnalysis(null))
       .finally(() => setLoading(false));
   }, [studyId]);
+
+  // Pull validation summary whenever we have a ready analysis. Returns
+  // null when no validation survey has been generated yet — that's the
+  // "Validate these themes" CTA's initial state.
+  useEffect(() => {
+    if (!analysis || analysis.status !== "ready") {
+      setValidation(null);
+      return;
+    }
+    getValidationSummary(studyId, analysis.id)
+      .then(setValidation)
+      .catch(() => setValidation(null));
+  }, [studyId, analysis?.id, analysis?.status]);
+
+  const onGenerateValidation = async () => {
+    if (!analysis) return;
+    setSpawningValidation(true);
+    try {
+      const result = await createValidationSurvey(studyId, analysis.id);
+      toast(`Validation survey created with ${result.question_count} questions`, "success");
+      navigate(`/surveys/${result.survey_id}/edit`);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || "Could not generate validation survey";
+      toast(detail, "error");
+    } finally {
+      setSpawningValidation(false);
+    }
+  };
 
   const onGenerate = async () => {
     setGenerating(true);
@@ -450,15 +486,30 @@ function ReportTab({
             Generated {analysis.generated_at ? new Date(analysis.generated_at).toLocaleString() : "—"}
           </span>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={onGenerate}
-          disabled={generating}
-        >
-          {generating ? "Regenerating…" : "Regenerate"}
-        </button>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          {!validation && analysis.status === "ready" && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onGenerateValidation}
+              disabled={spawningValidation}
+              title="Spawn a validation micro-survey from these themes"
+            >
+              {spawningValidation ? "Generating…" : "Validate these themes →"}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onGenerate}
+            disabled={generating}
+          >
+            {generating ? "Regenerating…" : "Regenerate"}
+          </button>
+        </div>
       </header>
+
+      {validation && <ValidationBanner validation={validation} studyId={studyId} />}
 
       {analysis.status === "failed" && (
         <div className="methodology-box methodology-box--inline">
@@ -518,7 +569,11 @@ function ReportTab({
               {analysis.report.themes.length} theme{analysis.report.themes.length === 1 ? "" : "s"}
             </div>
             {analysis.report.themes.map((theme, i) => (
-              <ThemeCard key={i} theme={theme} />
+              <ThemeCard
+                key={i}
+                theme={theme}
+                validation={validation?.per_theme?.[String(i)] ?? null}
+              />
             ))}
           </section>
 
@@ -573,7 +628,56 @@ function ReportTab({
   );
 }
 
-function ThemeCard({ theme }: { theme: QuantifiedTheme }) {
+function ValidationBanner({
+  validation,
+  studyId,
+}: {
+  validation: ValidationSummary;
+  studyId: string;
+}) {
+  const navigate = useNavigate();
+  const isDraft = validation.survey_status === "draft";
+  return (
+    <div
+      style={{
+        background: isDraft ? "var(--brand-gradient-soft)" : "var(--info-bg)",
+        border: `1px solid ${isDraft ? "var(--brand-300)" : "var(--info-border)"}`,
+        color: isDraft ? "var(--brand-700)" : "var(--info-text)",
+        borderRadius: "var(--radius-md)",
+        padding: "var(--space-3) var(--space-4)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--space-3)",
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>
+          Theme validation · {validation.survey_status.toUpperCase()}
+        </div>
+        <div className="tabular" style={{ fontSize: "var(--text-xs)", marginTop: 2 }}>
+          {validation.n_completed} of {validation.n_responses} respondents completed
+          {isDraft && " — survey is in draft, share it to start collecting"}
+        </div>
+      </div>
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm"
+        onClick={() => navigate(`/surveys/${validation.survey_id}/edit`)}
+      >
+        {isDraft ? "Edit + publish →" : "Open survey →"}
+      </button>
+    </div>
+  );
+}
+
+function ThemeCard({
+  theme,
+  validation,
+}: {
+  theme: QuantifiedTheme;
+  validation: ThemeValidationSnapshot | null;
+}) {
   const confidenceLabel: Record<QuantifiedTheme["confidence"], string> = {
     directional: "Directional",
     supported: "Supported",
@@ -707,6 +811,8 @@ function ThemeCard({ theme }: { theme: QuantifiedTheme }) {
         )}
       </div>
 
+      {validation && <ThemeValidationPanel validation={validation} />}
+
       {/* Recommendation footer */}
       <footer
         style={{
@@ -752,6 +858,77 @@ function ThemeCard({ theme }: { theme: QuantifiedTheme }) {
         )}
       </footer>
     </article>
+  );
+}
+
+function ThemeValidationPanel({
+  validation,
+}: {
+  validation: ThemeValidationSnapshot;
+}) {
+  if (validation.n_answered === 0) {
+    return (
+      <div
+        style={{
+          padding: "var(--space-3) var(--space-4)",
+          background: "var(--bg-sunken)",
+          borderRadius: "var(--radius-sm)",
+          fontSize: "var(--text-xs)",
+          color: "var(--text-tertiary)",
+        }}
+      >
+        Awaiting validation responses for this theme.
+      </div>
+    );
+  }
+  const pct = validation.agreement_pct;
+  return (
+    <div
+      style={{
+        background: "var(--info-bg)",
+        border: "1px solid var(--info-border)",
+        borderRadius: "var(--radius-sm)",
+        padding: "var(--space-3) var(--space-4)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "var(--text-eyebrow)",
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--info-text)",
+          marginBottom: "var(--space-1)",
+        }}
+      >
+        Theme validation · n={validation.n_answered}
+      </div>
+      <div
+        className="tabular"
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: "var(--text-md)",
+          color: "var(--info-text)",
+        }}
+      >
+        {pct === null ? (
+          <span>
+            {validation.distribution["4"] + validation.distribution["5"]} of{" "}
+            {validation.n_answered} respondents agreed (below n=30; counts only)
+          </span>
+        ) : (
+          <span>
+            <strong>{Math.round(pct)}%</strong> agreed this theme resonates
+            {validation.ci_low !== null && validation.ci_high !== null && (
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+                {" "}
+                · 95% CI {Math.round(validation.ci_low)}–{Math.round(validation.ci_high)}%
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
