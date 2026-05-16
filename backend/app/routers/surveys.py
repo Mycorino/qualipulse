@@ -36,11 +36,14 @@ from app.models.survey import (
 )
 from app.schemas.survey import (
     AnswerSubmission,
+    DiscoveriesResponse,
+    DiscoverySchema,
     PublicQuestion,
     PublicSurvey,
     QuestionCreate,
     QuestionPatch,
     QuestionResponse,
+    ReadyFilterSchema,
     ResponseAck,
     ResponseSubmission,
     SegmentFilterClause,
@@ -60,6 +63,7 @@ from app.schemas.survey import (
 from app.models.interview import InterviewLink
 from app.models.project import Project
 from app.services.email import send_interview_invite
+from app.services.segment_discoveries import compute_discoveries
 from app.services.survey_analytics import build_dashboard
 from app.services.survey_segments import (
     FilterClause,
@@ -511,6 +515,56 @@ def list_links(
     survey = _get_survey_or_404(db, survey_id, company)
     links = db.query(SurveyLink).filter(SurveyLink.survey_id == survey.id).all()
     return [SurveyLinkResponse.model_validate(link) for link in links]
+
+
+# ── Segment Discoveries (Sprint 10 — the "we found N segments worth interviewing" surface) ──
+
+
+@router.get("/{survey_id}/discoveries", response_model=DiscoveriesResponse)
+def get_discoveries(
+    survey_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> DiscoveriesResponse:
+    """Return up to N actionable segment discoveries for the dashboard.
+
+    Each discovery carries a ready-to-use filter clause that the
+    SurveyDashboard pre-fills on the Screener Bridge when the researcher
+    clicks "Interview this segment." This is where AI detects patterns
+    and researchers choose what to act on.
+    """
+
+    survey = _get_survey_or_404(db, survey_id, company)
+    found = compute_discoveries(db, survey)
+    return DiscoveriesResponse(
+        survey_id=survey.id,
+        discoveries=[
+            DiscoverySchema(
+                id=d.id,
+                title=d.title,
+                description=d.description,
+                confidence=d.confidence,  # type: ignore[arg-type]
+                segment_n=d.segment_n,
+                overall_n=d.overall_n,
+                metric_question_id=d.metric_question_id,
+                metric_question_prompt=d.metric_question_prompt,
+                metric_choice_label=d.metric_choice_label,
+                segment_mean=d.segment_mean,
+                overall_mean=d.overall_mean,
+                lift_ratio=d.lift_ratio,
+                mean_delta=d.mean_delta,
+                ready_filter=[
+                    ReadyFilterSchema(
+                        question_id=rf.question_id,
+                        operator=rf.operator,  # type: ignore[arg-type]
+                        value=rf.value,
+                    )
+                    for rf in d.ready_filter
+                ],
+            )
+            for d in found
+        ],
+    )
 
 
 # ── Screener bridge (the wedge) ──────────────────────────────────────

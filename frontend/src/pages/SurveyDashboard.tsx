@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
+  DiscoveryConfidence,
   QuestionAnalytics,
+  SegmentDiscovery,
   SegmentFilter,
   SegmentOperator,
   SegmentPreview,
   SurveyDashboard,
   getDashboard,
+  getDiscoveries,
   inviteSegment,
   previewSegment,
 } from "../api/surveys";
@@ -41,13 +44,28 @@ export default function SurveyDashboardPage() {
   const [preview, setPreview] = useState<SegmentPreview | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
+  // ── Sprint 10: discoveries ─────────────────────────────────────
+  const [discoveries, setDiscoveries] = useState<SegmentDiscovery[]>([]);
 
   useEffect(() => {
     if (!id) return;
     getDashboard(id)
       .then(setData)
       .catch(() => setError("Could not load dashboard"));
+    getDiscoveries(id)
+      .then((p) => setDiscoveries(p.discoveries))
+      .catch(() => setDiscoveries([]));
   }, [id]);
+
+  /** Discovery card click → pre-populate the Bridge filter + scroll to it. */
+  const onApplyDiscovery = (d: SegmentDiscovery) => {
+    setFilters(d.ready_filter);
+    // Scroll the filter rail into view so the change is obvious.
+    setTimeout(() => {
+      const target = document.querySelector("[data-bridge-target]") as HTMLElement | null;
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  };
 
   // Re-preview whenever filters change. Debounce keeps backend chatter sane.
   useEffect(() => {
@@ -168,6 +186,13 @@ export default function SurveyDashboardPage() {
 
         <div style={{ marginTop: "var(--space-6)" }}>
           <DashboardShell sidebar={<QuestionNav questions={data.questions} />}>
+            {discoveries.length > 0 && (
+              <DiscoveriesSection
+                discoveries={discoveries}
+                onApply={onApplyDiscovery}
+              />
+            )}
+            <div data-bridge-target />
             <SegmentFilterRail
               questions={data.questions}
               filters={filters}
@@ -396,6 +421,128 @@ function QuestionFilterRow({
       </div>
     </div>
   );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Sprint 10: Discoveries section
+   ──────────────────────────────────────────────────────────────────── */
+
+function DiscoveriesSection({
+  discoveries,
+  onApply,
+}: {
+  discoveries: SegmentDiscovery[];
+  onApply: (d: SegmentDiscovery) => void;
+}) {
+  return (
+    <section
+      aria-label="Suggested follow-up segments"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-3)",
+      }}
+    >
+      <header style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--space-3)" }}>
+        <div>
+          <div
+            style={{
+              fontSize: "var(--text-eyebrow)",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--brand-700)",
+            }}
+          >
+            Suggested follow-up segments
+          </div>
+          <h2
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: "var(--text-xl)",
+              letterSpacing: "-0.015em",
+              margin: "var(--space-1) 0 0",
+            }}
+          >
+            We found {discoveries.length} segment{discoveries.length === 1 ? "" : "s"} worth interviewing.
+          </h2>
+        </div>
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+          AI detects · researcher decides
+        </span>
+      </header>
+      <div className="quanti-showcase__grid-2">
+        {discoveries.map((d) => (
+          <DiscoveryCard key={d.id} discovery={d} onApply={() => onApply(d)} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DiscoveryCard({
+  discovery,
+  onApply,
+}: {
+  discovery: SegmentDiscovery;
+  onApply: () => void;
+}) {
+  const confidenceLabel: Record<DiscoveryConfidence, string> = {
+    directional: "Directional",
+    supported: "Supported",
+    strong: "Strong evidence",
+  };
+  return (
+    <article
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+        borderLeft: "3px solid var(--brand-500)",
+        borderRadius: "var(--radius-md)",
+        padding: "var(--space-5)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-3)",
+      }}
+    >
+      <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-3)" }}>
+        <h3
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: "var(--text-lg)",
+            fontWeight: 600,
+            letterSpacing: "-0.015em",
+            lineHeight: 1.3,
+            margin: 0,
+            color: "var(--text-primary)",
+          }}
+        >
+          {discovery.title}
+        </h3>
+        <span className={`confidence-pill confidence-pill--${discovery.confidence}`}>
+          <span className="confidence-pill__dot" aria-hidden="true" />
+          {confidenceLabel[discovery.confidence]}
+        </span>
+      </header>
+      <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
+        {discovery.description}
+      </p>
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }} className="tabular">
+        Based on Q "<em>{shortenPrompt(discovery.metric_question_prompt, 70)}</em>"
+        {discovery.metric_choice_label ? <> · choice: <em>{discovery.metric_choice_label}</em></> : null}
+      </div>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
+        <button type="button" className="btn btn-primary" onClick={onApply}>
+          Interview this segment →
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function shortenPrompt(prompt: string, max: number): string {
+  if (prompt.length <= max) return prompt;
+  return prompt.slice(0, max - 1).trimEnd() + "…";
 }
 
 function InviteReviewModal({
