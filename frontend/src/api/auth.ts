@@ -207,6 +207,12 @@ export interface StudyDraft {
   study_title: string;
   research_objective: string;
   target_audience: string;
+  // 3 concrete findings the study will surface (shown prominently on Step 4
+  // — the conversion content). Strategic outcomes, not topics or questions.
+  key_insights?: string[];
+  // 1-2 sentence strategic framing for why running this study now matters
+  // for the user's business. Shown on Step 4 above the meta chips.
+  why_this_matters?: string;
   duration_minutes: number;
   sample_size: number;
   questions: StudyDraftQuestion[];

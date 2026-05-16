@@ -82,6 +82,19 @@ def generate_onboarding_study(
         f"Grounded in the user's stated intent.\n"
         f"- target_audience: 1-2 sentences describing who to interview. Be specific about "
         f"behavior or role, not demographics alone.\n"
+        f"- key_insights: array of EXACTLY 3 specific findings this study will surface. "
+        f"Each is one sentence (max 18 words) describing a CONCRETE insight a researcher "
+        f"would actually use — not a topic, not a question. "
+        f"GOOD: \"Which moments in the checkout flow trigger hesitation among first-time buyers\", "
+        f"\"How architects discover technical references when working under tight design deadlines\". "
+        f"BAD: \"Customer satisfaction\" (topic), \"Why do users churn?\" (question), "
+        f"\"Lose 25% of revenue\" (invented number). "
+        f"Each insight must feel like a sentence the user would screenshot to share with their team.\n"
+        f"- why_this_matters: 1-2 sentences (max 280 chars total) explaining the strategic value "
+        f"of running THIS study now. Reference the user's actual business / role / industry. "
+        f"NEVER invent metrics, market sizes, percentages, or competitor names. Frame as opportunity "
+        f"or risk, not as marketing copy. NEVER use words like \"unlock\", \"empower\", \"leverage\", "
+        f"\"seamless\", \"game-changing\", \"transform\".\n"
         f"- duration_minutes: 15 or 20 (integer). Use 15 unless the topic genuinely needs more.\n"
         f"- sample_size: integer between 5 and 8. Recommend 6 by default.\n"
         f"- questions: array of exactly 5 question objects. Shape:\n"
@@ -115,6 +128,8 @@ def generate_onboarding_study(
         f'  "study_title": "...",\n'
         f'  "research_objective": "...",\n'
         f'  "target_audience": "...",\n'
+        f'  "key_insights": ["...", "...", "..."],\n'
+        f'  "why_this_matters": "...",\n'
         f'  "duration_minutes": 15,\n'
         f'  "sample_size": 6,\n'
         f'  "questions": [\n'
@@ -184,6 +199,24 @@ def generate_onboarding_study(
             ][:3]
         else:
             parsed["other_directions"] = []
+
+        # key_insights — the headline "what you'll learn" bullets on Step 4.
+        # These are the conversion content, not the questions. Coerce to a
+        # clean string list and trim to 3.
+        raw_insights = parsed.get("key_insights") or []
+        if isinstance(raw_insights, list):
+            parsed["key_insights"] = [
+                str(s).strip() for s in raw_insights if isinstance(s, str) and s.strip()
+            ][:3]
+        else:
+            parsed["key_insights"] = []
+
+        # why_this_matters — strategic framing sentence. Optional string.
+        raw_why = parsed.get("why_this_matters")
+        if isinstance(raw_why, str) and raw_why.strip():
+            parsed["why_this_matters"] = raw_why.strip()
+        else:
+            parsed["why_this_matters"] = ""
 
         logger.info(
             "onboarding_intelligence.study: generated %d questions for %s",

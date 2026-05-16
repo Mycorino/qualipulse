@@ -1123,8 +1123,41 @@ export default function Welcome() {
                   </div>
                 </div>
 
+                {/* What you'll learn — the conversion content, NOT the
+                    questions themselves. Each insight is a sentence the
+                    user would screenshot to share with their team. */}
+                {(studyDraft.key_insights?.length ?? 0) > 0 && (
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
+                      {t("onboarding.studyKeyInsightsLabel")}
+                    </div>
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+                      {studyDraft.key_insights!.map((insight, i) => (
+                        <li key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #4369f5)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                          <span>{insight}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Why this matters — strategic framing under the insights */}
+                {studyDraft.why_this_matters && (
+                  <div style={{ marginBottom: 18, padding: "12px 14px", borderRadius: "var(--radius)", background: "var(--primary-subtle, #eef2ff)", borderLeft: "3px solid var(--primary, #4369f5)" }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--primary, #4369f5)", marginBottom: 4 }}>
+                      {t("onboarding.studyWhyMattersLabel")}
+                    </div>
+                    <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5, margin: 0 }}>
+                      {studyDraft.why_this_matters}
+                    </p>
+                  </div>
+                )}
+
                 {/* Duration + sample size chips */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: 5 }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     {t("onboarding.studyDuration", { minutes: studyDraft.duration_minutes })}
@@ -1133,20 +1166,10 @@ export default function Welcome() {
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     {t("onboarding.studySampleSize", { count: studyDraft.sample_size })}
                   </span>
-                </div>
-
-                {/* Questions */}
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
-                    {t("onboarding.studyQuestions")}
-                  </div>
-                  <ol style={{ paddingLeft: 22, margin: 0 }}>
-                    {studyDraft.questions.map((q, i) => (
-                      <li key={i} style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5, marginBottom: 6 }}>
-                        {q.main_question}
-                      </li>
-                    ))}
-                  </ol>
+                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+                    {t("onboarding.studyQuestionCount", { count: studyDraft.questions.length })}
+                  </span>
                 </div>
               </div>
             )}
