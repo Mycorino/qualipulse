@@ -1511,9 +1511,14 @@ export default function ProjectDetail() {
                 stateClass = "eyebrow-tag eyebrow-tag--info";
                 stateLabel = tProject("hero.stateCollecting", { defaultValue: "Collecting responses" });
               }
+              // Eyebrow reflects link state so it agrees with the breadcrumb's
+              // Active/Inactive label rather than always saying "Active study".
+              const hasAnyActiveLink = links.some((l) => l.is_active);
               const eyebrowLabel = project.is_demo
                 ? tProject("hero.eyebrowDemo", { defaultValue: "Demo project" })
-                : tProject("hero.eyebrowActive", { defaultValue: "Active study" });
+                : hasAnyActiveLink
+                  ? tProject("hero.eyebrowActive", { defaultValue: "Active study" })
+                  : tProject("hero.eyebrowDraft", { defaultValue: "Study draft" });
               const eyebrowClass = project.is_demo
                 ? "eyebrow-tag eyebrow-tag--warning"
                 : "eyebrow-tag";
@@ -1533,10 +1538,10 @@ export default function ProjectDetail() {
               );
             })()}
             <div className="stats-row">
-              <div className="stat-card"><div className="stat-value">{participants.length}</div><div className="stat-label">{tProject("overview.totalParticipants")}</div></div>
-              <div className="stat-card stat-card--success"><div className="stat-value">{completedCount}</div><div className="stat-label">{tProject("overview.completed")}</div></div>
+              <div className="stat-card"><div className="stat-value">{participants.length || "—"}</div><div className="stat-label">{tProject("overview.totalParticipants")}</div></div>
+              <div className={`stat-card${completedCount > 0 ? " stat-card--success" : ""}`}><div className="stat-value">{completedCount || "—"}</div><div className="stat-label">{tProject("overview.completed")}</div></div>
               <div className="stat-card">
-                <div className="stat-value">{participants.length > 0 ? Math.round((completedCount / participants.length) * 100) : 0}%</div>
+                <div className="stat-value">{participants.length > 0 ? `${Math.round((completedCount / participants.length) * 100)}%` : "—"}</div>
                 <div className="stat-label">{tProject("overview.completionRate")}</div>
               </div>
               <div className={`stat-card${project.questions.length === 0 ? " stat-card--warning" : " stat-card--muted"}`}>

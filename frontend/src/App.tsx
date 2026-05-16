@@ -153,6 +153,8 @@ export default function App() {
         }
       />
       <Route path="/i/:token" element={<Interview />} />
+      {/* Legacy alias — backend share URLs use /interview/{token}. Keep both. */}
+      <Route path="/interview/:token" element={<Interview />} />
       <Route path="/interview/verify/:token" element={<InterviewVerify />} />
       <Route path="/reports/:token" element={<SharedReport />} />
       <Route path="/affiliate/:section" element={<AffiliatePortal />} />

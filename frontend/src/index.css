@@ -815,9 +815,13 @@ select.field-input {
 .auth-page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
+  padding: 6vh 24px 8vh;
+}
+
+@media (max-width: 640px) {
+  .auth-page { padding: 4vh 16px 6vh; }
 }
 
 .auth-card {
@@ -2072,10 +2076,14 @@ select.field-input {
 .interview-page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
+  padding: 6vh 24px 8vh;
   background: linear-gradient(135deg, #f8f9fa 0%, #eef2ff 100%);
+}
+
+@media (max-width: 640px) {
+  .interview-page { padding: 4vh 16px 6vh; }
 }
 
 .interview-container {
@@ -3724,10 +3732,14 @@ select.field-input {
 .welcome-page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: linear-gradient(135deg, #f9fafb 0%, #eef2ff 50%, #f9fafb 100%);
-  padding: 32px 24px;
+  padding: 6vh 24px 8vh;
+}
+
+@media (max-width: 640px) {
+  .welcome-page { padding: 4vh 16px 6vh; }
 }
 
 .welcome-container {
@@ -3917,8 +3929,15 @@ select.field-input {
 }
 
 .onboarding-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: var(--brand-50, #eef2ff);
+  color: var(--primary, #4369f5);
 }
 
 .onboarding-form {

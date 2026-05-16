@@ -208,7 +208,12 @@ export default function Dashboard() {
           const completedTotal = realProjects.reduce((acc, p) => acc + (p.completed_count || 0), 0);
           const inProgressTotal = realProjects.reduce((acc, p) => acc + (p.in_progress_count || 0), 0);
           const analysesReady = realProjects.filter((p) => p.analysis_status === "ready").length;
-          const firstName = (me?.name || "").trim().split(" ")[0];
+          // Greet by the user's actual first name when we have it, falling
+          // back to the company name's first token only as a last resort.
+          // "Welcome back, Sarah" beats "Welcome back, Northwind".
+          const firstName =
+            (me?.first_name || "").trim() ||
+            (me?.name || "").trim().split(" ")[0];
           const hasProjects = realProjects.length > 0;
           return (
             <section className="hub-header" aria-label={t("hubHeader.aria", "Workspace overview")}>
@@ -234,10 +239,14 @@ export default function Dashboard() {
                 <div className="hub-header__pills" aria-hidden={!hasProjects}>
                   {hasProjects && (
                     <>
-                      <span className="hub-header__pill">
-                        <strong>{realProjects.length}</strong>{" "}
-                        {t("hubHeader.pillProjects", { count: realProjects.length })}
-                      </span>
+                      {/* Hide the "N projects" pill when count <= 1 — the
+                          subtitle already states it, no value in repeating. */}
+                      {realProjects.length > 1 && (
+                        <span className="hub-header__pill">
+                          <strong>{realProjects.length}</strong>{" "}
+                          {t("hubHeader.pillProjects", { count: realProjects.length })}
+                        </span>
+                      )}
                       {completedTotal > 0 && (
                         <span className="hub-header__pill hub-header__pill--success">
                           <strong>{completedTotal}</strong>{" "}
@@ -317,7 +326,15 @@ export default function Dashboard() {
               className={`gs-trial-banner${endingSoon ? " gs-trial-banner--urgent" : ""}`}
               style={{ marginBottom: 16 }}
             >
-              <span aria-hidden="true">{endingSoon ? "⚠️" : "🎉"}</span>
+              <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", color: endingSoon ? "var(--danger-text, #b91c1c)" : "var(--primary, #4369f5)" }}>
+                {endingSoon ? (
+                  /* Triangle alert (Lucide-style) */
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                ) : (
+                  /* Sparkles (Lucide-style) */
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
+                )}
+              </span>
               <div style={{ flex: 1 }}>
                 <strong>
                   {endingSoon
