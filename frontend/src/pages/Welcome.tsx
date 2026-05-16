@@ -7,45 +7,12 @@ import {
   saveOnboardingProfile,
   resendVerification,
   analyseWebsite,
-  generateRecap,
+  generateStudyDraft,
 } from "../api/auth";
-import type { CompanyResponse } from "../api/auth";
+import type { CompanyResponse, StudyDraft } from "../api/auth";
+import { createProject } from "../api/projects";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
-
-// ── Lightweight markdown renderer (bold + bullets + paragraphs) ──
-
-function renderLightMarkdown(text: string): React.ReactNode[] {
-  const paragraphs = text.split(/\n{2,}/);
-  return paragraphs.map((para, pi) => {
-    const lines = para.split("\n");
-    const isBulletBlock = lines.every((l) => l.startsWith("- ") || l.trim() === "");
-    if (isBulletBlock) {
-      const items = lines.filter((l) => l.startsWith("- ")).map((l) => l.slice(2));
-      return (
-        <ul key={pi} style={{ paddingLeft: 20, margin: "12px 0", listStyleType: "disc" }}>
-          {items.map((item, li) => (
-            <li key={li} style={{ marginBottom: 6, lineHeight: 1.7 }}>{renderInline(item)}</li>
-          ))}
-        </ul>
-      );
-    }
-    return (
-      <p key={pi} style={{ margin: "10px 0", lineHeight: 1.7 }}>{renderInline(para.replace(/\n/g, " "))}</p>
-    );
-  });
-}
-
-function renderInline(text: string): React.ReactNode[] {
-  // Split on **bold** markers
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
 
 const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Other"];
 
@@ -103,10 +70,10 @@ export default function Welcome() {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   // Step 4 — Brief
-  const [recap, setRecap] = useState("");
-  const [recapLoading, setRecapLoading] = useState(false);
-  const [recapError, setRecapError] = useState(false);
-  const [recapEditing, setRecapEditing] = useState(false);
+  // Step 4 — Study draft (replaces standalone brief)
+  const [studyDraft, setStudyDraft] = useState<StudyDraft | null>(null);
+  const [studyLoading, setStudyLoading] = useState(false);
+  const [studyError, setStudyError] = useState(false);
 
   // Translated option arrays
   const industryLabels = t("onboarding.industries", { returnObjects: true }) as string[];
@@ -117,7 +84,7 @@ export default function Welcome() {
     t("onboarding.steps.verify"),
     t("onboarding.steps.researchGoal"),
     t("onboarding.steps.yourCompany"),
-    t("onboarding.steps.yourBrief"),
+    t("onboarding.steps.yourStudy"),
   ];
 
   const experienceOptions = [
@@ -398,17 +365,16 @@ export default function Welcome() {
     }
   }
 
-  // Step 4 — generate recap on enter
+  // Step 4 — generate study draft on enter
   useEffect(() => {
     if (step !== 4) return;
-    setRecapLoading(true);
-    setRecapError(false);
-    generateRecap({
+    setStudyLoading(true);
+    setStudyError(false);
+    generateStudyDraft({
       first_name: me?.first_name || undefined,
-      last_name: me?.last_name || undefined,
       company_name: companyName || undefined,
       role_title: roleTitle.trim() || undefined,
-      occupation_description: occupationDescription.trim() || undefined,
+      research_intent: occupationDescription.trim() || undefined,
       research_experience: researchExperience || undefined,
       industry: industry || undefined,
       business_summary: businessSummary.trim() || undefined,
@@ -416,28 +382,78 @@ export default function Welcome() {
       language: uiLang,
     })
       .then((res) => {
-        setRecap(res.recap);
+        if (res.draft) {
+          setStudyDraft(res.draft);
+        } else {
+          setStudyError(true);
+        }
       })
       .catch(() => {
-        setRecapError(true);
+        setStudyError(true);
       })
       .finally(() => {
-        setRecapLoading(false);
+        setStudyLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  // Step 4 — Launch workspace
-  async function handleLaunchWorkspace() {
+  // Step 4 — Create the study from the draft + complete onboarding
+  async function handleCreateStudy() {
+    if (!studyDraft) return;
+    setSaving(true);
+    setError("");
+    // Mark onboarding complete first (idempotent — if project creation
+    // fails the user still lands on the dashboard rather than being
+    // trapped in the wizard).
+    let onboardingDone = false;
+    try {
+      await completeOnboarding({
+        onboarding_recap: studyDraft.brief_summary || undefined,
+        goals_freeform: goalsFreeform.trim() || undefined,
+      });
+      setCachedOnboarded(true);
+      onboardingDone = true;
+
+      const project = await createProject({
+        name: studyDraft.study_title,
+        language: uiLang,
+        interview_duration_minutes: studyDraft.duration_minutes,
+        research_objective: studyDraft.research_objective,
+        target_customer_description: studyDraft.target_audience,
+        questions: studyDraft.questions.map((q) => ({
+          section_index: q.section_index,
+          section_title: q.section_title,
+          question_index: q.question_index,
+          main_question: q.main_question,
+          interview_notes: q.interview_notes,
+          desired_learning: q.desired_learning,
+        })),
+        screening_questions: [],
+      });
+      navigate(`/projects/${project.id}`, { replace: true });
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t("onboarding.failedSave")));
+      if (onboardingDone) {
+        // Onboarding succeeded but project creation failed — send the user
+        // to the dashboard rather than leaving them stuck in the wizard.
+        navigate("/dashboard", { replace: true });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Step 4 — Start from scratch (skip the AI study, but still complete onboarding)
+  async function handleStartFromBlank() {
     setSaving(true);
     setError("");
     try {
       await completeOnboarding({
-        onboarding_recap: recap || undefined,
+        onboarding_recap: studyDraft?.brief_summary || undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
       setCachedOnboarded(true);
-      navigate("/dashboard", { replace: true });
+      navigate("/projects/new", { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("onboarding.failedSave")));
     } finally {
@@ -497,18 +513,8 @@ export default function Welcome() {
     </div>
   );
 
-  // Carousel messages for recap loading
-  const recapCarouselMessages = (t("onboarding.briefCarousel", {
-    returnObjects: true,
-    firstName: me?.first_name || "",
-    roleTitle: roleTitle || "",
-    industry: industry || "",
-  }) as string[]).map((msg) =>
-    msg
-      .replace("{{firstName}}", me?.first_name || "")
-      .replace("{{roleTitle}}", roleTitle || "")
-      .replace("{{industry}}", industry || ""),
-  );
+  // Carousel messages for study-draft loading
+  const studyCarouselMessages = t("onboarding.studyCarousel", { returnObjects: true }) as string[];
 
   return (
     <div className="welcome-page">
@@ -982,12 +988,13 @@ export default function Welcome() {
           </div>
         )}
 
-        {/* ── Step 4: Your brief ── */}
+        {/* ── Step 4: Your first study ── */}
         {step === 4 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">{t("onboarding.briefTitle")}</h1>
+            <h1 className="welcome-title">{t("onboarding.studyTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.studySubtitle")}</p>
 
-            {recapLoading && (
+            {studyLoading && (
               <div style={{ padding: "40px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
                 <span
                   className="spinner"
@@ -1002,78 +1009,106 @@ export default function Welcome() {
                   }}
                 />
                 <LoadingCarousel
-                  messages={Array.isArray(recapCarouselMessages) && recapCarouselMessages.length > 0
-                    ? recapCarouselMessages
-                    : ["Preparing your brief..."]
+                  messages={Array.isArray(studyCarouselMessages) && studyCarouselMessages.length > 0
+                    ? studyCarouselMessages
+                    : ["Designing your study..."]
                   }
                 />
               </div>
             )}
 
-            {!recapLoading && recapError && (
+            {!studyLoading && studyError && (
               <div className="recap-card" style={{ marginTop: 24 }}>
-                <p style={{ whiteSpace: "pre-line", color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>
-                  {t("onboarding.briefFallback")}
+                <p style={{ color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>
+                  {t("onboarding.studyFallback")}
                 </p>
               </div>
             )}
 
-            {!recapLoading && !recapError && recap && (
+            {!studyLoading && !studyError && studyDraft && (
               <div className="recap-card" style={{ marginTop: 24 }}>
-                {recapEditing ? (
-                  <>
-                    <textarea
-                      className="field-input"
-                      value={recap}
-                      onChange={(e) => setRecap(e.target.value)}
-                      rows={8}
-                      style={{ resize: "vertical", lineHeight: 1.7, width: "100%", border: "none", background: "transparent", fontSize: 14 }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => setRecapEditing(false)}
-                      style={{ fontSize: 13, marginTop: 8 }}
-                    >
-                      {t("onboarding.briefDoneEditing")}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ color: "var(--text-secondary)", fontSize: 14 }}>
-                      {renderLightMarkdown(recap)}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => setRecapEditing(true)}
-                      style={{ fontSize: 13, marginTop: 12, color: "var(--text-muted)" }}
-                    >
-                      {t("onboarding.briefEdit")}
-                    </button>
-                  </>
-                )}
+                {/* Brief summary */}
+                <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6, margin: "0 0 20px" }}>
+                  {studyDraft.brief_summary}
+                </p>
+
+                {/* Study title */}
+                <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 16px" }}>
+                  {studyDraft.study_title}
+                </h2>
+
+                {/* Objective */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
+                    {t("onboarding.studyObjective")}
+                  </div>
+                  <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
+                    {studyDraft.research_objective}
+                  </div>
+                </div>
+
+                {/* Audience */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
+                    {t("onboarding.studyAudience")}
+                  </div>
+                  <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
+                    {studyDraft.target_audience}
+                  </div>
+                </div>
+
+                {/* Duration + sample size chips */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                    ⏱ {t("onboarding.studyDuration", { minutes: studyDraft.duration_minutes })}
+                  </span>
+                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                    👥 {t("onboarding.studySampleSize", { count: studyDraft.sample_size })}
+                  </span>
+                </div>
+
+                {/* Questions */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                    {t("onboarding.studyQuestions")}
+                  </div>
+                  <ol style={{ paddingLeft: 22, margin: 0 }}>
+                    {studyDraft.questions.map((q, i) => (
+                      <li key={i} style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5, marginBottom: 6 }}>
+                        {q.main_question}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </div>
             )}
 
             <div className="welcome-actions" style={{ marginTop: 32 }}>
               <button
                 className="btn btn-primary btn-lg"
-                onClick={handleLaunchWorkspace}
-                disabled={saving || recapLoading}
+                onClick={handleCreateStudy}
+                disabled={saving || studyLoading || !studyDraft}
               >
-                {saving ? t("onboarding.launchingWorkspace") : t("onboarding.launchWorkspace")}
+                {saving ? t("onboarding.creatingStudy") : t("onboarding.createThisStudy")}
               </button>
               {saving && (
                 <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "8px 0 0", textAlign: "center" }}>
-                  {t("onboarding.launchingWorkspaceDesc")}
+                  {t("onboarding.creatingStudyDesc")}
                 </p>
               )}
               <button
                 className="btn btn-ghost"
+                onClick={handleStartFromBlank}
+                disabled={saving || studyLoading}
+                style={{ fontSize: 13 }}
+              >
+                {t("onboarding.startFromBlank")}
+              </button>
+              <button
+                className="btn btn-ghost"
                 onClick={() => setStep(3)}
                 disabled={saving}
-                style={{ fontSize: 13 }}
+                style={{ fontSize: 13, color: "var(--text-muted)" }}
               >
                 ← {t("onboarding.goBackAdjust")}
               </button>

@@ -239,3 +239,46 @@ export async function generateRecap(payload: {
   );
   return data;
 }
+
+// ── Study draft (onboarding step 4 — hybrid redesign) ──
+
+export interface StudyDraftQuestion {
+  section_index: number;
+  section_title: string;
+  question_index: number;
+  main_question: string;
+  interview_notes?: string;
+  desired_learning?: string;
+}
+
+export interface StudyDraft {
+  brief_summary: string;
+  study_title: string;
+  research_objective: string;
+  target_audience: string;
+  duration_minutes: number;
+  sample_size: number;
+  questions: StudyDraftQuestion[];
+}
+
+export interface StudyDraftResponse {
+  draft: StudyDraft | null;
+}
+
+export async function generateStudyDraft(payload: {
+  first_name?: string;
+  company_name?: string;
+  role_title?: string;
+  research_intent?: string;
+  research_experience?: string;
+  industry?: string;
+  business_summary?: string;
+  goals_freeform?: string;
+  language?: string;
+}): Promise<StudyDraftResponse> {
+  const { data } = await client.post<StudyDraftResponse>(
+    "/auth/onboarding/generate-study",
+    payload,
+  );
+  return data;
+}

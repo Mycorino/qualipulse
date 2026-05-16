@@ -589,6 +589,48 @@ def generate_recap(
     return {"recap": recap}
 
 
+class GenerateStudyRequest(BaseModel):
+    first_name: Optional[str] = None
+    company_name: Optional[str] = None
+    role_title: Optional[str] = None
+    research_intent: Optional[str] = None
+    research_experience: Optional[str] = None
+    industry: Optional[str] = None
+    business_summary: Optional[str] = None
+    goals_freeform: Optional[str] = None
+    language: Optional[str] = None
+
+
+@router.post("/onboarding/generate-study")
+@limiter.limit("3/minute")
+def generate_study(
+    request: Request,
+    body: GenerateStudyRequest,
+    company: Company = Depends(get_current_company),
+):
+    """Generate a ready-to-launch study draft (brief + objective + questions).
+
+    Returns the full study draft on success. On failure (no API key, Claude
+    error, malformed JSON) returns {"draft": null} so the frontend can fall
+    back to a blank project.
+    """
+    from app.services.onboarding_intelligence import generate_onboarding_study
+
+    lang = (body.language or company.preferred_language or "en").strip().lower()[:2]
+    draft = generate_onboarding_study(
+        first_name=body.first_name,
+        company_name=body.company_name,
+        role_title=body.role_title,
+        research_intent=body.research_intent,
+        research_experience=body.research_experience,
+        industry=body.industry,
+        business_summary=body.business_summary,
+        goals_freeform=body.goals_freeform,
+        language=lang,
+    )
+    return {"draft": draft}
+
+
 @router.post("/onboarding")
 def complete_onboarding(
     body: OnboardingProfileRequest,
