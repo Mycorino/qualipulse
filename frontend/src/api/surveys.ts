@@ -275,6 +275,109 @@ export async function getDashboard(surveyId: string): Promise<SurveyDashboard> {
   return resp.data;
 }
 
+/* ── Templates ─────────────────────────────────────────────────────── */
+
+export interface SurveyTemplate {
+  id: string;
+  name: string;
+  summary: string;
+  role: SurveyRole;
+  question_count: number;
+}
+
+export async function listTemplates(): Promise<SurveyTemplate[]> {
+  const resp = await client.get<SurveyTemplate[]>("/surveys/templates");
+  return resp.data;
+}
+
+export async function createFromTemplate(templateId: string): Promise<Survey> {
+  const resp = await client.post<Survey>(`/surveys/from-template/${templateId}`);
+  return resp.data;
+}
+
+/* ── Screener bridge (segment preview + invite) ─────────────────── */
+
+export type SegmentOperator = "eq" | "lte" | "gte" | "between" | "in";
+
+export interface SegmentFilter {
+  question_id: string;
+  operator: SegmentOperator;
+  value: number | [number, number] | string[];
+}
+
+export interface SegmentSampleInvitee {
+  email: string;
+  display_name: string;
+}
+
+export interface SegmentPreview {
+  match_count: number;
+  invitable_count: number;
+  skipped_anonymous_count: number;
+  sample_invitees: SegmentSampleInvitee[];
+}
+
+export interface SegmentInviteResult {
+  invited_count: number;
+  skipped_count: number;
+  failed_emails: string[];
+  interview_link_tokens: string[];
+}
+
+export async function previewSegment(
+  surveyId: string,
+  filters: SegmentFilter[],
+): Promise<SegmentPreview> {
+  const resp = await client.post<SegmentPreview>(
+    `/surveys/${surveyId}/segment/preview`,
+    { filters },
+  );
+  return resp.data;
+}
+
+export async function inviteSegment(
+  surveyId: string,
+  filters: SegmentFilter[],
+  customMessage?: string,
+): Promise<SegmentInviteResult> {
+  const resp = await client.post<SegmentInviteResult>(
+    `/surveys/${surveyId}/segment/invite`,
+    { filters, custom_message: customMessage },
+  );
+  return resp.data;
+}
+
+/* ── Sprint 10: Segment Discoveries ───────────────────────────── */
+
+export type DiscoveryConfidence = "directional" | "supported" | "strong";
+
+export interface SegmentDiscovery {
+  id: string;
+  title: string;
+  description: string;
+  confidence: DiscoveryConfidence;
+  segment_n: number;
+  overall_n: number;
+  metric_question_id: string;
+  metric_question_prompt: string;
+  metric_choice_label: string | null;
+  segment_mean: number | null;
+  overall_mean: number | null;
+  lift_ratio: number | null;
+  mean_delta: number | null;
+  ready_filter: SegmentFilter[];
+}
+
+export interface DiscoveriesPayload {
+  survey_id: string;
+  discoveries: SegmentDiscovery[];
+}
+
+export async function getDiscoveries(surveyId: string): Promise<DiscoveriesPayload> {
+  const resp = await client.get<DiscoveriesPayload>(`/surveys/${surveyId}/discoveries`);
+  return resp.data;
+}
+
 /* ── Default config helpers (used by the editor when adding a question) */
 
 export function defaultConfigForType(type: QuestionType): Record<string, unknown> {

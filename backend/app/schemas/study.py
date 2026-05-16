@@ -1,0 +1,179 @@
+"""Pydantic schemas for Studies — the research-workspace surface.
+
+A Study is the parent of a research effort (see docs/quanti-roadmap.md
+section 1.1 + Sprint 9.5). Studies are auto-created on first survey or
+project creation; this module models the read views, not creation.
+
+The progress signal drives the Study Overview page's recommended-action
+chip and progress checklist:
+  - has_live_survey:        ≥1 Survey in the study is currently published
+  - total_completed_responses: sum across all surveys' completed responses
+  - segments_identified:    placeholder = total_completed_responses ≥ 30
+  - interviews_completed:   count of completed Participants in sibling Projects
+  - report_ready:           True iff a StudyAnalysis exists with status="ready"
+"""
+
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class ProjectMini(BaseModel):
+    """Minimal Project representation for the Study Overview tabs.
+
+    Avoids round-tripping the whole Project tree just to show interview
+    counts on the Study page.
+    """
+
+    id: str
+    name: str
+    language: str
+    interview_link_count: int = 0
+    completed_participant_count: int = 0
+    in_progress_participant_count: int = 0
+
+
+class SurveyMini(BaseModel):
+    """Minimal Survey representation for the Study Overview tabs."""
+
+    id: str
+    name: str
+    role: str
+    status: str
+    question_count: int = 0
+    response_count: int = 0
+    completed_count: int = 0
+
+
+class StudyProgress(BaseModel):
+    """Five-step progress signal driving the Study Overview checklist.
+
+    The Sprint 9.5 page uses these to render the progress strip; future
+    sprints flesh out the two `_placeholder` flags (segments + report)
+    with real signal.
+    """
+
+    has_live_survey: bool
+    total_completed_responses: int
+    segments_identified_placeholder: bool
+    interviews_completed: int
+    report_ready_placeholder: bool
+
+
+class StudySummary(BaseModel):
+    """List item shape for GET /studies."""
+
+    id: str
+    name: str
+    created_at: datetime
+    archived_at: datetime | None = None
+    survey_count: int = 0
+    project_count: int = 0
+    participant_count: int = 0
+
+
+class StudyDetail(BaseModel):
+    """Full detail for GET /studies/{id} — drives the Study Overview page."""
+
+    id: str
+    name: str
+    created_at: datetime
+    archived_at: datetime | None = None
+    surveys: list[SurveyMini]
+    projects: list[ProjectMini]
+    progress: StudyProgress
+    # Researcher-facing recommended next action ("Invite N detractors to interview" etc).
+    # Computed server-side based on progress flags; Sprint 10 widens the cases.
+    recommended_action: str | None = None
+
+
+# ── Sprint 11: Quantified Themes report ───────────────────────────────
+
+
+Confidence = Literal["directional", "supported", "strong"]
+RecommendationKind = Literal["product", "marketing", "next_research"]
+
+
+class SurveySignal(BaseModel):
+    """Numeric signal a theme rests on.
+
+    `percentage` is None when the supporting n is below the methodology
+    threshold — same contract as everywhere else in the codebase.
+    `segment_over_index` is the lift ratio when the theme is segment-
+    specific (e.g. 'PMs over-index 3.1× on…'); None when the theme is
+    workspace-wide.
+    """
+
+    summary: str = Field(..., description="One-line numeric anchor, e.g. '40% selected mobile setup'.")
+    n: int
+    percentage: float | None = None
+    segment_label: str | None = None
+    segment_over_index: float | None = None
+
+
+class InterviewEvidence(BaseModel):
+    """Qualitative anchor for a theme.
+
+    `x_of_y` reads as "this came up in X of Y interviews." The
+    `anchor_quote` is a verbatim from one of those interviews — never
+    paraphrased, AND it must be a verbatim substring of an actual
+    InterviewTurn.response_transcript on the same study's projects.
+    """
+
+    x_of_y: str  # e.g. "7 of 12"
+    interview_count: int
+    anchor_quote: str
+    segments_mentioned: list[str] = Field(default_factory=list)
+
+
+class ThemeRecommendation(BaseModel):
+    """The 'so what' line — what should the team do?"""
+
+    kind: RecommendationKind
+    action: str
+    rationale: str | None = None
+
+
+class QuantifiedTheme(BaseModel):
+    """One theme combining survey signal + interview evidence + a recommendation.
+
+    The 4-part shape comes from the consultant audit: every theme must
+    answer "what did we see in the data, what did people say about it,
+    what should we do, and how strong is the evidence?"
+    """
+
+    title: str
+    survey_signal: SurveySignal | None = None
+    interview_evidence: InterviewEvidence | None = None
+    recommendation: ThemeRecommendation
+    confidence: Confidence
+
+
+class QuantifiedThemeReport(BaseModel):
+    """The full report payload stored in `study_analyses.report`."""
+
+    executive_summary: str
+    themes: list[QuantifiedTheme]
+    methodology_note: str
+    generated_with_survey_count: int = 0
+    generated_with_response_count: int = 0
+    generated_with_interview_count: int = 0
+
+
+class StudyAnalysisSummary(BaseModel):
+    """List item shape for GET /studies/{id}/analyses."""
+
+    id: str
+    study_id: str
+    version: int
+    status: Literal["generating", "ready", "failed"]
+    error: str | None = None
+    created_at: datetime
+    generated_at: datetime | None = None
+
+
+class StudyAnalysisDetail(StudyAnalysisSummary):
+    """Full payload — report blob is parsed + returned as a typed object."""
+
+    report: QuantifiedThemeReport | None = None

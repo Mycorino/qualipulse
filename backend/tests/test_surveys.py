@@ -492,6 +492,329 @@ def test_dashboard_below_min_n_suppresses_percentages(
         assert bucket["ci_high"] is None
 
 
+# ── Templates ────────────────────────────────────────────────────────
+
+
+def test_templates_list_is_workspace_safe(client, auth_headers):
+    resp = client.get("/surveys/templates", headers=auth_headers)
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) >= 1
+    ids = {item["id"] for item in items}
+    assert "churn_pricing_onboarding" in ids
+
+
+def test_create_from_template_seeds_questions(client, auth_headers, db_session):
+    resp = client.post(
+        "/surveys/from-template/churn_pricing_onboarding", headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    survey = resp.json()
+    assert survey["name"].startswith("Why new users churn")
+    assert survey["role"] == "screener"
+    assert survey["question_count"] == 5
+
+    qs = client.get(
+        f"/surveys/{survey['id']}/questions", headers=auth_headers
+    ).json()
+    assert len(qs) == 5
+    types = [q["type"] for q in qs]
+    assert "likert" in types and "nps" in types and "mc_multi" in types
+    # First question is a Likert about pricing-page clarity.
+    assert "pricing page" in qs[0]["prompt"].lower()
+    assert qs[0]["is_required"] is True
+
+
+def test_create_from_unknown_template_returns_404(client, auth_headers):
+    resp = client.post("/surveys/from-template/nope", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+# ── Sprint 9: screener-bridge segment filtering + invite ─────────────
+
+
+def _seed_responses_for_segment(client, auth_headers, db_session):
+    """Helper: build a live NPS survey with 6 completed responses spanning
+    detractors / passives / promoters so segment filters have something
+    to slice."""
+
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "Segment test"}
+    ).json()
+    q = client.post(
+        f"/surveys/{survey['id']}/questions",
+        headers=auth_headers,
+        json={"type": "nps", "prompt": "Recommend?", "config": {}},
+    ).json()
+    link = client.post(
+        f"/surveys/{survey['id']}/links",
+        headers=auth_headers,
+        json={"is_anonymous": False},
+    ).json()
+    client.patch(f"/surveys/{survey['id']}", headers=auth_headers, json={"status": "live"})
+
+    # 2 detractors, 2 passives, 2 promoters.
+    scores = [3, 4, 7, 8, 9, 10]
+    for i, score in enumerate(scores):
+        client.post(
+            f"/r/{link['token']}/responses",
+            json={
+                "link_token": link["token"],
+                "email": f"resp-{i}@example.com",
+                "answers": [{"question_id": q["id"], "value_numeric": score}],
+                "is_complete": True,
+            },
+        )
+
+    return survey, q, link
+
+
+def test_segment_preview_lte_returns_detractors(client, auth_headers, db_session):
+    survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/preview",
+        headers=auth_headers,
+        json={"filters": [{"question_id": q["id"], "operator": "lte", "value": 6}]},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    # 2 detractors qualify (scores 3 and 4).
+    assert data["match_count"] == 2
+    assert data["invitable_count"] == 2
+    assert data["skipped_anonymous_count"] == 0
+    assert len(data["sample_invitees"]) == 2
+
+
+def test_segment_preview_gte_returns_promoters(client, auth_headers, db_session):
+    survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/preview",
+        headers=auth_headers,
+        json={"filters": [{"question_id": q["id"], "operator": "gte", "value": 9}]},
+    ).json()
+    assert resp["match_count"] == 2
+
+
+def test_segment_preview_empty_filters_returns_all_completed(
+    client, auth_headers, db_session
+):
+    survey, _, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/preview",
+        headers=auth_headers,
+        json={"filters": []},
+    ).json()
+    assert resp["match_count"] == 6
+
+
+def test_segment_invite_creates_interview_links_for_matched(
+    client, auth_headers, db_session
+):
+    """The wedge: matching respondents -> interview links.
+
+    Email sending is disabled in tests (no SENDGRID_API_KEY), so
+    `invited_count` will be 0 and the failed list will hold the matched
+    emails. The actual link creation still happens, which is the part of
+    the contract we care about here.
+    """
+
+    survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    # Need a project to invite into — survey's company has none yet, so create one.
+    client.post(
+        "/projects/",
+        headers=auth_headers,
+        json={
+            "name": "Follow-up interviews",
+            "language": "en",
+            "questions": [
+                {
+                    "section_index": 0,
+                    "section_title": "Intro",
+                    "question_index": 0,
+                    "main_question": "Tell me about your experience.",
+                }
+            ],
+        },
+    )
+
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/invite",
+        headers=auth_headers,
+        json={"filters": [{"question_id": q["id"], "operator": "lte", "value": 6}]},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    # 2 detractors → 2 tokens created.
+    assert len(data["interview_link_tokens"]) == 2
+    # invited_count counts successful EMAIL sends. With email disabled it's 0
+    # and the 2 emails land in failed_emails. The links still got created
+    # in the DB — that's what makes the wedge real.
+    assert data["invited_count"] + len(data["failed_emails"]) == 2
+
+
+def test_segment_invite_400_without_project(client, auth_headers, db_session):
+    """No interview track available → can't invite."""
+
+    survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
+    resp = client.post(
+        f"/surveys/{survey['id']}/segment/invite",
+        headers=auth_headers,
+        json={"filters": [{"question_id": q["id"], "operator": "lte", "value": 6}]},
+    )
+    assert resp.status_code == 400
+    assert "interview project" in resp.json()["detail"].lower()
+
+
+# ── Sprint 10: Segment Discoveries ───────────────────────────────────
+
+
+def _build_two_question_survey(client, auth_headers):
+    """Survey with one mc_single segment question and one NPS metric question."""
+
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "Discovery test"}
+    ).json()
+    seg_q = client.post(
+        f"/surveys/{survey['id']}/questions",
+        headers=auth_headers,
+        json={
+            "type": "mc_single",
+            "prompt": "Your role?",
+            "config": {
+                "choices": [
+                    {"id": "pm", "label": "Product Manager"},
+                    {"id": "designer", "label": "Designer"},
+                    {"id": "eng", "label": "Engineer"},
+                ],
+                "randomize": False,
+                "has_other": False,
+            },
+        },
+    ).json()
+    metric_q = client.post(
+        f"/surveys/{survey['id']}/questions",
+        headers=auth_headers,
+        json={"type": "nps", "prompt": "How likely to recommend?", "config": {}},
+    ).json()
+    link = client.post(
+        f"/surveys/{survey['id']}/links",
+        headers=auth_headers,
+        json={"is_anonymous": False},
+    ).json()
+    client.patch(f"/surveys/{survey['id']}", headers=auth_headers, json={"status": "live"})
+    return survey, seg_q, metric_q, link
+
+
+def test_discoveries_detects_segment_with_lower_nps(client, auth_headers):
+    """A clear over-indexing segment surfaces as a discovery."""
+
+    survey, seg_q, metric_q, link = _build_two_question_survey(client, auth_headers)
+
+    # 40 PMs averaging 3 (detractors) — well below overall.
+    # 40 Engineers averaging 9 (promoters) — well above overall.
+    cohorts = [("pm", 3, 40), ("eng", 9, 40)]
+    counter = 0
+    for role, score, n in cohorts:
+        for _ in range(n):
+            counter += 1
+            client.post(
+                f"/r/{link['token']}/responses",
+                json={
+                    "link_token": link["token"],
+                    "email": f"r-{counter}@example.com",
+                    "answers": [
+                        {"question_id": seg_q["id"], "value_choice_ids": [role]},
+                        {"question_id": metric_q["id"], "value_numeric": score},
+                    ],
+                    "is_complete": True,
+                },
+            )
+
+    resp = client.get(f"/surveys/{survey['id']}/discoveries", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["survey_id"] == survey["id"]
+    titles = [d["title"] for d in data["discoveries"]]
+    # PMs score below overall — at least one card mentions them.
+    assert any("Product Manager" in t.lower().title() or "product manager" in t.lower() for t in titles), titles
+    # Ready filter clauses point at the segment question.
+    for d in data["discoveries"]:
+        assert d["ready_filter"]
+        assert d["ready_filter"][0]["question_id"] == seg_q["id"]
+
+
+def test_discoveries_confidence_pills(client, auth_headers):
+    """Larger samples should produce a higher confidence pill."""
+
+    survey, seg_q, metric_q, link = _build_two_question_survey(client, auth_headers)
+
+    # 100 PMs at score 2, 100 Engineers at score 10 — should produce "strong" evidence.
+    for role, score in [("pm", 2)] * 100 + [("eng", 10)] * 100:
+        client.post(
+            f"/r/{link['token']}/responses",
+            json={
+                "link_token": link["token"],
+                "answers": [
+                    {"question_id": seg_q["id"], "value_choice_ids": [role]},
+                    {"question_id": metric_q["id"], "value_numeric": score},
+                ],
+                "is_complete": True,
+            },
+        )
+
+    data = client.get(f"/surveys/{survey['id']}/discoveries", headers=auth_headers).json()
+    confs = [d["confidence"] for d in data["discoveries"]]
+    # At this sample size + effect size, at least one finding should be "strong".
+    assert "strong" in confs or "supported" in confs, confs
+
+
+def test_discoveries_directional_for_small_segments(client, auth_headers):
+    """A segment with n<30 should max out at 'directional', never 'strong'."""
+
+    survey, seg_q, metric_q, link = _build_two_question_survey(client, auth_headers)
+
+    # Only 10 designers + 40 engineers. Designer segment is below the n=30 threshold.
+    cohorts = [("designer", 1, 10), ("eng", 10, 40)]
+    counter = 0
+    for role, score, n in cohorts:
+        for _ in range(n):
+            counter += 1
+            client.post(
+                f"/r/{link['token']}/responses",
+                json={
+                    "link_token": link["token"],
+                    "answers": [
+                        {"question_id": seg_q["id"], "value_choice_ids": [role]},
+                        {"question_id": metric_q["id"], "value_numeric": score},
+                    ],
+                    "is_complete": True,
+                },
+            )
+
+    data = client.get(f"/surveys/{survey['id']}/discoveries", headers=auth_headers).json()
+    # Find any discovery surfaced for the designer cohort.
+    designer_discos = [
+        d for d in data["discoveries"]
+        if any(rf["value"] == ["designer"] for rf in d["ready_filter"])
+    ]
+    for d in designer_discos:
+        assert d["confidence"] == "directional", d
+
+
+def test_discoveries_empty_for_under_used_survey(client, auth_headers):
+    """A survey with too few responses returns no discoveries."""
+
+    survey, _, _, link = _build_two_question_survey(client, auth_headers)
+    # 3 responses total — well below the MIN_SEGMENT_N floor.
+    for i in range(3):
+        client.post(
+            f"/r/{link['token']}/responses",
+            json={"link_token": link["token"], "answers": [], "is_complete": True},
+        )
+    data = client.get(f"/surveys/{survey['id']}/discoveries", headers=auth_headers).json()
+    assert data["discoveries"] == []
+
+
 def test_response_only_visible_to_owner_workspace(client, auth_headers, db_session):
     """Auth isolation — a survey created by company A is not listable by B."""
 

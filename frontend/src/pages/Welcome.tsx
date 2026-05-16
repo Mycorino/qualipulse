@@ -95,17 +95,25 @@ export default function Welcome() {
 
   const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
   // For Google signups we seed Company.name from the email domain (or
-  // the local part for free-mail addresses), but it can still match the
-  // person's name (e.g. corino@corino.com). When it's clearly a person
-  // we drop it from the role label so it reads "Your role" not
-  // "Your role at Corino Fontana".
+  // the local part for free-mail addresses), but the placeholder is
+  // often still meaningless to the user ("Your role at Mycorino"
+  // when their handle happens to match a freemail local-part). We
+  // consider the name an unconfirmed placeholder when it matches the
+  // person's full name, first/last name, or the email's local-part —
+  // and in those cases drop the "at <X>" suffix from the role label.
   const rawCompanyName = me?.name ?? "";
-  const looksLikePerson =
-    !!me?.first_name &&
-    !!me?.last_name &&
-    rawCompanyName.trim().toLowerCase() ===
-      `${me.first_name} ${me.last_name}`.trim().toLowerCase();
-  const companyName = looksLikePerson ? "" : rawCompanyName;
+  const emailLocalPart = (me?.email || "").split("@")[0] || "";
+  const normalized = rawCompanyName.trim().toLowerCase();
+  const isPlaceholderName =
+    !rawCompanyName ||
+    (!!me?.first_name &&
+      !!me?.last_name &&
+      normalized ===
+        `${me.first_name} ${me.last_name}`.trim().toLowerCase()) ||
+    (!!me?.first_name && normalized === me.first_name.toLowerCase()) ||
+    (!!me?.last_name && normalized === me.last_name.toLowerCase()) ||
+    (!!emailLocalPart && normalized === emailLocalPart.toLowerCase());
+  const companyName = isPlaceholderName ? "" : rawCompanyName;
 
   // Auto-poll for email verification
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -601,7 +609,9 @@ export default function Welcome() {
             <div className="onboarding-form">
               <div className="onboarding-field">
                 <label className="field-label" htmlFor="onb-role">
-                  {t("onboarding.roleTitleLabelShort")}
+                  {companyName
+                    ? t("onboarding.roleTitleLabel", { companyName })
+                    : t("onboarding.roleTitleLabelShort")}
                 </label>
                 <input
                   id="onb-role"

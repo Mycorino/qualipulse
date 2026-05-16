@@ -37,6 +37,8 @@ const SurveyEditor = lazy(() => import("./pages/SurveyEditor"));
 const SurveyPreview = lazy(() => import("./pages/SurveyPreview"));
 const SurveyDashboardPage = lazy(() => import("./pages/SurveyDashboard"));
 const PublicResponse = lazy(() => import("./pages/PublicResponse"));
+const StudyList = lazy(() => import("./pages/StudyList"));
+const StudyOverview = lazy(() => import("./pages/StudyOverview"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -193,6 +195,22 @@ export default function App() {
         }
       />
       <Route path="/r/:token" element={<PublicResponse />} />
+      <Route
+        path="/studies"
+        element={
+          <OnboardedRoute>
+            <StudyList />
+          </OnboardedRoute>
+        }
+      />
+      <Route
+        path="/studies/:id"
+        element={
+          <OnboardedRoute>
+            <StudyOverview />
+          </OnboardedRoute>
+        }
+      />
       <Route
         path="/account"
         element={

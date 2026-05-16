@@ -140,3 +140,43 @@ class ConsentAcknowledgment(Base):
         "StudyParticipant", back_populates="consent_acknowledgments"
     )
     study = relationship("Study")
+
+
+class StudyAnalysis(Base):
+    """Quantified Themes report generated for a Study (Sprint 11).
+
+    Parallel to `ProjectAnalysis` (the existing qualitative-only cache)
+    but mixes survey aggregates + interview transcripts into a single
+    `report` blob. The blob's shape is validated by `QuantifiedThemeReport`
+    in app/schemas/study.py.
+
+    `status` follows the same vocabulary as `project_analyses`:
+      "generating" | "ready" | "failed"
+    so the frontend polling helper is reusable.
+    """
+
+    __tablename__ = "study_analyses"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    study_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("studies.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="generating", nullable=False
+    )
+    # The Quantified Themes payload — see schemas/study.py.
+    report: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Snapshot of the inputs Claude saw — survey aggregates + transcript
+    # excerpts. Captured so a researcher can audit "where did this theme
+    # come from?" without re-running the generation.
+    inputs_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    study = relationship("Study")

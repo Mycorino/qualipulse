@@ -286,3 +286,95 @@ class PublicSurvey(BaseModel):
     description: str | None
     is_anonymous: bool
     questions: list[PublicQuestion]
+
+
+# ── Screener-bridge segment filtering (Sprint 9) ───────────────────────
+
+
+class SegmentFilterClause(BaseModel):
+    """One filter clause inside a segment query.
+
+    operator semantics depend on the target question's type:
+      - likert/nps + eq/lte/gte: value is a number
+      - likert/nps + between:    value is [low, high]
+      - mc_single/mc_multi + in: value is a list of choice ids
+    """
+
+    question_id: str
+    operator: Literal["eq", "lte", "gte", "between", "in"]
+    value: Any
+
+
+class SegmentPreviewRequest(BaseModel):
+    filters: list[SegmentFilterClause] = Field(default_factory=list)
+
+
+class SegmentPreviewResponse(BaseModel):
+    """Returned by POST /surveys/{id}/segment/preview.
+
+    Match counts are split between invitable (have an email) and skipped
+    (anonymous responses without an email) so the bridge UI can show the
+    upper bound + the actual invite count separately.
+    """
+
+    match_count: int
+    invitable_count: int
+    skipped_anonymous_count: int
+    # Up to 8 sample emails for the draft+review modal — only used to give
+    # the researcher a sanity check before they hit "Send all."
+    sample_invitees: list[dict[str, str]] = Field(default_factory=list)
+
+
+class SegmentInviteRequest(BaseModel):
+    filters: list[SegmentFilterClause] = Field(default_factory=list)
+    # Custom message appended to the invite email. Optional.
+    custom_message: str | None = None
+
+
+class SegmentInviteResult(BaseModel):
+    invited_count: int
+    skipped_count: int
+    failed_emails: list[str] = Field(default_factory=list)
+    interview_link_tokens: list[str] = Field(default_factory=list)
+
+
+# ── Sprint 10: Segment Discoveries ────────────────────────────────────
+
+
+class ReadyFilterSchema(BaseModel):
+    """Pre-populated bridge filter clause the dashboard wires up when the
+    researcher clicks 'Interview this segment' on a discovery card."""
+
+    question_id: str
+    operator: Literal["eq", "lte", "gte", "between", "in"]
+    value: Any
+
+
+class DiscoverySchema(BaseModel):
+    """One actionable observation about a segment of respondents.
+
+    The frontend reads `confidence`, `title`, `description`, and
+    `ready_filter` on every render. Numeric vs categorical extras
+    (segment_mean / lift_ratio etc.) are optional and let the UI render
+    a more specific card when present.
+    """
+
+    id: str
+    title: str
+    description: str
+    confidence: Literal["directional", "supported", "strong"]
+    segment_n: int
+    overall_n: int
+    metric_question_id: str
+    metric_question_prompt: str
+    metric_choice_label: str | None = None
+    segment_mean: float | None = None
+    overall_mean: float | None = None
+    lift_ratio: float | None = None
+    mean_delta: float | None = None
+    ready_filter: list[ReadyFilterSchema] = Field(default_factory=list)
+
+
+class DiscoveriesResponse(BaseModel):
+    survey_id: str
+    discoveries: list[DiscoverySchema]
