@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { StudyDetail, getStudy } from "../api/studies";
+import {
+  QuantifiedTheme,
+  StudyAnalysis,
+  StudyDetail,
+  getLatestAnalysis,
+  getStudy,
+  triggerAnalysis,
+} from "../api/studies";
+import { useToast } from "../components/Toast";
 
 /**
  * StudyOverview — `/studies/:id`.
@@ -149,7 +157,7 @@ export default function StudyOverview() {
         {tab === "surveys" && <SurveysTab study={study} navigate={navigate} />}
         {tab === "interviews" && <InterviewsTab study={study} navigate={navigate} />}
         {tab === "participants" && <ParticipantsTab study={study} />}
-        {tab === "report" && <ReportTab />}
+        {tab === "report" && <ReportTab studyId={study.id} progress={study.progress} />}
       </main>
     </div>
   );
@@ -308,18 +316,440 @@ function ParticipantsTab({ study }: { study: StudyDetail }) {
   );
 }
 
-function ReportTab() {
-  return (
-    <div className="chart-card">
-      <div className="chart-card__eyebrow">Sprint 11</div>
-      <div className="chart-card__takeaway">
-        The mixed-methods report lands in Sprint 11 — quantified themes pairing survey signal with interview evidence.
+function ReportTab({
+  studyId,
+  progress,
+}: {
+  studyId: string;
+  progress: StudyDetail["progress"];
+}) {
+  const { toast } = useToast();
+  const [analysis, setAnalysis] = useState<StudyAnalysis | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    getLatestAnalysis(studyId)
+      .then((a) => setAnalysis(a))
+      .catch(() => setAnalysis(null))
+      .finally(() => setLoading(false));
+  }, [studyId]);
+
+  const onGenerate = async () => {
+    setGenerating(true);
+    try {
+      const fresh = await triggerAnalysis(studyId);
+      setAnalysis(fresh);
+      if (fresh.status === "failed") {
+        toast(fresh.error || "Generation failed", "error");
+      } else {
+        toast("Report generated", "success");
+      }
+    } catch {
+      toast("Could not generate report", "error");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (loading) {
+    return <p className="quanti-showcase__section-meta">Loading…</p>;
+  }
+
+  // Empty-state CTA when no analysis exists yet.
+  if (!analysis) {
+    return (
+      <div
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px dashed var(--border-default)",
+          borderRadius: "var(--radius-md)",
+          padding: "var(--space-8)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "var(--space-4)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ maxWidth: 560 }}>
+          <h2
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: "var(--text-xl)",
+              letterSpacing: "-0.015em",
+              marginBottom: "var(--space-2)",
+            }}
+          >
+            Generate the Quantified Themes report
+          </h2>
+          <p
+            style={{
+              color: "var(--text-secondary)",
+              fontSize: "var(--text-md)",
+              lineHeight: 1.5,
+              margin: 0,
+            }}
+          >
+            Combines survey aggregates with interview transcripts into themes that pair what people
+            said with how often they said it. Each theme carries a recommended next step and a
+            confidence pill — the same methodology contract used everywhere else in the workspace.
+          </p>
+          {progress.total_completed_responses < 30 && (
+            <p
+              style={{
+                fontSize: "var(--text-xs)",
+                color: "var(--warning-text)",
+                marginTop: "var(--space-3)",
+              }}
+            >
+              ⚠ You have {progress.total_completed_responses} survey responses. Themes below n=30
+              will be marked "directional" — collect more responses for stronger evidence.
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onGenerate}
+          disabled={generating}
+        >
+          {generating ? "Generating… (≈10s)" : "Generate report"}
+        </button>
       </div>
-      <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-        Each theme will combine survey aggregates (n, %, segment over-index) with interview verbatim and a recommended action (product / marketing / next-research).
-        Today this tab is a placeholder; the data flows through `study_analyses` once that sprint ships.
-      </p>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+      {/* Report header + regenerate button */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--space-3)",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: "var(--text-eyebrow)",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--brand-700)",
+            }}
+          >
+            Quantified Themes · v{analysis.version}
+          </div>
+          <span className="tabular" style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+            Generated {analysis.generated_at ? new Date(analysis.generated_at).toLocaleString() : "—"}
+          </span>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={onGenerate}
+          disabled={generating}
+        >
+          {generating ? "Regenerating…" : "Regenerate"}
+        </button>
+      </header>
+
+      {analysis.status === "failed" && (
+        <div className="methodology-box methodology-box--inline">
+          ⚠ Last generation failed: {analysis.error || "unknown error"}
+        </div>
+      )}
+
+      {analysis.report && (
+        <>
+          {/* Executive summary */}
+          <section
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border-default)",
+              borderRadius: "var(--radius-lg)",
+              padding: "var(--space-6) var(--space-8)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "var(--text-eyebrow)",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--text-tertiary)",
+                marginBottom: "var(--space-3)",
+              }}
+            >
+              Executive summary
+            </div>
+            <p
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: "var(--text-lg)",
+                lineHeight: 1.5,
+                color: "var(--text-primary)",
+                margin: 0,
+                letterSpacing: "-0.01em",
+                maxWidth: "62ch",
+              }}
+            >
+              {analysis.report.executive_summary}
+            </p>
+          </section>
+
+          {/* Themes */}
+          <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            <div
+              style={{
+                fontSize: "var(--text-eyebrow)",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--text-tertiary)",
+              }}
+            >
+              {analysis.report.themes.length} theme{analysis.report.themes.length === 1 ? "" : "s"}
+            </div>
+            {analysis.report.themes.map((theme, i) => (
+              <ThemeCard key={i} theme={theme} />
+            ))}
+          </section>
+
+          {/* Methodology */}
+          <section
+            style={{
+              background: "var(--bg-sunken)",
+              borderRadius: "var(--radius-md)",
+              padding: "var(--space-4) var(--space-5)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "var(--text-eyebrow)",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--text-tertiary)",
+                marginBottom: "var(--space-2)",
+              }}
+            >
+              Methodology
+            </div>
+            <p
+              style={{
+                fontSize: "var(--text-sm)",
+                color: "var(--text-secondary)",
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              {analysis.report.methodology_note}
+            </p>
+            <div
+              className="tabular"
+              style={{
+                fontSize: "var(--text-xs)",
+                color: "var(--text-tertiary)",
+                marginTop: "var(--space-2)",
+              }}
+            >
+              {analysis.report.generated_with_survey_count} survey
+              {analysis.report.generated_with_survey_count === 1 ? "" : "s"} ·{" "}
+              {analysis.report.generated_with_response_count} responses ·{" "}
+              {analysis.report.generated_with_interview_count} interview
+              {analysis.report.generated_with_interview_count === 1 ? "" : "s"}
+            </div>
+          </section>
+        </>
+      )}
     </div>
+  );
+}
+
+function ThemeCard({ theme }: { theme: QuantifiedTheme }) {
+  const confidenceLabel: Record<QuantifiedTheme["confidence"], string> = {
+    directional: "Directional",
+    supported: "Supported",
+    strong: "Strong evidence",
+  };
+  const kindLabel: Record<QuantifiedTheme["recommendation"]["kind"], string> = {
+    product: "Product action",
+    marketing: "Marketing action",
+    next_research: "Next research step",
+  };
+  return (
+    <article
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-lg)",
+        padding: "var(--space-6) var(--space-7)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-4)",
+      }}
+    >
+      <header
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "var(--space-3)",
+        }}
+      >
+        <h3
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: "var(--text-headline)",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.2,
+            margin: 0,
+            maxWidth: "44ch",
+          }}
+        >
+          {theme.title}
+        </h3>
+        <span className={`confidence-pill confidence-pill--${theme.confidence}`}>
+          <span className="confidence-pill__dot" aria-hidden="true" />
+          {confidenceLabel[theme.confidence]}
+        </span>
+      </header>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "var(--space-4)",
+        }}
+      >
+        {/* Survey signal */}
+        {theme.survey_signal && (
+          <div>
+            <div
+              style={{
+                fontSize: "var(--text-eyebrow)",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--text-tertiary)",
+                marginBottom: "var(--space-2)",
+              }}
+            >
+              Survey signal
+            </div>
+            <p
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: "var(--text-md)",
+                lineHeight: 1.4,
+                color: "var(--text-primary)",
+                margin: 0,
+              }}
+            >
+              {theme.survey_signal.summary}
+            </p>
+            <div
+              className="tabular"
+              style={{
+                fontSize: "var(--text-xs)",
+                color: "var(--text-tertiary)",
+                marginTop: "var(--space-1)",
+              }}
+            >
+              n={theme.survey_signal.n}
+              {theme.survey_signal.segment_over_index
+                ? ` · over-index ${theme.survey_signal.segment_over_index.toFixed(1)}×`
+                : ""}
+              {theme.survey_signal.segment_label
+                ? ` · ${theme.survey_signal.segment_label}`
+                : ""}
+            </div>
+          </div>
+        )}
+
+        {/* Interview evidence */}
+        {theme.interview_evidence && (
+          <div>
+            <div
+              style={{
+                fontSize: "var(--text-eyebrow)",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--text-tertiary)",
+                marginBottom: "var(--space-2)",
+              }}
+            >
+              Interview evidence · {theme.interview_evidence.x_of_y}
+            </div>
+            <blockquote
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: "var(--text-md)",
+                fontStyle: "italic",
+                lineHeight: 1.5,
+                color: "var(--text-primary)",
+                margin: 0,
+                paddingLeft: "var(--space-3)",
+                borderLeft: "3px solid var(--brand-500)",
+              }}
+            >
+              "{theme.interview_evidence.anchor_quote}"
+            </blockquote>
+          </div>
+        )}
+      </div>
+
+      {/* Recommendation footer */}
+      <footer
+        style={{
+          borderTop: "1px solid var(--border-subtle)",
+          paddingTop: "var(--space-4)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "var(--text-eyebrow)",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "var(--brand-700)",
+            marginBottom: "var(--space-2)",
+          }}
+        >
+          {kindLabel[theme.recommendation.kind]}
+        </div>
+        <p
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: "var(--text-md)",
+            fontWeight: 500,
+            color: "var(--text-primary)",
+            margin: 0,
+            lineHeight: 1.4,
+          }}
+        >
+          {theme.recommendation.action}
+        </p>
+        {theme.recommendation.rationale && (
+          <p
+            style={{
+              fontSize: "var(--text-sm)",
+              color: "var(--text-secondary)",
+              marginTop: "var(--space-2)",
+              lineHeight: 1.5,
+            }}
+          >
+            {theme.recommendation.rationale}
+          </p>
+        )}
+      </footer>
+    </article>
   );
 }
 

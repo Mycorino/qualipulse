@@ -143,6 +143,133 @@ def test_study_detail_404_for_other_workspace(client, auth_headers):
     assert listing == []
 
 
+# ── Sprint 11: Quantified Themes report ──────────────────────────────
+
+
+def _seed_full_study(client, auth_headers):
+    """Build a study with one survey (mc_single + nps + mc_multi) seeded
+    with 4 cohorts to exercise the discoveries → themes pipeline."""
+
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "Sprint 11 fixture"}
+    ).json()
+    seg = client.post(
+        f"/surveys/{survey['id']}/questions",
+        headers=auth_headers,
+        json={
+            "type": "mc_single",
+            "prompt": "Your role?",
+            "config": {
+                "choices": [
+                    {"id": "pm", "label": "Product Manager"},
+                    {"id": "eng", "label": "Engineer"},
+                ],
+                "randomize": False,
+                "has_other": False,
+            },
+        },
+    ).json()
+    nps = client.post(
+        f"/surveys/{survey['id']}/questions",
+        headers=auth_headers,
+        json={"type": "nps", "prompt": "How likely to recommend?", "config": {}},
+    ).json()
+    link = client.post(
+        f"/surveys/{survey['id']}/links",
+        headers=auth_headers,
+        json={"is_anonymous": False},
+    ).json()
+    client.patch(f"/surveys/{survey['id']}", headers=auth_headers, json={"status": "live"})
+
+    cohorts = [("pm", 3, 40), ("eng", 9, 40)]
+    counter = 0
+    for role, score, n in cohorts:
+        for _ in range(n):
+            counter += 1
+            client.post(
+                f"/r/{link['token']}/responses",
+                json={
+                    "link_token": link["token"],
+                    "email": f"sp11-{counter}@example.com",
+                    "answers": [
+                        {"question_id": seg["id"], "value_choice_ids": [role]},
+                        {"question_id": nps["id"], "value_numeric": score},
+                    ],
+                    "is_complete": True,
+                },
+            )
+    return survey
+
+
+def test_create_analysis_returns_ready_report_in_stub_mode(client, auth_headers):
+    """With no ANTHROPIC_API_KEY the service emits a deterministic stub
+    so the rest of the system can be exercised end-to-end without an
+    AI dependency. Tests run with the key blanked out, so this hits
+    the stub path."""
+
+    survey = _seed_full_study(client, auth_headers)
+    resp = client.post(
+        f"/studies/{survey['study_id']}/analyses", headers=auth_headers
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["status"] == "ready"
+    assert data["report"] is not None
+    assert isinstance(data["report"]["themes"], list)
+    assert len(data["report"]["themes"]) >= 1
+    # Stub uses the discovery service as its data source; cohort gap → directional or supported.
+    confidences = {t["confidence"] for t in data["report"]["themes"]}
+    assert confidences.issubset({"directional", "supported", "strong"})
+
+
+def test_latest_analysis_returns_null_initially_then_the_one_we_made(client, auth_headers):
+    survey = _seed_full_study(client, auth_headers)
+    initial = client.get(
+        f"/studies/{survey['study_id']}/analyses/latest", headers=auth_headers
+    )
+    assert initial.status_code == 200
+    assert initial.json() is None
+
+    client.post(f"/studies/{survey['study_id']}/analyses", headers=auth_headers)
+
+    latest = client.get(
+        f"/studies/{survey['study_id']}/analyses/latest", headers=auth_headers
+    ).json()
+    assert latest is not None
+    assert latest["status"] == "ready"
+    assert latest["version"] == 1
+
+
+def test_versioning_increments_on_regenerate(client, auth_headers):
+    survey = _seed_full_study(client, auth_headers)
+    a1 = client.post(
+        f"/studies/{survey['study_id']}/analyses", headers=auth_headers
+    ).json()
+    a2 = client.post(
+        f"/studies/{survey['study_id']}/analyses", headers=auth_headers
+    ).json()
+    assert a2["version"] == a1["version"] + 1
+    rows = client.get(
+        f"/studies/{survey['study_id']}/analyses", headers=auth_headers
+    ).json()
+    assert len(rows) == 2
+
+
+def test_report_ready_flag_flips_progress_signal(client, auth_headers):
+    survey = _seed_full_study(client, auth_headers)
+    before = client.get(
+        f"/studies/{survey['study_id']}", headers=auth_headers
+    ).json()
+    assert before["progress"]["report_ready_placeholder"] is False
+
+    client.post(f"/studies/{survey['study_id']}/analyses", headers=auth_headers)
+
+    after = client.get(
+        f"/studies/{survey['study_id']}", headers=auth_headers
+    ).json()
+    assert after["progress"]["report_ready_placeholder"] is True
+
+
 def test_progress_reaches_inference_threshold_at_30_responses(
     client, auth_headers, db_session
 ):

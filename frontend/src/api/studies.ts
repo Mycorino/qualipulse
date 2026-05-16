@@ -65,3 +65,72 @@ export async function getStudy(id: string): Promise<StudyDetail> {
   const resp = await client.get<StudyDetail>(`/studies/${id}`);
   return resp.data;
 }
+
+/* ── Sprint 11: Quantified Themes report ─────────────────────── */
+
+export type Confidence = "directional" | "supported" | "strong";
+export type RecommendationKind = "product" | "marketing" | "next_research";
+
+export interface SurveySignal {
+  summary: string;
+  n: number;
+  percentage: number | null;
+  segment_label: string | null;
+  segment_over_index: number | null;
+}
+
+export interface InterviewEvidence {
+  x_of_y: string;
+  interview_count: number;
+  anchor_quote: string;
+  segments_mentioned: string[];
+}
+
+export interface ThemeRecommendation {
+  kind: RecommendationKind;
+  action: string;
+  rationale: string | null;
+}
+
+export interface QuantifiedTheme {
+  title: string;
+  survey_signal: SurveySignal | null;
+  interview_evidence: InterviewEvidence | null;
+  recommendation: ThemeRecommendation;
+  confidence: Confidence;
+}
+
+export interface QuantifiedThemeReport {
+  executive_summary: string;
+  themes: QuantifiedTheme[];
+  methodology_note: string;
+  generated_with_survey_count: number;
+  generated_with_response_count: number;
+  generated_with_interview_count: number;
+}
+
+export interface StudyAnalysis {
+  id: string;
+  study_id: string;
+  version: number;
+  status: "generating" | "ready" | "failed";
+  error: string | null;
+  created_at: string;
+  generated_at: string | null;
+  report: QuantifiedThemeReport | null;
+}
+
+export async function triggerAnalysis(studyId: string): Promise<StudyAnalysis> {
+  const resp = await client.post<StudyAnalysis>(`/studies/${studyId}/analyses`);
+  return resp.data;
+}
+
+export async function getLatestAnalysis(studyId: string): Promise<StudyAnalysis | null> {
+  const resp = await client.get<StudyAnalysis | null>(`/studies/${studyId}/analyses/latest`);
+  return resp.data;
+}
+
+export async function listAnalyses(studyId: string): Promise<StudyAnalysis[]> {
+  const resp = await client.get<StudyAnalysis[]>(`/studies/${studyId}/analyses`);
+  return resp.data;
+}
