@@ -378,6 +378,37 @@ export async function getDiscoveries(surveyId: string): Promise<DiscoveriesPaylo
   return resp.data;
 }
 
+/* ── Sprint 13: Question coach ─────────────────────────────────── */
+
+export interface LintFlag {
+  code: string;
+  tone: "warn" | "info";
+  label: string;
+  detail: string;
+  suggested_replacement: string | null;
+}
+
+export async function lintQuestion(
+  surveyId: string,
+  payload: {
+    prompt: string;
+    type: QuestionType;
+    config: Record<string, unknown>;
+    with_rewrite?: boolean;
+  },
+): Promise<LintFlag[]> {
+  const resp = await client.post<{ flags: LintFlag[] }>(
+    `/surveys/${surveyId}/questions/lint`,
+    {
+      prompt: payload.prompt,
+      type: payload.type,
+      config: payload.config,
+      with_rewrite: payload.with_rewrite ?? true,
+    },
+  );
+  return resp.data.flags;
+}
+
 /* ── Default config helpers (used by the editor when adding a question) */
 
 export function defaultConfigForType(type: QuestionType): Record<string, unknown> {

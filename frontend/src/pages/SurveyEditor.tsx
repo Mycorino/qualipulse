@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
+  LintFlag,
   QuestionType,
   Survey,
   SurveyQuestion,
@@ -9,6 +10,7 @@ import {
   defaultConfigForType,
   deprecateQuestion,
   getSurvey,
+  lintQuestion,
   listLinks,
   createLink,
   listQuestions,
@@ -330,6 +332,7 @@ export default function SurveyEditor() {
             <ActiveQuestionEditor
               key={activeQuestion.id}
               question={activeQuestion}
+              surveyId={survey.id}
               onChange={(payload) => {
                 setQuestions((prev) =>
                   prev.map((q) =>
@@ -422,13 +425,47 @@ function TypePickerPane({
 
 function ActiveQuestionEditor({
   question,
+  surveyId,
   onChange,
 }: {
   question: SurveyQuestion;
+  surveyId: string;
   onChange: (
     payload: Partial<{ prompt: string; is_required: boolean; config: Record<string, unknown> }>,
   ) => void;
 }) {
+  // ── Sprint 13: inline question coach ───────────────────────────
+  const [lintFlags, setLintFlags] = useState<LintFlag[]>([]);
+  const [linting, setLinting] = useState(false);
+  const lintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (lintTimer.current) clearTimeout(lintTimer.current);
+    if (!question.prompt || question.prompt.trim().length < 4) {
+      setLintFlags([]);
+      return;
+    }
+    setLinting(true);
+    lintTimer.current = setTimeout(async () => {
+      try {
+        const flags = await lintQuestion(surveyId, {
+          prompt: question.prompt,
+          type: question.type,
+          config: question.config,
+          with_rewrite: true,
+        });
+        setLintFlags(flags);
+      } catch {
+        setLintFlags([]);
+      } finally {
+        setLinting(false);
+      }
+    }, 900);
+    return () => {
+      if (lintTimer.current) clearTimeout(lintTimer.current);
+    };
+  }, [surveyId, question.prompt, question.type, question.config]);
+
   return (
     <div className="survey-q-editor" style={{ maxWidth: 720, margin: "0 auto" }}>
       <div className="survey-q-editor__head">
@@ -459,6 +496,14 @@ function ActiveQuestionEditor({
         rows={2}
       />
 
+      {(lintFlags.length > 0 || linting) && (
+        <QuestionCoachPanel
+          flags={lintFlags}
+          linting={linting}
+          onApplyRewrite={(rewrite) => onChange({ prompt: rewrite })}
+        />
+      )}
+
       <div className="survey-q-editor__divider" />
 
       <ConfigEditor
@@ -466,6 +511,117 @@ function ActiveQuestionEditor({
         config={question.config}
         onChange={(c) => onChange({ config: c })}
       />
+    </div>
+  );
+}
+
+function QuestionCoachPanel({
+  flags,
+  linting,
+  onApplyRewrite,
+}: {
+  flags: LintFlag[];
+  linting: boolean;
+  onApplyRewrite: (rewrite: string) => void;
+}) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        marginTop: "var(--space-3)",
+        background: "var(--bg-base)",
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)",
+        padding: "var(--space-3) var(--space-4)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: "var(--space-2)",
+          marginBottom: "var(--space-2)",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "var(--text-eyebrow)",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "var(--brand-700)",
+          }}
+        >
+          Question coach
+        </span>
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+          {linting ? "Checking…" : "Advisory only — apply at your discretion"}
+        </span>
+      </div>
+      {flags.length === 0 ? (
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)", margin: 0 }}>
+          Looking for double-barreled phrasing, leading wording, and bias patterns…
+        </p>
+      ) : (
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {flags.map((flag) => (
+            <li
+              key={flag.code}
+              className={`survey-q-editor__guardrail survey-q-editor__guardrail--${flag.tone}`}
+              style={{ padding: "var(--space-3)" }}
+            >
+              <div style={{ fontWeight: 600 }}>{flag.label}</div>
+              <div style={{ marginTop: 4, fontSize: "var(--text-xs)" }}>{flag.detail}</div>
+              {flag.suggested_replacement && (
+                <div
+                  style={{
+                    marginTop: "var(--space-2)",
+                    padding: "var(--space-2) var(--space-3)",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "var(--brand-700)",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Suggested replacement
+                  </div>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-serif)",
+                      fontSize: "var(--text-sm)",
+                      fontStyle: "italic",
+                      margin: 0,
+                      color: "var(--text-primary)",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    "{flag.suggested_replacement}"
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-xs"
+                    style={{ marginTop: "var(--space-2)" }}
+                    onClick={() => onApplyRewrite(flag.suggested_replacement!)}
+                  >
+                    Apply this rewrite
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

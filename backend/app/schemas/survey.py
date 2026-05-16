@@ -378,3 +378,35 @@ class DiscoverySchema(BaseModel):
 class DiscoveriesResponse(BaseModel):
     survey_id: str
     discoveries: list[DiscoverySchema]
+
+
+# ── Sprint 13: Question coach (lint) ─────────────────────────────────
+
+
+class LintFlagSchema(BaseModel):
+    """One advisory note from the question coach."""
+
+    code: str
+    tone: Literal["warn", "info"]
+    label: str
+    detail: str
+    suggested_replacement: str | None = None
+
+
+class LintRequest(BaseModel):
+    """Payload for POST /surveys/{id}/questions/lint.
+
+    The endpoint is workspace-scoped so we know who's invoking the
+    coach (for usage logging in a future sprint), but the prompt + type
+    don't need to match a saved question — researchers can lint a
+    draft they haven't saved yet.
+    """
+
+    prompt: str
+    type: QuestionType
+    config: dict[str, Any] = Field(default_factory=dict)
+    with_rewrite: bool = True
+
+
+class LintResponse(BaseModel):
+    flags: list[LintFlagSchema]

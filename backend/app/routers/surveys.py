@@ -38,6 +38,9 @@ from app.schemas.survey import (
     AnswerSubmission,
     DiscoveriesResponse,
     DiscoverySchema,
+    LintFlagSchema,
+    LintRequest,
+    LintResponse,
     PublicQuestion,
     PublicSurvey,
     QuestionCreate,
@@ -60,6 +63,7 @@ from app.schemas.survey import (
     QuestionAnalyticsSchema,
     validate_question_config,
 )
+from app.services.question_coach import lint_question
 from app.models.interview import InterviewLink
 from app.models.project import Project
 from app.services.email import send_interview_invite
@@ -515,6 +519,44 @@ def list_links(
     survey = _get_survey_or_404(db, survey_id, company)
     links = db.query(SurveyLink).filter(SurveyLink.survey_id == survey.id).all()
     return [SurveyLinkResponse.model_validate(link) for link in links]
+
+
+# ── Question Coach (Sprint 13 — prescriptive lint) ──────────────────
+
+
+@router.post("/{survey_id}/questions/lint", response_model=LintResponse)
+def lint_survey_question(
+    survey_id: str,
+    body: LintRequest,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> LintResponse:
+    """Lint a draft question prompt + config. Non-blocking advisory.
+
+    Workspace-scoped so the survey existence + ownership is verified, but
+    the prompt + config in the body don't have to match a saved question
+    yet — researchers can lint as they type.
+    """
+
+    _get_survey_or_404(db, survey_id, company)
+    result = lint_question(
+        prompt=body.prompt,
+        question_type=body.type,
+        config=body.config,
+        with_rewrite=body.with_rewrite,
+    )
+    return LintResponse(
+        flags=[
+            LintFlagSchema(
+                code=f.code,
+                tone=f.tone,  # type: ignore[arg-type]
+                label=f.label,
+                detail=f.detail,
+                suggested_replacement=f.suggested_replacement,
+            )
+            for f in result.flags
+        ]
+    )
 
 
 # ── Segment Discoveries (Sprint 10 — the "we found N segments worth interviewing" surface) ──
