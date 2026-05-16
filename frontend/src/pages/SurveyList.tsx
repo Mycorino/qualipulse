@@ -9,6 +9,7 @@ import {
   listSurveys,
   listTemplates,
 } from "../api/surveys";
+import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
 
 /**
@@ -64,6 +65,7 @@ export default function SurveyList() {
 
   return (
     <div className="quanti-showcase" style={{ padding: "var(--space-10) var(--report-canvas-pad-x)" }}>
+      <SurveyQuotaBanner />
       <header
         className="quanti-showcase__hero"
         style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}

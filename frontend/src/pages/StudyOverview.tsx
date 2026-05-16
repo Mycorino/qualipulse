@@ -9,6 +9,7 @@ import {
   getStudy,
   triggerAnalysis,
 } from "../api/studies";
+import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
 
 /**
@@ -153,6 +154,7 @@ export default function StudyOverview() {
       </nav>
 
       <main style={{ maxWidth: 1120, margin: "0 auto", padding: "var(--space-6)" }}>
+        <SurveyQuotaBanner />
         {tab === "overview" && <OverviewTab study={study} navigate={navigate} />}
         {tab === "surveys" && <SurveysTab study={study} navigate={navigate} />}
         {tab === "interviews" && <InterviewsTab study={study} navigate={navigate} />}
