@@ -89,6 +89,12 @@ def generate_onboarding_study(
         f"\"main_question\": str, \"interview_notes\": str, \"desired_learning\": str}}\n"
         f"  Use 3 sections: warmup (1 question, builds rapport), core (3 questions, the "
         f"heart of the study), closing (1 question, reflective).\n"
+        f"- other_directions: array of exactly 3 OTHER research questions this researcher "
+        f"might want to run later, DIFFERENT from the main study above. Each is one short "
+        f"sentence (max 12 words), phrased as a curiosity. Reference the actual business "
+        f"context, not generic topics. NEVER invent specific numbers or metrics. "
+        f"GOOD: \"How do new hires onboard onto the dashboard?\". "
+        f"BAD: \"Customer feedback\" (too vague), \"Why did churn rise 12% in Q2\" (invented numbers).\n"
         f"</task>\n\n"
         f"<question_rules>\n"
         f"- Open-ended ONLY. NEVER yes/no.\n"
@@ -114,7 +120,8 @@ def generate_onboarding_study(
         f'  "questions": [\n'
         f'    {{"section_index": 0, "section_title": "...", "question_index": 0, '
         f'"main_question": "...", "interview_notes": "...", "desired_learning": "..."}}\n'
-        f"  ]\n"
+        f"  ],\n"
+        f'  "other_directions": ["...", "...", "..."]\n'
         f"}}\n"
         f"</output_format>\n\n"
         f"{lang_instruction}"
@@ -165,6 +172,18 @@ def generate_onboarding_study(
             parsed["sample_size"] = max(3, min(20, int(parsed.get("sample_size", 6))))
         except (ValueError, TypeError):
             parsed["sample_size"] = 6
+
+        # other_directions is optional — coerce to a clean list of strings.
+        # Surfaces alternative research questions on Step 4 + reused as
+        # selected_use_cases in the welcome email so the 3 suggestions
+        # there match what we showed in-app.
+        raw_other = parsed.get("other_directions") or []
+        if isinstance(raw_other, list):
+            parsed["other_directions"] = [
+                str(s).strip() for s in raw_other if isinstance(s, str) and s.strip()
+            ][:3]
+        else:
+            parsed["other_directions"] = []
 
         logger.info(
             "onboarding_intelligence.study: generated %d questions for %s",
