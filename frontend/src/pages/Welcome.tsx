@@ -7,7 +7,6 @@ import {
   saveOnboardingProfile,
   resendVerification,
   analyseWebsite,
-  classifyRole,
   generateRecap,
 } from "../api/auth";
 import type { CompanyResponse } from "../api/auth";
@@ -100,13 +99,8 @@ export default function Welcome() {
   const [manualMode, setManualMode] = useState(false);
   const [websiteHint, setWebsiteHint] = useState<string | null>(null);
   const analyseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Use cases
-  const [useCases, setUseCases] = useState<string[]>([]);
-  const [selectedUseCases, setSelectedUseCases] = useState<Set<string>>(new Set());
-  const [useCasesLoading, setUseCasesLoading] = useState(false);
-  const [useCasesFetched, setUseCasesFetched] = useState(false);
-  const [newUseCaseInput, setNewUseCaseInput] = useState("");
   const [goalsFreeform, setGoalsFreeform] = useState("");
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   // Step 4 — Brief
   const [recap, setRecap] = useState("");
@@ -121,7 +115,7 @@ export default function Welcome() {
   // Step labels — 4 steps
   const STEP_LABELS = [
     t("onboarding.steps.verify"),
-    t("onboarding.steps.aboutYou"),
+    t("onboarding.steps.researchGoal"),
     t("onboarding.steps.yourCompany"),
     t("onboarding.steps.yourBrief"),
   ];
@@ -172,7 +166,6 @@ export default function Welcome() {
         if (data.business_summary) setBusinessSummary(data.business_summary);
         if (data.industry) setIndustry(data.industry);
         if (data.primary_region) setPrimaryRegion(data.primary_region);
-        if (data.selected_use_cases) setUseCases(data.selected_use_cases);
         if (data.goals_freeform) setGoalsFreeform(data.goals_freeform);
         setLoading(false);
       })
@@ -246,7 +239,7 @@ export default function Welcome() {
 
   // Step 2 -> 3
   async function handleAboutYouContinue() {
-    if (!roleTitle.trim() || !researchExperience) return;
+    if (!roleTitle.trim() || !occupationDescription.trim() || !researchExperience) return;
     setSaving(true);
     setError("");
     try {
@@ -373,39 +366,6 @@ export default function Welcome() {
     return () => clearInterval(id);
   }, [websiteLoading]);
 
-  // Fetch use-case suggestions when industry becomes available
-  const classifyTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (!industry) return;
-    if (classifyTriggeredRef.current) return;
-    if (useCasesFetched) return;
-
-    classifyTriggeredRef.current = true;
-    setUseCasesLoading(true);
-    classifyRole({
-      role_title: roleTitle.trim() || undefined,
-      occupation_description: occupationDescription.trim() || undefined,
-      industry,
-      business_summary: businessSummary.trim() || undefined,
-      language: uiLang,
-    })
-      .then((res) => {
-        if (res.suggested_use_cases && res.suggested_use_cases.length > 0) {
-          setUseCases(res.suggested_use_cases);
-        }
-        setUseCasesFetched(true);
-      })
-      .catch(() => {
-        // Fail silently — user can add their own
-        setUseCasesFetched(true);
-      })
-      .finally(() => {
-        setUseCasesLoading(false);
-        classifyTriggeredRef.current = false;
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [industry]);
-
   // Step 3 -> 4
   async function handleCompanyContinue() {
     const trimmed = websiteUrl.trim();
@@ -413,22 +373,6 @@ export default function Welcome() {
       handleAnalyseWebsite();
       return;
     }
-
-    // Flush any pending custom use-case input the user typed but didn't
-    // explicitly add — otherwise their own research question is silently
-    // dropped and the personalised brief reflects only the suggestions.
-    const pendingCustom = newUseCaseInput.trim();
-    const augmentedUseCases =
-      pendingCustom && !useCases.includes(pendingCustom)
-        ? [...useCases, pendingCustom]
-        : useCases;
-    if (pendingCustom && augmentedUseCases !== useCases) {
-      setUseCases(augmentedUseCases);
-      setSelectedUseCases((prev) => new Set(prev).add(pendingCustom));
-      setNewUseCaseInput("");
-    }
-    const augmentedSelected = pendingCustom ? new Set([...selectedUseCases, pendingCustom]) : selectedUseCases;
-    const finalActiveUseCases = augmentedUseCases.filter((uc) => augmentedSelected.has(uc));
 
     setSaving(true);
     setError("");
@@ -439,7 +383,6 @@ export default function Welcome() {
         business_summary: businessSummary.trim() || undefined,
         industry: industry || undefined,
         primary_region: primaryRegion || undefined,
-        selected_use_cases: finalActiveUseCases.length > 0 ? finalActiveUseCases.join(",") : undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
       // Reflect the corrected workspace name locally so step 4's recap
@@ -469,7 +412,6 @@ export default function Welcome() {
       research_experience: researchExperience || undefined,
       industry: industry || undefined,
       business_summary: businessSummary.trim() || undefined,
-      selected_use_cases: activeUseCases.length > 0 ? activeUseCases : undefined,
       goals_freeform: goalsFreeform.trim() || undefined,
       language: uiLang,
     })
@@ -492,7 +434,6 @@ export default function Welcome() {
     try {
       await completeOnboarding({
         onboarding_recap: recap || undefined,
-        selected_use_cases: activeUseCases.length > 0 ? activeUseCases.join(",") : undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
       });
       setCachedOnboarded(true);
@@ -502,27 +443,6 @@ export default function Welcome() {
     } finally {
       setSaving(false);
     }
-  }
-
-  function toggleUseCase(uc: string) {
-    setSelectedUseCases((prev) => {
-      const next = new Set(prev);
-      if (next.has(uc)) next.delete(uc);
-      else next.add(uc);
-      return next;
-    });
-  }
-
-  const activeUseCases = useCases.filter((uc) => selectedUseCases.has(uc));
-
-  function addCustomUseCase() {
-    const trimmed = newUseCaseInput.trim();
-    if (!trimmed) return;
-    if (!useCases.includes(trimmed)) {
-      setUseCases((prev) => [...prev, trimmed]);
-    }
-    setSelectedUseCases((prev) => new Set(prev).add(trimmed));
-    setNewUseCaseInput("");
   }
 
   if (loading) {
@@ -577,8 +497,6 @@ export default function Welcome() {
     </div>
   );
 
-  // Carousel messages for use-case loading
-  const useCaseCarouselMessages = t("onboarding.useCasesCarousel", { returnObjects: true }) as string[];
   // Carousel messages for recap loading
   const recapCarouselMessages = (t("onboarding.briefCarousel", {
     returnObjects: true,
@@ -668,16 +586,16 @@ export default function Welcome() {
           </div>
         )}
 
-        {/* ── Step 2: About you ── */}
+        {/* ── Step 2: What do you want to learn? ── */}
         {step === 2 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">{t("onboarding.aboutTitle")}</h1>
-            <p className="welcome-subtitle">{t("onboarding.aboutSubtitle")}</p>
+            <h1 className="welcome-title">{t("onboarding.researchIntentTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.researchIntentSubtitle")}</p>
 
             <div className="onboarding-form">
               <div className="onboarding-field">
                 <label className="field-label" htmlFor="onb-role">
-                  {t("onboarding.roleTitleLabel", { companyName: companyName || "your company" })}
+                  {t("onboarding.roleTitleLabelShort")}
                 </label>
                 <input
                   id="onb-role"
@@ -694,15 +612,15 @@ export default function Welcome() {
 
               <div className="onboarding-field">
                 <label className="field-label" htmlFor="onb-occupation">
-                  {t("onboarding.occupationLabel")}
+                  {t("onboarding.researchIntentLabel")}
                 </label>
                 <textarea
                   id="onb-occupation"
                   className="field-input"
                   value={occupationDescription}
                   onChange={(e) => setOccupationDescription(e.target.value)}
-                  placeholder={t("onboarding.occupationPlaceholder")}
-                  rows={2}
+                  placeholder={t("onboarding.researchIntentPlaceholder")}
+                  rows={3}
                   style={{ resize: "vertical", lineHeight: 1.6 }}
                   disabled={saving}
                 />
@@ -729,7 +647,7 @@ export default function Welcome() {
               <button
                 className="btn btn-primary btn-lg"
                 onClick={handleAboutYouContinue}
-                disabled={saving || !roleTitle.trim() || !researchExperience}
+                disabled={saving || !roleTitle.trim() || !occupationDescription.trim() || !researchExperience}
               >
                 {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
@@ -898,8 +816,34 @@ export default function Welcome() {
                 )}
               </div>
 
-              {/* Business summary textarea */}
-              {(businessSummary || manualMode) && (
+              {/* Business summary — collapsed when AI-drafted, inline when manual */}
+              {businessSummary && analysedUrl && !manualMode && !summaryExpanded && (
+                <div className="onboarding-field">
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "var(--text-secondary)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span>✨ {t("onboarding.websiteAutoFilled")}</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setSummaryExpanded(true)}
+                      disabled={saving}
+                      style={{ fontSize: 13, padding: "2px 0", textDecoration: "underline" }}
+                    >
+                      {t("onboarding.editAiSummary")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(manualMode || summaryExpanded) && (businessSummary || manualMode) && (
                 <div className="onboarding-field">
                   <label className="field-label">
                     {t("onboarding.businessSummaryLabel")}{" "}
@@ -907,26 +851,11 @@ export default function Welcome() {
                       {t("onboarding.websiteOptional")}
                     </span>
                   </label>
-                  {businessSummary && analysedUrl && (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "var(--text-muted)",
-                        marginBottom: 6,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <span>✨</span>
-                      <span>{t("onboarding.websiteAutoFilled")}</span>
-                    </div>
-                  )}
                   <textarea
                     className="field-input"
                     value={businessSummary}
                     onChange={(e) => setBusinessSummary(e.target.value)}
-                    rows={4}
+                    rows={manualMode ? 3 : 4}
                     placeholder={t("onboarding.businessSummaryPlaceholder")}
                     style={{ resize: "vertical", lineHeight: 1.6 }}
                     disabled={saving}
@@ -941,6 +870,15 @@ export default function Welcome() {
                         style={{ fontSize: 13 }}
                       >
                         ↻ {t("onboarding.websiteTryAgain")}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setSummaryExpanded(false)}
+                        disabled={saving}
+                        style={{ fontSize: 13 }}
+                      >
+                        {t("onboarding.hideAiSummary")}
                       </button>
                     </div>
                   )}
@@ -1007,75 +945,6 @@ export default function Welcome() {
                 </div>
               )}
 
-              {/* Use-case chips */}
-              {(industry || manualMode) && (
-                <div className="onboarding-field">
-                  <label className="field-label">{t("onboarding.useCasesLabel")}</label>
-                  <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 0, marginBottom: 12 }}>
-                    {t("onboarding.useCasesHint")}
-                  </p>
-
-                  {useCasesLoading ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
-                      <span
-                        className="spinner"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          border: "2px solid var(--primary)",
-                          borderTopColor: "transparent",
-                          borderRadius: "50%",
-                          display: "inline-block",
-                          animation: "spin 0.6s linear infinite",
-                          flexShrink: 0,
-                        }}
-                      />
-                      <LoadingCarousel
-                        messages={Array.isArray(useCaseCarouselMessages) ? useCaseCarouselMessages : ["Analyzing your profile..."]}
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="use-case-chips">
-                        {useCases.map((uc) => {
-                          const selected = selectedUseCases.has(uc);
-                          return (
-                            <button
-                              key={uc}
-                              type="button"
-                              className={`use-case-chip${selected ? " use-case-chip--selected" : ""}`}
-                              onClick={() => toggleUseCase(uc)}
-                              disabled={saving}
-                              aria-pressed={selected}
-                            >
-                              <span style={{ marginRight: 6, fontSize: 13 }}>{selected ? "✓" : "+"}</span>
-                              {uc}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <input
-                          type="text"
-                          className="field-input add-use-case-input"
-                          value={newUseCaseInput}
-                          onChange={(e) => setNewUseCaseInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addCustomUseCase();
-                            }
-                          }}
-                          placeholder={t("onboarding.addUseCasePlaceholder")}
-                          disabled={saving}
-                          style={{ flex: 1 }}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
               {/* Anything else */}
               {(industry || manualMode) && (
                 <div className="onboarding-field">
@@ -1107,7 +976,7 @@ export default function Welcome() {
                 {saving ? t("onboarding.saving") : t("onboarding.continue")}
               </button>
               <button className="btn btn-ghost" onClick={() => setStep(2)} disabled={saving}>
-                ← {t("onboarding.steps.aboutYou")}
+                ← {t("onboarding.steps.researchGoal")}
               </button>
             </div>
           </div>
