@@ -487,6 +487,16 @@ function ReportTab({
           </span>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          {analysis.status === "ready" && analysis.report && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => window.print()}
+              title="Print or save the report as a PDF"
+            >
+              Export PDF
+            </button>
+          )}
           {!validation && analysis.status === "ready" && (
             <button
               type="button"

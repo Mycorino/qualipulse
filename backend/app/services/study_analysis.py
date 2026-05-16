@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 
 import httpx
@@ -148,6 +149,12 @@ def trigger_study_analysis(db: Session, study: Study) -> StudyAnalysis:
 
     try:
         report_json, inputs_snapshot = _generate_report(db, study)
+        # Post-generation: verify every interview_evidence anchor quote is
+        # actually a verbatim substring of a real InterviewTurn transcript
+        # on a sibling Project. Anything that can't be verified is
+        # stripped — preserves the methodology contract even if Claude
+        # drifts on the system prompt's "never fabricate quotes" rule.
+        report_json = _verify_anchor_quotes(db, study, report_json)
         analysis.report = report_json
         analysis.inputs_snapshot = inputs_snapshot
         analysis.status = "ready"
@@ -400,3 +407,121 @@ def _find_first_quote(transcripts: list[dict]) -> str | None:
             if line.startswith("A:") and len(line) > 30:
                 return line[2:].strip().strip(".")
     return None
+
+
+# ── Anchor-quote verification (post-generation) ───────────────────────
+
+
+def _verify_anchor_quotes(db: Session, study: Study, report_json: str) -> str:
+    """Strip interview_evidence whose anchor_quote isn't real.
+
+    Claude is *instructed* never to fabricate quotes, but post-generation
+    verification means a drift doesn't break the methodology contract.
+    For each theme:
+      - Take interview_evidence.anchor_quote.
+      - Normalize (collapse whitespace, lowercase) for fuzzy matching.
+      - Compare against the same-normalized transcripts on the study's
+        sibling Projects.
+      - If not found, strip interview_evidence and downgrade confidence
+        from "strong" → "supported".
+
+    Returns the (possibly modified) report JSON. If parsing fails we
+    return the original — the caller's status="ready" handling is
+    unaffected.
+    """
+
+    try:
+        report = json.loads(report_json)
+    except (json.JSONDecodeError, TypeError):
+        return report_json
+
+    themes = report.get("themes") or []
+    if not themes:
+        return report_json
+
+    # Gather the verbatim transcript pool from sibling projects.
+    transcript_corpus = _normalised_transcript_corpus(db, study)
+    if not transcript_corpus:
+        # No transcripts to verify against → if a theme claims interview
+        # evidence, strip it. Nothing to hallucinate against.
+        for theme in themes:
+            if theme.get("interview_evidence"):
+                theme["interview_evidence"] = None
+                if theme.get("confidence") == "strong":
+                    theme["confidence"] = "supported"
+        return json.dumps(report)
+
+    stripped = 0
+    for theme in themes:
+        evidence = theme.get("interview_evidence")
+        if not evidence:
+            continue
+        quote = evidence.get("anchor_quote") or ""
+        normalised = _normalise_for_substring(quote)
+        # Require at least 12 characters of meaningful overlap to count
+        # as a verified verbatim — shorter snippets ("yes", "exactly")
+        # are too easy to coincidentally match.
+        if len(normalised) < 12 or normalised not in transcript_corpus:
+            theme["interview_evidence"] = None
+            if theme.get("confidence") == "strong":
+                theme["confidence"] = "supported"
+            stripped += 1
+
+    if stripped:
+        logger.info(
+            "Verbatim verifier stripped %d unverified anchor quote(s) for study %s",
+            stripped,
+            study.id,
+        )
+    return json.dumps(report)
+
+
+def _normalised_transcript_corpus(db: Session, study: Study) -> str:
+    """Concatenate every InterviewTurn.response_transcript on the study's
+    sibling projects, normalised for substring search. One giant string
+    keeps the verification cost O(N quotes × M transcript chars) which
+    for typical studies (<50 transcripts, <100k chars) is well under 1ms."""
+
+    project_ids = [
+        p.id
+        for p in db.query(Project)
+        .filter(Project.study_id == study.id, Project.archived_at.is_(None))
+        .all()
+    ]
+    if not project_ids:
+        return ""
+    turns = (
+        db.query(InterviewTurn)
+        .join(Participant, InterviewTurn.participant_id == Participant.id)
+        .filter(Participant.project_id.in_(project_ids))
+        .all()
+    )
+    parts: list[str] = []
+    for t in turns:
+        if t.response_transcript:
+            parts.append(_normalise_for_substring(t.response_transcript))
+    return " ".join(parts)
+
+
+def _normalise_for_substring(text: str) -> str:
+    """Lowercase + collapse whitespace + drop quote characters.
+
+    Claude often returns quotes with curly/smart punctuation while the
+    raw transcript stores straight ASCII; normalising both sides lets
+    the substring match survive that drift.
+    """
+
+    if not text:
+        return ""
+    # Replace smart quotes + ellipsis with straight equivalents.
+    cleaned = (
+        text.replace("‘", "'")
+        .replace("’", "'")
+        .replace("“", '"')
+        .replace("”", '"')
+        .replace("…", "...")
+    )
+    # Drop ALL quote chars + collapse whitespace.
+    cleaned = re.sub(r"[\"']", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip().lower()
