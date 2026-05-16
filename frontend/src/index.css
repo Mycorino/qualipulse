@@ -9268,3 +9268,75 @@ select.field-input {
   font-size: var(--text-xl);
   color: var(--text-primary);
 }
+
+/* ============================================
+   v1.1 — Mobile pass: Study Overview + quanti surfaces
+   ============================================
+   The new pages use inline styles for the most part (built fast,
+   desktop-first). These rules patch the obvious overflow + cramping
+   issues without rewriting the components. Scoped narrowly so they
+   only kick in below the relevant breakpoint.
+   ============================================ */
+
+@media (max-width: 720px) {
+  /* StudyOverview tab nav can overflow horizontally; let it scroll. */
+  nav[aria-label="Study sections"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+  nav[aria-label="Study sections"] button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Theme cards collapse their two-column body to one column on mobile. */
+  article > div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Validation banner stacks vertically on narrow viewports. */
+  div[style*="justify-content: space-between"][style*="border-radius"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--space-3) !important;
+  }
+}
+
+/* ============================================
+   v1.1 — Print: Study Overview Report tab
+   ============================================
+   The existing Sprint 5 print stylesheet handles the design-system
+   showcase report. The live Study Overview Report tab is a different
+   surface so we add scoped print rules here: hide the workspace chrome
+   (topbar, tabs, banners, the action buttons themselves), keep only
+   the report content.
+   ============================================ */
+
+@media print {
+  /* Hide the page chrome around the report */
+  header[role="banner"],
+  nav[aria-label="Study sections"],
+  .survey-quota-banner,
+  /* Hide the action buttons in the report header (Regenerate, Export
+     PDF, Validate these themes) — keep the title + timestamp. */
+  header button {
+    display: none !important;
+  }
+
+  /* Reset page background so the printed page is white */
+  body, .quanti-showcase { background: #fff !important; }
+
+  /* Theme cards: each on its own page for legibility */
+  article {
+    page-break-inside: avoid;
+  }
+
+  /* Don't let the validation banner blue tint print as a colour bar */
+  .methodology-box,
+  div[role="status"] {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #d8dce6 !important;
+  }
+}

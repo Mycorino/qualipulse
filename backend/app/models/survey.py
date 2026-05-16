@@ -58,6 +58,15 @@ class Survey(Base):
     # researcher overrides; powers MethodologyBox on every dashboard view.
     fielding_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     fielding_ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Sprint 14: validation surveys generated from a StudyAnalysis link
+    # back via this column. SET NULL on analysis delete so we don't lose
+    # responses when an old analysis is pruned.
+    source_analysis_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("study_analyses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

@@ -186,6 +186,14 @@ export default function Dashboard() {
           <span className="dashboard-hamburger-bar" />
         </button>
         <nav className={`dashboard-nav dashboard-nav--with-avatar${menuOpen ? " dashboard-nav--open" : ""}`}>
+          <button
+            className="btn btn-ghost"
+            style={{ minHeight: 44 }}
+            onClick={() => { setMenuOpen(false); navigate("/studies"); }}
+            title="Run a screener, validation, or mixed-methods study"
+          >
+            Studies
+          </button>
           <span className="nav-only-mobile" style={{ display: "contents" } as React.CSSProperties}>
             <LanguageSwitcher variant="light" />
             <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => { setMenuOpen(false); navigate("/account"); }}>

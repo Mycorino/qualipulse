@@ -177,3 +177,38 @@ class StudyAnalysisDetail(StudyAnalysisSummary):
     """Full payload — report blob is parsed + returned as a typed object."""
 
     report: QuantifiedThemeReport | None = None
+
+
+# ── Sprint 14: Theme validation (closing the loop) ─────────────────
+
+
+class ThemeValidationSnapshotSchema(BaseModel):
+    """Validation agreement for one theme in a `QuantifiedThemeReport`."""
+
+    theme_index: int
+    n_answered: int
+    agreement_pct: float | None = None
+    ci_low: float | None = None
+    ci_high: float | None = None
+    distribution: dict[int, int] = Field(default_factory=dict)
+
+
+class ValidationSummarySchema(BaseModel):
+    """Read-side payload attached to an analysis with a validation survey."""
+
+    survey_id: str
+    survey_name: str
+    survey_status: str
+    n_responses: int
+    n_completed: int
+    per_theme: dict[int, ThemeValidationSnapshotSchema]
+
+
+class GeneratedValidationSurvey(BaseModel):
+    """Returned by POST /analyses/{id}/validation-survey — just enough for
+    the frontend to navigate the researcher to the editor."""
+
+    survey_id: str
+    study_id: str
+    name: str
+    question_count: int
