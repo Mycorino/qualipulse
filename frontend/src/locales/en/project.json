@@ -146,6 +146,7 @@
   "hero": {
     "aria": "Study overview",
     "eyebrowActive": "Active study",
+    "eyebrowDraft": "Study draft",
     "eyebrowDemo": "Demo project",
     "stateSetup": "Setup",
     "stateCollecting": "Collecting responses",

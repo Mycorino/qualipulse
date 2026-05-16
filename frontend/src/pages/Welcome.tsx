@@ -480,9 +480,11 @@ export default function Welcome() {
     );
   }
 
-  // Persistent trial ribbon
+  // Trial ribbon — only on Step 4 where it's contextually useful
+  // (user is about to land in the product). Skip on Steps 1-3 to
+  // reduce repetition; the dashboard shows its own trial banner.
   const trialRibbon =
-    step < 5 && me?.trial_ends_at ? (
+    step === 4 && me?.trial_ends_at ? (
       <div
         className="onboarding-trial-ribbon"
         role="status"
@@ -554,7 +556,14 @@ export default function Welcome() {
         {/* ── Step 1: Verify Email ── */}
         {step === 1 && (
           <div className="onboarding-step">
-            <div className="onboarding-icon">📧</div>
+            <div className="onboarding-icon" aria-hidden="true">
+              {/* Mail icon (Lucide-style SVG) — replaces 📧 emoji for
+                  cross-platform consistency. */}
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+            </div>
             <h1 className="welcome-title">{t("onboarding.verifyTitle")}</h1>
             <p className="welcome-subtitle">
               {t("onboarding.verifyDesc")} <strong>{me?.email}</strong>.
@@ -1069,11 +1078,13 @@ export default function Welcome() {
 
                 {/* Duration + sample size chips */}
                 <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-                    ⏱ {t("onboarding.studyDuration", { minutes: studyDraft.duration_minutes })}
+                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    {t("onboarding.studyDuration", { minutes: studyDraft.duration_minutes })}
                   </span>
-                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-                    👥 {t("onboarding.studySampleSize", { count: studyDraft.sample_size })}
+                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    {t("onboarding.studySampleSize", { count: studyDraft.sample_size })}
                   </span>
                 </div>
 
@@ -1094,26 +1105,33 @@ export default function Welcome() {
             )}
 
             <div className="welcome-actions" style={{ marginTop: 32 }}>
-              <button
-                className="btn btn-primary btn-lg"
-                onClick={handleCreateStudy}
-                disabled={saving || studyLoading || !studyDraft}
-              >
-                {saving ? t("onboarding.creatingStudy") : t("onboarding.createThisStudy")}
-              </button>
-              {saving && (
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "8px 0 0", textAlign: "center" }}>
-                  {t("onboarding.creatingStudyDesc")}
-                </p>
+              {/* Hide both CTAs entirely while the AI is generating —
+                  rendering a disabled "Create this study" reads as "not
+                  ready" rather than "loading", per the design audit. */}
+              {!studyLoading && (
+                <>
+                  <button
+                    className="btn btn-primary btn-lg"
+                    onClick={handleCreateStudy}
+                    disabled={saving || !studyDraft}
+                  >
+                    {saving ? t("onboarding.creatingStudy") : t("onboarding.createThisStudy")}
+                  </button>
+                  {saving && (
+                    <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "8px 0 0", textAlign: "center" }}>
+                      {t("onboarding.creatingStudyDesc")}
+                    </p>
+                  )}
+                  <button
+                    className="btn btn-ghost"
+                    onClick={handleStartFromBlank}
+                    disabled={saving}
+                    style={{ fontSize: 13 }}
+                  >
+                    {t("onboarding.startFromBlank")}
+                  </button>
+                </>
               )}
-              <button
-                className="btn btn-ghost"
-                onClick={handleStartFromBlank}
-                disabled={saving || studyLoading}
-                style={{ fontSize: 13 }}
-              >
-                {t("onboarding.startFromBlank")}
-              </button>
               <button
                 className="btn btn-ghost"
                 onClick={() => setStep(3)}
