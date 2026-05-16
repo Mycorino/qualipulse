@@ -336,3 +336,45 @@ class SegmentInviteResult(BaseModel):
     skipped_count: int
     failed_emails: list[str] = Field(default_factory=list)
     interview_link_tokens: list[str] = Field(default_factory=list)
+
+
+# ── Sprint 10: Segment Discoveries ────────────────────────────────────
+
+
+class ReadyFilterSchema(BaseModel):
+    """Pre-populated bridge filter clause the dashboard wires up when the
+    researcher clicks 'Interview this segment' on a discovery card."""
+
+    question_id: str
+    operator: Literal["eq", "lte", "gte", "between", "in"]
+    value: Any
+
+
+class DiscoverySchema(BaseModel):
+    """One actionable observation about a segment of respondents.
+
+    The frontend reads `confidence`, `title`, `description`, and
+    `ready_filter` on every render. Numeric vs categorical extras
+    (segment_mean / lift_ratio etc.) are optional and let the UI render
+    a more specific card when present.
+    """
+
+    id: str
+    title: str
+    description: str
+    confidence: Literal["directional", "supported", "strong"]
+    segment_n: int
+    overall_n: int
+    metric_question_id: str
+    metric_question_prompt: str
+    metric_choice_label: str | None = None
+    segment_mean: float | None = None
+    overall_mean: float | None = None
+    lift_ratio: float | None = None
+    mean_delta: float | None = None
+    ready_filter: list[ReadyFilterSchema] = Field(default_factory=list)
+
+
+class DiscoveriesResponse(BaseModel):
+    survey_id: str
+    discoveries: list[DiscoverySchema]

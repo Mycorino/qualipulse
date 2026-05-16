@@ -347,6 +347,37 @@ export async function inviteSegment(
   return resp.data;
 }
 
+/* ── Sprint 10: Segment Discoveries ───────────────────────────── */
+
+export type DiscoveryConfidence = "directional" | "supported" | "strong";
+
+export interface SegmentDiscovery {
+  id: string;
+  title: string;
+  description: string;
+  confidence: DiscoveryConfidence;
+  segment_n: number;
+  overall_n: number;
+  metric_question_id: string;
+  metric_question_prompt: string;
+  metric_choice_label: string | null;
+  segment_mean: number | null;
+  overall_mean: number | null;
+  lift_ratio: number | null;
+  mean_delta: number | null;
+  ready_filter: SegmentFilter[];
+}
+
+export interface DiscoveriesPayload {
+  survey_id: string;
+  discoveries: SegmentDiscovery[];
+}
+
+export async function getDiscoveries(surveyId: string): Promise<DiscoveriesPayload> {
+  const resp = await client.get<DiscoveriesPayload>(`/surveys/${surveyId}/discoveries`);
+  return resp.data;
+}
+
 /* ── Default config helpers (used by the editor when adding a question) */
 
 export function defaultConfigForType(type: QuestionType): Record<string, unknown> {
