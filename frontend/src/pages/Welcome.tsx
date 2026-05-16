@@ -138,7 +138,12 @@ export default function Welcome() {
         if (data.research_experience) setResearchExperience(data.research_experience);
         if (data.name) setCompanyNameInput(data.name);
         if (data.website_url) setWebsiteUrl(data.website_url);
-        if (data.business_summary) setBusinessSummary(data.business_summary);
+        if (data.business_summary) {
+          setBusinessSummary(data.business_summary);
+          // Show the existing summary on first render so returning users
+          // can see what's saved without hunting for an "Edit" toggle.
+          setSummaryExpanded(true);
+        }
         if (data.industry) setIndustry(data.industry);
         if (data.primary_region) setPrimaryRegion(data.primary_region);
         if (data.goals_freeform) setGoalsFreeform(data.goals_freeform);
@@ -254,6 +259,10 @@ export default function Welcome() {
       setBusinessSummary(business_summary);
       setAnalysedUrl(trimmed);
       setManualMode(false);
+      // Auto-expand the summary after a fresh scrape so the user can
+      // immediately see what we drafted and decide whether to tweak it.
+      // The collapsed state only makes sense AFTER they've reviewed once.
+      setSummaryExpanded(true);
 
       if (detectedCountry) {
         if (REGION_VALUES.includes(detectedCountry)) {
@@ -841,26 +850,53 @@ export default function Welcome() {
                 )}
               </div>
 
-              {/* Business summary — collapsed when AI-drafted, inline when manual */}
+              {/* Business summary — collapsed preview when AI-drafted, inline when manual.
+                  Shows a truncated peek so users know there's real content here,
+                  not just a hidden empty field. */}
               {businessSummary && analysedUrl && !manualMode && !summaryExpanded && (
                 <div className="onboarding-field">
                   <div
                     style={{
-                      fontSize: 13,
-                      color: "var(--text-secondary)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      flexWrap: "wrap",
+                      padding: "12px 14px",
+                      borderRadius: "var(--radius)",
+                      background: "var(--primary-subtle, #eef2ff)",
+                      border: "1px solid var(--primary-border, #c7d2fe)",
                     }}
                   >
-                    <span>✨ {t("onboarding.websiteAutoFilled")}</span>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--primary, #4369f5)",
+                        marginBottom: 6,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+                      {t("onboarding.websiteAutoFilled")}
+                    </div>
+                    <p
+                      style={{
+                        fontSize: 14,
+                        color: "var(--text-primary)",
+                        lineHeight: 1.5,
+                        margin: 0,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {businessSummary}
+                    </p>
                     <button
                       type="button"
                       className="btn btn-ghost"
                       onClick={() => setSummaryExpanded(true)}
                       disabled={saving}
-                      style={{ fontSize: 13, padding: "2px 0", textDecoration: "underline" }}
+                      style={{ fontSize: 13, padding: "6px 0 0", textDecoration: "underline", color: "var(--text-secondary)" }}
                     >
                       {t("onboarding.editAiSummary")}
                     </button>
