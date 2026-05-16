@@ -29,6 +29,7 @@ from app.models.survey import (
     SurveyResponse,
     SurveyResponseAnswer,
 )
+from app.models.company import Company
 from app.schemas.survey import (
     PublicQuestion,
     PublicSurvey,
@@ -39,6 +40,7 @@ from app.routers.surveys import (
     _resolve_study_participant,
     _validate_answer_for_type,
 )
+from app.services.survey_quotas import get_status as get_quota_status
 
 router = APIRouter(prefix="/r", tags=["public_surveys"])
 
@@ -126,6 +128,22 @@ def submit_public_response(
     study = db.query(Study).filter(Study.id == survey.study_id).first()
     if not study:
         raise HTTPException(status_code=404, detail="Survey not available")
+
+    # Sprint 12: workspace-level survey quota check. Hard cap — no overage.
+    # Constant-time-ish response shape: "Survey is not available" so the
+    # respondent flow doesn't leak workspace billing state.
+    company = (
+        db.query(Company).filter(Company.id == survey.company_id).first()
+    )
+    if company is not None:
+        try:
+            quota = get_quota_status(db, company)
+            if quota.is_over_response_cap and body.is_complete:
+                raise HTTPException(status_code=404, detail="Survey is not available")
+        except HTTPException:
+            raise
+        except Exception:  # noqa: BLE001 — never let a quota lookup take down a submission
+            pass
 
     participant = _resolve_study_participant(
         db,

@@ -40,6 +40,7 @@ from app.services.billing_plans import (
     stripe_price_id_for,
 )
 from app.services.feature_gates import TIER_LIMITS, get_limits
+from app.services.survey_quotas import get_status as get_survey_quota_status
 
 logger = logging.getLogger("auto_interview.billing")
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -440,6 +441,55 @@ def create_portal_session(
 
 
 # ── Webhook ──────────────────────────────────────────────────────────────────
+
+
+# ── Sprint 12: Survey quota status ───────────────────────────────────
+
+
+class SurveyQuotaResponse(BaseModel):
+    """Workspace-facing snapshot of survey quotas. Used by the dashboard
+    nudge banner and the Study Overview progress card."""
+
+    responses_used: int
+    responses_cap: int | None
+    surveys_active: int
+    surveys_cap: int | None
+    questions_per_survey_cap: int | None
+    period_start: str
+    period_end: str | None
+    is_over_response_cap: bool
+    is_near_response_cap: bool
+    is_over_surveys_cap: bool
+
+
+@router.get("/survey-quota", response_model=SurveyQuotaResponse)
+def get_survey_quota(
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> SurveyQuotaResponse:
+    """Returns the current survey-quota status for the workspace.
+
+    Drives:
+      - Dashboard nudge banner when usage ≥ 80% or over cap
+      - Study Overview quota chip
+      - Future pricing-page logged-in context
+
+    Surveys do NOT touch the credit ledger — this is pure quota math.
+    """
+
+    status = get_survey_quota_status(db, company)
+    return SurveyQuotaResponse(
+        responses_used=status.responses_used,
+        responses_cap=status.responses_cap,
+        surveys_active=status.surveys_active,
+        surveys_cap=status.surveys_cap,
+        questions_per_survey_cap=status.questions_per_survey_cap,
+        period_start=status.period_start.isoformat(),
+        period_end=status.period_end.isoformat() if status.period_end else None,
+        is_over_response_cap=status.is_over_response_cap,
+        is_near_response_cap=status.is_near_response_cap,
+        is_over_surveys_cap=status.is_over_surveys_cap,
+    )
 
 
 @router.post("/webhook")

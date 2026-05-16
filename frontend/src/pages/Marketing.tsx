@@ -13,6 +13,9 @@ const MARKETING_PLANS = [
     monthlyEur: 89,
     annualEur: 890,  // 12-month savings handled in copy
     credits: 25,
+    // Sprint 12: survey response cap per period. Surveys are quota-based,
+    // not credit-priced (roadmap section 1.6).
+    surveyResponses: 500,
     highlight: false,
   },
   {
@@ -20,6 +23,7 @@ const MARKETING_PLANS = [
     monthlyEur: 299,
     annualEur: 2990,
     credits: 100,
+    surveyResponses: 2500,
     highlight: true,
   },
   {
@@ -27,6 +31,7 @@ const MARKETING_PLANS = [
     monthlyEur: 799,
     annualEur: 7990,
     credits: 300,
+    surveyResponses: 10000,
     highlight: false,
   },
 ] as const;
@@ -314,6 +319,9 @@ export default function Marketing() {
                 )}
                 <div className="mkt-plan-credits">
                   <strong>{p.credits}</strong> {t("pricing.creditsPerMonth", { defaultValue: "interview credits / month" })}
+                </div>
+                <div className="mkt-plan-credits" style={{ marginTop: 4, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                  <strong className="tabular">{p.surveyResponses.toLocaleString()}</strong> {t("pricing.surveyResponsesPerMonth", { defaultValue: "survey responses / month" })}
                 </div>
                 <div className="mkt-plan-desc">{t(`pricing.plans.${p.id}.desc`)}</div>
                 <ul className="mkt-plan-features">

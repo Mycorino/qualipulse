@@ -73,6 +73,11 @@ LEGACY_STARTER = PlanSpec(
         "max_questions_per_guide": 10,
         "max_links_per_project": 2,
         "legacy_tier": "starter",
+        # Survey quotas — legacy plans get parity with the equivalent new plan
+        # so they aren't locked out of quanti when surveys ship.
+        "survey_responses_per_period": 500,
+        "surveys_active_max": 5,
+        "survey_questions_per_survey_max": 30,
     },
 )
 
@@ -96,6 +101,9 @@ LEGACY_TEAM = PlanSpec(
         "max_questions_per_guide": 15,
         "max_links_per_project": 3,
         "legacy_tier": "team",
+        "survey_responses_per_period": 2500,
+        "surveys_active_max": 20,
+        "survey_questions_per_survey_max": 30,
     },
 )
 
@@ -119,6 +127,9 @@ LEGACY_LAB = PlanSpec(
         "max_questions_per_guide": 30,
         "max_links_per_project": 10,
         "legacy_tier": "lab",
+        "survey_responses_per_period": 10000,
+        "surveys_active_max": None,
+        "survey_questions_per_survey_max": 30,
     },
 )
 
@@ -146,6 +157,13 @@ TRIAL = PlanSpec(
         "sso": False,
         "api_access": False,
         "ai_analysis": True,
+        # ── Survey quotas (Sprint 12 — Decision 2 numbers) ─────────────────
+        # Surveys do NOT touch the credit ledger (roadmap section 1.6).
+        # Per-period response cap drives the "Survey is full" wall on the
+        # public response page. None ↔ unlimited.
+        "survey_responses_per_period": 100,
+        "surveys_active_max": 1,
+        "survey_questions_per_survey_max": 30,
     },
 )
 
@@ -173,6 +191,9 @@ EXPLORATION = PlanSpec(
         "sso": False,
         "api_access": False,
         "ai_analysis": True,
+        "survey_responses_per_period": 500,
+        "surveys_active_max": 5,
+        "survey_questions_per_survey_max": 30,
     },
 )
 
@@ -203,6 +224,9 @@ TEAM = PlanSpec(
         # V2 rollover knobs (read by the rollover service, not enforced in V1).
         "credit_rollover_days": 30,
         "credit_rollover_cap_ratio": 0.25,
+        "survey_responses_per_period": 2500,
+        "surveys_active_max": 20,
+        "survey_questions_per_survey_max": 30,
     },
 )
 
@@ -232,6 +256,9 @@ AGENCY = PlanSpec(
         "ai_analysis": True,
         "credit_rollover_days": 90,
         "credit_rollover_cap_ratio": 0.40,
+        "survey_responses_per_period": 10000,
+        "surveys_active_max": None,
+        "survey_questions_per_survey_max": 30,
     },
 )
 
@@ -260,6 +287,11 @@ ENTERPRISE = PlanSpec(
         "audit_logs": True,
         "dpa": True,
         "retention_policy": True,
+        # Enterprise gets unlimited surveys + responses by default; per-customer
+        # contracts can override via direct PlanEntitlement rows.
+        "survey_responses_per_period": None,
+        "surveys_active_max": None,
+        "survey_questions_per_survey_max": None,
     },
 )
 
