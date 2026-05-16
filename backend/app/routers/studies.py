@@ -17,6 +17,8 @@ Future sprint hooks (intentionally deferred):
   - POST  /studies/{id}/analyses  — quantified-themes report (Sprint 11)
 """
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -25,15 +27,19 @@ from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.models.interview import InterviewLink, Participant
 from app.models.project import Project
-from app.models.study import Study, StudyParticipant
+from app.models.study import Study, StudyAnalysis, StudyParticipant
 from app.models.survey import Survey, SurveyQuestion, SurveyResponse
 from app.schemas.study import (
     ProjectMini,
+    QuantifiedThemeReport,
+    StudyAnalysisDetail,
+    StudyAnalysisSummary,
     StudyDetail,
     StudyProgress,
     StudySummary,
     SurveyMini,
 )
+from app.services.study_analysis import trigger_study_analysis
 
 router = APIRouter(prefix="/studies", tags=["studies"])
 
@@ -95,7 +101,18 @@ def get_study(
     survey_minis = [_survey_mini(db, s) for s in surveys]
     project_minis = [_project_mini(db, p) for p in projects]
 
-    progress = _compute_progress(study, survey_minis, project_minis)
+    latest_ready = (
+        db.query(StudyAnalysis)
+        .filter(StudyAnalysis.study_id == study.id, StudyAnalysis.status == "ready")
+        .order_by(StudyAnalysis.generated_at.desc())
+        .first()
+    )
+    progress = _compute_progress(
+        study,
+        survey_minis,
+        project_minis,
+        report_ready=latest_ready is not None,
+    )
     recommended = _recommended_action(progress, surveys, projects)
 
     return StudyDetail(
@@ -218,6 +235,8 @@ def _compute_progress(
     study: Study,
     surveys: list[SurveyMini],
     projects: list[ProjectMini],
+    *,
+    report_ready: bool = False,
 ) -> StudyProgress:
     has_live_survey = any(s.status == "live" for s in surveys)
     total_completed = sum(s.completed_count for s in surveys)
@@ -230,8 +249,8 @@ def _compute_progress(
         # n=30 threshold the methodology contract uses everywhere.
         segments_identified_placeholder=total_completed >= 30,
         interviews_completed=interviews_completed,
-        # Sprint 11 lands StudyAnalysis; until then, report_ready is False.
-        report_ready_placeholder=False,
+        # Sprint 11 fills this in based on the presence of a ready StudyAnalysis.
+        report_ready_placeholder=report_ready,
     )
 
 
@@ -271,3 +290,139 @@ def _recommended_action(
         return f"Conduct {5 - progress.interviews_completed} more interview(s) before generating the mixed-methods report."
 
     return "Generate the mixed-methods report to synthesize quanti + quali into one view."
+
+
+# ── Sprint 11: Quantified Themes report ──────────────────────────────
+
+
+def _get_study_or_404(db: Session, study_id: str, company: Company) -> Study:
+    study = (
+        db.query(Study)
+        .filter(Study.id == study_id, Study.company_id == company.id)
+        .first()
+    )
+    if not study:
+        raise HTTPException(status_code=404, detail="Study not found")
+    return study
+
+
+def _analysis_to_summary(a: StudyAnalysis) -> StudyAnalysisSummary:
+    return StudyAnalysisSummary(
+        id=a.id,
+        study_id=a.study_id,
+        version=a.version,
+        status=a.status,  # type: ignore[arg-type]
+        error=a.error,
+        created_at=a.created_at,
+        generated_at=a.generated_at,
+    )
+
+
+def _analysis_to_detail(a: StudyAnalysis) -> StudyAnalysisDetail:
+    report = None
+    if a.report:
+        try:
+            report = QuantifiedThemeReport.model_validate(json.loads(a.report))
+        except Exception:  # noqa: BLE001 — be honest about malformed payloads
+            report = None
+    return StudyAnalysisDetail(
+        id=a.id,
+        study_id=a.study_id,
+        version=a.version,
+        status=a.status,  # type: ignore[arg-type]
+        error=a.error,
+        created_at=a.created_at,
+        generated_at=a.generated_at,
+        report=report,
+    )
+
+
+@router.post(
+    "/{study_id}/analyses",
+    response_model=StudyAnalysisDetail,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_analysis(
+    study_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> StudyAnalysisDetail:
+    """Trigger generation of a new Quantified Themes report.
+
+    v1 is synchronous: ~10-20s with the input budget we use. The endpoint
+    returns the completed (or failed) analysis. A future iteration can
+    move this to a background job + polling once the volume warrants it.
+    """
+
+    study = _get_study_or_404(db, study_id, company)
+    analysis = trigger_study_analysis(db, study)
+    return _analysis_to_detail(analysis)
+
+
+@router.get(
+    "/{study_id}/analyses",
+    response_model=list[StudyAnalysisSummary],
+)
+def list_analyses(
+    study_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> list[StudyAnalysisSummary]:
+    study = _get_study_or_404(db, study_id, company)
+    rows = (
+        db.query(StudyAnalysis)
+        .filter(StudyAnalysis.study_id == study.id)
+        .order_by(StudyAnalysis.created_at.desc())
+        .all()
+    )
+    return [_analysis_to_summary(r) for r in rows]
+
+
+@router.get(
+    "/{study_id}/analyses/latest",
+    response_model=StudyAnalysisDetail | None,
+)
+def get_latest_analysis(
+    study_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> StudyAnalysisDetail | None:
+    """Returns the most recent ready analysis, or None when none exist.
+
+    Returning None (200 OK with null body) is intentional — the frontend
+    distinguishes "no analysis yet" from "an analysis errored" by
+    checking status on the listing endpoint, not this one.
+    """
+
+    study = _get_study_or_404(db, study_id, company)
+    a = (
+        db.query(StudyAnalysis)
+        .filter(StudyAnalysis.study_id == study.id, StudyAnalysis.status == "ready")
+        .order_by(StudyAnalysis.generated_at.desc())
+        .first()
+    )
+    return _analysis_to_detail(a) if a else None
+
+
+@router.get(
+    "/{study_id}/analyses/{analysis_id}",
+    response_model=StudyAnalysisDetail,
+)
+def get_analysis(
+    study_id: str,
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> StudyAnalysisDetail:
+    study = _get_study_or_404(db, study_id, company)
+    a = (
+        db.query(StudyAnalysis)
+        .filter(
+            StudyAnalysis.id == analysis_id,
+            StudyAnalysis.study_id == study.id,
+        )
+        .first()
+    )
+    if not a:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return _analysis_to_detail(a)

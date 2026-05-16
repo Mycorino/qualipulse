@@ -16,7 +16,7 @@ from app.models.billing import (
     UsageEvent,
     WorkspaceSubscription,
 )
-from app.models.study import ConsentAcknowledgment, Study, StudyParticipant
+from app.models.study import ConsentAcknowledgment, Study, StudyAnalysis, StudyParticipant
 from app.models.survey import (
     Survey,
     SurveyLink,
@@ -52,6 +52,7 @@ __all__ = [
     "ProjectMemo",
     "QuoteTag",
     "Study",
+    "StudyAnalysis",
     "StudyParticipant",
     "Survey",
     "SurveyLink",
