@@ -229,6 +229,13 @@
     "noLinksHint": "Aucun lien pour l'instant. Générez-en un à partager avec les participants."
   },
   "setup": {
+    "conversationStyleTitle": "Style de conversation",
+    "conversationStyleSubtitle": "Comment le modérateur IA démarre et rythme l'entretien.",
+    "warmupLabel": "Ouvrir avec une question d'échauffement",
+    "warmupHelp": "Une mise en bouche légère avant les vraies questions de recherche. Recommandé.",
+    "warmupOnSaved": "Échauffement activé",
+    "warmupOffSaved": "Échauffement désactivé",
+    "warmupSaveError": "Impossible d'enregistrer. Veuillez réessayer.",
     "guideTitle": "Guide d'entretien",
     "welcomeMessage": "Message d'accueil",
     "systemPrompt": "Prompt système",

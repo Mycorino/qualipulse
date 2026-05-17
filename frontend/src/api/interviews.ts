@@ -2,6 +2,7 @@ import client from "./client";
 
 export interface InterviewInfo {
   project_name: string;
+  company_name?: string;
   language: string;
   welcome_message?: string;
   interview_duration_minutes?: number;

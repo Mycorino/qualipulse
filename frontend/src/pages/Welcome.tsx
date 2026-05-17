@@ -14,7 +14,7 @@ import { createProject } from "../api/projects";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 
-const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Other"];
+const INDUSTRY_VALUES = ["Consumer Brands", "SaaS / Tech", "Agency", "Healthcare", "Academia", "Government", "Travel & Hospitality", "Other"];
 
 const REGION_VALUES = [
   "fr", "be", "ch", "de", "uk", "es", "it", "nl", "pt",

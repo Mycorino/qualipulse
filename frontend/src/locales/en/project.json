@@ -229,6 +229,13 @@
     "noLinksHint": "No links yet. Generate one to share with participants."
   },
   "setup": {
+    "conversationStyleTitle": "Conversation style",
+    "conversationStyleSubtitle": "How the AI moderator opens and paces the interview.",
+    "warmupLabel": "Open with a warm-up question",
+    "warmupHelp": "A low-stakes icebreaker before the real research questions. Recommended.",
+    "warmupOnSaved": "Warm-up enabled",
+    "warmupOffSaved": "Warm-up disabled",
+    "warmupSaveError": "We couldn't save that. Please try again.",
     "guideTitle": "Interview guide",
     "welcomeMessage": "Welcome message",
     "systemPrompt": "System prompt",
