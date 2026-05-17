@@ -11,15 +11,22 @@ import {
   SurveyDashboard,
   getDashboard,
   getDiscoveries,
+  getSurvey,
   inviteSegment,
   previewSegment,
 } from "../api/surveys";
+import { getStudy } from "../api/studies";
 import { ChartCard } from "../components/ChartCard";
 import { DashboardShell, DashboardStrip } from "../components/DashboardShell";
 import { MethodologyBox, SmallNWarning } from "../components/MethodologyBox";
 import { ScreenerBridge } from "../components/ScreenerBridge";
 import { useToast } from "../components/Toast";
-import { QuantiTopBar } from "../components/QuantiTopBar";
+import { InstrumentShell } from "../components/InstrumentShell";
+import {
+  SURVEY_SECTIONS,
+  surveySectionPath,
+  surveyStatusPill,
+} from "../components/surveyShellNav";
 
 /**
  * SurveyDashboard — `/surveys/:id/dashboard`.
@@ -38,6 +45,7 @@ export default function SurveyDashboardPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [data, setData] = useState<SurveyDashboard | null>(null);
+  const [study, setStudy] = useState<{ id: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // ── Segment filter state ────────────────────────────────────────
@@ -53,6 +61,13 @@ export default function SurveyDashboardPage() {
     getDashboard(id)
       .then(setData)
       .catch(() => setError("Could not load dashboard"));
+    getSurvey(id)
+      .then((s) =>
+        getStudy(s.study_id)
+          .then((st) => setStudy({ id: st.id, name: st.name }))
+          .catch(() => setStudy(null)),
+      )
+      .catch(() => setStudy(null));
     getDiscoveries(id)
       .then((p) => setDiscoveries(p.discoveries))
       .catch(() => setDiscoveries([]));
@@ -123,41 +138,20 @@ export default function SurveyDashboardPage() {
   }
 
   return (
-    <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
-      <QuantiTopBar
-        crumbs={[
-          { label: "Studies", to: "/studies" },
-          { label: "Surveys", to: "/surveys" },
-          { label: `${data.name} · Dashboard` },
-        ]}
-      />
-      <header
-        style={{
-          padding: "var(--space-3) var(--space-5)",
-          background: "var(--bg-surface)",
-          borderBottom: "1px solid var(--border-default)",
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-4)",
-        }}
-      >
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => navigate(`/surveys/${id}/edit`)}
-        >
-          ← Editor
-        </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "var(--text-eyebrow)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>
-            Dashboard · {data.role.toUpperCase()}
-          </div>
-          <h1 style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-xl)", letterSpacing: "-0.015em", margin: 0 }}>
-            {data.name}
-          </h1>
-        </div>
-      </header>
-
+    <InstrumentShell
+      crumbs={[
+        { label: "Studies", to: "/studies" },
+        ...(study ? [{ label: study.name, to: `/studies/${study.id}` }] : []),
+        { label: data.name },
+      ]}
+      eyebrow="Survey"
+      title={data.name}
+      status={surveyStatusPill(data.status)}
+      sections={SURVEY_SECTIONS}
+      activeSection="results"
+      onSectionChange={(k) => navigate(surveySectionPath(k, data.survey_id))}
+      subNavLabel="Survey sections"
+    >
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "var(--space-6) var(--space-5)" }}>
         <MethodologyBox
           fields={[
@@ -255,7 +249,7 @@ export default function SurveyDashboardPage() {
           onConfirm={onConfirmInvite}
         />
       )}
-    </div>
+    </InstrumentShell>
   );
 }
 

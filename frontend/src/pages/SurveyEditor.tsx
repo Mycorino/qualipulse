@@ -20,7 +20,13 @@ import {
 } from "../api/surveys";
 import { QuestionTypeCard } from "../components/QuestionTypeCard";
 import { useToast } from "../components/Toast";
-import { QuantiTopBar } from "../components/QuantiTopBar";
+import { InstrumentShell } from "../components/InstrumentShell";
+import {
+  SURVEY_SECTIONS,
+  surveySectionPath,
+  surveyStatusPill,
+} from "../components/surveyShellNav";
+import { getStudy } from "../api/studies";
 
 /**
  * SurveyEditor — wires the existing QuestionTypeCard + the inline question
@@ -60,6 +66,7 @@ export default function SurveyEditor() {
   const { toast } = useToast();
 
   const [survey, setSurvey] = useState<Survey | null>(null);
+  const [study, setStudy] = useState<{ id: string; name: string } | null>(null);
   const [questions, setQuestions] = useState<SurveyQuestion[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showTypePicker, setShowTypePicker] = useState(false);
@@ -70,7 +77,14 @@ export default function SurveyEditor() {
 
   useEffect(() => {
     if (!id) return;
-    getSurvey(id).then(setSurvey).catch(() => toast("Survey not found", "error"));
+    getSurvey(id)
+      .then((s) => {
+        setSurvey(s);
+        getStudy(s.study_id)
+          .then((st) => setStudy({ id: st.id, name: st.name }))
+          .catch(() => setStudy(null));
+      })
+      .catch(() => toast("Survey not found", "error"));
     listQuestions(id)
       .then((qs) => {
         setQuestions(qs);
@@ -211,70 +225,38 @@ export default function SurveyEditor() {
   }
 
   return (
-    <div className="survey-editor">
-      <QuantiTopBar
-        crumbs={[
-          { label: "Studies", to: "/studies" },
-          { label: "Surveys", to: "/surveys" },
-          { label: survey.name },
-        ]}
-      />
-      <header className="survey-editor__topbar">
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => navigate("/surveys")}
-          aria-label="Back to surveys"
-        >
-          ← Surveys
+    <InstrumentShell
+      crumbs={[
+        { label: "Studies", to: "/studies" },
+        ...(study ? [{ label: study.name, to: `/studies/${study.id}` }] : []),
+        { label: survey.name },
+      ]}
+      eyebrow="Survey"
+      title={
+        <input
+          type="text"
+          className="survey-editor__title-input"
+          value={survey.name}
+          onChange={(e) => setSurvey({ ...survey, name: e.target.value })}
+          onBlur={() =>
+            patchSurvey(survey.id, { name: survey.name }).catch(() =>
+              toast("Save failed", "error"),
+            )
+          }
+          aria-label="Survey name"
+        />
+      }
+      status={surveyStatusPill(survey.status)}
+      actions={
+        <button type="button" className="btn btn-primary" onClick={onTogglePublish}>
+          {survey.status === "live" ? "Close survey" : "Publish"}
         </button>
-        <div className="survey-editor__title-block">
-          <input
-            type="text"
-            className="survey-editor__title-input"
-            value={survey.name}
-            onChange={(e) => setSurvey({ ...survey, name: e.target.value })}
-            onBlur={() =>
-              patchSurvey(survey.id, { name: survey.name }).catch(() =>
-                toast("Save failed", "error"),
-              )
-            }
-            aria-label="Survey name"
-          />
-          <span
-            className={`confidence-pill confidence-pill--${
-              survey.status === "live"
-                ? "strong"
-                : survey.status === "closed"
-                  ? "directional"
-                  : "supported"
-            }`}
-          >
-            <span className="confidence-pill__dot" aria-hidden="true" />
-            {survey.status.toUpperCase()}
-          </span>
-        </div>
-        <div className="survey-editor__actions">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => navigate(`/surveys/${survey.id}/preview`)}
-          >
-            Preview
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => navigate(`/surveys/${survey.id}/dashboard`)}
-          >
-            Dashboard
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onTogglePublish}>
-            {survey.status === "live" ? "Close survey" : "Publish"}
-          </button>
-        </div>
-      </header>
-
+      }
+      sections={SURVEY_SECTIONS}
+      activeSection="build"
+      onSectionChange={(k) => navigate(surveySectionPath(k, survey.id))}
+      subNavLabel="Survey sections"
+    >
       <div className="survey-editor__layout">
         {/* ── Left rail: question list ───────────────────────────────── */}
         <aside className="survey-editor__rail survey-editor__rail--left">
@@ -399,7 +381,7 @@ export default function SurveyEditor() {
           )}
         </aside>
       </div>
-    </div>
+    </InstrumentShell>
   );
 }
 
