@@ -19,6 +19,7 @@ from app.models.company import Company
 from app.models.survey import Survey
 from app.schemas.copilot import ConversationState, CopilotRequest, CopilotResponse
 from app.services.copilot import (
+    SURVEY_ADAPTER,
     get_conversation,
     run_copilot_turn,
     save_conversation,
@@ -49,7 +50,7 @@ def survey_copilot(
 ) -> CopilotResponse:
     """Run one Research Copilot turn against a survey."""
     survey = _survey_or_404(db, survey_id, company)
-    result = run_copilot_turn(db, company, survey, body.messages)
+    result = run_copilot_turn(db, company, survey, SURVEY_ADAPTER, body.messages)
     return CopilotResponse(**result)
 
 
@@ -63,7 +64,7 @@ def get_copilot_conversation(
 ) -> ConversationState:
     """Load the persisted copilot chat thread for a survey."""
     _survey_or_404(db, survey_id, company)
-    return ConversationState(thread=get_conversation(db, survey_id))
+    return ConversationState(thread=get_conversation(db, "survey", survey_id))
 
 
 @router.put(
@@ -77,5 +78,5 @@ def put_copilot_conversation(
 ) -> ConversationState:
     """Persist the copilot chat thread for a survey so it resumes later."""
     _survey_or_404(db, survey_id, company)
-    save_conversation(db, company.id, survey_id, body.thread)
+    save_conversation(db, company.id, "survey", survey_id, body.thread)
     return body
