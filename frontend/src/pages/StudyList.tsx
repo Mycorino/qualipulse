@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
 import { useToast } from "../components/Toast";
 import { QuantiTopBar } from "../components/QuantiTopBar";
 import { AccountNudges } from "../components/AccountNudges";
+import { NewStudyModal } from "../components/NewStudyModal";
 
 /**
  * StudyList — `/studies`, and the post-login home.
@@ -58,7 +58,7 @@ function studyStatusLine(s: StudySummary): string {
 
 export default function StudyList() {
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
-  const navigate = useNavigate();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function StudyList() {
               instrument mix is shown on each card. Quanti, quali, hybrid: one home for all of it.
             </p>
           </div>
-          <button type="button" className="btn btn-primary" onClick={() => navigate("/surveys")}>
+          <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
             + New study
           </button>
         </header>
@@ -111,17 +111,12 @@ export default function StudyList() {
               }}
             >
               <p style={{ color: "var(--text-secondary)", maxWidth: 520, margin: 0, lineHeight: 1.5 }}>
-                No studies yet. Create your first survey from a template, or start an interview
-                round — either way a Study forms around it and shows up here.
+                No studies yet. Start one — survey, interviews, or both. A Study forms around your
+                first instrument and shows up here.
               </p>
-              <div style={{ display: "flex", gap: "var(--space-3)" }}>
-                <button type="button" className="btn btn-primary" onClick={() => navigate("/surveys")}>
-                  Build a survey
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => navigate("/projects/new")}>
-                  Start an interview round
-                </button>
-              </div>
+              <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
+                + New study
+              </button>
             </div>
           ) : (
             <div className="quanti-showcase__grid-2">
@@ -156,6 +151,8 @@ export default function StudyList() {
           )}
         </section>
       </div>
+
+      {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
     </div>
   );
 }
