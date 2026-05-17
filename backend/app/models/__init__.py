@@ -7,6 +7,7 @@ from app.models.usage import AIUsageLog
 from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 from app.models.blog import BlogPost
+from app.models.copilot import CopilotMemory
 from app.models.team import WorkspaceInvitation, WorkspaceMember
 from app.models.billing import (
     CreditBalance,
@@ -33,6 +34,7 @@ __all__ = [
     "BlogPost",
     "Company",
     "ConsentAcknowledgment",
+    "CopilotMemory",
     "CreditBalance",
     "CreditLedger",
     "InterviewGuideQuestion",
