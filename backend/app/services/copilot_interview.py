@@ -13,7 +13,10 @@ from sqlalchemy.orm import Session
 
 from app.models.company import Company
 from app.models.project import Project
+from app.models.study import Study
+from app.models.survey import Survey, SurveyResponse
 from app.services.copilot import CopilotAdapter, remember_tool
+from app.services.segment_discoveries import compute_discoveries
 
 
 def _live_guide(project: Project) -> list:
@@ -42,8 +45,71 @@ def _guide_snapshot(project: Project) -> dict:
     }
 
 
+def _study_snapshot(db: Session, project: Project) -> dict:
+    """The rest of the Study this interview round belongs to — sibling
+    surveys (questions, response counts, findings) and other interview
+    rounds. Lets the copilot act as the deep-dive arm of a mixed-methods
+    study instead of cold-starting."""
+    study = (
+        db.query(Study).filter(Study.id == project.study_id).first()
+        if project.study_id
+        else None
+    )
+    if study is None:
+        return {"surveys": [], "interview_rounds": []}
+
+    surveys: list[dict] = []
+    for s in study.surveys:
+        if s.archived_at is not None:
+            continue
+        completed = (
+            db.query(SurveyResponse)
+            .filter(
+                SurveyResponse.survey_id == s.id,
+                SurveyResponse.completed_at.isnot(None),
+            )
+            .count()
+        )
+        entry: dict = {
+            "name": s.name,
+            "role": s.role,
+            "status": s.status,
+            "completed_responses": completed,
+            "questions": [
+                q.prompt for q in s.questions if q.deprecated_at is None
+            ],
+        }
+        # The survey's findings — what the interviews should dig into.
+        if completed > 0:
+            try:
+                entry["findings"] = [
+                    {
+                        "title": d.title,
+                        "detail": d.description,
+                        "confidence": d.confidence,
+                    }
+                    for d in compute_discoveries(db, s)[:5]
+                ]
+            except Exception:  # noqa: BLE001 — findings are best-effort
+                entry["findings"] = []
+        surveys.append(entry)
+
+    rounds = [
+        {"name": p.name}
+        for p in study.projects
+        if p.id != project.id and p.archived_at is None
+    ]
+    return {"study_name": study.name, "surveys": surveys, "interview_rounds": rounds}
+
+
 _INTERVIEW_METHODOLOGY = """Methodology contract for interview guides \
 (non-negotiable):
+- Call `read_study` EARLY — before asking the researcher generic \
+questions. If this study already has a survey, you are the deep-dive arm \
+of a mixed-methods study: ground the guide in the survey's questions and \
+findings, and do not ask the researcher what the survey already \
+establishes. Open by referencing what the survey shows and propose a \
+guide that digs into the "why" behind it.
 - If the research objective is empty, propose one FIRST with \
 `propose_objective` — a single sharp, decision-oriented sentence — before \
 drafting questions. Use the research context if it is provided.
@@ -66,6 +132,15 @@ _INTERVIEW_TOOLS = [
     {
         "name": "read_guide",
         "description": "Return the interview guide's sections and questions.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "read_study",
+        "description": (
+            "Return the rest of this Study — sibling surveys (their "
+            "questions, response counts, and findings) and other interview "
+            "rounds. Use it to ground the guide in what's already known."
+        ),
         "input_schema": {"type": "object", "properties": {}},
     },
     {
@@ -159,6 +234,9 @@ def _guide_run_tool(
     """Execute an interview-guide tool. `remember` is handled by the core."""
     if name == "read_guide":
         return json.dumps(_guide_snapshot(project), ensure_ascii=False)
+
+    if name == "read_study":
+        return json.dumps(_study_snapshot(db, project), ensure_ascii=False)
 
     if name == "propose_objective":
         objective = (tool_input.get("objective") or "").strip()
