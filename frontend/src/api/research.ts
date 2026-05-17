@@ -26,10 +26,12 @@ export interface QuestionsSuggestion {
 
 export async function parseBrief(
   context: string,
-  files: File[]
+  files: File[],
+  language?: string
 ): Promise<BriefSummary> {
   const form = new FormData();
   form.append("context", context);
+  if (language) form.append("language", language);
   files.forEach((f) => form.append("files", f));
   const { data } = await client.post<BriefSummary>("/research/parse-brief", form, {
     headers: { "Content-Type": "multipart/form-data" },
@@ -39,11 +41,12 @@ export async function parseBrief(
 
 export async function suggestObjective(
   context: string,
-  briefSummary: string
+  briefSummary: string,
+  language?: string
 ): Promise<ObjectiveSuggestion> {
   const { data } = await client.post<ObjectiveSuggestion>(
     "/research/suggest-objective",
-    { context, brief_summary: briefSummary }
+    { context, brief_summary: briefSummary, language }
   );
   return data;
 }
@@ -51,11 +54,12 @@ export async function suggestObjective(
 export async function suggestScope(
   objective: string,
   learningGoals: string[],
-  context: string
+  context: string,
+  language?: string
 ): Promise<ScopeSuggestion> {
   const { data } = await client.post<ScopeSuggestion>(
     "/research/suggest-scope",
-    { objective, learning_goals: learningGoals, context }
+    { objective, learning_goals: learningGoals, context, language }
   );
   return data;
 }

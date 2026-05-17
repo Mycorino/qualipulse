@@ -85,6 +85,7 @@ def _language_directive(language: str) -> str:
 @router.post("/parse-brief")
 async def parse_brief(
     context: str = Form(""),
+    language: str | None = Form(None),
     files: list[UploadFile] = File(default=[]),
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
@@ -106,7 +107,7 @@ async def parse_brief(
         combined += "\n\nUPLOADED DOCUMENTS:\n" + "\n\n".join(file_contents)
 
     biz_ctx = _business_context(company)
-    language = _resolve_language(None, company)
+    language = _resolve_language(language, company)
     lang_directive = _language_directive(language)
     response = _claude(512).messages.create(
         model="claude-sonnet-4-20250514",
