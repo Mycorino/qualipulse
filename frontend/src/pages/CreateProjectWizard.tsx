@@ -392,7 +392,7 @@ export default function CreateProjectWizard() {
     setError("");
     if (!originalContext) setOriginalContext(context);
     try {
-      const res = await parseBrief(context, files);
+      const res = await parseBrief(context, files, language);
       setBriefSummary(res.summary);
     } catch {
       setError(t("wizard.errorParseBrief"));
@@ -409,7 +409,7 @@ export default function CreateProjectWizard() {
     startCarousel(t("wizard.carouselObjective", { returnObjects: true }) as string[]);
     setError("");
     try {
-      const res = await suggestObjective(context, briefSummary);
+      const res = await suggestObjective(context, briefSummary, language);
       setObjective(res.objective);
       setLearningGoals(res.learning_goals);
       setStudyType(res.study_type);
@@ -429,7 +429,7 @@ export default function CreateProjectWizard() {
     startCarousel(t("wizard.carouselScope", { returnObjects: true }) as string[]);
     setError("");
     try {
-      const res = await suggestScope(objective, learningGoals, context);
+      const res = await suggestScope(objective, learningGoals, context, language);
       setAudience(res.audience);
       setDurationMinutes(res.duration_minutes);
       setLanguage(res.language);
@@ -1222,7 +1222,7 @@ export default function CreateProjectWizard() {
                 {t("wizard.screeningTitle")} <span className="optional-tag">({t("wizard.optional")})</span>
                 {screeningQuestions.length > 0 && (
                   <span style={{ fontWeight: 400, fontSize: 13, color: "var(--text-tertiary)", marginLeft: 8 }}>
-                    {screeningQuestions.length} question{screeningQuestions.length !== 1 ? "s" : ""}
+                    {t("wizard.summaryScreening", { count: screeningQuestions.length })}
                   </span>
                 )}
               </summary>
