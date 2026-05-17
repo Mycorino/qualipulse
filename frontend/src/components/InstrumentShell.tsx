@@ -32,6 +32,12 @@ interface InstrumentShellProps {
  * segmented sub-nav. No instrument page supplies its own breadcrumb or
  * tab bar — that nested chrome is exactly what the navigation critique
  * flagged as confusing.
+ *
+ * The shell renders the chrome and then `children` directly — it does NOT
+ * wrap them in a `<main>`. Each page owns its own body element so it can
+ * keep page-specific layout (e.g. the Responses tab's full-bleed grid).
+ * Pages that just want the standard centred body can wrap their content
+ * in `<main className="instrument-shell__main">`.
  */
 export function InstrumentShell({
   crumbs,
@@ -77,7 +83,7 @@ export function InstrumentShell({
         />
       </div>
 
-      <main className="instrument-shell__main">{children}</main>
+      {children}
     </div>
   );
 }

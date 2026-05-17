@@ -39,7 +39,9 @@ export function InstrumentSubNav({
             key={s.key}
             type="button"
             role="tab"
+            id={`isection-tab-${s.key}`}
             aria-selected={isActive}
+            aria-controls={`isection-panel-${s.key}`}
             className={`instrument-subnav__item${
               isActive ? " instrument-subnav__item--active" : ""
             }`}
