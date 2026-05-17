@@ -19,8 +19,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
-# Memory scope tiers, broadest first.
-MEMORY_SCOPES = ("company", "study", "survey")
+# Memory scope tiers. "company" and "study" are shared; the instrument
+# tier is "survey" or "project" depending on which surface the copilot
+# is running on.
+MEMORY_SCOPES = ("company", "study", "survey", "project")
 
 
 class CopilotMemory(Base):
@@ -58,7 +60,22 @@ class CopilotMemory(Base):
 
 
 class CopilotConversation(Base):
+    """One persisted chat thread per instrument (survey or project).
+
+    Keyed by ``(scope_kind, scope_id)`` — ``scope_kind`` is "survey" or
+    "project", ``scope_id`` the instrument id. The panel reloads this on
+    mount so the conversation resumes instead of being lost on navigation.
+    """
+
     __tablename__ = "copilot_conversations"
+    __table_args__ = (
+        Index(
+            "ix_copilot_conversations_scope",
+            "scope_kind",
+            "scope_id",
+            unique=True,
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
@@ -68,13 +85,10 @@ class CopilotConversation(Base):
         ForeignKey("companies.id", ondelete="CASCADE"),
         nullable=False,
     )
-    survey_id: Mapped[str] = mapped_column(
-        String(36),
-        ForeignKey("surveys.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-        unique=True,
-    )
+    # "survey" | "project"
+    scope_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    # survey id / project id, per scope_kind.
+    scope_id: Mapped[str] = mapped_column(String(36), nullable=False)
     # JSON array of the panel's thread items (user/assistant turns +
     # proposal cards with their accepted/rejected status).
     thread: Mapped[str] = mapped_column(Text, default="[]", nullable=False)

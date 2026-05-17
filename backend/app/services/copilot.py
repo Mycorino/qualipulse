@@ -1,21 +1,18 @@
-"""Research Copilot — the in-context AI assistant (survey surface).
+"""Research Copilot — the in-context AI assistant.
 
-A server-side agent loop behind ``POST /surveys/{id}/copilot``. The copilot
-reads the live survey, asks clarifying questions, and *proposes* question
-changes — it never mutates the survey directly. Proposed actions are
-returned to the frontend, which stages them as pending cards the
-researcher accepts or rejects.
+A surface-agnostic agent core plus per-surface *adapters*. Today the
+survey builder runs on the ``SURVEY_ADAPTER``; the interview guide and
+later surfaces add their own adapter — the loop, memory, conversation
+persistence, and prompt assembly stay generic.
 
 Design notes
 ------------
 - Model: ``claude-sonnet-4-6`` — fast enough for an interactive,
   type-alongside assistant doing tool-use loops.
-- Memory: per-workspace ``CopilotMemory``, read into every system prompt
-  and appended via the `remember` tool. Keeps the copilot consistent
-  across studies and surfaces.
-- Methodology guardrails: the copilot is bound to the same contract the
-  survey builder enforces — only the six sanctioned question types, no
-  leading / double-barrelled questions.
+- Memory: scoped ``CopilotMemory`` (company / study / instrument), read
+  into every system prompt and appended via the `remember` tool.
+- The copilot PROPOSES; it never mutates the instrument. Proposed actions
+  are returned to the frontend, which stages them as pending cards.
 - Stub mode: with no ``ANTHROPIC_API_KEY`` the agent returns a
   deterministic canned proposal so the UI and tests work without an AI
   dependency. Production always has the key.
@@ -25,24 +22,23 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Callable
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.company import Company
-from app.models.copilot import MEMORY_SCOPES, CopilotConversation, CopilotMemory
+from app.models.copilot import CopilotConversation, CopilotMemory
 from app.models.survey import QUESTION_TYPES, Survey
 from app.services.usage_logger import log_claude_usage
 
 MODEL = "claude-sonnet-4-6"
 MAX_AGENT_TURNS = 8
 
-# Choice-bearing question types — the only ones that take a `choices` list.
-_CHOICE_TYPES = ("mc_single", "mc_multi")
 
-
-# ── Memory (scoped: company / study / survey) ────────────────────────────────
+# ── Memory (scoped: company / study / instrument) ────────────────────────────
 
 
 def get_memory(
@@ -84,14 +80,17 @@ def append_memory(
     db.commit()
 
 
-# ── Conversation persistence ─────────────────────────────────────────────────
+# ── Conversation persistence (keyed by scope_kind / scope_id) ────────────────
 
 
-def get_conversation(db: Session, survey_id: str) -> list:
-    """Return the persisted panel thread for a survey (empty if none)."""
+def get_conversation(db: Session, scope_kind: str, scope_id: str) -> list:
+    """Return the persisted panel thread for an instrument (empty if none)."""
     row = (
         db.query(CopilotConversation)
-        .filter(CopilotConversation.survey_id == survey_id)
+        .filter(
+            CopilotConversation.scope_kind == scope_kind,
+            CopilotConversation.scope_id == scope_id,
+        )
         .first()
     )
     if row is None:
@@ -103,19 +102,25 @@ def get_conversation(db: Session, survey_id: str) -> list:
 
 
 def save_conversation(
-    db: Session, company_id: str, survey_id: str, thread: list
+    db: Session, company_id: str, scope_kind: str, scope_id: str, thread: list
 ) -> None:
-    """Persist the panel thread for a survey so it resumes on navigation."""
+    """Persist the panel thread for an instrument so it resumes on navigation."""
     row = (
         db.query(CopilotConversation)
-        .filter(CopilotConversation.survey_id == survey_id)
+        .filter(
+            CopilotConversation.scope_kind == scope_kind,
+            CopilotConversation.scope_id == scope_id,
+        )
         .first()
     )
     payload = json.dumps(thread, ensure_ascii=False)
     if row is None:
         db.add(
             CopilotConversation(
-                company_id=company_id, survey_id=survey_id, thread=payload
+                company_id=company_id,
+                scope_kind=scope_kind,
+                scope_id=scope_id,
+                thread=payload,
             )
         )
     else:
@@ -124,7 +129,226 @@ def save_conversation(
     db.commit()
 
 
-# ── Survey snapshot ──────────────────────────────────────────────────────────
+# ── Surface adapter ──────────────────────────────────────────────────────────
+
+
+@dataclass
+class CopilotAdapter:
+    """Everything surface-specific. The agent core is generic over this.
+
+    An ``instrument`` is a Survey or a Project — both expose ``.id`` and
+    ``.study_id``, which is all the core needs.
+    """
+
+    kind: str  # "survey" | "interview"
+    instrument_scope_kind: str  # memory/conversation tier: "survey" | "project"
+    instrument_memory_label: str  # e.g. "Memory for this survey"
+    methodology: str  # system-prompt fragment (the methodology contract)
+    tools: list[dict]
+    snapshot: Callable[[object], dict]
+    # (db, company, instrument, turn, tool_name, tool_input) -> tool_result str
+    run_tool: Callable[..., str]
+    # (instrument, history) -> {reply, proposed_actions, memory_updated}
+    stub: Callable[..., dict]
+    default_reply: str
+
+
+def remember_tool(instrument_scope: str) -> dict:
+    """Build the `remember` tool with the scope enum for this surface."""
+    return {
+        "name": "remember",
+        "description": (
+            "Save a durable fact to memory so you stay consistent later. "
+            "Use sparingly — only durable facts, never transient details."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "note": {"type": "string"},
+                "scope": {
+                    "type": "string",
+                    "enum": ["company", "study", instrument_scope],
+                    "description": (
+                        f"company = workspace-wide; study = this research "
+                        f"effort; {instrument_scope} = this {instrument_scope} "
+                        f"only. Defaults to company."
+                    ),
+                },
+            },
+            "required": ["note"],
+        },
+    }
+
+
+# ── System prompt ────────────────────────────────────────────────────────────
+
+_BASE_SYSTEM = """You are the Research Copilot inside QualiPulse — an AI \
+assistant embedded in the research tools. You help researchers (often \
+beginners) build methodologically sound studies.
+
+How you work:
+- You PROPOSE changes; you never apply them. The researcher reviews every \
+proposal as a pending card and accepts or rejects it.
+- When the researcher's goal is vague, ask ONE round of 2-4 sharp \
+clarifying questions — audience, the decision the research informs, and \
+roughly how much data they expect — then stop asking. The moment the \
+researcher answers, or says to go ahead / draft it / skip, you MUST start \
+proposing in that same turn. Never ask a second round of clarifying \
+questions; if something is still unclear, state your assumption out loud \
+and propose anyway.
+- Use `remember` to save durable facts — never transient details — and \
+pick the scope: "company" for workspace-wide preferences (house style, \
+recurring audiences, tone), "study" for facts about this whole research \
+effort, or the instrument scope for facts specific to this one survey or \
+interview guide. You already see everything in memory below; don't \
+re-save what's there.
+- Every proposed item carries a one-line rationale.
+
+Be concise and warm. The chat is for clarifying intent — the instrument \
+itself is where your work lands."""
+
+
+def _memory_block(db: Session, label: str, scope_kind: str, scope_id: str) -> str:
+    row = get_memory(db, scope_kind, scope_id)
+    if row and row.content.strip():
+        return f"\n\n{label}:\n{row.content}"
+    return ""
+
+
+def _system_prompt(
+    db: Session, company: Company, instrument, adapter: CopilotAdapter
+) -> str:
+    # Stack every applicable memory tier, broadest first.
+    blocks = (
+        _memory_block(
+            db, "Workspace memory (applies to every study)", "company", company.id
+        )
+        + _memory_block(db, "Memory for this study", "study", instrument.study_id)
+        + _memory_block(
+            db,
+            adapter.instrument_memory_label,
+            adapter.instrument_scope_kind,
+            instrument.id,
+        )
+    )
+    if not blocks:
+        blocks = "\n\nYou have no saved memory yet."
+    snapshot = json.dumps(adapter.snapshot(instrument), ensure_ascii=False)
+    return (
+        f"{_BASE_SYSTEM}\n\n{adapter.methodology}{blocks}"
+        f"\n\nThe instrument right now:\n{snapshot}"
+    )
+
+
+# ── Agent loop ───────────────────────────────────────────────────────────────
+
+
+class _Turn:
+    """Mutable accumulator for one copilot turn."""
+
+    def __init__(self) -> None:
+        self.actions: list[dict] = []
+        self.memory_updated = False
+
+
+def _handle_remember(
+    db: Session,
+    company: Company,
+    instrument,
+    adapter: CopilotAdapter,
+    turn: _Turn,
+    tool_input: dict,
+) -> str:
+    """Core `remember` handler — shared across surfaces."""
+    allowed = ("company", "study", adapter.instrument_scope_kind)
+    scope = tool_input.get("scope") or "company"
+    if scope not in allowed:
+        scope = "company"
+    scope_id = {
+        "company": company.id,
+        "study": instrument.study_id,
+        adapter.instrument_scope_kind: instrument.id,
+    }[scope]
+    append_memory(db, company.id, scope, scope_id, tool_input.get("note", ""))
+    turn.memory_updated = True
+    return f"Saved to {scope} memory."
+
+
+def run_copilot_turn(
+    db: Session,
+    company: Company,
+    instrument,
+    adapter: CopilotAdapter,
+    messages: list,
+) -> dict:
+    """Run one copilot turn. ``messages`` is the full chat history (objects
+    with ``.role`` / ``.content``). Returns {reply, proposed_actions,
+    memory_updated}."""
+    history = [{"role": m.role, "content": m.content} for m in messages]
+
+    if not settings.ANTHROPIC_API_KEY:
+        return adapter.stub(instrument, history)
+
+    import anthropic  # noqa: WPS433 — lazy import keeps tests AI-free
+
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    system = _system_prompt(db, company, instrument, adapter)
+    turn = _Turn()
+    reply_parts: list[str] = []
+
+    for _ in range(MAX_AGENT_TURNS):
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=2048,
+            system=system,
+            tools=adapter.tools,
+            messages=history,
+        )
+        log_claude_usage(db, response, "copilot", company_id=company.id)
+
+        for block in response.content:
+            if block.type == "text" and block.text.strip():
+                reply_parts.append(block.text.strip())
+
+        if response.stop_reason != "tool_use":
+            break
+
+        history.append({"role": "assistant", "content": response.content})
+        tool_results = []
+        for block in response.content:
+            if block.type != "tool_use":
+                continue
+            tool_input = block.input or {}
+            if block.name == "remember":
+                result = _handle_remember(
+                    db, company, instrument, adapter, turn, tool_input
+                )
+            else:
+                result = adapter.run_tool(
+                    db, company, instrument, turn, block.name, tool_input
+                )
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                }
+            )
+        history.append({"role": "user", "content": tool_results})
+
+    return {
+        "reply": "\n\n".join(reply_parts).strip() or adapter.default_reply,
+        "proposed_actions": turn.actions,
+        "memory_updated": turn.memory_updated,
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Survey adapter
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Choice-bearing question types — the only ones that take a `choices` list.
+_CHOICE_TYPES = ("mc_single", "mc_multi")
 
 
 def _live_questions(survey: Survey) -> list:
@@ -168,65 +392,17 @@ def _config_for(qtype: str, choices: list[str] | None) -> dict:
     return {}
 
 
-# ── System prompt ────────────────────────────────────────────────────────────
-
-_SYSTEM = """You are the Research Copilot inside QualiPulse — an AI \
-assistant embedded in the survey builder. You help researchers (often \
-beginners) build methodologically sound surveys.
-
-How you work:
-- You PROPOSE changes; you never apply them. The researcher reviews every \
-proposal as a pending card and accepts or rejects it.
-- When the researcher's goal is vague, ask ONE round of 2-4 sharp \
-clarifying questions — audience, the decision the survey informs, and \
-roughly how many responses they expect — then stop asking. The moment the \
-researcher answers, or says to go ahead / draft it / skip, you MUST call \
-propose_questions in that same turn. Never ask a second round of \
-clarifying questions; if something is still unclear, state your \
-assumption out loud and propose anyway.
-- Call `read_survey` first if you need the current state.
-- Use `remember` to save durable facts — never transient details — and \
-pick the scope: "company" for workspace-wide preferences (house style, \
-recurring audiences, tone), "study" for facts about this whole research \
-effort, "survey" for facts specific to this one survey. You already see \
-everything currently in memory below; don't re-save what's there.
-
-Methodology contract (non-negotiable):
+_SURVEY_METHODOLOGY = """Methodology contract for surveys (non-negotiable):
 - Only these six question types exist: likert, mc_single, mc_multi, nps, \
 open_text, short_text. If asked for MaxDiff, ranking, conjoint, or sliders, \
 explain they are unsupported and offer the nearest sound alternative.
 - Never write leading, double-barrelled, or unbalanced questions.
 - If the researcher expects fewer than ~30 responses, do not pad the survey \
 with fine-grained segmentation questions that cannot be cut at that n.
-- Every proposed question carries a one-line rationale.
-
-Be concise and warm. The chat is for clarifying intent — the survey itself \
-is where your work lands."""
+- Call `read_survey` first if you need the current state."""
 
 
-def _memory_block(db: Session, label: str, scope_kind: str, scope_id: str) -> str:
-    row = get_memory(db, scope_kind, scope_id)
-    if row and row.content.strip():
-        return f"\n\n{label}:\n{row.content}"
-    return ""
-
-
-def _system_prompt(db: Session, company: Company, survey: Survey) -> str:
-    # Stack every applicable memory tier, broadest first.
-    blocks = (
-        _memory_block(db, "Workspace memory (applies to every study)", "company", company.id)
-        + _memory_block(db, "Memory for this study", "study", survey.study_id)
-        + _memory_block(db, "Memory for this survey", "survey", survey.id)
-    )
-    if not blocks:
-        blocks = "\n\nYou have no saved memory yet."
-    snapshot = json.dumps(_survey_snapshot(survey), ensure_ascii=False)
-    return f"{_SYSTEM}{blocks}\n\nThe survey right now:\n{snapshot}"
-
-
-# ── Tools ────────────────────────────────────────────────────────────────────
-
-_TOOLS = [
+_SURVEY_TOOLS = [
     {
         "name": "read_survey",
         "description": "Return the survey's current name, status, and questions.",
@@ -291,43 +467,11 @@ _TOOLS = [
             "required": ["question_id", "rationale"],
         },
     },
-    {
-        "name": "remember",
-        "description": (
-            "Save a durable fact to memory so you stay consistent later. "
-            "Use sparingly — only durable facts, never transient details."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "note": {"type": "string"},
-                "scope": {
-                    "type": "string",
-                    "enum": list(MEMORY_SCOPES),
-                    "description": (
-                        "company = workspace-wide; study = this research "
-                        "effort; survey = this survey only. Defaults to company."
-                    ),
-                },
-            },
-            "required": ["note"],
-        },
-    },
+    remember_tool("survey"),
 ]
 
 
-# ── Agent loop ───────────────────────────────────────────────────────────────
-
-
-class _Turn:
-    """Mutable accumulator for one copilot turn."""
-
-    def __init__(self) -> None:
-        self.actions: list[dict] = []
-        self.memory_updated = False
-
-
-def _run_tool(
+def _survey_run_tool(
     db: Session,
     company: Company,
     survey: Survey,
@@ -335,7 +479,7 @@ def _run_tool(
     name: str,
     tool_input: dict,
 ) -> str:
-    """Execute a tool call. Returns the tool_result string for the model."""
+    """Execute a survey-surface tool. `remember` is handled by the core."""
     if name == "read_survey":
         return json.dumps(_survey_snapshot(survey), ensure_ascii=False)
 
@@ -383,85 +527,10 @@ def _run_tool(
         )
         return "Recorded the proposed removal."
 
-    if name == "remember":
-        scope = tool_input.get("scope") or "company"
-        if scope not in MEMORY_SCOPES:
-            scope = "company"
-        scope_id = {
-            "company": company.id,
-            "study": survey.study_id,
-            "survey": survey.id,
-        }[scope]
-        append_memory(db, company.id, scope, scope_id, tool_input.get("note", ""))
-        turn.memory_updated = True
-        return f"Saved to {scope} memory."
-
     return f"Unknown tool: {name}"
 
 
-def run_copilot_turn(
-    db: Session, company: Company, survey: Survey, messages: list
-) -> dict:
-    """Run one copilot turn. ``messages`` is the full chat history (objects
-    with ``.role`` / ``.content``). Returns {reply, proposed_actions,
-    memory_updated}."""
-    history = [{"role": m.role, "content": m.content} for m in messages]
-
-    if not settings.ANTHROPIC_API_KEY:
-        return _stub_turn(survey, history)
-
-    import anthropic  # noqa: WPS433 — lazy import keeps tests AI-free
-
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-    system = _system_prompt(db, company, survey)
-    turn = _Turn()
-    reply_parts: list[str] = []
-
-    for _ in range(MAX_AGENT_TURNS):
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=2048,
-            system=system,
-            tools=_TOOLS,
-            messages=history,
-        )
-        log_claude_usage(db, response, "copilot", company_id=company.id)
-
-        for block in response.content:
-            if block.type == "text" and block.text.strip():
-                reply_parts.append(block.text.strip())
-
-        if response.stop_reason != "tool_use":
-            break
-
-        history.append({"role": "assistant", "content": response.content})
-        tool_results = []
-        for block in response.content:
-            if block.type == "tool_use":
-                result = _run_tool(
-                    db, company, survey, turn, block.name, block.input or {}
-                )
-                tool_results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result,
-                    }
-                )
-        history.append({"role": "user", "content": tool_results})
-
-    return {
-        "reply": "\n\n".join(reply_parts).strip()
-        or "Done — review the proposed changes in your question list.",
-        "proposed_actions": turn.actions,
-        "memory_updated": turn.memory_updated,
-    }
-
-
-# ── Stub mode ────────────────────────────────────────────────────────────────
-
-
-def _stub_turn(survey: Survey, history: list[dict]) -> dict:
+def _survey_stub(survey: Survey, history: list[dict]) -> dict:
     """Deterministic offline response so the UI + tests work without an API
     key. NOT a real synthesis — a structural placeholder."""
     if _live_questions(survey):
@@ -502,3 +571,16 @@ def _stub_turn(survey: Survey, history: list[dict]) -> dict:
         ],
         "memory_updated": False,
     }
+
+
+SURVEY_ADAPTER = CopilotAdapter(
+    kind="survey",
+    instrument_scope_kind="survey",
+    instrument_memory_label="Memory for this survey",
+    methodology=_SURVEY_METHODOLOGY,
+    tools=_SURVEY_TOOLS,
+    snapshot=_survey_snapshot,
+    run_tool=_survey_run_tool,
+    stub=_survey_stub,
+    default_reply="Done — review the proposed changes in your question list.",
+)
