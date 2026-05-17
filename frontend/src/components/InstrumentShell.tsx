@@ -12,7 +12,8 @@ interface InstrumentShellProps {
   crumbs: Crumb[];
   /** Small uppercase kicker — e.g. "Interview round" or "Survey". */
   eyebrow: string;
-  title: string;
+  /** Plain string, or a node (e.g. an inline-rename input). */
+  title: ReactNode;
   status?: { label: string; tone?: InstrumentStatusTone };
   /** Header actions (overflow menu, secondary buttons). */
   actions?: ReactNode;

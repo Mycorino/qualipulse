@@ -8,7 +8,13 @@ import {
   getSurvey,
   listQuestions,
 } from "../api/surveys";
-import { QuantiTopBar } from "../components/QuantiTopBar";
+import { getStudy } from "../api/studies";
+import { InstrumentShell } from "../components/InstrumentShell";
+import {
+  SURVEY_SECTIONS,
+  surveySectionPath,
+  surveyStatusPill,
+} from "../components/surveyShellNav";
 
 /**
  * SurveyPreview — renders the survey exactly as a respondent would see it.
@@ -21,6 +27,7 @@ export default function SurveyPreview() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [survey, setSurvey] = useState<Survey | null>(null);
+  const [study, setStudy] = useState<{ id: string; name: string } | null>(null);
   const [questions, setQuestions] = useState<SurveyQuestion[]>([]);
 
   useEffect(() => {
@@ -28,6 +35,9 @@ export default function SurveyPreview() {
     Promise.all([getSurvey(id), listQuestions(id)]).then(([s, qs]) => {
       setSurvey(s);
       setQuestions(qs);
+      getStudy(s.study_id)
+        .then((st) => setStudy({ id: st.id, name: st.name }))
+        .catch(() => setStudy(null));
     });
   }, [id]);
 
@@ -40,41 +50,31 @@ export default function SurveyPreview() {
   }
 
   return (
-    <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
-      <QuantiTopBar
-        crumbs={[
-          { label: "Studies", to: "/studies" },
-          { label: "Surveys", to: "/surveys" },
-          { label: `${survey.name} · Preview` },
-        ]}
-      />
-      <header
-        style={{
-          padding: "var(--space-4) var(--space-6)",
-          borderBottom: "1px solid var(--border-subtle)",
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-4)",
-          background: "var(--bg-surface)",
-        }}
+    <InstrumentShell
+      crumbs={[
+        { label: "Studies", to: "/studies" },
+        ...(study ? [{ label: study.name, to: `/studies/${study.id}` }] : []),
+        { label: survey.name },
+      ]}
+      eyebrow="Survey"
+      title={survey.name}
+      status={surveyStatusPill(survey.status)}
+      sections={SURVEY_SECTIONS}
+      activeSection="preview"
+      onSectionChange={(k) => navigate(surveySectionPath(k, survey.id))}
+      subNavLabel="Survey sections"
+    >
+      <p
+        className="quanti-showcase__section-meta"
+        style={{ textAlign: "center", padding: "var(--space-3) 0 0" }}
       >
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => navigate(`/surveys/${survey.id}/edit`)}
-        >
-          ← Back to editor
-        </button>
-        <span style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>
-          Preview · how respondents will see it
-        </span>
-      </header>
-
+        Preview · how respondents will see it
+      </p>
       <div
         style={{
           maxWidth: 720,
           margin: "0 auto",
-          padding: "var(--space-12) var(--space-5)",
+          padding: "var(--space-8) var(--space-5)",
         }}
       >
         <h1
@@ -136,7 +136,7 @@ export default function SurveyPreview() {
           </button>
         </div>
       </div>
-    </div>
+    </InstrumentShell>
   );
 }
 
