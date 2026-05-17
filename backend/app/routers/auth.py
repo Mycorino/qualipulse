@@ -557,6 +557,38 @@ def generate_study(
     return {"draft": draft}
 
 
+@router.post("/onboarding/generate-plan")
+@limiter.limit("3/minute")
+def generate_plan(
+    request: Request,
+    body: GenerateStudyRequest,
+    company: Company = Depends(get_current_company),
+):
+    """Generate a sequenced 3-phase research plan (screener → interviews →
+    validation survey) for onboarding Step 4.
+
+    Returns the full plan on success. On any failure (no API key, Claude
+    error, malformed JSON) returns {"plan": null} so the frontend can fall
+    back to a blank-study path. Reuses GenerateStudyRequest — the intake
+    fields are identical.
+    """
+    from app.services.onboarding_intelligence import generate_research_plan
+
+    lang = (body.language or company.preferred_language or "en").strip().lower()[:2]
+    plan = generate_research_plan(
+        first_name=body.first_name,
+        company_name=body.company_name,
+        role_title=body.role_title,
+        research_intent=body.research_intent,
+        research_experience=body.research_experience,
+        industry=body.industry,
+        business_summary=body.business_summary,
+        goals_freeform=body.goals_freeform,
+        language=lang,
+    )
+    return {"plan": plan}
+
+
 @router.post("/onboarding")
 def complete_onboarding(
     body: OnboardingProfileRequest,

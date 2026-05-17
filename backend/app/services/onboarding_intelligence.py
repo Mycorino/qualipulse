@@ -228,3 +228,234 @@ def generate_onboarding_study(
     except Exception as exc:
         logger.warning("onboarding_intelligence.study failed: %s", exc)
         return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Research plan generation (onboarding Step 4 — the mixed-methods upgrade)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# ``generate_research_plan`` supersedes ``generate_onboarding_study``. Instead
+# of a single interview study, it returns a sequenced 3-phase research program
+# (screener survey → in-depth interviews → validation survey) that mirrors what
+# the product now does end-to-end: quantify → explain → validate.
+#
+# API design notes (see the claude-api skill):
+#   * Model: Opus 4.7 — this is the onboarding conversion moment; plan quality
+#     beats a few seconds of latency.
+#   * Prompt caching: the methodology system prompt is frozen and identical for
+#     every signup (EN or FR). It sits in a cache_control'd system block. The
+#     language directive + per-user intake go in the user turn, so EN and FR
+#     calls share one cached prefix.
+#   * JSON reliability: the exact output shape is specified in the prompt and
+#     parsed with a fence-stripping fallback. (Structured-output *enforcement*
+#     via output_config.format would be cleaner but needs a newer anthropic
+#     SDK than the pinned 0.43.0 — tracked as a separate upgrade.)
+
+_PLAN_MODEL = "claude-opus-4-7"
+
+# Frozen methodology system prompt. Identical across every signup → cacheable.
+# Encodes a quant→qual→quant triangulation design with real research rigour.
+# Keep this BYTE-STABLE: any edit invalidates the prompt cache for all callers.
+_RESEARCH_PLAN_SYSTEM = """You are the lead research strategist at QualiPulse, an AI-driven \
+mixed-methods research platform. After an intake conversation with a new customer you \
+design their first research program: a sequenced, methodologically sound plan they could \
+hand to a research agency and have respected.
+
+QualiPulse runs three instrument types, and a strong first program uses all three in \
+sequence — a quant → qual → quant triangulation design:
+
+  PHASE 1 — SCREENER SURVEY (quant, broad).
+    A short survey to a wide audience that does two jobs at once:
+      (a) sizes the phenomenon — gives a directional read on how widespread it is;
+      (b) recruits — identifies the specific sub-population worth interviewing.
+    It MUST include at least one behavioural or attitudinal segmentation question,
+    not demographics alone. Recommended sample: 150–250 respondents (enough to
+    surface the qualified segment and read any single percentage at n ≥ 30).
+
+  PHASE 2 — IN-DEPTH INTERVIEWS (qual, deep).
+    Voice interviews with the segment that EMERGED from Phase 1 data — not a
+    pre-guessed audience. This phase answers the "why" the survey can't.
+    Sample size is governed by thematic saturation: 8–12 interviews, default 10.
+
+  PHASE 3 — VALIDATION SURVEY (quant, confirmatory).
+    Takes the themes discovered in Phase 2 and tests them at scale, on an
+    audience filtered by the criteria Phase 2 revealed. One agree/disagree
+    item per theme. Recommended sample: 100+ respondents.
+
+NON-NEGOTIABLE METHODOLOGY RULES:
+  * Each phase's OUTPUT explicitly feeds the NEXT phase's design. Phase 2's
+    audience comes from Phase 1; Phase 3's items come from Phase 2. Say so.
+  * Never report or imply a percentage on a base smaller than n = 30.
+  * Never claim causation from correlation. A survey shows association; only
+    the interviews can surface mechanism.
+  * Screener questions describe ACTUAL past behaviour, never hypotheticals.
+  * Interview questions ELICIT STORIES, not opinions: open-ended only, one
+    concept per question, non-leading, past-tense ("walk me through the last
+    time…"), and they avoid the word "why".
+  * Sample sizes and the timeline are a RECOMMENDED DESIGN the user can edit —
+    present them as such, never as a guarantee or an SLA.
+
+HARD ANTI-HALLUCINATION RULE:
+  Never invent a number, percentage, market size, growth rate, competitor name,
+  customer segment, or business problem that the user did not provide. Ground
+  every sentence in the intake. If the intake is thin, stay general — do not
+  fabricate specificity.
+
+VOICE: a senior consultant who listened. Concise, concrete, no marketing-speak.
+BANNED words: unlock, empower, leverage, seamless, game-changing, transform,
+revolutionise, supercharge. No exclamation marks. No emojis.
+
+Your output is parsed by code — return only the JSON object, no preamble, no fences."""
+
+
+def generate_research_plan(
+    first_name: Optional[str] = None,
+    company_name: Optional[str] = None,
+    role_title: Optional[str] = None,
+    research_intent: Optional[str] = None,
+    research_experience: Optional[str] = None,
+    industry: Optional[str] = None,
+    business_summary: Optional[str] = None,
+    goals_freeform: Optional[str] = None,
+    language: str = "en",
+) -> Optional[dict]:
+    """Generate a sequenced 3-phase research plan from onboarding intake.
+
+    Returns a dict with ``brief_summary``, ``plan_title``, ``timeline_estimate``,
+    ``phases`` (exactly 3: screener survey → interviews → validation survey) and
+    ``interview_guide`` (5 QuestionCreate-shaped dicts for the Phase-2 project).
+    Returns None on any failure — the caller falls back to "start from blank".
+    """
+    if not settings.ANTHROPIC_API_KEY:
+        logger.warning("onboarding_intelligence.plan: no API key")
+        return None
+
+    language_name = _LANGUAGE_NAMES.get(language, "English")
+
+    # Volatile content (language directive + intake) goes in the user turn so
+    # the cached system prefix is identical for every signup, EN or FR.
+    user_prompt = (
+        f"Write every user-facing string in {language_name}. JSON keys stay in English.\n\n"
+        f"<intake>\n"
+        f"Researcher: {first_name or 'the researcher'}\n"
+        f"Role: {role_title or 'Not specified'}\n"
+        f"Company: {company_name or 'Not specified'}\n"
+        f"Industry: {industry or 'Not specified'}\n"
+        f"Business context: {business_summary or 'Not specified'}\n"
+        f"Research experience: {research_experience or 'Not specified'}\n"
+        f"What they want to learn: {research_intent or 'Not specified'}\n"
+        f"Additional notes: {goals_freeform or 'None'}\n"
+        f"</intake>\n\n"
+        f"<task>\n"
+        f"Design this customer's first research program. Produce a JSON object:\n"
+        f"- brief_summary: 2 sentences (max 300 chars) confirming what they want to "
+        f"learn. Open with \"Based on what you told us\" or the {language_name} equivalent.\n"
+        f"- plan_title: a concrete name for the overall program (max 70 chars).\n"
+        f"- timeline_estimate: a SHORT phrase, framed as a projection not a promise "
+        f"(e.g. the {language_name} equivalent of \"first results in about a week\").\n"
+        f"- phases: EXACTLY 3 objects, in order:\n"
+        f"    1. kind=\"survey\"    — the screener survey (Phase 1 above)\n"
+        f"    2. kind=\"interview\" — the in-depth interviews (Phase 2 above)\n"
+        f"    3. kind=\"survey\"    — the validation survey (Phase 3 above)\n"
+        f"  Each phase: number (1/2/3), kind, title (max 60 chars), purpose "
+        f"(1 sentence), what_it_answers (1 sentence — the concrete question this "
+        f"phase resolves), recommended_sample (integer), est_setup (a short phrase "
+        f"like the {language_name} for \"live in 10 minutes\" for phase 1, or "
+        f"\"~10 interviews\" / \"~1 day to field\" for the others).\n"
+        f"- interview_guide: EXACTLY 5 questions for the Phase-2 interviews. Shape: "
+        f"{{section_index, section_title, question_index, main_question, "
+        f"interview_notes, desired_learning}}. Three sections — a 1-question warm-up, "
+        f"a 3-question core, a 1-question reflective close. Story-elicitation, "
+        f"past-tense, non-leading, one concept each.\n"
+        f"</task>\n\n"
+        f"<output_format>\n"
+        f"Return ONLY this JSON shape, no fences, no preamble:\n"
+        f"{{\n"
+        f'  "brief_summary": "...",\n'
+        f'  "plan_title": "...",\n'
+        f'  "timeline_estimate": "...",\n'
+        f'  "phases": [\n'
+        f'    {{"number": 1, "kind": "survey", "title": "...", "purpose": "...", '
+        f'"what_it_answers": "...", "recommended_sample": 200, "est_setup": "..."}},\n'
+        f'    {{"number": 2, "kind": "interview", "title": "...", "purpose": "...", '
+        f'"what_it_answers": "...", "recommended_sample": 10, "est_setup": "..."}},\n'
+        f'    {{"number": 3, "kind": "survey", "title": "...", "purpose": "...", '
+        f'"what_it_answers": "...", "recommended_sample": 100, "est_setup": "..."}}\n'
+        f"  ],\n"
+        f'  "interview_guide": [\n'
+        f'    {{"section_index": 0, "section_title": "...", "question_index": 0, '
+        f'"main_question": "...", "interview_notes": "...", "desired_learning": "..."}}\n'
+        f"  ]\n"
+        f"}}\n"
+        f"</output_format>"
+    )
+
+    try:
+        from anthropic import Anthropic
+
+        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        # Prompt caching: the methodology system prompt is a cache_control'd
+        # block — frozen and identical across every signup, so it is written
+        # once and read on subsequent calls within the TTL.
+        response = client.with_options(timeout=60.0).messages.create(
+            model=_PLAN_MODEL,
+            max_tokens=8000,
+            system=[
+                {
+                    "type": "text",
+                    "text": _RESEARCH_PLAN_SYSTEM,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        text = ""
+        for block in getattr(response, "content", []) or []:
+            if getattr(block, "type", None) == "text":
+                text += getattr(block, "text", "") or ""
+
+        text = text.strip()
+        # Strip code fences if Claude added them despite instructions.
+        if text.startswith("```"):
+            text = text.split("```", 2)[1] if "```" in text[3:] else text[3:]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+
+        parsed = json.loads(text)
+
+        if not isinstance(parsed, dict):
+            return None
+        phases = parsed.get("phases")
+        guide = parsed.get("interview_guide")
+        if not isinstance(phases, list) or len(phases) != 3:
+            return None
+        if not isinstance(guide, list) or not guide:
+            return None
+        if not parsed.get("plan_title") or not parsed.get("brief_summary"):
+            return None
+
+        # Coerce each phase's recommended_sample into a sane range so a bad
+        # model number never reaches the UI as a quota.
+        for phase in phases:
+            try:
+                phase["recommended_sample"] = max(
+                    5, min(1000, int(phase.get("recommended_sample", 100)))
+                )
+            except (ValueError, TypeError):
+                phase["recommended_sample"] = 100
+
+        usage = getattr(response, "usage", None)
+        logger.info(
+            "onboarding_intelligence.plan: 3-phase plan for %s "
+            "(cache_read=%s, cache_write=%s)",
+            first_name or "unknown",
+            getattr(usage, "cache_read_input_tokens", None),
+            getattr(usage, "cache_creation_input_tokens", None),
+        )
+        return parsed
+
+    except Exception as exc:
+        logger.warning("onboarding_intelligence.plan failed: %s", exc)
+        return None

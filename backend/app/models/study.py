@@ -44,6 +44,12 @@ class Study(Base):
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # JSON-serialised 3-phase research plan generated during onboarding
+    # (screener survey → interviews → validation survey). Persisted so the
+    # Study page can show the plan as a roadmap after onboarding ends —
+    # Phases 2 and 3 stay discoverable. Null for Studies not born from the
+    # onboarding research-plan flow.
+    research_plan: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
     company = relationship("Company")
