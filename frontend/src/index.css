@@ -9340,3 +9340,95 @@ select.field-input {
     border: 1px solid #d8dce6 !important;
   }
 }
+
+/* ============================================
+   Quanti — QuantiTopBar (global nav for study/survey pages)
+   ============================================
+   Restores app-level navigation to the quanti surfaces, which were
+   built with page-local headers and no way back to /dashboard.
+   ============================================ */
+
+.quanti-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  min-height: 48px;
+}
+
+.quanti-topbar__logo {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  color: var(--brand-600);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  flex: 0 0 auto;
+}
+
+.quanti-topbar__logo:hover {
+  background: var(--bg-overlay);
+}
+
+.quanti-topbar__crumbs {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.quanti-topbar__crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.quanti-topbar__crumb-sep {
+  color: var(--text-disabled);
+  margin: 0 var(--space-1);
+  flex: 0 0 auto;
+}
+
+.quanti-topbar__crumb {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  font-family: inherit;
+}
+
+.quanti-topbar__crumb[aria-current="page"] {
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.quanti-topbar__crumb--link {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.quanti-topbar__crumb--link:hover {
+  color: var(--brand-600);
+  background: var(--bg-overlay);
+}
+
+.quanti-topbar__dashboard {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  /* Drop intermediate crumbs on narrow viewports — logo + Dashboard
+     button are the two escape hatches that matter. */
+  .quanti-topbar__crumbs { display: none; }
+}

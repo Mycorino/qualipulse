@@ -15,6 +15,7 @@ import {
 } from "../api/studies";
 import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
+import { QuantiTopBar } from "../components/QuantiTopBar";
 
 /**
  * StudyOverview — `/studies/:id`.
@@ -82,6 +83,12 @@ export default function StudyOverview() {
 
   return (
     <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
+      <QuantiTopBar
+        crumbs={[
+          { label: "Studies", to: "/studies" },
+          { label: study.name },
+        ]}
+      />
       <header
         style={{
           padding: "var(--space-4) var(--space-6)",

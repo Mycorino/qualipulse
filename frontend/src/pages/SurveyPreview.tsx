@@ -8,6 +8,7 @@ import {
   getSurvey,
   listQuestions,
 } from "../api/surveys";
+import { QuantiTopBar } from "../components/QuantiTopBar";
 
 /**
  * SurveyPreview — renders the survey exactly as a respondent would see it.
@@ -40,6 +41,13 @@ export default function SurveyPreview() {
 
   return (
     <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
+      <QuantiTopBar
+        crumbs={[
+          { label: "Studies", to: "/studies" },
+          { label: "Surveys", to: "/surveys" },
+          { label: `${survey.name} · Preview` },
+        ]}
+      />
       <header
         style={{
           padding: "var(--space-4) var(--space-6)",
