@@ -302,6 +302,10 @@ def validate_link(
 
     return {
         "project_name": project.name,
+        # Company name powers the participant-facing identity avatar when
+        # the project has no explicit researcher_name / logo. Falling back
+        # to project_name produced nonsense initials (study title → "PN").
+        "company_name": project.company.name if project.company else None,
         "welcome_message": project.welcome_message,
         "language": project.language,
         "interview_duration_minutes": project.interview_duration_minutes,

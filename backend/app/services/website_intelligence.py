@@ -52,6 +52,7 @@ _PREDEFINED_INDUSTRIES = [
     "Healthcare",
     "Academia",
     "Government",
+    "Travel & Hospitality",
     "Other",
 ]
 
@@ -77,8 +78,8 @@ _OUTPUT_SPEC = (
     'who their customers are, what market they operate in. Third person, no '
     'marketing fluff, no emojis.>",\n'
     '  "industry": "<one of: Consumer Brands | SaaS / Tech | Agency | '
-    'Healthcare | Academia | Government | Other — OR a short custom label '
-    '(max 3 words) if none of the predefined options fit.>",\n'
+    'Healthcare | Academia | Government | Travel & Hospitality | Other — OR a '
+    'short custom label (max 3 words) if none of the predefined options fit.>",\n'
     '  "primary_country": "<the company\'s main market as one of: fr | be | '
     'ch | de | uk | es | it | nl | pt | europe | us | ca | global | other. '
     'Use the lowercase ISO alpha-2 code for a single country; use '
