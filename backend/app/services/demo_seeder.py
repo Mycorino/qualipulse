@@ -48,6 +48,14 @@ from app.models.interview import (
 )
 from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
+from app.models.study import Study, StudyAnalysis
+from app.models.survey import (
+    Survey,
+    SurveyLink,
+    SurveyQuestion,
+    SurveyResponse,
+    SurveyResponseAnswer,
+)
 from app.services._demo_data_en import NOTABLE_QUOTES_EN, PARTICIPANTS_EN, QUALITY_EN
 from app.services._demo_data_fr import NOTABLE_QUOTES_FR, PARTICIPANTS_FR, QUALITY_FR
 from app.services.study_provisioning import create_study
@@ -598,6 +606,327 @@ DEMO_MEMOS_FR = [
 ]
 
 
+# ── Hybrid demo: a sibling survey + Quantified Themes report ────────────────
+#
+# The demo Study ships with an interview track *and* a quick-pulse survey, so
+# a new user lands on a genuine mixed-methods Study — the instrument-mix badge
+# reads "Hybrid" and the Report tab has a real Quantified Themes report — not
+# an interview-only project. The survey content is mono-language like the rest
+# of the seed. The Quantified Themes report is hand-authored (same approach as
+# the ProjectAnalysis reports above) so seeding never makes an AI call.
+
+DEMO_SURVEY_NAME = "Streaming habits — quick pulse"
+DEMO_SURVEY_NAME_FR = "Courses en ligne — pouls rapide"
+
+# Per-language survey plan. `cohorts` is a list of
+# (choice_id, response_count, [nps_scores_to_cycle]).
+DEMO_SURVEY_EN = {
+    "name": DEMO_SURVEY_NAME,
+    "freq_q": "Which best describes how much you stream?",
+    "freq_choices": [
+        {"id": "heavy", "label": "Heavy — I watch most days"},
+        {"id": "light", "label": "Light — a few times a week"},
+    ],
+    "nps_q": "How likely are you to recommend your main streaming service to a friend?",
+    "cohorts": [
+        ("heavy", 26, [9, 10, 8, 9, 10, 9, 8, 10]),
+        ("light", 18, [4, 3, 5, 2, 6, 4, 5, 4]),
+    ],
+}
+DEMO_SURVEY_FR = {
+    "name": DEMO_SURVEY_NAME_FR,
+    "freq_q": "À quelle fréquence faites-vous vos courses alimentaires en ligne ?",
+    "freq_choices": [
+        {"id": "souvent", "label": "Souvent — chaque semaine"},
+        {"id": "rarement", "label": "De temps en temps"},
+    ],
+    "nps_q": "Quelle est la probabilité que vous recommandiez votre enseigne principale ?",
+    "cohorts": [
+        ("souvent", 26, [9, 10, 8, 9, 10, 9, 8, 10]),
+        ("rarement", 18, [5, 4, 6, 4, 5, 4, 6, 3]),
+    ],
+}
+
+
+def _quanti_report(lang: str) -> dict:
+    """Hand-authored Quantified Themes report for the demo Study.
+
+    Matches the QuantifiedThemeReport schema (app/schemas/study.py). Anchor
+    quotes are pulled verbatim from NOTABLE_QUOTES so they survive the
+    interview-evidence verification the real analysis service applies.
+    """
+    if lang == "fr":
+        notable = NOTABLE_QUOTES_FR
+        return {
+            "executive_summary": (
+                "Un sondage éclair (n=44) et quatre entretiens approfondis "
+                "convergent : la fidélité aux enseignes de courses en ligne "
+                "tient à un coût de switch invisible, pas au prix. Les "
+                "clientes régulières notent leur enseigne 9,1 sur 10 en "
+                "recommandation ; les clientes occasionnelles la notent 4,6. "
+                "Les ruptures de stock sont la friction qui fait basculer "
+                "cette note."
+            ),
+            "themes": [
+                {
+                    "title": "Les clientes occasionnelles recommandent beaucoup moins leur enseigne",
+                    "survey_signal": {
+                        "summary": (
+                            "Les clientes occasionnelles donnent une note de "
+                            "recommandation moyenne de 4,6, contre 9,1 pour "
+                            "les clientes régulières."
+                        ),
+                        "n": 18,
+                        "percentage": None,
+                        "segment_label": "Clientes occasionnelles",
+                        "segment_over_index": None,
+                    },
+                    "interview_evidence": {
+                        "x_of_y": "3 sur 4",
+                        "interview_count": 3,
+                        "anchor_quote": notable[1]["text"],
+                        "segments_mentioned": [],
+                    },
+                    "recommendation": {
+                        "kind": "product",
+                        "action": (
+                            "Proposer une validation des substitutions à "
+                            "l'avance pour désamorcer la friction des "
+                            "ruptures de stock."
+                        ),
+                        "rationale": (
+                            "La rupture de stock est la friction la plus "
+                            "citée en entretien et le meilleur candidat pour "
+                            "remonter la note des clientes occasionnelles."
+                        ),
+                    },
+                    "confidence": "supported",
+                },
+                {
+                    "title": "La fidélité repose sur un coût de switch invisible, pas sur le prix",
+                    "survey_signal": {
+                        "summary": (
+                            "Les clientes régulières — seul groupe à se "
+                            "déclarer promotrices — restent malgré des écarts "
+                            "de prix connus."
+                        ),
+                        "n": 26,
+                        "percentage": None,
+                        "segment_label": "Clientes régulières",
+                        "segment_over_index": None,
+                    },
+                    "interview_evidence": {
+                        "x_of_y": "3 sur 4",
+                        "interview_count": 3,
+                        "anchor_quote": notable[0]["text"],
+                        "segments_mentioned": [],
+                    },
+                    "recommendation": {
+                        "kind": "next_research",
+                        "action": (
+                            "Lancer un sondage de suivi pour chiffrer le coût "
+                            "de switch perçu avant d'investir côté produit."
+                        ),
+                        "rationale": (
+                            "Quatre entretiens suggèrent l'effet mais ne "
+                            "permettent pas de le dimensionner."
+                        ),
+                    },
+                    "confidence": "directional",
+                },
+            ],
+            "methodology_note": (
+                "Sondage : 44 réponses complètes, recueillies sur 7 jours. "
+                "Entretiens : 4 complétés. Conformément au contrat "
+                "méthodologique, les pourcentages ne sont affichés qu'à "
+                "n≥30 ; les sous-groupes en deçà sont rapportés en moyennes "
+                "et effectifs. La confiance reflète l'accord entre le signal "
+                "du sondage et les entretiens."
+            ),
+            "generated_with_survey_count": 1,
+            "generated_with_response_count": 44,
+            "generated_with_interview_count": 4,
+        }
+
+    notable = NOTABLE_QUOTES_EN
+    return {
+        "executive_summary": (
+            "A quick-pulse survey (n=44) and four in-depth interviews point "
+            "the same direction: streaming loyalty is thin and concentrated. "
+            "Heavy streamers rate their main service an average 9.1 on a "
+            "0–10 recommendation scale; light streamers rate it 4.1 — a "
+            "5-point gap the interviews explain as show-driven, "
+            "rotate-in-rotate-out behaviour. The clearest product opening is "
+            "a pause state between subscribed and cancelled."
+        ),
+        "themes": [
+            {
+                "title": "Light streamers are far less likely to recommend their main service",
+                "survey_signal": {
+                    "summary": (
+                        "Light streamers gave their main service an average "
+                        "recommendation score of 4.1, against 9.1 for heavy "
+                        "streamers."
+                    ),
+                    "n": 18,
+                    "percentage": None,
+                    "segment_label": "Light streamers",
+                    "segment_over_index": None,
+                },
+                "interview_evidence": {
+                    "x_of_y": "3 of 4",
+                    "interview_count": 3,
+                    "anchor_quote": notable[0]["text"],
+                    "segments_mentioned": [],
+                },
+                "recommendation": {
+                    "kind": "product",
+                    "action": (
+                        "Build a pause state so light streamers can stay "
+                        "subscribed between the shows they come back for."
+                    ),
+                    "rationale": (
+                        "Light streamers churn decisively because the only "
+                        "exit is a full cancel; a dormant tier converts a "
+                        "lost subscriber into a paused one."
+                    ),
+                },
+                "confidence": "supported",
+            },
+            {
+                "title": "The loyalty that exists is locked in by exclusive content, not the brand",
+                "survey_signal": {
+                    "summary": (
+                        "Heavy streamers — the only group scoring their "
+                        "service as a clear promoter — concentrate on "
+                        "services with exclusive catalogue."
+                    ),
+                    "n": 26,
+                    "percentage": None,
+                    "segment_label": "Heavy streamers",
+                    "segment_over_index": None,
+                },
+                "interview_evidence": {
+                    "x_of_y": "3 of 4",
+                    "interview_count": 3,
+                    "anchor_quote": notable[2]["text"],
+                    "segments_mentioned": [],
+                },
+                "recommendation": {
+                    "kind": "next_research",
+                    "action": (
+                        "Run a follow-up survey isolating which exclusive "
+                        "titles drive renewal before committing catalogue "
+                        "spend."
+                    ),
+                    "rationale": (
+                        "Four interviews suggest exclusives carry loyalty "
+                        "but can't size which ones — a targeted survey "
+                        "closes the gap."
+                    ),
+                },
+                "confidence": "directional",
+            },
+        ],
+        "methodology_note": (
+            "Survey: 44 completed responses, fielded over 7 days. "
+            "Interviews: 4 completed, 7–9 turns each. Per the methodology "
+            "contract, percentages are shown only at n≥30; cohort cuts below "
+            "that threshold are reported as averages and counts. Confidence "
+            "reflects agreement between the survey signal and the interview "
+            "evidence."
+        ),
+        "generated_with_survey_count": 1,
+        "generated_with_response_count": 44,
+        "generated_with_interview_count": 4,
+    }
+
+
+def _seed_demo_survey(
+    db: Session, study: Study, company_id: str, lang: str, now: datetime
+) -> Survey:
+    """Add a published quick-pulse survey with 44 completed responses to the
+    demo Study, so the Study reads as a true hybrid (survey + interviews)."""
+    cfg = DEMO_SURVEY_FR if lang == "fr" else DEMO_SURVEY_EN
+    fielding_start = now - timedelta(days=9)
+    fielding_end = now - timedelta(days=2)
+
+    survey = Survey(
+        study_id=study.id,
+        company_id=company_id,
+        name=cfg["name"],
+        role="standalone",
+        status="live",
+        fielding_started_at=fielding_start,
+        fielding_ended_at=fielding_end,
+        created_at=now - timedelta(days=10),
+    )
+    db.add(survey)
+    db.flush()
+
+    freq_q = SurveyQuestion(
+        survey_id=survey.id,
+        sort_order=0,
+        type="mc_single",
+        prompt=cfg["freq_q"],
+        is_required=True,
+        config=json.dumps(
+            {"choices": cfg["freq_choices"], "randomize": False, "has_other": False}
+        ),
+    )
+    nps_q = SurveyQuestion(
+        survey_id=survey.id,
+        sort_order=1,
+        type="nps",
+        prompt=cfg["nps_q"],
+        is_required=True,
+        config="{}",
+    )
+    db.add_all([freq_q, nps_q])
+    db.flush()
+
+    link = SurveyLink(
+        survey_id=survey.id,
+        token=secrets.token_urlsafe(32),
+        is_active=True,
+        is_anonymous=False,
+        created_at=now - timedelta(days=10),
+    )
+    db.add(link)
+    db.flush()
+
+    n = 0
+    for choice_id, count, scores in cfg["cohorts"]:
+        for i in range(count):
+            n += 1
+            started = fielding_start + timedelta(hours=n * 3)
+            response = SurveyResponse(
+                survey_id=survey.id,
+                company_id=company_id,
+                link_id=link.id,
+                started_at=started,
+                completed_at=started + timedelta(minutes=4),
+            )
+            db.add(response)
+            db.flush()
+            db.add(
+                SurveyResponseAnswer(
+                    response_id=response.id,
+                    question_id=freq_q.id,
+                    value_choice_ids=json.dumps([choice_id]),
+                )
+            )
+            db.add(
+                SurveyResponseAnswer(
+                    response_id=response.id,
+                    question_id=nps_q.id,
+                    value_numeric=float(scores[i % len(scores)]),
+                )
+            )
+    db.flush()
+    return survey
+
+
 # ── Seeder ──────────────────────────────────────────────────────────────────
 
 
@@ -873,6 +1202,21 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
                 created_by="demo",
             )
         )
+
+    # Hybrid layer: a sibling quick-pulse survey + a Quantified Themes report,
+    # so the demo Study reads as a real mixed-methods effort, not an
+    # interview-only project.
+    _seed_demo_survey(db, demo_study, company_id, lang, now)
+    db.add(
+        StudyAnalysis(
+            study_id=demo_study.id,
+            version=1,
+            status="ready",
+            report=json.dumps(_quanti_report(lang)),
+            generated_at=now - timedelta(hours=6),
+            created_at=now - timedelta(hours=6),
+        )
+    )
 
     db.commit()
     db.refresh(project)
