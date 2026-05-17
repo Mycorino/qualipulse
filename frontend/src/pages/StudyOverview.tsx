@@ -13,6 +13,7 @@ import {
   getValidationSummary,
   triggerAnalysis,
 } from "../api/studies";
+import { createSurvey } from "../api/surveys";
 import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
 import { QuantiTopBar } from "../components/QuantiTopBar";
@@ -27,8 +28,7 @@ import { QuantiTopBar } from "../components/QuantiTopBar";
  *   - Tabs: Overview / Surveys / Interviews / Participants / Report
  *
  * Progress signal comes from /studies/:id which counts completed
- * survey responses + completed interviews. The "segments" and "report"
- * tabs land in Sprints 10/11; for now they show a friendly placeholder.
+ * survey responses + completed interviews.
  */
 
 type Tab = "overview" | "surveys" | "interviews" | "participants" | "report";
@@ -49,6 +49,22 @@ export default function StudyOverview() {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [study, setStudy] = useState<StudyDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  /** Create a survey inside THIS study and open its editor. Surveys live
+   *  in their Study — no detour through a separate global surveys page. */
+  const handleCreateSurvey = async () => {
+    if (!study) return;
+    try {
+      const survey = await createSurvey({
+        name: "Untitled survey",
+        study_id: study.id,
+      });
+      navigate(`/surveys/${survey.id}/edit`);
+    } catch {
+      toast("Could not create the survey", "error");
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -166,8 +182,12 @@ export default function StudyOverview() {
 
       <main style={{ maxWidth: 1120, margin: "0 auto", padding: "var(--space-6)" }}>
         <SurveyQuotaBanner />
-        {tab === "overview" && <OverviewTab study={study} navigate={navigate} />}
-        {tab === "surveys" && <SurveysTab study={study} navigate={navigate} />}
+        {tab === "overview" && (
+          <OverviewTab study={study} navigate={navigate} onCreateSurvey={handleCreateSurvey} />
+        )}
+        {tab === "surveys" && (
+          <SurveysTab study={study} onCreateSurvey={handleCreateSurvey} />
+        )}
         {tab === "interviews" && <InterviewsTab study={study} navigate={navigate} />}
         {tab === "participants" && <ParticipantsTab study={study} />}
         {tab === "report" && <ReportTab studyId={study.id} progress={study.progress} />}
@@ -183,9 +203,11 @@ export default function StudyOverview() {
 function OverviewTab({
   study,
   navigate,
+  onCreateSurvey,
 }: {
   study: StudyDetail;
   navigate: ReturnType<typeof useNavigate>;
+  onCreateSurvey: () => void;
 }) {
   const onAct = () => {
     // The recommended action is text — for v1 the chip just routes to the
@@ -193,7 +215,7 @@ function OverviewTab({
     // chip to a structured action (e.g. directly open the bridge for a
     // suggested segment).
     if (!study.progress.has_live_survey && study.surveys.length === 0) {
-      navigate("/surveys");
+      onCreateSurvey();
       return;
     }
     if (!study.progress.has_live_survey && study.surveys.length > 0) {
@@ -218,36 +240,52 @@ function OverviewTab({
 
 function SurveysTab({
   study,
-  navigate,
+  onCreateSurvey,
 }: {
   study: StudyDetail;
-  navigate: ReturnType<typeof useNavigate>;
+  onCreateSurvey: () => void;
 }) {
   if (study.surveys.length === 0) {
-    return <EmptyState message="No surveys yet — head to the Surveys page to create one." ctaLabel="Go to surveys" onAct={() => navigate("/surveys")} />;
+    return (
+      <EmptyState
+        message="No surveys yet. Add one to start collecting structured responses in this study."
+        ctaLabel="+ New survey"
+        onAct={onCreateSurvey}
+      />
+    );
   }
   return (
-    <div className="quanti-showcase__grid-2">
-      {study.surveys.map((s) => (
-        <a
-          key={s.id}
-          href={`/surveys/${s.id}/edit`}
-          className="chart-card"
-          style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
-        >
-          <div className="chart-card__eyebrow">
-            {s.role.toUpperCase()} · {s.status.toUpperCase()}
-          </div>
-          <div className="chart-card__takeaway">{s.name}</div>
-          <div className="chart-card__footer tabular">
-            <span>{s.question_count} questions</span>
-            <span className="chart-card__footer-divider">·</span>
-            <span>{s.completed_count} completed</span>
-            <span className="chart-card__footer-divider">·</span>
-            <span>{s.response_count} total</span>
-          </div>
-        </a>
-      ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <div className="quanti-showcase__grid-2">
+        {study.surveys.map((s) => (
+          <a
+            key={s.id}
+            href={`/surveys/${s.id}/edit`}
+            className="chart-card"
+            style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+          >
+            <div className="chart-card__eyebrow">
+              {s.role.toUpperCase()} · {s.status.toUpperCase()}
+            </div>
+            <div className="chart-card__takeaway">{s.name}</div>
+            <div className="chart-card__footer tabular">
+              <span>{s.question_count} questions</span>
+              <span className="chart-card__footer-divider">·</span>
+              <span>{s.completed_count} completed</span>
+              <span className="chart-card__footer-divider">·</span>
+              <span>{s.response_count} total</span>
+            </div>
+          </a>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        style={{ alignSelf: "flex-start" }}
+        onClick={onCreateSurvey}
+      >
+        + New survey
+      </button>
     </div>
   );
 }
@@ -314,9 +352,8 @@ function ParticipantsTab({ study }: { study: StudyDetail }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
       <p className="quanti-showcase__section-meta">
-        StudyParticipant identity is the join key across instruments — same human across survey
-        answers and interview transcripts. The full participant browser ships in Sprint 11
-        alongside the mixed-methods report.
+        Participant identity is the join key across instruments — the same person across survey
+        answers and interview transcripts.
       </p>
       <div className="dashboard-strip">
         <div className="dashboard-strip__item">
@@ -1050,7 +1087,7 @@ function ProgressChecklist({ study }: { study: StudyDetail }) {
     {
       label: "Mixed-methods report",
       done: study.progress.report_ready_placeholder,
-      detail: "Lands in Sprint 11",
+      detail: study.progress.report_ready_placeholder ? "Ready" : "Not yet",
     },
   ];
 
