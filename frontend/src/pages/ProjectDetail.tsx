@@ -4,12 +4,10 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
 import { AudioClip } from "../components/AudioClip";
-import { ProjectSwitcher } from "../components/HeaderControls";
-import { QuantiTopBar } from "../components/QuantiTopBar";
+import { InstrumentShell } from "../components/InstrumentShell";
 import { getMe } from "../api/auth";
 import {
   getProject,
-  listProjects,
   getLinks,
   getParticipants,
   createLink,
@@ -106,7 +104,6 @@ export default function ProjectDetail() {
   // Inline unsaved-changes banner (replaces blocking window.confirm for tab switches)
   const [pendingTab, setPendingTab] = useState<Tab | null>(null);
   // advancedPromptOpen removed — system prompt hidden from researchers
-  const [projects, setProjects] = useState<import("../api/projects").ProjectListItem[]>([]);
   const [accountName, setAccountName] = useState<string>("");
 
   // ── Responses tab filters/sort ─────────────────────────────────────────────
@@ -353,7 +350,6 @@ export default function ProjectDetail() {
       getCodes(id!).then(setCodes).catch(() => {}),
       getTags(id!).then(setTags).catch(() => {}),
       getMemos(id!).then(setMemos).catch(() => {}),
-      listProjects().then(setProjects).catch(() => {}),
       getMe().then((m) => setAccountName(m.name || m.email || "")).catch(() => {}),
       getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {}),
     ]);
@@ -1347,56 +1343,45 @@ export default function ProjectDetail() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  const isCollecting = links.some((l) => l.is_active);
+  const instrumentSections = [
+    { key: "overview", label: tProject("detail.tabOverview") },
+    { key: "setup", label: tProject("detail.tabSetup") },
+    {
+      key: "responses",
+      label: tProject("detail.tabResponses"),
+      badge:
+        participants.length > 0
+          ? `${completedCount}/${participants.length}`
+          : undefined,
+    },
+    {
+      key: "analysis",
+      label: tProject("detail.tabAnalysis"),
+      badge:
+        analysis?.status === "generating" ? (
+          <span className="tab-dot tab-dot-pulse" />
+        ) : undefined,
+    },
+  ];
+
   return (
-    <div className="detail-layout">
-
-      {/* ── Global chrome — same QuantiTopBar as the Study/Survey pages,
-           so the interview detail reads as part of one product. The
-           breadcrumb climbs Studies › <study> › <this interview>. ── */}
-      <QuantiTopBar
-        crumbs={[
-          { label: "Studies", to: "/studies" },
-          ...(project.study_id
-            ? [{ label: project.study_name || "Study", to: `/studies/${project.study_id}` }]
-            : []),
-          { label: project.name },
-        ]}
-      />
-
-      {/* Visually-hidden a11y announcer for inline-edit state */}
-      <div aria-live="polite" className="sr-only" role="status">{editAnnouncement}</div>
-
-      {/* ── Breadcrumb + project switcher + actions ── */}
-      <div className="detail-header">
-        <div className="detail-header-left">
-          <div className="detail-breadcrumb">
-            {/* Repointed from /dashboard to the parent Study — the
-                interview round is an instrument inside a Study now. */}
-            <a href={project.study_id ? `/studies/${project.study_id}` : "/studies"}>
-              {project.study_name || "Study"}
-            </a>
-            <span className="detail-breadcrumb-sep">/</span>
-            <ProjectSwitcher
-              currentId={id}
-              currentName={project.name}
-              projects={projects.length > 0 ? projects : [{
-                id: project.id,
-                name: project.name,
-                language: project.language,
-                created_at: project.created_at,
-                archived_at: null,
-                question_count: project.questions.length,
-                completed_count: completedCount,
-                in_progress_count: participants.length - completedCount,
-                analysis_status: analysis?.status ?? null,
-                last_response_at: null,
-                is_demo: project.is_demo,
-              }]}
-              participantCount={participants.length}
-              isActive={links.some((l) => l.is_active)}
-            />
-          </div>
-        </div>
+    <InstrumentShell
+      crumbs={[
+        { label: "Studies", to: "/studies" },
+        ...(project.study_id
+          ? [{ label: project.study_name || "Study", to: `/studies/${project.study_id}` }]
+          : []),
+        { label: project.name },
+      ]}
+      eyebrow="Interview round"
+      title={project.name}
+      status={
+        isCollecting
+          ? { label: "Collecting", tone: "live" }
+          : { label: "Paused", tone: "draft" }
+      }
+      actions={
         <div className="detail-header-actions">
           {/* Desktop: inline actions */}
           <button className="btn btn-ghost btn-sm detail-header-actions__inline" onClick={handleExportCSV}>{tProject("responses.exportCSV")}</button>
@@ -1424,28 +1409,14 @@ export default function ProjectDetail() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* ── Tabs — ordered by researcher workflow ── */}
-      <div className="detail-tabs" role="tablist" aria-label="Project sections">
-        {(["overview", "setup", "responses", "analysis"] as Tab[]).map((tabKey) => (
-          <button
-            key={tabKey}
-            id={`tab-${tabKey}`}
-            role="tab"
-            aria-selected={tab === tabKey}
-            aria-controls={`tabpanel-${tabKey}`}
-            tabIndex={tab === tabKey ? 0 : -1}
-            className={`detail-tab ${tab === tabKey ? "active" : ""}`}
-            onClick={() => setTab(tabKey)}
-          >
-            {tabKey === "responses" && (<>{tProject("detail.tabResponses")} {participants.length > 0 && <span className="count-badge">{completedCount}/{participants.length}</span>}</>)}
-            {tabKey === "analysis" && (<>{tProject("detail.tabAnalysis")} {analysis?.status === "generating" && <span className="tab-dot tab-dot-pulse" />}</>)}
-            {tabKey === "overview" && tProject("detail.tabOverview")}
-            {tabKey === "setup" && tProject("detail.tabSetup")}
-          </button>
-        ))}
-      </div>
+      }
+      sections={instrumentSections}
+      activeSection={tab}
+      onSectionChange={(k) => setTab(k as Tab)}
+      subNavLabel="Project sections"
+    >
+      {/* Visually-hidden a11y announcer for inline-edit state */}
+      <div aria-live="polite" className="sr-only" role="status">{editAnnouncement}</div>
 
       <main className="detail-main">
 
@@ -1488,7 +1459,7 @@ export default function ProjectDetail() {
 
         {/* ══ OVERVIEW ══ */}
         {tab === "overview" && (
-          <div className="tab-content" role="tabpanel" id="tabpanel-overview" aria-labelledby="tab-overview">
+          <div className="tab-content" role="tabpanel" id="isection-panel-overview" aria-labelledby="isection-tab-overview">
             {/* Project hero strip — brand band with eyebrow + state */}
             {(() => {
               const isReady = analysis?.status === "ready";
@@ -1681,7 +1652,7 @@ export default function ProjectDetail() {
 
         {/* ══ SETUP ══ */}
         {tab === "setup" && (
-          <div className="tab-content" role="tabpanel" id="tabpanel-setup" aria-labelledby="tab-setup">
+          <div className="tab-content" role="tabpanel" id="isection-panel-setup" aria-labelledby="isection-tab-setup">
             {/* Live-study warning: edits affect future participants */}
             {(() => {
               const hasInProgress = participants.some((p) => p.status === "in_progress");
@@ -2075,7 +2046,7 @@ export default function ProjectDetail() {
           }
 
           return (
-          <div className="tab-content" role="tabpanel" id="tabpanel-responses" aria-labelledby="tab-responses" style={{ padding: 0 }}>
+          <div className="tab-content" role="tabpanel" id="isection-panel-responses" aria-labelledby="isection-tab-responses" style={{ padding: 0 }}>
             <div className={`responses-layout${selectedParticipant && transcript !== null ? " responses-layout--detail-active" : ""}`}>
               {/* ── Left column: filter + list ── */}
               <div className="responses-list-col">
@@ -2579,7 +2550,7 @@ export default function ProjectDetail() {
 
         {/* ══ ANALYSIS ══ */}
         {tab === "analysis" && analysis && (
-          <div className="tab-content" role="tabpanel" id="tabpanel-analysis" aria-labelledby="tab-analysis">
+          <div className="tab-content" role="tabpanel" id="isection-panel-analysis" aria-labelledby="isection-tab-analysis">
             <section className="detail-section">
               {/* Stale banner — above actions so it's seen before clicking Regenerate */}
               {analysis.report && analysis.completed_count > analysis.participant_count && (
@@ -3348,6 +3319,6 @@ export default function ProjectDetail() {
           </div>
         );
       })()}
-    </div>
+    </InstrumentShell>
   );
 }
