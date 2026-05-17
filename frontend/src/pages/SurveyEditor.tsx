@@ -21,6 +21,7 @@ import {
 import { QuestionTypeCard } from "../components/QuestionTypeCard";
 import { useToast } from "../components/Toast";
 import { InstrumentShell } from "../components/InstrumentShell";
+import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
 import {
   SURVEY_SECTIONS,
   surveySectionPath,
@@ -381,6 +382,23 @@ export default function SurveyEditor() {
           )}
         </aside>
       </div>
+
+      {/* In-context AI assistant. Accepted proposals are applied via the
+          real survey API, then we reload the question list. */}
+      <ResearchCopilotPanel
+        surveyId={survey.id}
+        onApplied={() => {
+          if (!id) return;
+          listQuestions(id)
+            .then((qs) => {
+              setQuestions(qs);
+              if (qs.length > 0 && !qs.some((q) => q.id === activeId)) {
+                setActiveId(qs[qs.length - 1].id);
+              }
+            })
+            .catch(() => undefined);
+        }}
+      />
     </InstrumentShell>
   );
 }
