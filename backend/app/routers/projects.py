@@ -8,6 +8,7 @@ from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.schemas.project import (
+    GuideQuestionAdd,
     ProjectCreate,
     ProjectListResponse,
     ProjectResponse,
@@ -361,6 +362,56 @@ def unarchive_project(
     project.archived_at = None
     db.commit()
     return {"id": project.id, "archived_at": None}
+
+
+@router.post(
+    "/{project_id}/questions",
+    response_model=QuestionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_guide_question(
+    project_id: str,
+    body: GuideQuestionAdd,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> QuestionResponse:
+    """Add one interview-guide question. Section/question indices are
+    derived from the section title — a new title starts a new section.
+    Powers the Research Copilot's accept flow (and granular Setup edits)."""
+    project = _get_project_or_404(project_id, company.id, db)
+
+    live = [q for q in project.guide_questions if q.deprecated_at is None]
+    require_question_limit(company, len(live) + 1)
+
+    same_section = [
+        q for q in project.guide_questions if q.section_title == body.section_title
+    ]
+    if same_section:
+        section_index = same_section[0].section_index
+        question_index = max(q.question_index for q in same_section) + 1
+    else:
+        section_index = (
+            max((q.section_index for q in project.guide_questions), default=-1) + 1
+        )
+        question_index = 0
+    sort_order = (
+        max((q.sort_order for q in project.guide_questions), default=-1) + 1
+    )
+
+    question = InterviewGuideQuestion(
+        project_id=project.id,
+        section_index=section_index,
+        section_title=body.section_title,
+        question_index=question_index,
+        main_question=body.main_question,
+        interview_notes=body.interview_notes or "",
+        desired_learning=body.desired_learning or "",
+        sort_order=sort_order,
+    )
+    db.add(question)
+    db.commit()
+    db.refresh(question)
+    return QuestionResponse.model_validate(question)
 
 
 @router.patch("/{project_id}/questions/{question_id}", response_model=QuestionResponse)

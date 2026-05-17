@@ -1,27 +1,26 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import {
+import type {
   CopilotMessage,
+  CopilotTarget,
   ProposedAction,
-  getConversation,
-  runCopilot,
-  saveConversation,
+  ProposedGuideQuestion,
+  ProposedSurveyQuestion,
 } from "../api/copilot";
-import { createQuestion, deprecateQuestion, patchQuestion } from "../api/surveys";
 import { useToast } from "./Toast";
 
 /**
- * ResearchCopilotPanel — the in-context AI assistant for the survey builder.
+ * ResearchCopilotPanel — the in-context AI assistant.
  *
  * A collapsible slide-over (zero footprint when closed). The copilot reads
- * the live survey server-side, asks clarifying questions, and PROPOSES
- * question changes. Each proposal renders as a card the researcher accepts
- * (applied via the real survey API) or rejects. See api/copilot.ts and
- * backend services/copilot.py.
+ * the live instrument server-side, asks clarifying questions, and PROPOSES
+ * changes. Each proposal renders as a card the researcher accepts (applied
+ * via the real instrument API) or rejects.
  *
- * One copilot, every surface: this same component will later mount on the
- * interview guide and the homescreen — only the API target changes.
+ * One copilot, every surface: the panel is generic over a `CopilotTarget`.
+ * The survey editor and the interview-guide builder each build a target;
+ * later surfaces do the same.
  */
 
 const TYPE_LABEL: Record<string, string> = {
@@ -43,15 +42,15 @@ type ThreadItem =
   | { kind: "assistant"; text: string; actions: PendingAction[] };
 
 const STARTERS = [
-  "Help me start a survey from scratch",
-  "Review my questions for methodology issues",
-  "Suggest a screener question",
+  "Help me start from scratch",
+  "Review this for methodology issues",
+  "Suggest the next question",
 ];
 
 /**
  * Lightweight inline renderer for the copilot's replies — turns `**bold**`
- * into <strong>. Newlines and lists are preserved by the `white-space:
- * pre-wrap` on .copilot-msg__text, so this only handles bold. Dependency-free.
+ * into <strong>. Newlines/lists are preserved by `white-space: pre-wrap`
+ * on .copilot-msg__text, so this only handles bold. Dependency-free.
  */
 function renderRich(text: string): ReactNode {
   return text.split("**").map((part, i) =>
@@ -64,10 +63,10 @@ function renderRich(text: string): ReactNode {
 }
 
 export function ResearchCopilotPanel({
-  surveyId,
+  target,
   onApplied,
 }: {
-  surveyId: string;
+  target: CopilotTarget;
   onApplied: () => void;
 }) {
   const { toast } = useToast();
@@ -79,12 +78,15 @@ export function ResearchCopilotPanel({
   const prevCount = useRef(0);
   const loaded = useRef(false);
 
-  // Restore the persisted conversation for this survey on mount, so the
+  // Restore the persisted conversation for this instrument on mount, so the
   // chat resumes instead of being lost when the researcher navigates away.
   useEffect(() => {
     let cancelled = false;
     loaded.current = false;
-    getConversation(surveyId)
+    setThread([]);
+    prevCount.current = 0;
+    target
+      .loadConversation()
       .then((items) => {
         if (cancelled) return;
         if (Array.isArray(items) && items.length > 0) {
@@ -99,18 +101,19 @@ export function ResearchCopilotPanel({
     return () => {
       cancelled = true;
     };
-  }, [surveyId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.id]);
 
   // Persist the thread after every change (turns, accepts, rejects) once
   // the initial load has settled.
   useEffect(() => {
     if (!loaded.current) return;
-    saveConversation(surveyId, thread).catch(() => undefined);
-  }, [thread, surveyId]);
+    target.saveConversation(thread).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread, target.id]);
 
   // Auto-scroll only when a NEW message arrives (or the copilot starts
-  // thinking) — never when an existing proposal's status changes, or
-  // accepting a proposal higher up would yank the view to the bottom.
+  // thinking) — never when an existing proposal's status changes.
   useEffect(() => {
     if (thread.length > prevCount.current || busy) {
       threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight });
@@ -129,7 +132,7 @@ export function ResearchCopilotPanel({
     setInput("");
     setBusy(true);
     try {
-      const resp = await runCopilot(surveyId, toMessages(next));
+      const resp = await target.runTurn(toMessages(next));
       setThread((t) => [
         ...t,
         {
@@ -146,7 +149,11 @@ export function ResearchCopilotPanel({
       toast("The copilot is unavailable right now", "error");
       setThread((t) => [
         ...t,
-        { kind: "assistant", text: "Sorry — I couldn't respond. Please try again.", actions: [] },
+        {
+          kind: "assistant",
+          text: "Sorry — I couldn't respond. Please try again.",
+          actions: [],
+        },
       ]);
     } finally {
       setBusy(false);
@@ -170,21 +177,7 @@ export function ResearchCopilotPanel({
 
   const accept = async (action: PendingAction) => {
     try {
-      if (action.type === "add_question" && action.question) {
-        await createQuestion(surveyId, {
-          type: action.question.type,
-          prompt: action.question.prompt,
-          config: action.question.config,
-          is_required: false,
-        });
-      } else if (action.type === "edit_question" && action.question_id) {
-        const payload: { prompt?: string; config?: Record<string, unknown> } = {};
-        if (action.new_prompt) payload.prompt = action.new_prompt;
-        if (action.new_config) payload.config = action.new_config;
-        await patchQuestion(surveyId, action.question_id, payload);
-      } else if (action.type === "remove_question" && action.question_id) {
-        await deprecateQuestion(surveyId, action.question_id);
-      }
+      await target.applyAction(action);
       setStatus(action.id, "accepted");
       onApplied();
     } catch {
@@ -224,7 +217,7 @@ export function ResearchCopilotPanel({
           <div className="copilot-empty">
             <p className="copilot-empty__lead">
               I can draft questions, fix methodology issues, and shape your
-              survey. Tell me what you want to learn.
+              study. Tell me what you want to learn.
             </p>
             {STARTERS.map((s) => (
               <button
@@ -248,13 +241,20 @@ export function ResearchCopilotPanel({
             <div key={idx} className="copilot-msg copilot-msg--assistant">
               <div className="copilot-msg__text">{renderRich(it.text)}</div>
               {it.actions.map((a) => (
-                <ProposalCard key={a.id} action={a} onAccept={() => accept(a)} onReject={() => setStatus(a.id, "rejected")} />
+                <ProposalCard
+                  key={a.id}
+                  action={a}
+                  onAccept={() => accept(a)}
+                  onReject={() => setStatus(a.id, "rejected")}
+                />
               ))}
             </div>
           ),
         )}
 
-        {busy && <div className="copilot-msg copilot-msg--thinking">Thinking…</div>}
+        {busy && (
+          <div className="copilot-msg copilot-msg--thinking">Thinking…</div>
+        )}
       </div>
 
       <div className="copilot-input">
@@ -294,21 +294,31 @@ function ProposalCard({
   onAccept: () => void;
   onReject: () => void;
 }) {
-  const heading =
-    action.type === "add_question"
-      ? `Add — ${TYPE_LABEL[action.question?.type ?? ""] ?? action.question?.type}`
-      : action.type === "edit_question"
-        ? "Edit question"
-        : "Remove question";
-  const body =
-    action.type === "add_question"
-      ? action.question?.prompt
-      : action.type === "edit_question"
-        ? action.new_prompt ?? "Update this question"
-        : "Remove this question from the survey";
+  let heading: string;
+  let body: string | undefined;
+
+  if (action.type === "add_question") {
+    const q = action.question as ProposedSurveyQuestion | undefined;
+    heading = `Add — ${TYPE_LABEL[q?.type ?? ""] ?? q?.type ?? "question"}`;
+    body = q?.prompt;
+  } else if (action.type === "add_guide_question") {
+    const q = action.question as ProposedGuideQuestion | undefined;
+    heading = "Add — Interview question";
+    body = q?.main_question;
+  } else if (action.type === "edit_question") {
+    heading = "Edit question";
+    body = action.new_prompt ?? "Update this question";
+  } else if (action.type === "edit_guide_question") {
+    heading = "Edit question";
+    body = action.new_main_question ?? "Update this question";
+  } else {
+    heading = "Remove question";
+    body = "Remove this question";
+  }
+
   const rationale =
-    action.type === "add_question"
-      ? action.question?.rationale
+    action.question && "rationale" in action.question
+      ? (action.question as { rationale?: string }).rationale
       : action.rationale;
 
   return (
@@ -323,16 +333,24 @@ function ProposalCard({
       )}
       {action.status === "pending" ? (
         <div className="copilot-proposal__actions">
-          <button type="button" className="btn btn-primary btn-sm" onClick={onAccept}>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={onAccept}
+          >
             Accept
           </button>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onReject}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onReject}
+          >
             Dismiss
           </button>
         </div>
       ) : (
         <div className="copilot-proposal__status">
-          {action.status === "accepted" ? "✓ Added to your survey" : "Dismissed"}
+          {action.status === "accepted" ? "✓ Applied" : "Dismissed"}
         </div>
       )}
     </div>
