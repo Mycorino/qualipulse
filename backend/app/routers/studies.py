@@ -156,6 +156,36 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         .scalar()
         or 0
     )
+    # Sprint 17: card-level progress signals.
+    completed_responses = (
+        db.query(func.count(SurveyResponse.id))
+        .join(Survey, SurveyResponse.survey_id == Survey.id)
+        .filter(
+            Survey.study_id == study.id,
+            SurveyResponse.completed_at.isnot(None),
+        )
+        .scalar()
+        or 0
+    )
+    completed_interviews = (
+        db.query(func.count(Participant.id))
+        .join(Project, Participant.project_id == Project.id)
+        .filter(
+            Project.study_id == study.id,
+            Participant.status == "completed",
+        )
+        .scalar()
+        or 0
+    )
+    has_report = (
+        db.query(StudyAnalysis.id)
+        .filter(
+            StudyAnalysis.study_id == study.id,
+            StudyAnalysis.status == "ready",
+        )
+        .first()
+        is not None
+    )
     return StudySummary(
         id=study.id,
         name=study.name,
@@ -164,6 +194,9 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         survey_count=survey_count,
         project_count=project_count,
         participant_count=participant_count,
+        completed_response_count=completed_responses,
+        completed_interview_count=completed_interviews,
+        has_report=has_report,
     )
 
 

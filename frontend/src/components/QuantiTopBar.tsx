@@ -1,21 +1,20 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { getMe } from "../api/auth";
+import { useAuth } from "../hooks/useAuth";
+import { AccountMenu } from "./HeaderControls";
+
 /**
- * QuantiTopBar — the global app chrome for every quanti surface.
+ * QuantiTopBar — the universal app chrome.
  *
- * The Study / Survey pages were built fast with their own minimal
- * headers and skipped the app-level navigation entirely — leaving no
- * way back to the main dashboard. This component restores that:
+ * Sprint 17: now that the Studies list IS the home (`/dashboard` renders
+ * it), the old standalone "Dashboard" button is redundant — the
+ * QualiPulse wordmark already routes home. This bar is now three
+ * elements: wordmark (home) · breadcrumb (climb) · account menu.
  *
- *   [QualiPulse]  ›  Studies  ›  <current page>            [Dashboard]
- *
- * - The QualiPulse wordmark always routes to /dashboard.
- * - A breadcrumb trail shows where the researcher is + lets them climb
- *   back up one level at a time.
- * - A "Dashboard" button on the right is the explicit escape hatch.
- *
- * Pages render their own page-specific header (title, tabs, actions)
- * BELOW this bar — QuantiTopBar is only the global strip.
+ * Self-contained: fetches `me` for the avatar initial and owns sign-out
+ * via useAuth, so no page has to thread account props.
  */
 
 export interface Crumb {
@@ -30,13 +29,25 @@ interface QuantiTopBarProps {
 
 export function QuantiTopBar({ crumbs }: QuantiTopBarProps) {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [initial, setInitial] = useState("?");
+
+  useEffect(() => {
+    getMe()
+      .then((me) => {
+        const source = (me.name || me.email || "?").trim();
+        setInitial(source.charAt(0).toUpperCase() || "?");
+      })
+      .catch(() => setInitial("?"));
+  }, []);
+
   return (
     <div className="quanti-topbar">
       <button
         type="button"
         className="quanti-topbar__logo"
         onClick={() => navigate("/dashboard")}
-        aria-label="Back to dashboard"
+        aria-label="Home — your studies"
       >
         QualiPulse
       </button>
@@ -68,13 +79,9 @@ export function QuantiTopBar({ crumbs }: QuantiTopBarProps) {
           );
         })}
       </nav>
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm quanti-topbar__dashboard"
-        onClick={() => navigate("/dashboard")}
-      >
-        Dashboard
-      </button>
+      <div className="quanti-topbar__account">
+        <AccountMenu initial={initial} onSignOut={logout} />
+      </div>
     </div>
   );
 }

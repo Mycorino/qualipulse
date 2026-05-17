@@ -49,6 +49,32 @@ def test_creating_a_survey_implicitly_creates_a_study(client, auth_headers):
     assert studies[0]["participant_count"] == 0
 
 
+def test_study_summary_carries_card_signals(client, auth_headers):
+    """Sprint 17: the Studies-list cards need response/interview counts
+    and a has_report flag for the instrument-mix badge + status line."""
+
+    survey, q, link = _make_live_survey(client, auth_headers, name="Card signals")
+    # Two completed responses.
+    for i in range(2):
+        client.post(
+            f"/r/{link['token']}/responses",
+            json={
+                "link_token": link["token"],
+                "email": f"card-{i}@example.com",
+                "answers": [{"question_id": q["id"], "value_numeric": 7}],
+                "is_complete": True,
+            },
+        )
+
+    studies = client.get("/studies/", headers=auth_headers).json()
+    card = next(s for s in studies if s["id"] == survey["study_id"])
+    assert card["survey_count"] == 1
+    assert card["project_count"] == 0  # survey-only → instrument-mix badge = Survey
+    assert card["completed_response_count"] == 2
+    assert card["completed_interview_count"] == 0
+    assert card["has_report"] is False
+
+
 def test_study_detail_returns_surveys_and_progress(client, auth_headers):
     survey = client.post(
         "/surveys/", headers=auth_headers, json={"name": "With detail"}

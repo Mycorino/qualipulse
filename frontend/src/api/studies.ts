@@ -43,6 +43,10 @@ export interface StudySummary {
   survey_count: number;
   project_count: number;
   participant_count: number;
+  // Sprint 17: card-level progress signals for the Studies-list home.
+  completed_response_count: number;
+  completed_interview_count: number;
+  has_report: boolean;
 }
 
 export interface StudyDetail {
