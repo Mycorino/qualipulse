@@ -4,6 +4,9 @@ Tests run with ANTHROPIC_API_KEY blanked out, so they exercise the
 deterministic stub path in services/copilot_interview.py.
 """
 
+from app.models.project import Project
+from app.services.copilot_interview import _study_snapshot
+
 
 def _create_project(client, auth_headers, name: str = "Interview test") -> dict:
     return client.post(
@@ -146,3 +149,42 @@ class TestAddGuideQuestionEndpoint:
         )
         assert third.json()["section_index"] == 1
         assert third.json()["question_index"] == 0
+
+
+class TestStudyAwareInterviewCopilot:
+    def test_read_study_sees_sibling_survey(self, client, auth_headers, db_session):
+        """The interview copilot can see the survey in the same Study —
+        so in a hybrid study it acts as the deep-dive arm."""
+        project = _create_project(client, auth_headers, name="Deep dive round")
+        study_id = project["study_id"]
+
+        survey = client.post(
+            "/surveys/",
+            headers=auth_headers,
+            json={"name": "Churn pulse", "study_id": study_id},
+        ).json()
+        client.post(
+            f"/surveys/{survey['id']}/questions",
+            headers=auth_headers,
+            json={"type": "nps", "prompt": "How likely to recommend us?", "config": {}},
+        )
+
+        db_session.expire_all()
+        proj = db_session.query(Project).filter(Project.id == project["id"]).one()
+        snapshot = _study_snapshot(db_session, proj)
+
+        assert len(snapshot["surveys"]) == 1
+        sibling = snapshot["surveys"][0]
+        assert sibling["name"] == "Churn pulse"
+        assert "How likely to recommend us?" in sibling["questions"]
+        assert sibling["completed_responses"] == 0
+        # This round is not listed as its own sibling.
+        assert snapshot["interview_rounds"] == []
+
+    def test_read_study_empty_when_no_siblings(self, client, auth_headers, db_session):
+        project = _create_project(client, auth_headers, name="Lone round")
+        db_session.expire_all()
+        proj = db_session.query(Project).filter(Project.id == project["id"]).one()
+        snapshot = _study_snapshot(db_session, proj)
+        assert snapshot["surveys"] == []
+        assert snapshot["interview_rounds"] == []
