@@ -59,6 +59,10 @@ export default function CreateProjectWizard() {
   const { id: editId } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const isEditMode = !!editId;
+  // When the wizard is opened from a Study (e.g. "+ Add interview round"),
+  // the back button should return to that Study, not the Studies home.
+  const studyIdParam = searchParams.get("study_id");
+  const backTo = studyIdParam ? `/studies/${studyIdParam}` : "/dashboard";
   const { t, i18n } = useTranslation(["project", "common"]);
   const { logout } = useAuth();
 
@@ -713,7 +717,7 @@ export default function CreateProjectWizard() {
             </span>
             <button
               className="btn btn-ghost btn-sm"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate(backTo)}
             >
               {t("wizard.backButton")}
             </button>
@@ -825,7 +829,7 @@ export default function CreateProjectWizard() {
           </span>
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate(backTo)}
           >
             {t("wizard.backButton")}
           </button>
