@@ -4,8 +4,16 @@ Tests run with ANTHROPIC_API_KEY blanked out, so they exercise the
 deterministic stub path in services/copilot_interview.py.
 """
 
+from app.models.company import Company
 from app.models.project import Project
-from app.services.copilot_interview import _study_snapshot
+from app.services.copilot_interview import (
+    _analysis_snapshot,
+    _interviews_index,
+    _one_interview,
+    _progress_snapshot,
+    _study_snapshot,
+)
+from app.services.demo_seeder import seed_demo_project
 
 
 def _create_project(client, auth_headers, name: str = "Interview test") -> dict:
@@ -188,3 +196,58 @@ class TestStudyAwareInterviewCopilot:
         snapshot = _study_snapshot(db_session, proj)
         assert snapshot["surveys"] == []
         assert snapshot["interview_rounds"] == []
+
+
+class TestResultsCopilotReads:
+    """The interview copilot can read this round's conducted interviews and
+    analysis — so it can answer about results, not just build the guide."""
+
+    def _seed(self, db_session) -> Project:
+        company = Company(
+            name="Results Co",
+            email="results@example.com",
+            password_hash="x",
+            preferred_language="en",
+        )
+        db_session.add(company)
+        db_session.commit()
+        db_session.refresh(company)
+        return seed_demo_project(db_session, company.id)
+
+    def test_progress_snapshot_counts_completed_and_quality(self, db_session):
+        project = self._seed(db_session)
+        snap = _progress_snapshot(project)
+        assert snap["completed_interviews"] == 4
+        assert snap["in_progress"] == 0
+        assert sum(snap["quality_spread"].values()) == 4
+        assert snap["has_analysis"] is True
+
+    def test_interviews_index_lists_completed_without_transcripts(self, db_session):
+        project = self._seed(db_session)
+        index = _interviews_index(project)
+        assert len(index) == 4
+        for entry in index:
+            assert entry["id"]
+            assert entry["name"]
+            assert entry["turns"] > 0
+            assert "transcript" not in entry
+
+    def test_one_interview_returns_full_transcript(self, db_session):
+        project = self._seed(db_session)
+        first_id = _interviews_index(project)[0]["id"]
+        interview = _one_interview(project, first_id)
+        assert interview["transcript"]
+        assert "Q:" in interview["transcript"] and "A:" in interview["transcript"]
+        assert "profession" in interview["segments"]
+
+    def test_one_interview_unknown_id_returns_error(self, db_session):
+        project = self._seed(db_session)
+        assert "error" in _one_interview(project, "does-not-exist")
+
+    def test_analysis_snapshot_returns_latest_ready_report(self, db_session):
+        project = self._seed(db_session)
+        snap = _analysis_snapshot(project)
+        assert snap["status"] == "ready"
+        # Demo seeds two analyses (v1, v2) — latest version wins.
+        assert snap["version"] == 2
+        assert "themes" in snap["report"]

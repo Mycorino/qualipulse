@@ -102,6 +102,90 @@ def _study_snapshot(db: Session, project: Project) -> dict:
     return {"study_name": study.name, "surveys": surveys, "interview_rounds": rounds}
 
 
+# ── Results: reading this round's conducted interviews + analysis ────────────
+
+_TRANSCRIPT_BUDGET = 9000  # chars per single transcript fed to the model
+
+
+def _progress_snapshot(project: Project) -> dict:
+    """Counts + quality spread for this round's interviews."""
+    parts = list(project.participants)
+    completed = [p for p in parts if p.status == "completed"]
+    spread: dict[str, int] = {}
+    for p in completed:
+        label = p.quality_label or "unrated"
+        spread[label] = spread.get(label, 0) + 1
+    return {
+        "completed_interviews": len(completed),
+        "in_progress": sum(1 for p in parts if p.status == "in_progress"),
+        "quality_spread": spread,
+        "has_analysis": any(a.status == "ready" for a in project.analyses),
+    }
+
+
+def _interviews_index(project: Project) -> list[dict]:
+    """Compact per-participant index — NO transcript text. The copilot
+    reads full transcripts on demand via read_interview."""
+    return [
+        {
+            "id": p.id,
+            "name": p.display_name or "(anonymous)",
+            "profession": p.profession,
+            "age_range": p.age_range,
+            "country": p.country,
+            "quality": p.quality_label,
+            "turns": len(list(p.turns)),
+        }
+        for p in project.participants
+        if p.status == "completed"
+    ]
+
+
+def _one_interview(project: Project, participant_id: str) -> dict:
+    """One full transcript, truncated to a char budget."""
+    p = next((x for x in project.participants if x.id == participant_id), None)
+    if p is None:
+        return {"error": "No completed interview with that id in this round."}
+    parts: list[str] = []
+    total = 0
+    for t in sorted(p.turns, key=lambda t: t.turn_index):
+        if not t.response_transcript:
+            continue
+        block = f"Q: {t.question_text}\nA: {t.response_transcript}"
+        if total + len(block) > _TRANSCRIPT_BUDGET:
+            parts.append("[… transcript truncated …]")
+            break
+        parts.append(block)
+        total += len(block)
+    return {
+        "name": p.display_name or "(anonymous)",
+        "segments": {
+            "profession": p.profession,
+            "age_range": p.age_range,
+            "country": p.country,
+        },
+        "quality": p.quality_label,
+        "transcript": "\n\n".join(parts),
+    }
+
+
+def _analysis_snapshot(project: Project) -> dict:
+    """The latest ready AI analysis report for this round."""
+    ready = sorted(
+        (a for a in project.analyses if a.status == "ready"),
+        key=lambda a: a.version,
+        reverse=True,
+    )
+    if not ready:
+        return {"status": "none"}
+    latest = ready[0]
+    try:
+        report = json.loads(latest.report) if latest.report else {}
+    except (json.JSONDecodeError, TypeError):
+        report = {}
+    return {"status": "ready", "version": latest.version, "report": report}
+
+
 _INTERVIEW_METHODOLOGY = """Methodology contract for interview guides \
 (non-negotiable):
 - Call `read_study` EARLY — before asking the researcher generic \
@@ -125,7 +209,24 @@ piling on main questions — if asked for many more, push back.
 - Rating scales, NPS, and multiple-choice belong in a SURVEY, not an \
 interview guide. If the researcher wants to quantify something, say so and \
 suggest adding a survey to the study instead.
-- Call `read_guide` first if you need the current state."""
+- Call `read_guide` first if you need the current state.
+
+When the researcher asks about RESULTS (what the interviews found, who \
+said what, what to do next):
+- Call `read_progress` first to see how much data exists. With a small n \
+(say under 5 interviews) be explicit that findings are directional, not \
+conclusive — never report a count as a rate or imply statistical weight.
+- Use `read_interviews` to scan the index, then `read_interview` to read \
+specific transcripts before making any claim about a participant.
+- If an AI analysis exists, `read_analysis` gives you themes with \
+confidence scores — respect those scores and do not upgrade a \
+low-confidence theme into a certainty.
+- Quote participants verbatim from the transcript; never paraphrase a \
+quote into something they did not say. Attribute quotes to the segment \
+(profession/age/country), not just a name.
+- Keep observation separate from recommendation: state what the data \
+shows, then — clearly flagged as your suggestion — what the researcher \
+might do next. Do not present an inference as a finding."""
 
 
 _INTERVIEW_TOOLS = [
@@ -140,6 +241,50 @@ _INTERVIEW_TOOLS = [
             "Return the rest of this Study — sibling surveys (their "
             "questions, response counts, and findings) and other interview "
             "rounds. Use it to ground the guide in what's already known."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "read_progress",
+        "description": (
+            "Return how many interviews this round has collected — completed "
+            "and in-progress counts, the quality spread, and whether an AI "
+            "analysis already exists. Call this first when asked about "
+            "results."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "read_interviews",
+        "description": (
+            "Return a compact index of every completed interview in this "
+            "round — id, name, segments (profession/age/country), quality "
+            "label, turn count. NO transcript text. Use read_interview to "
+            "read one in full."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "read_interview",
+        "description": (
+            "Return one completed interview's full transcript (Q/A turns), "
+            "segments, and quality. Get the participant_id from "
+            "read_interviews."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "participant_id": {"type": "string"},
+            },
+            "required": ["participant_id"],
+        },
+    },
+    {
+        "name": "read_analysis",
+        "description": (
+            "Return the latest ready AI analysis report for this round — "
+            "themes, JTBDs, tensions, recommendations with confidence "
+            "scores. Returns status 'none' if no analysis has been run."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -237,6 +382,21 @@ def _guide_run_tool(
 
     if name == "read_study":
         return json.dumps(_study_snapshot(db, project), ensure_ascii=False)
+
+    if name == "read_progress":
+        return json.dumps(_progress_snapshot(project), ensure_ascii=False)
+
+    if name == "read_interviews":
+        return json.dumps(_interviews_index(project), ensure_ascii=False)
+
+    if name == "read_interview":
+        return json.dumps(
+            _one_interview(project, tool_input.get("participant_id") or ""),
+            ensure_ascii=False,
+        )
+
+    if name == "read_analysis":
+        return json.dumps(_analysis_snapshot(project), ensure_ascii=False)
 
     if name == "propose_objective":
         objective = (tool_input.get("objective") or "").strip()
