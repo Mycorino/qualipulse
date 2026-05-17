@@ -4,20 +4,58 @@ import { useNavigate } from "react-router-dom";
 import { StudySummary, listStudies } from "../api/studies";
 import { useToast } from "../components/Toast";
 import { QuantiTopBar } from "../components/QuantiTopBar";
+import { AccountNudges } from "../components/AccountNudges";
 
 /**
- * StudyList — `/studies`.
+ * StudyList — `/studies`, and the post-login home.
  *
- * Index of the workspace's research efforts. Each card is a Study with
- * counts. Studies are auto-created on first survey or project creation
- * (Decision 8), so this page is read-only — no "create Study" CTA. To
- * start a new study, the researcher creates a Survey (or eventually a
- * Project), which auto-creates a Study with the same name.
+ * Sprint 17: this page replaced the old project-grid dashboard. One
+ * list of all research efforts, each card tagged with its instrument
+ * mix (survey-only / interview-only / hybrid) so the angle is
+ * glanceable. A legacy interview project surfaces here as an
+ * interview-only Study card — no migration the user notices.
  *
- * Sprint 10.5+ will probably make this page the post-login landing for
- * accounts with ≥1 Study; today it's reachable via direct URL and from
- * "View as Study" links on the existing Surveys/Projects pages.
+ * Studies are auto-created on first survey/project creation (Decision 8),
+ * so there's no "create Study" CTA — the angle picker (Sprint 18) will
+ * be the deliberate "+ New study" entry point.
  */
+
+type InstrumentMix = "survey" | "interview" | "hybrid" | "empty";
+
+function instrumentMix(s: StudySummary): InstrumentMix {
+  const hasSurvey = s.survey_count > 0;
+  const hasInterview = s.project_count > 0;
+  if (hasSurvey && hasInterview) return "hybrid";
+  if (hasSurvey) return "survey";
+  if (hasInterview) return "interview";
+  return "empty";
+}
+
+const MIX_LABEL: Record<InstrumentMix, string> = {
+  survey: "Survey",
+  interview: "Interview",
+  hybrid: "Hybrid",
+  empty: "Empty",
+};
+
+const MIX_ICON: Record<InstrumentMix, string> = {
+  survey: "📊",
+  interview: "🎙",
+  hybrid: "📊🎙",
+  empty: "·",
+};
+
+function studyStatusLine(s: StudySummary): string {
+  if (s.has_report) return "Report ready";
+  if (s.completed_interview_count > 0) {
+    return `${s.completed_interview_count} interview${s.completed_interview_count === 1 ? "" : "s"} done`;
+  }
+  if (s.completed_response_count > 0) {
+    return `${s.completed_response_count} response${s.completed_response_count === 1 ? "" : "s"} in`;
+  }
+  return "Collecting — no responses yet";
+}
+
 export default function StudyList() {
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
   const navigate = useNavigate();
@@ -32,73 +70,91 @@ export default function StudyList() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
       <QuantiTopBar crumbs={[{ label: "Studies" }]} />
-      <div className="quanti-showcase" style={{ padding: "var(--space-10) var(--report-canvas-pad-x)" }}>
-      <header className="quanti-showcase__hero">
-        <div className="quanti-showcase__eyebrow">Research workspace</div>
-        <h1 className="quanti-showcase__title">Your studies</h1>
-        <p className="quanti-showcase__subtitle">
-          A Study is one research effort — a screener survey, the interviews it leads to, and the
-          validation that follows. Create a Survey or Project from the existing pages and a Study
-          forms around it automatically.
-        </p>
-      </header>
+      <div
+        className="quanti-showcase"
+        style={{ padding: "var(--space-8) var(--report-canvas-pad-x)" }}
+      >
+        <AccountNudges />
 
-      <section className="quanti-showcase__section">
-        {studies === null ? (
-          <p className="quanti-showcase__section-meta">Loading…</p>
-        ) : studies.length === 0 ? (
-          <div
-            style={{
-              background: "var(--bg-surface)",
-              border: "1px dashed var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-8)",
-              textAlign: "center",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "var(--space-4)",
-            }}
-          >
-            <p style={{ color: "var(--text-secondary)", maxWidth: 520, margin: 0, lineHeight: 1.5 }}>
-              No studies yet. Create your first survey from a template — a Study will form around it
-              and you'll find it here.
+        <header
+          className="quanti-showcase__hero"
+          style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="quanti-showcase__eyebrow">Research workspace</div>
+            <h1 className="quanti-showcase__title">Your studies</h1>
+            <p className="quanti-showcase__subtitle">
+              A Study is one research effort. It can be a survey, an interview round, or both — the
+              instrument mix is shown on each card. Quanti, quali, hybrid: one home for all of it.
             </p>
-            <button type="button" className="btn btn-primary" onClick={() => navigate("/surveys")}>
-              Go to surveys
-            </button>
           </div>
-        ) : (
-          <div className="quanti-showcase__grid-2">
-            {studies.map((s) => (
-              <a
-                key={s.id}
-                href={`/studies/${s.id}`}
-                className="chart-card"
-                style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
-              >
-                <div className="chart-card__eyebrow">
-                  STUDY · {new Date(s.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
-                </div>
-                <div className="chart-card__takeaway">{s.name}</div>
-                <div className="chart-card__footer tabular">
-                  <span>
-                    {s.survey_count} survey{s.survey_count === 1 ? "" : "s"}
-                  </span>
-                  <span className="chart-card__footer-divider">·</span>
-                  <span>
-                    {s.project_count} interview{s.project_count === 1 ? "" : "s"}
-                  </span>
-                  <span className="chart-card__footer-divider">·</span>
-                  <span>
-                    {s.participant_count} participant{s.participant_count === 1 ? "" : "s"}
-                  </span>
-                </div>
-              </a>
-            ))}
-          </div>
-        )}
-      </section>
+          <button type="button" className="btn btn-primary" onClick={() => navigate("/surveys")}>
+            + New study
+          </button>
+        </header>
+
+        <section className="quanti-showcase__section">
+          {studies === null ? (
+            <p className="quanti-showcase__section-meta">Loading…</p>
+          ) : studies.length === 0 ? (
+            <div
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px dashed var(--border-default)",
+                borderRadius: "var(--radius-md)",
+                padding: "var(--space-8)",
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "var(--space-4)",
+              }}
+            >
+              <p style={{ color: "var(--text-secondary)", maxWidth: 520, margin: 0, lineHeight: 1.5 }}>
+                No studies yet. Create your first survey from a template, or start an interview
+                round — either way a Study forms around it and shows up here.
+              </p>
+              <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                <button type="button" className="btn btn-primary" onClick={() => navigate("/surveys")}>
+                  Build a survey
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => navigate("/projects/new")}>
+                  Start an interview round
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="quanti-showcase__grid-2">
+              {studies.map((s) => {
+                const mix = instrumentMix(s);
+                return (
+                  <a
+                    key={s.id}
+                    href={`/studies/${s.id}`}
+                    className="chart-card"
+                    style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+                  >
+                    <div
+                      className="chart-card__eyebrow"
+                      style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+                    >
+                      <span aria-hidden="true">{MIX_ICON[mix]}</span>
+                      <span>{MIX_LABEL[mix].toUpperCase()} STUDY</span>
+                    </div>
+                    <div className="chart-card__takeaway">{s.name}</div>
+                    <div className="chart-card__footer tabular">
+                      <span>{s.survey_count} survey{s.survey_count === 1 ? "" : "s"}</span>
+                      <span className="chart-card__footer-divider">·</span>
+                      <span>{s.project_count} interview{s.project_count === 1 ? "" : "s"}</span>
+                      <span className="chart-card__footer-divider">·</span>
+                      <span>{studyStatusLine(s)}</span>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

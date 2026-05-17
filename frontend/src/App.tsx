@@ -9,7 +9,9 @@ import { ToastProvider } from "./components/Toast";
 // the critical shell.
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import Dashboard from "./pages/Dashboard";
+// Sprint 17: the Studies list is the post-login home (it replaced the
+// old project-grid Dashboard at /dashboard). Eager-loaded as hot path.
+import StudyList from "./pages/StudyList";
 import Interview from "./pages/Interview";
 import Marketing from "./pages/Marketing";
 
@@ -37,7 +39,6 @@ const SurveyEditor = lazy(() => import("./pages/SurveyEditor"));
 const SurveyPreview = lazy(() => import("./pages/SurveyPreview"));
 const SurveyDashboardPage = lazy(() => import("./pages/SurveyDashboard"));
 const PublicResponse = lazy(() => import("./pages/PublicResponse"));
-const StudyList = lazy(() => import("./pages/StudyList"));
 const StudyOverview = lazy(() => import("./pages/StudyOverview"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -120,11 +121,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      {/* Sprint 17: /dashboard renders the Studies list — one home for
+          quanti, quali, and hybrid. The URL stays alive for bookmarks
+          and muscle memory; the old project-grid Dashboard is retired. */}
       <Route
         path="/dashboard"
         element={
           <OnboardedRoute>
-            <Dashboard />
+            <StudyList />
           </OnboardedRoute>
         }
       />

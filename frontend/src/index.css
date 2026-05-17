@@ -9423,12 +9423,14 @@ select.field-input {
   background: var(--bg-overlay);
 }
 
-.quanti-topbar__dashboard {
+.quanti-topbar__account {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
 }
 
 @media (max-width: 640px) {
-  /* Drop intermediate crumbs on narrow viewports — logo + Dashboard
-     button are the two escape hatches that matter. */
+  /* Drop intermediate crumbs on narrow viewports — the wordmark (home)
+     and the account menu stay. */
   .quanti-topbar__crumbs { display: none; }
 }

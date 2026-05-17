@@ -62,7 +62,12 @@ class StudyProgress(BaseModel):
 
 
 class StudySummary(BaseModel):
-    """List item shape for GET /studies."""
+    """List item shape for GET /studies — drives the Studies-list home cards.
+
+    `survey_count` + `project_count` give the instrument-mix badge
+    (survey-only / interview-only / hybrid). The completion counts +
+    `has_report` let the card show a one-line progress state.
+    """
 
     id: str
     name: str
@@ -71,6 +76,10 @@ class StudySummary(BaseModel):
     survey_count: int = 0
     project_count: int = 0
     participant_count: int = 0
+    # Sprint 17: richer card signals.
+    completed_response_count: int = 0
+    completed_interview_count: int = 0
+    has_report: bool = False
 
 
 class StudyDetail(BaseModel):
