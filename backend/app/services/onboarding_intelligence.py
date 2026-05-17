@@ -246,12 +246,67 @@ def generate_onboarding_study(
 #     every signup (EN or FR). It sits in a cache_control'd system block. The
 #     language directive + per-user intake go in the user turn, so EN and FR
 #     calls share one cached prefix.
-#   * JSON reliability: the exact output shape is specified in the prompt and
-#     parsed with a fence-stripping fallback. (Structured-output *enforcement*
-#     via output_config.format would be cleaner but needs a newer anthropic
-#     SDK than the pinned 0.43.0 — tracked as a separate upgrade.)
+#   * Structured output: output_config.format with a json_schema constrains
+#     the response to valid, parseable JSON — no fence-stripping guesswork.
+#     (JSON Schema can't express minItems/maxItems, so the "exactly 3 phases /
+#     5 questions" cardinality is still enforced in the post-parse coercion.)
 
 _PLAN_MODEL = "claude-opus-4-7"
+
+# JSON schema for output_config.format — every object additionalProperties:
+# false with all properties required, as structured outputs expects.
+_RESEARCH_PLAN_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "brief_summary": {"type": "string"},
+        "plan_title": {"type": "string"},
+        "timeline_estimate": {"type": "string"},
+        "phases": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "number": {"type": "integer"},
+                    "kind": {"type": "string", "enum": ["survey", "interview"]},
+                    "title": {"type": "string"},
+                    "purpose": {"type": "string"},
+                    "what_it_answers": {"type": "string"},
+                    "recommended_sample": {"type": "integer"},
+                    "est_setup": {"type": "string"},
+                },
+                "required": [
+                    "number", "kind", "title", "purpose",
+                    "what_it_answers", "recommended_sample", "est_setup",
+                ],
+            },
+        },
+        "interview_guide": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "section_index": {"type": "integer"},
+                    "section_title": {"type": "string"},
+                    "question_index": {"type": "integer"},
+                    "main_question": {"type": "string"},
+                    "interview_notes": {"type": "string"},
+                    "desired_learning": {"type": "string"},
+                },
+                "required": [
+                    "section_index", "section_title", "question_index",
+                    "main_question", "interview_notes", "desired_learning",
+                ],
+            },
+        },
+    },
+    "required": [
+        "brief_summary", "plan_title", "timeline_estimate",
+        "phases", "interview_guide",
+    ],
+}
 
 # Frozen methodology system prompt. Identical across every signup → cacheable.
 # Encodes a quant→qual→quant triangulation design with real research rigour.
@@ -397,6 +452,8 @@ def generate_research_plan(
         # Prompt caching: the methodology system prompt is a cache_control'd
         # block — frozen and identical across every signup, so it is written
         # once and read on subsequent calls within the TTL.
+        # Structured output: output_config.format constrains the response to
+        # the schema, so the text block is guaranteed valid JSON.
         response = client.with_options(timeout=60.0).messages.create(
             model=_PLAN_MODEL,
             max_tokens=8000,
@@ -407,6 +464,12 @@ def generate_research_plan(
                     "cache_control": {"type": "ephemeral"},
                 }
             ],
+            output_config={
+                "format": {
+                    "type": "json_schema",
+                    "schema": _RESEARCH_PLAN_SCHEMA,
+                }
+            },
             messages=[{"role": "user", "content": user_prompt}],
         )
 
@@ -415,8 +478,9 @@ def generate_research_plan(
             if getattr(block, "type", None) == "text":
                 text += getattr(block, "text", "") or ""
 
+        # output_config.format guarantees valid JSON — but keep a defensive
+        # fence-strip in case a refusal or edge case slips through.
         text = text.strip()
-        # Strip code fences if Claude added them despite instructions.
         if text.startswith("```"):
             text = text.split("```", 2)[1] if "```" in text[3:] else text[3:]
             if text.startswith("json"):
