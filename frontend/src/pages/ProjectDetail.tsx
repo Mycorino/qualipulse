@@ -1347,6 +1347,23 @@ export default function ProjectDetail() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const isCollecting = links.some((l) => l.is_active);
+
+  /** Add a blank guide question inline (then edit it in place). The old
+   *  wizard used to own this; the copilot drafts whole guides, this is
+   *  the manual fallback. */
+  const addBlankGuideQuestion = async () => {
+    if (!id) return;
+    try {
+      await createGuideQuestion(id, {
+        section_title: "Questions",
+        main_question: "New question",
+      });
+      const fresh = await getProject(id);
+      setProject(fresh);
+    } catch {
+      toast("Could not add a question", "error");
+    }
+  };
   const instrumentSections = [
     { key: "overview", label: tProject("detail.tabOverview") },
     { key: "setup", label: tProject("detail.tabSetup") },
@@ -1470,7 +1487,7 @@ export default function ProjectDetail() {
         {project.is_demo && (
           <div className="demo-banner">
             <p>{tProject("detail.demoBannerText")}</p>
-            <Link to="/projects/new" className="btn btn-primary btn-sm" style={{ whiteSpace: "nowrap", textDecoration: "none", flexShrink: 0 }}>
+            <Link to="/dashboard" className="btn btn-primary btn-sm" style={{ whiteSpace: "nowrap", textDecoration: "none", flexShrink: 0 }}>
               {tProject("detail.demoBannerCta")}
             </Link>
           </div>
@@ -1834,10 +1851,10 @@ export default function ProjectDetail() {
                     )}
                   </p>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>{tProject("setup.addQuestions")}</button>
+                <button className="btn btn-ghost btn-sm" onClick={addBlankGuideQuestion}>{tProject("setup.addQuestions")}</button>
               </div>
               {project.questions.length === 0 ? (
-                <p className="muted-text">{tProject("setup.noQuestionsYet")} <button className="btn btn-primary btn-sm" onClick={() => navigate(`/projects/${id}/edit`)}>{tProject("setup.createGuide")}</button></p>
+                <p className="muted-text">{tProject("setup.noQuestionsYet")} <button className="btn btn-primary btn-sm" onClick={addBlankGuideQuestion}>{tProject("setup.createGuide")}</button> <span style={{ color: "var(--text-tertiary)" }}>or use the ✦ Ask AI copilot to draft the whole guide.</span></p>
               ) : (
                 <>
                   {/* Active questions */}

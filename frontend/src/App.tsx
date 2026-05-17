@@ -17,7 +17,6 @@ import Marketing from "./pages/Marketing";
 
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const InterviewVerify = lazy(() => import("./pages/InterviewVerify"));
-const CreateProjectWizard = lazy(() => import("./pages/CreateProjectWizard"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AccountSettings = lazy(() => import("./pages/AccountSettings"));
@@ -137,22 +136,6 @@ export default function App() {
         element={
           <OnboardedRoute>
             <ProjectDetail />
-          </OnboardedRoute>
-        }
-      />
-      <Route
-        path="/projects/new"
-        element={
-          <OnboardedRoute>
-            <CreateProjectWizard />
-          </OnboardedRoute>
-        }
-      />
-      <Route
-        path="/projects/:id/edit"
-        element={
-          <OnboardedRoute>
-            <CreateProjectWizard />
           </OnboardedRoute>
         }
       />
