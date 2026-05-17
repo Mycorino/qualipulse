@@ -7,10 +7,12 @@ import {
   saveOnboardingProfile,
   resendVerification,
   analyseWebsite,
-  generateStudyDraft,
+  generateResearchPlan,
 } from "../api/auth";
-import type { CompanyResponse, StudyDraft } from "../api/auth";
+import type { CompanyResponse, ResearchPlan } from "../api/auth";
 import { createProject } from "../api/projects";
+import { createSurvey } from "../api/surveys";
+import { updateStudy } from "../api/studies";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 
@@ -69,11 +71,10 @@ export default function Welcome() {
   const [goalsFreeform, setGoalsFreeform] = useState("");
   const [summaryExpanded, setSummaryExpanded] = useState(false);
 
-  // Step 4 — Brief
-  // Step 4 — Study draft (replaces standalone brief)
-  const [studyDraft, setStudyDraft] = useState<StudyDraft | null>(null);
-  const [studyLoading, setStudyLoading] = useState(false);
-  const [studyError, setStudyError] = useState(false);
+  // Step 4 — the AI-generated 3-phase research plan
+  const [researchPlan, setResearchPlan] = useState<ResearchPlan | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planError, setPlanError] = useState(false);
 
   // Translated option arrays
   const industryLabels = t("onboarding.industries", { returnObjects: true }) as string[];
@@ -382,12 +383,12 @@ export default function Welcome() {
     }
   }
 
-  // Step 4 — generate study draft on enter
+  // Step 4 — generate the 3-phase research plan on enter
   useEffect(() => {
     if (step !== 4) return;
-    setStudyLoading(true);
-    setStudyError(false);
-    generateStudyDraft({
+    setPlanLoading(true);
+    setPlanError(false);
+    generateResearchPlan({
       first_name: me?.first_name || undefined,
       company_name: companyName || undefined,
       role_title: roleTitle.trim() || undefined,
@@ -399,66 +400,87 @@ export default function Welcome() {
       language: uiLang,
     })
       .then((res) => {
-        if (res.draft) {
-          setStudyDraft(res.draft);
+        if (res.plan && res.plan.phases?.length === 3) {
+          setResearchPlan(res.plan);
         } else {
-          setStudyError(true);
+          setPlanError(true);
         }
       })
       .catch(() => {
-        setStudyError(true);
+        setPlanError(true);
       })
       .finally(() => {
-        setStudyLoading(false);
+        setPlanLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  // Step 4 — Create the study from the draft + complete onboarding
-  async function handleCreateStudy() {
-    if (!studyDraft) return;
+  // Step 4 — Launch Phase 1: create the screener survey, attach the
+  // interview project to the same Study, persist the plan as a roadmap.
+  //
+  // Resilience: Phase 1 (the screener survey) is the critical path — it
+  // auto-creates the Study and is where the user lands. The interview
+  // project and the plan-persistence are best-effort: if either fails the
+  // survey + Study still exist, so we swallow those errors and proceed.
+  async function handleLaunchPhase1() {
+    if (!researchPlan) return;
     setSaving(true);
     setError("");
-    // Mark onboarding complete first (idempotent — if project creation
-    // fails the user still lands on the dashboard rather than being
-    // trapped in the wizard).
     let onboardingDone = false;
     try {
       await completeOnboarding({
-        onboarding_recap: studyDraft.brief_summary || undefined,
+        onboarding_recap: researchPlan.brief_summary || undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
-        // Persist the AI's other research directions as "use cases" so
-        // the personalised welcome email surfaces them as 3 study ideas
-        // (matching what we showed on Step 4).
-        selected_use_cases: (studyDraft.other_directions || []).length > 0
-          ? (studyDraft.other_directions || []).join(",")
-          : undefined,
       });
       setCachedOnboarded(true);
       onboardingDone = true;
 
-      const project = await createProject({
-        name: studyDraft.study_title,
-        language: uiLang,
-        interview_duration_minutes: studyDraft.duration_minutes,
-        research_objective: studyDraft.research_objective,
-        target_customer_description: studyDraft.target_audience,
-        questions: studyDraft.questions.map((q) => ({
-          section_index: q.section_index,
-          section_title: q.section_title,
-          question_index: q.question_index,
-          main_question: q.main_question,
-          interview_notes: q.interview_notes,
-          desired_learning: q.desired_learning,
-        })),
-        screening_questions: [],
+      // Phase 1 — the screener survey. role:"screener" auto-creates the Study.
+      const phase1 = researchPlan.phases.find((p) => p.number === 1);
+      const survey = await createSurvey({
+        name: phase1?.title || researchPlan.plan_title,
+        role: "screener",
       });
-      navigate(`/projects/${project.id}`, { replace: true });
+
+      // Phase 2 — the interview project, joined to the SAME Study via
+      // study_id, pre-filled with the AI interview guide. Best-effort.
+      const phase2 = researchPlan.phases.find((p) => p.kind === "interview");
+      try {
+        await createProject({
+          name: phase2?.title || researchPlan.plan_title,
+          language: uiLang,
+          study_id: survey.study_id,
+          research_objective: phase2?.what_it_answers || undefined,
+          questions: researchPlan.interview_guide.map((q) => ({
+            section_index: q.section_index,
+            section_title: q.section_title,
+            question_index: q.question_index,
+            main_question: q.main_question,
+            interview_notes: q.interview_notes,
+            desired_learning: q.desired_learning,
+          })),
+          screening_questions: [],
+        });
+      } catch {
+        // non-fatal — the screener survey + Study still exist
+      }
+
+      // Persist the plan onto the Study so the Study page shows it as a
+      // roadmap (Phases 2-3 stay discoverable). Best-effort.
+      try {
+        await updateStudy(survey.study_id, {
+          research_plan: JSON.stringify(researchPlan),
+        });
+      } catch {
+        // non-fatal — the plan is a nice-to-have on the Study page
+      }
+
+      navigate(`/surveys/${survey.id}/edit`, { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("onboarding.failedSave")));
       if (onboardingDone) {
-        // Onboarding succeeded but project creation failed — send the user
-        // to the dashboard rather than leaving them stuck in the wizard.
+        // Onboarding completed but the screener survey failed — send the
+        // user home rather than trapping them in the wizard.
         navigate("/dashboard", { replace: true });
       }
     } finally {
@@ -466,22 +488,18 @@ export default function Welcome() {
     }
   }
 
-  // Step 4 — Start from scratch (skip the AI study, but still complete onboarding)
+  // Step 4 — Start from scratch: complete onboarding, go to the Studies
+  // home where the angle picker lets the user build their own.
   async function handleStartFromBlank() {
     setSaving(true);
     setError("");
     try {
       await completeOnboarding({
-        onboarding_recap: studyDraft?.brief_summary || undefined,
+        onboarding_recap: researchPlan?.brief_summary || undefined,
         goals_freeform: goalsFreeform.trim() || undefined,
-        // Still pass other_directions so the welcome email gets the
-        // same 3 ideas even when the user opts to start from blank.
-        selected_use_cases: (studyDraft?.other_directions || []).length > 0
-          ? (studyDraft!.other_directions || []).join(",")
-          : undefined,
       });
       setCachedOnboarded(true);
-      navigate("/projects/new", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("onboarding.failedSave")));
     } finally {
@@ -544,7 +562,7 @@ export default function Welcome() {
   );
 
   // Carousel messages for study-draft loading
-  const studyCarouselMessages = t("onboarding.studyCarousel", { returnObjects: true }) as string[];
+  const planCarouselMessages = t("onboarding.planCarousel", { returnObjects: true }) as string[];
 
   return (
     <div className="welcome-page">
@@ -1054,13 +1072,13 @@ export default function Welcome() {
           </div>
         )}
 
-        {/* ── Step 4: Your first study ── */}
+        {/* ── Step 4: Your research plan ── */}
         {step === 4 && (
           <div className="onboarding-step">
-            <h1 className="welcome-title">{t("onboarding.studyTitle")}</h1>
-            <p className="welcome-subtitle">{t("onboarding.studySubtitle")}</p>
+            <h1 className="welcome-title">{t("onboarding.planTitle")}</h1>
+            <p className="welcome-subtitle">{t("onboarding.planSubtitle")}</p>
 
-            {studyLoading && (
+            {planLoading && (
               <div style={{ padding: "40px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
                 <span
                   className="spinner"
@@ -1075,151 +1093,111 @@ export default function Welcome() {
                   }}
                 />
                 <LoadingCarousel
-                  messages={Array.isArray(studyCarouselMessages) && studyCarouselMessages.length > 0
-                    ? studyCarouselMessages
-                    : ["Designing your study..."]
+                  messages={Array.isArray(planCarouselMessages) && planCarouselMessages.length > 0
+                    ? planCarouselMessages
+                    : ["Designing your research plan..."]
                   }
                 />
               </div>
             )}
 
-            {!studyLoading && studyError && (
+            {!planLoading && planError && (
               <div className="recap-card" style={{ marginTop: 24 }}>
                 <p style={{ color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>
-                  {t("onboarding.studyFallback")}
+                  {t("onboarding.planFallback")}
                 </p>
               </div>
             )}
 
-            {!studyLoading && !studyError && studyDraft && (
+            {!planLoading && !planError && researchPlan && (
               <div className="recap-card" style={{ marginTop: 24 }}>
                 {/* Brief summary */}
-                <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6, margin: "0 0 20px" }}>
-                  {studyDraft.brief_summary}
+                <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
+                  {researchPlan.brief_summary}
                 </p>
 
-                {/* Study title */}
-                <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 16px" }}>
-                  {studyDraft.study_title}
+                {/* Plan title */}
+                <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 12px" }}>
+                  {researchPlan.plan_title}
                 </h2>
 
-                {/* Objective */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
-                    {t("onboarding.studyObjective")}
-                  </div>
-                  <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
-                    {studyDraft.research_objective}
-                  </div>
+                {/* Timeline headline — projection, not a promise */}
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "var(--primary, #4369f5)", background: "var(--primary-subtle, #eef2ff)", borderRadius: 999, padding: "5px 12px", marginBottom: 22 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  {researchPlan.timeline_estimate}
                 </div>
 
-                {/* Audience */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
-                    {t("onboarding.studyAudience")}
-                  </div>
-                  <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
-                    {studyDraft.target_audience}
-                  </div>
-                </div>
-
-                {/* What you'll learn — the conversion content, NOT the
-                    questions themselves. Each insight is a sentence the
-                    user would screenshot to share with their team. */}
-                {(studyDraft.key_insights?.length ?? 0) > 0 && (
-                  <div style={{ marginBottom: 18 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>
-                      {t("onboarding.studyKeyInsightsLabel")}
-                    </div>
-                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-                      {studyDraft.key_insights!.map((insight, i) => (
-                        <li key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #4369f5)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                          <span>{insight}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Why this matters — strategic framing under the insights */}
-                {studyDraft.why_this_matters && (
-                  <div style={{ marginBottom: 18, padding: "12px 14px", borderRadius: "var(--radius)", background: "var(--primary-subtle, #eef2ff)", borderLeft: "3px solid var(--primary, #4369f5)" }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--primary, #4369f5)", marginBottom: 4 }}>
-                      {t("onboarding.studyWhyMattersLabel")}
-                    </div>
-                    <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5, margin: 0 }}>
-                      {studyDraft.why_this_matters}
-                    </p>
-                  </div>
-                )}
-
-                {/* Duration + sample size chips */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    {t("onboarding.studyDuration", { minutes: studyDraft.duration_minutes })}
-                  </span>
-                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    {t("onboarding.studySampleSize", { count: studyDraft.sample_size })}
-                  </span>
-                  <span style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
-                    {t("onboarding.studyQuestionCount", { count: studyDraft.questions.length })}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Other research directions the AI noticed alongside the main
-                study. Shown so the user knows the breadth — and reassured
-                that the lite study isn't the only thing on the table.
-                These also seed the 3 suggestions in the welcome email. */}
-            {!studyLoading && !studyError && studyDraft && (studyDraft.other_directions?.length ?? 0) > 0 && (
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: "16px 18px",
-                  borderRadius: "var(--radius)",
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-surface)",
-                }}
-              >
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
-                  {t("onboarding.studyOtherDirectionsLabel")}
-                </div>
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "0 0 10px", lineHeight: 1.5 }}>
-                  {t("onboarding.studyOtherDirectionsHint")}
-                </p>
-                <ul style={{ paddingLeft: 20, margin: 0 }}>
-                  {studyDraft.other_directions!.map((dir, i) => (
-                    <li key={i} style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 4 }}>
-                      {dir}
+                {/* The 3 phases */}
+                <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 18 }}>
+                  {researchPlan.phases.map((phase) => (
+                    <li key={phase.number} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                      {/* Numbered marker */}
+                      <div
+                        style={{
+                          flexShrink: 0,
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          background: "var(--primary, #4369f5)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 14,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        aria-hidden="true"
+                      >
+                        {phase.number}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
+                          {/* Instrument icon: chart for survey, mic for interview */}
+                          {phase.kind === "interview" ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #4369f5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #4369f5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+                          )}
+                          <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
+                            {phase.title}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5, margin: "0 0 4px" }}>
+                          {phase.purpose}
+                        </p>
+                        <p style={{ fontSize: 13, color: "var(--text-tertiary)", lineHeight: 1.5, margin: "0 0 6px" }}>
+                          {phase.what_it_answers}
+                        </p>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 12, padding: "3px 9px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                            {t("onboarding.planPhaseSample", { count: phase.recommended_sample })}
+                          </span>
+                          <span style={{ fontSize: 12, padding: "3px 9px", borderRadius: 999, background: "var(--bg-surface)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                            {phase.est_setup}
+                          </span>
+                        </div>
+                      </div>
                     </li>
                   ))}
-                </ul>
+                </ol>
               </div>
             )}
 
             <div className="welcome-actions" style={{ marginTop: 32 }}>
-              {/* Hide both CTAs entirely while the AI is generating —
-                  rendering a disabled "Create this study" reads as "not
-                  ready" rather than "loading", per the design audit. */}
-              {!studyLoading && (
+              {/* CTAs hidden while generating — a disabled primary button
+                  reads as "not ready" rather than "loading". */}
+              {!planLoading && (
                 <>
                   <button
                     className="btn btn-primary btn-lg"
-                    onClick={handleCreateStudy}
-                    disabled={saving || !studyDraft}
+                    onClick={handleLaunchPhase1}
+                    disabled={saving || !researchPlan}
                   >
-                    {saving ? t("onboarding.creatingStudy") : t("onboarding.createThisStudy")}
+                    {saving ? t("onboarding.launchingPhase1") : t("onboarding.launchPhase1")}
                   </button>
                   {saving && (
                     <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "8px 0 0", textAlign: "center" }}>
-                      {t("onboarding.creatingStudyDesc")}
+                      {t("onboarding.launchingPhase1Desc")}
                     </p>
                   )}
                   <button

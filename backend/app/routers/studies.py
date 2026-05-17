@@ -20,6 +20,7 @@ Future sprint hooks (intentionally deferred):
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -131,7 +132,50 @@ def get_study(
         projects=project_minis,
         progress=progress,
         recommended_action=recommended,
+        research_plan=study.research_plan,
     )
+
+
+class StudyPatch(BaseModel):
+    """Partial update for a Study. Every field optional — only set ones apply."""
+
+    name: str | None = None
+    # JSON-serialised 3-phase research plan from onboarding. The frontend
+    # sends the plan here right after the screener survey auto-creates the
+    # Study, so the Study page can render it as a roadmap.
+    research_plan: str | None = None
+
+
+@router.patch("/{study_id}", response_model=StudyDetail)
+def update_study(
+    study_id: str,
+    body: StudyPatch,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> StudyDetail:
+    """Partial update of a Study — currently rename + research_plan.
+
+    Used by onboarding to attach the generated 3-phase research plan to
+    the Study the screener survey just auto-created.
+    """
+
+    study = (
+        db.query(Study)
+        .filter(Study.id == study_id, Study.company_id == company.id)
+        .first()
+    )
+    if not study:
+        raise HTTPException(status_code=404, detail="Study not found")
+
+    if body.name is not None:
+        name = body.name.strip()
+        if name:
+            study.name = name[:255]
+    if body.research_plan is not None:
+        study.research_plan = body.research_plan or None
+
+    db.commit()
+    return get_study(study_id=study_id, db=db, company=company)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

@@ -58,6 +58,8 @@ export interface StudyDetail {
   projects: ProjectMini[];
   progress: StudyProgress;
   recommended_action: string | null;
+  // JSON-serialised 3-phase onboarding research plan, when present.
+  research_plan: string | null;
 }
 
 export async function listStudies(): Promise<StudySummary[]> {
@@ -67,6 +69,15 @@ export async function listStudies(): Promise<StudySummary[]> {
 
 export async function getStudy(id: string): Promise<StudyDetail> {
   const resp = await client.get<StudyDetail>(`/studies/${id}`);
+  return resp.data;
+}
+
+/** Partial update of a Study — rename and/or attach a research plan. */
+export async function updateStudy(
+  id: string,
+  patch: { name?: string; research_plan?: string },
+): Promise<StudyDetail> {
+  const resp = await client.patch<StudyDetail>(`/studies/${id}`, patch);
   return resp.data;
 }
 

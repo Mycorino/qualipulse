@@ -95,6 +95,10 @@ class StudyDetail(BaseModel):
     # Researcher-facing recommended next action ("Invite N detractors to interview" etc).
     # Computed server-side based on progress flags; Sprint 10 widens the cases.
     recommended_action: str | None = None
+    # JSON-serialised 3-phase onboarding research plan, when the Study was
+    # born from the onboarding research-plan flow. Null otherwise. The Study
+    # page renders it as a roadmap.
+    research_plan: str | None = None
 
 
 # ── Sprint 11: Quantified Themes report ───────────────────────────────

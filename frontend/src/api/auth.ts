@@ -243,3 +243,49 @@ export async function generateStudyDraft(payload: {
   );
   return data;
 }
+
+// ── Research plan (onboarding step 4 — the mixed-methods upgrade) ──
+//
+// Supersedes StudyDraft. Instead of one interview study, the AI returns a
+// sequenced 3-phase program: screener survey → in-depth interviews →
+// validation survey. interview_guide seeds the Phase-2 interview project.
+
+export interface ResearchPhase {
+  number: number;
+  kind: "survey" | "interview";
+  title: string;
+  purpose: string;
+  what_it_answers: string;
+  recommended_sample: number;
+  est_setup: string;
+}
+
+export interface ResearchPlan {
+  brief_summary: string;
+  plan_title: string;
+  timeline_estimate: string;
+  phases: ResearchPhase[]; // exactly 3
+  interview_guide: StudyDraftQuestion[]; // 5, reused for the Phase-2 project
+}
+
+export interface ResearchPlanResponse {
+  plan: ResearchPlan | null;
+}
+
+export async function generateResearchPlan(payload: {
+  first_name?: string;
+  company_name?: string;
+  role_title?: string;
+  research_intent?: string;
+  research_experience?: string;
+  industry?: string;
+  business_summary?: string;
+  goals_freeform?: string;
+  language?: string;
+}): Promise<ResearchPlanResponse> {
+  const { data } = await client.post<ResearchPlanResponse>(
+    "/auth/onboarding/generate-plan",
+    payload,
+  );
+  return data;
+}
