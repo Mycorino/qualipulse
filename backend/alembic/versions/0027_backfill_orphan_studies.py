@@ -12,9 +12,15 @@ Study named after the project — identical to the 0024 backfill logic.
 Idempotent: only touches rows where ``study_id IS NULL``. Safe to
 re-run; no-ops once every project has a Study.
 
-Revision ID: 0027_backfill_orphan_project_studies
+Revision ID: 0027_backfill_orphan_studies
 Revises: 0026_survey_source_analysis
 Create Date: 2026-05-17
+
+Note: the revision id is kept to 28 chars. Alembic stores
+``alembic_version.version_num`` as ``VARCHAR(32)``, so a longer id fails
+to stamp on Postgres with StringDataRightTruncation — which is exactly
+how the original ``0027_backfill_orphan_project_studies`` (36 chars)
+broke production deploys.
 """
 from datetime import datetime, timezone
 import uuid
@@ -23,7 +29,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0027_backfill_orphan_project_studies"
+revision = "0027_backfill_orphan_studies"
 down_revision = "0026_survey_source_analysis"
 branch_labels = None
 depends_on = None
