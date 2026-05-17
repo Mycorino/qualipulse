@@ -4,9 +4,8 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { SkeletonTable } from "../components/Skeleton";
 import { AudioClip } from "../components/AudioClip";
-import LanguageSwitcher from "../components/LanguageSwitcher";
-import { ProjectSwitcher, AccountMenu } from "../components/HeaderControls";
-import { useAuth } from "../hooks/useAuth";
+import { ProjectSwitcher } from "../components/HeaderControls";
+import { QuantiTopBar } from "../components/QuantiTopBar";
 import { getMe } from "../api/auth";
 import {
   getProject,
@@ -71,7 +70,6 @@ export default function ProjectDetail() {
   const { t: tAnalysis, i18n } = useTranslation("analysis");
   const { t: tProject } = useTranslation("project");
   const { t: tCommon } = useTranslation("common");
-  const { logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Header / coachmarks / overflow menu ───────────────────────────────
@@ -1352,25 +1350,18 @@ export default function ProjectDetail() {
   return (
     <div className="detail-layout">
 
-      {/* ── Branded header (matches Dashboard) ── */}
-      <header className="dashboard-header" style={{ flexWrap: "wrap" }}>
-        <span className="logo">QualiPulse</span>
-        <nav className="dashboard-nav dashboard-nav--with-avatar" aria-label="Account">
-          <span className="nav-only-mobile" style={{ display: "contents" } as React.CSSProperties}>
-            <LanguageSwitcher variant="light" />
-            <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => navigate("/account")}>
-              {tCommon("account")}
-            </button>
-            <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={logout}>
-              {tCommon("signOut")}
-            </button>
-          </span>
-          <AccountMenu
-            initial={(accountName || "?").trim().charAt(0).toUpperCase()}
-            onSignOut={logout}
-          />
-        </nav>
-      </header>
+      {/* ── Global chrome — same QuantiTopBar as the Study/Survey pages,
+           so the interview detail reads as part of one product. The
+           breadcrumb climbs Studies › <study> › <this interview>. ── */}
+      <QuantiTopBar
+        crumbs={[
+          { label: "Studies", to: "/studies" },
+          ...(project.study_id
+            ? [{ label: project.study_name || "Study", to: `/studies/${project.study_id}` }]
+            : []),
+          { label: project.name },
+        ]}
+      />
 
       {/* Visually-hidden a11y announcer for inline-edit state */}
       <div aria-live="polite" className="sr-only" role="status">{editAnnouncement}</div>
@@ -1379,7 +1370,11 @@ export default function ProjectDetail() {
       <div className="detail-header">
         <div className="detail-header-left">
           <div className="detail-breadcrumb">
-            <a href="/dashboard">{tProject("detail.backToDashboard").replace("← ", "")}</a>
+            {/* Repointed from /dashboard to the parent Study — the
+                interview round is an instrument inside a Study now. */}
+            <a href={project.study_id ? `/studies/${project.study_id}` : "/studies"}>
+              {project.study_name || "Study"}
+            </a>
             <span className="detail-breadcrumb-sep">/</span>
             <ProjectSwitcher
               currentId={id}

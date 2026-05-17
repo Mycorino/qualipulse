@@ -484,6 +484,8 @@ def _project_to_response(project: Project) -> ProjectResponse:
     return ProjectResponse(
         id=project.id,
         company_id=project.company_id,
+        study_id=project.study_id,
+        study_name=project.study.name if project.study else None,
         name=project.name,
         language=project.language,
         interview_duration_minutes=project.interview_duration_minutes,
