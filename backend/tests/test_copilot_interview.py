@@ -57,16 +57,20 @@ class TestInterviewCopilot:
             assert q["desired_learning"]
             assert q["rationale"]
 
-    def test_settings_patch_accepts_research_objective(self, client, auth_headers):
-        """The copilot's edit_objective applies via PATCH /settings."""
+    def test_settings_patch_accepts_objective_and_name(self, client, auth_headers):
+        """The copilot's edit_objective and inline-rename apply via /settings."""
         project = _create_project(client, auth_headers)
         resp = client.patch(
             f"/projects/{project['id']}/settings",
             headers=auth_headers,
-            json={"research_objective": "Understand why trial users churn."},
+            json={
+                "research_objective": "Understand why trial users churn.",
+                "name": "Trial churn — round 1",
+            },
         )
         assert resp.status_code == 200, resp.text
         assert resp.json()["research_objective"] == "Understand why trial users churn."
+        assert resp.json()["name"] == "Trial churn — round 1"
 
     def test_conversation_round_trip(self, client, auth_headers):
         project = _create_project(client, auth_headers, name="Convo project")

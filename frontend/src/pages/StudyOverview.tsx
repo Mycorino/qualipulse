@@ -14,6 +14,7 @@ import {
   triggerAnalysis,
 } from "../api/studies";
 import { createSurvey } from "../api/surveys";
+import { createProject } from "../api/projects";
 import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
 import { QuantiTopBar } from "../components/QuantiTopBar";
@@ -63,6 +64,23 @@ export default function StudyOverview() {
       navigate(`/surveys/${survey.id}/edit`);
     } catch {
       toast("Could not create the survey", "error");
+    }
+  };
+
+  /** Create an interview round inside THIS study and drop into the
+   *  workspace — the copilot drafts the objective + guide there. */
+  const handleCreateInterview = async () => {
+    if (!study) return;
+    try {
+      const project = await createProject({
+        name: "Untitled interview round",
+        language: "en",
+        study_id: study.id,
+        questions: [],
+      });
+      navigate(`/projects/${project.id}?tab=setup`);
+    } catch {
+      toast("Could not create the interview round", "error");
     }
   };
 
@@ -188,7 +206,9 @@ export default function StudyOverview() {
         {tab === "surveys" && (
           <SurveysTab study={study} onCreateSurvey={handleCreateSurvey} />
         )}
-        {tab === "interviews" && <InterviewsTab study={study} navigate={navigate} />}
+        {tab === "interviews" && (
+          <InterviewsTab study={study} onCreateInterview={handleCreateInterview} />
+        )}
         {tab === "participants" && <ParticipantsTab study={study} />}
         {tab === "report" && <ReportTab studyId={study.id} progress={study.progress} />}
       </main>
@@ -292,17 +312,17 @@ function SurveysTab({
 
 function InterviewsTab({
   study,
-  navigate,
+  onCreateInterview,
 }: {
   study: StudyDetail;
-  navigate: ReturnType<typeof useNavigate>;
+  onCreateInterview: () => void;
 }) {
   if (study.projects.length === 0) {
     return (
       <EmptyState
         message="No interview track yet. Add an interview round to talk to respondents in depth — or use the Screener Bridge from a survey dashboard to auto-create one from a filtered segment."
         ctaLabel="+ Add interview round"
-        onAct={() => navigate(`/projects/new?study_id=${study.id}`)}
+        onAct={onCreateInterview}
       />
     );
   }
@@ -332,7 +352,7 @@ function InterviewsTab({
         type="button"
         className="btn btn-secondary"
         style={{ alignSelf: "flex-start" }}
-        onClick={() => navigate(`/projects/new?study_id=${study.id}`)}
+        onClick={onCreateInterview}
       >
         + Add interview round
       </button>

@@ -71,6 +71,7 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectSettingsPatch(BaseModel):
+    name: str | None = None
     panel_collection_enabled: bool | None = None
     warmup_enabled: bool | None = None
     # Granular updates to the research framing — the Research Copilot sets

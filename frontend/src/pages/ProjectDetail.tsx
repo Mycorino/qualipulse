@@ -1378,7 +1378,23 @@ export default function ProjectDetail() {
         { label: project.name },
       ]}
       eyebrow="Interview round"
-      title={project.name}
+      title={
+        <input
+          type="text"
+          className="survey-editor__title-input"
+          value={project.name}
+          onChange={(e) =>
+            setProject((p) => (p ? { ...p, name: e.target.value } : p))
+          }
+          onBlur={() => {
+            if (!id || !project.name.trim()) return;
+            patchProjectSettings(id, { name: project.name.trim() }).catch(() =>
+              toast("Couldn't rename the interview round", "error"),
+            );
+          }}
+          aria-label="Interview round name"
+        />
+      }
       status={
         isCollecting
           ? { label: "Collecting", tone: "live" }

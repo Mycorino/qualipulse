@@ -303,6 +303,7 @@ export async function updateProject(id: string, body: ProjectCreate): Promise<Pr
 export async function patchProjectSettings(
   id: string,
   settings: {
+    name?: string;
     panel_collection_enabled?: boolean;
     warmup_enabled?: boolean;
     research_objective?: string;

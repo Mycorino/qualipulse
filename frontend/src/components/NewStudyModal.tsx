@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { createSurvey } from "../api/surveys";
+import { createProject } from "../api/projects";
 import { useToast } from "./Toast";
 
 /**
@@ -70,9 +71,14 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
     setBusy(true);
     try {
       if (angle === "interview") {
-        // The wizard creates the interview round (and its Study). The
-        // name carries through via ?name=.
-        navigate(`/projects/new?name=${encodeURIComponent(studyName)}`);
+        // Create the interview round directly (its Study auto-creates),
+        // then drop into the workspace — the copilot drafts the guide.
+        const project = await createProject({
+          name: studyName,
+          language: "en",
+          questions: [],
+        });
+        navigate(`/projects/${project.id}?tab=setup`);
         return;
       }
       // survey + both → create the survey, which auto-creates the Study.

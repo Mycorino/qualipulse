@@ -331,6 +331,8 @@ def patch_project_settings(
 ) -> ProjectResponse:
     """Update individual project settings (e.g. panel_collection_enabled)."""
     project = _get_project_or_404(project_id, company.id, db)
+    if body.name is not None and body.name.strip():
+        project.name = body.name.strip()
     if body.panel_collection_enabled is not None:
         project.panel_collection_enabled = body.panel_collection_enabled
     if body.warmup_enabled is not None:
