@@ -48,7 +48,8 @@ export interface ProposedAction {
     | "remove_question"
     | "add_guide_question"
     | "edit_guide_question"
-    | "remove_guide_question";
+    | "remove_guide_question"
+    | "edit_objective";
   /** add_question / add_guide_question */
   question?: ProposedSurveyQuestion | ProposedGuideQuestion;
   /** edit / remove */
@@ -59,6 +60,8 @@ export interface ProposedAction {
   /** interview edit_guide_question */
   new_main_question?: string;
   new_desired_learning?: string;
+  /** edit_objective */
+  new_objective?: string;
   rationale?: string;
 }
 

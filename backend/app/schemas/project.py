@@ -71,8 +71,13 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectSettingsPatch(BaseModel):
+    name: str | None = None
     panel_collection_enabled: bool | None = None
     warmup_enabled: bool | None = None
+    # Granular updates to the research framing — the Research Copilot sets
+    # these so it can own interview-round setup without the old wizard.
+    research_objective: str | None = None
+    research_context: str | None = None
 
 
 class QuestionResponse(BaseModel):

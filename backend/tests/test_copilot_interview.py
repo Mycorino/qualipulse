@@ -20,7 +20,9 @@ def _create_project(client, auth_headers, name: str = "Interview test") -> dict:
 
 
 class TestInterviewCopilot:
-    def test_proposes_guide_questions_for_empty_guide(self, client, auth_headers):
+    def test_proposes_objective_and_questions_for_empty_guide(
+        self, client, auth_headers
+    ):
         project = _create_project(client, auth_headers)
 
         resp = client.post(
@@ -35,14 +37,40 @@ class TestInterviewCopilot:
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["reply"]
-        assert len(data["proposed_actions"]) == 2
+        kinds = [a["type"] for a in data["proposed_actions"]]
+        # A brand-new round with no objective: the copilot proposes the
+        # research objective first, then starter questions.
+        assert "edit_objective" in kinds
+        assert kinds.count("add_guide_question") == 2
+
+        objective = next(
+            a for a in data["proposed_actions"] if a["type"] == "edit_objective"
+        )
+        assert objective["new_objective"]
+
         for action in data["proposed_actions"]:
-            assert action["type"] == "add_guide_question"
+            if action["type"] != "add_guide_question":
+                continue
             q = action["question"]
             assert q["section_title"]
             assert q["main_question"]
             assert q["desired_learning"]
             assert q["rationale"]
+
+    def test_settings_patch_accepts_objective_and_name(self, client, auth_headers):
+        """The copilot's edit_objective and inline-rename apply via /settings."""
+        project = _create_project(client, auth_headers)
+        resp = client.patch(
+            f"/projects/{project['id']}/settings",
+            headers=auth_headers,
+            json={
+                "research_objective": "Understand why trial users churn.",
+                "name": "Trial churn — round 1",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["research_objective"] == "Understand why trial users churn."
+        assert resp.json()["name"] == "Trial churn — round 1"
 
     def test_conversation_round_trip(self, client, auth_headers):
         project = _create_project(client, auth_headers, name="Convo project")

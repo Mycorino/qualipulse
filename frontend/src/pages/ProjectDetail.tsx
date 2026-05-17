@@ -1378,7 +1378,23 @@ export default function ProjectDetail() {
         { label: project.name },
       ]}
       eyebrow="Interview round"
-      title={project.name}
+      title={
+        <input
+          type="text"
+          className="survey-editor__title-input"
+          value={project.name}
+          onChange={(e) =>
+            setProject((p) => (p ? { ...p, name: e.target.value } : p))
+          }
+          onBlur={() => {
+            if (!id || !project.name.trim()) return;
+            patchProjectSettings(id, { name: project.name.trim() }).catch(() =>
+              toast("Couldn't rename the interview round", "error"),
+            );
+          }}
+          aria-label="Interview round name"
+        />
+      }
       status={
         isCollecting
           ? { label: "Collecting", tone: "live" }
@@ -3332,7 +3348,11 @@ export default function ProjectDetail() {
           loadConversation: () => getConversation("projects", project.id),
           saveConversation: (t) => saveConversation("projects", project.id, t),
           applyAction: async (action) => {
-            if (action.type === "add_guide_question" && action.question) {
+            if (action.type === "edit_objective" && action.new_objective) {
+              await patchProjectSettings(project.id, {
+                research_objective: action.new_objective,
+              });
+            } else if (action.type === "add_guide_question" && action.question) {
               const q = action.question as ProposedGuideQuestion;
               await createGuideQuestion(project.id, {
                 section_title: q.section_title,
