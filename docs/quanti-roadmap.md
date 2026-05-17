@@ -268,3 +268,85 @@ The 8 questions raised during planning have been resolved. Future contributors: 
 - `backend/alembic/versions/0024_quanti_schema.py` (new — all tables above + `projects.study_id` nullable + backfill)
 - `backend/app/services/stats.py` (new — Wilson CI, n<30 guard, chi-square; the place where the methodology contract lives in code)
 - `backend/app/models/billing.py` (modify — new `PlanEntitlement` seed rows for survey quotas; **do not** add new ledger event types)
+
+---
+
+## 7. Integration phase — finishing "one product" (Sprints 15–18)
+
+**Context.** v1 (Sprints 6–14) shipped the quanti track and the quanti↔quali
+wedge. A consultant audit and a follow-up design critique then surfaced the
+real remaining problem: quanti and quali *feel like two products*. Two home
+surfaces (`/dashboard` lists projects, `/studies` lists studies). Two visual
+languages (`dashboard-header` vs `QuantiTopBar`). Two detail paradigms
+(`/projects/:id` 4-tab page vs the Study Overview 5-tab shell). A researcher's
+mental model fractures the moment they cross from a survey to an interview.
+
+**The model these sprints deliver.** Every research effort is a **Study**.
+Surveys and interview rounds are **instruments inside a Study**. The three
+research "angles" are not three products — they're three instrument
+configurations:
+
+- **Quanti-only** — Study with Survey(s), no interview round.
+- **Quali-only** — Study with an interview round, no survey. (The legacy
+  interview product, rehoused.)
+- **Hybrid** — both. The recommended angle; the product gently routes every
+  other angle toward it (a quanti study's Screener Bridge, a quali study's
+  validation survey).
+
+**Guiding principle.** Do **not** redesign the interview engine. *Rehouse* it.
+The adaptive AI interview, Whisper STT, TTS, `ProjectAnalysis` — all untouched.
+What changes is the chrome around them and where they live in the IA. The new
+quanti UX (`QuantiTopBar`, the Study Overview shell, the tabbed instrument
+layout, the progress checklist) becomes the *only* UX; the qualitative product
+inherits it.
+
+### Sprint table
+
+| Sprint | Deliverable | NOT included | Depends on |
+|---|---|---|---|
+| **15: Projects belong to Studies** | `POST /projects` accepts an optional `study_id`; auto-creates a Study (named after the project) when none is passed — mirrors Decision 8 for surveys. Screener Bridge's `_resolve_target_project_for_invite` stops borrowing the most-recent unrelated project: when a Study has no interview track it **creates a study-linked one**. Idempotent startup backfill (or migration 0027) adopts every orphaned `projects.study_id IS NULL` row into a Study — covers projects created between migration 0024 and this sprint. `CreateProjectWizard` threads `study_id` when launched from inside a Study. | Any UI rehousing (Sprint 16). Dashboard rework (Sprint 17). | Nothing — pure backend + data. |
+| **16: Rehouse the interview detail into the Study shell** | `ProjectDetail` (`/projects/:id`) drops `dashboard-header`, adopts `QuantiTopBar` with breadcrumb `Studies › <study name> › <interview round>`. The 4 tabs (Overview / Setup / Responses / Analysis) and all their logic are **untouched** — only the outer chrome changes. The Study Overview Interviews tab links here and the page now visibly belongs to the same app. The `/projects/:id` URL stays valid — external share links and email deep-links must not break. | Rendering interview tabs literally *inside* the Study Overview page (deferred — chrome unification is enough for v1; full in-place embedding is a later option). Dashboard rework. | Sprint 15 (breadcrumb needs a reliable study link). |
+| **17: One home — the dashboard becomes the Studies list** | Post-login lands on a Studies list. `/dashboard` route stays alive (bookmarks, muscle memory) but renders the Studies list. Study cards carry an **instrument-mix badge** — survey-only / interview-only / hybrid — so the angle is glanceable. A legacy interview project surfaces as an interview-only Study card with zero data migration the user has to think about. Still-relevant Dashboard furniture (trial banner, account menu, email-verification nudge) moves into the Studies list header; the project grid retires. | The angle picker (Sprint 18). | Sprints 15 + 16 — every project must be in a Study and openable in the unified shell, or the list shows dead cards. |
+| **18: The "What do you want to learn?" angle picker** | "+ New study" on the Studies list opens a name field + a 3-card picker (Survey a lot of people / Talk to people in depth / Both — recommended badge). Each card creates the Study and seeds the first instrument, then routes to the matching builder. The picker does **not** hard-commit — a quanti study can grow an interview round later via the Bridge; a quali study can grow a validation survey. | AI-suggested study types from the onboarding profile (a later enhancement once the picker exists). | Sprint 17. |
+
+**Why this order.**
+
+- Sprint 15 is the load-bearing data fix. Sprints 16–17 are IA changes that
+  *assume* every project lives in a Study — if 15 isn't done first they build
+  on sand (orphaned projects → dead cards, broken breadcrumbs, transcripts
+  that never reach the report).
+- Sprint 16 is the cheapest, highest-signal change (the design critique's
+  "Priority 1"): unifying the chrome kills most of the "two products" feeling
+  for almost no risk, and it de-risks Sprint 17 by proving the unified shell
+  works on the qualitative pages before the dashboards are folded together.
+- Sprint 17 changes post-login routing — the highest-regression-risk change in
+  the phase — so it goes after the cheaper, safer work has shipped and built
+  confidence.
+- Sprint 18 is the entry experience; it only makes sense once the Studies list
+  is the home (Sprint 17).
+
+### Integration risk register
+
+| # | Risk | P | B | Mitigation |
+|---|---|---|---|---|
+| I1 | **Orphaned projects** — any project created between migration 0024 and Sprint 15 has `study_id IS NULL`; after the IA flip those become invisible or dead cards. | H | 4 | Sprint 15's idempotent startup backfill adopts every null-study project into a fresh Study. Runs every boot, no-ops after the first — same pattern as the credits backfill. |
+| I2 | **Post-login routing regression** — existing qual-only customers open the app expecting their project list and instead see "Studies." | M | 3 | The Studies list shows their interview projects as interview-only Study cards — nothing is *lost*, only relabelled. Ship a one-time dismissible "Your projects are now Studies" notice on first post-Sprint-17 login. |
+| I3 | **`/projects/:id` deep links break** — share URLs, invite emails, and `/reports/{token}` all reference the legacy interview routes. | M | 4 | Sprint 16 re-chromes the page but keeps every existing route resolving. No route is removed in the whole phase — only re-skinned and re-parented. |
+| I4 | **`ProjectDetail` is a large 4-tab component** — rehousing the chrome risks touching tab-content logic. | M | 3 | Sprint 16 changes only the outer wrapper (header swap). A full read-through diff + the existing project tests must pass before merge; tab content is not edited. |
+| I5 | **Screener Bridge silently routes interviews to the wrong project** (the v1 gap) — fixed in Sprint 15, but in-flight studies created before the fix may already have orphaned interview links. | L | 2 | The Sprint 15 backfill adopts orphaned projects; interviews already collected stay attached to their (now study-linked) project, so they retroactively flow into the report. |
+
+### Integration done-definition
+
+The phase is done when a researcher can:
+
+1. Open the app and see **one list** — all their research, as Studies, each
+   tagged with its instrument mix.
+2. Click **+ New study**, pick an angle, and land in the right builder.
+3. Move between a survey and an interview round inside the same Study **without
+   the chrome, breadcrumb, or navigation changing** — it reads as one product.
+4. Open a legacy interview project and find it rehoused as a Study, with zero
+   data loss and no "where did my stuff go" moment.
+
+When all four hold, the three angles (quanti / quali / hybrid) are demonstrably
+one product, and the v1 narrative — *quantify → explain → validate* — is
+navigable end to end without ever feeling like an app switch.
