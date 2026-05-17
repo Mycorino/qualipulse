@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
 import { useToast } from "../components/Toast";
+import { QuantiTopBar } from "../components/QuantiTopBar";
 
 /**
  * StudyList — `/studies`.
@@ -29,7 +30,9 @@ export default function StudyList() {
   }, [toast]);
 
   return (
-    <div className="quanti-showcase" style={{ padding: "var(--space-10) var(--report-canvas-pad-x)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
+      <QuantiTopBar crumbs={[{ label: "Studies" }]} />
+      <div className="quanti-showcase" style={{ padding: "var(--space-10) var(--report-canvas-pad-x)" }}>
       <header className="quanti-showcase__hero">
         <div className="quanti-showcase__eyebrow">Research workspace</div>
         <h1 className="quanti-showcase__title">Your studies</h1>
@@ -96,6 +99,7 @@ export default function StudyList() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

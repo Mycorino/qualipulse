@@ -20,6 +20,7 @@ import {
 } from "../api/surveys";
 import { QuestionTypeCard } from "../components/QuestionTypeCard";
 import { useToast } from "../components/Toast";
+import { QuantiTopBar } from "../components/QuantiTopBar";
 
 /**
  * SurveyEditor — wires the existing QuestionTypeCard + the inline question
@@ -211,6 +212,13 @@ export default function SurveyEditor() {
 
   return (
     <div className="survey-editor">
+      <QuantiTopBar
+        crumbs={[
+          { label: "Studies", to: "/studies" },
+          { label: "Surveys", to: "/surveys" },
+          { label: survey.name },
+        ]}
+      />
       <header className="survey-editor__topbar">
         <button
           type="button"

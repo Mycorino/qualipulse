@@ -19,6 +19,7 @@ import { DashboardShell, DashboardStrip } from "../components/DashboardShell";
 import { MethodologyBox, SmallNWarning } from "../components/MethodologyBox";
 import { ScreenerBridge } from "../components/ScreenerBridge";
 import { useToast } from "../components/Toast";
+import { QuantiTopBar } from "../components/QuantiTopBar";
 
 /**
  * SurveyDashboard — `/surveys/:id/dashboard`.
@@ -123,6 +124,13 @@ export default function SurveyDashboardPage() {
 
   return (
     <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
+      <QuantiTopBar
+        crumbs={[
+          { label: "Studies", to: "/studies" },
+          { label: "Surveys", to: "/surveys" },
+          { label: `${data.name} · Dashboard` },
+        ]}
+      />
       <header
         style={{
           padding: "var(--space-3) var(--space-5)",
