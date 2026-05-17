@@ -53,3 +53,23 @@ export async function runCopilot(
   );
   return resp.data;
 }
+
+/* ── Conversation persistence ─────────────────────────────────────────
+ * The panel's chat thread is stored server-side per survey, so it
+ * resumes when the researcher navigates away and back. `thread` is the
+ * panel's own thread-item structure — opaque to the API layer.
+ */
+
+export async function getConversation(surveyId: string): Promise<unknown[]> {
+  const resp = await client.get<{ thread: unknown[] }>(
+    `/surveys/${surveyId}/copilot/conversation`,
+  );
+  return resp.data.thread ?? [];
+}
+
+export async function saveConversation(
+  surveyId: string,
+  thread: unknown[],
+): Promise<void> {
+  await client.put(`/surveys/${surveyId}/copilot/conversation`, { thread });
+}

@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
   CopilotMessage,
   ProposedAction,
+  getConversation,
   runCopilot,
+  saveConversation,
 } from "../api/copilot";
 import { createQuestion, deprecateQuestion, patchQuestion } from "../api/surveys";
 import { useToast } from "./Toast";
@@ -45,6 +48,21 @@ const STARTERS = [
   "Suggest a screener question",
 ];
 
+/**
+ * Lightweight inline renderer for the copilot's replies — turns `**bold**`
+ * into <strong>. Newlines and lists are preserved by the `white-space:
+ * pre-wrap` on .copilot-msg__text, so this only handles bold. Dependency-free.
+ */
+function renderRich(text: string): ReactNode {
+  return text.split("**").map((part, i) =>
+    i % 2 === 1 ? (
+      <strong key={i}>{part}</strong>
+    ) : (
+      <Fragment key={i}>{part}</Fragment>
+    ),
+  );
+}
+
 export function ResearchCopilotPanel({
   surveyId,
   onApplied,
@@ -58,9 +76,46 @@ export function ResearchCopilotPanel({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
+  const prevCount = useRef(0);
+  const loaded = useRef(false);
 
+  // Restore the persisted conversation for this survey on mount, so the
+  // chat resumes instead of being lost when the researcher navigates away.
   useEffect(() => {
-    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight });
+    let cancelled = false;
+    loaded.current = false;
+    getConversation(surveyId)
+      .then((items) => {
+        if (cancelled) return;
+        if (Array.isArray(items) && items.length > 0) {
+          setThread(items as ThreadItem[]);
+          prevCount.current = items.length;
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) loaded.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [surveyId]);
+
+  // Persist the thread after every change (turns, accepts, rejects) once
+  // the initial load has settled.
+  useEffect(() => {
+    if (!loaded.current) return;
+    saveConversation(surveyId, thread).catch(() => undefined);
+  }, [thread, surveyId]);
+
+  // Auto-scroll only when a NEW message arrives (or the copilot starts
+  // thinking) — never when an existing proposal's status changes, or
+  // accepting a proposal higher up would yank the view to the bottom.
+  useEffect(() => {
+    if (thread.length > prevCount.current || busy) {
+      threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight });
+    }
+    prevCount.current = thread.length;
   }, [thread, busy]);
 
   const toMessages = (items: ThreadItem[]): CopilotMessage[] =>
@@ -191,7 +246,7 @@ export function ResearchCopilotPanel({
             </div>
           ) : (
             <div key={idx} className="copilot-msg copilot-msg--assistant">
-              <div className="copilot-msg__text">{it.text}</div>
+              <div className="copilot-msg__text">{renderRich(it.text)}</div>
               {it.actions.map((a) => (
                 <ProposalCard key={a.id} action={a} onAccept={() => accept(a)} onReject={() => setStatus(a.id, "rejected")} />
               ))}

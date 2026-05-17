@@ -35,3 +35,14 @@ class CopilotResponse(BaseModel):
     reply: str
     proposed_actions: list[dict] = Field(default_factory=list)
     memory_updated: bool = False
+
+
+class ConversationState(BaseModel):
+    """The persisted chat thread for a survey's copilot panel.
+
+    `thread` is the panel's own thread-item structure — stored and
+    returned verbatim so the conversation resumes on navigation. Opaque
+    to the backend.
+    """
+
+    thread: list[dict] = Field(default_factory=list)
