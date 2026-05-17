@@ -55,6 +55,9 @@ export interface QuestionResponse {
 export interface ProjectResponse {
   id: string;
   company_id: string;
+  /** Parent Study — drives the breadcrumb on the rehoused interview detail. */
+  study_id?: string | null;
+  study_name?: string | null;
   name: string;
   language: string;
   interview_duration_minutes: number;

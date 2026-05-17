@@ -81,6 +81,10 @@ class QuestionResponse(BaseModel):
 class ProjectResponse(BaseModel):
     id: str
     company_id: str
+    # Sprint 16: the parent Study — lets the interview detail page render
+    # the `Studies › <study> › <interview>` breadcrumb without an extra fetch.
+    study_id: str | None = None
+    study_name: str | None = None
     name: str
     language: str
     interview_duration_minutes: int
