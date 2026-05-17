@@ -370,6 +370,23 @@ class TestDemoStudyIsHybrid:
                 f"anchor quote not verbatim: {ev.anchor_quote!r}"
             )
 
+    def test_demo_survey_responses_do_not_consume_survey_quota(self, db_session):
+        """The demo Study's survey + its 44 seeded responses are showcase
+        content — they must not count toward the workspace survey quota."""
+        from app.services.survey_quotas import get_status
+
+        company = _make_company(db_session)
+        seed_demo_project(db_session, company.id)
+        db_session.expire_all()
+
+        status = get_status(db_session, company)
+        assert status.responses_used == 0, (
+            f"demo responses leaked into quota: {status.responses_used}"
+        )
+        assert status.surveys_active == 0, (
+            f"demo survey leaked into quota: {status.surveys_active}"
+        )
+
     def test_en_report_anchor_quotes_are_real_transcript_substrings(self, db_session):
         company = _make_company(db_session, preferred_language="en")
         self._assert_anchor_quotes_verbatim(db_session, company)

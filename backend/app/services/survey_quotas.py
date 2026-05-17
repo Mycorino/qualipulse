@@ -29,6 +29,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.company import Company
+from app.models.project import Project
 from app.models.survey import Survey, SurveyResponse
 from app.services.billing_service import get_current_subscription, get_entitlements
 
@@ -82,22 +83,27 @@ def get_status(db: Session, company: Company) -> SurveyQuotaStatus:
 
     period_start, period_end = _resolve_period(db, company.id)
 
-    responses_used = (
-        db.query(func.count(SurveyResponse.id))
-        .filter(
-            SurveyResponse.company_id == company.id,
-            SurveyResponse.completed_at.isnot(None),
-            SurveyResponse.completed_at >= period_start,
-        )
-        .scalar()
-        or 0
+    # Surveys that belong to a seeded demo Study are showcase content, not
+    # the user's real research — they must never consume quota, exactly as
+    # demo Projects are excluded from the project quota in routers/projects.py.
+    demo_study_ids = _demo_study_ids(db, company.id)
+
+    responses_query = db.query(func.count(SurveyResponse.id)).filter(
+        SurveyResponse.company_id == company.id,
+        SurveyResponse.completed_at.isnot(None),
+        SurveyResponse.completed_at >= period_start,
     )
-    surveys_active = (
-        db.query(func.count(Survey.id))
-        .filter(Survey.company_id == company.id, Survey.archived_at.is_(None))
-        .scalar()
-        or 0
+    surveys_query = db.query(func.count(Survey.id)).filter(
+        Survey.company_id == company.id, Survey.archived_at.is_(None)
     )
+    if demo_study_ids:
+        responses_query = responses_query.join(
+            Survey, SurveyResponse.survey_id == Survey.id
+        ).filter(Survey.study_id.notin_(demo_study_ids))
+        surveys_query = surveys_query.filter(Survey.study_id.notin_(demo_study_ids))
+
+    responses_used = responses_query.scalar() or 0
+    surveys_active = surveys_query.scalar() or 0
 
     is_over_response = bool(responses_cap is not None and responses_used >= responses_cap)
     is_near = bool(
@@ -119,6 +125,27 @@ def get_status(db: Session, company: Company) -> SurveyQuotaStatus:
         is_near_response_cap=is_near,
         is_over_surveys_cap=is_over_surveys,
     )
+
+
+def _demo_study_ids(db: Session, company_id: str) -> list[str]:
+    """Study ids for this workspace that hold a seeded demo project.
+
+    The demo marker lives on ``Project.is_demo``; a Study is "demo" when it
+    contains a demo project. Surveys under such a Study are showcase
+    content and are excluded from every quota count.
+    """
+
+    rows = (
+        db.query(Project.study_id)
+        .filter(
+            Project.company_id == company_id,
+            Project.is_demo.is_(True),
+            Project.study_id.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    return [r[0] for r in rows]
 
 
 def _coerce_int(value) -> int | None:
