@@ -9434,3 +9434,195 @@ select.field-input {
      and the account menu stay. */
   .quanti-topbar__crumbs { display: none; }
 }
+
+/* ============================================
+   Quanti — NewStudyModal (Sprint 18 angle picker)
+   ============================================
+   The "What do you want to learn?" entry point. Name + 3 angle cards.
+   ============================================ */
+
+.new-study-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 15, 26, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  z-index: 100;
+}
+
+.new-study-modal {
+  position: relative;
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  max-width: 720px;
+  width: 100%;
+  padding: var(--space-8);
+  box-shadow: var(--shadow-lg);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.new-study-modal__close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: transparent;
+  border: none;
+  font-size: var(--text-md);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.new-study-modal__close:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+.new-study-modal__eyebrow {
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-600);
+}
+
+.new-study-modal__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-headline);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.025em;
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  margin: var(--space-2) 0 var(--space-2);
+}
+
+.new-study-modal__sub {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+  margin: 0 0 var(--space-5);
+  max-width: 56ch;
+}
+
+.new-study-modal__label {
+  display: block;
+  font-size: var(--text-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+.new-study-modal__name {
+  width: 100%;
+  min-height: 48px;
+  font-family: inherit;
+  font-size: var(--text-md);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.new-study-modal__name:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: var(--glow-brand);
+}
+
+.new-study-modal__angles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.new-study-modal__angle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-align: left;
+  padding: var(--space-5) var(--space-4);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.new-study-modal__angle:hover:not(:disabled) {
+  border-color: var(--brand-300);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.new-study-modal__angle:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+.new-study-modal__angle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.new-study-modal__angle--recommended {
+  border-color: var(--brand-400);
+  background: var(--brand-50);
+}
+
+.new-study-modal__badge {
+  position: absolute;
+  top: -10px;
+  left: var(--space-4);
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--brand-500);
+  color: #fff;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+}
+
+.new-study-modal__angle-icon {
+  font-size: 1.4rem;
+}
+
+.new-study-modal__angle-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  line-height: var(--leading-tight);
+}
+
+.new-study-modal__angle-blurb {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.new-study-modal__hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin: var(--space-3) 0 0;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .new-study-modal__angles {
+    grid-template-columns: 1fr;
+  }
+  .new-study-modal { padding: var(--space-6) var(--space-5); }
+}

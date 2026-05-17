@@ -77,7 +77,9 @@ export default function CreateProjectWizard() {
   const [step, setStep] = useState(draft?.step ?? 1);
 
   // Step 1
-  const [name, setName] = useState(draft?.name ?? "");
+  // Sprint 18: the angle picker routes "Talk to people in depth" here with
+  // a ?name= param so the study name carries through from the modal.
+  const [name, setName] = useState(draft?.name ?? searchParams.get("name") ?? "");
   const [context, setContext] = useState<string>(draft?.context ?? "");
   const [originalContext, setOriginalContext] = useState("");
   const [files, setFiles] = useState<File[]>([]);
