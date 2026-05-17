@@ -133,7 +133,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ── Routers ───────────────────────────────────────────────────────────────────
 from app.routers import (
     auth, projects, links, interview, export, audio,
-    research_assistant, analysis, responses, coding, memos, billing, admin, affiliate, blog,
+    analysis, responses, coding, memos, billing, admin, affiliate, blog,
     templates, team, surveys, public_surveys, studies, copilot,
 )
 
@@ -143,7 +143,6 @@ app.include_router(links.router)
 app.include_router(interview.router)
 app.include_router(export.router)
 app.include_router(audio.router)
-app.include_router(research_assistant.router)
 app.include_router(analysis.router)
 app.include_router(responses.router)
 app.include_router(coding.router)

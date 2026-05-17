@@ -481,7 +481,7 @@ export default function Welcome() {
           : undefined,
       });
       setCachedOnboarded(true);
-      navigate("/projects/new", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("onboarding.failedSave")));
     } finally {
