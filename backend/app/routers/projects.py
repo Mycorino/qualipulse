@@ -335,6 +335,10 @@ def patch_project_settings(
         project.panel_collection_enabled = body.panel_collection_enabled
     if body.warmup_enabled is not None:
         project.warmup_enabled = body.warmup_enabled
+    if body.research_objective is not None:
+        project.research_objective = body.research_objective
+    if body.research_context is not None:
+        project.research_context = body.research_context
     db.commit()
     db.refresh(project)
     return _project_to_response(project)

@@ -302,7 +302,12 @@ export async function updateProject(id: string, body: ProjectCreate): Promise<Pr
 
 export async function patchProjectSettings(
   id: string,
-  settings: { panel_collection_enabled?: boolean; warmup_enabled?: boolean }
+  settings: {
+    panel_collection_enabled?: boolean;
+    warmup_enabled?: boolean;
+    research_objective?: string;
+    research_context?: string;
+  }
 ): Promise<ProjectResponse> {
   const { data } = await client.patch<ProjectResponse>(`/projects/${id}/settings`, settings);
   return data;

@@ -3332,7 +3332,11 @@ export default function ProjectDetail() {
           loadConversation: () => getConversation("projects", project.id),
           saveConversation: (t) => saveConversation("projects", project.id, t),
           applyAction: async (action) => {
-            if (action.type === "add_guide_question" && action.question) {
+            if (action.type === "edit_objective" && action.new_objective) {
+              await patchProjectSettings(project.id, {
+                research_objective: action.new_objective,
+              });
+            } else if (action.type === "add_guide_question" && action.question) {
               const q = action.question as ProposedGuideQuestion;
               await createGuideQuestion(project.id, {
                 section_title: q.section_title,

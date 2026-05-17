@@ -29,6 +29,7 @@ def _guide_snapshot(project: Project) -> dict:
         "name": project.name,
         "language": project.language,
         "research_objective": project.research_objective or "",
+        "research_context": project.research_context or "",
         "questions": [
             {
                 "id": q.id,
@@ -43,6 +44,9 @@ def _guide_snapshot(project: Project) -> dict:
 
 _INTERVIEW_METHODOLOGY = """Methodology contract for interview guides \
 (non-negotiable):
+- If the research objective is empty, propose one FIRST with \
+`propose_objective` — a single sharp, decision-oriented sentence — before \
+drafting questions. Use the research context if it is provided.
 - Questions must be OPEN and non-leading — "Tell me about..." / "Walk me \
 through..." not "Don't you think...".
 - One idea per question — never double-barrelled.
@@ -63,6 +67,22 @@ _INTERVIEW_TOOLS = [
         "name": "read_guide",
         "description": "Return the interview guide's sections and questions.",
         "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "propose_objective",
+        "description": (
+            "Propose the research objective for this interview round — a "
+            "sharp, decision-oriented sentence. Staged for the researcher "
+            "to accept."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "objective": {"type": "string"},
+                "rationale": {"type": "string"},
+            },
+            "required": ["objective", "rationale"],
+        },
     },
     {
         "name": "propose_guide_questions",
@@ -140,6 +160,19 @@ def _guide_run_tool(
     if name == "read_guide":
         return json.dumps(_guide_snapshot(project), ensure_ascii=False)
 
+    if name == "propose_objective":
+        objective = (tool_input.get("objective") or "").strip()
+        if not objective:
+            return "No objective text provided."
+        turn.actions.append(
+            {
+                "type": "edit_objective",
+                "new_objective": objective,
+                "rationale": (tool_input.get("rationale") or "").strip(),
+            }
+        )
+        return "Recorded the proposed research objective."
+
     if name == "propose_guide_questions":
         added = 0
         for q in tool_input.get("questions", []):
@@ -198,12 +231,25 @@ def _guide_stub(project: Project, history: list[dict]) -> dict:
             "proposed_actions": [],
             "memory_updated": False,
         }
+    proposed: list[dict] = []
+    if not (project.research_objective or "").strip():
+        proposed.append(
+            {
+                "type": "edit_objective",
+                "new_objective": (
+                    "Understand how this audience makes the decision at the "
+                    "centre of this study, and what drives or blocks it."
+                ),
+                "rationale": "Every interview round needs a clear objective to anchor the guide.",
+            }
+        )
     return {
         "reply": (
             "(Offline stub — set ANTHROPIC_API_KEY for the real copilot.) "
-            "Here are two starter interview questions to review."
+            "Here is a starting objective and two interview questions to review."
         ),
-        "proposed_actions": [
+        "proposed_actions": proposed
+        + [
             {
                 "type": "add_guide_question",
                 "question": {

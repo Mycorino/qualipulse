@@ -311,6 +311,9 @@ function ProposalCard({
   } else if (action.type === "edit_guide_question") {
     heading = "Edit question";
     body = action.new_main_question ?? "Update this question";
+  } else if (action.type === "edit_objective") {
+    heading = "Set the research objective";
+    body = action.new_objective;
   } else {
     heading = "Remove question";
     body = "Remove this question";
