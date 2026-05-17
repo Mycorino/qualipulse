@@ -50,6 +50,7 @@ from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.services._demo_data_en import NOTABLE_QUOTES_EN, PARTICIPANTS_EN, QUALITY_EN
 from app.services._demo_data_fr import NOTABLE_QUOTES_FR, PARTICIPANTS_FR, QUALITY_FR
+from app.services.study_provisioning import create_study
 
 
 DEMO_PROJECT_NAME = "[Demo] How people choose streaming services"
@@ -660,8 +661,12 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             "Catalogue-vs-curation theme needs more evidence before scaling."
         )
 
+    # Sprint 15: the demo project belongs to a Study like any other project.
+    demo_study = create_study(db, company_id, demo_name)
+
     project = Project(
         company_id=company_id,
+        study_id=demo_study.id,
         name=demo_name,
         language=lang,
         interview_duration_minutes=25,

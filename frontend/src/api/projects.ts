@@ -26,6 +26,8 @@ export interface ScreeningQuestionResponse {
 export interface ProjectCreate {
   name: string;
   language: string;
+  /** When set, the interview round joins this existing Study (Sprint 15). */
+  study_id?: string;
   interview_duration_minutes?: number;
   system_prompt?: string;
   research_objective?: string;

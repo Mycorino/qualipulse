@@ -262,35 +262,42 @@ function InterviewsTab({
   if (study.projects.length === 0) {
     return (
       <EmptyState
-        message="No interview track yet. The Screener Bridge will create one for you when you invite respondents to interviews."
-        ctaLabel="Open a survey dashboard"
-        onAct={() => {
-          if (study.surveys.length > 0) navigate(`/surveys/${study.surveys[0].id}/dashboard`);
-          else navigate("/surveys");
-        }}
+        message="No interview track yet. Add an interview round to talk to respondents in depth — or use the Screener Bridge from a survey dashboard to auto-create one from a filtered segment."
+        ctaLabel="+ Add interview round"
+        onAct={() => navigate(`/projects/new?study_id=${study.id}`)}
       />
     );
   }
   return (
-    <div className="quanti-showcase__grid-2">
-      {study.projects.map((p) => (
-        <a
-          key={p.id}
-          href={`/projects/${p.id}`}
-          className="chart-card"
-          style={{ textDecoration: "none", color: "inherit" }}
-        >
-          <div className="chart-card__eyebrow">INTERVIEW · {p.language.toUpperCase()}</div>
-          <div className="chart-card__takeaway">{p.name}</div>
-          <div className="chart-card__footer tabular">
-            <span>{p.completed_participant_count} completed</span>
-            <span className="chart-card__footer-divider">·</span>
-            <span>{p.in_progress_participant_count} in progress</span>
-            <span className="chart-card__footer-divider">·</span>
-            <span>{p.interview_link_count} link(s)</span>
-          </div>
-        </a>
-      ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <div className="quanti-showcase__grid-2">
+        {study.projects.map((p) => (
+          <a
+            key={p.id}
+            href={`/projects/${p.id}`}
+            className="chart-card"
+            style={{ textDecoration: "none", color: "inherit" }}
+          >
+            <div className="chart-card__eyebrow">INTERVIEW · {p.language.toUpperCase()}</div>
+            <div className="chart-card__takeaway">{p.name}</div>
+            <div className="chart-card__footer tabular">
+              <span>{p.completed_participant_count} completed</span>
+              <span className="chart-card__footer-divider">·</span>
+              <span>{p.in_progress_participant_count} in progress</span>
+              <span className="chart-card__footer-divider">·</span>
+              <span>{p.interview_link_count} link(s)</span>
+            </div>
+          </a>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        style={{ alignSelf: "flex-start" }}
+        onClick={() => navigate(`/projects/new?study_id=${study.id}`)}
+      >
+        + Add interview round
+      </button>
     </div>
   );
 }
