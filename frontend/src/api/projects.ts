@@ -335,6 +335,24 @@ export async function patchQuestion(
   return data;
 }
 
+/** Add a single interview-guide question. Section/question indices are
+ *  derived server-side from the section title. Powers the Research Copilot. */
+export async function createGuideQuestion(
+  projectId: string,
+  body: {
+    section_title: string;
+    main_question: string;
+    desired_learning?: string;
+    interview_notes?: string;
+  },
+): Promise<QuestionResponse> {
+  const { data } = await client.post<QuestionResponse>(
+    `/projects/${projectId}/questions`,
+    body,
+  );
+  return data;
+}
+
 export async function createLink(projectId: string): Promise<InterviewLink> {
   const { data } = await client.post<InterviewLink>(`/projects/${projectId}/links`);
   return data;

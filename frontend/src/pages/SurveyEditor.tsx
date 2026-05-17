@@ -28,6 +28,8 @@ import {
   surveyStatusPill,
 } from "../components/surveyShellNav";
 import { getStudy } from "../api/studies";
+import { getConversation, runCopilot, saveConversation } from "../api/copilot";
+import type { ProposedSurveyQuestion } from "../api/copilot";
 
 /**
  * SurveyEditor — wires the existing QuestionTypeCard + the inline question
@@ -386,7 +388,36 @@ export default function SurveyEditor() {
       {/* In-context AI assistant. Accepted proposals are applied via the
           real survey API, then we reload the question list. */}
       <ResearchCopilotPanel
-        surveyId={survey.id}
+        target={{
+          id: survey.id,
+          runTurn: (m) => runCopilot("surveys", survey.id, m),
+          loadConversation: () => getConversation("surveys", survey.id),
+          saveConversation: (t) => saveConversation("surveys", survey.id, t),
+          applyAction: async (action) => {
+            if (action.type === "add_question" && action.question) {
+              const q = action.question as ProposedSurveyQuestion;
+              await createQuestion(survey.id, {
+                type: q.type,
+                prompt: q.prompt,
+                config: q.config,
+                is_required: false,
+              });
+            } else if (action.type === "edit_question" && action.question_id) {
+              const payload: {
+                prompt?: string;
+                config?: Record<string, unknown>;
+              } = {};
+              if (action.new_prompt) payload.prompt = action.new_prompt;
+              if (action.new_config) payload.config = action.new_config;
+              await patchQuestion(survey.id, action.question_id, payload);
+            } else if (
+              action.type === "remove_question" &&
+              action.question_id
+            ) {
+              await deprecateQuestion(survey.id, action.question_id);
+            }
+          },
+        }}
         onApplied={() => {
           if (!id) return;
           listQuestions(id)

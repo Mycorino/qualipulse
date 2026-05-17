@@ -1,14 +1,14 @@
 """Research Copilot endpoints.
 
-The copilot is the in-context AI assistant.
+The copilot is the in-context AI assistant. It runs on two surfaces, each
+with its own adapter (see ``services/copilot.py`` / ``copilot_interview.py``):
 
-- ``POST /surveys/{id}/copilot`` runs one agent turn: the copilot reads
-  the live survey, asks clarifying questions, and returns *proposed*
-  changes for the researcher to accept or reject.
-- ``GET/PUT /surveys/{id}/copilot/conversation`` persist the panel's chat
-  thread so it resumes when the researcher navigates away and back.
+- ``/surveys/{id}/copilot``  — the survey builder
+- ``/projects/{id}/copilot`` — the interview-guide builder
 
-See ``services/copilot.py``.
+``POST .../copilot`` runs one agent turn (proposes changes). The
+``.../copilot/conversation`` GET/PUT persist the panel's chat thread so
+it resumes when the researcher navigates away and back.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
+from app.models.project import Project
 from app.models.survey import Survey
 from app.schemas.copilot import ConversationState, CopilotRequest, CopilotResponse
 from app.services.copilot import (
@@ -24,8 +25,9 @@ from app.services.copilot import (
     run_copilot_turn,
     save_conversation,
 )
+from app.services.copilot_interview import INTERVIEW_ADAPTER
 
-router = APIRouter(prefix="/surveys", tags=["copilot"])
+router = APIRouter(tags=["copilot"])
 
 
 def _survey_or_404(db: Session, survey_id: str, company: Company) -> Survey:
@@ -41,7 +43,23 @@ def _survey_or_404(db: Session, survey_id: str, company: Company) -> Survey:
     return survey
 
 
-@router.post("/{survey_id}/copilot", response_model=CopilotResponse)
+def _project_or_404(db: Session, project_id: str, company: Company) -> Project:
+    project = (
+        db.query(Project)
+        .filter(Project.id == project_id, Project.company_id == company.id)
+        .first()
+    )
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+        )
+    return project
+
+
+# ── Survey surface ───────────────────────────────────────────────────────────
+
+
+@router.post("/surveys/{survey_id}/copilot", response_model=CopilotResponse)
 def survey_copilot(
     survey_id: str,
     body: CopilotRequest,
@@ -55,28 +73,68 @@ def survey_copilot(
 
 
 @router.get(
-    "/{survey_id}/copilot/conversation", response_model=ConversationState
+    "/surveys/{survey_id}/copilot/conversation", response_model=ConversationState
 )
-def get_copilot_conversation(
+def get_survey_conversation(
     survey_id: str,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
-    """Load the persisted copilot chat thread for a survey."""
     _survey_or_404(db, survey_id, company)
     return ConversationState(thread=get_conversation(db, "survey", survey_id))
 
 
 @router.put(
-    "/{survey_id}/copilot/conversation", response_model=ConversationState
+    "/surveys/{survey_id}/copilot/conversation", response_model=ConversationState
 )
-def put_copilot_conversation(
+def put_survey_conversation(
     survey_id: str,
     body: ConversationState,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
-    """Persist the copilot chat thread for a survey so it resumes later."""
     _survey_or_404(db, survey_id, company)
     save_conversation(db, company.id, "survey", survey_id, body.thread)
+    return body
+
+
+# ── Interview-guide surface ──────────────────────────────────────────────────
+
+
+@router.post("/projects/{project_id}/copilot", response_model=CopilotResponse)
+def project_copilot(
+    project_id: str,
+    body: CopilotRequest,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> CopilotResponse:
+    """Run one Research Copilot turn against an interview guide."""
+    project = _project_or_404(db, project_id, company)
+    result = run_copilot_turn(db, company, project, INTERVIEW_ADAPTER, body.messages)
+    return CopilotResponse(**result)
+
+
+@router.get(
+    "/projects/{project_id}/copilot/conversation", response_model=ConversationState
+)
+def get_project_conversation(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ConversationState:
+    _project_or_404(db, project_id, company)
+    return ConversationState(thread=get_conversation(db, "project", project_id))
+
+
+@router.put(
+    "/projects/{project_id}/copilot/conversation", response_model=ConversationState
+)
+def put_project_conversation(
+    project_id: str,
+    body: ConversationState,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ConversationState:
+    _project_or_404(db, project_id, company)
+    save_conversation(db, company.id, "project", project_id, body.thread)
     return body

@@ -12,6 +12,17 @@ class QuestionCreate(BaseModel):
     desired_learning: str | None = None
 
 
+class GuideQuestionAdd(BaseModel):
+    """Add a single interview-guide question. Section/question indices are
+    computed server-side from the section title, so the Research Copilot
+    (and any caller) only needs to name the section."""
+
+    section_title: str
+    main_question: str
+    desired_learning: str | None = None
+    interview_notes: str | None = None
+
+
 class QuestionPatch(BaseModel):
     main_question: str | None = None
     question_index: int | None = None

@@ -52,7 +52,10 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript, translateTranscript, patchProjectSettings } from "../api/projects";
+import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion } from "../api/projects";
+import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
+import { getConversation, runCopilot, saveConversation } from "../api/copilot";
+import type { ProposedGuideQuestion } from "../api/copilot";
 
 type Tab = "overview" | "setup" | "responses" | "analysis";
 
@@ -3319,6 +3322,53 @@ export default function ProjectDetail() {
           </div>
         );
       })()}
+
+      {/* In-context AI assistant. Accepted proposals are applied via the
+          real interview-guide API, then we reload the project. */}
+      <ResearchCopilotPanel
+        target={{
+          id: project.id,
+          runTurn: (m) => runCopilot("projects", project.id, m),
+          loadConversation: () => getConversation("projects", project.id),
+          saveConversation: (t) => saveConversation("projects", project.id, t),
+          applyAction: async (action) => {
+            if (action.type === "add_guide_question" && action.question) {
+              const q = action.question as ProposedGuideQuestion;
+              await createGuideQuestion(project.id, {
+                section_title: q.section_title,
+                main_question: q.main_question,
+                desired_learning: q.desired_learning,
+              });
+            } else if (
+              action.type === "edit_guide_question" &&
+              action.question_id
+            ) {
+              const payload: {
+                main_question?: string;
+                desired_learning?: string;
+              } = {};
+              if (action.new_main_question)
+                payload.main_question = action.new_main_question;
+              if (action.new_desired_learning)
+                payload.desired_learning = action.new_desired_learning;
+              await patchQuestion(project.id, action.question_id, payload);
+            } else if (
+              action.type === "remove_guide_question" &&
+              action.question_id
+            ) {
+              await patchQuestion(project.id, action.question_id, {
+                deprecated_at: new Date().toISOString(),
+              });
+            }
+          },
+        }}
+        onApplied={() => {
+          if (!id) return;
+          getProject(id)
+            .then(setProject)
+            .catch(() => undefined);
+        }}
+      />
     </InstrumentShell>
   );
 }
