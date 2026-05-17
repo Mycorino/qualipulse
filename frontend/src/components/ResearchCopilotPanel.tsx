@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import {
   CopilotMessage,
   ProposedAction,
+  getConversation,
   runCopilot,
+  saveConversation,
 } from "../api/copilot";
 import { createQuestion, deprecateQuestion, patchQuestion } from "../api/surveys";
 import { useToast } from "./Toast";
@@ -75,6 +77,36 @@ export function ResearchCopilotPanel({
   const [busy, setBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
   const prevCount = useRef(0);
+  const loaded = useRef(false);
+
+  // Restore the persisted conversation for this survey on mount, so the
+  // chat resumes instead of being lost when the researcher navigates away.
+  useEffect(() => {
+    let cancelled = false;
+    loaded.current = false;
+    getConversation(surveyId)
+      .then((items) => {
+        if (cancelled) return;
+        if (Array.isArray(items) && items.length > 0) {
+          setThread(items as ThreadItem[]);
+          prevCount.current = items.length;
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) loaded.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [surveyId]);
+
+  // Persist the thread after every change (turns, accepts, rejects) once
+  // the initial load has settled.
+  useEffect(() => {
+    if (!loaded.current) return;
+    saveConversation(surveyId, thread).catch(() => undefined);
+  }, [thread, surveyId]);
 
   // Auto-scroll only when a NEW message arrives (or the copilot starts
   // thinking) — never when an existing proposal's status changes, or

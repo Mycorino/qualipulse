@@ -1,21 +1,64 @@
 """Research Copilot — persistent state.
 
-``CopilotMemory`` is the per-workspace memory the copilot reads into every
-system prompt and appends to via its `remember` tool. One row per Company,
-so the assistant stays consistent across studies and surfaces.
+``CopilotMemory`` — scoped, durable memory. A row is keyed by
+``(scope_kind, scope_id)``:
+  - company: workspace-wide facts (scope_id = company id)
+  - study:   facts about one research effort (scope_id = study id)
+  - survey:  facts about one survey (scope_id = survey id)
+The copilot stacks every applicable tier into its system prompt.
+
+``CopilotConversation`` — one persisted chat thread per survey, so the
+panel resumes the conversation instead of losing it on navigation.
 """
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
+# Memory scope tiers, broadest first.
+MEMORY_SCOPES = ("company", "study", "survey")
+
 
 class CopilotMemory(Base):
     __tablename__ = "copilot_memory"
+    __table_args__ = (
+        Index("ix_copilot_memory_scope", "scope_kind", "scope_id", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    # Owning workspace — drives cascade delete and access checks.
+    company_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # "company" | "study" | "survey"
+    scope_kind: Mapped[str] = mapped_column(
+        String(16), default="company", nullable=False
+    )
+    # company id / study id / survey id, per scope_kind.
+    scope_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    # Free-text markdown of durable facts the copilot has learned.
+    content: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    company = relationship("Company")
+
+
+class CopilotConversation(Base):
+    __tablename__ = "copilot_conversations"
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
@@ -24,11 +67,17 @@ class CopilotMemory(Base):
         String(36),
         ForeignKey("companies.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    survey_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("surveys.id", ondelete="CASCADE"),
+        nullable=False,
         index=True,
         unique=True,
     )
-    # Free-text markdown of durable facts the copilot has learned.
-    content: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # JSON array of the panel's thread items (user/assistant turns +
+    # proposal cards with their accepted/rejected status).
+    thread: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )

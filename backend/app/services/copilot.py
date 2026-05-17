@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.company import Company
-from app.models.copilot import CopilotMemory
+from app.models.copilot import MEMORY_SCOPES, CopilotConversation, CopilotMemory
 from app.models.survey import QUESTION_TYPES, Survey
 from app.services.usage_logger import log_claude_usage
 
@@ -42,28 +42,84 @@ MAX_AGENT_TURNS = 8
 _CHOICE_TYPES = ("mc_single", "mc_multi")
 
 
-# ── Memory ───────────────────────────────────────────────────────────────────
+# ── Memory (scoped: company / study / survey) ────────────────────────────────
 
 
-def get_memory(db: Session, company_id: str) -> CopilotMemory | None:
+def get_memory(
+    db: Session, scope_kind: str, scope_id: str
+) -> CopilotMemory | None:
     return (
         db.query(CopilotMemory)
-        .filter(CopilotMemory.company_id == company_id)
+        .filter(
+            CopilotMemory.scope_kind == scope_kind,
+            CopilotMemory.scope_id == scope_id,
+        )
         .first()
     )
 
 
-def append_memory(db: Session, company_id: str, note: str) -> None:
-    """Append a durable fact to the workspace memory (creates the row once)."""
+def append_memory(
+    db: Session,
+    company_id: str,
+    scope_kind: str,
+    scope_id: str,
+    note: str,
+) -> None:
+    """Append a durable fact to memory at a given scope (creates the row once)."""
     note = (note or "").strip()
     if not note:
         return
-    row = get_memory(db, company_id)
+    row = get_memory(db, scope_kind, scope_id)
     if row is None:
-        row = CopilotMemory(company_id=company_id, content=f"- {note}")
+        row = CopilotMemory(
+            company_id=company_id,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+            content=f"- {note}",
+        )
         db.add(row)
     else:
         row.content = f"{row.content}\n- {note}".strip()
+        row.updated_at = datetime.utcnow()
+    db.commit()
+
+
+# ── Conversation persistence ─────────────────────────────────────────────────
+
+
+def get_conversation(db: Session, survey_id: str) -> list:
+    """Return the persisted panel thread for a survey (empty if none)."""
+    row = (
+        db.query(CopilotConversation)
+        .filter(CopilotConversation.survey_id == survey_id)
+        .first()
+    )
+    if row is None:
+        return []
+    try:
+        return json.loads(row.thread)
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+def save_conversation(
+    db: Session, company_id: str, survey_id: str, thread: list
+) -> None:
+    """Persist the panel thread for a survey so it resumes on navigation."""
+    row = (
+        db.query(CopilotConversation)
+        .filter(CopilotConversation.survey_id == survey_id)
+        .first()
+    )
+    payload = json.dumps(thread, ensure_ascii=False)
+    if row is None:
+        db.add(
+            CopilotConversation(
+                company_id=company_id, survey_id=survey_id, thread=payload
+            )
+        )
+    else:
+        row.thread = payload
         row.updated_at = datetime.utcnow()
     db.commit()
 
@@ -129,8 +185,11 @@ propose_questions in that same turn. Never ask a second round of \
 clarifying questions; if something is still unclear, state your \
 assumption out loud and propose anyway.
 - Call `read_survey` first if you need the current state.
-- Use `remember` to save durable, workspace-level facts (recurring \
-audiences, research preferences, house style) — never transient details.
+- Use `remember` to save durable facts — never transient details — and \
+pick the scope: "company" for workspace-wide preferences (house style, \
+recurring audiences, tone), "study" for facts about this whole research \
+effort, "survey" for facts specific to this one survey. You already see \
+everything currently in memory below; don't re-save what's there.
 
 Methodology contract (non-negotiable):
 - Only these six question types exist: likert, mc_single, mc_multi, nps, \
@@ -145,15 +204,24 @@ Be concise and warm. The chat is for clarifying intent — the survey itself \
 is where your work lands."""
 
 
+def _memory_block(db: Session, label: str, scope_kind: str, scope_id: str) -> str:
+    row = get_memory(db, scope_kind, scope_id)
+    if row and row.content.strip():
+        return f"\n\n{label}:\n{row.content}"
+    return ""
+
+
 def _system_prompt(db: Session, company: Company, survey: Survey) -> str:
-    mem = get_memory(db, company.id)
-    memory_block = (
-        f"\n\nWhat you remember about this workspace:\n{mem.content}"
-        if mem and mem.content.strip()
-        else "\n\nYou have no saved memory for this workspace yet."
+    # Stack every applicable memory tier, broadest first.
+    blocks = (
+        _memory_block(db, "Workspace memory (applies to every study)", "company", company.id)
+        + _memory_block(db, "Memory for this study", "study", survey.study_id)
+        + _memory_block(db, "Memory for this survey", "survey", survey.id)
     )
+    if not blocks:
+        blocks = "\n\nYou have no saved memory yet."
     snapshot = json.dumps(_survey_snapshot(survey), ensure_ascii=False)
-    return f"{_SYSTEM}{memory_block}\n\nThe survey right now:\n{snapshot}"
+    return f"{_SYSTEM}{blocks}\n\nThe survey right now:\n{snapshot}"
 
 
 # ── Tools ────────────────────────────────────────────────────────────────────
@@ -226,12 +294,22 @@ _TOOLS = [
     {
         "name": "remember",
         "description": (
-            "Save a durable, workspace-level fact to memory so you stay "
-            "consistent across studies. Use sparingly."
+            "Save a durable fact to memory so you stay consistent later. "
+            "Use sparingly — only durable facts, never transient details."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {"note": {"type": "string"}},
+            "properties": {
+                "note": {"type": "string"},
+                "scope": {
+                    "type": "string",
+                    "enum": list(MEMORY_SCOPES),
+                    "description": (
+                        "company = workspace-wide; study = this research "
+                        "effort; survey = this survey only. Defaults to company."
+                    ),
+                },
+            },
             "required": ["note"],
         },
     },
@@ -306,9 +384,17 @@ def _run_tool(
         return "Recorded the proposed removal."
 
     if name == "remember":
-        append_memory(db, company.id, tool_input.get("note", ""))
+        scope = tool_input.get("scope") or "company"
+        if scope not in MEMORY_SCOPES:
+            scope = "company"
+        scope_id = {
+            "company": company.id,
+            "study": survey.study_id,
+            "survey": survey.id,
+        }[scope]
+        append_memory(db, company.id, scope, scope_id, tool_input.get("note", ""))
         turn.memory_updated = True
-        return "Saved to workspace memory."
+        return f"Saved to {scope} memory."
 
     return f"Unknown tool: {name}"
 
