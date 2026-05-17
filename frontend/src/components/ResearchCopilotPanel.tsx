@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
   CopilotMessage,
@@ -45,6 +46,21 @@ const STARTERS = [
   "Suggest a screener question",
 ];
 
+/**
+ * Lightweight inline renderer for the copilot's replies — turns `**bold**`
+ * into <strong>. Newlines and lists are preserved by the `white-space:
+ * pre-wrap` on .copilot-msg__text, so this only handles bold. Dependency-free.
+ */
+function renderRich(text: string): ReactNode {
+  return text.split("**").map((part, i) =>
+    i % 2 === 1 ? (
+      <strong key={i}>{part}</strong>
+    ) : (
+      <Fragment key={i}>{part}</Fragment>
+    ),
+  );
+}
+
 export function ResearchCopilotPanel({
   surveyId,
   onApplied,
@@ -58,9 +74,16 @@ export function ResearchCopilotPanel({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
+  const prevCount = useRef(0);
 
+  // Auto-scroll only when a NEW message arrives (or the copilot starts
+  // thinking) — never when an existing proposal's status changes, or
+  // accepting a proposal higher up would yank the view to the bottom.
   useEffect(() => {
-    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight });
+    if (thread.length > prevCount.current || busy) {
+      threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight });
+    }
+    prevCount.current = thread.length;
   }, [thread, busy]);
 
   const toMessages = (items: ThreadItem[]): CopilotMessage[] =>
@@ -191,7 +214,7 @@ export function ResearchCopilotPanel({
             </div>
           ) : (
             <div key={idx} className="copilot-msg copilot-msg--assistant">
-              <div className="copilot-msg__text">{it.text}</div>
+              <div className="copilot-msg__text">{renderRich(it.text)}</div>
               {it.actions.map((a) => (
                 <ProposalCard key={a.id} action={a} onAccept={() => accept(a)} onReject={() => setStatus(a.id, "rejected")} />
               ))}
