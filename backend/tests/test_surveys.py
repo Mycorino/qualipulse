@@ -652,8 +652,12 @@ def test_segment_invite_creates_interview_links_for_matched(
     assert data["invited_count"] + len(data["failed_emails"]) == 2
 
 
-def test_segment_invite_400_without_project(client, auth_headers, db_session):
-    """No interview track available → can't invite."""
+def test_segment_invite_creates_interview_track_when_study_has_none(
+    client, auth_headers, db_session
+):
+    """Sprint 15 changed this: the bridge no longer 400s when the Study
+    has no interview track — it creates a study-linked one. (Full
+    coverage in tests/test_project_study_link.py.)"""
 
     survey, q, _ = _seed_responses_for_segment(client, auth_headers, db_session)
     resp = client.post(
@@ -661,8 +665,8 @@ def test_segment_invite_400_without_project(client, auth_headers, db_session):
         headers=auth_headers,
         json={"filters": [{"question_id": q["id"], "operator": "lte", "value": 6}]},
     )
-    assert resp.status_code == 400
-    assert "interview project" in resp.json()["detail"].lower()
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()["interview_link_tokens"]) >= 1
 
 
 # ── Sprint 10: Segment Discoveries ───────────────────────────────────

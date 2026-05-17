@@ -42,6 +42,10 @@ class ScreeningQuestionResponse(BaseModel):
 class ProjectCreate(BaseModel):
     name: str
     language: str = "en"
+    # Sprint 15: when set, the project joins this existing Study (e.g. an
+    # interview round added from inside a Study). When omitted, a Study is
+    # auto-created named after the project — Decision 8, implicit creation.
+    study_id: str | None = None
     interview_duration_minutes: int = 20
     system_prompt: str | None = None
     research_objective: str | None = None

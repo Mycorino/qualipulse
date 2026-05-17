@@ -498,6 +498,9 @@ export default function CreateProjectWizard() {
         target_customer_description: targetCustomerDescription.trim() || undefined,
         questions: validQuestions,
         screening_questions: screeningQuestions.filter((sq) => sq.question.trim()),
+        // Sprint 15: when launched from inside a Study (Interviews tab),
+        // the interview round joins that Study instead of starting a new one.
+        study_id: searchParams.get("study_id") || undefined,
       };
       const project = isEditMode
         ? await updateProject(editId!, body)

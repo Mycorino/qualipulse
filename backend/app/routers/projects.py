@@ -23,6 +23,7 @@ from app.services.demo_seeder import (
 )
 from app.services.feature_gates import require_project_limit, require_question_limit
 from app.services.guide_parser import parse_guide_csv
+from app.services.study_provisioning import study_for_new_project
 from app.services.workspace import accessible_workspace_ids, can_edit, get_member_role
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -41,8 +42,18 @@ def create_project(
     )
     require_project_limit(company, current_count)
     require_question_limit(company, len(body.questions))
+
+    # Sprint 15: every project belongs to a Study. Use the one the caller
+    # named (e.g. an interview round added from a Study Overview) or
+    # auto-create one named after the project.
+    try:
+        study = study_for_new_project(db, company.id, body.name, body.study_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Study not found")
+
     project = Project(
         company_id=company.id,
+        study_id=study.id,
         name=body.name,
         language=body.language,
         interview_duration_minutes=body.interview_duration_minutes,
@@ -135,8 +146,13 @@ async def import_project_from_csv(
     questions = parse_guide_csv(content)
     require_question_limit(company, len(questions))
 
+    # Sprint 15: CSV imports auto-create their parent Study like any other
+    # project. (No study_id form field — imports always start a new Study.)
+    study = study_for_new_project(db, company.id, name, None)
+
     project = Project(
         company_id=company.id,
+        study_id=study.id,
         name=name,
         language=language,
     )

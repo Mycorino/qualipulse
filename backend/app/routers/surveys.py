@@ -65,7 +65,7 @@ from app.schemas.survey import (
 )
 from app.services.question_coach import lint_question
 from app.models.interview import InterviewLink
-from app.models.project import Project
+from app.models.project import InterviewGuideQuestion, Project
 from app.services.email import send_interview_invite
 from app.services.segment_discoveries import compute_discoveries
 from app.services.survey_analytics import build_dashboard
@@ -612,31 +612,60 @@ def get_discoveries(
 # ── Screener bridge (the wedge) ──────────────────────────────────────
 
 
-def _resolve_target_project_for_invite(db: Session, survey: Survey) -> Project | None:
-    """Pick the interview track to invite respondents into.
+def _resolve_target_project_for_invite(db: Session, survey: Survey) -> Project:
+    """Pick — or create — the interview track to invite respondents into.
 
-    Logic:
-      1. Look for a sibling Project on the same Study.
-      2. If none, fall back to the most-recently-created Project in the
-         same workspace (best-effort default — the researcher can change it
-         later via project picker once Sprint 11 wires it).
+    Sprint 15 fix: the v1 version fell back to "the most-recently-created
+    project in the workspace," which could attach Screener-Bridge
+    interviews to a completely unrelated project whose study_id didn't
+    match — so those transcripts never flowed into this study's report.
+
+    New logic:
+      1. A sibling Project already on this survey's Study → use it.
+      2. Otherwise → CREATE a study-linked interview round, seeded with
+         one open-ended guide question so the interview is immediately
+         functional. The researcher fleshes out the guide afterward.
     """
 
-    if survey.study_id:
-        project = (
-            db.query(Project)
-            .filter(Project.study_id == survey.study_id, Project.archived_at.is_(None))
-            .first()
-        )
-        if project:
-            return project
-
-    project = (
+    sibling = (
         db.query(Project)
-        .filter(Project.company_id == survey.company_id, Project.archived_at.is_(None))
-        .order_by(Project.created_at.desc())
+        .filter(Project.study_id == survey.study_id, Project.archived_at.is_(None))
+        .order_by(Project.created_at.asc())
         .first()
     )
+    if sibling:
+        return sibling
+
+    # No interview track on this Study yet — create one, study-linked.
+    project = Project(
+        company_id=survey.company_id,
+        study_id=survey.study_id,
+        name=f"{survey.name} — follow-up interviews",
+        language="en",
+        research_objective=(
+            "Understand the 'why' behind the survey responses for the "
+            "segment invited from the screener."
+        ),
+    )
+    db.add(project)
+    db.flush()
+    # Seed one open-ended question so the interview engine has something
+    # to run. A single broad prompt is a valid interview; the researcher
+    # edits the guide from the Interviews tab.
+    db.add(
+        InterviewGuideQuestion(
+            project_id=project.id,
+            section_index=0,
+            section_title="Follow-up",
+            question_index=0,
+            main_question=(
+                "Walk me through your experience — what stood out, what "
+                "was frustrating, and what you wish had been different."
+            ),
+            sort_order=0,
+        )
+    )
+    db.flush()
     return project
 
 
@@ -699,12 +728,9 @@ def invite_segment_to_interview(
     """
 
     survey = _get_survey_or_404(db, survey_id, company)
+    # Sprint 15: always resolves to a project — creates a study-linked
+    # interview round if the Study has no interview track yet.
     target_project = _resolve_target_project_for_invite(db, survey)
-    if not target_project:
-        raise HTTPException(
-            status_code=400,
-            detail="No interview project available in this workspace. Create one first.",
-        )
 
     clauses = [FilterClause(c.question_id, c.operator, c.value) for c in body.filters]
     participants = resolve_segment(db, survey, clauses)
