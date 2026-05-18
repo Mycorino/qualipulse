@@ -27,6 +27,11 @@ export type NbaActionType =
   | "share_survey"
   | "generate_report"
   | "refresh_report"
+  // workspace / home
+  | "start_study"
+  | "set_up_study"
+  | "analyze_study"
+  | "collect_study"
   // shared terminal states
   | "wait"
   | "done";
@@ -43,6 +48,8 @@ export interface NextAction {
   kind: "do" | "wait" | "done";
   /** Priority for cross-scope ranking (workspace NBA = max across studies). */
   weight: number;
+  /** Where the action routes — e.g. the study a workspace action points at. */
+  targetId?: string;
 }
 
 // ── Interview project ────────────────────────────────────────────────────────
@@ -264,4 +271,97 @@ export function resolveSurveyNextAction(input: SurveyNbaInput): NextAction {
     if (rule.test(input)) return rule.action(input);
   }
   return SURVEY_DONE;
+}
+
+// ── Workspace / home ─────────────────────────────────────────────────────────
+
+/** Coarse per-study signal from the studies-list summary. */
+export interface StudyNbaSummary {
+  id: string;
+  name: string;
+  surveyCount: number;
+  projectCount: number;
+  completedResponseCount: number;
+  completedInterviewCount: number;
+  hasReport: boolean;
+}
+
+const WS_MIN_RESPONSES = 30;
+const WS_MIN_INTERVIEWS = 3;
+
+/** The candidate next action for one study, or null if it needs nothing. */
+function studyCandidate(s: StudyNbaSummary): NextAction | null {
+  if (s.surveyCount + s.projectCount === 0) {
+    return {
+      id: `set_up_${s.id}`,
+      actionType: "set_up_study",
+      label: `Set up “${s.name}”`,
+      reason: "This study has no survey or interview round yet.",
+      kind: "do",
+      weight: 95,
+      targetId: s.id,
+    };
+  }
+  const hasData =
+    s.completedInterviewCount >= WS_MIN_INTERVIEWS ||
+    s.completedResponseCount >= WS_MIN_RESPONSES;
+  if (hasData && !s.hasReport) {
+    return {
+      id: `analyze_${s.id}`,
+      actionType: "analyze_study",
+      label: `Analyse “${s.name}”`,
+      reason: "Enough data is in — synthesise it into findings.",
+      kind: "do",
+      weight: 85,
+      targetId: s.id,
+    };
+  }
+  if (!s.hasReport) {
+    return {
+      id: `collect_${s.id}`,
+      actionType: "collect_study",
+      label: `“${s.name}” is collecting`,
+      reason: "Responses are still coming in — share the links to reach a sample.",
+      kind: "wait",
+      weight: 45,
+      targetId: s.id,
+    };
+  }
+  return null; // has a report — nothing needs doing
+}
+
+/**
+ * The single study across the workspace that most needs attention — the
+ * highest-weight candidate. Drives the home-page copilot suggestion.
+ */
+export function resolveWorkspaceNextAction(
+  studies: StudyNbaSummary[],
+): NextAction {
+  if (studies.length === 0) {
+    return {
+      id: "start_first_study",
+      actionType: "start_study",
+      label: "Start your first study",
+      reason: "A study is one research effort — a survey, an interview round, or both.",
+      kind: "do",
+      weight: 100,
+    };
+  }
+  let best: NextAction | null = null;
+  for (const s of studies) {
+    const candidate = studyCandidate(s);
+    if (candidate && (!best || candidate.weight > best.weight)) {
+      best = candidate;
+    }
+  }
+  return (
+    best ?? {
+      id: "workspace_done",
+      actionType: "done",
+      label: "Your studies are all moving",
+      reason: "Every study has a report — nothing needs you right now.",
+      kind: "done",
+      weight: 0,
+    }
+  );
 }

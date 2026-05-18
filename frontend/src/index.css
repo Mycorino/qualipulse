@@ -9818,6 +9818,25 @@ select.field-input {
 }
 .copilot-fab:hover { background: var(--brand-700); }
 
+/* Home-page workspace next-action — the copilot's portfolio triage. */
+.workspace-nba {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: var(--space-5) 0 var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.workspace-nba__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+
 /* ── Next-best-action chip ─────────────────────────────────────────────── */
 .nba-chip--inline {
   display: flex;
