@@ -1387,13 +1387,26 @@ export default function ProjectDetail() {
 
   return (
     <InstrumentShell
-      crumbs={[
-        { label: "Studies", to: "/studies" },
-        ...(project.study_id
-          ? [{ label: project.study_name || "Study", to: `/studies/${project.study_id}` }]
-          : []),
-        { label: project.name },
-      ]}
+      crumbs={(() => {
+        // A single-instrument study is auto-named after its round, so the
+        // study crumb and the round crumb would read identically. Drop the
+        // redundant study link in that case — show just Studies › <name>.
+        const sameName =
+          !!project.study_name &&
+          project.study_name.trim() === project.name.trim();
+        return [
+          { label: "Studies", to: "/studies" },
+          ...(project.study_id && !sameName
+            ? [
+                {
+                  label: project.study_name || "Study",
+                  to: `/studies/${project.study_id}`,
+                },
+              ]
+            : []),
+          { label: project.name },
+        ];
+      })()}
       eyebrow="Interview round"
       title={
         <input
@@ -1410,6 +1423,7 @@ export default function ProjectDetail() {
             );
           }}
           aria-label="Interview round name"
+          title={project.name}
         />
       }
       status={
@@ -1854,7 +1868,33 @@ export default function ProjectDetail() {
                 <button className="btn btn-ghost btn-sm" onClick={addBlankGuideQuestion}>{tProject("setup.addQuestions")}</button>
               </div>
               {project.questions.length === 0 ? (
-                <p className="muted-text">{tProject("setup.noQuestionsYet")} <button className="btn btn-primary btn-sm" onClick={addBlankGuideQuestion}>{tProject("setup.createGuide")}</button> <span style={{ color: "var(--text-tertiary)" }}>or use the ✦ Ask AI copilot to draft the whole guide.</span></p>
+                <div className="guide-empty">
+                  <p className="muted-text" style={{ marginBottom: 12 }}>
+                    {tProject("setup.noQuestionsYet")} The fastest way to a
+                    methodologically sound guide is to let the copilot draft
+                    one.
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() =>
+                        document
+                          .querySelector<HTMLButtonElement>(".copilot-fab")
+                          ?.click()
+                      }
+                    >
+                      ✦ Ask AI to draft the guide
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={addBlankGuideQuestion}>
+                      Write the guide myself
+                    </button>
+                  </div>
+                  <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 10 }}>
+                    The AI proposes a full guide you review one question at a
+                    time — accept, edit, reorder, or delete anything. It never
+                    changes your guide without your approval.
+                  </p>
+                </div>
               ) : (
                 <>
                   {/* Active questions */}
