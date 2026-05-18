@@ -226,7 +226,12 @@ quote into something they did not say. Attribute quotes to the segment \
 (profession/age/country), not just a name.
 - Keep observation separate from recommendation: state what the data \
 shows, then — clearly flagged as your suggestion — what the researcher \
-might do next. Do not present an inference as a finding."""
+might do next. Do not present an inference as a finding.
+- You can move the work forward: when enough interviews are in and no \
+analysis exists yet, offer `propose_run_analysis`. When a ready analysis \
+exists and the researcher has annotated themes or you have spotted gaps, \
+offer `propose_refine_analysis`. Always explain why in the rationale and \
+let the researcher accept — never imply it has already run."""
 
 
 _INTERVIEW_TOOLS = [
@@ -364,6 +369,42 @@ _INTERVIEW_TOOLS = [
             "required": ["question_id", "rationale"],
         },
     },
+    {
+        "name": "propose_run_analysis",
+        "description": (
+            "Propose running the AI analysis pipeline over this round's "
+            "completed interviews — synthesises themes, JTBDs, tensions, and "
+            "recommendations. Staged for the researcher to accept. Only "
+            "propose this when interviews have been completed (check "
+            "read_progress first)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "rationale": {
+                    "type": "string",
+                    "description": "Why now — e.g. enough interviews collected.",
+                },
+            },
+            "required": ["rationale"],
+        },
+    },
+    {
+        "name": "propose_refine_analysis",
+        "description": (
+            "Propose a refined analysis pass that re-synthesises using the "
+            "researcher's theme annotations and context. Staged for the "
+            "researcher to accept. Only propose this when a ready analysis "
+            "already exists (check read_analysis first)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "rationale": {"type": "string"},
+            },
+            "required": ["rationale"],
+        },
+    },
     remember_tool("project"),
 ]
 
@@ -454,6 +495,35 @@ def _guide_run_tool(
             }
         )
         return "Recorded the proposed removal."
+
+    if name == "propose_run_analysis":
+        progress = _progress_snapshot(project)
+        if progress["completed_interviews"] == 0:
+            return (
+                "No completed interviews yet — analysis needs data. "
+                "Not recorded."
+            )
+        turn.actions.append(
+            {
+                "type": "run_analysis",
+                "rationale": (tool_input.get("rationale") or "").strip(),
+            }
+        )
+        return "Recorded the proposed analysis run."
+
+    if name == "propose_refine_analysis":
+        if _analysis_snapshot(project)["status"] != "ready":
+            return (
+                "No ready analysis to refine — run the analysis first. "
+                "Not recorded."
+            )
+        turn.actions.append(
+            {
+                "type": "refine_analysis",
+                "rationale": (tool_input.get("rationale") or "").strip(),
+            }
+        )
+        return "Recorded the proposed refined-analysis run."
 
     return f"Unknown tool: {name}"
 

@@ -3396,6 +3396,10 @@ export default function ProjectDetail() {
               await patchQuestion(project.id, action.question_id, {
                 deprecated_at: new Date().toISOString(),
               });
+            } else if (action.type === "run_analysis") {
+              await triggerAnalysis(project.id);
+            } else if (action.type === "refine_analysis") {
+              await triggerRefinedAnalysis(project.id);
             }
           },
         }}

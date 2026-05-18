@@ -6,8 +6,11 @@ deterministic stub path in services/copilot_interview.py.
 
 from app.models.company import Company
 from app.models.project import Project
+from types import SimpleNamespace
+
 from app.services.copilot_interview import (
     _analysis_snapshot,
+    _guide_run_tool,
     _interviews_index,
     _one_interview,
     _progress_snapshot,
@@ -251,3 +254,71 @@ class TestResultsCopilotReads:
         # Demo seeds two analyses (v1, v2) — latest version wins.
         assert snap["version"] == 2
         assert "themes" in snap["report"]
+
+
+class TestResultsCopilotProposals:
+    """Phase 2 — the copilot can propose running / refining the analysis.
+    These exercise the tool executor directly (the model picks the tool)."""
+
+    def _seed(self, db_session) -> Project:
+        company = Company(
+            name="Proposals Co",
+            email="proposals@example.com",
+            password_hash="x",
+            preferred_language="en",
+        )
+        db_session.add(company)
+        db_session.commit()
+        db_session.refresh(company)
+        return company, seed_demo_project(db_session, company.id)
+
+    def test_propose_run_analysis_records_action(self, db_session):
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, project, turn,
+            "propose_run_analysis", {"rationale": "Four interviews are in."},
+        )
+        assert "Recorded" in msg
+        assert turn.actions == [
+            {"type": "run_analysis", "rationale": "Four interviews are in."}
+        ]
+
+    def test_propose_run_analysis_blocked_without_interviews(
+        self, client, auth_headers, db_session
+    ):
+        project = _create_project(client, auth_headers, name="No data round")
+        db_session.expire_all()
+        proj = db_session.query(Project).filter(Project.id == project["id"]).one()
+        company = proj.company
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, proj, turn,
+            "propose_run_analysis", {"rationale": "x"},
+        )
+        assert "No completed interviews" in msg
+        assert turn.actions == []
+
+    def test_propose_refine_analysis_records_action(self, db_session):
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, project, turn,
+            "propose_refine_analysis", {"rationale": "Themes annotated."},
+        )
+        assert "Recorded" in msg
+        assert turn.actions[0]["type"] == "refine_analysis"
+
+    def test_propose_refine_analysis_blocked_without_analysis(
+        self, client, auth_headers, db_session
+    ):
+        project = _create_project(client, auth_headers, name="Unanalysed round")
+        db_session.expire_all()
+        proj = db_session.query(Project).filter(Project.id == project["id"]).one()
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, proj.company, proj, turn,
+            "propose_refine_analysis", {"rationale": "x"},
+        )
+        assert "No ready analysis" in msg
+        assert turn.actions == []
