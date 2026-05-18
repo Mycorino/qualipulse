@@ -9951,8 +9951,61 @@ select.field-input {
   gap: var(--space-2);
 }
 .copilot-dock .copilot-fab {
-  position: static;
+  position: relative;
 }
+
+/* Soft dot signalling an unseen nudge on the collapsed FAB. */
+.copilot-fab__dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--warning-text, #b45309);
+  border: 2px solid var(--bg-base);
+}
+
+/* In-panel nudge banner — "something changed while you were away." */
+.copilot-nudges {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-bottom: 1px solid var(--border-default);
+}
+.copilot-nudge {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+}
+.copilot-nudge--positive {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.copilot-nudge--neutral {
+  background: var(--info-bg, var(--bg-base));
+  color: var(--info-text, var(--text-secondary));
+}
+.copilot-nudge--caution {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+.copilot-nudge__text {
+  flex: 1;
+  line-height: 1.4;
+}
+.copilot-nudge__dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  line-height: 1;
+  font-size: var(--text-sm);
+}
+.copilot-nudge__dismiss:hover { opacity: 1; }
 
 /* Suggested-next-step card at the top of an empty copilot thread. */
 .copilot-nba-starter {
