@@ -10,6 +10,7 @@ import type {
 } from "../api/copilot";
 import type { NextAction } from "../copilot/nextAction";
 import type { Nudge } from "../copilot/signals";
+import { useNudgeAnnounce } from "../copilot/useNudgeAnnounce";
 import { NextActionChip } from "./NextActionChip";
 import { useToast } from "./Toast";
 
@@ -84,6 +85,7 @@ export function ResearchCopilotPanel({
   onDismissNudge?: (id: string) => void;
 }) {
   const { toast } = useToast();
+  const announce = useNudgeAnnounce(nudges);
   const [open, setOpen] = useState(false);
   const [thread, setThread] = useState<ThreadItem[]>([]);
   const [input, setInput] = useState("");
@@ -205,6 +207,9 @@ export function ResearchCopilotPanel({
     const hasNudge = (nudges?.length ?? 0) > 0;
     return (
       <div className="copilot-dock">
+        <div className="sr-only" aria-live="polite" role="status">
+          {announce}
+        </div>
         {nextAction && nextAction.kind === "do" && (
           <NextActionChip
             action={nextAction}
@@ -233,6 +238,9 @@ export function ResearchCopilotPanel({
 
   return (
     <aside className="copilot-panel" aria-label="Research Copilot">
+      <div className="sr-only" aria-live="polite" role="status">
+        {announce}
+      </div>
       <header className="copilot-panel__header">
         <div className="copilot-panel__heading">
           <span className="copilot-panel__title">✦ Research Copilot</span>

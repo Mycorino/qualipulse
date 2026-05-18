@@ -327,16 +327,19 @@ export default function ProjectDetail() {
   // away (analysis finished, interviews crossed the analysable threshold).
   useEffect(() => {
     if (!project) return;
-    const completed = participants.filter(
+    const completedParts = participants.filter(
       (p) => p.status === "completed",
-    ).length;
+    );
     setNudges(
       detectProjectNudges(
         project.id,
         {
           analysisStatus: analysis?.status ?? "none",
-          completedCount: completed,
+          completedCount: completedParts.length,
           analysisParticipantCount: analysis?.participant_count ?? 0,
+          lowQualityCount: completedParts.filter(
+            (p) => p.quality_label === "low",
+          ).length,
         },
         tab,
       ),
