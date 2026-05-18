@@ -285,11 +285,13 @@ def run_copilot_turn(
     adapter: CopilotAdapter,
     messages: list,
     active_section: str | None = None,
+    mission: str | None = None,
 ) -> dict:
     """Run one copilot turn. ``messages`` is the full chat history (objects
     with ``.role`` / ``.content``). ``active_section`` is the tab the
-    researcher is currently viewing, if the surface has tabs. Returns
-    {reply, proposed_actions, memory_updated}."""
+    researcher is currently viewing; ``mission`` is the one-line job the
+    copilot is helping with on this surface. Returns {reply,
+    proposed_actions, memory_updated}."""
     history = [{"role": m.role, "content": m.content} for m in messages]
 
     if not settings.ANTHROPIC_API_KEY:
@@ -310,18 +312,25 @@ def run_copilot_turn(
             "cache_control": {"type": "ephemeral"},
         }
     ]
-    # Tab awareness — a tiny, volatile block AFTER the cached breakpoint.
-    # It changes as the researcher navigates, so it must not sit inside
-    # the cached prefix or every tab switch would bust the cache.
+    # Tab + mission awareness — a tiny, volatile block AFTER the cached
+    # breakpoint. It changes as the researcher navigates, so it must not
+    # sit inside the cached prefix or every tab switch would bust the cache.
+    context_bits: list[str] = []
     if active_section:
+        context_bits.append(
+            f'The researcher is on the "{active_section}" tab of this '
+            f"{adapter.kind}."
+        )
+    if mission:
+        context_bits.append(f"Your mission here: {mission}")
+    if context_bits:
         system.append(
             {
                 "type": "text",
                 "text": (
-                    f'The researcher is currently on the "{active_section}" '
-                    f"tab of this {adapter.kind}. Bias your help toward what "
-                    f"is actionable from there — but still propose anything "
-                    f"relevant if they ask."
+                    " ".join(context_bits)
+                    + " Bias your help toward what is actionable from where "
+                    "they sit — but still propose anything relevant if they ask."
                 ),
             }
         )

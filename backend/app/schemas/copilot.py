@@ -19,13 +19,15 @@ class CopilotRequest(BaseModel):
     """One turn: the full chat history, latest user message last.
 
     ``active_section`` tells the copilot which tab/section the researcher
-    is looking at right now (e.g. "Setup", "Analysis") so it can bias its
-    help toward what is actionable from there. Optional — older clients
-    and non-tabbed surfaces simply omit it.
+    is looking at right now (e.g. "Setup", "Analysis"). ``mission`` is the
+    one-line job the copilot is helping with on this surface (e.g. "Turn
+    transcripts into decisions"). Both are optional — they let the agent
+    bias its help toward where the researcher sits.
     """
 
     messages: list[CopilotMessage] = Field(..., min_length=1)
     active_section: str | None = None
+    mission: str | None = None
 
 
 class CopilotResponse(BaseModel):

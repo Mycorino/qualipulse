@@ -8,6 +8,8 @@ import type {
   ProposedGuideQuestion,
   ProposedSurveyQuestion,
 } from "../api/copilot";
+import type { NextAction } from "../copilot/nextAction";
+import { NextActionChip } from "./NextActionChip";
 import { useToast } from "./Toast";
 
 /**
@@ -65,9 +67,15 @@ function renderRich(text: string): ReactNode {
 export function ResearchCopilotPanel({
   target,
   onApplied,
+  mission,
+  nextAction,
 }: {
   target: CopilotTarget;
   onApplied: () => void;
+  /** The one-line job the copilot helps with on this surface. */
+  mission?: string;
+  /** The deterministic next-best-action for this surface, if any. */
+  nextAction?: NextAction;
 }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -186,22 +194,38 @@ export function ResearchCopilotPanel({
   };
 
   if (!open) {
+    // Collapsed dock — the FAB, plus the live next-best-action when there
+    // is one. Either opens the copilot.
     return (
-      <button
-        type="button"
-        className="copilot-fab"
-        onClick={() => setOpen(true)}
-        aria-label="Open the Research Copilot"
-      >
-        ✦ Ask AI
-      </button>
+      <div className="copilot-dock">
+        {nextAction && nextAction.kind === "do" && (
+          <NextActionChip
+            action={nextAction}
+            variant="dock"
+            onRun={() => setOpen(true)}
+          />
+        )}
+        <button
+          type="button"
+          className="copilot-fab"
+          onClick={() => setOpen(true)}
+          aria-label="Open the Research Copilot"
+        >
+          ✦ Ask AI
+        </button>
+      </div>
     );
   }
 
   return (
     <aside className="copilot-panel" aria-label="Research Copilot">
       <header className="copilot-panel__header">
-        <span className="copilot-panel__title">✦ Research Copilot</span>
+        <div className="copilot-panel__heading">
+          <span className="copilot-panel__title">✦ Research Copilot</span>
+          {mission && (
+            <span className="copilot-panel__mission">Here to: {mission}</span>
+          )}
+        </div>
         <button
           type="button"
           className="copilot-panel__close"
@@ -215,6 +239,23 @@ export function ResearchCopilotPanel({
       <div className="copilot-thread" ref={threadRef}>
         {thread.length === 0 && (
           <div className="copilot-empty">
+            {nextAction && nextAction.kind === "do" && (
+              <button
+                type="button"
+                className="copilot-nba-starter"
+                onClick={() => send(`Help me: ${nextAction.label}`)}
+              >
+                <span className="copilot-nba-starter__eyebrow">
+                  ✦ Suggested next step
+                </span>
+                <span className="copilot-nba-starter__label">
+                  {nextAction.label}
+                </span>
+                <span className="copilot-nba-starter__reason">
+                  {nextAction.reason}
+                </span>
+              </button>
+            )}
             <p className="copilot-empty__lead">
               I can draft questions, fix methodology issues, and shape your
               study. Tell me what you want to learn.

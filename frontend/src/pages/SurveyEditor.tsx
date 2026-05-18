@@ -30,6 +30,7 @@ import {
 import { getStudy } from "../api/studies";
 import { getConversation, runCopilot, saveConversation } from "../api/copilot";
 import type { ProposedSurveyQuestion } from "../api/copilot";
+import { resolveSurveyNextAction } from "../copilot/nextAction";
 
 /**
  * SurveyEditor — wires the existing QuestionTypeCard + the inline question
@@ -227,6 +228,19 @@ export default function SurveyEditor() {
     );
   }
 
+  // The copilot's mission + next-best-action for the survey editor. The
+  // editor is the pre-launch surface, so the resolver works off question
+  // count and status; post-launch response/report data lives on the
+  // survey dashboard (a later phase).
+  const surveyMission = "Get this survey ready to publish.";
+  const surveyNextAction = resolveSurveyNextAction({
+    questionCount: questions.length,
+    status: survey.status,
+    completedResponses: 0,
+    hasReport: false,
+    reportResponseCount: 0,
+  });
+
   return (
     <InstrumentShell
       crumbs={[
@@ -390,7 +404,8 @@ export default function SurveyEditor() {
       <ResearchCopilotPanel
         target={{
           id: survey.id,
-          runTurn: (m) => runCopilot("surveys", survey.id, m, "Build"),
+          runTurn: (m) =>
+            runCopilot("surveys", survey.id, m, "Build", surveyMission),
           loadConversation: () => getConversation("surveys", survey.id),
           saveConversation: (t) => saveConversation("surveys", survey.id, t),
           applyAction: async (action) => {
@@ -429,6 +444,8 @@ export default function SurveyEditor() {
             })
             .catch(() => undefined);
         }}
+        mission={surveyMission}
+        nextAction={surveyNextAction}
       />
     </InstrumentShell>
   );

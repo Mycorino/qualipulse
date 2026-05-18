@@ -62,6 +62,14 @@ import type { ProposedGuideQuestion } from "../api/copilot";
 
 type Tab = "overview" | "setup" | "responses" | "analysis";
 
+/** The copilot's one-line mission per tab — what it's helping with here. */
+const PROJECT_MISSIONS: Record<Tab, string> = {
+  overview: "Keep this round moving.",
+  setup: "Get this interview guide ready to collect.",
+  responses: "Watch the data land and flag quality problems early.",
+  analysis: "Turn transcripts into decisions.",
+};
+
 const PRESET_COLORS = [
   "#6366f1", "#ec4899", "#f59e0b", "#10b981",
   "#3b82f6", "#8b5cf6", "#ef4444", "#14b8a6",
@@ -1363,6 +1371,8 @@ export default function ProjectDetail() {
     analysisParticipantCount: analysis?.participant_count ?? 0,
     annotationCount: 0,
   };
+  const projectMission = PROJECT_MISSIONS[tab];
+  const projectNextAction = resolveProjectNextAction(projectNbaInput);
 
   /** Add a blank guide question inline (then edit it in place). The old
    *  wizard used to own this; the copilot drafts whole guides, this is
@@ -1887,7 +1897,7 @@ export default function ProjectDetail() {
                 <div className="guide-empty">
                   <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
                     <NextActionChip
-                      action={resolveProjectNextAction(projectNbaInput)}
+                      action={projectNextAction}
                       variant="inline"
                       onRun={() =>
                         document
@@ -3421,6 +3431,7 @@ export default function ProjectDetail() {
               project.id,
               m,
               instrumentSections.find((s) => s.key === tab)?.label,
+              projectMission,
             ),
           loadConversation: () => getConversation("projects", project.id),
           saveConversation: (t) => saveConversation("projects", project.id, t),
@@ -3469,6 +3480,8 @@ export default function ProjectDetail() {
             .then(setProject)
             .catch(() => undefined);
         }}
+        mission={projectMission}
+        nextAction={projectNextAction}
       />
     </InstrumentShell>
   );
