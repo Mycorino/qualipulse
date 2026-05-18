@@ -284,10 +284,12 @@ def run_copilot_turn(
     instrument,
     adapter: CopilotAdapter,
     messages: list,
+    active_section: str | None = None,
 ) -> dict:
     """Run one copilot turn. ``messages`` is the full chat history (objects
-    with ``.role`` / ``.content``). Returns {reply, proposed_actions,
-    memory_updated}."""
+    with ``.role`` / ``.content``). ``active_section`` is the tab the
+    researcher is currently viewing, if the surface has tabs. Returns
+    {reply, proposed_actions, memory_updated}."""
     history = [{"role": m.role, "content": m.content} for m in messages]
 
     if not settings.ANTHROPIC_API_KEY:
@@ -308,6 +310,21 @@ def run_copilot_turn(
             "cache_control": {"type": "ephemeral"},
         }
     ]
+    # Tab awareness — a tiny, volatile block AFTER the cached breakpoint.
+    # It changes as the researcher navigates, so it must not sit inside
+    # the cached prefix or every tab switch would bust the cache.
+    if active_section:
+        system.append(
+            {
+                "type": "text",
+                "text": (
+                    f'The researcher is currently on the "{active_section}" '
+                    f"tab of this {adapter.kind}. Bias your help toward what "
+                    f"is actionable from there — but still propose anything "
+                    f"relevant if they ask."
+                ),
+            }
+        )
     turn = _Turn()
     reply_parts: list[str] = []
 

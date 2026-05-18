@@ -68,7 +68,9 @@ def survey_copilot(
 ) -> CopilotResponse:
     """Run one Research Copilot turn against a survey."""
     survey = _survey_or_404(db, survey_id, company)
-    result = run_copilot_turn(db, company, survey, SURVEY_ADAPTER, body.messages)
+    result = run_copilot_turn(
+        db, company, survey, SURVEY_ADAPTER, body.messages, body.active_section
+    )
     return CopilotResponse(**result)
 
 
@@ -110,7 +112,9 @@ def project_copilot(
 ) -> CopilotResponse:
     """Run one Research Copilot turn against an interview guide."""
     project = _project_or_404(db, project_id, company)
-    result = run_copilot_turn(db, company, project, INTERVIEW_ADAPTER, body.messages)
+    result = run_copilot_turn(
+        db, company, project, INTERVIEW_ADAPTER, body.messages, body.active_section
+    )
     return CopilotResponse(**result)
 
 

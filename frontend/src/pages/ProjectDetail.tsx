@@ -3401,7 +3401,13 @@ export default function ProjectDetail() {
       <ResearchCopilotPanel
         target={{
           id: project.id,
-          runTurn: (m) => runCopilot("projects", project.id, m),
+          runTurn: (m) =>
+            runCopilot(
+              "projects",
+              project.id,
+              m,
+              instrumentSections.find((s) => s.key === tab)?.label,
+            ),
           loadConversation: () => getConversation("projects", project.id),
           saveConversation: (t) => saveConversation("projects", project.id, t),
           applyAction: async (action) => {

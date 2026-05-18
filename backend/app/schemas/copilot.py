@@ -16,9 +16,16 @@ class CopilotMessage(BaseModel):
 
 
 class CopilotRequest(BaseModel):
-    """One turn: the full chat history, latest user message last."""
+    """One turn: the full chat history, latest user message last.
+
+    ``active_section`` tells the copilot which tab/section the researcher
+    is looking at right now (e.g. "Setup", "Analysis") so it can bias its
+    help toward what is actionable from there. Optional — older clients
+    and non-tabbed surfaces simply omit it.
+    """
 
     messages: list[CopilotMessage] = Field(..., min_length=1)
+    active_section: str | None = None
 
 
 class CopilotResponse(BaseModel):
