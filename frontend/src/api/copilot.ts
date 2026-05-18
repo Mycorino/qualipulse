@@ -49,7 +49,9 @@ export interface ProposedAction {
     | "add_guide_question"
     | "edit_guide_question"
     | "remove_guide_question"
-    | "edit_objective";
+    | "edit_objective"
+    | "run_analysis"
+    | "refine_analysis";
   /** add_question / add_guide_question */
   question?: ProposedSurveyQuestion | ProposedGuideQuestion;
   /** edit / remove */

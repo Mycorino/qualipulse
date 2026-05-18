@@ -314,6 +314,12 @@ function ProposalCard({
   } else if (action.type === "edit_objective") {
     heading = "Set the research objective";
     body = action.new_objective;
+  } else if (action.type === "run_analysis") {
+    heading = "Run AI analysis";
+    body = "Synthesise themes, JTBDs, and tensions from the interviews";
+  } else if (action.type === "refine_analysis") {
+    heading = "Refine the analysis";
+    body = "Re-synthesise using your theme annotations and context";
   } else {
     heading = "Remove question";
     body = "Remove this question";

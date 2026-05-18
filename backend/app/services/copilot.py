@@ -7,8 +7,11 @@ persistence, and prompt assembly stay generic.
 
 Design notes
 ------------
-- Model: ``claude-sonnet-4-6`` — fast enough for an interactive,
-  type-alongside assistant doing tool-use loops.
+- Model: ``claude-opus-4-7`` with adaptive thinking — research-grade
+  qualitative reasoning (reading transcripts, respecting confidence
+  levels, separating observation from recommendation). Adaptive thinking
+  self-moderates, so trivial guide-edit turns stay fast while results
+  turns think as hard as they need to.
 - Memory: scoped ``CopilotMemory`` (company / study / instrument), read
   into every system prompt and appended via the `remember` tool.
 - The copilot PROPOSES; it never mutates the instrument. Proposed actions
@@ -29,12 +32,13 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.logging_config import logger
 from app.models.company import Company
 from app.models.copilot import CopilotConversation, CopilotMemory
 from app.models.survey import QUESTION_TYPES, Survey
 from app.services.usage_logger import log_claude_usage
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-opus-4-7"
 MAX_AGENT_TURNS = 8
 
 
@@ -292,49 +296,91 @@ def run_copilot_turn(
     import anthropic  # noqa: WPS433 — lazy import keeps tests AI-free
 
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-    system = _system_prompt(db, company, instrument, adapter)
+    # System prompt + tools are identical across every iteration of the
+    # agent loop and stable across turns until the instrument changes —
+    # cache the prefix so iterations 2..N read it at ~0.1x cost instead
+    # of re-billing the full Opus 4.7 input price. A cache_control marker
+    # on the last system block caches the tools too (tools render first).
+    system = [
+        {
+            "type": "text",
+            "text": _system_prompt(db, company, instrument, adapter),
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
     turn = _Turn()
     reply_parts: list[str] = []
 
-    for _ in range(MAX_AGENT_TURNS):
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=2048,
-            system=system,
-            tools=adapter.tools,
-            messages=history,
-        )
-        log_claude_usage(db, response, "copilot", company_id=company.id)
-
-        for block in response.content:
-            if block.type == "text" and block.text.strip():
-                reply_parts.append(block.text.strip())
-
-        if response.stop_reason != "tool_use":
-            break
-
-        history.append({"role": "assistant", "content": response.content})
-        tool_results = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-            tool_input = block.input or {}
-            if block.name == "remember":
-                result = _handle_remember(
-                    db, company, instrument, adapter, turn, tool_input
-                )
-            else:
-                result = adapter.run_tool(
-                    db, company, instrument, turn, block.name, tool_input
-                )
-            tool_results.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                }
+    try:
+        for _ in range(MAX_AGENT_TURNS):
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=16000,
+                system=system,
+                tools=adapter.tools,
+                thinking={"type": "adaptive"},
+                output_config={"effort": "high"},
+                messages=history,
             )
-        history.append({"role": "user", "content": tool_results})
+            log_claude_usage(db, response, "copilot", company_id=company.id)
+
+            for block in response.content:
+                if block.type == "text" and block.text.strip():
+                    reply_parts.append(block.text.strip())
+
+            # max_tokens => the reply / proposal JSON may be truncated;
+            # surface it rather than silently returning a partial turn.
+            if response.stop_reason == "max_tokens":
+                logger.warning(
+                    "Copilot turn hit max_tokens (company=%s) — output may be "
+                    "truncated.",
+                    company.id,
+                )
+                break
+
+            if response.stop_reason != "tool_use":
+                break
+
+            history.append({"role": "assistant", "content": response.content})
+            tool_results = []
+            for block in response.content:
+                if block.type != "tool_use":
+                    continue
+                tool_input = block.input or {}
+                if block.name == "remember":
+                    result = _handle_remember(
+                        db, company, instrument, adapter, turn, tool_input
+                    )
+                else:
+                    result = adapter.run_tool(
+                        db, company, instrument, turn, block.name, tool_input
+                    )
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result,
+                    }
+                )
+            history.append({"role": "user", "content": tool_results})
+    except anthropic.APIError as exc:
+        # Rate limit, overload, or upstream 5xx — the SDK already retried
+        # transient failures. Degrade gracefully instead of bubbling a 500.
+        logger.error(
+            "Copilot turn failed (company=%s, request_id=%s): %s",
+            company.id,
+            getattr(exc, "request_id", None),
+            exc,
+        )
+        return {
+            "reply": (
+                "\n\n".join(reply_parts).strip()
+                or "The copilot is briefly unavailable — please try again in a "
+                "moment."
+            ),
+            "proposed_actions": turn.actions,
+            "memory_updated": turn.memory_updated,
+        }
 
     return {
         "reply": "\n\n".join(reply_parts).strip() or adapter.default_reply,
