@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
 import { useToast } from "../components/Toast";
 import { QuantiTopBar } from "../components/QuantiTopBar";
 import { AccountNudges } from "../components/AccountNudges";
 import { NewStudyModal } from "../components/NewStudyModal";
+import { NextActionChip } from "../components/NextActionChip";
+import {
+  resolveWorkspaceNextAction,
+  type NextAction,
+  type StudyNbaSummary,
+} from "../copilot/nextAction";
 
 /**
  * StudyList — `/studies`, and the post-login home.
@@ -45,6 +52,18 @@ const MIX_ICON: Record<InstrumentMix, string> = {
   empty: "·",
 };
 
+function toNbaSummary(s: StudySummary): StudyNbaSummary {
+  return {
+    id: s.id,
+    name: s.name,
+    surveyCount: s.survey_count,
+    projectCount: s.project_count,
+    completedResponseCount: s.completed_response_count,
+    completedInterviewCount: s.completed_interview_count,
+    hasReport: s.has_report,
+  };
+}
+
 function studyStatusLine(s: StudySummary): string {
   if (s.has_report) return "Report ready";
   if (s.completed_interview_count > 0) {
@@ -60,12 +79,19 @@ export default function StudyList() {
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     listStudies()
       .then(setStudies)
       .catch(() => toast("Failed to load studies", "error"));
   }, [toast]);
+
+  // The copilot's portfolio-triage suggestion — which study needs you.
+  const runWorkspaceAction = (a: NextAction) => {
+    if (a.actionType === "start_study") setPickerOpen(true);
+    else if (a.targetId) navigate(`/studies/${a.targetId}`);
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
@@ -92,6 +118,20 @@ export default function StudyList() {
             + New study
           </button>
         </header>
+
+        {studies && studies.length > 0 && (() => {
+          const nba = resolveWorkspaceNextAction(studies.map(toNbaSummary));
+          return (
+            <div className="workspace-nba">
+              <span className="workspace-nba__eyebrow">✦ Research Copilot</span>
+              <NextActionChip
+                action={nba}
+                variant="inline"
+                onRun={() => runWorkspaceAction(nba)}
+              />
+            </div>
+          );
+        })()}
 
         <section className="quanti-showcase__section">
           {studies === null ? (
