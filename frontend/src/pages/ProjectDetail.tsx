@@ -54,6 +54,9 @@ import {
 } from "../api/projects";
 import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion } from "../api/projects";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
+import { NextActionChip } from "../components/NextActionChip";
+import { resolveProjectNextAction } from "../copilot/nextAction";
+import type { ProjectNbaInput } from "../copilot/nextAction";
 import { getConversation, runCopilot, saveConversation } from "../api/copilot";
 import type { ProposedGuideQuestion } from "../api/copilot";
 
@@ -1348,6 +1351,19 @@ export default function ProjectDetail() {
 
   const isCollecting = links.some((l) => l.is_active);
 
+  // Deterministic next-best-action input for this round. Drives the
+  // empty-state suggestion today; the Copilot dock (Phase 2b) reuses it.
+  const projectNbaInput: ProjectNbaInput = {
+    guideQuestionCount: project?.questions?.length ?? 0,
+    activeLinkCount: links.filter((l) => l.is_active).length,
+    completedCount: participants.filter((p) => p.status === "completed").length,
+    inProgressCount: participants.filter((p) => p.status !== "completed").length,
+    analysisStatus:
+      (analysis?.status as ProjectNbaInput["analysisStatus"]) ?? "none",
+    analysisParticipantCount: analysis?.participant_count ?? 0,
+    annotationCount: 0,
+  };
+
   /** Add a blank guide question inline (then edit it in place). The old
    *  wizard used to own this; the copilot drafts whole guides, this is
    *  the manual fallback. */
@@ -1869,23 +1885,21 @@ export default function ProjectDetail() {
               </div>
               {project.questions.length === 0 ? (
                 <div className="guide-empty">
-                  <p className="muted-text" style={{ marginBottom: 12 }}>
-                    {tProject("setup.noQuestionsYet")} The fastest way to a
-                    methodologically sound guide is to let the copilot draft
-                    one.
-                  </p>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() =>
+                  <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+                    <NextActionChip
+                      action={resolveProjectNextAction(projectNbaInput)}
+                      variant="inline"
+                      onRun={() =>
                         document
                           .querySelector<HTMLButtonElement>(".copilot-fab")
                           ?.click()
                       }
+                    />
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={addBlankGuideQuestion}
+                      style={{ marginTop: 2 }}
                     >
-                      ✦ Ask AI to draft the guide
-                    </button>
-                    <button className="btn btn-ghost btn-sm" onClick={addBlankGuideQuestion}>
                       Write the guide myself
                     </button>
                   </div>
