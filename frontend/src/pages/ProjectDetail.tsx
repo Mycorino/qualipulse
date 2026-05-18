@@ -57,6 +57,12 @@ import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
 import { NextActionChip } from "../components/NextActionChip";
 import { resolveProjectNextAction } from "../copilot/nextAction";
 import type { ProjectNbaInput } from "../copilot/nextAction";
+import {
+  detectProjectNudges,
+  dismissNudge,
+  activeNudgesFor,
+} from "../copilot/signals";
+import type { Nudge } from "../copilot/signals";
 import { getConversation, runCopilot, saveConversation } from "../api/copilot";
 import type { ProposedGuideQuestion } from "../api/copilot";
 
@@ -109,6 +115,8 @@ export default function ProjectDetail() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
+  // Copilot nudges — "something changed while you were away."
+  const [nudges, setNudges] = useState<Nudge[]>([]);
   const [tab, setTabRaw] = useState<Tab>(() => {
     const t = searchParams.get("tab");
     return (t === "setup" || t === "responses" || t === "analysis" || t === "overview")
@@ -313,6 +321,33 @@ export default function ProjectDetail() {
     const timer = setTimeout(() => setHighlightTarget(null), 4000);
     return () => clearTimeout(timer);
   }, [transcript, highlightTarget]);
+
+  // Copilot nudge detection — diff this round's state against the stored
+  // baseline and surface anything that changed while the researcher was
+  // away (analysis finished, interviews crossed the analysable threshold).
+  useEffect(() => {
+    if (!project) return;
+    const completed = participants.filter(
+      (p) => p.status === "completed",
+    ).length;
+    setNudges(
+      detectProjectNudges(
+        project.id,
+        {
+          analysisStatus: analysis?.status ?? "none",
+          completedCount: completed,
+          analysisParticipantCount: analysis?.participant_count ?? 0,
+        },
+        tab,
+      ),
+    );
+  }, [
+    project?.id,
+    analysis?.status,
+    analysis?.participant_count,
+    participants,
+    tab,
+  ]);
 
   // Escape key dismisses the tag popup
   useEffect(() => {
@@ -3482,6 +3517,11 @@ export default function ProjectDetail() {
         }}
         mission={projectMission}
         nextAction={projectNextAction}
+        nudges={nudges}
+        onDismissNudge={(nid) => {
+          dismissNudge(nid);
+          if (project) setNudges(activeNudgesFor(project.id));
+        }}
       />
     </InstrumentShell>
   );

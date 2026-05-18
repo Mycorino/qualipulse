@@ -9,6 +9,7 @@ import type {
   ProposedSurveyQuestion,
 } from "../api/copilot";
 import type { NextAction } from "../copilot/nextAction";
+import type { Nudge } from "../copilot/signals";
 import { NextActionChip } from "./NextActionChip";
 import { useToast } from "./Toast";
 
@@ -69,6 +70,8 @@ export function ResearchCopilotPanel({
   onApplied,
   mission,
   nextAction,
+  nudges,
+  onDismissNudge,
 }: {
   target: CopilotTarget;
   onApplied: () => void;
@@ -76,6 +79,9 @@ export function ResearchCopilotPanel({
   mission?: string;
   /** The deterministic next-best-action for this surface, if any. */
   nextAction?: NextAction;
+  /** Event-driven nudges — "something changed while you were away." */
+  nudges?: Nudge[];
+  onDismissNudge?: (id: string) => void;
 }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -195,7 +201,8 @@ export function ResearchCopilotPanel({
 
   if (!open) {
     // Collapsed dock — the FAB, plus the live next-best-action when there
-    // is one. Either opens the copilot.
+    // is one. A soft dot signals an unseen nudge. Either opens the copilot.
+    const hasNudge = (nudges?.length ?? 0) > 0;
     return (
       <div className="copilot-dock">
         {nextAction && nextAction.kind === "do" && (
@@ -209,9 +216,16 @@ export function ResearchCopilotPanel({
           type="button"
           className="copilot-fab"
           onClick={() => setOpen(true)}
-          aria-label="Open the Research Copilot"
+          aria-label={
+            hasNudge
+              ? "Open the Research Copilot — new updates"
+              : "Open the Research Copilot"
+          }
         >
           ✦ Ask AI
+          {hasNudge && (
+            <span className="copilot-fab__dot" aria-hidden="true" />
+          )}
         </button>
       </div>
     );
@@ -235,6 +249,27 @@ export function ResearchCopilotPanel({
           ✕
         </button>
       </header>
+
+      {nudges && nudges.length > 0 && (
+        <div className="copilot-nudges">
+          {nudges.map((n) => (
+            <div
+              key={n.id}
+              className={`copilot-nudge copilot-nudge--${n.tone}`}
+            >
+              <span className="copilot-nudge__text">{n.text}</span>
+              <button
+                type="button"
+                className="copilot-nudge__dismiss"
+                onClick={() => onDismissNudge?.(n.id)}
+                aria-label="Dismiss update"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="copilot-thread" ref={threadRef}>
         {thread.length === 0 && (
