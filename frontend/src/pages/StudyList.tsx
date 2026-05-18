@@ -9,6 +9,8 @@ import { NewStudyModal } from "../components/NewStudyModal";
 import { NextActionChip } from "../components/NextActionChip";
 import {
   resolveWorkspaceNextAction,
+  resolveStudySummaryAction,
+  type NbaActionType,
   type NextAction,
   type StudyNbaSummary,
 } from "../copilot/nextAction";
@@ -64,16 +66,13 @@ function toNbaSummary(s: StudySummary): StudyNbaSummary {
   };
 }
 
-function studyStatusLine(s: StudySummary): string {
-  if (s.has_report) return "Report ready";
-  if (s.completed_interview_count > 0) {
-    return `${s.completed_interview_count} interview${s.completed_interview_count === 1 ? "" : "s"} done`;
-  }
-  if (s.completed_response_count > 0) {
-    return `${s.completed_response_count} response${s.completed_response_count === 1 ? "" : "s"} in`;
-  }
-  return "Collecting — no responses yet";
-}
+/** Short, action-oriented footer status per study card. */
+const CARD_STATUS: Partial<Record<NbaActionType, string>> = {
+  set_up_study: "Needs an instrument",
+  analyze_study: "Ready to analyse",
+  collect_study: "Collecting",
+  done: "Report ready",
+};
 
 export default function StudyList() {
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
@@ -162,11 +161,13 @@ export default function StudyList() {
             <div className="quanti-showcase__grid-2">
               {studies.map((s) => {
                 const mix = instrumentMix(s);
+                const action = resolveStudySummaryAction(toNbaSummary(s));
+                const needsAttention = action.kind === "do";
                 return (
                   <a
                     key={s.id}
                     href={`/studies/${s.id}`}
-                    className="chart-card"
+                    className={`chart-card${needsAttention ? " chart-card--needs-attention" : ""}`}
                     style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
                   >
                     <div
@@ -182,7 +183,10 @@ export default function StudyList() {
                       <span className="chart-card__footer-divider">·</span>
                       <span>{s.project_count} interview{s.project_count === 1 ? "" : "s"}</span>
                       <span className="chart-card__footer-divider">·</span>
-                      <span>{studyStatusLine(s)}</span>
+                      <span className={needsAttention ? "study-card__status--attention" : undefined}>
+                        {needsAttention ? "✦ " : ""}
+                        {CARD_STATUS[action.actionType] ?? "In progress"}
+                      </span>
                     </div>
                   </a>
                 );
