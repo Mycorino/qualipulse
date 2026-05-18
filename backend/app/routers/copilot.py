@@ -26,6 +26,7 @@ from app.services.copilot import (
     save_conversation,
 )
 from app.services.copilot_interview import INTERVIEW_ADAPTER
+from app.services.copilot_onboarding import ONBOARDING_ADAPTER
 
 router = APIRouter(tags=["copilot"])
 
@@ -143,4 +144,42 @@ def put_project_conversation(
 ) -> ConversationState:
     _project_or_404(db, project_id, company)
     save_conversation(db, company.id, "project", project_id, body.thread)
+    return body
+
+
+# ── Onboarding surface ───────────────────────────────────────────────────────
+
+
+@router.post("/onboarding/copilot", response_model=CopilotResponse)
+def onboarding_copilot(
+    body: CopilotRequest,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> CopilotResponse:
+    """Run one onboarding-copilot turn — the new researcher's first
+    conversation. The 'instrument' is the Company itself."""
+    result = run_copilot_turn(
+        db, company, company, ONBOARDING_ADAPTER, body.messages,
+        None, body.mission,
+    )
+    return CopilotResponse(**result)
+
+
+@router.get("/onboarding/copilot/conversation", response_model=ConversationState)
+def get_onboarding_conversation(
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ConversationState:
+    return ConversationState(
+        thread=get_conversation(db, "company", company.id),
+    )
+
+
+@router.put("/onboarding/copilot/conversation", response_model=ConversationState)
+def put_onboarding_conversation(
+    body: ConversationState,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ConversationState:
+    save_conversation(db, company.id, "company", company.id, body.thread)
     return body

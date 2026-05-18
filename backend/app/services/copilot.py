@@ -222,19 +222,26 @@ def _memory_block(db: Session, label: str, scope_kind: str, scope_id: str) -> st
 def _system_prompt(
     db: Session, company: Company, instrument, adapter: CopilotAdapter
 ) -> str:
-    # Stack every applicable memory tier, broadest first.
-    blocks = (
-        _memory_block(
-            db, "Workspace memory (applies to every study)", "company", company.id
-        )
-        + _memory_block(db, "Memory for this study", "study", instrument.study_id)
-        + _memory_block(
+    # Stack every applicable memory tier, broadest first. The onboarding
+    # surface's "instrument" is the Company itself — it has no study_id,
+    # and its instrument scope would duplicate the workspace block — so
+    # both are guarded.
+    study_id = getattr(instrument, "study_id", None)
+    blocks = _memory_block(
+        db, "Workspace memory (applies to every study)", "company", company.id
+    )
+    if study_id:
+        blocks += _memory_block(db, "Memory for this study", "study", study_id)
+    if not (
+        adapter.instrument_scope_kind == "company"
+        and instrument.id == company.id
+    ):
+        blocks += _memory_block(
             db,
             adapter.instrument_memory_label,
             adapter.instrument_scope_kind,
             instrument.id,
         )
-    )
     if not blocks:
         blocks = "\n\nYou have no saved memory yet."
     snapshot = json.dumps(adapter.snapshot(instrument), ensure_ascii=False)
@@ -268,11 +275,16 @@ def _handle_remember(
     scope = tool_input.get("scope") or "company"
     if scope not in allowed:
         scope = "company"
+    # The onboarding surface's instrument is the Company — no study_id.
+    # Resolve lazily so an absent attribute can't crash an unused branch.
     scope_id = {
         "company": company.id,
-        "study": instrument.study_id,
+        "study": getattr(instrument, "study_id", None),
         adapter.instrument_scope_kind: instrument.id,
     }[scope]
+    if scope_id is None:
+        scope = "company"
+        scope_id = company.id
     append_memory(db, company.id, scope, scope_id, tool_input.get("note", ""))
     turn.memory_updated = True
     return f"Saved to {scope} memory."

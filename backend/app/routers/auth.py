@@ -616,7 +616,22 @@ def complete_onboarding(
                 bg_company = db_bg.query(_Company).filter(_Company.id == company_id).first()
                 if bg_company:
                     if bg_company.demo_seeded_at is None:
-                        seed_demo_project(db_bg, company_id)
+                        # The conversational onboarding may have already
+                        # created the researcher's real first study. Only
+                        # seed the read-only demo when there's nothing real
+                        # yet — the demo is now a fallback, not the default.
+                        from app.models.project import Project as _Project
+                        has_real_study = (
+                            db_bg.query(_Project)
+                            .filter(
+                                _Project.company_id == company_id,
+                                _Project.is_demo.is_(False),
+                            )
+                            .first()
+                            is not None
+                        )
+                        if not has_real_study:
+                            seed_demo_project(db_bg, company_id)
                         bg_company.demo_seeded_at = datetime.utcnow()
                         db_bg.commit()
 
