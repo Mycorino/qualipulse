@@ -7,8 +7,11 @@ persistence, and prompt assembly stay generic.
 
 Design notes
 ------------
-- Model: ``claude-sonnet-4-6`` — fast enough for an interactive,
-  type-alongside assistant doing tool-use loops.
+- Model: ``claude-opus-4-7`` with adaptive thinking — research-grade
+  qualitative reasoning (reading transcripts, respecting confidence
+  levels, separating observation from recommendation). Adaptive thinking
+  self-moderates, so trivial guide-edit turns stay fast while results
+  turns think as hard as they need to.
 - Memory: scoped ``CopilotMemory`` (company / study / instrument), read
   into every system prompt and appended via the `remember` tool.
 - The copilot PROPOSES; it never mutates the instrument. Proposed actions
@@ -34,7 +37,7 @@ from app.models.copilot import CopilotConversation, CopilotMemory
 from app.models.survey import QUESTION_TYPES, Survey
 from app.services.usage_logger import log_claude_usage
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-opus-4-7"
 MAX_AGENT_TURNS = 8
 
 
@@ -299,9 +302,11 @@ def run_copilot_turn(
     for _ in range(MAX_AGENT_TURNS):
         response = client.messages.create(
             model=MODEL,
-            max_tokens=2048,
+            max_tokens=16000,
             system=system,
             tools=adapter.tools,
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
             messages=history,
         )
         log_claude_usage(db, response, "copilot", company_id=company.id)
