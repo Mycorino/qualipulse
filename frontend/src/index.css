@@ -9818,6 +9818,62 @@ select.field-input {
 }
 .copilot-fab:hover { background: var(--brand-700); }
 
+/* ── Next-best-action chip ─────────────────────────────────────────────── */
+.nba-chip--inline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.nba-chip__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.nba-chip__static {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.nba-chip__reason {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* Dock variant — a compact pill carrying the live next action. */
+.nba-chip--dock {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.nba-chip--dock:hover:not(:disabled) { border-color: var(--brand-300); }
+.nba-chip--dock:disabled { cursor: default; }
+.nba-chip__eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.nba-chip--dock .nba-chip__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.nba-chip--dock.nba-chip--do .nba-chip__label { color: var(--brand-700); }
+
 .copilot-panel {
   position: fixed;
   top: 0;
