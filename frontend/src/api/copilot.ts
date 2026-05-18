@@ -92,9 +92,14 @@ export async function runCopilot(
   id: string,
   messages: CopilotMessage[],
 ): Promise<CopilotResponse> {
+  // A copilot turn runs an Opus 4.7 agent loop (adaptive thinking +
+  // multiple tool-call iterations) and routinely takes 30-90s — well past
+  // the axios client's 30s default. Give it a generous per-request
+  // timeout so the panel waits for the real reply instead of aborting.
   const resp = await client.post<CopilotResponse>(
     `/${instrument}/${id}/copilot`,
     { messages },
+    { timeout: 180000 },
   );
   return resp.data;
 }
