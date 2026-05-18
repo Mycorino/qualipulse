@@ -71,6 +71,21 @@ class TestInterviewCopilot:
             assert q["desired_learning"]
             assert q["rationale"]
 
+    def test_copilot_accepts_active_section(self, client, auth_headers):
+        """Tab awareness — the endpoint accepts an optional active_section
+        telling the copilot which tab the researcher is viewing."""
+        project = _create_project(client, auth_headers)
+        resp = client.post(
+            f"/projects/{project['id']}/copilot",
+            headers=auth_headers,
+            json={
+                "messages": [{"role": "user", "content": "What should I do?"}],
+                "active_section": "Analysis",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["reply"]
+
     def test_settings_patch_accepts_objective_and_name(self, client, auth_headers):
         """The copilot's edit_objective and inline-rename apply via /settings."""
         project = _create_project(client, auth_headers)

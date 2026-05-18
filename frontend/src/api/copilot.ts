@@ -91,6 +91,9 @@ export async function runCopilot(
   instrument: CopilotInstrument,
   id: string,
   messages: CopilotMessage[],
+  /** The tab/section the researcher is currently viewing, if any — lets
+   *  the copilot tailor its help to where they sit. */
+  activeSection?: string,
 ): Promise<CopilotResponse> {
   // A copilot turn runs an Opus 4.7 agent loop (adaptive thinking +
   // multiple tool-call iterations) and routinely takes 30-90s — well past
@@ -98,7 +101,7 @@ export async function runCopilot(
   // timeout so the panel waits for the real reply instead of aborting.
   const resp = await client.post<CopilotResponse>(
     `/${instrument}/${id}/copilot`,
-    { messages },
+    { messages, active_section: activeSection },
     { timeout: 180000 },
   );
   return resp.data;
