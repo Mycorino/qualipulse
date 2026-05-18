@@ -14,6 +14,8 @@ import {
   type NextAction,
   type StudyNbaSummary,
 } from "../copilot/nextAction";
+import { detectWorkspaceNudges, dismissNudge, type Nudge } from "../copilot/signals";
+import { useNudgeAnnounce } from "../copilot/useNudgeAnnounce";
 
 /**
  * StudyList — `/studies`, and the post-login home.
@@ -77,14 +79,26 @@ const CARD_STATUS: Partial<Record<NbaActionType, string>> = {
 export default function StudyList() {
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [nudges, setNudges] = useState<Nudge[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const announce = useNudgeAnnounce(nudges);
 
   useEffect(() => {
     listStudies()
       .then(setStudies)
       .catch(() => toast("Failed to load studies", "error"));
   }, [toast]);
+
+  // Detect studies that gained a report since the researcher's last visit.
+  useEffect(() => {
+    if (!studies) return;
+    setNudges(
+      detectWorkspaceNudges(
+        studies.map((s) => ({ id: s.id, name: s.name, hasReport: s.has_report })),
+      ),
+    );
+  }, [studies]);
 
   // The copilot's portfolio-triage suggestion — which study needs you.
   const runWorkspaceAction = (a: NextAction) => {
@@ -118,11 +132,34 @@ export default function StudyList() {
           </button>
         </header>
 
+        <div className="sr-only" aria-live="polite" role="status">
+          {announce}
+        </div>
+
         {studies && studies.length > 0 && (() => {
           const nba = resolveWorkspaceNextAction(studies.map(toNbaSummary));
           return (
             <div className="workspace-nba">
               <span className="workspace-nba__eyebrow">✦ Research Copilot</span>
+              {nudges.map((n) => (
+                <div
+                  key={n.id}
+                  className={`copilot-nudge copilot-nudge--${n.tone}`}
+                >
+                  <span className="copilot-nudge__text">{n.text}</span>
+                  <button
+                    type="button"
+                    className="copilot-nudge__dismiss"
+                    onClick={() => {
+                      dismissNudge(n.id);
+                      setNudges((ns) => ns.filter((x) => x.id !== n.id));
+                    }}
+                    aria-label="Dismiss update"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
               <NextActionChip
                 action={nba}
                 variant="inline"

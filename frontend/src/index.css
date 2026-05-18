@@ -9836,6 +9836,10 @@ select.field-input {
   text-transform: uppercase;
   color: var(--brand-700);
 }
+/* Standalone nudge rows on the home page read as cards, not a flush banner. */
+.workspace-nba .copilot-nudge {
+  border-radius: var(--radius-sm);
+}
 
 /* Home study card that needs the researcher's attention. */
 .chart-card--needs-attention {
