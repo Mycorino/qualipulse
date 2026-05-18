@@ -1207,6 +1207,9 @@ select.field-input {
 .instrument-shell {
   min-height: 100vh;
   background: var(--bg-base);
+  /* Clear the fixed "✦ Ask AI" copilot FAB so it never overlaps the
+     last row of page content (e.g. the Analysis confidence stat). */
+  padding-bottom: 6rem;
 }
 
 .instrument-header {
@@ -8914,6 +8917,9 @@ select.field-input {
   padding: 4px 6px;
   border-radius: var(--radius-sm);
   min-width: 0;
+  /* A long round name can't wrap inside an <input> — show an ellipsis
+     when unfocused instead of a hard mid-word cut. */
+  text-overflow: ellipsis;
 }
 
 .survey-editor__title-input:hover {
