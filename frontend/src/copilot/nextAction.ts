@@ -289,6 +289,25 @@ export interface StudyNbaSummary {
 const WS_MIN_RESPONSES = 30;
 const WS_MIN_INTERVIEWS = 3;
 
+/**
+ * The next action for one study — always returns something (a "done"
+ * action when the study has a report and needs nothing). Use this for
+ * per-study UI like the home study cards.
+ */
+export function resolveStudySummaryAction(s: StudyNbaSummary): NextAction {
+  return (
+    studyCandidate(s) ?? {
+      id: `study_done_${s.id}`,
+      actionType: "done",
+      label: `“${s.name}” is in good shape`,
+      reason: "This study has a report — nothing needs you right now.",
+      kind: "done",
+      weight: 0,
+      targetId: s.id,
+    }
+  );
+}
+
 /** The candidate next action for one study, or null if it needs nothing. */
 function studyCandidate(s: StudyNbaSummary): NextAction | null {
   if (s.surveyCount + s.projectCount === 0) {

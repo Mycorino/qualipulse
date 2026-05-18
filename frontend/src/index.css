@@ -9837,6 +9837,15 @@ select.field-input {
   color: var(--brand-700);
 }
 
+/* Home study card that needs the researcher's attention. */
+.chart-card--needs-attention {
+  border-left: 3px solid var(--brand-500);
+}
+.study-card__status--attention {
+  color: var(--brand-700);
+  font-weight: 600;
+}
+
 /* ── Next-best-action chip ─────────────────────────────────────────────── */
 .nba-chip--inline {
   display: flex;
