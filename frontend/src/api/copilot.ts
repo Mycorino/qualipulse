@@ -129,6 +129,14 @@ export async function runOnboardingCopilot(
   return resp.data;
 }
 
+/** The memory the copilot wrote during onboarding — for the completion recap. */
+export async function getOnboardingMemory(): Promise<string> {
+  const resp = await client.get<{ memory: string }>(
+    "/onboarding/copilot/memory",
+  );
+  return resp.data.memory;
+}
+
 export async function getConversation(
   instrument: CopilotInstrument,
   id: string,

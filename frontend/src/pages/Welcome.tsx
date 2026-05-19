@@ -9,6 +9,7 @@ import {
 } from "../api/auth";
 import {
   runOnboardingCopilot,
+  getOnboardingMemory,
   type CopilotMessage,
   type ProposedAction,
   type ProposedGuideQuestion,
@@ -52,6 +53,11 @@ export default function Welcome() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [done, setDone] = useState<{
+    projectId: string;
+    studyName: string;
+    memory: string;
+  } | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
 
   // Load the researcher, redirect out if already onboarded, and seed the
@@ -132,7 +138,13 @@ export default function Welcome() {
       }
       await completeOnboarding({});
       setCachedOnboarded(true);
-      navigate(`/projects/${project.id}`, { replace: true });
+      const memory = await getOnboardingMemory().catch(() => "");
+      setDone({
+        projectId: project.id,
+        studyName: study.study_name || "Your study",
+        memory,
+      });
+      setCreating(false);
     } catch {
       toast("Couldn't set up your study — please try again.", "error");
       setCreating(false);
@@ -153,6 +165,41 @@ export default function Welcome() {
   };
 
   if (!me) return null;
+
+  if (done) {
+    return (
+      <div className="onboarding">
+        <header className="onboarding__bar">
+          <span className="onboarding__brand">QualiPulse</span>
+        </header>
+        <div className="onboarding-done">
+          <div className="onboarding-done__eyebrow">✦ You're all set</div>
+          <h1 className="onboarding-done__title">{done.studyName}</h1>
+          <p className="onboarding-done__sub">
+            Your first study is ready — build it out and launch when you are.
+          </p>
+          <div className="onboarding-done__memory">
+            <div className="onboarding-done__memory-label">
+              Here's what I'll remember about your research
+            </div>
+            <p className="onboarding-done__memory-text">
+              {done.memory.trim() ||
+                "I'll learn more about your research as we work together."}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() =>
+              navigate(`/projects/${done.projectId}`, { replace: true })
+            }
+          >
+            Open your study →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="onboarding">
