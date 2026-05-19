@@ -51,7 +51,8 @@ export interface ProposedAction {
     | "remove_guide_question"
     | "edit_objective"
     | "run_analysis"
-    | "refine_analysis";
+    | "refine_analysis"
+    | "create_first_study";
   /** add_question / add_guide_question */
   question?: ProposedSurveyQuestion | ProposedGuideQuestion;
   /** edit / remove */
@@ -64,6 +65,10 @@ export interface ProposedAction {
   new_desired_learning?: string;
   /** edit_objective */
   new_objective?: string;
+  /** create_first_study (onboarding) */
+  study_name?: string;
+  objective?: string;
+  questions?: ProposedGuideQuestion[];
   rationale?: string;
 }
 
@@ -104,6 +109,21 @@ export async function runCopilot(
   const resp = await client.post<CopilotResponse>(
     `/${instrument}/${id}/copilot`,
     { messages, active_section: activeSection, mission },
+    { timeout: 180000 },
+  );
+  return resp.data;
+}
+
+/**
+ * Onboarding copilot — the new researcher's first conversation. No
+ * instrument id: the surface is the workspace itself.
+ */
+export async function runOnboardingCopilot(
+  messages: CopilotMessage[],
+): Promise<CopilotResponse> {
+  const resp = await client.post<CopilotResponse>(
+    "/onboarding/copilot",
+    { messages },
     { timeout: 180000 },
   );
   return resp.data;
