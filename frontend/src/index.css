@@ -10171,6 +10171,61 @@ select.field-input {
   color: var(--text-tertiary);
 }
 
+/* Onboarding completion screen — the memory recap. */
+.onboarding-done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  max-width: 560px;
+  margin: 0 auto;
+}
+.onboarding-done__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+.onboarding-done__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  margin: 0;
+}
+.onboarding-done__sub {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+.onboarding-done__memory {
+  width: 100%;
+  text-align: left;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
+}
+.onboarding-done__memory-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+.onboarding-done__memory-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
 /* Suggested-next-step card at the top of an empty copilot thread. */
 .copilot-nba-starter {
   display: flex;

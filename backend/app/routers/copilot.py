@@ -22,6 +22,7 @@ from app.schemas.copilot import ConversationState, CopilotRequest, CopilotRespon
 from app.services.copilot import (
     SURVEY_ADAPTER,
     get_conversation,
+    get_memory,
     run_copilot_turn,
     save_conversation,
 )
@@ -183,3 +184,14 @@ def put_onboarding_conversation(
 ) -> ConversationState:
     save_conversation(db, company.id, "company", company.id, body.thread)
     return body
+
+
+@router.get("/onboarding/copilot/memory")
+def get_onboarding_memory(
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> dict:
+    """The workspace-scope memory the copilot wrote during onboarding —
+    shown back to the researcher on the completion screen."""
+    row = get_memory(db, "company", company.id)
+    return {"memory": (row.content if row and row.content else "")}
