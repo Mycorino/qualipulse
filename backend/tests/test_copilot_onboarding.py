@@ -11,7 +11,7 @@ from app.services.copilot_onboarding import _onboarding_run_tool
 
 
 class TestOnboardingCopilot:
-    def test_proposes_a_first_study(self, client, auth_headers):
+    def test_proposes_a_first_study(self, client, auth_headers, drain_sse):
         resp = client.post(
             "/onboarding/copilot",
             headers=auth_headers,
@@ -22,7 +22,7 @@ class TestOnboardingCopilot:
             },
         )
         assert resp.status_code == 200, resp.text
-        data = resp.json()
+        data = drain_sse(resp)
         assert data["reply"]
         actions = data["proposed_actions"]
         assert len(actions) == 1

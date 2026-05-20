@@ -44,6 +44,55 @@ def _sse_event(event: dict) -> str:
 # X-Accel-Buffering; Cloud Run streams HTTP/1.1 natively.
 _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
+
+def _stream_copilot_response(
+    engine,
+    company_id: str,
+    instrument_kind: str,  # "project" | "survey" | "company"
+    instrument_id: str,
+    adapter,
+    body: CopilotRequest,
+) -> StreamingResponse:
+    """Shared streaming response for every copilot surface.
+
+    The generator opens its OWN Session bound to the request's engine —
+    Depends(get_db) closes its session as soon as the route returns the
+    StreamingResponse, but the body iterator runs after that. Binding to
+    ``engine`` (captured from the request session, ``db.get_bind()``) means
+    the test conftest's in-memory engine and the production engine both
+    work without touching ``SessionLocal`` directly.
+    """
+    def stream():
+        from sqlalchemy.orm import Session as _Session
+
+        from app.models.company import Company as _Company
+        from app.models.project import Project as _Project
+        from app.models.survey import Survey as _Survey
+
+        with _Session(engine) as gen_db:
+            comp = gen_db.query(_Company).filter(_Company.id == company_id).one()
+            if instrument_kind == "company":
+                inst = comp
+            elif instrument_kind == "project":
+                inst = gen_db.query(_Project).filter(
+                    _Project.id == instrument_id
+                ).one()
+            elif instrument_kind == "survey":
+                inst = gen_db.query(_Survey).filter(
+                    _Survey.id == instrument_id
+                ).one()
+            else:
+                raise ValueError(f"Unknown instrument kind: {instrument_kind}")
+            for event in run_copilot_turn_stream(
+                gen_db, comp, inst, adapter, body.messages,
+                body.active_section, body.mission,
+            ):
+                yield _sse_event(event)
+
+    return StreamingResponse(
+        stream(), media_type="text/event-stream", headers=_SSE_HEADERS,
+    )
+
 router = APIRouter(tags=["copilot"])
 
 
@@ -76,20 +125,25 @@ def _project_or_404(db: Session, project_id: str, company: Company) -> Project:
 # ── Survey surface ───────────────────────────────────────────────────────────
 
 
-@router.post("/surveys/{survey_id}/copilot", response_model=CopilotResponse)
+@router.post("/surveys/{survey_id}/copilot")
 def survey_copilot(
     survey_id: str,
     body: CopilotRequest,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
-) -> CopilotResponse:
-    """Run one Research Copilot turn against a survey."""
-    survey = _survey_or_404(db, survey_id, company)
-    result = run_copilot_turn(
-        db, company, survey, SURVEY_ADAPTER, body.messages,
-        body.active_section, body.mission,
+) -> StreamingResponse:
+    """Run one Research Copilot turn against a survey — SSE stream.
+    See project_copilot for the event schema and the session-lifetime
+    workaround for Depends(get_db) under StreamingResponse."""
+    _survey_or_404(db, survey_id, company)
+    return _stream_copilot_response(
+        engine=db.get_bind(),
+        company_id=company.id,
+        instrument_kind="survey",
+        instrument_id=survey_id,
+        adapter=SURVEY_ADAPTER,
+        body=body,
     )
-    return CopilotResponse(**result)
 
 
 @router.get(
@@ -131,29 +185,14 @@ def project_copilot(
     """Run one Research Copilot turn against an interview guide — streams
     progress + the reply text as SSE. The terminal `done` event carries
     the authoritative {reply, proposed_actions, memory_updated}."""
-    # 404 / authz on the request session, then re-fetch inside the
-    # generator: a StreamingResponse keeps running after the route
-    # returns, but Depends(get_db) closes its session promptly — so the
-    # generator opens its own SessionLocal that lives for the stream.
     _project_or_404(db, project_id, company)
-    company_id = company.id
-
-    def stream():
-        from app.database import SessionLocal
-        from app.models.project import Project as _Project
-        from app.models.company import Company as _Company
-
-        with SessionLocal() as gen_db:
-            proj = gen_db.query(_Project).filter(_Project.id == project_id).one()
-            comp = gen_db.query(_Company).filter(_Company.id == company_id).one()
-            for event in run_copilot_turn_stream(
-                gen_db, comp, proj, INTERVIEW_ADAPTER, body.messages,
-                body.active_section, body.mission,
-            ):
-                yield _sse_event(event)
-
-    return StreamingResponse(
-        stream(), media_type="text/event-stream", headers=_SSE_HEADERS,
+    return _stream_copilot_response(
+        engine=db.get_bind(),
+        company_id=company.id,
+        instrument_kind="project",
+        instrument_id=project_id,
+        adapter=INTERVIEW_ADAPTER,
+        body=body,
     )
 
 
@@ -186,19 +225,22 @@ def put_project_conversation(
 # ── Onboarding surface ───────────────────────────────────────────────────────
 
 
-@router.post("/onboarding/copilot", response_model=CopilotResponse)
+@router.post("/onboarding/copilot")
 def onboarding_copilot(
     body: CopilotRequest,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
-) -> CopilotResponse:
+) -> StreamingResponse:
     """Run one onboarding-copilot turn — the new researcher's first
-    conversation. The 'instrument' is the Company itself."""
-    result = run_copilot_turn(
-        db, company, company, ONBOARDING_ADAPTER, body.messages,
-        None, body.mission,
+    conversation. The 'instrument' is the Company itself. SSE stream."""
+    return _stream_copilot_response(
+        engine=db.get_bind(),
+        company_id=company.id,
+        instrument_kind="company",
+        instrument_id=company.id,
+        adapter=ONBOARDING_ADAPTER,
+        body=body,
     )
-    return CopilotResponse(**result)
 
 
 @router.get("/onboarding/copilot/conversation", response_model=ConversationState)

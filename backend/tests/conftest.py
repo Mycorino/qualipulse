@@ -66,3 +66,19 @@ def auth_headers(registered_company):
     """Authorization headers for the registered company."""
     token = registered_company["tokens"]["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def drain_sse():
+    """Pull the `done` payload from a streaming /copilot SSE response."""
+    import json
+
+    def _drain(resp) -> dict:
+        for frame in resp.text.split("\n\n"):
+            if frame.startswith("data: "):
+                event = json.loads(frame[len("data: ") :])
+                if event.get("type") == "done":
+                    return event
+        raise AssertionError(f"no done event in stream:\n{resp.text}")
+
+    return _drain
