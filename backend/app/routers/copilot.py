@@ -11,7 +11,10 @@ with its own adapter (see ``services/copilot.py`` / ``copilot_interview.py``):
 it resumes when the researcher navigates away and back.
 """
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
@@ -24,10 +27,22 @@ from app.services.copilot import (
     get_conversation,
     get_memory,
     run_copilot_turn,
+    run_copilot_turn_stream,
     save_conversation,
 )
 from app.services.copilot_interview import INTERVIEW_ADAPTER
 from app.services.copilot_onboarding import ONBOARDING_ADAPTER
+
+
+def _sse_event(event: dict) -> str:
+    """Frame one event for an SSE stream. One JSON object per `data:` line."""
+    return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+
+# Buffering must be off through every proxy or the stream batches at the
+# end and defeats the point. nginx in the frontend container respects
+# X-Accel-Buffering; Cloud Run streams HTTP/1.1 natively.
+_SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
 router = APIRouter(tags=["copilot"])
 
@@ -106,20 +121,40 @@ def put_survey_conversation(
 # ── Interview-guide surface ──────────────────────────────────────────────────
 
 
-@router.post("/projects/{project_id}/copilot", response_model=CopilotResponse)
+@router.post("/projects/{project_id}/copilot")
 def project_copilot(
     project_id: str,
     body: CopilotRequest,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
-) -> CopilotResponse:
-    """Run one Research Copilot turn against an interview guide."""
-    project = _project_or_404(db, project_id, company)
-    result = run_copilot_turn(
-        db, company, project, INTERVIEW_ADAPTER, body.messages,
-        body.active_section, body.mission,
+) -> StreamingResponse:
+    """Run one Research Copilot turn against an interview guide — streams
+    progress + the reply text as SSE. The terminal `done` event carries
+    the authoritative {reply, proposed_actions, memory_updated}."""
+    # 404 / authz on the request session, then re-fetch inside the
+    # generator: a StreamingResponse keeps running after the route
+    # returns, but Depends(get_db) closes its session promptly — so the
+    # generator opens its own SessionLocal that lives for the stream.
+    _project_or_404(db, project_id, company)
+    company_id = company.id
+
+    def stream():
+        from app.database import SessionLocal
+        from app.models.project import Project as _Project
+        from app.models.company import Company as _Company
+
+        with SessionLocal() as gen_db:
+            proj = gen_db.query(_Project).filter(_Project.id == project_id).one()
+            comp = gen_db.query(_Company).filter(_Company.id == company_id).one()
+            for event in run_copilot_turn_stream(
+                gen_db, comp, proj, INTERVIEW_ADAPTER, body.messages,
+                body.active_section, body.mission,
+            ):
+                yield _sse_event(event)
+
+    return StreamingResponse(
+        stream(), media_type="text/event-stream", headers=_SSE_HEADERS,
     )
-    return CopilotResponse(**result)
 
 
 @router.get(

@@ -290,33 +290,44 @@ def _handle_remember(
     return f"Saved to {scope} memory."
 
 
-def run_copilot_turn(
+# Human labels for the agent's tool calls — surfaced live as the copilot
+# narrates "what it's doing right now" while a turn is running. Unmapped
+# tools fall back to a generic "Working…".
+_TOOL_LABELS: dict[str, str] = {
+    "remember": "Noting that down",
+    # interview reads
+    "read_guide": "Reading your guide",
+    "read_study": "Reading the rest of your study",
+    "read_progress": "Checking progress",
+    "read_interviews": "Reading your interviews",
+    "read_interview": "Reading a transcript",
+    "read_analysis": "Reading your analysis",
+    # interview proposals
+    "propose_objective": "Drafting the objective",
+    "propose_guide_questions": "Drafting questions",
+    "edit_guide_question": "Revising a question",
+    "remove_guide_question": "Removing a question",
+    "propose_run_analysis": "Setting up the analysis",
+    "propose_refine_analysis": "Setting up the refined analysis",
+    # survey
+    "add_question": "Drafting a question",
+    "edit_question": "Revising a question",
+    "remove_question": "Removing a question",
+    # onboarding
+    "save_profile": "Noting your profile",
+    "propose_study": "Drafting your study",
+}
+
+
+def _build_system_blocks(
     db: Session,
     company: Company,
     instrument,
     adapter: CopilotAdapter,
-    messages: list,
-    active_section: str | None = None,
-    mission: str | None = None,
-) -> dict:
-    """Run one copilot turn. ``messages`` is the full chat history (objects
-    with ``.role`` / ``.content``). ``active_section`` is the tab the
-    researcher is currently viewing; ``mission`` is the one-line job the
-    copilot is helping with on this surface. Returns {reply,
-    proposed_actions, memory_updated}."""
-    history = [{"role": m.role, "content": m.content} for m in messages]
-
-    if not settings.ANTHROPIC_API_KEY:
-        return adapter.stub(instrument, history)
-
-    import anthropic  # noqa: WPS433 — lazy import keeps tests AI-free
-
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-    # System prompt + tools are identical across every iteration of the
-    # agent loop and stable across turns until the instrument changes —
-    # cache the prefix so iterations 2..N read it at ~0.1x cost instead
-    # of re-billing the full Opus 4.7 input price. A cache_control marker
-    # on the last system block caches the tools too (tools render first).
+    active_section: str | None,
+    mission: str | None,
+) -> list[dict]:
+    """The cached system prefix + the volatile tab/mission block."""
     system = [
         {
             "type": "text",
@@ -324,9 +335,6 @@ def run_copilot_turn(
             "cache_control": {"type": "ephemeral"},
         }
     ]
-    # Tab + mission awareness — a tiny, volatile block AFTER the cached
-    # breakpoint. It changes as the researcher navigates, so it must not
-    # sit inside the cached prefix or every tab switch would bust the cache.
     context_bits: list[str] = []
     if active_section:
         context_bits.append(
@@ -346,12 +354,52 @@ def run_copilot_turn(
                 ),
             }
         )
+    return system
+
+
+def run_copilot_turn_stream(
+    db: Session,
+    company: Company,
+    instrument,
+    adapter: CopilotAdapter,
+    messages: list,
+    active_section: str | None = None,
+    mission: str | None = None,
+):
+    """Run one copilot turn as a generator of SSE event dicts.
+
+    Yields:
+      - {"type": "status", "label": str}  — one per tool call.
+      - {"type": "delta",  "text":  str}  — reply text chunks.
+      - {"type": "done",   "reply", "proposed_actions", "memory_updated"}
+        — exactly one terminal event, always (even on error). This is the
+        authoritative final state the client persists.
+
+    The non-streaming ``run_copilot_turn`` below drains this generator and
+    returns the final dict — same contract as before for non-HTTP callers
+    and existing tests that call it directly.
+    """
+    history = [{"role": m.role, "content": m.content} for m in messages]
+
+    if not settings.ANTHROPIC_API_KEY:
+        # Stub path — no streaming, just emit the canned final.
+        result = adapter.stub(instrument, history)
+        yield {"type": "done", **result}
+        return
+
+    import anthropic  # noqa: WPS433 — lazy import keeps tests AI-free
+
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    system = _build_system_blocks(
+        db, company, instrument, adapter, active_section, mission
+    )
     turn = _Turn()
     reply_parts: list[str] = []
 
     try:
         for _ in range(MAX_AGENT_TURNS):
-            response = client.messages.create(
+            iteration_text: list[str] = []
+            with client.messages.stream(
                 model=MODEL,
                 max_tokens=16000,
                 system=system,
@@ -359,15 +407,18 @@ def run_copilot_turn(
                 thinking={"type": "adaptive"},
                 output_config={"effort": "high"},
                 messages=history,
-            )
+            ) as stream:
+                for text in stream.text_stream:
+                    iteration_text.append(text)
+                    yield {"type": "delta", "text": text}
+                response = stream.get_final_message()
+
             log_claude_usage(db, response, "copilot", company_id=company.id)
 
-            for block in response.content:
-                if block.type == "text" and block.text.strip():
-                    reply_parts.append(block.text.strip())
+            joined = "".join(iteration_text).strip()
+            if joined:
+                reply_parts.append(joined)
 
-            # max_tokens => the reply / proposal JSON may be truncated;
-            # surface it rather than silently returning a partial turn.
             if response.stop_reason == "max_tokens":
                 logger.warning(
                     "Copilot turn hit max_tokens (company=%s) — output may be "
@@ -384,6 +435,12 @@ def run_copilot_turn(
             for block in response.content:
                 if block.type != "tool_use":
                     continue
+                # Narrate the agent's action BEFORE running the tool so the
+                # status sits on the wire while the next iteration thinks.
+                yield {
+                    "type": "status",
+                    "label": _TOOL_LABELS.get(block.name, "Working…"),
+                }
                 tool_input = block.input or {}
                 if block.name == "remember":
                     result = _handle_remember(
@@ -403,14 +460,16 @@ def run_copilot_turn(
             history.append({"role": "user", "content": tool_results})
     except anthropic.APIError as exc:
         # Rate limit, overload, or upstream 5xx — the SDK already retried
-        # transient failures. Degrade gracefully instead of bubbling a 500.
+        # transient failures. End on a graceful `done` so the client has
+        # one terminal contract.
         logger.error(
             "Copilot turn failed (company=%s, request_id=%s): %s",
             company.id,
             getattr(exc, "request_id", None),
             exc,
         )
-        return {
+        yield {
+            "type": "done",
             "reply": (
                 "\n\n".join(reply_parts).strip()
                 or "The copilot is briefly unavailable — please try again in a "
@@ -419,12 +478,39 @@ def run_copilot_turn(
             "proposed_actions": turn.actions,
             "memory_updated": turn.memory_updated,
         }
+        return
 
-    return {
+    yield {
+        "type": "done",
         "reply": "\n\n".join(reply_parts).strip() or adapter.default_reply,
         "proposed_actions": turn.actions,
         "memory_updated": turn.memory_updated,
     }
+
+
+def run_copilot_turn(
+    db: Session,
+    company: Company,
+    instrument,
+    adapter: CopilotAdapter,
+    messages: list,
+    active_section: str | None = None,
+    mission: str | None = None,
+) -> dict:
+    """Drain ``run_copilot_turn_stream`` and return the final dict. Kept
+    so non-HTTP callers (and tests calling this directly) see the same
+    contract as before the streaming refactor."""
+    final = {
+        "reply": adapter.default_reply,
+        "proposed_actions": [],
+        "memory_updated": False,
+    }
+    for event in run_copilot_turn_stream(
+        db, company, instrument, adapter, messages, active_section, mission
+    ):
+        if event.get("type") == "done":
+            final = {k: v for k, v in event.items() if k != "type"}
+    return final
 
 
 # ═════════════════════════════════════════════════════════════════════════════
