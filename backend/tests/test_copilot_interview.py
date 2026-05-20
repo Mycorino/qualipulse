@@ -4,9 +4,21 @@ Tests run with ANTHROPIC_API_KEY blanked out, so they exercise the
 deterministic stub path in services/copilot_interview.py.
 """
 
+import json
+from types import SimpleNamespace
+
 from app.models.company import Company
 from app.models.project import Project
-from types import SimpleNamespace
+
+
+def _drain_sse(resp) -> dict:
+    """Return the `done` payload from a streaming /copilot response."""
+    for frame in resp.text.split("\n\n"):
+        if frame.startswith("data: "):
+            event = json.loads(frame[len("data: "):])
+            if event.get("type") == "done":
+                return event
+    raise AssertionError(f"no done event in stream:\n{resp.text}")
 
 from app.services.copilot_interview import (
     _analysis_snapshot,
@@ -49,7 +61,7 @@ class TestInterviewCopilot:
             },
         )
         assert resp.status_code == 200, resp.text
-        data = resp.json()
+        data = _drain_sse(resp)
         assert data["reply"]
         kinds = [a["type"] for a in data["proposed_actions"]]
         # A brand-new round with no objective: the copilot proposes the
@@ -84,7 +96,7 @@ class TestInterviewCopilot:
             },
         )
         assert resp.status_code == 200, resp.text
-        assert resp.json()["reply"]
+        assert _drain_sse(resp)["reply"]
 
     def test_settings_patch_accepts_objective_and_name(self, client, auth_headers):
         """The copilot's edit_objective and inline-rename apply via /settings."""
