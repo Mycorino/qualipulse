@@ -16,7 +16,9 @@ def _create_survey(client, auth_headers, name: str = "Copilot test") -> dict:
 
 
 class TestSurveyCopilotEndpoint:
-    def test_proposes_starter_questions_for_empty_survey(self, client, auth_headers):
+    def test_proposes_starter_questions_for_empty_survey(
+        self, client, auth_headers, drain_sse
+    ):
         survey = _create_survey(client, auth_headers)
 
         resp = client.post(
@@ -25,7 +27,7 @@ class TestSurveyCopilotEndpoint:
             json={"messages": [{"role": "user", "content": "Help me start a survey"}]},
         )
         assert resp.status_code == 200, resp.text
-        data = resp.json()
+        data = drain_sse(resp)
         assert data["reply"]
         assert len(data["proposed_actions"]) == 2
         for action in data["proposed_actions"]:
@@ -41,7 +43,9 @@ class TestSurveyCopilotEndpoint:
             )
             assert action["question"]["rationale"]
 
-    def test_no_proposals_once_survey_has_questions(self, client, auth_headers):
+    def test_no_proposals_once_survey_has_questions(
+        self, client, auth_headers, drain_sse
+    ):
         survey = _create_survey(client, auth_headers, name="Has a question")
         client.post(
             f"/surveys/{survey['id']}/questions",
@@ -55,7 +59,7 @@ class TestSurveyCopilotEndpoint:
             json={"messages": [{"role": "user", "content": "What next?"}]},
         )
         assert resp.status_code == 200, resp.text
-        data = resp.json()
+        data = drain_sse(resp)
         assert data["reply"]
         assert data["proposed_actions"] == []
 

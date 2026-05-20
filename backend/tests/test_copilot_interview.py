@@ -4,21 +4,10 @@ Tests run with ANTHROPIC_API_KEY blanked out, so they exercise the
 deterministic stub path in services/copilot_interview.py.
 """
 
-import json
 from types import SimpleNamespace
 
 from app.models.company import Company
 from app.models.project import Project
-
-
-def _drain_sse(resp) -> dict:
-    """Return the `done` payload from a streaming /copilot response."""
-    for frame in resp.text.split("\n\n"):
-        if frame.startswith("data: "):
-            event = json.loads(frame[len("data: "):])
-            if event.get("type") == "done":
-                return event
-    raise AssertionError(f"no done event in stream:\n{resp.text}")
 
 from app.services.copilot_interview import (
     _analysis_snapshot,
@@ -47,7 +36,7 @@ def _create_project(client, auth_headers, name: str = "Interview test") -> dict:
 
 class TestInterviewCopilot:
     def test_proposes_objective_and_questions_for_empty_guide(
-        self, client, auth_headers
+        self, client, auth_headers, drain_sse
     ):
         project = _create_project(client, auth_headers)
 
@@ -61,7 +50,7 @@ class TestInterviewCopilot:
             },
         )
         assert resp.status_code == 200, resp.text
-        data = _drain_sse(resp)
+        data = drain_sse(resp)
         assert data["reply"]
         kinds = [a["type"] for a in data["proposed_actions"]]
         # A brand-new round with no objective: the copilot proposes the
@@ -83,7 +72,7 @@ class TestInterviewCopilot:
             assert q["desired_learning"]
             assert q["rationale"]
 
-    def test_copilot_accepts_active_section(self, client, auth_headers):
+    def test_copilot_accepts_active_section(self, client, auth_headers, drain_sse):
         """Tab awareness — the endpoint accepts an optional active_section
         telling the copilot which tab the researcher is viewing."""
         project = _create_project(client, auth_headers)
@@ -96,7 +85,7 @@ class TestInterviewCopilot:
             },
         )
         assert resp.status_code == 200, resp.text
-        assert _drain_sse(resp)["reply"]
+        assert drain_sse(resp)["reply"]
 
     def test_settings_patch_accepts_objective_and_name(self, client, auth_headers):
         """The copilot's edit_objective and inline-rename apply via /settings."""
