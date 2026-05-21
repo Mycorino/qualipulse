@@ -79,17 +79,127 @@ export interface CopilotResponse {
 }
 
 /**
+ * Live-stream callbacks the panel passes through `target.runTurn` so the
+ * agent's progress narration (`onStatus`) and reply text (`onDelta`)
+ * appear in the UI as they arrive — instead of the user staring at a
+ * spinner for 30-90s. Omit them for a buffered call (test code etc.).
+ */
+export interface CopilotStreamHandlers {
+  onStatus?: (label: string) => void;
+  onDelta?: (text: string) => void;
+}
+
+/**
  * Everything <ResearchCopilotPanel> needs to talk to one surface. Each host
  * page (survey editor, interview project) builds one of these.
  */
 export interface CopilotTarget {
   /** Stable id of the instrument — used as the panel's reload key. */
   id: string;
-  runTurn: (messages: CopilotMessage[]) => Promise<CopilotResponse>;
+  runTurn: (
+    messages: CopilotMessage[],
+    handlers?: CopilotStreamHandlers,
+  ) => Promise<CopilotResponse>;
   loadConversation: () => Promise<unknown[]>;
   saveConversation: (thread: unknown[]) => Promise<void>;
   /** Apply an accepted proposal via the real instrument API. */
   applyAction: (action: ProposedAction) => Promise<void>;
+}
+
+/** Idle stream timeout — abort if the server stops emitting for this long. */
+const STREAM_IDLE_MS = 60_000;
+
+/**
+ * POST a copilot request and consume the SSE stream. Status + delta
+ * events fire through `handlers`; the `done` payload is returned (and is
+ * the authoritative final state).
+ *
+ * Raw `fetch` (not axios) so the response body can be streamed. The
+ * client-level Authorization interceptor is bypassed; the token is
+ * read straight from localStorage here.
+ */
+async function streamCopilot(
+  path: string,
+  body: object,
+  handlers?: CopilotStreamHandlers,
+): Promise<CopilotResponse> {
+  const token = localStorage.getItem("token");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  // Per-chunk idle timeout — reset on every read so a slow stream is
+  // fine, but a stalled one (network drop, server hung) aborts.
+  const controller = new AbortController();
+  let idleTimer: ReturnType<typeof setTimeout> = setTimeout(
+    () => controller.abort(),
+    STREAM_IDLE_MS,
+  );
+  const resetIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_MS);
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(idleTimer);
+    throw err;
+  }
+  if (!response.ok || !response.body) {
+    clearTimeout(idleTimer);
+    throw new Error(`Copilot HTTP ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let final: CopilotResponse | null = null;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      resetIdle();
+      buffer += decoder.decode(value, { stream: true });
+      let split: number;
+      while ((split = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        if (!frame.startsWith("data: ")) continue;
+        let event: { type: string; [k: string]: unknown };
+        try {
+          event = JSON.parse(frame.slice(6));
+        } catch {
+          continue;
+        }
+        if (event.type === "status" && handlers?.onStatus) {
+          handlers.onStatus(event.label as string);
+        } else if (event.type === "delta" && handlers?.onDelta) {
+          handlers.onDelta(event.text as string);
+        } else if (event.type === "done") {
+          final = {
+            reply: (event.reply as string) ?? "",
+            proposed_actions:
+              (event.proposed_actions as ProposedAction[]) ?? [],
+            memory_updated: Boolean(event.memory_updated),
+          };
+        }
+      }
+    }
+  } finally {
+    clearTimeout(idleTimer);
+  }
+
+  if (!final) throw new Error("Copilot stream ended without a 'done' event");
+  return final;
 }
 
 export async function runCopilot(
@@ -101,17 +211,13 @@ export async function runCopilot(
   activeSection?: string,
   /** The one-line job the copilot is helping with on this surface. */
   mission?: string,
+  handlers?: CopilotStreamHandlers,
 ): Promise<CopilotResponse> {
-  // A copilot turn runs an Opus 4.7 agent loop (adaptive thinking +
-  // multiple tool-call iterations) and routinely takes 30-90s — well past
-  // the axios client's 30s default. Give it a generous per-request
-  // timeout so the panel waits for the real reply instead of aborting.
-  const resp = await client.post<CopilotResponse>(
+  return streamCopilot(
     `/${instrument}/${id}/copilot`,
     { messages, active_section: activeSection, mission },
-    { timeout: 180000 },
+    handlers,
   );
-  return resp.data;
 }
 
 /**
@@ -120,13 +226,9 @@ export async function runCopilot(
  */
 export async function runOnboardingCopilot(
   messages: CopilotMessage[],
+  handlers?: CopilotStreamHandlers,
 ): Promise<CopilotResponse> {
-  const resp = await client.post<CopilotResponse>(
-    "/onboarding/copilot",
-    { messages },
-    { timeout: 180000 },
-  );
-  return resp.data;
+  return streamCopilot("/onboarding/copilot", { messages }, handlers);
 }
 
 /** The memory the copilot wrote during onboarding — for the completion recap. */

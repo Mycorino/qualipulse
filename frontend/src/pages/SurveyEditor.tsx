@@ -404,8 +404,8 @@ export default function SurveyEditor() {
       <ResearchCopilotPanel
         target={{
           id: survey.id,
-          runTurn: (m) =>
-            runCopilot("surveys", survey.id, m, "Build", surveyMission),
+          runTurn: (m, h) =>
+            runCopilot("surveys", survey.id, m, "Build", surveyMission, h),
           loadConversation: () => getConversation("surveys", survey.id),
           saveConversation: (t) => saveConversation("surveys", survey.id, t),
           applyAction: async (action) => {
