@@ -85,7 +85,9 @@ export default function Welcome() {
     const text = raw.trim();
     if (!text || busy) return;
     const next: ThreadItem[] = [...thread, { role: "user", text }];
-    setThread(next);
+    // Push the user turn AND an empty assistant draft — streaming deltas
+    // fill it in, the final `done` event finalises with the study proposal.
+    setThread([...next, { role: "assistant", text: "" }]);
     setInput("");
     setBusy(true);
     try {
@@ -97,19 +99,34 @@ export default function Welcome() {
       }));
       while (msgs.length && msgs[0].role === "assistant") msgs.shift();
 
-      const resp = await runOnboardingCopilot(msgs);
+      const resp = await runOnboardingCopilot(msgs, {
+        onDelta: (chunk) =>
+          setThread((t) =>
+            t.map((it, i) =>
+              i === t.length - 1 && it.role === "assistant"
+                ? { ...it, text: it.text + chunk }
+                : it,
+            ),
+          ),
+      });
       const study = resp.proposed_actions.find(
         (a) => a.type === "create_first_study",
       );
-      setThread((t) => [...t, { role: "assistant", text: resp.reply, study }]);
+      setThread((t) =>
+        t.map((it, i) =>
+          i === t.length - 1 && it.role === "assistant"
+            ? { ...it, text: resp.reply, study }
+            : it,
+        ),
+      );
     } catch {
-      setThread((t) => [
-        ...t,
-        {
-          role: "assistant",
-          text: "Sorry — I couldn't respond just now. Please try again.",
-        },
-      ]);
+      setThread((t) =>
+        t.map((it, i) =>
+          i === t.length - 1 && it.role === "assistant"
+            ? { ...it, text: "Sorry — I couldn't respond just now. Please try again." }
+            : it,
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -241,7 +258,9 @@ export default function Welcome() {
       <div className="onboarding__thread" ref={threadRef}>
         {thread.map((it, i) => (
           <div key={i} className={`onboarding-msg onboarding-msg--${it.role}`}>
-            <div className="onboarding-msg__text">{it.text}</div>
+            {it.text && (
+              <div className="onboarding-msg__text">{it.text}</div>
+            )}
             {it.study && (
               <StudyCard
                 study={it.study}

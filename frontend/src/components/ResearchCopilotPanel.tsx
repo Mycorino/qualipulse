@@ -90,6 +90,9 @@ export function ResearchCopilotPanel({
   const [thread, setThread] = useState<ThreadItem[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // Live narration of the agent's current step ("Reading your interviews…")
+  // while busy. Falls back to a generic "Thinking…" between status events.
+  const [statusLabel, setStatusLabel] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const prevCount = useRef(0);
   const loaded = useRef(false);
@@ -144,34 +147,54 @@ export function ResearchCopilotPanel({
     const text = raw.trim();
     if (!text || busy) return;
     const next: ThreadItem[] = [...thread, { kind: "user", text }];
-    setThread(next);
+    // Push the user turn AND an empty assistant draft. Streaming deltas
+    // fill the draft; the final `done` event finalises it with the
+    // authoritative reply + proposed actions.
+    setThread([...next, { kind: "assistant", text: "", actions: [] }]);
     setInput("");
+    setStatusLabel(null);
     setBusy(true);
     try {
-      const resp = await target.runTurn(toMessages(next));
-      setThread((t) => [
-        ...t,
-        {
-          kind: "assistant",
-          text: resp.reply,
-          actions: resp.proposed_actions.map((a, i) => ({
-            ...a,
-            id: `${Date.now()}-${i}`,
-            status: "pending" as const,
-          })),
-        },
-      ]);
+      const resp = await target.runTurn(toMessages(next), {
+        onStatus: (label) => setStatusLabel(label),
+        onDelta: (chunk) =>
+          setThread((t) =>
+            t.map((it, i) =>
+              i === t.length - 1 && it.kind === "assistant"
+                ? { ...it, text: it.text + chunk }
+                : it,
+            ),
+          ),
+      });
+      setThread((t) =>
+        t.map((it, i) =>
+          i === t.length - 1 && it.kind === "assistant"
+            ? {
+                ...it,
+                text: resp.reply,
+                actions: resp.proposed_actions.map((a, j) => ({
+                  ...a,
+                  id: `${Date.now()}-${j}`,
+                  status: "pending" as const,
+                })),
+              }
+            : it,
+        ),
+      );
     } catch {
       toast("The copilot is unavailable right now", "error");
-      setThread((t) => [
-        ...t,
-        {
-          kind: "assistant",
-          text: "Sorry — I couldn't respond. Please try again.",
-          actions: [],
-        },
-      ]);
+      setThread((t) =>
+        t.map((it, i) =>
+          i === t.length - 1 && it.kind === "assistant"
+            ? {
+                ...it,
+                text: "Sorry — I couldn't respond. Please try again.",
+              }
+            : it,
+        ),
+      );
     } finally {
+      setStatusLabel(null);
       setBusy(false);
     }
   };
@@ -323,7 +346,9 @@ export function ResearchCopilotPanel({
             </div>
           ) : (
             <div key={idx} className="copilot-msg copilot-msg--assistant">
-              <div className="copilot-msg__text">{renderRich(it.text)}</div>
+              {it.text && (
+                <div className="copilot-msg__text">{renderRich(it.text)}</div>
+              )}
               {it.actions.map((a) => (
                 <ProposalCard
                   key={a.id}
@@ -337,7 +362,9 @@ export function ResearchCopilotPanel({
         )}
 
         {busy && (
-          <div className="copilot-msg copilot-msg--thinking">Thinking…</div>
+          <div className="copilot-msg copilot-msg--thinking">
+            {statusLabel ?? "Thinking…"}
+          </div>
         )}
       </div>
 
