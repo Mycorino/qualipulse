@@ -316,6 +316,8 @@ _TOOL_LABELS: dict[str, str] = {
     # onboarding
     "save_profile": "Noting your profile",
     "propose_study": "Drafting your study",
+    "suggest_replies": "Lining up some options",
+    "request_website": "Checking your site",
 }
 
 

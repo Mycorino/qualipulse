@@ -27,6 +27,8 @@ def _onboarding_snapshot(company: Company) -> dict:
             "company_size": company.company_size or "",
             "industry": company.industry or "",
             "use_case": company.use_case or "",
+            "website_url": company.website_url or "",
+            "business_summary": (company.business_summary or "")[:600],
         },
     }
 
@@ -48,6 +50,17 @@ from rather than interrogating them.
 - Weave the profile in naturally — ask their role and company as ONE \
 light question, not a form. Call `save_profile` as you learn role, \
 company size, industry, or use case. It saves directly; it is not a card.
+- For profile questions (role, team size, industry, use case) you MUST \
+also call `suggest_replies` with the canonical option set listed in that \
+tool's description — same labels every time, so the UI is predictable. \
+The user can still type freely if none fit; always include "Other" as \
+the last chip. For non-profile discrete questions, invent 3-5 short \
+options of your own. Never call `suggest_replies` for open free-text \
+questions (the opening research goal, study objective, etc.).
+- When you want to know about their company, call `request_website` \
+instead of asking them to describe it from scratch. The user can paste a \
+URL and we'll read their site for you. Use this AT MOST ONCE per \
+onboarding, and only after they've answered the opening research goal.
 - Call `remember` (scope "company") to durably record their research \
 goal, audience, and what their company does — this is the memory you \
 will carry into every future session.
@@ -123,9 +136,123 @@ _PROPOSE_STUDY_TOOL = {
     },
 }
 
-_ONBOARDING_TOOLS = [_SAVE_PROFILE_TOOL, _PROPOSE_STUDY_TOOL, remember_tool("company")]
+_SUGGEST_REPLIES_TOOL = {
+    "name": "suggest_replies",
+    "description": (
+        "Attach short tap-to-answer chips under your current message. "
+        "The user can still type freely — chips are a shortcut. Always "
+        "include 'Other' as the last chip.\n\n"
+        "For profile questions, USE THESE CANONICAL OPTIONS verbatim "
+        "(same labels every time so the UI is predictable):\n"
+        "- role: 'Product Manager', 'UX Researcher', 'Designer', "
+        "'Founder / CEO', 'Marketing', 'Other'\n"
+        "- company_size: '1–10', '11–50', '51–200', '201–1000', "
+        "'1000+', 'Other'\n"
+        "- industry: 'SaaS / Tech', 'E-commerce / Retail', 'Financial "
+        "services', 'Healthcare', 'Consumer goods', 'Media / Education', "
+        "'Other'\n"
+        "- use_case: 'Product discovery', 'Concept testing', "
+        "'Onboarding research', 'Brand / messaging', 'Usability', "
+        "'Other'\n\n"
+        "For other discrete questions, invent 3-5 short options yourself."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "context": {
+                "type": "string",
+                "enum": [
+                    "role",
+                    "company_size",
+                    "industry",
+                    "use_case",
+                    "custom",
+                ],
+                "description": (
+                    "What the chips answer. Use the matching key for "
+                    "profile questions; 'custom' for everything else."
+                ),
+            },
+            "options": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "3-6 short answer chips. Each ≤ 40 chars.",
+            },
+        },
+        "required": ["context", "options"],
+    },
+}
+
+_REQUEST_WEBSITE_TOOL = {
+    "name": "request_website",
+    "description": (
+        "Surface a website-lookup card under your current message. The "
+        "user pastes their company URL and we'll read the site to fill in "
+        "what their company does. Use this instead of asking them to "
+        "describe their company from scratch. At most once per onboarding."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "prompt": {
+                "type": "string",
+                "description": (
+                    "Short label for the card — e.g. 'Drop in your "
+                    "company URL and I'll take a look.'"
+                ),
+            },
+        },
+    },
+}
+
+_ONBOARDING_TOOLS = [
+    _SAVE_PROFILE_TOOL,
+    _PROPOSE_STUDY_TOOL,
+    _SUGGEST_REPLIES_TOOL,
+    _REQUEST_WEBSITE_TOOL,
+    remember_tool("company"),
+]
 
 _PROFILE_FIELDS = ("role", "company_size", "industry", "use_case")
+
+# Canonical chip sets. These are enforced server-side whenever the agent
+# calls `suggest_replies` with a profile `context`, so the UI is identical
+# every time regardless of what the model happened to emit.
+_CANONICAL_REPLIES: dict[str, list[str]] = {
+    "role": [
+        "Product Manager",
+        "UX Researcher",
+        "Designer",
+        "Founder / CEO",
+        "Marketing",
+        "Other",
+    ],
+    "company_size": [
+        "1–10",
+        "11–50",
+        "51–200",
+        "201–1000",
+        "1000+",
+        "Other",
+    ],
+    "industry": [
+        "SaaS / Tech",
+        "E-commerce / Retail",
+        "Financial services",
+        "Healthcare",
+        "Consumer goods",
+        "Media / Education",
+        "Other",
+    ],
+    "use_case": [
+        "Product discovery",
+        "Concept testing",
+        "Onboarding research",
+        "Brand / messaging",
+        "Usability",
+        "Other",
+    ],
+}
 
 
 def _onboarding_run_tool(
@@ -178,6 +305,45 @@ def _onboarding_run_tool(
             }
         )
         return f"Proposed the first study with {len(questions)} question(s)."
+
+    if name == "suggest_replies":
+        context = (tool_input.get("context") or "").strip()
+        # For the four profile questions, ignore what the model emitted
+        # and use the canonical set — UI is then identical every time.
+        if context in _CANONICAL_REPLIES:
+            options = list(_CANONICAL_REPLIES[context])
+        else:
+            options = [
+                (opt or "").strip()
+                for opt in (tool_input.get("options") or [])
+                if (opt or "").strip()
+            ][:6]
+            # Always finish a custom set with "Other" so the user has a
+            # clear escape hatch.
+            if options and "Other" not in options and "other" not in options:
+                options.append("Other")
+        if not options:
+            return "No chip options provided — skipping."
+        turn.actions.append(
+            {
+                "type": "suggest_replies",
+                "context": context,
+                "options": options,
+            }
+        )
+        return f"Attached {len(options)} reply chip(s) to this turn."
+
+    if name == "request_website":
+        turn.actions.append(
+            {
+                "type": "request_website",
+                "prompt": (
+                    tool_input.get("prompt")
+                    or "Paste your company URL and I'll take a quick look."
+                ).strip(),
+            }
+        )
+        return "Attached a website-lookup card to this turn."
 
     return f"Unknown tool: {name}"
 

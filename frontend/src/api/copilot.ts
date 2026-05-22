@@ -52,7 +52,9 @@ export interface ProposedAction {
     | "edit_objective"
     | "run_analysis"
     | "refine_analysis"
-    | "create_first_study";
+    | "create_first_study"
+    | "suggest_replies"
+    | "request_website";
   /** add_question / add_guide_question */
   question?: ProposedSurveyQuestion | ProposedGuideQuestion;
   /** edit / remove */
@@ -70,6 +72,11 @@ export interface ProposedAction {
   objective?: string;
   questions?: ProposedGuideQuestion[];
   rationale?: string;
+  /** suggest_replies (onboarding) */
+  options?: string[];
+  context?: string;
+  /** request_website (onboarding) */
+  prompt?: string;
 }
 
 export interface CopilotResponse {

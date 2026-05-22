@@ -9881,11 +9881,12 @@ select.field-input {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
-  padding: var(--space-2) var(--space-4);
-  border-radius: 999px;
+  gap: 4px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: 18px;
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
   font-family: inherit;
   cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease-out);
@@ -9946,13 +9947,13 @@ select.field-input {
 /* Collapsed dock — stacks the live next action above the ✦ FAB. */
 .copilot-dock {
   position: fixed;
-  right: var(--space-5);
-  bottom: var(--space-5);
+  right: var(--space-6);
+  bottom: var(--space-6);
   z-index: 80;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 .copilot-dock .copilot-fab {
   position: relative;
@@ -10045,17 +10046,39 @@ select.field-input {
   text-decoration: underline;
   cursor: pointer;
 }
+.onboarding__layout {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: var(--space-6);
+  padding: 0 var(--space-6);
+  box-sizing: border-box;
+  min-height: 0;
+}
+.onboarding__main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+@media (max-width: 880px) {
+  .onboarding__layout {
+    grid-template-columns: 1fr;
+    padding: 0 var(--space-4);
+  }
+}
 .onboarding__thread {
   flex: 1;
   overflow-y: auto;
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--space-6);
+  padding: var(--space-5) 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   box-sizing: border-box;
+  min-height: 0;
 }
 .onboarding-msg {
   display: flex;
@@ -10093,9 +10116,7 @@ select.field-input {
   display: flex;
   gap: var(--space-2);
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-4) 0;
   border-top: 1px solid var(--border-default);
   box-sizing: border-box;
 }
@@ -10119,6 +10140,223 @@ select.field-input {
   font-size: var(--text-md);
   color: var(--text-secondary);
 }
+
+/* ── Milestone bar ───────────────────────────────────────────────────── */
+.onboarding-milestones {
+  list-style: none;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-6);
+  width: 100%;
+  max-width: 1100px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.onboarding-milestones__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+.onboarding-milestones__step:not(:last-child)::after {
+  content: "";
+  width: 24px;
+  height: 1px;
+  background: var(--border-default);
+  margin-left: 8px;
+}
+.onboarding-milestones__dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+}
+.onboarding-milestones__step--active .onboarding-milestones__dot {
+  background: var(--brand-600);
+  color: #fff;
+  border-color: var(--brand-600);
+}
+.onboarding-milestones__step--active .onboarding-milestones__label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.onboarding-milestones__step--done .onboarding-milestones__dot {
+  background: var(--brand-50, #eef2ff);
+  color: var(--brand-700);
+  border-color: var(--brand-300, var(--border-default));
+}
+.onboarding-milestones__step--done .onboarding-milestones__label {
+  color: var(--text-secondary);
+}
+@media (max-width: 600px) {
+  .onboarding-milestones__label { display: none; }
+}
+
+/* ── "What I know about you" sidebar ─────────────────────────────────── */
+.onboarding-sidebar {
+  align-self: start;
+  position: sticky;
+  top: var(--space-5);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.onboarding-sidebar__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+.onboarding-sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.onboarding-sidebar__row {
+  display: grid;
+  grid-template-columns: 18px auto 1fr;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.onboarding-sidebar__check {
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+.onboarding-sidebar__row--filled .onboarding-sidebar__check {
+  color: var(--brand-600);
+}
+.onboarding-sidebar__label {
+  color: var(--text-secondary);
+}
+.onboarding-sidebar__row--filled .onboarding-sidebar__label {
+  color: var(--text-tertiary);
+}
+.onboarding-sidebar__value {
+  color: var(--text-primary);
+  font-weight: 500;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onboarding-sidebar__summary {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-default);
+}
+.onboarding-sidebar__summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+.onboarding-sidebar__summary-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+@media (max-width: 880px) {
+  .onboarding-sidebar {
+    position: static;
+  }
+}
+
+/* ── Quick-reply chips under an assistant turn ───────────────────────── */
+.onboarding-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+.onboarding-chip {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--brand-300, var(--border-default));
+  background: var(--bg-surface);
+  color: var(--brand-700);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.onboarding-chip:hover:not(:disabled) {
+  background: var(--brand-50, #eef2ff);
+  border-color: var(--brand-600);
+}
+.onboarding-chip:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Website-lookup card ─────────────────────────────────────────────── */
+.onboarding-website {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.onboarding-website__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+.onboarding-website__prompt {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.onboarding-website__row {
+  display: flex;
+  gap: 8px;
+}
+.onboarding-website__row input {
+  flex: 1;
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+.onboarding-website__skip {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.onboarding-website__skip:disabled { opacity: 0.5; cursor: default; }
 
 /* The first-study proposal card inside an assistant turn. */
 .onboarding-study {
