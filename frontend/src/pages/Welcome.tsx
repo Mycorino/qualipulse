@@ -19,6 +19,7 @@ import {
   createProject,
   patchProjectSettings,
   createGuideQuestion,
+  createLink,
 } from "../api/projects";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
@@ -76,6 +77,26 @@ function renderItalics(text: string, parentKey: number): ReactNode {
   });
 }
 
+/**
+ * Compute "Day X of Y" for the trial chip on the completion screen.
+ * Returns null when the trial has ended or no trial_ends_at is set.
+ */
+function trialDayInfo(trialEndsAt: string | null | undefined): {
+  day: number;
+  total: number;
+} | null {
+  if (!trialEndsAt) return null;
+  const end = new Date(trialEndsAt).getTime();
+  if (!Number.isFinite(end)) return null;
+  const now = Date.now();
+  // Assume a 14-day trial (matches backend bootstrap); start = end - 14d.
+  const total = 14;
+  const start = end - total * 24 * 60 * 60 * 1000;
+  if (now < start || now > end) return null;
+  const elapsed = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+  return { day: Math.max(1, Math.min(total, elapsed + 1)), total };
+}
+
 const greeting = (firstName: string): string =>
   `Hi ${firstName} — I'm your Research Copilot. I help you run interviews ` +
   `and surveys without the scheduling-and-synthesis grind.\n\n` +
@@ -90,11 +111,17 @@ export default function Welcome() {
   const [thread, setThread] = useState<ThreadItem[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  /** Live narration of which tool the agent is running ("Drafting your
+   *  study", "Lining up some options"). Shown in the thinking bubble in
+   *  place of the generic "Drafting…" string. Cleared between turns. */
+  const [statusLabel, setStatusLabel] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [done, setDone] = useState<{
     projectId: string;
     studyName: string;
     memory: string;
+    profileSummary: string;
+    interviewToken: string | null;
   } | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
 
@@ -137,7 +164,9 @@ export default function Welcome() {
       }));
       while (msgs.length && msgs[0].role === "assistant") msgs.shift();
 
+      setStatusLabel(null);
       const resp = await runOnboardingCopilot(msgs, {
+        onStatus: (label) => setStatusLabel(label),
         onDelta: (chunk) =>
           setThread((t) =>
             t.map((it, i) =>
@@ -182,6 +211,7 @@ export default function Welcome() {
       );
     } finally {
       setBusy(false);
+      setStatusLabel(null);
     }
   };
 
@@ -206,13 +236,29 @@ export default function Welcome() {
           desired_learning: q.desired_learning,
         });
       }
+      // Auto-create the first interview link so the completion screen's
+      // "Take your own interview" + "Share your link" CTAs are usable
+      // immediately — no extra click. If link creation fails the user
+      // can still create one from the project page, so we don't block.
+      let interviewToken: string | null = null;
+      try {
+        const link = await createLink(project.id);
+        interviewToken = link.token;
+      } catch {
+        interviewToken = null;
+      }
       await completeOnboarding({});
       setCachedOnboarded(true);
-      const memory = await getOnboardingMemory().catch(() => "");
+      const recap = await getOnboardingMemory().catch(() => ({
+        memory: "",
+        profile_summary: "",
+      }));
       setDone({
         projectId: project.id,
         studyName: study.study_name || "Your study",
-        memory,
+        memory: recap.memory,
+        profileSummary: recap.profile_summary,
+        interviewToken,
       });
       setCreating(false);
     } catch {
@@ -283,35 +329,96 @@ export default function Welcome() {
         : "profile";
 
   if (done) {
+    const trial = trialDayInfo(me.trial_ends_at);
+    const interviewUrl = done.interviewToken
+      ? `${window.location.origin}/interview/${done.interviewToken}`
+      : null;
+    const handleShareLink = async () => {
+      if (!interviewUrl) {
+        toast("Link couldn't be created — open your study to set one up.", "error");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(interviewUrl);
+        toast("Interview link copied to your clipboard.", "success");
+      } catch {
+        toast("Couldn't copy — open your study to grab the link.", "error");
+      }
+    };
+    // Prefer the deterministic profile summary (concrete facts the
+    // server built from captured fields) over the agent's free-form
+    // memory note. Fall back gracefully.
+    const recapText =
+      done.profileSummary.trim() ||
+      done.memory.trim() ||
+      "I'll learn more about your research as we work together.";
+
     return (
       <div className="onboarding">
         <header className="onboarding__bar">
           <span className="onboarding__brand">QualiPulse</span>
+          {trial && (
+            <span className="onboarding-trial-chip" title="Free trial">
+              Day {trial.day} of {trial.total}
+            </span>
+          )}
         </header>
         <div className="onboarding-done">
-          <div className="onboarding-done__eyebrow">✦ You're all set</div>
+          <div className="onboarding-done__eyebrow">✦ Your study is ready</div>
           <h1 className="onboarding-done__title">{done.studyName}</h1>
           <p className="onboarding-done__sub">
-            Your first study is ready — build it out and launch when you are.
+            Pick what to do next — most teams test-drive their own interview
+            first so they hear the AI in action.
           </p>
+
           <div className="onboarding-done__memory">
             <div className="onboarding-done__memory-label">
               Here's what I'll remember about your research
             </div>
-            <p className="onboarding-done__memory-text">
-              {done.memory.trim() ||
-                "I'll learn more about your research as we work together."}
-            </p>
+            <p className="onboarding-done__memory-text">{recapText}</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() =>
-              navigate(`/projects/${done.projectId}`, { replace: true })
-            }
-          >
-            Open your study →
-          </button>
+
+          <div className="onboarding-done__actions">
+            <button
+              type="button"
+              className="btn btn-primary onboarding-done__cta--primary"
+              disabled={!interviewUrl}
+              onClick={() => {
+                if (!interviewUrl) {
+                  toast("Open your study to set up an interview link.", "error");
+                  return;
+                }
+                window.open(interviewUrl, "_blank", "noopener");
+              }}
+            >
+              <span className="onboarding-done__cta-label">
+                Take your own interview
+              </span>
+              <span className="onboarding-done__cta-hint">
+                90 seconds — hear Claude ask + adapt
+              </span>
+            </button>
+
+            <div className="onboarding-done__cta-row">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleShareLink}
+                disabled={!interviewUrl}
+              >
+                Copy shareable link
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() =>
+                  navigate(`/projects/${done.projectId}`, { replace: true })
+                }
+              >
+                Open your study →
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -329,11 +436,11 @@ export default function Welcome() {
         <span className="onboarding__brand">QualiPulse</span>
         <button
           type="button"
-          className="btn btn-ghost btn-sm"
+          className="onboarding__skip"
           onClick={skip}
           disabled={creating}
         >
-          Skip — just take me in
+          Skip for now
         </button>
       </header>
 
@@ -403,9 +510,12 @@ export default function Welcome() {
               );
             })}
             {busy && (
-              <div className="onboarding-msg onboarding-msg--assistant">
+              <div
+                className="onboarding-msg onboarding-msg--assistant"
+                aria-live="polite"
+              >
                 <div className="onboarding-msg__text onboarding-msg__text--thinking">
-                  Drafting…
+                  {statusLabel ? `${statusLabel}…` : "Drafting…"}
                 </div>
               </div>
             )}

@@ -36,6 +36,7 @@ from app.services.auth import (
     hash_password,
     verify_password,
 )
+from app.services.analytics import emit_event
 from app.services.demo_seeder import seed_demo_project
 from app.services.email import (
     send_newsletter_welcome,
@@ -101,6 +102,7 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     db.refresh(company)
 
     logger.info("New company signup: %s", company.email)
+    emit_event("signup", company=company, plan_requested=requested_plan or "starter")
 
     # Check for affiliate referral code (from query params or body)
     ref_code = None
@@ -577,6 +579,7 @@ def complete_onboarding(
 
     company.onboarding_completed = True
     db.commit()
+    emit_event("onboarding_completed", company=company)
 
     # Place the new account on the credits-based trial plan. Idempotent —
     # subsequent onboarding completions (replays, reset flows) no-op when

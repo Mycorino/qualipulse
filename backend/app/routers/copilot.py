@@ -269,6 +269,54 @@ def get_onboarding_memory(
     company: Company = Depends(get_current_company),
 ) -> dict:
     """The workspace-scope memory the copilot wrote during onboarding —
-    shown back to the researcher on the completion screen."""
+    shown back to the researcher on the completion screen.
+
+    Returns both the free-form memory the agent saved AND a deterministic
+    ``profile_summary`` built from the captured Company fields. The latter
+    is what makes the recap feel earned ("you're a Product Manager at a
+    50-person SaaS company…") instead of a generic "I'll learn more about
+    your research as we work together."
+    """
     row = get_memory(db, "company", company.id)
-    return {"memory": (row.content if row and row.content else "")}
+    return {
+        "memory": (row.content if row and row.content else ""),
+        "profile_summary": _build_profile_summary(company),
+    }
+
+
+def _build_profile_summary(company: Company) -> str:
+    """Stitch captured Company fields into a single conversational
+    sentence. Returns empty string when there's nothing to say (so the
+    frontend can fall back gracefully)."""
+    role = (company.role or "").strip()
+    size = (company.company_size or "").strip()
+    industry = (company.industry or "").strip()
+    use_case = (company.use_case or "").strip()
+    business = (company.business_summary or "").strip()
+
+    # Who they are: "a Product Manager at a 50-person SaaS company"
+    parts: list[str] = []
+    if role:
+        # Lowercase to avoid double-capitalisation mid-sentence; the chip
+        # values are already title-cased so we keep them as the agent saw
+        # them.
+        parts.append(f"You're a {role}")
+    if size or industry:
+        size_phrase = f"{size}-person " if size else ""
+        industry_phrase = industry if industry else "team"
+        joiner = " at a " if parts else "You work at a "
+        parts.append(f"{joiner}{size_phrase}{industry_phrase} company")
+
+    who = "".join(parts).strip()
+    sentences: list[str] = []
+    if who:
+        sentences.append(who + ".")
+    if use_case:
+        sentences.append(f"You're using QualiPulse for {use_case.lower()}.")
+    if business:
+        # Cap the business blurb so the recap stays readable on the
+        # completion screen.
+        snippet = business if len(business) <= 240 else business[:240].rstrip() + "…"
+        sentences.append(snippet)
+
+    return " ".join(sentences).strip()

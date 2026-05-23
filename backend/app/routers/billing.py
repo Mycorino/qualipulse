@@ -645,6 +645,17 @@ def _handle_subscription_event(db: Session, event_type: str, sub: dict) -> None:
 
     if event_type == "customer.subscription.created":
         _track_affiliate_conversion(db, workspace_id, sub)
+        try:
+            from app.services.analytics import emit_event
+            emit_event(
+                "paid_converted",
+                company=company,
+                plan_id=subscription.plan_id if subscription else None,
+                billing_interval=subscription.billing_interval if subscription else None,
+                stripe_subscription_id=subscription.stripe_subscription_id if subscription else None,
+            )
+        except Exception:
+            pass
 
 
 def _handle_subscription_deleted(db: Session, sub: dict) -> None:

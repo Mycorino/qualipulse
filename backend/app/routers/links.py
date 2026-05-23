@@ -8,6 +8,7 @@ from app.models.company import Company
 from app.models.interview import InterviewLink
 from app.models.project import Project
 from app.schemas.interview import LinkResponse
+from app.services.analytics import emit_event
 
 router = APIRouter(tags=["links"])
 
@@ -33,6 +34,20 @@ def create_link(
     db.add(link)
     db.commit()
     db.refresh(link)
+
+    # Activation funnel marker — "researcher has a shareable link in hand".
+    existing_links = (
+        db.query(InterviewLink)
+        .filter(InterviewLink.project_id == project.id)
+        .count()
+    )
+    emit_event(
+        "link_shared",
+        company=company,
+        project_id=str(project.id),
+        link_id=str(link.id),
+        is_first_link_on_project=existing_links == 1,
+    )
 
     return _link_to_response(link)
 

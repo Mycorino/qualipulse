@@ -34,3 +34,4 @@ frontend/dist/
 .vscode/
 .idea/
 auto_interview.db.bak-*
+.claude/worktrees/

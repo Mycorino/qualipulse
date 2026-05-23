@@ -239,11 +239,22 @@ export async function runOnboardingCopilot(
 }
 
 /** The memory the copilot wrote during onboarding — for the completion recap. */
-export async function getOnboardingMemory(): Promise<string> {
-  const resp = await client.get<{ memory: string }>(
+export interface OnboardingMemory {
+  /** Free-form notes the agent wrote via the `remember` tool. */
+  memory: string;
+  /** Deterministic sentence built server-side from the captured profile
+   *  fields. Empty if nothing was captured. */
+  profile_summary: string;
+}
+
+export async function getOnboardingMemory(): Promise<OnboardingMemory> {
+  const resp = await client.get<OnboardingMemory>(
     "/onboarding/copilot/memory",
   );
-  return resp.data.memory;
+  return {
+    memory: resp.data.memory || "",
+    profile_summary: resp.data.profile_summary || "",
+  };
 }
 
 export async function getConversation(
