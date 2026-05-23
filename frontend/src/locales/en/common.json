@@ -61,6 +61,12 @@
   "emailSent": "Email sent! Check your inbox.",
   "learnMore": "Learn more",
   "contactSupport": "Contact support",
+  "notFound": {
+    "title": "Page not found",
+    "body": "The page you were looking for doesn't exist or has been moved.",
+    "ctaHome": "Back to home",
+    "ctaBlog": "Read the blog"
+  },
   "legal": {
     "backToHome": "Back to home",
     "contents": "Contents",

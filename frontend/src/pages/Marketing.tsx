@@ -371,7 +371,12 @@ export default function Marketing() {
           <Link to="/privacy">{t("footer.privacy")}</Link>
           <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
         </div>
-        <span className="mkt-footer-copy">{t("footer.copy")} &middot; <Link to="/i/demo" style={{color: "inherit"}}>{t("footer.interviewLink")}</Link></span>
+        {/* The "Got an interview link?" text used to wrap a <Link to="/i/demo">
+            that pointed at a non-existent demo token — Googlebot crawled it from
+            every public page and Search Console flagged it as 404. Participants
+            don't need a link here anyway (they already have their own from the
+            invitation email), so we keep the helper copy but drop the broken link. */}
+        <span className="mkt-footer-copy">{t("footer.copy")} &middot; {t("footer.interviewLink")}</span>
       </footer>
     </div>
   );

@@ -61,6 +61,12 @@
   "emailSent": "Email envoyé ! Consultez votre boîte mail.",
   "learnMore": "En savoir plus",
   "contactSupport": "Contacter le support",
+  "notFound": {
+    "title": "Page introuvable",
+    "body": "La page que vous cherchez n’existe pas ou a été déplacée.",
+    "ctaHome": "Retour à l’accueil",
+    "ctaBlog": "Lire le blog"
+  },
   "legal": {
     "backToHome": "Retour \u00e0 l\u2019accueil",
     "contents": "Sommaire",
