@@ -872,6 +872,22 @@ def process_interview_turn(
                 participant.id,
             )
 
+        # Activation funnel event — fire-and-forget, never raises.
+        try:
+            from app.services.analytics import emit_event
+            duration = None
+            if participant.started_at and participant.completed_at:
+                duration = int((participant.completed_at - participant.started_at).total_seconds())
+            emit_event(
+                "participant_completed",
+                company=participant.project.company if participant.project else None,
+                project_id=str(participant.project_id),
+                participant_id=str(participant.id),
+                duration_seconds=duration,
+            )
+        except Exception:
+            pass
+
         # Send completion email if participant provided one
         try:
             from app.services.email import send_email

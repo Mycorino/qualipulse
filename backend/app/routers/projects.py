@@ -17,6 +17,7 @@ from app.schemas.project import (
     QuestionResponse,
     ScreeningQuestionResponse,
 )
+from app.services.analytics import emit_event
 from app.services.demo_seeder import (
     DEMO_PROJECT_NAME,
     DEMO_PROJECT_NAME_FR,
@@ -92,6 +93,17 @@ def create_project(
 
     db.commit()
     db.refresh(project)
+
+    # Fire `study_created` only on the first non-demo project for this
+    # company — the activation milestone, not every project.
+    is_first_real = current_count == 0
+    emit_event(
+        "study_created",
+        company=company,
+        project_id=str(project.id),
+        is_first=is_first_real,
+        question_count=len(body.questions),
+    )
 
     return _project_to_response(project)
 
