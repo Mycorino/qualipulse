@@ -996,6 +996,9 @@ gcloud builds list --region=europe-west1 --limit=5
 ### AIUsageLog
 `id` (int), `company_id` (FK), `project_id` (FK), `participant_id` (FK), `operation` (indexed), `model`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `characters` (TTS), `audio_seconds` (STT), `cost_usd`, `created_at` (indexed). **Cost is model-aware** (Opus / Sonnet / Haiku per-token rates in `services/usage_logger.py::_CLAUDE_RATES`) and **cache-aware** (cache writes 1.25× input price, cache reads 0.10×). Each Claude call also emits an INFO log line `"claude usage op=… model=… input=… output=… cache_read=… cache_write=… cost=$…"` so cache-hit rates are visible via `gcloud logging read`.
 
+### EmailSendLog
+`id` (str uuid), `company_id` (FK, indexed), `event` (str, indexed — `day_1_followup` | `trial_half_over` | `trial_ending`), `sent_at`. Unique constraint on `(company_id, event)` — append-only log that makes the Wave 3B `/admin/scheduled-emails/run` runner idempotent: a duplicate cron firing in the same window trips the constraint instead of double-sending. Alembic 0032. The Wave 3A first-response email predates this table and uses `Company.first_response_email_sent_at` instead.
+
 ### PanelProfile
 `id` (int), `email` (unique), `first_name`, `age_range`, `gender`, `country`, `city`, `education`, `employment_status`, `job_function`, `seniority`, `industry`, `company_size`, `panel_consent`, `consent_at`, `consent_interview_token`, `interviews_completed`, `last_active`, `created_at`
 
@@ -1177,6 +1180,28 @@ All `/copilot` endpoints return **SSE** (`text/event-stream`) — events `status
 | GET | `/admin/stats` | X-Admin-Key | Platform stats (users, tiers, interviews, signups) |
 | GET | `/admin/costs` | X-Admin-Key | Platform-wide AI cost report |
 | GET | `/admin/costs/company/{company_id}` | X-Admin-Key | Per-company cost breakdown |
+| POST | `/admin/scheduled-emails/run` | X-Admin-Key | Run the lifecycle-email cron pass (Day-1, Day-7, Day-12). Supports `?dry_run=true`. Idempotent via `email_send_log` unique constraint. Hit hourly by Cloud Scheduler. Returns per-event sent/skipped counts. |
+
+### Lifecycle emails — scheduling
+The Wave 3B endpoint `/admin/scheduled-emails/run` is designed to be hit hourly by an external cron (Cloud Run scales to zero, no persistent worker). To wire it up:
+
+```bash
+# One-time setup — schedule the hourly cron on Cloud Scheduler.
+gcloud scheduler jobs create http qualipulse-lifecycle-emails \
+  --schedule="0 * * * *" \
+  --uri="https://api.qualipulse.com/admin/scheduled-emails/run" \
+  --http-method=POST \
+  --headers="Authorization=Bearer $ADMIN_SECRET_KEY" \
+  --time-zone="Europe/Paris" \
+  --location=europe-west1
+```
+
+The three events handled:
+- `day_1_followup` — 18h–7d after signup, only if `onboarding_completed=true` and email verified
+- `trial_half_over` — 5-7 days remaining on `trial_ends_at` (window prevents drops on cron blips)
+- `trial_ending` — 0-2 days remaining on `trial_ends_at`
+
+Each Company × event sends at most once thanks to the unique constraint on `email_send_log (company_id, event)`. Test with `?dry_run=true` before flipping on the cron.
 
 ### Health
 | Method | Path | Description |

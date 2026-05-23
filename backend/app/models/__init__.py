@@ -4,6 +4,7 @@ from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestio
 from app.models.coding import ManualCode, QuoteTag
 from app.models.memo import ProjectMemo
 from app.models.usage import AIUsageLog
+from app.models.email_log import EmailSendLog
 from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 from app.models.blog import BlogPost
@@ -28,6 +29,7 @@ from app.models.survey import (
 
 __all__ = [
     "AIUsageLog",
+    "EmailSendLog",
     "Affiliate",
     "AffiliateReferral",
     "AffiliatePayout",
