@@ -10409,6 +10409,28 @@ select.field-input {
   color: var(--text-tertiary);
 }
 
+/* The "Recommended for your team: X participants" pill inside the
+ * study proposal card — surfaces the company_size personalisation
+ * so users see the agent listened. */
+.onboarding-study__recommend {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: 6px var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--brand-300, var(--border-default));
+  border-radius: 999px;
+  font-size: var(--text-xs);
+}
+.onboarding-study__recommend-label {
+  color: var(--text-tertiary);
+}
+.onboarding-study__recommend-value {
+  color: var(--brand-700);
+  font-weight: 600;
+}
+
 /* Onboarding completion screen — the memory recap. */
 .onboarding-done {
   flex: 1;

@@ -44,9 +44,15 @@ question — "what's the most important thing you need to learn about your \
 users right now?". The researcher's first message is their answer to it. \
 Do NOT re-introduce yourself or re-ask the opening question; engage with \
 their answer directly. Never ask company-profile questions first.
-- HARD CAP: at most 3 exchanges before you call `propose_study`. If the \
+- HARD CAP: at most 4 exchanges before you call `propose_study`. If the \
 researcher is vague or unsure, offer 3 concrete example goals to pick \
 from rather than interrogating them.
+- In exchange 2 or 3 — once you've engaged with their goal but before \
+proposing — plant ONE short value beat that distinguishes this product \
+from a survey tool. Something like: *"Most teams would send a survey \
+here — but voice interviews surface the why, not just the what. The \
+follow-ups are where the real insight lives."* One line, not a pitch. \
+This is the only marketing you do in the whole conversation.
 - Weave the profile in naturally — ask their role and company as ONE \
 light question, not a form. Call `save_profile` as you learn role, \
 company size, industry, or use case. It saves directly; it is not a card.
@@ -131,6 +137,17 @@ _PROPOSE_STUDY_TOOL = {
                 },
             },
             "rationale": {"type": "string"},
+            "recommended_participants": {
+                "type": "integer",
+                "description": (
+                    "Suggested number of participants for this first "
+                    "study, based on team size. The server will "
+                    "normalise this value against the captured "
+                    "company_size — use 10 for solo, 25 for small "
+                    "teams, 50 for mid-market, 100 for enterprise. "
+                    "If you're unsure, omit and the server will pick."
+                ),
+            },
         },
         "required": ["study_name", "objective", "questions"],
     },
@@ -254,6 +271,28 @@ _CANONICAL_REPLIES: dict[str, list[str]] = {
     ],
 }
 
+# Recommended participant N per company-size bucket. The agent can emit
+# its own `recommended_participants` but the server normalises it to the
+# bucket so the suggestion stays predictable across sessions — same
+# two-layer pattern as the canonical chip sets.
+_RECOMMENDED_N_BY_SIZE: dict[str, int] = {
+    "1–10": 10,
+    "11–50": 25,
+    "51–200": 50,
+    "201–1000": 75,
+    "1000+": 100,
+}
+_DEFAULT_RECOMMENDED_N = 20
+
+
+def _recommended_participants_for(company: Company | None) -> int:
+    """Pick the recommended N based on captured company_size. Falls back
+    to a safe mid-bucket value when nothing's captured yet."""
+    if company is None:
+        return _DEFAULT_RECOMMENDED_N
+    size = (company.company_size or "").strip()
+    return _RECOMMENDED_N_BY_SIZE.get(size, _DEFAULT_RECOMMENDED_N)
+
 
 def _onboarding_run_tool(
     db: Session,
@@ -295,6 +334,21 @@ def _onboarding_run_tool(
             )
         if not study_name or not objective or not questions:
             return "A study needs a name, an objective, and at least one question."
+        # Normalise the recommended N: if the captured company_size maps
+        # to a bucket, that wins over whatever the model emitted (same
+        # two-layer pattern as the canonical chips). Otherwise honour
+        # the model's value, clamped to a sane range.
+        size_recommended = _recommended_participants_for(company)
+        captured_size = (
+            (company.company_size or "").strip() if company is not None else ""
+        )
+        model_recommended = tool_input.get("recommended_participants")
+        if captured_size in _RECOMMENDED_N_BY_SIZE:
+            recommended_n = size_recommended
+        elif isinstance(model_recommended, int) and 5 <= model_recommended <= 500:
+            recommended_n = model_recommended
+        else:
+            recommended_n = _DEFAULT_RECOMMENDED_N
         turn.actions.append(
             {
                 "type": "create_first_study",
@@ -302,6 +356,7 @@ def _onboarding_run_tool(
                 "objective": objective,
                 "questions": questions,
                 "rationale": (tool_input.get("rationale") or "").strip(),
+                "recommended_participants": recommended_n,
             }
         )
         return f"Proposed the first study with {len(questions)} question(s)."
@@ -365,6 +420,7 @@ def _onboarding_stub(company: Company, history: list[dict]) -> dict:
                     "centre of your research, and what drives or blocks it."
                 ),
                 "rationale": "Every study needs a clear objective to anchor the guide.",
+                "recommended_participants": _recommended_participants_for(company),
                 "questions": [
                     {
                         "section_title": "Background",

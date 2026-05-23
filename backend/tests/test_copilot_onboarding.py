@@ -119,3 +119,80 @@ class TestOnboardingTools:
         )
         assert "needs" in msg.lower()
         assert turn.actions == []
+
+
+class TestRecommendedParticipants:
+    """W2.4 — recommended N is normalised against company_size, so
+    the suggestion stays consistent regardless of what the model emits."""
+
+    def _propose(self, db_session, company, payload_extra=None):
+        turn = SimpleNamespace(actions=[])
+        payload = {
+            "study_name": "Test study",
+            "objective": "Understand a thing.",
+            "questions": [
+                {
+                    "section_title": "Background",
+                    "main_question": "Tell me about it.",
+                    "desired_learning": "Context.",
+                    "rationale": "Warm opener.",
+                }
+            ],
+        }
+        if payload_extra:
+            payload.update(payload_extra)
+        _onboarding_run_tool(
+            db_session, company, company, turn, "propose_study", payload
+        )
+        return turn.actions[0]
+
+    def test_uses_captured_company_size_bucket(self, db_session):
+        company = Company(
+            id="r-1", name="Acme", email="alice@acme.com",
+            password_hash="x", company_size="51–200",
+        )
+        action = self._propose(db_session, company)
+        # Server bucket wins, regardless of what the model would have said.
+        assert action["recommended_participants"] == 50
+
+    def test_overrides_model_value_when_size_captured(self, db_session):
+        # Even if the model emits a wildly different number, the server
+        # snaps it back to the size bucket.
+        company = Company(
+            id="r-2", name="Acme", email="b@acme.com",
+            password_hash="x", company_size="1–10",
+        )
+        action = self._propose(
+            db_session, company,
+            payload_extra={"recommended_participants": 500},
+        )
+        assert action["recommended_participants"] == 10
+
+    def test_falls_back_to_default_when_size_missing(self, db_session):
+        company = Company(
+            id="r-3", name="Acme", email="c@acme.com", password_hash="x",
+        )
+        action = self._propose(db_session, company)
+        assert action["recommended_participants"] == 20
+
+    def test_honours_model_value_when_size_missing_but_value_reasonable(
+        self, db_session
+    ):
+        company = Company(
+            id="r-4", name="Acme", email="d@acme.com", password_hash="x",
+        )
+        action = self._propose(
+            db_session, company,
+            payload_extra={"recommended_participants": 40},
+        )
+        assert action["recommended_participants"] == 40
+
+    def test_clamps_obvious_garbage(self, db_session):
+        company = Company(
+            id="r-5", name="Acme", email="e@acme.com", password_hash="x",
+        )
+        action = self._propose(
+            db_session, company,
+            payload_extra={"recommended_participants": -1000},
+        )
+        assert action["recommended_participants"] == 20
