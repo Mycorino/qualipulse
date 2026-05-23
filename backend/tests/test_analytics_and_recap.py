@@ -94,3 +94,43 @@ class TestProfileSummary:
         summary = _build_profile_summary(company)
         assert summary.endswith("…")
         assert len(summary) < len(long_blurb) + 200
+
+
+class TestFirstResponseEmail:
+    """W3.2 — the lifecycle email that pulls the researcher back at the
+    moment their first response arrives. Fires once per workspace,
+    idempotent via Company.first_response_email_sent_at."""
+
+    def test_template_renders_subject_and_body(self):
+        from app.services.email import send_first_response_in
+        from unittest.mock import patch
+
+        with patch("app.services.email.send_email", return_value=True) as mock:
+            ok = send_first_response_in(
+                to="alice@acme.com",
+                project_name="Trial drop-off study",
+                project_url="https://app.qualipulse.com/projects/p-1?tab=responses",
+                lang="en",
+            )
+        assert ok is True
+        kwargs = mock.call_args.kwargs
+        assert kwargs["to"] == "alice@acme.com"
+        assert "Trial drop-off study" in kwargs["subject"]
+        assert "first response" in kwargs["subject"].lower()
+        assert "Listen to the response" in kwargs["body_html"]
+        assert "Trial drop-off study" in kwargs["body_html"]
+
+    def test_template_renders_french(self):
+        from app.services.email import send_first_response_in
+        from unittest.mock import patch
+
+        with patch("app.services.email.send_email", return_value=True) as mock:
+            send_first_response_in(
+                to="x@x.com",
+                project_name="Étude pilote",
+                project_url="https://example.com",
+                lang="fr",
+            )
+        body = mock.call_args.kwargs["body_html"]
+        assert "Écouter la réponse" in body
+        assert "Étude pilote" in body

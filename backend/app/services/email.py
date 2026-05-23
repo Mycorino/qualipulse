@@ -228,6 +228,38 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "cta": "Voir l'analyse",
         },
     },
+    "first_response_in": {
+        "en": {
+            "subject": "Your first response is in — {project_name}",
+            "heading": "Your first interview is in",
+            "body": (
+                "Someone just completed your <strong>{project_name}</strong> "
+                "interview. Listen to the transcript, tag a quote, or add a "
+                "memo while it's fresh — these small touches are what turn "
+                "responses into research insights."
+            ),
+            "cta": "Listen to the response",
+            "foot": (
+                "Once you have a few more responses, run an AI analysis to "
+                "surface themes across all of them."
+            ),
+        },
+        "fr": {
+            "subject": "Votre première réponse est arrivée — {project_name}",
+            "heading": "Votre premier entretien est arrivé",
+            "body": (
+                "Quelqu'un vient de compléter l'entretien <strong>"
+                "{project_name}</strong>. Écoutez la transcription, taguez "
+                "une citation ou ajoutez une note pendant que c'est frais — "
+                "ces petits gestes transforment les réponses en insights."
+            ),
+            "cta": "Écouter la réponse",
+            "foot": (
+                "Une fois quelques réponses de plus, lancez une analyse IA "
+                "pour faire émerger les thèmes transversaux."
+            ),
+        },
+    },
     "interview_invite": {
         "en": {
             "subject": "You're invited to a research interview",
@@ -568,6 +600,32 @@ def send_analysis_ready(to: str, project_name: str, project_url: str, lang: str 
     return send_email(
         to=to,
         subject=_c("analysis_ready", lang, "subject", project_name=project_name),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_first_response_in(
+    to: str,
+    project_name: str,
+    project_url: str,
+    lang: str = "en",
+) -> bool:
+    """Fires once company-wide, the first time any participant completes
+    an interview. Pulls the researcher back into the product at the
+    precise moment they can act — listen, tag, take a note — and turns
+    "study created" into "study with insight"."""
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("first_response_in", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("first_response_in", lang, "body", project_name=project_name)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{project_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("first_response_in", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;line-height:1.55;margin:24px 0 0;">{_c("first_response_in", lang, "foot")}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("first_response_in", lang, "subject", project_name=project_name),
         body_html=_wrap_email(content, lang),
     )
 

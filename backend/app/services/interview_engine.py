@@ -888,6 +888,42 @@ def process_interview_turn(
         except Exception:
             pass
 
+        # W3.2 — "your first response is in" lifecycle email. Fires the
+        # FIRST time any participant ever completes for this workspace.
+        # Idempotent via Company.first_response_email_sent_at: a second
+        # response (or a replay) never re-triggers. Always best-effort.
+        try:
+            company_for_email = (
+                participant.project.company if participant.project else None
+            )
+            if (
+                company_for_email is not None
+                and company_for_email.email
+                and company_for_email.first_response_email_sent_at is None
+            ):
+                from app.config import settings
+                from app.services.email import send_first_response_in
+
+                project = participant.project
+                project_url = (
+                    f"{settings.APP_BASE_URL}/projects/{project.id}?tab=responses"
+                    if project
+                    else settings.APP_BASE_URL
+                )
+                send_first_response_in(
+                    to=company_for_email.email,
+                    project_name=(project.name if project else "your study"),
+                    project_url=project_url,
+                    lang=(company_for_email.preferred_language or "en"),
+                )
+                company_for_email.first_response_email_sent_at = datetime.utcnow()
+                db.commit()
+        except Exception:
+            logger.exception(
+                "First-response email failed for participant %s; interview still completed",
+                participant.id,
+            )
+
         # Send completion email if participant provided one
         try:
             from app.services.email import send_email
