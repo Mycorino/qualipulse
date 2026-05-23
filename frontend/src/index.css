@@ -10409,6 +10409,52 @@ select.field-input {
   color: var(--text-tertiary);
 }
 
+/* V2 — strategic-context summary inside the study card (decision,
+ * timeline, audience, success criteria). Quiet, two-column dl. */
+.onboarding-study__context {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--space-3);
+  row-gap: 4px;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  background: rgba(79, 70, 229, 0.06);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+.onboarding-study__context dt {
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  align-self: baseline;
+}
+.onboarding-study__context dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* V2 — progressive disclosure expander on the study card. */
+.onboarding-study__expand {
+  align-self: flex-start;
+  margin: var(--space-3) 0 0;
+  padding: 6px 10px;
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.onboarding-study__expand:hover {
+  background: var(--bg-surface);
+}
+
 /* The "Recommended for your team: X participants" pill inside the
  * study proposal card — surfaces the company_size personalisation
  * so users see the agent listened. */
@@ -10559,6 +10605,184 @@ select.field-input {
 }
 @media (prefers-reduced-motion: reduce) {
   .onboarding-verify-modal { animation: none; }
+}
+
+/* V2 — pre-suggested research-goal chips below the canned greeting.
+ * Tap to PREFILL the textarea (not Send). Kills cold-start. */
+.onboarding-goal-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.onboarding-goal-chips__hint {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+.onboarding-goal-chips__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.onboarding-goal-chip {
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+.onboarding-goal-chip:hover:not(:disabled) {
+  border-color: var(--brand-400);
+  background: rgba(79, 70, 229, 0.05);
+}
+.onboarding-goal-chip:disabled { opacity: 0.5; cursor: default; }
+
+/* V2 — "see a sample study first" secondary link below the chips. */
+.onboarding-see-sample {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 4px 0 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.onboarding-see-sample:hover:not(:disabled) {
+  color: var(--text-secondary);
+}
+.onboarding-see-sample:disabled { opacity: 0.5; cursor: default; }
+
+/* V2 — edit-in-place sidebar rows. The filled value becomes a button
+ * that opens an inline text input on click. */
+.onboarding-sidebar__value--clickable {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  text-align: right;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 4px;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.onboarding-sidebar__value--clickable:hover {
+  background: rgba(79, 70, 229, 0.08);
+}
+.onboarding-sidebar__row--editing {
+  grid-template-columns: 18px auto 1fr;
+}
+.onboarding-sidebar__editor {
+  display: flex;
+  align-items: center;
+}
+.onboarding-sidebar__editor input {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid var(--brand-400);
+  border-radius: 4px;
+  background: var(--bg-surface);
+}
+
+/* V2 — "Sample study" preview modal opened from below the greeting. */
+.onboarding-sample-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(15, 23, 42, 0.55);
+  animation: onboardingFade var(--dur-fast) var(--ease-out);
+  overflow-y: auto;
+}
+.onboarding-sample-modal__card {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.onboarding-sample-modal__close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: none;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.onboarding-sample-modal__close:hover {
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--text-primary);
+}
+.onboarding-sample-modal__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+.onboarding-sample-modal__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  margin: 0;
+}
+.onboarding-sample-modal__body {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.onboarding-sample-modal__example {
+  margin: var(--space-3) 0;
+  padding: var(--space-4);
+  background: var(--bg-surface-alt, rgba(79, 70, 229, 0.04));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.onboarding-sample-modal__actions {
+  margin-top: var(--space-2);
+  display: flex;
+  justify-content: flex-end;
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-sample-modal { animation: none; }
 }
 
 /* ── Completion-screen action bundle (the 3-CTA layout) ──────────────── */

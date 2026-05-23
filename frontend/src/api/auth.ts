@@ -40,6 +40,8 @@ export interface CompanyResponse {
   interviews_per_month_target?: string | null;
   current_tool?: string | null;
   decision_role?: string | null;
+  // V2 onboarding marketing-attribution signal.
+  referral_source?: string | null;
   goals_classification?: string | null;
   // Monthly "what are you focused on right now?" prompt shown on the
   // Dashboard. Null when never set; ``current_priority_updated_at`` drives
@@ -74,6 +76,8 @@ export interface OnboardingProfile {
   interviews_per_month_target?: string;
   current_tool?: string;
   decision_role?: string;
+  // V2 onboarding marketing-attribution signal.
+  referral_source?: string;
 }
 
 export async function signup(

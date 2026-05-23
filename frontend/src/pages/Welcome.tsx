@@ -7,6 +7,7 @@ import {
   completeOnboarding,
   resendVerification,
   analyseWebsite,
+  saveOnboardingProfile,
   type CompanyResponse,
 } from "../api/auth";
 import {
@@ -147,6 +148,11 @@ export default function Welcome() {
     profileSummary: string;
     interviewToken: string | null;
   } | null>(null);
+  // V2 — controls the "see a sample study first" preview overlay.
+  // Lets evaluators look at what a finished study card looks like
+  // without committing to drafting their own.
+  const [showSamplePreview, setShowSamplePreview] = useState(false);
+
   // W3.5 — controls the "want a recap by email?" verify modal on the
   // completion screen. Initial value reads localStorage so a refresh
   // doesn't re-pop the modal once the user dismissed it.
@@ -267,10 +273,22 @@ export default function Welcome() {
         language: "en",
         questions: [],
       });
-      if (study.objective) {
-        await patchProjectSettings(project.id, {
-          research_objective: study.objective,
-        });
+      // Write the objective plus the V2 strategic context (decision,
+      // timeline, success criteria, audience) in a single PATCH so the
+      // Project carries everything we captured into downstream
+      // personalisation. Empty strings on these fields are fine —
+      // ProjectSettingsPatch only updates non-None values.
+      const patch: Record<string, string | undefined> = {};
+      if (study.objective) patch.research_objective = study.objective;
+      if (study.decision_to_inform)
+        patch.decision_to_inform = study.decision_to_inform;
+      if (study.timeline) patch.timeline = study.timeline;
+      if (study.success_criteria)
+        patch.success_criteria = study.success_criteria;
+      if (study.target_customer_description)
+        patch.target_customer_description = study.target_customer_description;
+      if (Object.keys(patch).length > 0) {
+        await patchProjectSettings(project.id, patch);
       }
       for (const q of (study.questions ?? []) as ProposedGuideQuestion[]) {
         await createGuideQuestion(project.id, {
@@ -360,6 +378,24 @@ export default function Welcome() {
     { key: "company_size", label: t("sidebar.team_size") },
     { key: "industry", label: t("sidebar.industry") },
     { key: "use_case", label: t("sidebar.use_case") },
+    // V2: shown only once captured — keep the sidebar tidy for the
+    // first few exchanges.
+    ...(me.current_tool
+      ? [
+          {
+            key: "current_tool" as keyof CompanyResponse,
+            label: t("sidebar.current_tool"),
+          },
+        ]
+      : []),
+    ...(me.referral_source
+      ? [
+          {
+            key: "referral_source" as keyof CompanyResponse,
+            label: t("sidebar.referral_source"),
+          },
+        ]
+      : []),
   ];
   const profileFilled = profileFields.filter((f) => !!me[f.key]).length;
   const studyProposed = thread.some((t) => !!t.study);
@@ -581,7 +617,24 @@ export default function Welcome() {
       <MilestoneBar phase={phase} />
 
       <div className="onboarding__layout">
-        <ProfileSidebar me={me} profileFields={profileFields} />
+        <ProfileSidebar
+          me={me}
+          profileFields={profileFields}
+          onChange={async (key, value) => {
+            // Optimistic UI — sidebar shows the new value immediately, then
+            // the network call confirms. PATCH /auth/onboarding accepts
+            // partial profile updates.
+            setMe((prev) => (prev ? { ...prev, [key]: value } : prev));
+            try {
+              await saveOnboardingProfile({ [key]: value });
+            } catch {
+              // Roll back on failure + surface a toast.
+              toast(t("toast.skip_failed"), "error");
+              const fresh = await getMe().catch(() => null);
+              if (fresh) setMe(fresh);
+            }
+          }}
+        />
 
         <div className="onboarding__main">
           <div className="onboarding__thread" ref={threadRef}>
@@ -623,6 +676,30 @@ export default function Welcome() {
                       }}
                     />
                   )}
+                  {/* V2: when this is the canned greeting (first
+                   *  assistant turn, no user reply yet), surface three
+                   *  example research-goal chips that PREFILL the
+                   *  textarea — kills the cold-start hesitation. Tapping
+                   *  doesn't send; the user can still edit before Send. */}
+                  {i === 0 &&
+                    it.role === "assistant" &&
+                    thread.length === 1 &&
+                    !busy && (
+                      <>
+                        <GoalSuggestionChips
+                          disabled={busy || creating}
+                          onPick={(text) => setInput(text)}
+                        />
+                        <button
+                          type="button"
+                          className="onboarding-see-sample"
+                          onClick={() => setShowSamplePreview(true)}
+                          disabled={creating}
+                        >
+                          {t("see_sample_link")}
+                        </button>
+                      </>
+                    )}
                 </div>
               );
             })}
@@ -663,6 +740,110 @@ export default function Welcome() {
           </div>
         </div>
       </div>
+
+      {showSamplePreview && (
+        <SampleStudyPreview onClose={() => setShowSamplePreview(false)} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * V2 — modal preview of what a finished study card looks like.
+ * Surfaces the deliverable BEFORE the user has to commit to drafting
+ * their own. Hard-coded sample content (intentionally — this is
+ * marketing, not user data).
+ */
+function SampleStudyPreview({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation("onboarding");
+  // Capture Escape to close
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+  return (
+    <div
+      className="onboarding-sample-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sample-modal-title"
+      onClick={(e) => {
+        if (e.currentTarget === e.target) onClose();
+      }}
+    >
+      <div className="onboarding-sample-modal__card">
+        <button
+          type="button"
+          className="onboarding-sample-modal__close"
+          onClick={onClose}
+          aria-label={t("sample_modal.close")}
+        >
+          ×
+        </button>
+        <div className="onboarding-sample-modal__eyebrow">
+          ✦ {t("sample_modal.eyebrow")}
+        </div>
+        <h2
+          id="sample-modal-title"
+          className="onboarding-sample-modal__title"
+        >
+          {t("sample_modal.title")}
+        </h2>
+        <p className="onboarding-sample-modal__body">
+          {t("sample_modal.body")}
+        </p>
+        <div className="onboarding-sample-modal__example">
+          <div className="onboarding-study__eyebrow">
+            ✦ {t("study.eyebrow")}
+          </div>
+          <div className="onboarding-study__name">
+            {t("sample_modal.example.name")}
+          </div>
+          <p className="onboarding-study__objective">
+            {t("sample_modal.example.objective")}
+          </p>
+          <div className="onboarding-study__recommend">
+            <span className="onboarding-study__recommend-label">
+              {t("study.recommended_label")}
+            </span>
+            <span className="onboarding-study__recommend-value">
+              {t("study.recommended_value", { count: 25 })}
+            </span>
+          </div>
+          <ol className="onboarding-study__questions">
+            <li>
+              <span className="onboarding-study__section">
+                {t("sample_modal.example.q1_section")}
+              </span>
+              {t("sample_modal.example.q1_question")}
+            </li>
+            <li>
+              <span className="onboarding-study__section">
+                {t("sample_modal.example.q2_section")}
+              </span>
+              {t("sample_modal.example.q2_question")}
+            </li>
+            <li>
+              <span className="onboarding-study__section">
+                {t("sample_modal.example.q3_section")}
+              </span>
+              {t("sample_modal.example.q3_question")}
+            </li>
+          </ol>
+        </div>
+        <div className="onboarding-sample-modal__actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onClose}
+          >
+            {t("sample_modal.cta")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -699,30 +880,85 @@ function MilestoneBar({ phase }: { phase: Phase }) {
 function ProfileSidebar({
   me,
   profileFields,
+  onChange,
 }: {
   me: CompanyResponse;
   profileFields: { key: keyof CompanyResponse; label: string }[];
+  onChange: (key: keyof CompanyResponse, value: string) => Promise<void>;
 }) {
   const { t } = useTranslation("onboarding");
   const summary = (me.business_summary || "").trim();
+  const [editing, setEditing] = useState<keyof CompanyResponse | null>(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = (key: keyof CompanyResponse, currentValue: string) => {
+    setEditing(key);
+    setDraft(currentValue);
+  };
+  const cancelEdit = () => {
+    setEditing(null);
+    setDraft("");
+  };
+  const commitEdit = async () => {
+    if (editing === null) return;
+    const trimmed = draft.trim();
+    setSaving(true);
+    try {
+      await onChange(editing, trimmed);
+    } finally {
+      setSaving(false);
+      setEditing(null);
+      setDraft("");
+    }
+  };
+
   return (
     <aside className="onboarding-sidebar" aria-label={t("sidebar.eyebrow")}>
       <div className="onboarding-sidebar__eyebrow">{t("sidebar.eyebrow")}</div>
       <ul className="onboarding-sidebar__list">
         {profileFields.map((f) => {
           const value = (me[f.key] as string | null | undefined) || "";
+          const isEditing = editing === f.key;
           return (
             <li
               key={String(f.key)}
-              className={`onboarding-sidebar__row onboarding-sidebar__row--${value ? "filled" : "empty"}`}
+              className={`onboarding-sidebar__row onboarding-sidebar__row--${value ? "filled" : "empty"} ${isEditing ? "onboarding-sidebar__row--editing" : ""}`}
             >
               <span className="onboarding-sidebar__check" aria-hidden>
                 {value ? "✓" : "○"}
               </span>
               <span className="onboarding-sidebar__label">{f.label}</span>
-              {value && (
-                <span className="onboarding-sidebar__value">{value}</span>
-              )}
+              {isEditing ? (
+                <span className="onboarding-sidebar__editor">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitEdit();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelEdit();
+                      }
+                    }}
+                    disabled={saving}
+                    aria-label={f.label}
+                  />
+                </span>
+              ) : value ? (
+                <button
+                  type="button"
+                  className="onboarding-sidebar__value onboarding-sidebar__value--clickable"
+                  onClick={() => startEdit(f.key, value)}
+                  title={value}
+                >
+                  {value}
+                </button>
+              ) : null}
             </li>
           );
         })}
@@ -736,6 +972,49 @@ function ProfileSidebar({
         </div>
       )}
     </aside>
+  );
+}
+
+/**
+ * V2 — pre-suggested research-goal chips rendered under the canned
+ * greeting BEFORE the user has sent anything. Tap PREFILLS the
+ * textarea (not Send) so the user can edit. Kills the cold-start
+ * blank-textarea hesitation. Translation key is plural: t("goal_suggestions",
+ * { returnObjects: true }) returns a string[] which we render directly.
+ */
+function GoalSuggestionChips({
+  disabled,
+  onPick,
+}: {
+  disabled: boolean;
+  onPick: (text: string) => void;
+}) {
+  const { t } = useTranslation("onboarding");
+  const suggestions = t("goal_suggestions", { returnObjects: true }) as unknown;
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
+  return (
+    <div
+      className="onboarding-goal-chips"
+      role="group"
+      aria-label={t("goal_suggestions_label")}
+    >
+      <span className="onboarding-goal-chips__hint">
+        {t("goal_suggestions_label")}
+      </span>
+      <div className="onboarding-goal-chips__row">
+        {(suggestions as string[]).map((s) => (
+          <button
+            key={s}
+            type="button"
+            className="onboarding-goal-chip"
+            disabled={disabled}
+            onClick={() => onPick(s)}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -847,6 +1126,17 @@ function StudyCard({
 }) {
   const { t } = useTranslation("onboarding");
   const questions = (study.questions ?? []) as ProposedGuideQuestion[];
+  // V2 progressive disclosure: questions collapsed by default so the
+  // CTA stays above the fold. The strategic context (decision /
+  // timeline / success criteria / who they'll interview) the agent
+  // captured is also surfaced as a compact summary.
+  const [showQuestions, setShowQuestions] = useState(false);
+  const decision = (study.decision_to_inform || "").trim();
+  const timeline = (study.timeline || "").trim();
+  const success = (study.success_criteria || "").trim();
+  const audience = (study.target_customer_description || "").trim();
+  const hasContext = decision || timeline || success || audience;
+
   return (
     <div className="onboarding-study">
       <div className="onboarding-study__eyebrow">
@@ -856,14 +1146,7 @@ function StudyCard({
       {study.objective && (
         <p className="onboarding-study__objective">{study.objective}</p>
       )}
-      <ol className="onboarding-study__questions">
-        {questions.map((q, i) => (
-          <li key={i}>
-            <span className="onboarding-study__section">{q.section_title}</span>
-            {q.main_question}
-          </li>
-        ))}
-      </ol>
+
       {typeof study.recommended_participants === "number" && (
         <div className="onboarding-study__recommend">
           <span className="onboarding-study__recommend-label">
@@ -876,6 +1159,59 @@ function StudyCard({
           </span>
         </div>
       )}
+
+      {hasContext && (
+        <dl className="onboarding-study__context">
+          {decision && (
+            <>
+              <dt>{t("study.context_decision")}</dt>
+              <dd>{decision}</dd>
+            </>
+          )}
+          {timeline && (
+            <>
+              <dt>{t("study.context_timeline")}</dt>
+              <dd>{timeline}</dd>
+            </>
+          )}
+          {audience && (
+            <>
+              <dt>{t("study.context_audience")}</dt>
+              <dd>{audience}</dd>
+            </>
+          )}
+          {success && (
+            <>
+              <dt>{t("study.context_success")}</dt>
+              <dd>{success}</dd>
+            </>
+          )}
+        </dl>
+      )}
+
+      <button
+        type="button"
+        className="onboarding-study__expand"
+        aria-expanded={showQuestions}
+        onClick={() => setShowQuestions((v) => !v)}
+      >
+        {showQuestions
+          ? t("study.hide_questions", { count: questions.length })
+          : t("study.show_questions", { count: questions.length })}
+      </button>
+      {showQuestions && (
+        <ol className="onboarding-study__questions">
+          {questions.map((q, i) => (
+            <li key={i}>
+              <span className="onboarding-study__section">
+                {q.section_title}
+              </span>
+              {q.main_question}
+            </li>
+          ))}
+        </ol>
+      )}
+
       <div className="onboarding-study__actions">
         <button
           type="button"
@@ -885,9 +1221,7 @@ function StudyCard({
         >
           {t("study.create_cta")}
         </button>
-        <span className="onboarding-study__hint">
-          {t("study.hint")}
-        </span>
+        <span className="onboarding-study__hint">{t("study.hint")}</span>
       </div>
     </div>
   );

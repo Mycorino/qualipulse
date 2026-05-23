@@ -506,6 +506,8 @@ def _apply_onboarding_fields(company: Company, body: OnboardingProfileRequest) -
         company.current_tool = body.current_tool
     if body.decision_role is not None:
         company.decision_role = body.decision_role
+    if body.referral_source is not None:
+        company.referral_source = body.referral_source
 
     # Onboarding redesign — personal identity + recap
     if body.first_name is not None:

@@ -74,6 +74,13 @@ export interface ProposedAction {
   rationale?: string;
   /** Suggested participant count scaled to the captured company_size. */
   recommended_participants?: number;
+  /** Strategic context captured during the V2 onboarding chat — written
+   *  through to the Project on accept so downstream personalisation
+   *  (analysis, lifecycle emails, plan recommendation) can tie back. */
+  decision_to_inform?: string;
+  timeline?: string;
+  success_criteria?: string;
+  target_customer_description?: string;
   /** suggest_replies (onboarding) */
   options?: string[];
   context?: string;

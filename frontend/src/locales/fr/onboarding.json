@@ -6,6 +6,15 @@
 
   "greeting": "Bonjour {{firstName}} — je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planning et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager — et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : quelle est la chose la plus importante que vous avez besoin d'apprendre sur vos utilisateurs en ce moment ?",
 
+  "goal_suggestions_label": "Ou choisissez un point de départ :",
+  "goal_suggestions": [
+    "Pourquoi les utilisateurs en essai partent",
+    "Tester un nouveau parcours d'onboarding",
+    "Comprendre une nouvelle audience"
+  ],
+
+  "see_sample_link": "Ou voir d'abord à quoi ressemble une étude finie →",
+
   "phase": {
     "profile": "Parlez-moi de votre travail",
     "frame": "Cadrez votre étude",
@@ -18,6 +27,8 @@
     "team_size": "Taille de l'équipe",
     "industry": "Secteur",
     "use_case": "Cas d'usage",
+    "current_tool": "Outil actuel",
+    "referral_source": "Trouvé via",
     "company": "Votre entreprise"
   },
 
@@ -31,7 +42,13 @@
     "create_cta": "Créer cette étude",
     "hint": "ou continuez à discuter pour l'affiner",
     "recommended_label": "Recommandé pour votre équipe",
-    "recommended_value": "{{count}} participants"
+    "recommended_value": "{{count}} participants",
+    "show_questions": "Voir les {{count}} questions d'entretien ▾",
+    "hide_questions": "Masquer les {{count}} questions ▴",
+    "context_decision": "Décision",
+    "context_timeline": "Échéance",
+    "context_audience": "Qui vous allez interviewer",
+    "context_success": "Critère de réussite"
   },
 
   "website": {
@@ -62,6 +79,24 @@
     "body": "Nous vous enverrons aussi un email dès que votre première réponse arrivera — pour ne pas avoir à revenir vérifier. Vérifiez votre adresse et c'est fait.",
     "accept": "Oui, envoyer le lien de vérification",
     "dismiss": "Plus tard"
+  },
+
+  "sample_modal": {
+    "close": "Fermer",
+    "eyebrow": "Étude exemple",
+    "title": "Voici ce que nous construirons ensemble",
+    "body": "Une étude finie a un objectif précis, un nombre de participants recommandé pour votre équipe et un guide d'entretien synthétique. Le Copilot rédige tout cela à partir d'une conversation de 2 minutes. Quand vous êtes prêt·e, fermez et dites-moi ce que vous voulez apprendre.",
+    "cta": "Compris — rédigeons la mienne",
+    "example": {
+      "name": "Pourquoi les PM mid-market choisissent Linear plutôt que Jira",
+      "objective": "Comprendre le moment de décision quand les équipes produit changent d'outil, pour affiner notre positionnement sur le segment mid-market.",
+      "q1_section": "CONTEXTE",
+      "q1_question": "Parlez-moi de la dernière fois que votre équipe a choisi un nouvel outil — qu'est-ce qui a déclenché la réflexion ?",
+      "q2_section": "MOMENT DE DÉCISION",
+      "q2_question": "Racontez-moi comment vous avez évalué les options. Qu'est-ce qui a compté le plus ?",
+      "q3_section": "CE QUI AURAIT AIDÉ",
+      "q3_question": "Avec le recul, qu'est-ce qui aurait rendu la décision plus simple ou plus rapide ?"
+    }
   },
 
   "chat_error": "Désolé — je n'ai pas pu répondre à l'instant. Merci de réessayer.",

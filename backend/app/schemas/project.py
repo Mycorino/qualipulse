@@ -78,6 +78,13 @@ class ProjectSettingsPatch(BaseModel):
     # these so it can own interview-round setup without the old wizard.
     research_objective: str | None = None
     research_context: str | None = None
+    # Strategic capture (V2): the decision, when it's due, how they'll
+    # know we helped. Surfaces the WHY/HOW that drives email cadence,
+    # plan recommendation, and the eventual analysis output.
+    decision_to_inform: str | None = None
+    timeline: str | None = None
+    success_criteria: str | None = None
+    target_customer_description: str | None = None
 
 
 class QuestionResponse(BaseModel):
