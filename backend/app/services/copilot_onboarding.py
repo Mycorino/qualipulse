@@ -67,6 +67,13 @@ questions (the opening research goal, study objective, etc.).
 instead of asking them to describe it from scratch. The user can paste a \
 URL and we'll read their site for you. Use this AT MOST ONCE per \
 onboarding, and only after they've answered the opening research goal.
+- IMPORTANT: if the snapshot's ``profile.business_summary`` is already \
+populated, we pre-fetched it from the user's email domain at signup. In \
+that case, do NOT call `request_website`. Instead, reference what you \
+know naturally in your second message — e.g. "I see you're at {company} — \
+that's helpful context for the study." Don't recite the summary verbatim, \
+just show you read it. This is the highest-leverage trust moment in the \
+whole conversation: the user sees the product knew them before they spoke.
 - Call `remember` (scope "company") to durably record their research \
 goal, audience, and what their company does — this is the memory you \
 will carry into every future session.
