@@ -353,6 +353,14 @@ def patch_project_settings(
         project.research_objective = body.research_objective
     if body.research_context is not None:
         project.research_context = body.research_context
+    if body.decision_to_inform is not None:
+        project.decision_to_inform = body.decision_to_inform
+    if body.timeline is not None:
+        project.timeline = body.timeline
+    if body.success_criteria is not None:
+        project.success_criteria = body.success_criteria
+    if body.target_customer_description is not None:
+        project.target_customer_description = body.target_customer_description
     db.commit()
     db.refresh(project)
     return _project_to_response(project)

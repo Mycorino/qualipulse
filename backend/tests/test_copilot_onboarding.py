@@ -196,3 +196,85 @@ class TestRecommendedParticipants:
             payload_extra={"recommended_participants": -1000},
         )
         assert action["recommended_participants"] == 20
+
+
+class TestV2StrategicCapture:
+    """V2 onboarding — propose_study captures decision / timeline /
+    success criteria / audience, save_profile captures referral_source
+    + current_tool. These flow through to Project on accept and into
+    the memory recap."""
+
+    def _propose(self, db_session, payload):
+        company = Company(
+            id="v2-1", name="Acme", email="v2@acme.com",
+            password_hash="x", company_size="11–50",
+        )
+        turn = SimpleNamespace(actions=[])
+        _onboarding_run_tool(
+            db_session, company, company, turn, "propose_study", payload
+        )
+        return turn.actions[0]
+
+    def test_propose_study_carries_strategic_context(self, db_session):
+        action = self._propose(db_session, {
+            "study_name": "Why trial users churn",
+            "objective": "Understand churn moment.",
+            "questions": [
+                {
+                    "section_title": "Background",
+                    "main_question": "Tell me about your trial.",
+                    "desired_learning": "Context.",
+                    "rationale": "Warm opener.",
+                }
+            ],
+            "decision_to_inform": "Rebuild onboarding vs polish.",
+            "timeline": "2 weeks",
+            "success_criteria": "Trial-to-paid lifts by 5 points.",
+            "target_customer_description": "Lapsed trial users in the last 60 days.",
+        })
+        assert action["decision_to_inform"] == "Rebuild onboarding vs polish."
+        assert action["timeline"] == "2 weeks"
+        assert action["success_criteria"] == "Trial-to-paid lifts by 5 points."
+        assert action["target_customer_description"] == (
+            "Lapsed trial users in the last 60 days."
+        )
+
+    def test_save_profile_writes_referral_source(self, db_session):
+        company = Company(
+            id="v2-2", name="Acme", email="v2b@acme.com", password_hash="x",
+        )
+        db_session.add(company)
+        db_session.commit()
+        turn = SimpleNamespace(actions=[])
+        msg = _onboarding_run_tool(
+            db_session, company, company, turn, "save_profile",
+            {"referral_source": "LinkedIn"},
+        )
+        assert "Saved" in msg
+        db_session.refresh(company)
+        assert company.referral_source == "LinkedIn"
+
+    def test_save_profile_writes_current_tool(self, db_session):
+        company = Company(
+            id="v2-3", name="Acme", email="v2c@acme.com", password_hash="x",
+        )
+        db_session.add(company)
+        db_session.commit()
+        turn = SimpleNamespace(actions=[])
+        _onboarding_run_tool(
+            db_session, company, company, turn, "save_profile",
+            {"current_tool": "Typeform"},
+        )
+        db_session.refresh(company)
+        assert company.current_tool == "Typeform"
+
+    def test_canonical_chips_include_v2_contexts(self):
+        """The canonical-options set the server enforces must cover the
+        three new chip contexts so they're predictable across sessions."""
+        from app.services.copilot_onboarding import _CANONICAL_REPLIES
+        assert "referral_source" in _CANONICAL_REPLIES
+        assert "current_tool" in _CANONICAL_REPLIES
+        assert "timeline" in _CANONICAL_REPLIES
+        assert "Other" in _CANONICAL_REPLIES["referral_source"]
+        assert "Nothing yet" in _CANONICAL_REPLIES["current_tool"]
+        assert "2 weeks" in _CANONICAL_REPLIES["timeline"]

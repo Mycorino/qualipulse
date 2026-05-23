@@ -272,22 +272,35 @@ def get_onboarding_memory(
     shown back to the researcher on the completion screen.
 
     Returns both the free-form memory the agent saved AND a deterministic
-    ``profile_summary`` built from the captured Company fields. The latter
-    is what makes the recap feel earned ("you're a Product Manager at a
-    50-person SaaS company…") instead of a generic "I'll learn more about
-    your research as we work together."
+    ``profile_summary`` built from the captured Company fields plus the
+    most recent non-demo Project's strategic context (decision /
+    timeline / audience / success criteria). That mix is what makes the
+    recap feel earned ("you're a PM at a 50-person SaaS company; your
+    decision is in 2 weeks") instead of a generic placeholder.
     """
     row = get_memory(db, "company", company.id)
+    # Most recent non-demo Project — created by acceptStudy moments
+    # before the completion screen renders.
+    from app.models.project import Project
+
+    latest_project = (
+        db.query(Project)
+        .filter(Project.company_id == company.id, Project.is_demo.is_(False))
+        .order_by(Project.created_at.desc())
+        .first()
+    )
     return {
         "memory": (row.content if row and row.content else ""),
-        "profile_summary": _build_profile_summary(company),
+        "profile_summary": _build_profile_summary(company, latest_project),
     }
 
 
-def _build_profile_summary(company: Company) -> str:
-    """Stitch captured Company fields into a single conversational
-    sentence. Returns empty string when there's nothing to say (so the
-    frontend can fall back gracefully)."""
+def _build_profile_summary(
+    company: Company, project=None
+) -> str:
+    """Stitch captured Company fields + Project strategic context into
+    a single conversational recap. Returns empty string when there's
+    nothing to say (so the frontend can fall back gracefully)."""
     role = (company.role or "").strip()
     size = (company.company_size or "").strip()
     industry = (company.industry or "").strip()
@@ -297,9 +310,6 @@ def _build_profile_summary(company: Company) -> str:
     # Who they are: "a Product Manager at a 50-person SaaS company"
     parts: list[str] = []
     if role:
-        # Lowercase to avoid double-capitalisation mid-sentence; the chip
-        # values are already title-cased so we keep them as the agent saw
-        # them.
         parts.append(f"You're a {role}")
     if size or industry:
         size_phrase = f"{size}-person " if size else ""
@@ -311,12 +321,40 @@ def _build_profile_summary(company: Company) -> str:
     sentences: list[str] = []
     if who:
         sentences.append(who + ".")
+    # V3 — research experience changes the tone of everything that
+    # follows. Surfacing it in the recap proves the agent listened.
+    experience = (company.research_experience or "").strip()
+    if experience:
+        if experience.lower().startswith("first"):
+            sentences.append("This is your first research project — I'll keep things clear and explain as we go.")
+        elif "seasoned" in experience.lower():
+            sentences.append("You're a seasoned researcher — I'll keep it lean and skip the basics.")
+        else:
+            sentences.append(f"Research experience: {experience.lower()}.")
     if use_case:
         sentences.append(f"You're using QualiPulse for {use_case.lower()}.")
+
+    # V2 strategic context — pulled from the most recent Project so the
+    # recap names the DECISION + TIMELINE, not just the demographic.
+    if project is not None:
+        decision = (getattr(project, "decision_to_inform", "") or "").strip()
+        timeline = (getattr(project, "timeline", "") or "").strip()
+        success = (getattr(project, "success_criteria", "") or "").strip()
+        if decision:
+            sentences.append(f"Decision riding on it: {decision}")
+            if timeline:
+                sentences[-1] = sentences[-1].rstrip(".") + f" ({timeline})."
+            elif not sentences[-1].endswith("."):
+                sentences[-1] += "."
+        if success:
+            sentences.append(f"Success looks like: {success}")
+            if not sentences[-1].endswith("."):
+                sentences[-1] += "."
+
     if business:
-        # Cap the business blurb so the recap stays readable on the
-        # completion screen.
-        snippet = business if len(business) <= 240 else business[:240].rstrip() + "…"
+        snippet = (
+            business if len(business) <= 240 else business[:240].rstrip() + "…"
+        )
         sentences.append(snippet)
 
     return " ".join(sentences).strip()

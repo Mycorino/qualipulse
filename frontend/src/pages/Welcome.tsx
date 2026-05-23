@@ -7,15 +7,19 @@ import {
   completeOnboarding,
   resendVerification,
   analyseWebsite,
+  saveOnboardingProfile,
   type CompanyResponse,
 } from "../api/auth";
 import {
   runOnboardingCopilot,
   getOnboardingMemory,
+  transcribeDemoAudio,
   type CopilotMessage,
+  type DemoTranscribeResponse,
   type ProposedAction,
   type ProposedGuideQuestion,
 } from "../api/copilot";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import {
   createProject,
   patchProjectSettings,
@@ -43,6 +47,8 @@ type ThreadItem = {
   replies?: { context?: string; options: string[] };
   /** Website-lookup card the agent attached to this turn. */
   website?: { prompt: string };
+  /** Participant-experience demo card the agent attached to this turn. */
+  participantDemo?: { intro: string };
   /** True once the user has used the chips/website card on this turn —
    *  prevents re-use after the conversation moves on. */
   consumed?: boolean;
@@ -147,6 +153,15 @@ export default function Welcome() {
     profileSummary: string;
     interviewToken: string | null;
   } | null>(null);
+  // V2 — controls the "see a sample study first" preview overlay.
+  // Lets evaluators look at what a finished study card looks like
+  // without committing to drafting their own.
+  const [showSamplePreview, setShowSamplePreview] = useState(false);
+
+  // V3 — participant-experience demo modal. Opened from the inline
+  // demo card the agent posts after the user's first message.
+  const [showParticipantDemo, setShowParticipantDemo] = useState(false);
+
   // W3.5 — controls the "want a recap by email?" verify modal on the
   // completion screen. Initial value reads localStorage so a refresh
   // doesn't re-pop the modal once the user dismissed it.
@@ -228,16 +243,33 @@ export default function Welcome() {
       const websiteAction = resp.proposed_actions.find(
         (a) => a.type === "request_website",
       );
+      const demoAction = resp.proposed_actions.find(
+        (a) => a.type === "propose_participant_demo",
+      );
       const replies = repliesAction?.options?.length
         ? { context: repliesAction.context, options: repliesAction.options }
         : undefined;
       const website = websiteAction
         ? { prompt: websiteAction.prompt || "Paste your company URL." }
         : undefined;
+      const participantDemo = demoAction
+        ? {
+            intro:
+              demoAction.intro ||
+              "Want to see what your participants will experience?",
+          }
+        : undefined;
       setThread((prev) =>
         prev.map((it, i) =>
           i === prev.length - 1 && it.role === "assistant"
-            ? { ...it, text: resp.reply, study, replies, website }
+            ? {
+                ...it,
+                text: resp.reply,
+                study,
+                replies,
+                website,
+                participantDemo,
+              }
             : it,
         ),
       );
@@ -267,10 +299,22 @@ export default function Welcome() {
         language: "en",
         questions: [],
       });
-      if (study.objective) {
-        await patchProjectSettings(project.id, {
-          research_objective: study.objective,
-        });
+      // Write the objective plus the V2 strategic context (decision,
+      // timeline, success criteria, audience) in a single PATCH so the
+      // Project carries everything we captured into downstream
+      // personalisation. Empty strings on these fields are fine —
+      // ProjectSettingsPatch only updates non-None values.
+      const patch: Record<string, string | undefined> = {};
+      if (study.objective) patch.research_objective = study.objective;
+      if (study.decision_to_inform)
+        patch.decision_to_inform = study.decision_to_inform;
+      if (study.timeline) patch.timeline = study.timeline;
+      if (study.success_criteria)
+        patch.success_criteria = study.success_criteria;
+      if (study.target_customer_description)
+        patch.target_customer_description = study.target_customer_description;
+      if (Object.keys(patch).length > 0) {
+        await patchProjectSettings(project.id, patch);
       }
       for (const q of (study.questions ?? []) as ProposedGuideQuestion[]) {
         await createGuideQuestion(project.id, {
@@ -360,6 +404,40 @@ export default function Welcome() {
     { key: "company_size", label: t("sidebar.team_size") },
     { key: "industry", label: t("sidebar.industry") },
     { key: "use_case", label: t("sidebar.use_case") },
+    // V2: shown only once captured — keep the sidebar tidy for the
+    // first few exchanges.
+    ...(me.current_tool
+      ? [
+          {
+            key: "current_tool" as keyof CompanyResponse,
+            label: t("sidebar.current_tool"),
+          },
+        ]
+      : []),
+    ...(me.referral_source
+      ? [
+          {
+            key: "referral_source" as keyof CompanyResponse,
+            label: t("sidebar.referral_source"),
+          },
+        ]
+      : []),
+    ...(me.research_experience
+      ? [
+          {
+            key: "research_experience" as keyof CompanyResponse,
+            label: t("sidebar.research_experience"),
+          },
+        ]
+      : []),
+    ...(me.decision_role
+      ? [
+          {
+            key: "decision_role" as keyof CompanyResponse,
+            label: t("sidebar.decision_role"),
+          },
+        ]
+      : []),
   ];
   const profileFilled = profileFields.filter((f) => !!me[f.key]).length;
   const studyProposed = thread.some((t) => !!t.study);
@@ -581,7 +659,24 @@ export default function Welcome() {
       <MilestoneBar phase={phase} />
 
       <div className="onboarding__layout">
-        <ProfileSidebar me={me} profileFields={profileFields} />
+        <ProfileSidebar
+          me={me}
+          profileFields={profileFields}
+          onChange={async (key, value) => {
+            // Optimistic UI — sidebar shows the new value immediately, then
+            // the network call confirms. PATCH /auth/onboarding accepts
+            // partial profile updates.
+            setMe((prev) => (prev ? { ...prev, [key]: value } : prev));
+            try {
+              await saveOnboardingProfile({ [key]: value });
+            } catch {
+              // Roll back on failure + surface a toast.
+              toast(t("toast.skip_failed"), "error");
+              const fresh = await getMe().catch(() => null);
+              if (fresh) setMe(fresh);
+            }
+          }}
+        />
 
         <div className="onboarding__main">
           <div className="onboarding__thread" ref={threadRef}>
@@ -613,6 +708,14 @@ export default function Welcome() {
                       onSkip={() => consumeAttachment(i)}
                     />
                   )}
+                  {showAttachments && it.participantDemo && (
+                    <ParticipantDemoInvite
+                      intro={it.participantDemo.intro}
+                      disabled={busy || creating}
+                      onOpen={() => setShowParticipantDemo(true)}
+                      onSkip={() => consumeAttachment(i)}
+                    />
+                  )}
                   {showAttachments && it.replies && (
                     <ReplyChips
                       options={it.replies.options}
@@ -623,6 +726,30 @@ export default function Welcome() {
                       }}
                     />
                   )}
+                  {/* V2: when this is the canned greeting (first
+                   *  assistant turn, no user reply yet), surface three
+                   *  example research-goal chips that PREFILL the
+                   *  textarea — kills the cold-start hesitation. Tapping
+                   *  doesn't send; the user can still edit before Send. */}
+                  {i === 0 &&
+                    it.role === "assistant" &&
+                    thread.length === 1 &&
+                    !busy && (
+                      <>
+                        <GoalSuggestionChips
+                          disabled={busy || creating}
+                          onPick={(text) => setInput(text)}
+                        />
+                        <button
+                          type="button"
+                          className="onboarding-see-sample"
+                          onClick={() => setShowSamplePreview(true)}
+                          disabled={creating}
+                        >
+                          {t("see_sample_link")}
+                        </button>
+                      </>
+                    )}
                 </div>
               );
             })}
@@ -663,6 +790,117 @@ export default function Welcome() {
           </div>
         </div>
       </div>
+
+      {showSamplePreview && (
+        <SampleStudyPreview onClose={() => setShowSamplePreview(false)} />
+      )}
+
+      {showParticipantDemo && (
+        <ParticipantDemoModal
+          firstName={me.first_name || "there"}
+          onClose={() => setShowParticipantDemo(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * V2 — modal preview of what a finished study card looks like.
+ * Surfaces the deliverable BEFORE the user has to commit to drafting
+ * their own. Hard-coded sample content (intentionally — this is
+ * marketing, not user data).
+ */
+function SampleStudyPreview({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation("onboarding");
+  // Capture Escape to close
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+  return (
+    <div
+      className="onboarding-sample-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sample-modal-title"
+      onClick={(e) => {
+        if (e.currentTarget === e.target) onClose();
+      }}
+    >
+      <div className="onboarding-sample-modal__card">
+        <button
+          type="button"
+          className="onboarding-sample-modal__close"
+          onClick={onClose}
+          aria-label={t("sample_modal.close")}
+        >
+          ×
+        </button>
+        <div className="onboarding-sample-modal__eyebrow">
+          ✦ {t("sample_modal.eyebrow")}
+        </div>
+        <h2
+          id="sample-modal-title"
+          className="onboarding-sample-modal__title"
+        >
+          {t("sample_modal.title")}
+        </h2>
+        <p className="onboarding-sample-modal__body">
+          {t("sample_modal.body")}
+        </p>
+        <div className="onboarding-sample-modal__example">
+          <div className="onboarding-study__eyebrow">
+            ✦ {t("study.eyebrow")}
+          </div>
+          <div className="onboarding-study__name">
+            {t("sample_modal.example.name")}
+          </div>
+          <p className="onboarding-study__objective">
+            {t("sample_modal.example.objective")}
+          </p>
+          <div className="onboarding-study__recommend">
+            <span className="onboarding-study__recommend-label">
+              {t("study.recommended_label")}
+            </span>
+            <span className="onboarding-study__recommend-value">
+              {t("study.recommended_value", { count: 25 })}
+            </span>
+          </div>
+          <ol className="onboarding-study__questions">
+            <li>
+              <span className="onboarding-study__section">
+                {t("sample_modal.example.q1_section")}
+              </span>
+              {t("sample_modal.example.q1_question")}
+            </li>
+            <li>
+              <span className="onboarding-study__section">
+                {t("sample_modal.example.q2_section")}
+              </span>
+              {t("sample_modal.example.q2_question")}
+            </li>
+            <li>
+              <span className="onboarding-study__section">
+                {t("sample_modal.example.q3_section")}
+              </span>
+              {t("sample_modal.example.q3_question")}
+            </li>
+          </ol>
+        </div>
+        <div className="onboarding-sample-modal__actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onClose}
+          >
+            {t("sample_modal.cta")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -699,30 +937,85 @@ function MilestoneBar({ phase }: { phase: Phase }) {
 function ProfileSidebar({
   me,
   profileFields,
+  onChange,
 }: {
   me: CompanyResponse;
   profileFields: { key: keyof CompanyResponse; label: string }[];
+  onChange: (key: keyof CompanyResponse, value: string) => Promise<void>;
 }) {
   const { t } = useTranslation("onboarding");
   const summary = (me.business_summary || "").trim();
+  const [editing, setEditing] = useState<keyof CompanyResponse | null>(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = (key: keyof CompanyResponse, currentValue: string) => {
+    setEditing(key);
+    setDraft(currentValue);
+  };
+  const cancelEdit = () => {
+    setEditing(null);
+    setDraft("");
+  };
+  const commitEdit = async () => {
+    if (editing === null) return;
+    const trimmed = draft.trim();
+    setSaving(true);
+    try {
+      await onChange(editing, trimmed);
+    } finally {
+      setSaving(false);
+      setEditing(null);
+      setDraft("");
+    }
+  };
+
   return (
     <aside className="onboarding-sidebar" aria-label={t("sidebar.eyebrow")}>
       <div className="onboarding-sidebar__eyebrow">{t("sidebar.eyebrow")}</div>
       <ul className="onboarding-sidebar__list">
         {profileFields.map((f) => {
           const value = (me[f.key] as string | null | undefined) || "";
+          const isEditing = editing === f.key;
           return (
             <li
               key={String(f.key)}
-              className={`onboarding-sidebar__row onboarding-sidebar__row--${value ? "filled" : "empty"}`}
+              className={`onboarding-sidebar__row onboarding-sidebar__row--${value ? "filled" : "empty"} ${isEditing ? "onboarding-sidebar__row--editing" : ""}`}
             >
               <span className="onboarding-sidebar__check" aria-hidden>
                 {value ? "✓" : "○"}
               </span>
               <span className="onboarding-sidebar__label">{f.label}</span>
-              {value && (
-                <span className="onboarding-sidebar__value">{value}</span>
-              )}
+              {isEditing ? (
+                <span className="onboarding-sidebar__editor">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitEdit();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelEdit();
+                      }
+                    }}
+                    disabled={saving}
+                    aria-label={f.label}
+                  />
+                </span>
+              ) : value ? (
+                <button
+                  type="button"
+                  className="onboarding-sidebar__value onboarding-sidebar__value--clickable"
+                  onClick={() => startEdit(f.key, value)}
+                  title={value}
+                >
+                  {value}
+                </button>
+              ) : null}
             </li>
           );
         })}
@@ -736,6 +1029,49 @@ function ProfileSidebar({
         </div>
       )}
     </aside>
+  );
+}
+
+/**
+ * V2 — pre-suggested research-goal chips rendered under the canned
+ * greeting BEFORE the user has sent anything. Tap PREFILLS the
+ * textarea (not Send) so the user can edit. Kills the cold-start
+ * blank-textarea hesitation. Translation key is plural: t("goal_suggestions",
+ * { returnObjects: true }) returns a string[] which we render directly.
+ */
+function GoalSuggestionChips({
+  disabled,
+  onPick,
+}: {
+  disabled: boolean;
+  onPick: (text: string) => void;
+}) {
+  const { t } = useTranslation("onboarding");
+  const suggestions = t("goal_suggestions", { returnObjects: true }) as unknown;
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
+  return (
+    <div
+      className="onboarding-goal-chips"
+      role="group"
+      aria-label={t("goal_suggestions_label")}
+    >
+      <span className="onboarding-goal-chips__hint">
+        {t("goal_suggestions_label")}
+      </span>
+      <div className="onboarding-goal-chips__row">
+        {(suggestions as string[]).map((s) => (
+          <button
+            key={s}
+            type="button"
+            className="onboarding-goal-chip"
+            disabled={disabled}
+            onClick={() => onPick(s)}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -847,6 +1183,17 @@ function StudyCard({
 }) {
   const { t } = useTranslation("onboarding");
   const questions = (study.questions ?? []) as ProposedGuideQuestion[];
+  // V2 progressive disclosure: questions collapsed by default so the
+  // CTA stays above the fold. The strategic context (decision /
+  // timeline / success criteria / who they'll interview) the agent
+  // captured is also surfaced as a compact summary.
+  const [showQuestions, setShowQuestions] = useState(false);
+  const decision = (study.decision_to_inform || "").trim();
+  const timeline = (study.timeline || "").trim();
+  const success = (study.success_criteria || "").trim();
+  const audience = (study.target_customer_description || "").trim();
+  const hasContext = decision || timeline || success || audience;
+
   return (
     <div className="onboarding-study">
       <div className="onboarding-study__eyebrow">
@@ -856,14 +1203,7 @@ function StudyCard({
       {study.objective && (
         <p className="onboarding-study__objective">{study.objective}</p>
       )}
-      <ol className="onboarding-study__questions">
-        {questions.map((q, i) => (
-          <li key={i}>
-            <span className="onboarding-study__section">{q.section_title}</span>
-            {q.main_question}
-          </li>
-        ))}
-      </ol>
+
       {typeof study.recommended_participants === "number" && (
         <div className="onboarding-study__recommend">
           <span className="onboarding-study__recommend-label">
@@ -876,6 +1216,59 @@ function StudyCard({
           </span>
         </div>
       )}
+
+      {hasContext && (
+        <dl className="onboarding-study__context">
+          {decision && (
+            <>
+              <dt>{t("study.context_decision")}</dt>
+              <dd>{decision}</dd>
+            </>
+          )}
+          {timeline && (
+            <>
+              <dt>{t("study.context_timeline")}</dt>
+              <dd>{timeline}</dd>
+            </>
+          )}
+          {audience && (
+            <>
+              <dt>{t("study.context_audience")}</dt>
+              <dd>{audience}</dd>
+            </>
+          )}
+          {success && (
+            <>
+              <dt>{t("study.context_success")}</dt>
+              <dd>{success}</dd>
+            </>
+          )}
+        </dl>
+      )}
+
+      <button
+        type="button"
+        className="onboarding-study__expand"
+        aria-expanded={showQuestions}
+        onClick={() => setShowQuestions((v) => !v)}
+      >
+        {showQuestions
+          ? t("study.hide_questions", { count: questions.length })
+          : t("study.show_questions", { count: questions.length })}
+      </button>
+      {showQuestions && (
+        <ol className="onboarding-study__questions">
+          {questions.map((q, i) => (
+            <li key={i}>
+              <span className="onboarding-study__section">
+                {q.section_title}
+              </span>
+              {q.main_question}
+            </li>
+          ))}
+        </ol>
+      )}
+
       <div className="onboarding-study__actions">
         <button
           type="button"
@@ -885,10 +1278,355 @@ function StudyCard({
         >
           {t("study.create_cta")}
         </button>
-        <span className="onboarding-study__hint">
-          {t("study.hint")}
+        <span className="onboarding-study__hint">{t("study.hint")}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── V3 — Participant-experience demo (iPhone-framed embedded interview) ──
+ *
+ * Two components:
+ *   1. <ParticipantDemoInvite> — the inline chat card the agent posts.
+ *      Just an intro line + two buttons (Open / Skip).
+ *   2. <ParticipantDemoModal>  — the full-screen overlay with the
+ *      iPhone frame, mic recording, transcribe round-trip, and the
+ *      analysis-view reveal.
+ */
+
+function ParticipantDemoInvite({
+  intro,
+  disabled,
+  onOpen,
+  onSkip,
+}: {
+  intro: string;
+  disabled: boolean;
+  onOpen: () => void;
+  onSkip: () => void;
+}) {
+  const { t } = useTranslation("onboarding");
+  return (
+    <div className="onboarding-demo-invite">
+      <div className="onboarding-demo-invite__eyebrow">
+        ✦ {t("participant_demo.invite_eyebrow")}
+      </div>
+      <p className="onboarding-demo-invite__intro">{intro}</p>
+      <div className="onboarding-demo-invite__actions">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={onOpen}
+          disabled={disabled}
+        >
+          {t("participant_demo.invite_open")}
+        </button>
+        <button
+          type="button"
+          className="onboarding-demo-invite__skip"
+          onClick={onSkip}
+          disabled={disabled}
+        >
+          {t("participant_demo.invite_skip")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+type DemoPhase =
+  | "intro"        // Bot question on screen, mic not yet engaged
+  | "permission"   // Awaiting mic permission
+  | "recording"    // User holding/talking
+  | "uploading"    // Whisper round trip
+  | "reveal"       // Transcript + highlight + code shown
+  | "error";
+
+function ParticipantDemoModal({
+  firstName,
+  onClose,
+}: {
+  firstName: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation("onboarding");
+  const [phase, setPhase] = useState<DemoPhase>("intro");
+  const [result, setResult] = useState<DemoTranscribeResponse | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string>("");
+  const { isRecording, error: recorderError, startRecording, stopRecording } =
+    useAudioRecorder();
+
+  // Escape closes the modal at any phase except mid-upload (don't
+  // strand the user if Whisper is mid-call).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && phase !== "uploading") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose, phase]);
+
+  // Mirror the recorder hook's error state into our local error
+  // phase so the UI can render a clear message.
+  useEffect(() => {
+    if (recorderError) {
+      setErrorMsg(
+        recorderError === "PERMISSION_DENIED"
+          ? t("participant_demo.error_mic_denied")
+          : recorderError,
+      );
+      setPhase("error");
+    }
+  }, [recorderError, t]);
+
+  const handleStart = async () => {
+    setPhase("permission");
+    await startRecording();
+    // If permission was denied the hook will surface via recorderError;
+    // otherwise it flips isRecording on. Let the effect catch errors.
+    setPhase((prev) => (prev === "permission" ? "recording" : prev));
+  };
+
+  const handleStop = async () => {
+    setPhase("uploading");
+    try {
+      const blob = await stopRecording();
+      const res = await transcribeDemoAudio(blob);
+      setResult(res);
+      setPhase("reveal");
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : t("participant_demo.error_generic"),
+      );
+      setPhase("error");
+    }
+  };
+
+  // Canned fallback shown on Skip (no recording needed). Renders a
+  // hand-crafted transcript + highlight + code that matches what the
+  // real flow would produce — keeps the wow moment for users who
+  // decline mic permission.
+  const cannedResult: DemoTranscribeResponse = {
+    transcript: t("participant_demo.canned_transcript"),
+    highlight: {
+      start: 0,
+      end: 0,
+      text: t("participant_demo.canned_highlight"),
+    },
+    code: {
+      label: t("participant_demo.canned_code"),
+      color: "#4f46e5",
+    },
+  };
+  const handleSkipToReveal = () => {
+    setResult(cannedResult);
+    setPhase("reveal");
+  };
+
+  return (
+    <div
+      className="onboarding-demo-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="demo-modal-title"
+      onClick={(e) => {
+        if (e.currentTarget === e.target && phase !== "uploading") onClose();
+      }}
+    >
+      <div className="onboarding-demo-modal__card">
+        <button
+          type="button"
+          className="onboarding-demo-modal__close"
+          onClick={onClose}
+          disabled={phase === "uploading"}
+          aria-label={t("participant_demo.close")}
+        >
+          ×
+        </button>
+        <div className="onboarding-demo-modal__header">
+          <div className="onboarding-demo-modal__eyebrow">
+            ✦ {t("participant_demo.modal_eyebrow")}
+          </div>
+          <h2
+            id="demo-modal-title"
+            className="onboarding-demo-modal__title"
+          >
+            {phase === "reveal"
+              ? t("participant_demo.modal_title_reveal")
+              : t("participant_demo.modal_title")}
+          </h2>
+          <p className="onboarding-demo-modal__body">
+            {phase === "reveal"
+              ? t("participant_demo.modal_body_reveal")
+              : t("participant_demo.modal_body")}
+          </p>
+        </div>
+
+        {phase !== "reveal" ? (
+          <DemoPhoneFrame>
+            <div className="onboarding-demo-phone__bot-question">
+              {t("participant_demo.question", { firstName })}
+            </div>
+            <div className="onboarding-demo-phone__controls">
+              {phase === "intro" && (
+                <button
+                  type="button"
+                  className="onboarding-demo-phone__record-button"
+                  onClick={handleStart}
+                  aria-label={t("participant_demo.start_recording")}
+                >
+                  <span className="onboarding-demo-phone__mic-icon">🎤</span>
+                  <span className="onboarding-demo-phone__record-label">
+                    {t("participant_demo.tap_to_speak")}
+                  </span>
+                </button>
+              )}
+              {phase === "permission" && (
+                <p className="onboarding-demo-phone__hint">
+                  {t("participant_demo.requesting_mic")}
+                </p>
+              )}
+              {phase === "recording" && isRecording && (
+                <button
+                  type="button"
+                  className="onboarding-demo-phone__record-button onboarding-demo-phone__record-button--active"
+                  onClick={handleStop}
+                  aria-label={t("participant_demo.stop_recording")}
+                >
+                  <span className="onboarding-demo-phone__pulse" aria-hidden />
+                  <span className="onboarding-demo-phone__record-label">
+                    {t("participant_demo.tap_to_stop")}
+                  </span>
+                </button>
+              )}
+              {phase === "uploading" && (
+                <p className="onboarding-demo-phone__hint">
+                  {t("participant_demo.transcribing")}
+                </p>
+              )}
+              {phase === "error" && (
+                <div className="onboarding-demo-phone__error">
+                  <p>{errorMsg}</p>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setErrorMsg("");
+                      setPhase("intro");
+                    }}
+                  >
+                    {t("participant_demo.try_again")}
+                  </button>
+                </div>
+              )}
+            </div>
+          </DemoPhoneFrame>
+        ) : (
+          result && <DemoRevealView result={result} />
+        )}
+
+        <div className="onboarding-demo-modal__footer">
+          {phase !== "reveal" && phase !== "uploading" && (
+            <button
+              type="button"
+              className="onboarding-demo-modal__skip"
+              onClick={handleSkipToReveal}
+            >
+              {t("participant_demo.skip_to_example")}
+            </button>
+          )}
+          {phase === "reveal" && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onClose}
+            >
+              {t("participant_demo.reveal_cta")}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Pure-CSS iPhone frame around its children. Cosmetic — collapses
+ *  to a phone-shaped rounded card on narrow viewports to avoid
+ *  the nested-phone weirdness on mobile devices. */
+function DemoPhoneFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="onboarding-demo-phone" aria-hidden={false}>
+      <div className="onboarding-demo-phone__notch" aria-hidden />
+      <div className="onboarding-demo-phone__screen">{children}</div>
+      <div className="onboarding-demo-phone__home-indicator" aria-hidden />
+    </div>
+  );
+}
+
+/** Reveal phase — show the user's transcript with a highlighted
+ *  span and the code tag the server picked. Mimics what the real
+ *  researcher analysis view will look like. */
+function DemoRevealView({
+  result,
+}: {
+  result: DemoTranscribeResponse;
+}) {
+  const { t } = useTranslation("onboarding");
+  const transcript = result.transcript || "";
+  const highlight = result.highlight;
+  // Render transcript with the highlighted span wrapped in a tagged
+  // <mark>. If no highlight, render plain transcript.
+  let pre = "";
+  let mid = "";
+  let post = "";
+  if (highlight && highlight.text && transcript) {
+    // Find the highlight text in the transcript (case-insensitive,
+    // tolerant of whitespace). Server returns char offsets but the
+    // transcript may have been normalised, so we re-search here for
+    // safety.
+    const idx = transcript.indexOf(highlight.text);
+    if (idx >= 0) {
+      pre = transcript.slice(0, idx);
+      mid = highlight.text;
+      post = transcript.slice(idx + highlight.text.length);
+    } else {
+      pre = transcript;
+    }
+  } else {
+    pre = transcript;
+  }
+
+  return (
+    <div className="onboarding-demo-reveal">
+      <div className="onboarding-demo-reveal__label">
+        {t("participant_demo.your_answer")}
+      </div>
+      <p className="onboarding-demo-reveal__transcript">
+        {pre}
+        {mid && (
+          <mark
+            className="onboarding-demo-reveal__highlight"
+            style={{ ["--highlight-color" as string]: result.code.color } as Record<string, string>}
+          >
+            {mid}
+          </mark>
+        )}
+        {post}
+      </p>
+      <div
+        className="onboarding-demo-reveal__code"
+        style={{ ["--code-color" as string]: result.code.color } as Record<string, string>}
+      >
+        <span className="onboarding-demo-reveal__code-dot" aria-hidden />
+        <span className="onboarding-demo-reveal__code-label">
+          {result.code.label}
         </span>
       </div>
+      <p className="onboarding-demo-reveal__caption">
+        {t("participant_demo.reveal_caption")}
+      </p>
     </div>
   );
 }

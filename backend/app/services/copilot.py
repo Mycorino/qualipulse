@@ -318,6 +318,7 @@ _TOOL_LABELS: dict[str, str] = {
     "propose_study": "Drafting your study",
     "suggest_replies": "Lining up some options",
     "request_website": "Checking your site",
+    "propose_participant_demo": "Spinning up a participant preview",
 }
 
 

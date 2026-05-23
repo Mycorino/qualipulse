@@ -29,6 +29,14 @@ def _onboarding_snapshot(company: Company) -> dict:
             "use_case": company.use_case or "",
             "website_url": company.website_url or "",
             "business_summary": (company.business_summary or "")[:600],
+            # V2 capture — informs marketing attribution + sales positioning.
+            "referral_source": company.referral_source or "",
+            "current_tool": company.current_tool or "",
+            # V3 capture — calibrates the agent's communication style
+            # (first-time researcher needs scaffolding) and qualifies
+            # the lead for sales (decision-maker vs evaluator).
+            "research_experience": company.research_experience or "",
+            "decision_role": company.decision_role or "",
         },
     }
 
@@ -47,12 +55,32 @@ their answer directly. Never ask company-profile questions first.
 - HARD CAP: at most 4 exchanges before you call `propose_study`. If the \
 researcher is vague or unsure, offer 3 concrete example goals to pick \
 from rather than interrogating them.
+- IMMEDIATELY after the researcher's FIRST message (i.e. in your second \
+turn overall), call `propose_participant_demo` to offer them an \
+iPhone-framed preview of what their participants will experience. \
+Engage briefly with their goal first ("Great starting point — onboarding \
+drop-off is a rich area"), then surface the demo card with a warm \
+lead-in. This is the wow moment of the entire flow — call it exactly \
+once and call it early. After the user dismisses or completes the demo, \
+pick up where you left off with profile capture + study draft.
 - In exchange 2 or 3 — once you've engaged with their goal but before \
 proposing — plant ONE short value beat that distinguishes this product \
 from a survey tool. Something like: *"Most teams would send a survey \
 here — but voice interviews surface the why, not just the what. The \
 follow-ups are where the real insight lives."* One line, not a pitch. \
 This is the only marketing you do in the whole conversation.
+- STRATEGIC CONTEXT (non-optional) — before proposing, you MUST have \
+captured: (1) the **decision** the researcher needs to make (e.g. \
+"rebuild onboarding vs polish"), (2) the **timeline** for that \
+decision (e.g. "decision in 2 weeks"), and (3) the **success \
+criterion** they'll use to know the research helped. These three plus \
+the audience description go into `propose_study` and drive every \
+downstream personalisation. If the user gives you a goal but no \
+decision, briefly ask: *"What's the decision that hangs on this?"* — \
+do NOT propose a study until you have it. Same for timeline: if \
+missing, ask "When do you need to land this?" with a chip set \
+(*2 weeks · 1 month · 1 quarter · No deadline*). Same for success \
+criterion: *"How will you know this research delivered?"*
 - Weave the profile in naturally — ask their role and company as ONE \
 light question, not a form. Call `save_profile` as you learn role, \
 company size, industry, or use case. It saves directly; it is not a card.
@@ -63,17 +91,35 @@ The user can still type freely if none fit; always include "Other" as \
 the last chip. For non-profile discrete questions, invent 3-5 short \
 options of your own. Never call `suggest_replies` for open free-text \
 questions (the opening research goal, study objective, etc.).
-- When you want to know about their company, call `request_website` \
-instead of asking them to describe it from scratch. The user can paste a \
-URL and we'll read their site for you. Use this AT MOST ONCE per \
-onboarding, and only after they've answered the opening research goal.
-- IMPORTANT: if the snapshot's ``profile.business_summary`` is already \
-populated, we pre-fetched it from the user's email domain at signup. In \
-that case, do NOT call `request_website`. Instead, reference what you \
-know naturally in your second message — e.g. "I see you're at {company} — \
-that's helpful context for the study." Don't recite the summary verbatim, \
-just show you read it. This is the highest-leverage trust moment in the \
-whole conversation: the user sees the product knew them before they spoke.
+- If the snapshot's ``profile.business_summary`` is ALREADY populated, \
+we pre-fetched it from the email domain at signup. In that case, do \
+NOT call `request_website`. Instead, reference what you know naturally \
+in your second message — e.g. *"I see you're at {company} — that's \
+helpful context for the study."* Don't recite the summary verbatim, \
+just show you read it. This is the highest-leverage trust moment.
+- If the snapshot's ``profile.business_summary`` is EMPTY (gmail / \
+free-text signup / prefetch missed), you MUST call `request_website` \
+exactly once between exchange 2 and exchange 3 — never zero times. The \
+card lets the user paste a URL and we'll read it; if they decline, \
+they can describe their company in chat instead. Don't propose a study \
+before you have at least the chat-described version of what their \
+company does.
+- Also capture four LIGHTWEIGHT signals naturally during the \
+conversation, with `suggest_replies` chips: (1) **how they found us** \
+— `referral_source` [Google, LinkedIn, Colleague, Other]; (2) **what \
+they use today for research** — `current_tool` [SurveyMonkey, Typeform, \
+User interviews on my own, Nothing yet, Other]; (3) **how experienced \
+they are** — `research_experience` [First study, A few past projects, \
+Seasoned researcher]; (4) **whether the decision is theirs** — \
+`decision_role` [I'll decide, I'm helping someone decide, Just \
+exploring]. Combine into TWO light questions max ("How did you find us, \
+and what do you use today?" then "Quick context — is this your first \
+project, and is the decision yours?") so it doesn't feel like a form.
+- Once `research_experience` is captured, adapt your communication \
+style: first-time researchers need brief explanations of why each \
+question matters ("interviews surface the *why*, not the *what*"); \
+seasoned researchers want you to be terse and get to the proposal \
+faster. Don't repeat this calibration aloud — just use it.
 - Call `remember` (scope "company") to durably record their research \
 goal, audience, and what their company does — this is the memory you \
 will carry into every future session.
@@ -103,6 +149,41 @@ _SAVE_PROFILE_TOOL = {
             "company_size": {"type": "string"},
             "industry": {"type": "string"},
             "use_case": {"type": "string"},
+            "referral_source": {
+                "type": "string",
+                "description": (
+                    "How the researcher found us. Use the canonical "
+                    "set (Google / LinkedIn / Colleague / Other) when "
+                    "the user picks from chips; pass their free-text "
+                    "answer otherwise."
+                ),
+            },
+            "current_tool": {
+                "type": "string",
+                "description": (
+                    "What they use today for research, if anything. "
+                    "Canonical chips: SurveyMonkey / Typeform / User "
+                    "interviews on my own / Nothing yet / Other."
+                ),
+            },
+            "research_experience": {
+                "type": "string",
+                "description": (
+                    "How experienced they are at running research. "
+                    "Canonical chips: First study / A few past "
+                    "projects / Seasoned researcher. Drives the "
+                    "agent's communication style going forward."
+                ),
+            },
+            "decision_role": {
+                "type": "string",
+                "description": (
+                    "Who's making the call on what to do with the "
+                    "research findings. Canonical chips: I'll decide / "
+                    "I'm helping someone decide / Just exploring. "
+                    "Critical sales / CSM qualification signal."
+                ),
+            },
         },
     },
 }
@@ -155,8 +236,47 @@ _PROPOSE_STUDY_TOOL = {
                     "If you're unsure, omit and the server will pick."
                 ),
             },
+            "decision_to_inform": {
+                "type": "string",
+                "description": (
+                    "The concrete business decision the research will "
+                    "feed into — e.g. 'rebuild onboarding vs polish' "
+                    "or 'kill or scale feature X'. Captured from the "
+                    "conversation. Required."
+                ),
+            },
+            "timeline": {
+                "type": "string",
+                "description": (
+                    "When the researcher needs to land the decision. "
+                    "Canonical chips: '2 weeks', '1 month', "
+                    "'1 quarter', 'No deadline'."
+                ),
+            },
+            "success_criteria": {
+                "type": "string",
+                "description": (
+                    "How they'll know the research delivered — e.g. "
+                    "'trial-to-paid lifts by 5 points' or 'leadership "
+                    "signs off on the redesign'. Captured from the "
+                    "conversation. Anchors the analysis output later."
+                ),
+            },
+            "target_customer_description": {
+                "type": "string",
+                "description": (
+                    "Who they need to interview — e.g. 'lapsed trial "
+                    "users from the last 60 days' or 'PMs at 50-200 "
+                    "person companies'. Drives recruitment guidance."
+                ),
+            },
         },
-        "required": ["study_name", "objective", "questions"],
+        "required": [
+            "study_name",
+            "objective",
+            "questions",
+            "decision_to_inform",
+        ],
     },
 }
 
@@ -177,7 +297,15 @@ _SUGGEST_REPLIES_TOOL = {
         "'Other'\n"
         "- use_case: 'Product discovery', 'Concept testing', "
         "'Onboarding research', 'Brand / messaging', 'Usability', "
-        "'Other'\n\n"
+        "'Other'\n"
+        "- referral_source: 'Google', 'LinkedIn', 'Colleague', 'Other'\n"
+        "- current_tool: 'SurveyMonkey', 'Typeform', 'User interviews "
+        "on my own', 'Nothing yet', 'Other'\n"
+        "- timeline: '2 weeks', '1 month', '1 quarter', 'No deadline'\n"
+        "- research_experience: 'First study', 'A few past projects', "
+        "'Seasoned researcher'\n"
+        "- decision_role: 'I'll decide', 'I'm helping someone decide', "
+        "'Just exploring'\n\n"
         "For other discrete questions, invent 3-5 short options yourself."
     ),
     "input_schema": {
@@ -190,11 +318,17 @@ _SUGGEST_REPLIES_TOOL = {
                     "company_size",
                     "industry",
                     "use_case",
+                    "referral_source",
+                    "current_tool",
+                    "timeline",
+                    "research_experience",
+                    "decision_role",
                     "custom",
                 ],
                 "description": (
                     "What the chips answer. Use the matching key for "
-                    "profile questions; 'custom' for everything else."
+                    "profile or strategic-context questions; 'custom' "
+                    "for everything else."
                 ),
             },
             "options": {
@@ -204,6 +338,35 @@ _SUGGEST_REPLIES_TOOL = {
             },
         },
         "required": ["context", "options"],
+    },
+}
+
+_PROPOSE_PARTICIPANT_DEMO_TOOL = {
+    "name": "propose_participant_demo",
+    "description": (
+        "Surface an iPhone-framed demo modal showing the researcher "
+        "what their participants will experience. The user records a "
+        "20-30s answer to a meta-question ('best onboarding you had '"
+        "recently'), then sees their own transcript with a highlighted "
+        "quote + code tag — exactly what they'll see for real "
+        "interviews. Call this AT MOST ONCE per onboarding, after the "
+        "user has shared their research goal but BEFORE you start "
+        "asking for profile fields. It is the wow moment — don't skip "
+        "it. The user can decline; the modal has a skip path."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "intro": {
+                "type": "string",
+                "description": (
+                    "One-line lead-in shown above the demo card in the "
+                    "chat, e.g. 'Before I draft your study, want to "
+                    "see what this will feel like for your "
+                    "participants?'"
+                ),
+            },
+        },
     },
 }
 
@@ -234,10 +397,20 @@ _ONBOARDING_TOOLS = [
     _PROPOSE_STUDY_TOOL,
     _SUGGEST_REPLIES_TOOL,
     _REQUEST_WEBSITE_TOOL,
+    _PROPOSE_PARTICIPANT_DEMO_TOOL,
     remember_tool("company"),
 ]
 
-_PROFILE_FIELDS = ("role", "company_size", "industry", "use_case")
+_PROFILE_FIELDS = (
+    "role",
+    "company_size",
+    "industry",
+    "use_case",
+    "referral_source",
+    "current_tool",
+    "research_experience",
+    "decision_role",
+)
 
 # Canonical chip sets. These are enforced server-side whenever the agent
 # calls `suggest_replies` with a profile `context`, so the UI is identical
@@ -275,6 +448,35 @@ _CANONICAL_REPLIES: dict[str, list[str]] = {
         "Brand / messaging",
         "Usability",
         "Other",
+    ],
+    "referral_source": [
+        "Google",
+        "LinkedIn",
+        "Colleague",
+        "Other",
+    ],
+    "current_tool": [
+        "SurveyMonkey",
+        "Typeform",
+        "User interviews on my own",
+        "Nothing yet",
+        "Other",
+    ],
+    "timeline": [
+        "2 weeks",
+        "1 month",
+        "1 quarter",
+        "No deadline",
+    ],
+    "research_experience": [
+        "First study",
+        "A few past projects",
+        "Seasoned researcher",
+    ],
+    "decision_role": [
+        "I'll decide",
+        "I'm helping someone decide",
+        "Just exploring",
     ],
 }
 
@@ -364,6 +566,16 @@ def _onboarding_run_tool(
                 "questions": questions,
                 "rationale": (tool_input.get("rationale") or "").strip(),
                 "recommended_participants": recommended_n,
+                "decision_to_inform": (
+                    tool_input.get("decision_to_inform") or ""
+                ).strip(),
+                "timeline": (tool_input.get("timeline") or "").strip(),
+                "success_criteria": (
+                    tool_input.get("success_criteria") or ""
+                ).strip(),
+                "target_customer_description": (
+                    tool_input.get("target_customer_description") or ""
+                ).strip(),
             }
         )
         return f"Proposed the first study with {len(questions)} question(s)."
@@ -407,6 +619,19 @@ def _onboarding_run_tool(
         )
         return "Attached a website-lookup card to this turn."
 
+    if name == "propose_participant_demo":
+        turn.actions.append(
+            {
+                "type": "propose_participant_demo",
+                "intro": (
+                    tool_input.get("intro")
+                    or "Before I draft your study — want to see what your "
+                    "participants will experience? Takes 30 seconds."
+                ).strip(),
+            }
+        )
+        return "Attached a participant-demo card to this turn."
+
     return f"Unknown tool: {name}"
 
 
@@ -426,6 +651,12 @@ def _onboarding_stub(company: Company, history: list[dict]) -> dict:
                     "Understand how this audience makes the decision at the "
                     "centre of your research, and what drives or blocks it."
                 ),
+                "decision_to_inform": "Whether to proceed, refine, or pivot.",
+                "timeline": "No deadline",
+                "success_criteria": (
+                    "Clear themes across at least 5 participants."
+                ),
+                "target_customer_description": "Recent users of the experience.",
                 "rationale": "Every study needs a clear objective to anchor the guide.",
                 "recommended_participants": _recommended_participants_for(company),
                 "questions": [

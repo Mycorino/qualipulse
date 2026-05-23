@@ -62,6 +62,10 @@ class Company(Base):
     # Free-form with suggestions: "Nothing yet" | "User interviews (service)" | "Dovetail" | etc.
     decision_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # "buyer" | "influencer" | "user" | "evaluator"
+    # How the researcher found us. Marketing attribution + cohort
+    # analysis depend on this. Free-text with suggested chips
+    # (Google / LinkedIn / Colleague / Other). Alembic 0033.
+    referral_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
     goals_classification: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Claude-classified bucket(s), e.g. "product_discovery,customer_retention"
 

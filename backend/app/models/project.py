@@ -48,6 +48,13 @@ class Project(Base):
     research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Study grounding — what business decision this study will inform
     decision_to_inform: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # When the researcher needs the answer ("2 weeks", "end of Q2", etc.)
+    # Drives email cadence + plan recommendation.
+    timeline: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # How the researcher will know the study delivered ("trial-to-paid
+    # lifts by 5 points", "leadership signs off on the redesign", etc.).
+    # Anchors the AI analysis output back to a concrete criterion.
+    success_criteria: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Who we're interviewing for this specific study (overrides company customer_type)
     target_customer_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

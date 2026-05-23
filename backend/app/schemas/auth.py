@@ -73,6 +73,8 @@ class OnboardingProfileRequest(BaseModel):
     interviews_per_month_target: Optional[str] = None
     current_tool: Optional[str] = None
     decision_role: Optional[str] = None
+    # V2 onboarding marketing-attribution signal.
+    referral_source: Optional[str] = None
 
     # Onboarding redesign — personal identity + recap
     first_name: Optional[str] = None
@@ -109,6 +111,7 @@ class CompanyResponse(BaseModel):
     interviews_per_month_target: Optional[str] = None
     current_tool: Optional[str] = None
     decision_role: Optional[str] = None
+    referral_source: Optional[str] = None
     goals_classification: Optional[str] = None
     current_priority: Optional[str] = None
     current_priority_updated_at: Optional[datetime] = None

@@ -6,6 +6,15 @@
 
   "greeting": "Hi {{firstName}} — I'm your Research Copilot. I help you run interviews and surveys without the scheduling-and-analysis grind.\n\nIn about two minutes we'll have a real study ready to share — and I'll start learning what your research looks like so I can be more useful next time.\n\nTo start: what's the one thing you most need to learn about your users right now?",
 
+  "goal_suggestions_label": "Or pick one to start:",
+  "goal_suggestions": [
+    "Why trial users churn",
+    "Test a new onboarding flow",
+    "Understand a new audience"
+  ],
+
+  "see_sample_link": "Or see what a finished study looks like first →",
+
   "phase": {
     "profile": "Tell me about your work",
     "frame": "Frame your study",
@@ -18,6 +27,10 @@
     "team_size": "Team size",
     "industry": "Industry",
     "use_case": "Use case",
+    "current_tool": "Today's tool",
+    "referral_source": "Found us via",
+    "research_experience": "Experience level",
+    "decision_role": "Decision role",
     "company": "Your company"
   },
 
@@ -31,7 +44,13 @@
     "create_cta": "Create this study",
     "hint": "or keep chatting to refine it",
     "recommended_label": "Recommended for your team",
-    "recommended_value": "{{count}} participants"
+    "recommended_value": "{{count}} participants",
+    "show_questions": "See the {{count}} interview questions ▾",
+    "hide_questions": "Hide the {{count}} questions ▴",
+    "context_decision": "Decision",
+    "context_timeline": "Timeline",
+    "context_audience": "Who you'll interview",
+    "context_success": "Success criteria"
   },
 
   "website": {
@@ -62,6 +81,53 @@
     "body": "We'll also email you when your first response comes in — so you don't have to keep checking. Verify your email and you're set.",
     "accept": "Yes, send the verify link",
     "dismiss": "Not now"
+  },
+
+  "sample_modal": {
+    "close": "Close",
+    "eyebrow": "Sample study",
+    "title": "Here's what we'll build together",
+    "body": "A finished study has a sharp objective, a recommended participant count for your team, and a lean interview guide. The Copilot drafts all of it from a 2-minute conversation. When you're ready, close this and tell me what you want to learn.",
+    "cta": "Got it — let's draft mine",
+    "example": {
+      "name": "Why mid-market PMs choose Linear over Jira",
+      "objective": "Understand the decision moment when product teams switch tools, so we can sharpen our positioning for the mid-market segment.",
+      "q1_section": "CONTEXT",
+      "q1_question": "Tell me about the last time your team chose a new tool — what was the spark?",
+      "q2_section": "DECISION MOMENT",
+      "q2_question": "Walk me through how you evaluated the options. What mattered most?",
+      "q3_section": "WHAT WOULD HAVE HELPED",
+      "q3_question": "Looking back, what would have made the decision easier or faster?"
+    }
+  },
+
+  "participant_demo": {
+    "invite_eyebrow": "30-second preview",
+    "invite_open": "Take a 30s test interview",
+    "invite_skip": "Skip and keep going",
+    "modal_eyebrow": "Participant preview",
+    "modal_title": "Here's what your participants will see",
+    "modal_title_reveal": "And here's what you'll see when they're done",
+    "modal_body": "We'll ask you one quick question — the same way your participants will be asked theirs. About 30 seconds.",
+    "modal_body_reveal": "Real interviews go through transcription, automatic highlighting, and tagging. Imagine seeing 30 of these analysed together.",
+    "question": "Hi {{firstName}} — quick question: tell me about the best onboarding experience you had recently, and what made it stand out?",
+    "tap_to_speak": "Tap to speak",
+    "tap_to_stop": "Tap when done",
+    "start_recording": "Start recording your answer",
+    "stop_recording": "Stop recording",
+    "requesting_mic": "Asking for microphone access…",
+    "transcribing": "Transcribing your answer…",
+    "try_again": "Try again",
+    "skip_to_example": "Skip — just show me the example",
+    "reveal_cta": "Got it — let's draft my study →",
+    "your_answer": "Your answer",
+    "reveal_caption": "Real studies surface dozens of these — the codes group similar moments across participants automatically.",
+    "close": "Close",
+    "error_mic_denied": "Microphone access was denied. You can still see the example below.",
+    "error_generic": "Couldn't transcribe — try again or skip to the example.",
+    "canned_transcript": "What stood out was that they literally walked me through setting up my first project in under two minutes. I felt like I knew what I was doing right away, not like I was being tested on whether I could figure it out.",
+    "canned_highlight": "walked me through setting up my first project in under two minutes",
+    "canned_code": "First-success moment"
   },
 
   "chat_error": "Sorry — I couldn't respond just now. Please try again.",
