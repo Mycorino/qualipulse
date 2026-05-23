@@ -104,6 +104,22 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     logger.info("New company signup: %s", company.email)
     emit_event("signup", company=company, plan_requested=requested_plan or "starter")
 
+    # W2.5 — fire the domain pre-fetch in a background thread so the
+    # copilot walks into the very first /welcome turn already knowing
+    # what the company does. Never blocks signup, never fails the
+    # caller. Skips freemail domains automatically.
+    try:
+        from app.services.signup_prefetch import prefetch_company_intel
+        prefetch_company_intel(
+            company_id=company.id,
+            email=company.email,
+            language=signup_lang,
+        )
+    except Exception:
+        # Defence-in-depth — prefetch_company_intel already swallows,
+        # but the import itself shouldn't be allowed to break signup.
+        logger.exception("signup prefetch failed to schedule")
+
     # Check for affiliate referral code (from query params or body)
     ref_code = None
     if hasattr(body, "ref_code") and body.ref_code:

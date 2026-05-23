@@ -103,6 +103,8 @@ auto-interview/
 │   │       ├── analysis.py          # AI synthesis + refined analysis
 │   │       ├── copilot.py           # Research Copilot turn engine (Opus 4.7, SSE streaming, scoped memory, tool dispatch)
 │   │       ├── copilot_onboarding.py # ONBOARDING_ADAPTER (save_profile, propose_study, suggest_replies, request_website, remember) — drives /welcome
+│   │       ├── signup_prefetch.py   # W2.5 — background website pre-fetch keyed off the user's email domain at signup
+│   │       ├── analytics.py         # Funnel-event INFO logger (signup / onboarding_completed / study_created / link_shared / participant_completed / paid_converted)
 │   │       ├── quality.py           # Heuristic quality scoring
 │   │       ├── feature_gates.py     # Legacy tier-based limits (used by legacy plans only)
 │   │       ├── billing_plans.py     # Credits-based plan catalogue (8 plans, 76 entitlements)
@@ -458,6 +460,7 @@ Layout: a 2-column shell under a milestone bar.
 - **Conversation (right)** — streaming Copilot chat. Assistant turns can carry attachments:
   - **Quick-reply chips** — server-enforced canonical options for `role` / `company_size` / `industry` / `use_case`. The `suggest_replies` tool's `context` is an `enum`; whenever it matches a profile key the server discards whatever the model emitted and substitutes the canonical set (instruction + post-processing = two safety layers). Always includes "Other" as the escape hatch. Free typing remains available.
   - **Website-lookup card** — URL input + "Look it up" button that calls the existing `/auth/website-intel`, persists `business_summary`, and injects the summary back into the conversation as the user's next message.
+  - **Domain pre-fetch at signup (W2.5)** — for corporate emails (anything not in the freemail allowlist in `services/signup_prefetch.py`), a background thread fires `fetch_website_summary` against the email's domain right after the Company row commits. Writes `website_url` + `business_summary` + `industry` if those fields aren't already user-set. The agent's snapshot picks up the pre-fetched summary on the very first turn, and the methodology explicitly tells it to reference the company naturally in its second message rather than calling `request_website`. Daemonised thread — never blocks signup, swallows every error path.
   - **Study proposal card** — `propose_study` emits `create_first_study`; one-click accept runs `POST /projects/` + `PATCH settings` (objective) + 5–7 `POST /guide` calls.
 
 Once a study is accepted: `POST /auth/onboarding` marks `onboarding_completed = true`, and a completion screen shows the study name + a memory recap fetched from `GET /onboarding/copilot/memory` ("Here's what I'll remember about your research"). The header **"Skip — just take me in"** bypasses everything; email verification is non-blocking (yellow banner with Resend link until verified).
