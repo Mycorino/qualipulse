@@ -39,6 +39,7 @@ const SurveyPreview = lazy(() => import("./pages/SurveyPreview"));
 const SurveyDashboardPage = lazy(() => import("./pages/SurveyDashboard"));
 const PublicResponse = lazy(() => import("./pages/PublicResponse"));
 const StudyOverview = lazy(() => import("./pages/StudyOverview"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -208,6 +209,10 @@ export default function App() {
           </OnboardedRoute>
         }
       />
+      {/* Catch-all 404 — renders a real "Page not found" UI with
+          noindex,follow so Search Console stops flagging unknown URLs as
+          soft 404s. Must stay last; React Router matches in order. */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>
     </ToastProvider>

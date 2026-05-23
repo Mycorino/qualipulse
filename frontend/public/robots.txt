@@ -1,0 +1,40 @@
+# QualiPulse — crawler policy
+#
+# We're an SPA: nginx returns the same index.html for every path, so Googlebot
+# can technically fetch anything with a 200. Auth-walled routes render a blank
+# shell when unauthenticated, which gets flagged as a soft 404 in Search
+# Console. The rules below keep crawlers on the genuinely public surfaces and
+# off the rest.
+
+User-agent: *
+
+# Auth-walled product surfaces — blank shell when crawled
+Disallow: /dashboard
+Disallow: /account
+Disallow: /admin
+Disallow: /welcome
+Disallow: /projects/
+Disallow: /studies
+Disallow: /surveys
+
+# Dynamic-token URLs — only resolvable for the specific recipient
+Disallow: /i/
+Disallow: /interview/
+Disallow: /reports/
+Disallow: /r/
+Disallow: /team/
+
+# Auth callbacks and one-time-link landings — never useful in search
+Disallow: /auth/
+Disallow: /verify-email
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Affiliate portal — gated by application/login
+Disallow: /affiliate
+Disallow: /affiliate/
+
+# Internal design-system showcase — not customer-facing
+Disallow: /design-system/
+
+Sitemap: https://app.qualipulse.com/sitemap.xml
