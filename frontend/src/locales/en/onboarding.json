@@ -29,6 +29,8 @@
     "use_case": "Use case",
     "current_tool": "Today's tool",
     "referral_source": "Found us via",
+    "research_experience": "Experience level",
+    "decision_role": "Decision role",
     "company": "Your company"
   },
 
@@ -97,6 +99,35 @@
       "q3_section": "WHAT WOULD HAVE HELPED",
       "q3_question": "Looking back, what would have made the decision easier or faster?"
     }
+  },
+
+  "participant_demo": {
+    "invite_eyebrow": "30-second preview",
+    "invite_open": "Take a 30s test interview",
+    "invite_skip": "Skip and keep going",
+    "modal_eyebrow": "Participant preview",
+    "modal_title": "Here's what your participants will see",
+    "modal_title_reveal": "And here's what you'll see when they're done",
+    "modal_body": "We'll ask you one quick question — the same way your participants will be asked theirs. About 30 seconds.",
+    "modal_body_reveal": "Real interviews go through transcription, automatic highlighting, and tagging. Imagine seeing 30 of these analysed together.",
+    "question": "Hi {{firstName}} — quick question: tell me about the best onboarding experience you had recently, and what made it stand out?",
+    "tap_to_speak": "Tap to speak",
+    "tap_to_stop": "Tap when done",
+    "start_recording": "Start recording your answer",
+    "stop_recording": "Stop recording",
+    "requesting_mic": "Asking for microphone access…",
+    "transcribing": "Transcribing your answer…",
+    "try_again": "Try again",
+    "skip_to_example": "Skip — just show me the example",
+    "reveal_cta": "Got it — let's draft my study →",
+    "your_answer": "Your answer",
+    "reveal_caption": "Real studies surface dozens of these — the codes group similar moments across participants automatically.",
+    "close": "Close",
+    "error_mic_denied": "Microphone access was denied. You can still see the example below.",
+    "error_generic": "Couldn't transcribe — try again or skip to the example.",
+    "canned_transcript": "What stood out was that they literally walked me through setting up my first project in under two minutes. I felt like I knew what I was doing right away, not like I was being tested on whether I could figure it out.",
+    "canned_highlight": "walked me through setting up my first project in under two minutes",
+    "canned_code": "First-success moment"
   },
 
   "chat_error": "Sorry — I couldn't respond just now. Please try again.",

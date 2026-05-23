@@ -32,6 +32,11 @@ def _onboarding_snapshot(company: Company) -> dict:
             # V2 capture — informs marketing attribution + sales positioning.
             "referral_source": company.referral_source or "",
             "current_tool": company.current_tool or "",
+            # V3 capture — calibrates the agent's communication style
+            # (first-time researcher needs scaffolding) and qualifies
+            # the lead for sales (decision-maker vs evaluator).
+            "research_experience": company.research_experience or "",
+            "decision_role": company.decision_role or "",
         },
     }
 
@@ -50,6 +55,14 @@ their answer directly. Never ask company-profile questions first.
 - HARD CAP: at most 4 exchanges before you call `propose_study`. If the \
 researcher is vague or unsure, offer 3 concrete example goals to pick \
 from rather than interrogating them.
+- IMMEDIATELY after the researcher's FIRST message (i.e. in your second \
+turn overall), call `propose_participant_demo` to offer them an \
+iPhone-framed preview of what their participants will experience. \
+Engage briefly with their goal first ("Great starting point — onboarding \
+drop-off is a rich area"), then surface the demo card with a warm \
+lead-in. This is the wow moment of the entire flow — call it exactly \
+once and call it early. After the user dismisses or completes the demo, \
+pick up where you left off with profile capture + study draft.
 - In exchange 2 or 3 — once you've engaged with their goal but before \
 proposing — plant ONE short value beat that distinguishes this product \
 from a survey tool. Something like: *"Most teams would send a survey \
@@ -91,15 +104,22 @@ card lets the user paste a URL and we'll read it; if they decline, \
 they can describe their company in chat instead. Don't propose a study \
 before you have at least the chat-described version of what their \
 company does.
-- Also capture two LIGHTWEIGHT marketing signals naturally during the \
+- Also capture four LIGHTWEIGHT signals naturally during the \
 conversation, with `suggest_replies` chips: (1) **how they found us** \
-— save to `referral_source` via `save_profile` using the canonical \
-chip set [Google, LinkedIn, Colleague, Other]; (2) **what they use \
-today for research** — save to `current_tool` via the canonical set \
-[SurveyMonkey, Typeform, User interviews on my own, Nothing yet, Other]. \
-Combine these into ONE light question if possible ("Quick context — \
-how did you find us, and what do you use today for research?") so it \
-doesn't feel like an interrogation.
+— `referral_source` [Google, LinkedIn, Colleague, Other]; (2) **what \
+they use today for research** — `current_tool` [SurveyMonkey, Typeform, \
+User interviews on my own, Nothing yet, Other]; (3) **how experienced \
+they are** — `research_experience` [First study, A few past projects, \
+Seasoned researcher]; (4) **whether the decision is theirs** — \
+`decision_role` [I'll decide, I'm helping someone decide, Just \
+exploring]. Combine into TWO light questions max ("How did you find us, \
+and what do you use today?" then "Quick context — is this your first \
+project, and is the decision yours?") so it doesn't feel like a form.
+- Once `research_experience` is captured, adapt your communication \
+style: first-time researchers need brief explanations of why each \
+question matters ("interviews surface the *why*, not the *what*"); \
+seasoned researchers want you to be terse and get to the proposal \
+faster. Don't repeat this calibration aloud — just use it.
 - Call `remember` (scope "company") to durably record their research \
 goal, audience, and what their company does — this is the memory you \
 will carry into every future session.
@@ -144,6 +164,24 @@ _SAVE_PROFILE_TOOL = {
                     "What they use today for research, if anything. "
                     "Canonical chips: SurveyMonkey / Typeform / User "
                     "interviews on my own / Nothing yet / Other."
+                ),
+            },
+            "research_experience": {
+                "type": "string",
+                "description": (
+                    "How experienced they are at running research. "
+                    "Canonical chips: First study / A few past "
+                    "projects / Seasoned researcher. Drives the "
+                    "agent's communication style going forward."
+                ),
+            },
+            "decision_role": {
+                "type": "string",
+                "description": (
+                    "Who's making the call on what to do with the "
+                    "research findings. Canonical chips: I'll decide / "
+                    "I'm helping someone decide / Just exploring. "
+                    "Critical sales / CSM qualification signal."
                 ),
             },
         },
@@ -263,7 +301,11 @@ _SUGGEST_REPLIES_TOOL = {
         "- referral_source: 'Google', 'LinkedIn', 'Colleague', 'Other'\n"
         "- current_tool: 'SurveyMonkey', 'Typeform', 'User interviews "
         "on my own', 'Nothing yet', 'Other'\n"
-        "- timeline: '2 weeks', '1 month', '1 quarter', 'No deadline'\n\n"
+        "- timeline: '2 weeks', '1 month', '1 quarter', 'No deadline'\n"
+        "- research_experience: 'First study', 'A few past projects', "
+        "'Seasoned researcher'\n"
+        "- decision_role: 'I'll decide', 'I'm helping someone decide', "
+        "'Just exploring'\n\n"
         "For other discrete questions, invent 3-5 short options yourself."
     ),
     "input_schema": {
@@ -279,6 +321,8 @@ _SUGGEST_REPLIES_TOOL = {
                     "referral_source",
                     "current_tool",
                     "timeline",
+                    "research_experience",
+                    "decision_role",
                     "custom",
                 ],
                 "description": (
@@ -294,6 +338,35 @@ _SUGGEST_REPLIES_TOOL = {
             },
         },
         "required": ["context", "options"],
+    },
+}
+
+_PROPOSE_PARTICIPANT_DEMO_TOOL = {
+    "name": "propose_participant_demo",
+    "description": (
+        "Surface an iPhone-framed demo modal showing the researcher "
+        "what their participants will experience. The user records a "
+        "20-30s answer to a meta-question ('best onboarding you had '"
+        "recently'), then sees their own transcript with a highlighted "
+        "quote + code tag — exactly what they'll see for real "
+        "interviews. Call this AT MOST ONCE per onboarding, after the "
+        "user has shared their research goal but BEFORE you start "
+        "asking for profile fields. It is the wow moment — don't skip "
+        "it. The user can decline; the modal has a skip path."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "intro": {
+                "type": "string",
+                "description": (
+                    "One-line lead-in shown above the demo card in the "
+                    "chat, e.g. 'Before I draft your study, want to "
+                    "see what this will feel like for your "
+                    "participants?'"
+                ),
+            },
+        },
     },
 }
 
@@ -324,6 +397,7 @@ _ONBOARDING_TOOLS = [
     _PROPOSE_STUDY_TOOL,
     _SUGGEST_REPLIES_TOOL,
     _REQUEST_WEBSITE_TOOL,
+    _PROPOSE_PARTICIPANT_DEMO_TOOL,
     remember_tool("company"),
 ]
 
@@ -334,6 +408,8 @@ _PROFILE_FIELDS = (
     "use_case",
     "referral_source",
     "current_tool",
+    "research_experience",
+    "decision_role",
 )
 
 # Canonical chip sets. These are enforced server-side whenever the agent
@@ -391,6 +467,16 @@ _CANONICAL_REPLIES: dict[str, list[str]] = {
         "1 month",
         "1 quarter",
         "No deadline",
+    ],
+    "research_experience": [
+        "First study",
+        "A few past projects",
+        "Seasoned researcher",
+    ],
+    "decision_role": [
+        "I'll decide",
+        "I'm helping someone decide",
+        "Just exploring",
     ],
 }
 
@@ -532,6 +618,19 @@ def _onboarding_run_tool(
             }
         )
         return "Attached a website-lookup card to this turn."
+
+    if name == "propose_participant_demo":
+        turn.actions.append(
+            {
+                "type": "propose_participant_demo",
+                "intro": (
+                    tool_input.get("intro")
+                    or "Before I draft your study — want to see what your "
+                    "participants will experience? Takes 30 seconds."
+                ).strip(),
+            }
+        )
+        return "Attached a participant-demo card to this turn."
 
     return f"Unknown tool: {name}"
 

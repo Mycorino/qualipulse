@@ -13,10 +13,13 @@ import {
 import {
   runOnboardingCopilot,
   getOnboardingMemory,
+  transcribeDemoAudio,
   type CopilotMessage,
+  type DemoTranscribeResponse,
   type ProposedAction,
   type ProposedGuideQuestion,
 } from "../api/copilot";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import {
   createProject,
   patchProjectSettings,
@@ -44,6 +47,8 @@ type ThreadItem = {
   replies?: { context?: string; options: string[] };
   /** Website-lookup card the agent attached to this turn. */
   website?: { prompt: string };
+  /** Participant-experience demo card the agent attached to this turn. */
+  participantDemo?: { intro: string };
   /** True once the user has used the chips/website card on this turn —
    *  prevents re-use after the conversation moves on. */
   consumed?: boolean;
@@ -153,6 +158,10 @@ export default function Welcome() {
   // without committing to drafting their own.
   const [showSamplePreview, setShowSamplePreview] = useState(false);
 
+  // V3 — participant-experience demo modal. Opened from the inline
+  // demo card the agent posts after the user's first message.
+  const [showParticipantDemo, setShowParticipantDemo] = useState(false);
+
   // W3.5 — controls the "want a recap by email?" verify modal on the
   // completion screen. Initial value reads localStorage so a refresh
   // doesn't re-pop the modal once the user dismissed it.
@@ -234,16 +243,33 @@ export default function Welcome() {
       const websiteAction = resp.proposed_actions.find(
         (a) => a.type === "request_website",
       );
+      const demoAction = resp.proposed_actions.find(
+        (a) => a.type === "propose_participant_demo",
+      );
       const replies = repliesAction?.options?.length
         ? { context: repliesAction.context, options: repliesAction.options }
         : undefined;
       const website = websiteAction
         ? { prompt: websiteAction.prompt || "Paste your company URL." }
         : undefined;
+      const participantDemo = demoAction
+        ? {
+            intro:
+              demoAction.intro ||
+              "Want to see what your participants will experience?",
+          }
+        : undefined;
       setThread((prev) =>
         prev.map((it, i) =>
           i === prev.length - 1 && it.role === "assistant"
-            ? { ...it, text: resp.reply, study, replies, website }
+            ? {
+                ...it,
+                text: resp.reply,
+                study,
+                replies,
+                website,
+                participantDemo,
+              }
             : it,
         ),
       );
@@ -393,6 +419,22 @@ export default function Welcome() {
           {
             key: "referral_source" as keyof CompanyResponse,
             label: t("sidebar.referral_source"),
+          },
+        ]
+      : []),
+    ...(me.research_experience
+      ? [
+          {
+            key: "research_experience" as keyof CompanyResponse,
+            label: t("sidebar.research_experience"),
+          },
+        ]
+      : []),
+    ...(me.decision_role
+      ? [
+          {
+            key: "decision_role" as keyof CompanyResponse,
+            label: t("sidebar.decision_role"),
           },
         ]
       : []),
@@ -666,6 +708,14 @@ export default function Welcome() {
                       onSkip={() => consumeAttachment(i)}
                     />
                   )}
+                  {showAttachments && it.participantDemo && (
+                    <ParticipantDemoInvite
+                      intro={it.participantDemo.intro}
+                      disabled={busy || creating}
+                      onOpen={() => setShowParticipantDemo(true)}
+                      onSkip={() => consumeAttachment(i)}
+                    />
+                  )}
                   {showAttachments && it.replies && (
                     <ReplyChips
                       options={it.replies.options}
@@ -743,6 +793,13 @@ export default function Welcome() {
 
       {showSamplePreview && (
         <SampleStudyPreview onClose={() => setShowSamplePreview(false)} />
+      )}
+
+      {showParticipantDemo && (
+        <ParticipantDemoModal
+          firstName={me.first_name || "there"}
+          onClose={() => setShowParticipantDemo(false)}
+        />
       )}
     </div>
   );
@@ -1223,6 +1280,353 @@ function StudyCard({
         </button>
         <span className="onboarding-study__hint">{t("study.hint")}</span>
       </div>
+    </div>
+  );
+}
+
+/* ── V3 — Participant-experience demo (iPhone-framed embedded interview) ──
+ *
+ * Two components:
+ *   1. <ParticipantDemoInvite> — the inline chat card the agent posts.
+ *      Just an intro line + two buttons (Open / Skip).
+ *   2. <ParticipantDemoModal>  — the full-screen overlay with the
+ *      iPhone frame, mic recording, transcribe round-trip, and the
+ *      analysis-view reveal.
+ */
+
+function ParticipantDemoInvite({
+  intro,
+  disabled,
+  onOpen,
+  onSkip,
+}: {
+  intro: string;
+  disabled: boolean;
+  onOpen: () => void;
+  onSkip: () => void;
+}) {
+  const { t } = useTranslation("onboarding");
+  return (
+    <div className="onboarding-demo-invite">
+      <div className="onboarding-demo-invite__eyebrow">
+        ✦ {t("participant_demo.invite_eyebrow")}
+      </div>
+      <p className="onboarding-demo-invite__intro">{intro}</p>
+      <div className="onboarding-demo-invite__actions">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={onOpen}
+          disabled={disabled}
+        >
+          {t("participant_demo.invite_open")}
+        </button>
+        <button
+          type="button"
+          className="onboarding-demo-invite__skip"
+          onClick={onSkip}
+          disabled={disabled}
+        >
+          {t("participant_demo.invite_skip")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+type DemoPhase =
+  | "intro"        // Bot question on screen, mic not yet engaged
+  | "permission"   // Awaiting mic permission
+  | "recording"    // User holding/talking
+  | "uploading"    // Whisper round trip
+  | "reveal"       // Transcript + highlight + code shown
+  | "error";
+
+function ParticipantDemoModal({
+  firstName,
+  onClose,
+}: {
+  firstName: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation("onboarding");
+  const [phase, setPhase] = useState<DemoPhase>("intro");
+  const [result, setResult] = useState<DemoTranscribeResponse | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string>("");
+  const { isRecording, error: recorderError, startRecording, stopRecording } =
+    useAudioRecorder();
+
+  // Escape closes the modal at any phase except mid-upload (don't
+  // strand the user if Whisper is mid-call).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && phase !== "uploading") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose, phase]);
+
+  // Mirror the recorder hook's error state into our local error
+  // phase so the UI can render a clear message.
+  useEffect(() => {
+    if (recorderError) {
+      setErrorMsg(
+        recorderError === "PERMISSION_DENIED"
+          ? t("participant_demo.error_mic_denied")
+          : recorderError,
+      );
+      setPhase("error");
+    }
+  }, [recorderError, t]);
+
+  const handleStart = async () => {
+    setPhase("permission");
+    await startRecording();
+    // If permission was denied the hook will surface via recorderError;
+    // otherwise it flips isRecording on. Let the effect catch errors.
+    setPhase((prev) => (prev === "permission" ? "recording" : prev));
+  };
+
+  const handleStop = async () => {
+    setPhase("uploading");
+    try {
+      const blob = await stopRecording();
+      const res = await transcribeDemoAudio(blob);
+      setResult(res);
+      setPhase("reveal");
+    } catch (err: unknown) {
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : t("participant_demo.error_generic"),
+      );
+      setPhase("error");
+    }
+  };
+
+  // Canned fallback shown on Skip (no recording needed). Renders a
+  // hand-crafted transcript + highlight + code that matches what the
+  // real flow would produce — keeps the wow moment for users who
+  // decline mic permission.
+  const cannedResult: DemoTranscribeResponse = {
+    transcript: t("participant_demo.canned_transcript"),
+    highlight: {
+      start: 0,
+      end: 0,
+      text: t("participant_demo.canned_highlight"),
+    },
+    code: {
+      label: t("participant_demo.canned_code"),
+      color: "#4f46e5",
+    },
+  };
+  const handleSkipToReveal = () => {
+    setResult(cannedResult);
+    setPhase("reveal");
+  };
+
+  return (
+    <div
+      className="onboarding-demo-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="demo-modal-title"
+      onClick={(e) => {
+        if (e.currentTarget === e.target && phase !== "uploading") onClose();
+      }}
+    >
+      <div className="onboarding-demo-modal__card">
+        <button
+          type="button"
+          className="onboarding-demo-modal__close"
+          onClick={onClose}
+          disabled={phase === "uploading"}
+          aria-label={t("participant_demo.close")}
+        >
+          ×
+        </button>
+        <div className="onboarding-demo-modal__header">
+          <div className="onboarding-demo-modal__eyebrow">
+            ✦ {t("participant_demo.modal_eyebrow")}
+          </div>
+          <h2
+            id="demo-modal-title"
+            className="onboarding-demo-modal__title"
+          >
+            {phase === "reveal"
+              ? t("participant_demo.modal_title_reveal")
+              : t("participant_demo.modal_title")}
+          </h2>
+          <p className="onboarding-demo-modal__body">
+            {phase === "reveal"
+              ? t("participant_demo.modal_body_reveal")
+              : t("participant_demo.modal_body")}
+          </p>
+        </div>
+
+        {phase !== "reveal" ? (
+          <DemoPhoneFrame>
+            <div className="onboarding-demo-phone__bot-question">
+              {t("participant_demo.question", { firstName })}
+            </div>
+            <div className="onboarding-demo-phone__controls">
+              {phase === "intro" && (
+                <button
+                  type="button"
+                  className="onboarding-demo-phone__record-button"
+                  onClick={handleStart}
+                  aria-label={t("participant_demo.start_recording")}
+                >
+                  <span className="onboarding-demo-phone__mic-icon">🎤</span>
+                  <span className="onboarding-demo-phone__record-label">
+                    {t("participant_demo.tap_to_speak")}
+                  </span>
+                </button>
+              )}
+              {phase === "permission" && (
+                <p className="onboarding-demo-phone__hint">
+                  {t("participant_demo.requesting_mic")}
+                </p>
+              )}
+              {phase === "recording" && isRecording && (
+                <button
+                  type="button"
+                  className="onboarding-demo-phone__record-button onboarding-demo-phone__record-button--active"
+                  onClick={handleStop}
+                  aria-label={t("participant_demo.stop_recording")}
+                >
+                  <span className="onboarding-demo-phone__pulse" aria-hidden />
+                  <span className="onboarding-demo-phone__record-label">
+                    {t("participant_demo.tap_to_stop")}
+                  </span>
+                </button>
+              )}
+              {phase === "uploading" && (
+                <p className="onboarding-demo-phone__hint">
+                  {t("participant_demo.transcribing")}
+                </p>
+              )}
+              {phase === "error" && (
+                <div className="onboarding-demo-phone__error">
+                  <p>{errorMsg}</p>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setErrorMsg("");
+                      setPhase("intro");
+                    }}
+                  >
+                    {t("participant_demo.try_again")}
+                  </button>
+                </div>
+              )}
+            </div>
+          </DemoPhoneFrame>
+        ) : (
+          result && <DemoRevealView result={result} />
+        )}
+
+        <div className="onboarding-demo-modal__footer">
+          {phase !== "reveal" && phase !== "uploading" && (
+            <button
+              type="button"
+              className="onboarding-demo-modal__skip"
+              onClick={handleSkipToReveal}
+            >
+              {t("participant_demo.skip_to_example")}
+            </button>
+          )}
+          {phase === "reveal" && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onClose}
+            >
+              {t("participant_demo.reveal_cta")}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Pure-CSS iPhone frame around its children. Cosmetic — collapses
+ *  to a phone-shaped rounded card on narrow viewports to avoid
+ *  the nested-phone weirdness on mobile devices. */
+function DemoPhoneFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="onboarding-demo-phone" aria-hidden={false}>
+      <div className="onboarding-demo-phone__notch" aria-hidden />
+      <div className="onboarding-demo-phone__screen">{children}</div>
+      <div className="onboarding-demo-phone__home-indicator" aria-hidden />
+    </div>
+  );
+}
+
+/** Reveal phase — show the user's transcript with a highlighted
+ *  span and the code tag the server picked. Mimics what the real
+ *  researcher analysis view will look like. */
+function DemoRevealView({
+  result,
+}: {
+  result: DemoTranscribeResponse;
+}) {
+  const { t } = useTranslation("onboarding");
+  const transcript = result.transcript || "";
+  const highlight = result.highlight;
+  // Render transcript with the highlighted span wrapped in a tagged
+  // <mark>. If no highlight, render plain transcript.
+  let pre = "";
+  let mid = "";
+  let post = "";
+  if (highlight && highlight.text && transcript) {
+    // Find the highlight text in the transcript (case-insensitive,
+    // tolerant of whitespace). Server returns char offsets but the
+    // transcript may have been normalised, so we re-search here for
+    // safety.
+    const idx = transcript.indexOf(highlight.text);
+    if (idx >= 0) {
+      pre = transcript.slice(0, idx);
+      mid = highlight.text;
+      post = transcript.slice(idx + highlight.text.length);
+    } else {
+      pre = transcript;
+    }
+  } else {
+    pre = transcript;
+  }
+
+  return (
+    <div className="onboarding-demo-reveal">
+      <div className="onboarding-demo-reveal__label">
+        {t("participant_demo.your_answer")}
+      </div>
+      <p className="onboarding-demo-reveal__transcript">
+        {pre}
+        {mid && (
+          <mark
+            className="onboarding-demo-reveal__highlight"
+            style={{ ["--highlight-color" as string]: result.code.color } as Record<string, string>}
+          >
+            {mid}
+          </mark>
+        )}
+        {post}
+      </p>
+      <div
+        className="onboarding-demo-reveal__code"
+        style={{ ["--code-color" as string]: result.code.color } as Record<string, string>}
+      >
+        <span className="onboarding-demo-reveal__code-dot" aria-hidden />
+        <span className="onboarding-demo-reveal__code-label">
+          {result.code.label}
+        </span>
+      </div>
+      <p className="onboarding-demo-reveal__caption">
+        {t("participant_demo.reveal_caption")}
+      </p>
     </div>
   );
 }

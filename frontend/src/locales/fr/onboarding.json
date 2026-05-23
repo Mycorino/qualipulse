@@ -29,6 +29,8 @@
     "use_case": "Cas d'usage",
     "current_tool": "Outil actuel",
     "referral_source": "Trouvé via",
+    "research_experience": "Expérience",
+    "decision_role": "Rôle dans la décision",
     "company": "Votre entreprise"
   },
 
@@ -97,6 +99,35 @@
       "q3_section": "CE QUI AURAIT AIDÉ",
       "q3_question": "Avec le recul, qu'est-ce qui aurait rendu la décision plus simple ou plus rapide ?"
     }
+  },
+
+  "participant_demo": {
+    "invite_eyebrow": "Aperçu de 30 secondes",
+    "invite_open": "Tester un entretien de 30 s",
+    "invite_skip": "Passer et continuer",
+    "modal_eyebrow": "Aperçu participant",
+    "modal_title": "Voici ce que vos participants verront",
+    "modal_title_reveal": "Et voici ce que vous verrez après leur passage",
+    "modal_body": "Nous allons vous poser une question rapide — exactement comme vos participants. Environ 30 secondes.",
+    "modal_body_reveal": "Les vrais entretiens passent par la transcription, le surlignage automatique et le tagging. Imaginez 30 de ces réponses analysées ensemble.",
+    "question": "Bonjour {{firstName}} — petite question : parlez-moi du meilleur onboarding que vous avez vécu récemment, et de ce qui l'a rendu marquant ?",
+    "tap_to_speak": "Touchez pour parler",
+    "tap_to_stop": "Touchez quand fini",
+    "start_recording": "Commencer l'enregistrement",
+    "stop_recording": "Arrêter l'enregistrement",
+    "requesting_mic": "Demande d'accès au micro…",
+    "transcribing": "Transcription de votre réponse…",
+    "try_again": "Réessayer",
+    "skip_to_example": "Passer — montrez-moi l'exemple",
+    "reveal_cta": "Compris — rédigeons mon étude →",
+    "your_answer": "Votre réponse",
+    "reveal_caption": "Les vraies études font émerger des dizaines de ces moments — les codes regroupent automatiquement les passages similaires entre participants.",
+    "close": "Fermer",
+    "error_mic_denied": "Accès au micro refusé. Vous pouvez voir l'exemple ci-dessous.",
+    "error_generic": "Transcription impossible — réessayez ou passez à l'exemple.",
+    "canned_transcript": "Ce qui m'a marqué c'est qu'ils m'ont littéralement guidé pour configurer mon premier projet en moins de deux minutes. J'ai eu le sentiment de savoir ce que je faisais tout de suite, pas d'être testé sur ma capacité à comprendre.",
+    "canned_highlight": "guidé pour configurer mon premier projet en moins de deux minutes",
+    "canned_code": "Moment de premier succès"
   },
 
   "chat_error": "Désolé — je n'ai pas pu répondre à l'instant. Merci de réessayer.",

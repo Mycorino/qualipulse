@@ -54,7 +54,8 @@ export interface ProposedAction {
     | "refine_analysis"
     | "create_first_study"
     | "suggest_replies"
-    | "request_website";
+    | "request_website"
+    | "propose_participant_demo";
   /** add_question / add_guide_question */
   question?: ProposedSurveyQuestion | ProposedGuideQuestion;
   /** edit / remove */
@@ -86,6 +87,9 @@ export interface ProposedAction {
   context?: string;
   /** request_website (onboarding) */
   prompt?: string;
+  /** propose_participant_demo (onboarding) — lead-in text shown in
+   *  the chat above the demo card. */
+  intro?: string;
 }
 
 export interface CopilotResponse {
@@ -264,6 +268,38 @@ export async function getOnboardingMemory(): Promise<OnboardingMemory> {
     memory: resp.data.memory || "",
     profile_summary: resp.data.profile_summary || "",
   };
+}
+
+/** V3 participant-experience demo response. */
+export interface DemoTranscribeResponse {
+  transcript: string;
+  highlight: { start: number; end: number; text: string } | null;
+  code: { label: string; color: string };
+}
+
+/** Send the user's demo recording for Whisper transcription + light
+ *  keyword coding. Preview only — nothing persists. */
+export async function transcribeDemoAudio(
+  audio: Blob,
+): Promise<DemoTranscribeResponse> {
+  const form = new FormData();
+  // Whisper picks up the extension from the filename — pass through
+  // whatever the recorder gave us (webm on Chrome, m4a on Safari).
+  const filename = audio.type.includes("mp4")
+    ? "demo.m4a"
+    : audio.type.includes("ogg")
+      ? "demo.ogg"
+      : "demo.webm";
+  form.append("audio", audio, filename);
+  const resp = await client.post<DemoTranscribeResponse>(
+    "/onboarding/demo-interview/transcribe",
+    form,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
+    },
+  );
+  return resp.data;
 }
 
 export async function getConversation(

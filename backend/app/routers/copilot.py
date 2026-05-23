@@ -321,6 +321,16 @@ def _build_profile_summary(
     sentences: list[str] = []
     if who:
         sentences.append(who + ".")
+    # V3 — research experience changes the tone of everything that
+    # follows. Surfacing it in the recap proves the agent listened.
+    experience = (company.research_experience or "").strip()
+    if experience:
+        if experience.lower().startswith("first"):
+            sentences.append("This is your first research project — I'll keep things clear and explain as we go.")
+        elif "seasoned" in experience.lower():
+            sentences.append("You're a seasoned researcher — I'll keep it lean and skip the basics.")
+        else:
+            sentences.append(f"Research experience: {experience.lower()}.")
     if use_case:
         sentences.append(f"You're using QualiPulse for {use_case.lower()}.")
 

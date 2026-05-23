@@ -10785,6 +10785,339 @@ select.field-input {
   .onboarding-sample-modal { animation: none; }
 }
 
+/* ── V3 — Participant-experience demo (iPhone-framed embedded interview) ─ */
+
+.onboarding-demo-invite {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.10), rgba(124, 58, 237, 0.08));
+  border: 1px solid var(--brand-300, var(--border-default));
+  border-radius: var(--radius-md);
+}
+.onboarding-demo-invite__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+.onboarding-demo-invite__intro {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+.onboarding-demo-invite__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: 4px;
+}
+.onboarding-demo-invite__skip {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 0;
+}
+.onboarding-demo-invite__skip:hover:not(:disabled) {
+  color: var(--text-secondary);
+}
+.onboarding-demo-invite__skip:disabled { opacity: 0.5; cursor: default; }
+
+.onboarding-demo-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  background: rgba(15, 23, 42, 0.6);
+  animation: onboardingFade var(--dur-fast) var(--ease-out);
+  overflow-y: auto;
+}
+.onboarding-demo-modal__card {
+  position: relative;
+  width: 100%;
+  max-width: 540px;
+  max-height: 95vh;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.onboarding-demo-modal__close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: none;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.onboarding-demo-modal__close:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--text-primary);
+}
+.onboarding-demo-modal__close:disabled { opacity: 0.4; cursor: default; }
+.onboarding-demo-modal__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 28px;
+}
+.onboarding-demo-modal__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+.onboarding-demo-modal__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  margin: 0;
+}
+.onboarding-demo-modal__body {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.onboarding-demo-modal__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-2);
+}
+.onboarding-demo-modal__skip {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 0;
+}
+
+/* iPhone frame — pure CSS shell. Notch + home indicator + rounded
+ * corners + subtle bezel highlight. Collapses to a phone-shaped
+ * rounded card under 480px so we don't nest a phone inside a phone. */
+.onboarding-demo-phone {
+  align-self: center;
+  position: relative;
+  width: 320px;
+  height: 560px;
+  background: #0f172a;
+  border-radius: 38px;
+  padding: 12px;
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.9),
+    0 0 0 4px rgba(255, 255, 255, 0.08) inset,
+    0 22px 60px rgba(15, 23, 42, 0.4);
+}
+.onboarding-demo-phone__notch {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 22px;
+  background: #0f172a;
+  border-radius: 0 0 16px 16px;
+  z-index: 1;
+}
+.onboarding-demo-phone__home-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.onboarding-demo-phone__screen {
+  height: 100%;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #fafafa, #f3f4f6);
+  padding: 44px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.onboarding-demo-phone__bot-question {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2937;
+  font-weight: 500;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px 14px 14px 4px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+.onboarding-demo-phone__controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.onboarding-demo-phone__record-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: var(--brand-600);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 22px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.4);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.onboarding-demo-phone__record-button:hover {
+  transform: translateY(-1px);
+}
+.onboarding-demo-phone__record-button--active {
+  background: #dc2626;
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.5);
+}
+.onboarding-demo-phone__mic-icon {
+  font-size: 20px;
+}
+.onboarding-demo-phone__record-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+.onboarding-demo-phone__pulse {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  animation: onboardingPulse 1s ease-in-out infinite;
+}
+.onboarding-demo-phone__hint {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+  text-align: center;
+}
+.onboarding-demo-phone__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #b91c1c;
+  text-align: center;
+}
+@keyframes onboardingPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-demo-modal { animation: none; }
+  .onboarding-demo-phone__pulse { animation: none; }
+}
+
+/* Mobile — collapse the recursive phone frame to a phone-shaped card. */
+@media (max-width: 480px) {
+  .onboarding-demo-phone {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    min-height: 420px;
+    border-radius: 24px;
+    padding: 24px 12px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25);
+  }
+  .onboarding-demo-phone__notch,
+  .onboarding-demo-phone__home-indicator { display: none; }
+  .onboarding-demo-phone__screen { padding: 16px; }
+}
+
+/* Reveal view — transcript with highlighted span + code tag. */
+.onboarding-demo-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--bg-surface-alt, rgba(79, 70, 229, 0.04));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.onboarding-demo-reveal__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.onboarding-demo-reveal__transcript {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+.onboarding-demo-reveal__highlight {
+  background: color-mix(in srgb, var(--highlight-color, var(--brand-600)) 20%, transparent);
+  color: var(--text-primary);
+  padding: 0 2px;
+  border-radius: 3px;
+  border-bottom: 2px solid var(--highlight-color, var(--brand-600));
+}
+.onboarding-demo-reveal__code {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.onboarding-demo-reveal__code-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--code-color, var(--brand-600));
+}
+.onboarding-demo-reveal__caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
 /* ── Completion-screen action bundle (the 3-CTA layout) ──────────────── */
 .onboarding-done__actions {
   width: 100%;
