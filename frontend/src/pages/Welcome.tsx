@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, ReactNode, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
   getMe,
   completeOnboarding,
   resendVerification,
+  analyseWebsite,
   type CompanyResponse,
 } from "../api/auth";
 import {
@@ -36,7 +37,44 @@ type ThreadItem = {
   text: string;
   /** Attached to an assistant turn that proposed the first study. */
   study?: ProposedAction;
+  /** Tap-to-answer chips the agent attached to this turn. */
+  replies?: { context?: string; options: string[] };
+  /** Website-lookup card the agent attached to this turn. */
+  website?: { prompt: string };
+  /** True once the user has used the chips/website card on this turn —
+   *  prevents re-use after the conversation moves on. */
+  consumed?: boolean;
 };
+
+type Phase = "profile" | "frame" | "launch";
+
+/**
+ * Lightweight inline markdown renderer — handles `**bold**` and `*italic*`.
+ * Newlines/lists are preserved by `white-space: pre-wrap` on
+ * `.onboarding-msg__text`. Dependency-free, same pattern as the copilot panel.
+ */
+function renderRich(text: string): ReactNode {
+  // Split on **bold** first so single-asterisk italics inside survive.
+  const parts: ReactNode[] = [];
+  text.split("**").forEach((chunk, i) => {
+    const node = i % 2 === 1 ? (
+      <strong key={`b-${i}`}>{renderItalics(chunk, i)}</strong>
+    ) : (
+      <Fragment key={`p-${i}`}>{renderItalics(chunk, i)}</Fragment>
+    );
+    parts.push(node);
+  });
+  return parts;
+}
+
+function renderItalics(text: string, parentKey: number): ReactNode {
+  return text.split(/(\*[^*\n]+\*)/g).map((seg, j) => {
+    if (seg.startsWith("*") && seg.endsWith("*") && seg.length > 2) {
+      return <em key={`i-${parentKey}-${j}`}>{seg.slice(1, -1)}</em>;
+    }
+    return <Fragment key={`t-${parentKey}-${j}`}>{seg}</Fragment>;
+  });
+}
 
 const greeting = (firstName: string): string =>
   `Hi ${firstName} — I'm your Research Copilot. I help you run interviews ` +
@@ -112,13 +150,28 @@ export default function Welcome() {
       const study = resp.proposed_actions.find(
         (a) => a.type === "create_first_study",
       );
+      const repliesAction = resp.proposed_actions.find(
+        (a) => a.type === "suggest_replies",
+      );
+      const websiteAction = resp.proposed_actions.find(
+        (a) => a.type === "request_website",
+      );
+      const replies = repliesAction?.options?.length
+        ? { context: repliesAction.context, options: repliesAction.options }
+        : undefined;
+      const website = websiteAction
+        ? { prompt: websiteAction.prompt || "Paste your company URL." }
+        : undefined;
       setThread((t) =>
         t.map((it, i) =>
           i === t.length - 1 && it.role === "assistant"
-            ? { ...it, text: resp.reply, study }
+            ? { ...it, text: resp.reply, study, replies, website }
             : it,
         ),
       );
+      // Profile fields may have been written by `save_profile` —
+      // refresh `me` so the "What I know about you" panel updates.
+      getMe().then(setMe).catch(() => undefined);
     } catch {
       setThread((t) =>
         t.map((it, i) =>
@@ -168,6 +221,34 @@ export default function Welcome() {
     }
   };
 
+  // Mark a turn's chip/website attachment as consumed once the user has
+  // acted on it — keeps the chips from re-appearing alongside later turns.
+  const consumeAttachment = (turnIndex: number) => {
+    setThread((t) =>
+      t.map((it, i) => (i === turnIndex ? { ...it, consumed: true } : it)),
+    );
+  };
+
+  // After a website lookup, drop the resulting summary into the conversation
+  // as the user's next message so the agent can incorporate it.
+  const handleWebsiteLookup = async (turnIndex: number, url: string) => {
+    if (!url || busy) return;
+    consumeAttachment(turnIndex);
+    try {
+      const res = await analyseWebsite(url);
+      const summary = (res.business_summary || "").trim();
+      if (!summary) {
+        toast("Couldn't read that site — try a different URL.", "error");
+        return;
+      }
+      // Refresh `me` — backend will have saved website_url + business_summary.
+      getMe().then(setMe).catch(() => undefined);
+      await send(`Our company: ${url}\n\n${summary}`);
+    } catch {
+      toast("Couldn't read that site — try a different URL.", "error");
+    }
+  };
+
   const skip = async () => {
     if (creating) return;
     setCreating(true);
@@ -182,6 +263,24 @@ export default function Welcome() {
   };
 
   if (!me) return null;
+
+  // Phase: tell-me-about-your-work until 2+ profile fields are set; frame
+  // your study until the agent has proposed one; launch once accepted.
+  const profileFields: { key: keyof CompanyResponse; label: string }[] = [
+    { key: "role", label: "Role" },
+    { key: "company_size", label: "Team size" },
+    { key: "industry", label: "Industry" },
+    { key: "use_case", label: "Use case" },
+  ];
+  const profileFilled = profileFields.filter((f) => !!me[f.key]).length;
+  const studyProposed = thread.some((t) => !!t.study);
+  const phase: Phase = done
+    ? "launch"
+    : studyProposed
+      ? "frame"
+      : profileFilled >= 2
+        ? "frame"
+        : "profile";
 
   if (done) {
     return (
@@ -255,31 +354,64 @@ export default function Welcome() {
         </div>
       )}
 
-      <div className="onboarding__thread" ref={threadRef}>
-        {thread.map((it, i) => (
-          <div key={i} className={`onboarding-msg onboarding-msg--${it.role}`}>
-            {it.text && (
-              <div className="onboarding-msg__text">{it.text}</div>
-            )}
-            {it.study && (
-              <StudyCard
-                study={it.study}
-                onAccept={() => acceptStudy(it.study!)}
-                disabled={creating}
-              />
-            )}
-          </div>
-        ))}
-        {busy && (
-          <div className="onboarding-msg onboarding-msg--assistant">
-            <div className="onboarding-msg__text onboarding-msg__text--thinking">
-              Drafting…
-            </div>
-          </div>
-        )}
-      </div>
+      <MilestoneBar phase={phase} />
 
-      <div className="onboarding__input">
+      <div className="onboarding__layout">
+        <ProfileSidebar me={me} profileFields={profileFields} />
+
+        <div className="onboarding__main">
+          <div className="onboarding__thread" ref={threadRef}>
+            {thread.map((it, i) => {
+              const lastTurn = i === thread.length - 1;
+              const showAttachments = lastTurn && !it.consumed && !busy;
+              return (
+                <div
+                  key={i}
+                  className={`onboarding-msg onboarding-msg--${it.role}`}
+                >
+                  {it.text && (
+                    <div className="onboarding-msg__text">
+                      {renderRich(it.text)}
+                    </div>
+                  )}
+                  {it.study && (
+                    <StudyCard
+                      study={it.study}
+                      onAccept={() => acceptStudy(it.study!)}
+                      disabled={creating}
+                    />
+                  )}
+                  {showAttachments && it.website && (
+                    <WebsiteCard
+                      prompt={it.website.prompt}
+                      disabled={busy || creating}
+                      onLookup={(url) => handleWebsiteLookup(i, url)}
+                      onSkip={() => consumeAttachment(i)}
+                    />
+                  )}
+                  {showAttachments && it.replies && (
+                    <ReplyChips
+                      options={it.replies.options}
+                      disabled={busy || creating}
+                      onPick={(text) => {
+                        consumeAttachment(i);
+                        send(text);
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+            {busy && (
+              <div className="onboarding-msg onboarding-msg--assistant">
+                <div className="onboarding-msg__text onboarding-msg__text--thinking">
+                  Drafting…
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="onboarding__input">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -299,9 +431,168 @@ export default function Welcome() {
           onClick={() => send(input)}
           disabled={busy || creating || !input.trim()}
         >
-          Send
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MilestoneBar({ phase }: { phase: Phase }) {
+  const steps: { id: Phase; label: string }[] = [
+    { id: "profile", label: "Tell me about your work" },
+    { id: "frame", label: "Frame your study" },
+    { id: "launch", label: "Launch" },
+  ];
+  const order: Phase[] = ["profile", "frame", "launch"];
+  const currentIdx = order.indexOf(phase);
+  return (
+    <ol className="onboarding-milestones" aria-label="Onboarding progress">
+      {steps.map((s, i) => {
+        const state = i < currentIdx ? "done" : i === currentIdx ? "active" : "todo";
+        return (
+          <li
+            key={s.id}
+            className={`onboarding-milestones__step onboarding-milestones__step--${state}`}
+          >
+            <span className="onboarding-milestones__dot" aria-hidden>
+              {state === "done" ? "✓" : i + 1}
+            </span>
+            <span className="onboarding-milestones__label">{s.label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ProfileSidebar({
+  me,
+  profileFields,
+}: {
+  me: CompanyResponse;
+  profileFields: { key: keyof CompanyResponse; label: string }[];
+}) {
+  const summary = (me.business_summary || "").trim();
+  return (
+    <aside className="onboarding-sidebar" aria-label="What the copilot knows">
+      <div className="onboarding-sidebar__eyebrow">What I know about you</div>
+      <ul className="onboarding-sidebar__list">
+        {profileFields.map((f) => {
+          const value = (me[f.key] as string | null | undefined) || "";
+          return (
+            <li
+              key={String(f.key)}
+              className={`onboarding-sidebar__row onboarding-sidebar__row--${value ? "filled" : "empty"}`}
+            >
+              <span className="onboarding-sidebar__check" aria-hidden>
+                {value ? "✓" : "○"}
+              </span>
+              <span className="onboarding-sidebar__label">{f.label}</span>
+              {value && (
+                <span className="onboarding-sidebar__value">{value}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {summary && (
+        <div className="onboarding-sidebar__summary">
+          <div className="onboarding-sidebar__summary-label">
+            Your company
+          </div>
+          <p className="onboarding-sidebar__summary-text">{summary}</p>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function ReplyChips({
+  options,
+  disabled,
+  onPick,
+}: {
+  options: string[];
+  disabled: boolean;
+  onPick: (text: string) => void;
+}) {
+  return (
+    <div className="onboarding-chips" role="group" aria-label="Quick replies">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          className="onboarding-chip"
+          disabled={disabled}
+          onClick={() => onPick(opt)}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function WebsiteCard({
+  prompt,
+  disabled,
+  onLookup,
+  onSkip,
+}: {
+  prompt: string;
+  disabled: boolean;
+  onLookup: (url: string) => void;
+  onSkip: () => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [working, setWorking] = useState(false);
+  const submit = async () => {
+    const v = url.trim();
+    if (!v || working) return;
+    setWorking(true);
+    await onLookup(v);
+    setWorking(false);
+  };
+  return (
+    <div className="onboarding-website">
+      <div className="onboarding-website__eyebrow">✦ Quick lookup</div>
+      <p className="onboarding-website__prompt">{prompt}</p>
+      <div className="onboarding-website__row">
+        <input
+          type="url"
+          inputMode="url"
+          autoComplete="url"
+          placeholder="https://yourcompany.com"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          disabled={disabled || working}
+        />
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={submit}
+          disabled={disabled || working || !url.trim()}
+        >
+          {working ? "Reading…" : "Look it up"}
         </button>
       </div>
+      <button
+        type="button"
+        className="onboarding-website__skip"
+        onClick={onSkip}
+        disabled={disabled || working}
+      >
+        I'd rather just tell you
+      </button>
     </div>
   );
 }
