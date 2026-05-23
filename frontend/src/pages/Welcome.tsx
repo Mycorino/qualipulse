@@ -99,7 +99,10 @@ function trialDayInfo(trialEndsAt: string | null | undefined): {
 
 const greeting = (firstName: string): string =>
   `Hi ${firstName} — I'm your Research Copilot. I help you run interviews ` +
-  `and surveys without the scheduling-and-synthesis grind.\n\n` +
+  `and surveys without the scheduling-and-analysis grind.\n\n` +
+  `In about two minutes we'll have a real study ready to share — and ` +
+  `I'll start learning what your research looks like so I can be more ` +
+  `useful next time.\n\n` +
   `To start: what's the one thing you most need to learn about your users ` +
   `right now?`;
 
@@ -732,6 +735,16 @@ function StudyCard({
           </li>
         ))}
       </ol>
+      {typeof study.recommended_participants === "number" && (
+        <div className="onboarding-study__recommend">
+          <span className="onboarding-study__recommend-label">
+            Recommended for your team
+          </span>
+          <span className="onboarding-study__recommend-value">
+            {study.recommended_participants} participants
+          </span>
+        </div>
+      )}
       <div className="onboarding-study__actions">
         <button
           type="button"

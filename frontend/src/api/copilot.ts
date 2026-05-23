@@ -72,6 +72,8 @@ export interface ProposedAction {
   objective?: string;
   questions?: ProposedGuideQuestion[];
   rationale?: string;
+  /** Suggested participant count scaled to the captured company_size. */
+  recommended_participants?: number;
   /** suggest_replies (onboarding) */
   options?: string[];
   context?: string;
