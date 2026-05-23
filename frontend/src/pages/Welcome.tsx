@@ -97,6 +97,30 @@ function trialDayInfo(trialEndsAt: string | null | undefined): {
   return { day: Math.max(1, Math.min(total, elapsed + 1)), total };
 }
 
+/**
+ * W3.6 — soft plan suggestion. Maps captured `company_size` to the
+ * plan that fits, so the completion screen plants the price anchor
+ * the user will eventually see. No CTA — just a quiet line.
+ * Returns null when we don't have enough signal to suggest.
+ */
+function planSuggestion(companySize: string | null | undefined): {
+  name: string;
+  monthly: string;
+} | null {
+  const size = (companySize || "").trim();
+  if (!size) return null;
+  if (size === "1–10" || size === "1-10") {
+    return { name: "Exploration", monthly: "€89" };
+  }
+  if (size === "11–50" || size === "11-50" || size === "51–200" || size === "51-200") {
+    return { name: "Team", monthly: "€299" };
+  }
+  if (size === "201–1000" || size === "201-1000" || size === "1000+") {
+    return { name: "Agency", monthly: "€799" };
+  }
+  return null;
+}
+
 const greeting = (firstName: string): string =>
   `Hi ${firstName} — I'm your Research Copilot. I help you run interviews ` +
   `and surveys without the scheduling-and-analysis grind.\n\n` +
@@ -126,6 +150,18 @@ export default function Welcome() {
     profileSummary: string;
     interviewToken: string | null;
   } | null>(null);
+  // W3.5 — controls the "want a recap by email?" verify modal on the
+  // completion screen. Initial value reads localStorage so a refresh
+  // doesn't re-pop the modal once the user dismissed it.
+  const [verifyModalDismissed, setVerifyModalDismissed] = useState<boolean>(
+    () => {
+      try {
+        return localStorage.getItem("verify_modal_dismissed") === "1";
+      } catch {
+        return false;
+      }
+    },
+  );
   const threadRef = useRef<HTMLDivElement>(null);
 
   // Load the researcher, redirect out if already onboarded, and seed the
@@ -356,6 +392,32 @@ export default function Welcome() {
       done.memory.trim() ||
       "I'll learn more about your research as we work together.";
 
+    // W3.6 — soft plan line, only when we have signal.
+    const plan = planSuggestion(me.company_size);
+
+    // W3.5 — only show the recap-by-email modal once per browser and
+    // only when an unverified email is the actual obstacle.
+    const showVerifyModal = !me.email_verified && !verifyModalDismissed;
+    const dismissVerifyModal = () => {
+      try {
+        localStorage.setItem("verify_modal_dismissed", "1");
+      } catch {
+        /* no-op — sessionStorage / private mode */
+      }
+      setVerifyModalDismissed(true);
+    };
+    const acceptVerifyModal = () => {
+      resendVerification()
+        .then(() =>
+          toast(
+            "Sent — check your inbox to verify and unlock email recaps.",
+            "success",
+          ),
+        )
+        .catch(() => toast("Couldn't resend right now.", "error"));
+      dismissVerifyModal();
+    };
+
     return (
       <div className="onboarding">
         <header className="onboarding__bar">
@@ -380,6 +442,14 @@ export default function Welcome() {
             </div>
             <p className="onboarding-done__memory-text">{recapText}</p>
           </div>
+
+          {plan && (
+            <p className="onboarding-done__plan-hint">
+              Your trial includes everything in <strong>{plan.name}</strong>
+              {" "}
+              ({plan.monthly}/mo). Stay on past Day 14 to keep going.
+            </p>
+          )}
 
           <div className="onboarding-done__actions">
             <button
@@ -423,6 +493,47 @@ export default function Welcome() {
             </div>
           </div>
         </div>
+
+        {showVerifyModal && (
+          <div
+            className="onboarding-verify-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="verify-modal-title"
+          >
+            <div className="onboarding-verify-modal__card">
+              <div className="onboarding-verify-modal__eyebrow">
+                ✦ One small thing
+              </div>
+              <h2
+                id="verify-modal-title"
+                className="onboarding-verify-modal__title"
+              >
+                Want a recap of this conversation by email?
+              </h2>
+              <p className="onboarding-verify-modal__body">
+                We'll also email you when your first response comes in — so you
+                don't have to keep checking. Verify your email and you're set.
+              </p>
+              <div className="onboarding-verify-modal__actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={acceptVerifyModal}
+                >
+                  Yes, send the verify link
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={dismissVerifyModal}
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

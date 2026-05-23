@@ -10486,6 +10486,81 @@ select.field-input {
   white-space: pre-wrap;
 }
 
+/* W3.6 — soft plan suggestion under the memory recap. Quiet, single
+ * line, no CTA. Just plants the price anchor users will see at Day 14. */
+.onboarding-done__plan-hint {
+  margin: var(--space-2) 0 0;
+  padding: 10px var(--space-3);
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  text-align: left;
+}
+.onboarding-done__plan-hint strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* W3.5 — recap-by-email verify modal on the completion screen. Shown
+ * only when the email is unverified AND the user hasn't dismissed it
+ * before. Trades a verify action for ongoing return-emails. */
+.onboarding-verify-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(15, 23, 42, 0.55);
+  animation: onboardingFade var(--dur-fast) var(--ease-out);
+}
+.onboarding-verify-modal__card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.onboarding-verify-modal__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+.onboarding-verify-modal__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  margin: 0;
+}
+.onboarding-verify-modal__body {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.onboarding-verify-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+@keyframes onboardingFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-verify-modal { animation: none; }
+}
+
 /* ── Completion-screen action bundle (the 3-CTA layout) ──────────────── */
 .onboarding-done__actions {
   width: 100%;

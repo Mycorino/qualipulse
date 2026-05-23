@@ -100,6 +100,14 @@ class Company(Base):
     # user re-opens the welcome flow after clearing localStorage).
     demo_seeded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # Set the first time a participant completes an interview anywhere in
+    # this workspace. Idempotency guard for the "your first response is
+    # in" lifecycle email — fire-once, never re-send (the trigger is
+    # special; "every response" would be spam). Alembic 0023.
+    first_response_email_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
 
