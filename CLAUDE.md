@@ -48,7 +48,10 @@ A SaaS platform that lets companies create AI-driven voice interviews. Researche
 **Stack:**
 - **Backend:** FastAPI (Python) + SQLAlchemy + PostgreSQL (prod) / SQLite (dev), JWT auth
 - **Frontend:** React 18 + Vite + TypeScript
-- **AI:** Claude (`claude-sonnet-4-20250514`) for adaptive interview orchestration + analysis
+- **AI:**
+  - Interview orchestration + analysis: Claude Sonnet (`claude-sonnet-4-20250514`)
+  - Research Copilot (surface-level chat agent + onboarding): Claude **Opus 4.7** (`claude-opus-4-7`) with adaptive thinking (`thinking: {type: "adaptive"}`), `output_config: {effort: "high"}`, and prompt-cache breakpoints on system blocks
+  - Anthropic SDK pinned at **`anthropic==0.102.0`** (0.43.x lacked `output_config` / adaptive thinking)
 - **STT:** OpenAI Whisper (`whisper-1`)
 - **TTS:** OpenAI TTS (`tts-1`, voice: `alloy`)
 - **Infra:** GCP Cloud Run (auto-scaling), Neon PostgreSQL, Cloudflare R2 (audio storage)
@@ -96,8 +99,10 @@ auto-interview/
 │   │   │   ├── project.py       # Pydantic schemas for project + screening questions
 │   │   │   └── interview.py     # StartInterviewRequest (with demographics), responses
 │   │   └── services/
-│   │       ├── interview_engine.py  # Core AI orchestration (Claude)
+│   │       ├── interview_engine.py  # Core AI orchestration (Claude Sonnet)
 │   │       ├── analysis.py          # AI synthesis + refined analysis
+│   │       ├── copilot.py           # Research Copilot turn engine (Opus 4.7, SSE streaming, scoped memory, tool dispatch)
+│   │       ├── copilot_onboarding.py # ONBOARDING_ADAPTER (save_profile, propose_study, suggest_replies, request_website, remember) — drives /welcome
 │   │       ├── quality.py           # Heuristic quality scoring
 │   │       ├── feature_gates.py     # Legacy tier-based limits (used by legacy plans only)
 │   │       ├── billing_plans.py     # Credits-based plan catalogue (8 plans, 76 entitlements)
@@ -157,8 +162,12 @@ auto-interview/
 │   │   │   ├── auth.ts          # login, register, refreshToken, onboarding, email verification
 │   │   │   ├── projects.ts      # projects CRUD, links, participants, analysis, codes, tags, memos, export
 │   │   │   ├── interviews.ts    # getInterviewInfo, getScreeningQuestions, submitScreening, startInterview, submitAudio
-│   │   │   ├── research.ts      # AI brief parsing, objective/scope/question suggestions
+│   │   │   ├── copilot.ts       # Research Copilot SSE client (fetch + ReadableStream, status/delta/done handlers)
 │   │   │   └── blog.ts          # Blog API (public listing + admin CRUD)
+│   │   ├── copilot/
+│   │   │   ├── nextAction.ts        # Deterministic NBA resolvers (project / survey / workspace / study summary)
+│   │   │   ├── signals.ts           # Client-side nudge detection (localStorage diff, 5 event types, 24h TTL)
+│   │   │   └── useNudgeAnnounce.ts  # aria-live polite announcer for new nudges
 │   │   ├── hooks/
 │   │   │   ├── useAuth.ts       # JWT auth state
 │   │   │   └── useAudioRecorder.ts  # Safari-compatible MediaRecorder
@@ -169,7 +178,7 @@ auto-interview/
 │   │   │   ├── Signup.tsx
 │   │   │   ├── ForgotPassword.tsx
 │   │   │   ├── ResetPassword.tsx
-│   │   │   ├── Welcome.tsx           # 4-step onboarding (verify email → profile → use case → ready)
+│   │   │   ├── Welcome.tsx           # Conversational onboarding: chat with Copilot + milestone bar + "What I know" sidebar + chips + website lookup → first study
 │   │   │   ├── VerifyEmail.tsx       # Token-based email verification page
 │   │   │   ├── Terms.tsx             # Terms of Service
 │   │   │   ├── Privacy.tsx           # Privacy Policy (GDPR-compliant)
@@ -188,6 +197,8 @@ auto-interview/
 │   │   ├── components/
 │   │   │   ├── Toast.tsx        # Toast notification system
 │   │   │   ├── Skeleton.tsx     # Loading placeholders
+│   │   │   ├── ResearchCopilotPanel.tsx  # Always-on Copilot dock + open panel (mission, NBA starter, nudges, streaming)
+│   │   │   ├── NextActionChip.tsx        # Renders one resolved NBA (inline button or compact dock pill)
 │   │   │   └── ErrorBoundary.tsx
 │   │   ├── index.css            # Design system (CSS custom properties, no framework)
 │   │   ├── Marketing.css
@@ -422,18 +433,43 @@ boot, no-ops after the first.
 - ✅ V2.2 (this) — rollover policy. Purchased + prior-rollover credits roll forever; included credits expire at period end. Consumption attributes to buckets in this order: included → rollover → purchased, so unused purchased credits survive even when usage exceeds the included grant. Implemented in `grant_period_credits`: at each new period it looks up the most recent prior balance, computes carryover via `_compute_rollover_from_prior_balance`, seeds the new balance's `rollover_credits` bucket, and writes `grant_rollover` + `expire_credits` ledger rows for audit. Idempotent (replay returns existing balance, no double-grant). Tests cover: no-prior, all-unused, partial-overflow, rollover-of-rollover, fully-drained, replay.
 - ⏳ Deferred — metered overage settlement (Stripe invoice items at period end). Credit-pack flow shipped in V2.1 covers the same need; revisit if real customers ask. The `overage_enabled` toggle stays in the schema but settlement is a no-op.
 
-### Onboarding Flow
-After signup, users are redirected to `/welcome` (4-step onboarding):
-1. **Email verification** — click link in email (auto-skipped if already verified)
-2. **Company profile** — team size, role, industry (intermediate save via `PATCH /auth/onboarding`)
-3. **Use case** — what they'll use the platform for (completes via `POST /auth/onboarding`, sets `onboarding_completed = true`)
-4. **Ready** — trial info, CTA to dashboard
+### Research Copilot architecture
+The Research Copilot is an always-on agent surfaced as a dock + open panel on every authenticated page (and as the full-screen `/welcome` conversation for onboarding). It powers free-form chat, surface-aware suggestions, and structured **proposal actions** the user accepts with one click.
 
-Login checks `onboarding_completed` — if false, redirects to `/welcome` instead of `/dashboard`.
+**Adapter pattern.** Each surface defines a `CopilotAdapter` in `services/copilot.py` (or a sibling module):
+- `INTERVIEW_ADAPTER` (kind=`project`) — guides, links, analysis, refinement, sharing
+- `SURVEY_ADAPTER` (kind=`survey`) — questions, branching, publishing, reports
+- `ONBOARDING_ADAPTER` (kind=`onboarding`, instrument_scope_kind=`company`) — `services/copilot_onboarding.py`, drives `/welcome`
 
-### Showcase Demo Project (auto-seeded)
+Each adapter exposes: `methodology` (system prompt fragment with rules and caps), `tools` (JSON Schema), `snapshot(instrument)` (compact state read each turn), `run_tool(name, args, ...)`, and a `stub` reply for tests. The shared `run_copilot_turn` / `run_copilot_turn_stream` in `services/copilot.py` build prompt-cache-friendly system blocks (stable methodology FIRST behind the breakpoint, volatile snapshot AFTER), call Anthropic with Opus 4.7 + adaptive thinking, dispatch tool calls, and persist conversation history.
+
+**Streaming.** All copilot endpoints return **SSE** (`text/event-stream`) with `Cache-Control: no-cache` and `X-Accel-Buffering: no`. Events: `{type: "status", label}` (tool labels via `_TOOL_LABELS`), `{type: "delta", text}` (token-by-token model output), `{type: "done", reply, proposed_actions, memory}`. The frontend `streamCopilot` in `api/copilot.ts` uses `fetch` + `ReadableStream.getReader()` (axios buffers — unsuitable for SSE) with a 60s idle timeout per chunk. **Critical:** the FastAPI generator captures `db.get_bind()` BEFORE returning, then opens a fresh `Session(bind=engine)` inside the stream body — otherwise `Depends(get_db)` closes the session before iteration begins.
+
+**Memory.** `CopilotMemory` rows are scoped at company / study / instrument tiers. The `remember` tool writes durable notes; the snapshot embeds recent memory at each turn. `CopilotConversation` persists turn history per instrument so the panel can reopen mid-thread.
+
+**Mission + NBA + Nudges.** Each surface declares a one-line **mission** shown in the panel header. A deterministic **NBA resolver** (`frontend/src/copilot/nextAction.ts` — `resolveProjectNextAction`, `resolveSurveyNextAction`, `resolveWorkspaceNextAction`, `resolveStudySummaryAction`) picks a single best next action from a priority ladder — **no LLM call**, runs on every render. Rendered as a chip in the dock or inline in empty states via `NextActionChip`. **Nudges** are localStorage-diffed events (`frontend/src/copilot/signals.ts`, key `copilot_signals_v2`): `analysis_ready`, `analysis_stale`, `data_milestone`, `quality_flag`, `study_report_ready`. 24h TTL, dismiss persists, and nudges for the current tab auto-suppress to avoid noise. New nudges are announced once via aria-live (`useNudgeAnnounce.ts`).
+
+### Onboarding Flow (conversational)
+After signup users land on `/welcome` — a **full-screen Research Copilot conversation** with structured product UI alongside the chat, not a multi-step form. The page opens with an instant canned greeting so there's no API latency before something is on screen. The model is only called once the researcher answers.
+
+Layout: a 2-column shell under a milestone bar.
+- **Milestone bar** — three deterministic phases (*Tell me about your work → Frame your study → Launch*). Advances based on profile completeness + study proposal — no LLM call.
+- **Sticky sidebar (left, 280 px)** — "What I know about you" with checked rows for role / team size / industry / use case. Includes a company-summary block once the website lookup runs. Refetches `GET /auth/me` after every turn so `save_profile` writes appear in real time.
+- **Conversation (right)** — streaming Copilot chat. Assistant turns can carry attachments:
+  - **Quick-reply chips** — server-enforced canonical options for `role` / `company_size` / `industry` / `use_case`. The `suggest_replies` tool's `context` is an `enum`; whenever it matches a profile key the server discards whatever the model emitted and substitutes the canonical set (instruction + post-processing = two safety layers). Always includes "Other" as the escape hatch. Free typing remains available.
+  - **Website-lookup card** — URL input + "Look it up" button that calls the existing `/auth/website-intel`, persists `business_summary`, and injects the summary back into the conversation as the user's next message.
+  - **Study proposal card** — `propose_study` emits `create_first_study`; one-click accept runs `POST /projects/` + `PATCH settings` (objective) + 5–7 `POST /guide` calls.
+
+Once a study is accepted: `POST /auth/onboarding` marks `onboarding_completed = true`, and a completion screen shows the study name + a memory recap fetched from `GET /onboarding/copilot/memory` ("Here's what I'll remember about your research"). The header **"Skip — just take me in"** bypasses everything; email verification is non-blocking (yellow banner with Resend link until verified).
+
+Login checks `onboarding_completed` — if false, redirects to `/welcome`.
+
+### Showcase Demo Project (fallback seed)
 On the first successful `POST /auth/onboarding`, the backend calls
-`seed_demo_project()` to populate a read-only example project named
+`seed_demo_project()` **only when no real Project already exists for the
+company** (the conversational onboarding usually creates one, in which
+case the demo seed is skipped). When it does fire it populates a
+read-only example project named
 `[Demo] How modern teams work across borders` for the new account.
 Idempotent via `Company.demo_seeded_at` — subsequent onboarding completions
 skip seeding. Seeder errors are swallowed so a fixture bug never blocks a
@@ -794,7 +830,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Email verification on signup (token-based, 24h expiry, resend endpoint)
 - [x] Password reset flow (ForgotPassword + ResetPassword pages; console email in dev)
 - [x] Project creation wizard (4 steps: Brief → Objective → Scope → Questionnaire)
-- [x] AI brief parsing from text and uploaded files (`/research/parse-brief`)
+- [x] AI brief parsing + objective / scope / question suggestions (now driven by the Research Copilot via tool calls — legacy `/research/*` endpoints removed)
 - [x] AI-suggested research objective, learning goals, scope, and full interview guide
 - [x] CSV import/export for interview guides
 - [x] Shareable interview links (UUID tokens), multiple per project, toggle active/inactive
@@ -822,7 +858,8 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Profile save + change password in AccountSettings UI (PATCH /auth/me, POST /auth/change-password)
 - [x] Analysis-ready email (triggered after AI synthesis completes)
 - [x] Feature gates enforced on: projects, questions, links, analysis, export
-- [x] Multi-step onboarding flow (Welcome page: verify email → profile → use case → ready)
+- [x] Conversational onboarding via Research Copilot (`/welcome`): canned greeting → SSE chat with `ONBOARDING_ADAPTER` → milestone bar + "What I know about you" sidebar + canonical quick-reply chips + inline website-lookup card → `propose_study` proposal → one-click accept creates real first study + objective + guide questions → memory recap screen. Replaces the legacy 4-step form. Server enforces canonical chip option sets for the four profile contexts.
+- [x] Research Copilot (always-on): dock + open panel on every authenticated page; per-surface adapters (interview/survey/onboarding); SSE streaming (status/delta/done); deterministic NBA chip; nudge tier with 5 event types and aria-live announcer; mission header per surface; scoped memory (company/study/instrument); Opus 4.7 + adaptive thinking + prompt cache
 - [x] Centralized error messages (frontend `utils/errorMessages.ts`)
 - [x] Terms of Service + Privacy Policy pages
 - [x] SendGrid email integration (domain-authenticated, branded HTML templates)
@@ -957,7 +994,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id` (str), `affiliate_id` (FK), `amount`, `paid_at`, `notes`
 
 ### AIUsageLog
-`id` (int), `company_id` (FK), `project_id` (FK), `participant_id` (FK), `operation` (indexed), `model`, `input_tokens`, `output_tokens`, `characters` (TTS), `audio_seconds` (STT), `cost_usd`, `created_at` (indexed)
+`id` (int), `company_id` (FK), `project_id` (FK), `participant_id` (FK), `operation` (indexed), `model`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `characters` (TTS), `audio_seconds` (STT), `cost_usd`, `created_at` (indexed). **Cost is model-aware** (Opus / Sonnet / Haiku per-token rates in `services/usage_logger.py::_CLAUDE_RATES`) and **cache-aware** (cache writes 1.25× input price, cache reads 0.10×). Each Claude call also emits an INFO log line `"claude usage op=… model=… input=… output=… cache_read=… cache_write=… cost=$…"` so cache-hit rates are visible via `gcloud logging read`.
 
 ### PanelProfile
 `id` (int), `email` (unique), `first_name`, `age_range`, `gender`, `country`, `city`, `education`, `employment_status`, `job_function`, `seniority`, `industry`, `company_size`, `panel_consent`, `consent_at`, `consent_interview_token`, `interviews_completed`, `last_active`, `created_at`
@@ -1082,13 +1119,20 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | GET/POST | `/projects/{id}/memos` | List/create memos |
 | PUT/DELETE | `/projects/{id}/memos/{mid}` | Update/delete memo |
 
-### Research Assistant (`/research`)
-| Method | Path | Description |
-|---|---|---|
-| POST | `/research/parse-brief` | Parse brief from text + files |
-| POST | `/research/suggest-objective` | Generate research objective |
-| POST | `/research/suggest-scope` | Recommend audience, duration |
-| POST | `/research/suggest-questions` | Generate interview guide |
+### Research Copilot (`/copilot` + `/onboarding/copilot`)
+All `/copilot` endpoints return **SSE** (`text/event-stream`) — events `status`, `delta`, `done`. See "Research Copilot architecture" above. Onboarding endpoints are scoped at the **company** level and drive `/welcome`.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/projects/{id}/copilot` | Yes | Run a Copilot turn for a project (interview adapter) — SSE stream |
+| GET | `/projects/{id}/copilot/conversation` | Yes | Recent turn history for this project |
+| POST | `/surveys/{id}/copilot` | Yes | Run a Copilot turn for a survey (survey adapter) — SSE stream |
+| GET | `/surveys/{id}/copilot/conversation` | Yes | Recent turn history for this survey |
+| POST | `/onboarding/copilot` | Yes | Run an onboarding Copilot turn — SSE stream; can emit `create_first_study`, `suggest_replies`, `request_website` proposals |
+| GET | `/onboarding/copilot/conversation` | Yes | Onboarding conversation history |
+| GET | `/onboarding/copilot/memory` | Yes | Recap of what the Copilot remembers (used by Welcome completion screen) |
+
+> The legacy `/research/*` endpoints (parse-brief, suggest-objective, suggest-scope, suggest-questions) have been **removed**. Their flow is now driven by the Copilot via tool calls / proposal actions.
 
 ### Billing (`/billing`)
 | Method | Path | Description |

@@ -33,3 +33,4 @@ frontend/dist/
 # IDEs
 .vscode/
 .idea/
+auto_interview.db.bak-*
