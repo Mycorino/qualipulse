@@ -1,4 +1,5 @@
 import { Fragment, ReactNode, useEffect, useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -121,18 +122,14 @@ function planSuggestion(companySize: string | null | undefined): {
   return null;
 }
 
-const greeting = (firstName: string): string =>
-  `Hi ${firstName} — I'm your Research Copilot. I help you run interviews ` +
-  `and surveys without the scheduling-and-analysis grind.\n\n` +
-  `In about two minutes we'll have a real study ready to share — and ` +
-  `I'll start learning what your research looks like so I can be more ` +
-  `useful next time.\n\n` +
-  `To start: what's the one thing you most need to learn about your users ` +
-  `right now?`;
+// The canned greeting is i18n'd — the actual string lives in
+// frontend/src/locales/{en,fr}/onboarding.json under "greeting" and
+// interpolates {{firstName}}.
 
 export default function Welcome() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation("onboarding");
 
   const [me, setMe] = useState<CompanyResponse | null>(null);
   const [thread, setThread] = useState<ThreadItem[]>([]);
@@ -175,10 +172,17 @@ export default function Welcome() {
         }
         setMe(m);
         setThread([
-          { role: "assistant", text: greeting(m.first_name || "there") },
+          {
+            role: "assistant",
+            text: t("greeting", { firstName: m.first_name || "there" }),
+          },
         ]);
       })
       .catch(() => navigate("/login", { replace: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps — `t` swap would
+    // rewrite the greeting in-place after a language toggle, but the
+    // canned greeting is meant to stay in the language captured at first
+    // load (matches the user's chosen account language at signup).
   }, [navigate]);
 
   useEffect(() => {
@@ -207,9 +211,9 @@ export default function Welcome() {
       const resp = await runOnboardingCopilot(msgs, {
         onStatus: (label) => setStatusLabel(label),
         onDelta: (chunk) =>
-          setThread((t) =>
-            t.map((it, i) =>
-              i === t.length - 1 && it.role === "assistant"
+          setThread((prev) =>
+            prev.map((it, i) =>
+              i === prev.length - 1 && it.role === "assistant"
                 ? { ...it, text: it.text + chunk }
                 : it,
             ),
@@ -230,9 +234,9 @@ export default function Welcome() {
       const website = websiteAction
         ? { prompt: websiteAction.prompt || "Paste your company URL." }
         : undefined;
-      setThread((t) =>
-        t.map((it, i) =>
-          i === t.length - 1 && it.role === "assistant"
+      setThread((prev) =>
+        prev.map((it, i) =>
+          i === prev.length - 1 && it.role === "assistant"
             ? { ...it, text: resp.reply, study, replies, website }
             : it,
         ),
@@ -241,10 +245,10 @@ export default function Welcome() {
       // refresh `me` so the "What I know about you" panel updates.
       getMe().then(setMe).catch(() => undefined);
     } catch {
-      setThread((t) =>
-        t.map((it, i) =>
-          i === t.length - 1 && it.role === "assistant"
-            ? { ...it, text: "Sorry — I couldn't respond just now. Please try again." }
+      setThread((prev) =>
+        prev.map((it, i) =>
+          i === prev.length - 1 && it.role === "assistant"
+            ? { ...it, text: t("chat_error") }
             : it,
         ),
       );
@@ -301,7 +305,7 @@ export default function Welcome() {
       });
       setCreating(false);
     } catch {
-      toast("Couldn't set up your study — please try again.", "error");
+      toast(t("toast.study_setup_failed"), "error");
       setCreating(false);
     }
   };
@@ -309,8 +313,8 @@ export default function Welcome() {
   // Mark a turn's chip/website attachment as consumed once the user has
   // acted on it — keeps the chips from re-appearing alongside later turns.
   const consumeAttachment = (turnIndex: number) => {
-    setThread((t) =>
-      t.map((it, i) => (i === turnIndex ? { ...it, consumed: true } : it)),
+    setThread((prev) =>
+      prev.map((it, i) => (i === turnIndex ? { ...it, consumed: true } : it)),
     );
   };
 
@@ -323,7 +327,7 @@ export default function Welcome() {
       const res = await analyseWebsite(url);
       const summary = (res.business_summary || "").trim();
       if (!summary) {
-        toast("Couldn't read that site — try a different URL.", "error");
+        toast(t("toast.website_unreadable"), "error");
         return;
       }
       // Refresh `me` — backend will have saved website_url + business_summary.
@@ -342,7 +346,7 @@ export default function Welcome() {
       setCachedOnboarded(true);
       navigate("/dashboard", { replace: true });
     } catch {
-      toast("Something went wrong — please try again.", "error");
+      toast(t("toast.skip_failed"), "error");
       setCreating(false);
     }
   };
@@ -352,10 +356,10 @@ export default function Welcome() {
   // Phase: tell-me-about-your-work until 2+ profile fields are set; frame
   // your study until the agent has proposed one; launch once accepted.
   const profileFields: { key: keyof CompanyResponse; label: string }[] = [
-    { key: "role", label: "Role" },
-    { key: "company_size", label: "Team size" },
-    { key: "industry", label: "Industry" },
-    { key: "use_case", label: "Use case" },
+    { key: "role", label: t("sidebar.role") },
+    { key: "company_size", label: t("sidebar.team_size") },
+    { key: "industry", label: t("sidebar.industry") },
+    { key: "use_case", label: t("sidebar.use_case") },
   ];
   const profileFilled = profileFields.filter((f) => !!me[f.key]).length;
   const studyProposed = thread.some((t) => !!t.study);
@@ -374,14 +378,14 @@ export default function Welcome() {
       : null;
     const handleShareLink = async () => {
       if (!interviewUrl) {
-        toast("Link couldn't be created — open your study to set one up.", "error");
+        toast(t("toast.no_link"), "error");
         return;
       }
       try {
         await navigator.clipboard.writeText(interviewUrl);
-        toast("Interview link copied to your clipboard.", "success");
+        toast(t("toast.link_copied"), "success");
       } catch {
-        toast("Couldn't copy — open your study to grab the link.", "error");
+        toast(t("toast.link_copy_failed"), "error");
       }
     };
     // Prefer the deterministic profile summary (concrete facts the
@@ -390,7 +394,7 @@ export default function Welcome() {
     const recapText =
       done.profileSummary.trim() ||
       done.memory.trim() ||
-      "I'll learn more about your research as we work together.";
+      t("done.memory_fallback");
 
     // W3.6 — soft plan line, only when we have signal.
     const plan = planSuggestion(me.company_size);
@@ -408,13 +412,8 @@ export default function Welcome() {
     };
     const acceptVerifyModal = () => {
       resendVerification()
-        .then(() =>
-          toast(
-            "Sent — check your inbox to verify and unlock email recaps.",
-            "success",
-          ),
-        )
-        .catch(() => toast("Couldn't resend right now.", "error"));
+        .then(() => toast(t("toast.verify_sent"), "success"))
+        .catch(() => toast(t("toast.resend_error"), "error"));
       dismissVerifyModal();
     };
 
@@ -423,31 +422,36 @@ export default function Welcome() {
         <header className="onboarding__bar">
           <span className="onboarding__brand">QualiPulse</span>
           {trial && (
-            <span className="onboarding-trial-chip" title="Free trial">
-              Day {trial.day} of {trial.total}
+            <span
+              className="onboarding-trial-chip"
+              title={t("done.trial_chip", { day: trial.day, total: trial.total })}
+            >
+              {t("done.trial_chip", { day: trial.day, total: trial.total })}
             </span>
           )}
         </header>
         <div className="onboarding-done">
-          <div className="onboarding-done__eyebrow">✦ Your study is ready</div>
+          <div className="onboarding-done__eyebrow">
+            ✦ {t("done.eyebrow")}
+          </div>
           <h1 className="onboarding-done__title">{done.studyName}</h1>
-          <p className="onboarding-done__sub">
-            Pick what to do next — most teams test-drive their own interview
-            first so they hear the AI in action.
-          </p>
+          <p className="onboarding-done__sub">{t("done.sub")}</p>
 
           <div className="onboarding-done__memory">
             <div className="onboarding-done__memory-label">
-              Here's what I'll remember about your research
+              {t("done.memory_label")}
             </div>
             <p className="onboarding-done__memory-text">{recapText}</p>
           </div>
 
           {plan && (
             <p className="onboarding-done__plan-hint">
-              Your trial includes everything in <strong>{plan.name}</strong>
-              {" "}
-              ({plan.monthly}/mo). Stay on past Day 14 to keep going.
+              <Trans
+                ns="onboarding"
+                i18nKey="done.plan_hint"
+                values={{ planName: plan.name, monthly: plan.monthly }}
+                components={{ strong: <strong /> }}
+              />
             </p>
           )}
 
@@ -458,17 +462,17 @@ export default function Welcome() {
               disabled={!interviewUrl}
               onClick={() => {
                 if (!interviewUrl) {
-                  toast("Open your study to set up an interview link.", "error");
+                  toast(t("toast.no_link_short"), "error");
                   return;
                 }
                 window.open(interviewUrl, "_blank", "noopener");
               }}
             >
               <span className="onboarding-done__cta-label">
-                Take your own interview
+                {t("done.cta_take_interview")}
               </span>
               <span className="onboarding-done__cta-hint">
-                90 seconds — hear Claude ask + adapt
+                {t("done.cta_take_interview_hint")}
               </span>
             </button>
 
@@ -479,7 +483,7 @@ export default function Welcome() {
                 onClick={handleShareLink}
                 disabled={!interviewUrl}
               >
-                Copy shareable link
+                {t("done.cta_copy_link")}
               </button>
               <button
                 type="button"
@@ -488,7 +492,7 @@ export default function Welcome() {
                   navigate(`/projects/${done.projectId}`, { replace: true })
                 }
               >
-                Open your study →
+                {t("done.cta_open_study")}
               </button>
             </div>
           </div>
@@ -503,17 +507,16 @@ export default function Welcome() {
           >
             <div className="onboarding-verify-modal__card">
               <div className="onboarding-verify-modal__eyebrow">
-                ✦ One small thing
+                ✦ {t("verify_modal.eyebrow")}
               </div>
               <h2
                 id="verify-modal-title"
                 className="onboarding-verify-modal__title"
               >
-                Want a recap of this conversation by email?
+                {t("verify_modal.title")}
               </h2>
               <p className="onboarding-verify-modal__body">
-                We'll also email you when your first response comes in — so you
-                don't have to keep checking. Verify your email and you're set.
+                {t("verify_modal.body")}
               </p>
               <div className="onboarding-verify-modal__actions">
                 <button
@@ -521,14 +524,14 @@ export default function Welcome() {
                   className="btn btn-primary"
                   onClick={acceptVerifyModal}
                 >
-                  Yes, send the verify link
+                  {t("verify_modal.accept")}
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost"
                   onClick={dismissVerifyModal}
                 >
-                  Not now
+                  {t("verify_modal.dismiss")}
                 </button>
               </div>
             </div>
@@ -542,7 +545,7 @@ export default function Welcome() {
     <div className="onboarding">
       {creating && (
         <div className="onboarding__overlay">
-          <p>Setting up your study…</p>
+          <p>{t("setting_up")}</p>
         </div>
       )}
 
@@ -554,23 +557,23 @@ export default function Welcome() {
           onClick={skip}
           disabled={creating}
         >
-          Skip for now
+          {t("skip")}
         </button>
       </header>
 
       {!me.email_verified && (
         <div className="onboarding__verify">
-          Verify your email when you get a moment — check your inbox.{" "}
+          {t("verify_banner")}{" "}
           <button
             type="button"
             className="onboarding__verify-resend"
             onClick={() =>
               resendVerification()
-                .then(() => toast("Verification email sent.", "success"))
-                .catch(() => toast("Couldn't resend right now.", "error"))
+                .then(() => toast(t("toast.resend_success"), "success"))
+                .catch(() => toast(t("toast.resend_error"), "error"))
             }
           >
-            Resend
+            {t("verify_resend")}
           </button>
         </div>
       )}
@@ -629,7 +632,7 @@ export default function Welcome() {
                 aria-live="polite"
               >
                 <div className="onboarding-msg__text onboarding-msg__text--thinking">
-                  {statusLabel ? `${statusLabel}…` : "Drafting…"}
+                  {statusLabel ? `${statusLabel}…` : t("thinking_fallback")}
                 </div>
               </div>
             )}
@@ -645,7 +648,7 @@ export default function Welcome() {
               send(input);
             }
           }}
-          placeholder="Tell the copilot what you want to learn…"
+          placeholder={t("input_placeholder")}
           rows={2}
           disabled={busy || creating}
         />
@@ -655,7 +658,7 @@ export default function Welcome() {
           onClick={() => send(input)}
           disabled={busy || creating || !input.trim()}
         >
-              Send
+              {t("send")}
             </button>
           </div>
         </div>
@@ -665,15 +668,16 @@ export default function Welcome() {
 }
 
 function MilestoneBar({ phase }: { phase: Phase }) {
+  const { t } = useTranslation("onboarding");
   const steps: { id: Phase; label: string }[] = [
-    { id: "profile", label: "Tell me about your work" },
-    { id: "frame", label: "Frame your study" },
-    { id: "launch", label: "Launch" },
+    { id: "profile", label: t("phase.profile") },
+    { id: "frame", label: t("phase.frame") },
+    { id: "launch", label: t("phase.launch") },
   ];
   const order: Phase[] = ["profile", "frame", "launch"];
   const currentIdx = order.indexOf(phase);
   return (
-    <ol className="onboarding-milestones" aria-label="Onboarding progress">
+    <ol className="onboarding-milestones" aria-label={t("phase.profile")}>
       {steps.map((s, i) => {
         const state = i < currentIdx ? "done" : i === currentIdx ? "active" : "todo";
         return (
@@ -699,10 +703,11 @@ function ProfileSidebar({
   me: CompanyResponse;
   profileFields: { key: keyof CompanyResponse; label: string }[];
 }) {
+  const { t } = useTranslation("onboarding");
   const summary = (me.business_summary || "").trim();
   return (
-    <aside className="onboarding-sidebar" aria-label="What the copilot knows">
-      <div className="onboarding-sidebar__eyebrow">What I know about you</div>
+    <aside className="onboarding-sidebar" aria-label={t("sidebar.eyebrow")}>
+      <div className="onboarding-sidebar__eyebrow">{t("sidebar.eyebrow")}</div>
       <ul className="onboarding-sidebar__list">
         {profileFields.map((f) => {
           const value = (me[f.key] as string | null | undefined) || "";
@@ -725,7 +730,7 @@ function ProfileSidebar({
       {summary && (
         <div className="onboarding-sidebar__summary">
           <div className="onboarding-sidebar__summary-label">
-            Your company
+            {t("sidebar.company")}
           </div>
           <p className="onboarding-sidebar__summary-text">{summary}</p>
         </div>
@@ -743,8 +748,13 @@ function ReplyChips({
   disabled: boolean;
   onPick: (text: string) => void;
 }) {
+  const { t } = useTranslation("onboarding");
   return (
-    <div className="onboarding-chips" role="group" aria-label="Quick replies">
+    <div
+      className="onboarding-chips"
+      role="group"
+      aria-label={t("sidebar.eyebrow")}
+    >
       {options.map((opt) => (
         <button
           key={opt}
@@ -771,6 +781,7 @@ function WebsiteCard({
   onLookup: (url: string) => void;
   onSkip: () => void;
 }) {
+  const { t } = useTranslation("onboarding");
   const [url, setUrl] = useState("");
   const [working, setWorking] = useState(false);
   const submit = async () => {
@@ -782,14 +793,18 @@ function WebsiteCard({
   };
   return (
     <div className="onboarding-website">
-      <div className="onboarding-website__eyebrow">✦ Quick lookup</div>
-      <p className="onboarding-website__prompt">{prompt}</p>
+      <div className="onboarding-website__eyebrow">
+        ✦ {t("website.eyebrow")}
+      </div>
+      <p className="onboarding-website__prompt">
+        {prompt || t("website.default_prompt")}
+      </p>
       <div className="onboarding-website__row">
         <input
           type="url"
           inputMode="url"
           autoComplete="url"
-          placeholder="https://yourcompany.com"
+          placeholder={t("website.url_placeholder")}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => {
@@ -806,7 +821,7 @@ function WebsiteCard({
           onClick={submit}
           disabled={disabled || working || !url.trim()}
         >
-          {working ? "Reading…" : "Look it up"}
+          {working ? t("website.reading") : t("website.lookup_cta")}
         </button>
       </div>
       <button
@@ -815,7 +830,7 @@ function WebsiteCard({
         onClick={onSkip}
         disabled={disabled || working}
       >
-        I'd rather just tell you
+        {t("website.skip")}
       </button>
     </div>
   );
@@ -830,10 +845,13 @@ function StudyCard({
   onAccept: () => void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation("onboarding");
   const questions = (study.questions ?? []) as ProposedGuideQuestion[];
   return (
     <div className="onboarding-study">
-      <div className="onboarding-study__eyebrow">✦ Your first study</div>
+      <div className="onboarding-study__eyebrow">
+        ✦ {t("study.eyebrow")}
+      </div>
       <div className="onboarding-study__name">{study.study_name}</div>
       {study.objective && (
         <p className="onboarding-study__objective">{study.objective}</p>
@@ -849,10 +867,12 @@ function StudyCard({
       {typeof study.recommended_participants === "number" && (
         <div className="onboarding-study__recommend">
           <span className="onboarding-study__recommend-label">
-            Recommended for your team
+            {t("study.recommended_label")}
           </span>
           <span className="onboarding-study__recommend-value">
-            {study.recommended_participants} participants
+            {t("study.recommended_value", {
+              count: study.recommended_participants,
+            })}
           </span>
         </div>
       )}
@@ -863,10 +883,10 @@ function StudyCard({
           onClick={onAccept}
           disabled={disabled}
         >
-          Create this study
+          {t("study.create_cta")}
         </button>
         <span className="onboarding-study__hint">
-          or keep chatting to refine it
+          {t("study.hint")}
         </span>
       </div>
     </div>

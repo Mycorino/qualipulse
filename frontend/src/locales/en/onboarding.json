@@ -1,0 +1,81 @@
+{
+  "skip": "Skip for now",
+
+  "verify_banner": "Verify your email when you get a moment — check your inbox.",
+  "verify_resend": "Resend",
+
+  "greeting": "Hi {{firstName}} — I'm your Research Copilot. I help you run interviews and surveys without the scheduling-and-analysis grind.\n\nIn about two minutes we'll have a real study ready to share — and I'll start learning what your research looks like so I can be more useful next time.\n\nTo start: what's the one thing you most need to learn about your users right now?",
+
+  "phase": {
+    "profile": "Tell me about your work",
+    "frame": "Frame your study",
+    "launch": "Launch"
+  },
+
+  "sidebar": {
+    "eyebrow": "What I know about you",
+    "role": "Role",
+    "team_size": "Team size",
+    "industry": "Industry",
+    "use_case": "Use case",
+    "company": "Your company"
+  },
+
+  "input_placeholder": "Tell the copilot what you want to learn…",
+  "send": "Send",
+  "thinking_fallback": "Drafting…",
+  "setting_up": "Setting up your study…",
+
+  "study": {
+    "eyebrow": "Your first study",
+    "create_cta": "Create this study",
+    "hint": "or keep chatting to refine it",
+    "recommended_label": "Recommended for your team",
+    "recommended_value": "{{count}} participants"
+  },
+
+  "website": {
+    "eyebrow": "Quick lookup",
+    "default_prompt": "Paste your company URL and I'll take a look.",
+    "url_placeholder": "https://yourcompany.com",
+    "lookup_cta": "Look it up",
+    "reading": "Reading…",
+    "skip": "I'd rather just tell you"
+  },
+
+  "done": {
+    "eyebrow": "Your study is ready",
+    "sub": "Pick what to do next — most teams test-drive their own interview first so they hear the AI in action.",
+    "memory_label": "Here's what I'll remember about your research",
+    "memory_fallback": "I'll learn more about your research as we work together.",
+    "cta_take_interview": "Take your own interview",
+    "cta_take_interview_hint": "90 seconds — hear Claude ask + adapt",
+    "cta_copy_link": "Copy shareable link",
+    "cta_open_study": "Open your study →",
+    "trial_chip": "Day {{day}} of {{total}}",
+    "plan_hint": "Your trial includes everything in <strong>{{planName}}</strong> ({{monthly}}/mo). Stay on past Day 14 to keep going."
+  },
+
+  "verify_modal": {
+    "eyebrow": "One small thing",
+    "title": "Want a recap of this conversation by email?",
+    "body": "We'll also email you when your first response comes in — so you don't have to keep checking. Verify your email and you're set.",
+    "accept": "Yes, send the verify link",
+    "dismiss": "Not now"
+  },
+
+  "chat_error": "Sorry — I couldn't respond just now. Please try again.",
+
+  "toast": {
+    "resend_success": "Verification email sent.",
+    "resend_error": "Couldn't resend right now.",
+    "verify_sent": "Sent — check your inbox to verify and unlock email recaps.",
+    "link_copied": "Interview link copied to your clipboard.",
+    "link_copy_failed": "Couldn't copy — open your study to grab the link.",
+    "no_link": "Link couldn't be created — open your study to set one up.",
+    "no_link_short": "Open your study to set up an interview link.",
+    "study_setup_failed": "Couldn't set up your study — please try again.",
+    "skip_failed": "Something went wrong — please try again.",
+    "website_unreadable": "Couldn't read that site — try a different URL."
+  }
+}

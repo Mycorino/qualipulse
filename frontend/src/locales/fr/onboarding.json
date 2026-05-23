@@ -1,0 +1,81 @@
+{
+  "skip": "Passer pour le moment",
+
+  "verify_banner": "Pensez à vérifier votre adresse email quand vous avez un moment — regardez votre boîte de réception.",
+  "verify_resend": "Renvoyer",
+
+  "greeting": "Bonjour {{firstName}} — je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planning et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager — et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : quelle est la chose la plus importante que vous avez besoin d'apprendre sur vos utilisateurs en ce moment ?",
+
+  "phase": {
+    "profile": "Parlez-moi de votre travail",
+    "frame": "Cadrez votre étude",
+    "launch": "Lancez"
+  },
+
+  "sidebar": {
+    "eyebrow": "Ce que je sais de vous",
+    "role": "Rôle",
+    "team_size": "Taille de l'équipe",
+    "industry": "Secteur",
+    "use_case": "Cas d'usage",
+    "company": "Votre entreprise"
+  },
+
+  "input_placeholder": "Dites au copilot ce que vous voulez apprendre…",
+  "send": "Envoyer",
+  "thinking_fallback": "Rédaction…",
+  "setting_up": "Préparation de votre étude…",
+
+  "study": {
+    "eyebrow": "Votre première étude",
+    "create_cta": "Créer cette étude",
+    "hint": "ou continuez à discuter pour l'affiner",
+    "recommended_label": "Recommandé pour votre équipe",
+    "recommended_value": "{{count}} participants"
+  },
+
+  "website": {
+    "eyebrow": "Vérification rapide",
+    "default_prompt": "Collez l'URL de votre entreprise et je vais y jeter un œil.",
+    "url_placeholder": "https://votreentreprise.com",
+    "lookup_cta": "Analyser",
+    "reading": "Lecture…",
+    "skip": "Je préfère vous le dire moi-même"
+  },
+
+  "done": {
+    "eyebrow": "Votre étude est prête",
+    "sub": "Choisissez la prochaine étape — la plupart des équipes commencent par tester leur propre entretien pour entendre l'IA en action.",
+    "memory_label": "Voici ce que je retiendrai de votre recherche",
+    "memory_fallback": "J'en apprendrai davantage sur votre recherche au fil de notre collaboration.",
+    "cta_take_interview": "Passer votre propre entretien",
+    "cta_take_interview_hint": "90 secondes — écoutez Claude poser ses questions et s'adapter",
+    "cta_copy_link": "Copier le lien à partager",
+    "cta_open_study": "Ouvrir votre étude →",
+    "trial_chip": "Jour {{day}} sur {{total}}",
+    "plan_hint": "Votre essai inclut toutes les fonctionnalités du plan <strong>{{planName}}</strong> ({{monthly}}/mois). Continuez après le 14e jour pour ne rien perdre."
+  },
+
+  "verify_modal": {
+    "eyebrow": "Un petit détail",
+    "title": "Souhaitez-vous un récapitulatif de cette conversation par email ?",
+    "body": "Nous vous enverrons aussi un email dès que votre première réponse arrivera — pour ne pas avoir à revenir vérifier. Vérifiez votre adresse et c'est fait.",
+    "accept": "Oui, envoyer le lien de vérification",
+    "dismiss": "Plus tard"
+  },
+
+  "chat_error": "Désolé — je n'ai pas pu répondre à l'instant. Merci de réessayer.",
+
+  "toast": {
+    "resend_success": "Email de vérification envoyé.",
+    "resend_error": "Impossible de renvoyer pour l'instant.",
+    "verify_sent": "Envoyé — vérifiez votre boîte de réception pour activer les emails récapitulatifs.",
+    "link_copied": "Lien d'entretien copié dans votre presse-papier.",
+    "link_copy_failed": "Copie impossible — ouvrez votre étude pour récupérer le lien.",
+    "no_link": "Le lien n'a pas pu être créé — ouvrez votre étude pour en configurer un.",
+    "no_link_short": "Ouvrez votre étude pour configurer un lien d'entretien.",
+    "study_setup_failed": "Impossible de préparer votre étude — merci de réessayer.",
+    "skip_failed": "Une erreur est survenue — merci de réessayer.",
+    "website_unreadable": "Impossible de lire ce site — essayez une autre URL."
+  }
+}
