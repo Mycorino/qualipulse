@@ -228,6 +228,104 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "cta": "Voir l'analyse",
         },
     },
+    "day_1_followup": {
+        "en": {
+            "subject": "Your study, day 1 — what to do today",
+            "heading": "Day 1 — keep momentum",
+            "body": (
+                "Yesterday we drafted <strong>{study_name}</strong> together. "
+                "Today the highest-leverage thing you can do is share your "
+                "interview link with one real participant — even a teammate "
+                "works. Voice interviews surface the why; the only way to "
+                "feel that is to hear it."
+            ),
+            "cta": "Open your study",
+            "foot": (
+                "I'll let you know the moment your first response comes in."
+            ),
+        },
+        "fr": {
+            "subject": "Votre étude, jour 1 — quoi faire aujourd'hui",
+            "heading": "Jour 1 — gardons l'élan",
+            "body": (
+                "Hier nous avons rédigé <strong>{study_name}</strong> "
+                "ensemble. Aujourd'hui, le plus important : partager votre "
+                "lien d'entretien avec un participant réel — même un collègue "
+                "fait l'affaire. Les entretiens vocaux révèlent le pourquoi ; "
+                "il faut l'entendre pour le sentir."
+            ),
+            "cta": "Ouvrir votre étude",
+            "foot": (
+                "Je vous préviendrai dès que votre première réponse arrive."
+            ),
+        },
+    },
+    "trial_half_over": {
+        "en": {
+            "subject": "Halfway through your QualiPulse trial",
+            "heading": "{days_left} days left on your trial",
+            "body": (
+                "You're {days_left} days away from the end of your trial. "
+                "{usage_line} The teams who renew tend to be the ones who "
+                "shared their link with at least three participants by now — "
+                "if you haven't yet, a quick share or two will tell you "
+                "everything you need to know about whether voice interviews "
+                "fit your research."
+            ),
+            "cta": "Open your study",
+            "foot": (
+                "Want to keep going past Day 14? {plan_line}"
+            ),
+        },
+        "fr": {
+            "subject": "Mi-parcours de votre essai QualiPulse",
+            "heading": "Plus que {days_left} jours d'essai",
+            "body": (
+                "Il vous reste {days_left} jours d'essai. {usage_line} Les "
+                "équipes qui restent sont celles qui ont partagé leur lien "
+                "avec au moins trois participants à ce stade — si ce n'est "
+                "pas encore fait, un ou deux partages vous diront si les "
+                "entretiens vocaux conviennent à votre recherche."
+            ),
+            "cta": "Ouvrir votre étude",
+            "foot": (
+                "Envie de continuer après le 14e jour ? {plan_line}"
+            ),
+        },
+    },
+    "trial_ending": {
+        "en": {
+            "subject": "Your trial ends in {days_left} days",
+            "heading": "Pick a plan to keep going",
+            "body": (
+                "Your trial wraps up in {days_left} days. You've run "
+                "{interviews} interview{interviews_plural} so far. To keep "
+                "your studies live past then, pick a plan — or grab a credit "
+                "pack if you only need a handful more interviews."
+            ),
+            "cta": "Choose a plan",
+            "foot": (
+                "{plan_line} You can also continue on a credit pack — "
+                "low-commitment, no monthly fee."
+            ),
+        },
+        "fr": {
+            "subject": "Votre essai se termine dans {days_left} jours",
+            "heading": "Choisissez un plan pour continuer",
+            "body": (
+                "Votre essai se termine dans {days_left} jours. Vous avez "
+                "lancé {interviews} entretien{interviews_plural} jusqu'ici. "
+                "Pour garder vos études en ligne au-delà, choisissez un plan "
+                "— ou prenez un pack de crédits si vous n'avez besoin que "
+                "de quelques entretiens de plus."
+            ),
+            "cta": "Choisir un plan",
+            "foot": (
+                "{plan_line} Vous pouvez aussi continuer avec un pack de "
+                "crédits — sans engagement mensuel."
+            ),
+        },
+    },
     "first_response_in": {
         "en": {
             "subject": "Your first response is in — {project_name}",
@@ -626,6 +724,129 @@ def send_first_response_in(
     return send_email(
         to=to,
         subject=_c("first_response_in", lang, "subject", project_name=project_name),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_day_1_followup(
+    to: str,
+    study_name: str,
+    project_url: str,
+    lang: str = "en",
+) -> bool:
+    """Wave 3B — 18h after signup. One concrete action: share the
+    interview link with one real participant."""
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("day_1_followup", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("day_1_followup", lang, "body", study_name=study_name)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{project_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("day_1_followup", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;line-height:1.55;margin:24px 0 0;">{_c("day_1_followup", lang, "foot")}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("day_1_followup", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_trial_half_over(
+    to: str,
+    *,
+    days_left: int,
+    interviews_run: int,
+    plan_name: str | None,
+    plan_monthly: str | None,
+    project_url: str,
+    lang: str = "en",
+) -> bool:
+    """Wave 3B — Day 7 of a 14-day trial. Personalised by usage so far
+    + soft-plan-suggest based on company size."""
+    lang = _normalise_lang(lang)
+    if interviews_run > 0:
+        usage_line_en = (
+            f"You've run {interviews_run} interview"
+            f"{'s' if interviews_run != 1 else ''} so far — nice."
+        )
+        usage_line_fr = (
+            f"Vous avez lancé {interviews_run} entretien"
+            f"{'s' if interviews_run != 1 else ''} jusqu'ici — bravo."
+        )
+    else:
+        usage_line_en = "You haven't run an interview yet — now's the time."
+        usage_line_fr = (
+            "Vous n'avez pas encore lancé d'entretien — c'est le moment."
+        )
+    usage_line = usage_line_en if lang == "en" else usage_line_fr
+
+    if plan_name and plan_monthly:
+        plan_line_en = (
+            f"The {plan_name} plan ({plan_monthly}/mo) fits a team your size."
+        )
+        plan_line_fr = (
+            f"Le plan {plan_name} ({plan_monthly}/mois) correspond à une "
+            f"équipe de votre taille."
+        )
+        plan_line = plan_line_en if lang == "en" else plan_line_fr
+    else:
+        plan_line = "" if lang == "en" else ""
+
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("trial_half_over", lang, "heading", days_left=days_left)}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("trial_half_over", lang, "body", days_left=days_left, usage_line=usage_line)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{project_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("trial_half_over", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;line-height:1.55;margin:24px 0 0;">{_c("trial_half_over", lang, "foot", plan_line=plan_line)}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("trial_half_over", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_trial_ending(
+    to: str,
+    *,
+    days_left: int,
+    interviews_run: int,
+    plan_name: str | None,
+    plan_monthly: str | None,
+    billing_url: str,
+    lang: str = "en",
+) -> bool:
+    """Wave 3B — Day 12 of a 14-day trial. Last warm nudge before the
+    paywall lands. Always mentions the credit-pack alternative."""
+    lang = _normalise_lang(lang)
+    interviews_plural = "s" if interviews_run != 1 else ""
+
+    if plan_name and plan_monthly:
+        plan_line_en = (
+            f"For your team size we'd suggest the {plan_name} plan "
+            f"({plan_monthly}/mo)."
+        )
+        plan_line_fr = (
+            f"Pour la taille de votre équipe, nous suggérons le plan "
+            f"{plan_name} ({plan_monthly}/mois)."
+        )
+        plan_line = plan_line_en if lang == "en" else plan_line_fr
+    else:
+        plan_line = ""
+
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("trial_ending", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("trial_ending", lang, "body", days_left=days_left, interviews=interviews_run, interviews_plural=interviews_plural)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{billing_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("trial_ending", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;line-height:1.55;margin:24px 0 0;">{_c("trial_ending", lang, "foot", plan_line=plan_line)}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("trial_ending", lang, "subject", days_left=days_left),
         body_html=_wrap_email(content, lang),
     )
 
