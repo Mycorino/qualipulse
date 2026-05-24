@@ -135,7 +135,7 @@ from app.routers import (
     auth, projects, links, interview, export, audio,
     analysis, responses, coding, memos, billing, admin, affiliate, blog,
     templates, team, surveys, public_surveys, studies, copilot,
-    scheduled_emails, onboarding_demo,
+    scheduled_emails, onboarding_demo, funnel_stats,
 )
 
 app.include_router(auth.router)
@@ -160,6 +160,7 @@ app.include_router(studies.router)
 app.include_router(copilot.router)
 app.include_router(scheduled_emails.router)
 app.include_router(onboarding_demo.router)
+app.include_router(funnel_stats.router)
 
 
 @app.get("/", tags=["health"])
