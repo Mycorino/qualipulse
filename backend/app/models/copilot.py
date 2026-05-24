@@ -14,7 +14,7 @@ panel resumes the conversation instead of losing it on navigation.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -92,6 +92,7 @@ class CopilotConversation(Base):
     # JSON array of the panel's thread items (user/assistant turns +
     # proposal cards with their accepted/rejected status).
     thread: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )

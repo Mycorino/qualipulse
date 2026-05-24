@@ -96,6 +96,8 @@ export function ResearchCopilotPanel({
   const threadRef = useRef<HTMLDivElement>(null);
   const prevCount = useRef(0);
   const loaded = useRef(false);
+  const versionRef = useRef(0);
+  const saveInFlight = useRef(false);
 
   // Restore the persisted conversation for this instrument on mount, so the
   // chat resumes instead of being lost when the researcher navigates away.
@@ -104,14 +106,16 @@ export function ResearchCopilotPanel({
     loaded.current = false;
     setThread([]);
     prevCount.current = 0;
+    versionRef.current = 0;
     target
       .loadConversation()
-      .then((items) => {
+      .then((snapshot) => {
         if (cancelled) return;
-        if (Array.isArray(items) && items.length > 0) {
-          setThread(items as ThreadItem[]);
-          prevCount.current = items.length;
+        if (Array.isArray(snapshot.thread) && snapshot.thread.length > 0) {
+          setThread(snapshot.thread as ThreadItem[]);
+          prevCount.current = snapshot.thread.length;
         }
+        versionRef.current = snapshot.version;
       })
       .catch(() => undefined)
       .finally(() => {
@@ -124,10 +128,21 @@ export function ResearchCopilotPanel({
   }, [target.id]);
 
   // Persist the thread after every change (turns, accepts, rejects) once
-  // the initial load has settled.
+  // the initial load has settled. Serialized to avoid concurrent writes
+  // racing on the version counter.
   useEffect(() => {
     if (!loaded.current) return;
-    target.saveConversation(thread).catch(() => undefined);
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
+    target
+      .saveConversation(thread, versionRef.current)
+      .then((newVersion) => {
+        versionRef.current = newVersion;
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        saveInFlight.current = false;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread, target.id]);
 

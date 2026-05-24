@@ -407,7 +407,7 @@ export default function SurveyEditor() {
           runTurn: (m, h) =>
             runCopilot("surveys", survey.id, m, "Build", surveyMission, h),
           loadConversation: () => getConversation("surveys", survey.id),
-          saveConversation: (t) => saveConversation("surveys", survey.id, t),
+          saveConversation: (t, v) => saveConversation("surveys", survey.id, t, v),
           applyAction: async (action) => {
             if (action.type === "add_question" && action.question) {
               const q = action.question as ProposedSurveyQuestion;

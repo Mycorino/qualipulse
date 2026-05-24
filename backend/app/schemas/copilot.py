@@ -46,12 +46,31 @@ class CopilotResponse(BaseModel):
     memory_updated: bool = False
 
 
-class ConversationState(BaseModel):
-    """The persisted chat thread for a survey's copilot panel.
+class OnboardingStudyQuestion(BaseModel):
+    section_title: str
+    main_question: str
+    desired_learning: str | None = None
 
-    `thread` is the panel's own thread-item structure — stored and
-    returned verbatim so the conversation resumes on navigation. Opaque
-    to the backend.
+
+class OnboardingStudyCreate(BaseModel):
+    """Atomic study creation — project + settings + guide in one call."""
+
+    study_name: str
+    objective: str | None = None
+    decision_to_inform: str | None = None
+    timeline: str | None = None
+    success_criteria: str | None = None
+    target_customer_description: str | None = None
+    questions: list[OnboardingStudyQuestion] = []
+    language: str = "en"
+
+
+class ConversationState(BaseModel):
+    """The persisted chat thread for a copilot panel.
+
+    ``version`` enables optimistic concurrency — the client sends back
+    the version it loaded, and the server rejects stale writes.
     """
 
     thread: list[dict] = Field(default_factory=list)
+    version: int = 0
