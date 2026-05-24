@@ -49,6 +49,35 @@ def trigger_analysis(
     """Kick off (or re-run) AI synthesis. Optionally filter participants by an attribute."""
     project = _get_project_or_404(project_id, company.id, db)
 
+    # V4 paywall — AI synthesis is one of the premium product features.
+    # Free workspaces can tag / memo on their 3 visible transcripts;
+    # running synthesis across the study requires a paid plan or
+    # credit-pack purchase (sets has_ever_paid).
+    from app.services.paywall import (
+        get_visibility_state,
+        paywall_payload,
+        FREE_PREVIEW_COUNT,
+    )
+
+    state = get_visibility_state(db, company)
+    if not state.fully_unlocked:
+        completed_count = (
+            db.query(Participant)
+            .filter(
+                Participant.project_id == project.id,
+                Participant.status == "completed",
+            )
+            .count()
+        )
+        locked = max(0, completed_count - FREE_PREVIEW_COUNT)
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                **paywall_payload(company, locked),
+                "feature": "analysis",
+            },
+        )
+
     filter_by = body.filter_by if body else None
     filter_values = body.filter_values if body else []
 

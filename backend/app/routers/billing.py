@@ -569,6 +569,16 @@ def _handle_checkout_session_completed(db: Session, session: dict) -> None:
         pack_id=pack_id,
     )
 
+    # V4 paywall — a credit-pack purchase counts as "has paid" for
+    # the purposes of unlocking historical transcripts. Pack buyers
+    # get the same unlock-everything treatment as subscribers.
+    from app.models.company import Company
+
+    company = db.query(Company).filter(Company.id == workspace_id).first()
+    if company is not None and not company.has_ever_paid:
+        company.has_ever_paid = True
+        db.commit()
+
 
 def _handle_subscription_event(db: Session, event_type: str, sub: dict) -> None:
     """Apply a Stripe subscription create/update event to our state.
@@ -641,6 +651,11 @@ def _handle_subscription_event(db: Session, event_type: str, sub: dict) -> None:
     company.stripe_customer_id = subscription.stripe_customer_id or company.stripe_customer_id
     company.stripe_subscription_id = subscription.stripe_subscription_id
     company.subscription_status = subscription.status
+    # V4 paywall — sticky flag for "has ever paid." Survives cancellation
+    # so ex-customers don't lose read-only access to their historical
+    # transcripts. Set once, never reset.
+    if subscription.status in ("active", "past_due"):
+        company.has_ever_paid = True
     db.commit()
 
     if event_type == "customer.subscription.created":

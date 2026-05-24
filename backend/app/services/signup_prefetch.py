@@ -106,7 +106,8 @@ _FREEMAIL_DOMAINS = frozenset(
         "126.com",
         "naver.com",
         "daum.net",
-        # Disposable / privacy
+        # Disposable / privacy (mirrored in _DISPOSABLE_DOMAINS — those
+        # are REJECTED at signup, not just skipped for prefetch)
         "duck.com",
         "anonaddy.me",
         "simplelogin.com",
@@ -117,6 +118,87 @@ _FREEMAIL_DOMAINS = frozenset(
         "10minutemail.com",
     }
 )
+
+
+# Disposable / throwaway providers. We BLOCK signup from these (vs
+# freemail above which is just allowed-but-skipped-for-prefetch). Keep
+# this list focused on widely-known disposable services — false
+# positives reject real users and feel arbitrary. The fraud-floor
+# arithmetic: each fake account costs ~$5 in Whisper/Claude/TTS, so
+# even imperfect coverage pays off.
+_DISPOSABLE_DOMAINS = frozenset(
+    {
+        # 10minutemail family
+        "10minutemail.com",
+        "10minutemail.net",
+        "10minutemail.co.uk",
+        "20minutemail.com",
+        "20email.eu",
+        "30minutemail.com",
+        # mailinator family
+        "mailinator.com",
+        "mailinator.net",
+        "mailinator2.com",
+        "binkmail.com",
+        "bobmail.info",
+        # yopmail family
+        "yopmail.com",
+        "yopmail.fr",
+        "yopmail.net",
+        # guerrillamail family
+        "guerrillamail.com",
+        "guerrillamail.net",
+        "guerrillamail.org",
+        "sharklasers.com",
+        "grr.la",
+        # tempmail family
+        "tempmail.com",
+        "temp-mail.org",
+        "tempr.email",
+        "throwawaymail.com",
+        "throwawaymail.net",
+        "trashmail.com",
+        "trash-mail.com",
+        "trashmail.de",
+        "trashmail.net",
+        # Others
+        "fakeinbox.com",
+        "dispostable.com",
+        "spamgourmet.com",
+        "getairmail.com",
+        "maildrop.cc",
+        "mintemail.com",
+        "mytemp.email",
+        "mytrashmail.com",
+        "owlymail.com",
+        "spamex.com",
+        "tempinbox.com",
+        "tempemail.com",
+        "tempmailaddress.com",
+        "tempmail.de",
+        "tempmail.net",
+        "tempmail.us",
+        "throwaway.email",
+        "yopmail.org",
+        # Russian disposables
+        "mail-tester.com",
+        # Asian disposables
+        "mailcatch.com",
+        "rmqkr.net",
+    }
+)
+
+
+def is_disposable_email_domain(domain: str | None) -> bool:
+    """Check if a domain is on the disposable-email blocklist.
+
+    Returns False for None / empty / unknown — only blocks domains
+    we explicitly flagged. False negatives (a disposable provider we
+    haven't listed) just mean the abuser pays the ~$5 cost for one
+    extra account before we notice and add the domain."""
+    if not domain:
+        return False
+    return domain.strip().lower() in _DISPOSABLE_DOMAINS
 
 
 def extract_domain(email: str | None) -> Optional[str]:

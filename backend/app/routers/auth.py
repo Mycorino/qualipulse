@@ -56,7 +56,39 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("10/minute")
 def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    existing = db.query(Company).filter(Company.email == body.email.lower().strip()).first()
+    # Fraud floor — canonicalize email so +tag aliases and gmail dot-
+    # variants don't farm free credits. ``alice+study1@gmail.com`` and
+    # ``a.lice@gmail.com`` both collapse to ``alice@gmail.com`` for the
+    # uniqueness check. Stored email is the canonical form.
+    from app.services.email_normalization import canonicalize_email
+    from app.services.signup_prefetch import (
+        extract_domain,
+        is_disposable_email_domain,
+    )
+
+    canonical_email = canonicalize_email(body.email)
+    if not canonical_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please enter a valid email address.",
+        )
+
+    # Block known disposable / throwaway-mail providers — they're the
+    # primary vector for multi-account farming.
+    if is_disposable_email_domain(extract_domain(canonical_email)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "We can't accept disposable email addresses. Please use "
+                "your work or personal email."
+            ),
+        )
+
+    existing = (
+        db.query(Company)
+        .filter(Company.email == canonical_email)
+        .first()
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -89,7 +121,7 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
 
     company = Company(
         name=body.name.strip(),
-        email=body.email.lower().strip(),
+        email=canonical_email,
         password_hash=hash_password(body.password),
         subscription_tier=tier,
         trial_ends_at=trial_ends,

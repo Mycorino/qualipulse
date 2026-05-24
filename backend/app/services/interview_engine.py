@@ -924,6 +924,64 @@ def process_interview_turn(
                 participant.id,
             )
 
+        # V4 paywall milestone — when the 3rd participant completes
+        # for a workspace, fire the "free preview full, unlock the
+        # rest" email. Fires at most once per workspace (idempotent).
+        # Skip for paid / ever-paid workspaces — they don't see the
+        # paywall, so the email would confuse them.
+        try:
+            from app.models.project import Project
+            from app.models.interview import Participant as _Participant
+            from app.services.paywall import FREE_PREVIEW_COUNT
+
+            cefe = participant.project.company if participant.project else None
+            paid_or_ever_paid = bool(
+                cefe
+                and (
+                    cefe.has_ever_paid
+                    or (cefe.subscription_status or "")
+                    in ("active", "trialing-paid", "past_due")
+                )
+            )
+            if (
+                cefe is not None
+                and cefe.email
+                and not paid_or_ever_paid
+                and cefe.free_preview_full_email_sent_at is None
+            ):
+                completed_count = (
+                    db.query(_Participant)
+                    .join(Project, _Participant.project_id == Project.id)
+                    .filter(
+                        Project.company_id == cefe.id,
+                        Project.is_demo.is_(False),
+                        _Participant.status == "completed",
+                    )
+                    .count()
+                )
+                if completed_count >= FREE_PREVIEW_COUNT:
+                    from app.config import settings
+                    from app.services.email import send_free_preview_full
+
+                    project = participant.project
+                    project_url = (
+                        f"{settings.APP_BASE_URL}/projects/{project.id}?tab=responses"
+                        if project
+                        else settings.APP_BASE_URL
+                    )
+                    send_free_preview_full(
+                        to=cefe.email,
+                        project_name=(project.name if project else "your study"),
+                        project_url=project_url,
+                        lang=(cefe.preferred_language or "en"),
+                    )
+                    cefe.free_preview_full_email_sent_at = datetime.utcnow()
+                    db.commit()
+        except Exception:
+            logger.exception(
+                "Free-preview-full email failed; interview still completed",
+            )
+
         # Send completion email if participant provided one
         try:
             from app.services.email import send_email

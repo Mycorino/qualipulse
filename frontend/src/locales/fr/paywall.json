@@ -1,0 +1,36 @@
+{
+  "locked_aria": "Transcription verrouillée",
+  "anonymous_participant": "Quelqu'un",
+  "from": "de",
+  "of_voice": "de voix",
+  "answered_all": "a répondu à toutes les questions",
+  "pitch_transcript": "{{count}} transcriptions de plus attendent — débloquez-les avec un plan. Vos {{preview}} premières restent gratuites pour toujours.",
+  "pitch_analysis": "L'analyse IA s'exécute sur toute votre étude. Débloquez les {{count}} transcriptions pour synthétiser les thèmes — vos {{preview}} premières restent gratuites pour le tag et les notes.",
+  "unlock_cta": "Débloquer les transcriptions",
+
+  "close": "Fermer",
+  "dismiss": "Plus tard",
+  "modal_eyebrow": "Débloquez votre étude complète",
+  "modal_title": "{{count}} transcriptions de plus prêtes à écouter",
+  "modal_body": "Vous avez déjà collecté les données — choisissez comment y accéder. Les abonnements incluent aussi des nouveaux crédits chaque mois pour continuer.",
+
+  "subscription_eyebrow": "Recherche continue",
+  "subscription_title": "Plan mensuel",
+  "subscription_body": "Idéal pour des études récurrentes. Inclut une nouvelle salve de crédits chaque mois, l'analyse IA, et débloque tout ce que vous avez déjà collecté.",
+  "subscription_perk_1": "Débloque toutes les transcriptions actuelles et futures",
+  "subscription_perk_2": "Analyse IA sur l'étude complète",
+  "subscription_perk_3": "Nouveaux crédits chaque mois",
+  "subscription_cta_exploration": "S'abonner à Exploration — 89 €/mois",
+  "subscription_cta_team": "S'abonner à Team — 299 €/mois",
+
+  "pack_eyebrow": "Paiement à l'usage",
+  "pack_title": "Pack de crédits",
+  "pack_body": "Idéal pour une étude unique. Achetez un pack pour débloquer et continuer — sans abonnement.",
+  "pack_perk_1": "Débloque toutes les transcriptions actuelles",
+  "pack_perk_2": "Crédits supplémentaires pour plus d'entretiens",
+  "pack_cta": "Acheter {{credits}} crédits — {{price}}",
+  "other_packs": "Ou une autre taille :",
+  "credits_label": "crédits",
+
+  "redirecting": "Redirection vers le paiement…"
+}
