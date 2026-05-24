@@ -65,7 +65,12 @@ def append_memory(
     scope_id: str,
     note: str,
 ) -> None:
-    """Append a durable fact to memory at a given scope (creates the row once)."""
+    """Append a durable fact to memory at a given scope (creates the row once).
+
+    Uses a single-statement UPDATE for existing rows to avoid a
+    read-modify-write race when concurrent requests append to the same
+    scope.
+    """
     note = (note or "").strip()
     if not note:
         return
@@ -78,17 +83,33 @@ def append_memory(
             content=f"- {note}",
         )
         db.add(row)
+        db.commit()
     else:
-        row.content = f"{row.content}\n- {note}".strip()
-        row.updated_at = datetime.utcnow()
-    db.commit()
+        (
+            db.query(CopilotMemory)
+            .filter(CopilotMemory.id == row.id)
+            .update(
+                {
+                    CopilotMemory.content: CopilotMemory.content + "\n- " + note,
+                    CopilotMemory.updated_at: datetime.utcnow(),
+                },
+                synchronize_session="fetch",
+            )
+        )
+        db.commit()
 
 
 # ── Conversation persistence (keyed by scope_kind / scope_id) ────────────────
 
 
-def get_conversation(db: Session, scope_kind: str, scope_id: str) -> list:
-    """Return the persisted panel thread for an instrument (empty if none)."""
+MAX_CONVERSATION_TURNS = 200
+
+
+def get_conversation(
+    db: Session, scope_kind: str, scope_id: str
+) -> tuple[list, int]:
+    """Return (thread, version) for an instrument. Empty list + version 0
+    when no conversation exists yet."""
     row = (
         db.query(CopilotConversation)
         .filter(
@@ -98,17 +119,31 @@ def get_conversation(db: Session, scope_kind: str, scope_id: str) -> list:
         .first()
     )
     if row is None:
-        return []
+        return [], 0
     try:
-        return json.loads(row.thread)
+        thread = json.loads(row.thread)
     except (json.JSONDecodeError, TypeError):
-        return []
+        thread = []
+    return thread, row.version
 
 
 def save_conversation(
-    db: Session, company_id: str, scope_kind: str, scope_id: str, thread: list
-) -> None:
-    """Persist the panel thread for an instrument so it resumes on navigation."""
+    db: Session,
+    company_id: str,
+    scope_kind: str,
+    scope_id: str,
+    thread: list,
+    expected_version: int | None = None,
+) -> int:
+    """Persist the panel thread with optimistic concurrency.
+
+    Returns the new version number. If ``expected_version`` is given and
+    doesn't match the stored version, the save is skipped (stale-write
+    protection). Threads exceeding ``MAX_CONVERSATION_TURNS`` are pruned.
+    """
+    if len(thread) > MAX_CONVERSATION_TURNS:
+        thread = thread[-MAX_CONVERSATION_TURNS:]
+    payload = json.dumps(thread, ensure_ascii=False)
     row = (
         db.query(CopilotConversation)
         .filter(
@@ -117,20 +152,24 @@ def save_conversation(
         )
         .first()
     )
-    payload = json.dumps(thread, ensure_ascii=False)
     if row is None:
-        db.add(
-            CopilotConversation(
-                company_id=company_id,
-                scope_kind=scope_kind,
-                scope_id=scope_id,
-                thread=payload,
-            )
+        row = CopilotConversation(
+            company_id=company_id,
+            scope_kind=scope_kind,
+            scope_id=scope_id,
+            thread=payload,
+            version=1,
         )
-    else:
-        row.thread = payload
-        row.updated_at = datetime.utcnow()
+        db.add(row)
+        db.commit()
+        return 1
+    if expected_version is not None and row.version != expected_version:
+        return row.version
+    row.thread = payload
+    row.version += 1
+    row.updated_at = datetime.utcnow()
     db.commit()
+    return row.version
 
 
 # ── Surface adapter ──────────────────────────────────────────────────────────
@@ -445,14 +484,21 @@ def run_copilot_turn_stream(
                     "label": _TOOL_LABELS.get(block.name, "Working…"),
                 }
                 tool_input = block.input or {}
-                if block.name == "remember":
-                    result = _handle_remember(
-                        db, company, instrument, adapter, turn, tool_input
+                try:
+                    if block.name == "remember":
+                        result = _handle_remember(
+                            db, company, instrument, adapter, turn, tool_input
+                        )
+                    else:
+                        result = adapter.run_tool(
+                            db, company, instrument, turn, block.name, tool_input
+                        )
+                except Exception as tool_exc:
+                    logger.error(
+                        "Copilot tool %s failed (company=%s): %s",
+                        block.name, company.id, tool_exc,
                     )
-                else:
-                    result = adapter.run_tool(
-                        db, company, instrument, turn, block.name, tool_input
-                    )
+                    result = f"Tool error: {block.name} failed."
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -462,9 +508,6 @@ def run_copilot_turn_stream(
                 )
             history.append({"role": "user", "content": tool_results})
     except anthropic.APIError as exc:
-        # Rate limit, overload, or upstream 5xx — the SDK already retried
-        # transient failures. End on a graceful `done` so the client has
-        # one terminal contract.
         logger.error(
             "Copilot turn failed (company=%s, request_id=%s): %s",
             company.id,
@@ -478,7 +521,22 @@ def run_copilot_turn_stream(
                 or "The copilot is briefly unavailable — please try again in a "
                 "moment."
             ),
-            "proposed_actions": turn.actions,
+            "proposed_actions": [],
+            "memory_updated": turn.memory_updated,
+        }
+        return
+    except Exception as exc:
+        logger.error(
+            "Copilot turn unexpected error (company=%s): %s",
+            company.id, exc,
+        )
+        yield {
+            "type": "done",
+            "reply": (
+                "\n\n".join(reply_parts).strip()
+                or "Something went wrong — please try again."
+            ),
+            "proposed_actions": [],
             "memory_updated": turn.memory_updated,
         }
         return

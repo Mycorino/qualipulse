@@ -113,6 +113,11 @@ export interface CopilotStreamHandlers {
  * Everything <ResearchCopilotPanel> needs to talk to one surface. Each host
  * page (survey editor, interview project) builds one of these.
  */
+export interface ConversationSnapshot {
+  thread: unknown[];
+  version: number;
+}
+
 export interface CopilotTarget {
   /** Stable id of the instrument — used as the panel's reload key. */
   id: string;
@@ -120,8 +125,8 @@ export interface CopilotTarget {
     messages: CopilotMessage[],
     handlers?: CopilotStreamHandlers,
   ) => Promise<CopilotResponse>;
-  loadConversation: () => Promise<unknown[]>;
-  saveConversation: (thread: unknown[]) => Promise<void>;
+  loadConversation: () => Promise<ConversationSnapshot>;
+  saveConversation: (thread: unknown[], version: number) => Promise<number>;
   /** Apply an accepted proposal via the real instrument API. */
   applyAction: (action: ProposedAction) => Promise<void>;
 }
@@ -216,6 +221,7 @@ async function streamCopilot(
     }
   } finally {
     clearTimeout(idleTimer);
+    reader.releaseLock();
   }
 
   if (!final) throw new Error("Copilot stream ended without a 'done' event");
@@ -305,17 +311,44 @@ export async function transcribeDemoAudio(
 export async function getConversation(
   instrument: CopilotInstrument,
   id: string,
-): Promise<unknown[]> {
-  const resp = await client.get<{ thread: unknown[] }>(
+): Promise<ConversationSnapshot> {
+  const resp = await client.get<{ thread: unknown[]; version: number }>(
     `/${instrument}/${id}/copilot/conversation`,
   );
-  return resp.data.thread ?? [];
+  return { thread: resp.data.thread ?? [], version: resp.data.version ?? 0 };
 }
 
 export async function saveConversation(
   instrument: CopilotInstrument,
   id: string,
   thread: unknown[],
-): Promise<void> {
-  await client.put(`/${instrument}/${id}/copilot/conversation`, { thread });
+  version: number,
+): Promise<number> {
+  const resp = await client.put<{ version: number }>(
+    `/${instrument}/${id}/copilot/conversation`,
+    { thread, version },
+  );
+  return resp.data.version ?? version;
+}
+
+export interface OnboardingStudyPayload {
+  study_name: string;
+  objective?: string;
+  decision_to_inform?: string;
+  timeline?: string;
+  success_criteria?: string;
+  target_customer_description?: string;
+  questions: { section_title: string; main_question: string; desired_learning?: string }[];
+  language: string;
+}
+
+export async function createOnboardingStudy(
+  payload: OnboardingStudyPayload,
+): Promise<{ project_id: string; study_name: string; interview_token: string }> {
+  const resp = await client.post<{
+    project_id: string;
+    study_name: string;
+    interview_token: string;
+  }>("/onboarding/study", payload);
+  return resp.data;
 }

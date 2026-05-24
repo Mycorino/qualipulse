@@ -12,6 +12,7 @@ it resumes when the researcher navigates away and back.
 """
 
 import json
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -21,7 +22,12 @@ from app.dependencies import get_current_company, get_db
 from app.models.company import Company
 from app.models.project import Project
 from app.models.survey import Survey
-from app.schemas.copilot import ConversationState, CopilotRequest, CopilotResponse
+from app.schemas.copilot import (
+    ConversationState,
+    CopilotRequest,
+    CopilotResponse,
+    OnboardingStudyCreate,
+)
 from app.services.copilot import (
     SURVEY_ADAPTER,
     get_conversation,
@@ -155,7 +161,8 @@ def get_survey_conversation(
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
     _survey_or_404(db, survey_id, company)
-    return ConversationState(thread=get_conversation(db, "survey", survey_id))
+    thread, version = get_conversation(db, "survey", survey_id)
+    return ConversationState(thread=thread, version=version)
 
 
 @router.put(
@@ -168,8 +175,10 @@ def put_survey_conversation(
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
     _survey_or_404(db, survey_id, company)
-    save_conversation(db, company.id, "survey", survey_id, body.thread)
-    return body
+    new_version = save_conversation(
+        db, company.id, "survey", survey_id, body.thread, body.version,
+    )
+    return ConversationState(thread=body.thread, version=new_version)
 
 
 # ── Interview-guide surface ──────────────────────────────────────────────────
@@ -205,7 +214,8 @@ def get_project_conversation(
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
     _project_or_404(db, project_id, company)
-    return ConversationState(thread=get_conversation(db, "project", project_id))
+    thread, version = get_conversation(db, "project", project_id)
+    return ConversationState(thread=thread, version=version)
 
 
 @router.put(
@@ -218,8 +228,10 @@ def put_project_conversation(
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
     _project_or_404(db, project_id, company)
-    save_conversation(db, company.id, "project", project_id, body.thread)
-    return body
+    new_version = save_conversation(
+        db, company.id, "project", project_id, body.thread, body.version,
+    )
+    return ConversationState(thread=body.thread, version=new_version)
 
 
 # ── Onboarding surface ───────────────────────────────────────────────────────
@@ -248,9 +260,8 @@ def get_onboarding_conversation(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
-    return ConversationState(
-        thread=get_conversation(db, "company", company.id),
-    )
+    thread, version = get_conversation(db, "company", company.id)
+    return ConversationState(thread=thread, version=version)
 
 
 @router.put("/onboarding/copilot/conversation", response_model=ConversationState)
@@ -259,8 +270,10 @@ def put_onboarding_conversation(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
-    save_conversation(db, company.id, "company", company.id, body.thread)
-    return body
+    new_version = save_conversation(
+        db, company.id, "company", company.id, body.thread, body.version,
+    )
+    return ConversationState(thread=body.thread, version=new_version)
 
 
 @router.get("/onboarding/copilot/memory")
@@ -358,3 +371,60 @@ def _build_profile_summary(
         sentences.append(snippet)
 
     return " ".join(sentences).strip()
+
+
+# ── Atomic study creation (onboarding) ──────────────────────────────────────
+
+_BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+@router.post("/onboarding/study", status_code=status.HTTP_201_CREATED)
+def create_onboarding_study(
+    body: OnboardingStudyCreate,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> dict:
+    """Create a project + guide questions + interview link in one
+    transaction. Replaces the fragile multi-call sequence the frontend
+    used to perform during onboarding acceptance."""
+    from app.models.interview import InterviewLink
+    from app.models.project import InterviewGuideQuestion, Project
+
+    project = Project(
+        company_id=company.id,
+        name=body.study_name,
+        language=body.language,
+        research_objective=body.objective,
+        decision_to_inform=body.decision_to_inform,
+        timeline=body.timeline,
+        success_criteria=body.success_criteria,
+        target_customer_description=body.target_customer_description,
+        interview_duration_minutes=20,
+    )
+    db.add(project)
+    db.flush()
+
+    sections: dict[str, int] = {}
+    for i, q in enumerate(body.questions):
+        if q.section_title not in sections:
+            sections[q.section_title] = len(sections)
+        db.add(InterviewGuideQuestion(
+            project_id=project.id,
+            section_index=sections[q.section_title],
+            section_title=q.section_title,
+            question_index=i,
+            main_question=q.main_question,
+            desired_learning=q.desired_learning or "",
+            sort_order=i,
+        ))
+
+    token = "".join(secrets.choice(_BASE58) for _ in range(43))
+    link = InterviewLink(project_id=project.id, token=token)
+    db.add(link)
+    db.commit()
+
+    return {
+        "project_id": project.id,
+        "study_name": body.study_name,
+        "interview_token": token,
+    }

@@ -3571,7 +3571,7 @@ export default function ProjectDetail() {
               h,
             ),
           loadConversation: () => getConversation("projects", project.id),
-          saveConversation: (t) => saveConversation("projects", project.id, t),
+          saveConversation: (t, v) => saveConversation("projects", project.id, t, v),
           applyAction: async (action) => {
             if (action.type === "edit_objective" && action.new_objective) {
               await patchProjectSettings(project.id, {
