@@ -93,7 +93,9 @@ auto-interview/
 │   │   │   ├── affiliate.py     # Affiliate program (apply, login, dashboard, admin)
 │   │   │   ├── admin.py         # Admin panel (users, stats, costs, tier management)
 │   │   │   ├── blog.py          # Blog public + admin CRUD (TipTap HTML content)
-│   │   │   └── audio.py         # Audio file serving
+│   │   │   ├── audio.py         # Audio file serving
+│   │   │   ├── scheduled_emails.py   # Wave 3B — POST /admin/scheduled-emails/run (cron-hit endpoint)
+│   │   │   └── onboarding_demo.py    # V3 — POST /onboarding/demo-interview/transcribe (participant-experience demo)
 │   │   ├── schemas/
 │   │   │   ├── auth.py          # SignupRequest, CompanyResponse, OnboardingProfileRequest
 │   │   │   ├── project.py       # Pydantic schemas for project + screening questions
@@ -145,14 +147,27 @@ auto-interview/
 │   │       ├── 0019_warmup_enabled.py
 │   │       ├── 0020_fix_audio_recording_urls.py
 │   │       ├── 0021_response_segments.py
-│   │       └── 0022_credits_system.py
+│   │       ├── 0022_credits_system.py
+│   │       ├── 0023_google_sub.py           # OAuth-only accounts
+│   │       ├── 0024-0027_*                  # team collab, workspace billing, study tables
+│   │       ├── 0028_copilot_memory.py
+│   │       ├── 0029_copilot_scope_convo.py
+│   │       ├── 0030_copilot_convo_scope.py
+│   │       ├── 0031_first_response_email.py # Wave 3A — one-shot email idempotency
+│   │       ├── 0032_email_send_log.py       # Wave 3B — scheduled email send-log
+│   │       └── 0033_onboarding_v2.py        # V2 — Project.timeline + success_criteria + Company.referral_source
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
 │   │   ├── test_projects.py     # CRUD, auth isolation, archive, tier limits
 │   │   ├── test_feature_gates.py # All tier limits + feature gates (legacy plans)
 │   │   ├── test_billing_credits.py # Credits-based billing (PR 1: foundation)
-│   │   └── test_demo_seeder.py  # Showcase demo project seeding + quota exclusion
+│   │   ├── test_demo_seeder.py  # Showcase demo project seeding + quota exclusion
+│   │   ├── test_copilot_onboarding.py # 15 tests — ONBOARDING_ADAPTER tools + V2/V3 capture
+│   │   ├── test_analytics_and_recap.py # 8 tests — funnel events + concrete-recap helper + first-response email
+│   │   ├── test_scheduled_emails.py # 12 tests — /admin/scheduled-emails/run runner (Wave 3B)
+│   │   ├── test_signup_prefetch.py # 29 tests — W2.5 domain prefetch
+│   │   └── test_onboarding_demo.py # 11 tests — V3 keyword detection + highlight picker
 │   ├── Dockerfile               # Python 3.11, runs alembic + uvicorn
 │   ├── pytest.ini
 │   ├── requirements.txt
@@ -269,7 +284,7 @@ DATABASE_URL="sqlite:///:memory:" SECRET_KEY="test-secret" \
   ANTHROPIC_API_KEY="" OPENAI_API_KEY="" \
   python -m pytest tests/ -v
 ```
-- 57 tests covering auth, email verification, projects CRUD, and all feature gates
+- 274 tests covering auth, email verification, projects CRUD, feature gates, billing, copilot adapters, V1-V3 onboarding capture, scheduled emails, signup prefetch, and demo transcript coding
 - Rate limiter is disabled in tests (see `tests/conftest.py`)
 - Uses in-memory SQLite with `StaticPool` for full test isolation
 
@@ -361,6 +376,7 @@ See `.env.example` at repo root for Docker/production template.
 - **Production:** PostgreSQL (Neon or Cloud SQL). Set `DATABASE_URL` to `postgresql://...`
 - Alembic migrations run on startup in Docker (`alembic upgrade head`)
 - Datetime: use `datetime.utcnow()` (SQLite stores naive UTC — `datetime.now(timezone.utc)` causes issues)
+- **⚠️ Known dev-DB issue:** running `alembic upgrade head` on an existing dev SQLite DB trips a `CircularDependencyError` in the batch op for `interview_turns` (some translation_* + audit-fields combination). Production isn't affected (already past that migration). Workaround for fresh local rebuilds is to apply pending migrations manually with `sqlite3 auto_interview.db "ALTER TABLE …"`. See the open follow-up task.
 
 ### Billing — dual-track (legacy tiers + credits)
 
@@ -441,7 +457,7 @@ The Research Copilot is an always-on agent surfaced as a dock + open panel on ev
 **Adapter pattern.** Each surface defines a `CopilotAdapter` in `services/copilot.py` (or a sibling module):
 - `INTERVIEW_ADAPTER` (kind=`project`) — guides, links, analysis, refinement, sharing
 - `SURVEY_ADAPTER` (kind=`survey`) — questions, branching, publishing, reports
-- `ONBOARDING_ADAPTER` (kind=`onboarding`, instrument_scope_kind=`company`) — `services/copilot_onboarding.py`, drives `/welcome`
+- `ONBOARDING_ADAPTER` (kind=`onboarding`, instrument_scope_kind=`company`) — `services/copilot_onboarding.py`, drives `/welcome`. Tools: `save_profile` (8 fields), `propose_study` (with V2 strategic-context fields, V3 calibration), `suggest_replies` (9 canonical contexts), `request_website`, `propose_participant_demo` (V3), `remember`.
 
 Each adapter exposes: `methodology` (system prompt fragment with rules and caps), `tools` (JSON Schema), `snapshot(instrument)` (compact state read each turn), `run_tool(name, args, ...)`, and a `stub` reply for tests. The shared `run_copilot_turn` / `run_copilot_turn_stream` in `services/copilot.py` build prompt-cache-friendly system blocks (stable methodology FIRST behind the breakpoint, volatile snapshot AFTER), call Anthropic with Opus 4.7 + adaptive thinking, dispatch tool calls, and persist conversation history.
 
@@ -458,12 +474,16 @@ Layout: a 2-column shell under a milestone bar.
 - **Milestone bar** — three deterministic phases (*Tell me about your work → Frame your study → Launch*). Advances based on profile completeness + study proposal — no LLM call.
 - **Sticky sidebar (left, 280 px)** — "What I know about you" with checked rows for role / team size / industry / use case. Includes a company-summary block once the website lookup runs. Refetches `GET /auth/me` after every turn so `save_profile` writes appear in real time.
 - **Conversation (right)** — streaming Copilot chat. Assistant turns can carry attachments:
-  - **Quick-reply chips** — server-enforced canonical options for `role` / `company_size` / `industry` / `use_case`. The `suggest_replies` tool's `context` is an `enum`; whenever it matches a profile key the server discards whatever the model emitted and substitutes the canonical set (instruction + post-processing = two safety layers). Always includes "Other" as the escape hatch. Free typing remains available.
-  - **Website-lookup card** — URL input + "Look it up" button that calls the existing `/auth/website-intel`, persists `business_summary`, and injects the summary back into the conversation as the user's next message.
+  - **Quick-reply chips** — server-enforced canonical option sets across **9 contexts**: profile (`role` / `company_size` / `industry` / `use_case`), marketing (`referral_source`, `current_tool`), strategic (`timeline`, `research_experience`, `decision_role`). The `suggest_replies` tool's `context` is an `enum`; whenever it matches a known key the server discards whatever the model emitted and substitutes the canonical set (instruction + post-processing = two safety layers). Always includes "Other" as the escape hatch. Free typing remains available.
+  - **Pre-suggested goal chips (V2)** — three tap-to-PREFILL chips below the canned greeting (*"Why trial users churn"* / *"Test a new onboarding flow"* / *"Understand a new audience"*). Kills the cold-start blank-textarea hesitation. EN/FR.
+  - **"See a sample study first" secondary link (V2)** — opens a static modal preview of what a finished study card looks like, for evaluators who aren't ready to commit to drafting their own.
+  - **Participant-experience demo (V3)** — `propose_participant_demo` action surfaces an inline card with two CTAs after the user's first message. *"Take a 30s test interview"* opens an iPhone-framed modal where the researcher records a 20-30s answer to a meta-question (*"What was the best onboarding you had recently?"*). Whisper transcribes via `POST /onboarding/demo-interview/transcribe`; the server keyword-matches one of 5 code categories (Trust signal / First-success moment / Friction / Price concern / Onboarding craft) and picks the most quote-worthy sentence to highlight. The reveal view shows the transcript with the highlighted span + code-tag pill — mimicking what the real researcher analysis view will look like. *Skip / mic denied* path renders a hand-crafted canned transcript so non-mic users still see the wow moment. NB: keyword detection is currently EN-only — FR users always hit the "Worth coming back to" fallback (known gap).
+  - **Website-lookup card** — URL input + "Look it up" button that calls the existing `/auth/website-intel`, persists `business_summary`, and injects the summary back into the conversation as the user's next message. The methodology forces this card to appear exactly once when `business_summary` is empty (covers gmail / freemail signups).
   - **Domain pre-fetch at signup (W2.5)** — for corporate emails (anything not in the freemail allowlist in `services/signup_prefetch.py`), a background thread fires `fetch_website_summary` against the email's domain right after the Company row commits. Writes `website_url` + `business_summary` + `industry` if those fields aren't already user-set. The agent's snapshot picks up the pre-fetched summary on the very first turn, and the methodology explicitly tells it to reference the company naturally in its second message rather than calling `request_website`. Daemonised thread — never blocks signup, swallows every error path.
-  - **Study proposal card** — `propose_study` emits `create_first_study`; one-click accept runs `POST /projects/` + `PATCH settings` (objective) + 5–7 `POST /guide` calls.
+  - **Edit-in-place sidebar rows (V2)** — each filled row in the "What I know about you" sidebar is click-to-edit; opens an inline text input, Enter/Escape commit/cancel, PATCH `/auth/onboarding` writes through. Optimistic UI with rollback on failure.
+  - **Study proposal card** — `propose_study` emits `create_first_study` with `recommended_participants` (V1, scaled to company_size), plus V2 strategic context (`decision_to_inform` (required), `timeline`, `success_criteria`, `target_customer_description`). Card uses **progressive disclosure** — name + objective + N pill + context summary + CTA visible; questions hidden behind a "See the X questions ▾" expander so the CTA stays above the fold. One-click accept runs `POST /projects/` + `PATCH /projects/{id}/settings` (objective + all V2 context fields) + 5–7 guide-question `POST`s + auto-creates the first `InterviewLink` so the completion-screen CTAs work zero-click.
 
-Once a study is accepted: `POST /auth/onboarding` marks `onboarding_completed = true`, and a completion screen shows the study name + a memory recap fetched from `GET /onboarding/copilot/memory` ("Here's what I'll remember about your research"). The header **"Skip — just take me in"** bypasses everything; email verification is non-blocking (yellow banner with Resend link until verified).
+Once a study is accepted: `POST /auth/onboarding` marks `onboarding_completed = true`, and a completion screen shows the study name + a memory recap fetched from `GET /onboarding/copilot/memory` ("Here's what I'll remember about your research"). The recap incorporates the captured profile + V2 strategic context + V3 research-experience calibration (*"This is your first research project — I'll keep things clear"* vs. *"You're a seasoned researcher — I'll keep it lean"*). Three CTAs: **Take your own interview** (primary, opens the auto-created link) / **Copy shareable link** (clipboard) / **Open your study →** (ghost). Day-X/14 trial chip in the header. The **"Skip for now"** demoted text link bypasses everything; email verification is non-blocking (yellow banner with Resend link until verified; recap-by-email modal offers to verify in exchange for a useful thing).
 
 Login checks `onboarding_completed` — if false, redirects to `/welcome`.
 
@@ -930,7 +950,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] CI/CD: GitHub Actions (pytest + tsc + build), Cloud Build (auto-deploy on push)
 - [x] Health checks: `GET /` (shallow) + `GET /health` (deep, DB-aware)
 - [x] Secret Manager integration (secrets injected at deploy, not in .env)
-- [x] Test suite: 57 tests (auth, email verification, feature gates, project CRUD)
+- [x] Test suite: 274 tests (auth, email verification, feature gates, project CRUD, billing, copilot V1-V3, scheduled emails, signup prefetch, demo coding)
 - [x] Rate limiting (SlowAPI): public/auth/default tiers
 - [x] Security headers middleware
 - [x] JSON structured logging (python-json-logger)
@@ -946,10 +966,10 @@ gcloud builds list --region=europe-west1 --limit=5
 ## Data Models Summary
 
 ### Company (auth)
-`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience`, `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at` (idempotency guard for showcase demo), `created_at`
+`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience` (V3 — *First study* / *A few past projects* / *Seasoned researcher*), `decision_role` (V3 — *I'll decide* / *I'm helping someone decide* / *Just exploring*), `current_tool` (V2), `referral_source` (V2 — *Google* / *LinkedIn* / *Colleague* / *Other*), `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at` (idempotency guard for showcase demo), `first_response_email_sent_at` (Wave 3A — one-shot guard for the first-response email), `created_at`
 
 ### Project
-`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
+`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `decision_to_inform` (V2 — required in `propose_study`), `timeline` (V2 — canonical chips), `success_criteria` (V2), `target_customer_description` (V2 — who they'll interview), `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
 
 ### InterviewGuideQuestion
 `id`, `project_id`, `section_index`, `section_title`, `question_index`, `main_question`, `interview_notes`, `desired_learning`, `researcher_notes`, `deprecated_at`, `sort_order`
@@ -1134,9 +1154,10 @@ All `/copilot` endpoints return **SSE** (`text/event-stream`) — events `status
 | GET | `/projects/{id}/copilot/conversation` | Yes | Recent turn history for this project |
 | POST | `/surveys/{id}/copilot` | Yes | Run a Copilot turn for a survey (survey adapter) — SSE stream |
 | GET | `/surveys/{id}/copilot/conversation` | Yes | Recent turn history for this survey |
-| POST | `/onboarding/copilot` | Yes | Run an onboarding Copilot turn — SSE stream; can emit `create_first_study`, `suggest_replies`, `request_website` proposals |
+| POST | `/onboarding/copilot` | Yes | Run an onboarding Copilot turn — SSE stream; can emit `create_first_study` (with V2 strategic context), `suggest_replies` (across 9 canonical contexts), `request_website`, `propose_participant_demo` (V3 — surfaces the iPhone-frame demo card) proposals |
 | GET | `/onboarding/copilot/conversation` | Yes | Onboarding conversation history |
-| GET | `/onboarding/copilot/memory` | Yes | Recap of what the Copilot remembers (used by Welcome completion screen) |
+| GET | `/onboarding/copilot/memory` | Yes | Recap of what the Copilot remembers — built server-side from captured Company fields + the most recent non-demo Project's strategic context (used by Welcome completion screen) |
+| POST | `/onboarding/demo-interview/transcribe` | Yes | V3 — accepts a multipart audio blob from the participant-demo modal, calls Whisper, light-keyword-codes the transcript into one of 5 categories, picks the most quote-worthy sentence to highlight. Returns `{transcript, highlight, code}`. No persistence — pure preview. |
 
 > The legacy `/research/*` endpoints (parse-brief, suggest-objective, suggest-scope, suggest-questions) have been **removed**. Their flow is now driven by the Copilot via tool calls / proposal actions.
 
