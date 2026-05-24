@@ -73,8 +73,7 @@
     "cta_take_interview_hint": "90 secondes — écoutez Claude poser ses questions et s'adapter",
     "cta_copy_link": "Copier le lien à partager",
     "cta_open_study": "Ouvrir votre étude →",
-    "trial_chip": "Jour {{day}} sur {{total}}",
-    "plan_hint": "Votre essai inclut toutes les fonctionnalités du plan <strong>{{planName}}</strong> ({{monthly}}/mois). Continuez après le 14e jour pour ne rien perdre."
+    "plan_hint": "Les équipes comme la vôtre commencent souvent sur <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — passez au plan quand QualiPulse aura fait ses preuves."
   },
 
   "verify_modal": {

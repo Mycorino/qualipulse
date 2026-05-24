@@ -73,8 +73,7 @@
     "cta_take_interview_hint": "90 seconds — hear Claude ask + adapt",
     "cta_copy_link": "Copy shareable link",
     "cta_open_study": "Open your study →",
-    "trial_chip": "Day {{day}} of {{total}}",
-    "plan_hint": "Your trial includes everything in <strong>{{planName}}</strong> ({{monthly}}/mo). Stay on past Day 14 to keep going."
+    "plan_hint": "Teams like yours usually start on <strong>{{planName}}</strong> ({{monthly}}/mo). No pressure — pick it up when QualiPulse is earning its keep."
   },
 
   "verify_modal": {

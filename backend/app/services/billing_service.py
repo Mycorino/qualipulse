@@ -65,7 +65,7 @@ class CanStartResult:
     """Outcome of a pre-interview quota check."""
 
     allowed: bool
-    reason: str  # 'ok' | 'no_subscription' | 'quota_exceeded' | 'trial_expired' | 'past_due' | 'email_not_verified'
+    reason: str  # 'ok' | 'no_subscription' | 'quota_exceeded' | 'past_due' | 'email_not_verified'
     plan_id: str | None = None
     available_credits: int | None = None
     overage_will_apply: bool = False
@@ -283,9 +283,11 @@ def can_start_interview(db: Session, workspace_id: str) -> CanStartResult:
             plan_id=plan.id,
         )
 
-    # Trial that's expired
-    if sub.status == "trialing" and sub.trial_end and sub.trial_end <= _utcnow():
-        return CanStartResult(allowed=False, reason="trial_expired", plan_id=plan.id)
+    # Trial expiry used to gate here, but credits already do the gating —
+    # an out-of-credits user gets reason="quota_exceeded" regardless of
+    # trial state. Calendar trials are a vestige from the old plan model;
+    # the credits-native flow lets people sit on unused free credits as
+    # long as they want.
 
     if sub.status in ("canceled", "unpaid"):
         return CanStartResult(allowed=False, reason="past_due", plan_id=plan.id)
