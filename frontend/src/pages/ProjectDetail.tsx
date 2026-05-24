@@ -52,7 +52,8 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion } from "../api/projects";
+import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, type PaywallDetail } from "../api/projects";
+import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
 import { NextActionChip } from "../components/NextActionChip";
 import { resolveProjectNextAction } from "../copilot/nextAction";
@@ -143,6 +144,32 @@ export default function ProjectDetail() {
   // ── Transcript translation (reading aid) ──────────────────────────────────
   const [transcriptViewMode, setTranscriptViewMode] = useState<"original" | "translated">("original");
   const [translating, setTranslating] = useState(false);
+
+  // ── V4 paywall (unlock modal triggered by 402 from gated endpoints) ──
+  const [unlockState, setUnlockState] = useState<{
+    open: boolean;
+    lockedCount: number;
+  }>({ open: false, lockedCount: 0 });
+  // Helper — extract paywall payload from an Axios 402 response.
+  // Returns null when the error isn't a paywall (so the caller can
+  // re-throw / show its own error UI).
+  const extractPaywall = (err: unknown): PaywallDetail | null => {
+    if (typeof err !== "object" || err === null) return null;
+    const maybeAxios = err as {
+      response?: { status?: number; data?: { detail?: PaywallDetail } | PaywallDetail };
+    };
+    if (maybeAxios.response?.status !== 402) return null;
+    const data = maybeAxios.response.data;
+    // FastAPI wraps HTTPException(detail=...) as { detail: ... }
+    if (data && typeof data === "object" && "detail" in data) {
+      const detail = (data as { detail?: PaywallDetail }).detail;
+      if (detail && detail.paywall === true) return detail;
+    }
+    if (data && typeof data === "object" && "paywall" in data) {
+      return data as PaywallDetail;
+    }
+    return null;
+  };
 
   // ── Synced-segment audio playback ─────────────────────────────────────────
   // Map of turnId → recording <audio> element so transcript spans can seek
@@ -443,7 +470,22 @@ export default function ProjectDetail() {
       activeFilterBy && activeFilterValues.length > 0
         ? { filter_by: activeFilterBy, filter_values: activeFilterValues }
         : undefined;
-    await triggerAnalysis(id!, filters);
+    try {
+      await triggerAnalysis(id!, filters);
+    } catch (err) {
+      // V4 paywall — AI analysis is gated for free workspaces.
+      // Backend returns 402; we open the unlock modal with the
+      // analysis framing rather than throwing an opaque error.
+      const paywall = extractPaywall(err);
+      if (paywall) {
+        setUnlockState({
+          open: true,
+          lockedCount: paywall.locked_completed_count,
+        });
+        return;
+      }
+      throw err;
+    }
     setAnalysis((prev) => prev ? { ...prev, status: "generating" } : null);
     startPolling();
   }
@@ -662,6 +704,13 @@ export default function ProjectDetail() {
     p: ParticipantResponse,
     highlight?: { turnIndex: number; quoteText: string }
   ) {
+    // V4 paywall — locked rows open the unlock modal instead of
+    // attempting the fetch. Cheaper than letting the request 402.
+    if (p.is_locked) {
+      const locked = participants.filter((x) => x.is_locked).length;
+      setUnlockState({ open: true, lockedCount: locked });
+      return;
+    }
     if (editingTurnId && editingText !== editingOriginalText) {
       if (!confirm("You have unsaved transcript changes. Discard them?")) return;
     }
@@ -676,7 +725,20 @@ export default function ProjectDetail() {
       const result = await getTranscript(id!, p.id);
       setSelectedParticipant(result.participant);
       setTranscript(result.turns);
-    } catch {
+    } catch (err) {
+      // V4 paywall — backend may return 402 for participants that
+      // became locked between list-fetch and transcript-fetch
+      // (e.g. subscription expired during the session). Catch it
+      // and open the unlock modal rather than silently emptying.
+      const paywall = extractPaywall(err);
+      if (paywall) {
+        setSelectedParticipant(null);
+        setUnlockState({
+          open: true,
+          lockedCount: paywall.locked_completed_count,
+        });
+        return;
+      }
       setTranscript([]);
     }
   }
@@ -2213,6 +2275,35 @@ export default function ProjectDetail() {
                   })}
                 </div>
 
+                {/* V4 paywall — visibility banner. Shown when any
+                 * participants in this project are locked, so the user
+                 * sees the unlock CTA without having to click a locked
+                 * row first. */}
+                {(() => {
+                  const lockedCount = participants.filter((p) => p.is_locked).length;
+                  if (lockedCount === 0) return null;
+                  return (
+                    <div className="paywall-banner">
+                      <div className="paywall-banner__icon" aria-hidden>🔒</div>
+                      <div className="paywall-banner__body">
+                        <div className="paywall-banner__title">
+                          {lockedCount} {lockedCount === 1 ? "transcript" : "transcripts"} waiting to be unlocked
+                        </div>
+                        <div className="paywall-banner__sub">
+                          Your first 3 stay free forever. Unlock the rest with a plan or a credit pack.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setUnlockState({ open: true, lockedCount })}
+                      >
+                        Unlock
+                      </button>
+                    </div>
+                  );
+                })()}
+
                 {/* Sort */}
                 <div style={{ marginBottom: 14 }}>
                   <select
@@ -2243,16 +2334,23 @@ export default function ProjectDetail() {
                     {filtered.map((p) => (
                       <div
                         key={p.id}
-                        className={`participant-row participant-row--compact ${selectedParticipant?.id === p.id ? "active" : ""}`}
+                        className={`participant-row participant-row--compact ${selectedParticipant?.id === p.id ? "active" : ""} ${p.is_locked ? "participant-row--locked" : ""}`}
                         onClick={() => handleViewTranscript(p)}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleViewTranscript(p); } }}
                       >
-                        <div className="participant-avatar">{avatarInitial(p.display_name)}</div>
+                        <div className="participant-avatar">
+                          {p.is_locked ? "🔒" : avatarInitial(p.display_name)}
+                        </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <span className="participant-name" style={{ fontSize: 13, marginRight: 0 }}>{p.display_name || tProject("responses.anonymous")}</span>
+                            {p.is_locked && (
+                              <span className="status-badge" style={{ fontSize: 10, background: "var(--brand-50, #eef2ff)", color: "var(--brand-700)" }}>
+                                Locked
+                              </span>
+                            )}
                             {p.status !== "completed" && (() => {
                               const ageMs = Date.now() - new Date(p.started_at).getTime();
                               const isRecent = ageMs < 2 * 60 * 60 * 1000; // < 2 hours
@@ -3526,6 +3624,14 @@ export default function ProjectDetail() {
           dismissNudge(nid);
           if (project) setNudges(activeNudgesFor(project.id));
         }}
+      />
+
+      {/* V4 paywall — opens when a locked transcript is clicked or
+       *  the analysis trigger returns 402. */}
+      <UnlockModal
+        open={unlockState.open}
+        onClose={() => setUnlockState({ open: false, lockedCount: 0 })}
+        lockedCount={unlockState.lockedCount}
       />
     </InstrumentShell>
   );
