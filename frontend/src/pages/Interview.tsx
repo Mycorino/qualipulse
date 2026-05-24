@@ -391,6 +391,9 @@ export default function Interview() {
     return () => {
       if (micAnimRef.current) cancelAnimationFrame(micAnimRef.current);
       micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      if (analyserRef.current?.context && "close" in analyserRef.current.context) {
+        (analyserRef.current.context as AudioContext).close().catch(() => {});
+      }
     };
   }, [phase, micTestDone, micPermissionRequested]);
 
@@ -659,9 +662,8 @@ export default function Interview() {
       lastBlobRef.current = blob;
       setPendingBlob(blob);
       setTtsEnded(false);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t("interview.recordingError");
-      setError(msg);
+    } catch (_e) {
+      setError(t("interview.recordingError", { defaultValue: "Recording was interrupted. Please try again." }));
     }
   }
 
@@ -675,8 +677,8 @@ export default function Interview() {
     setPendingBlob(null);
 
     const stepInterval = setInterval(() => {
-      setProcessingStep((s) => Math.min(s + 1, 2));
-    }, 2500);
+      setProcessingStep((s) => Math.min(s + 1, 3));
+    }, 3000);
 
     try {
       const res = await submitAudio(token!, participantId, blob);
@@ -734,8 +736,10 @@ export default function Interview() {
         }));
       } else {
         setPendingBlob(lastBlobRef.current);
-        const msg = err instanceof Error ? err.message : t("interview.uploadError");
-        setError(msg);
+        const isNetwork = !(err as { response?: unknown })?.response;
+        setError(isNetwork
+          ? t("interview.networkError", { defaultValue: "Connection lost — please check your internet and tap Submit to retry." })
+          : t("interview.serverError", { defaultValue: "Something went wrong on our end. Please tap Submit to try again." }));
       }
     } finally {
       setProcessing(false);
@@ -1664,6 +1668,7 @@ export default function Interview() {
                   {processingStep === 0 && <>{t("interview.processing.transcribing")}</>}
                   {processingStep === 1 && <>{t("interview.processing.thinking")}</>}
                   {processingStep === 2 && <>{t("interview.processing.preparing")}</>}
+                  {processingStep >= 3 && <>{t("interview.processing.takingLonger", { defaultValue: "Still working — hang tight…" })}</>}
                 </span>
               </div>
             ) : pendingBlob ? (
