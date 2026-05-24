@@ -141,17 +141,20 @@ class TestCanStartInterviewCredits:
         assert result.is_legacy is False
         assert result.available_credits == 10
 
-    def test_trial_expired_blocks_interview(self, db_session):
+    def test_expired_trial_still_allowed_if_credits_remain(self, db_session):
+        # Credits-native model: trial expiry no longer gates. As long as
+        # the company has credits left (or overage is on), they can
+        # still run an interview. Calendar trials are vestigial.
         ensure_plans_seeded(db_session)
         c = _make_company(db_session)
         sub = bootstrap_trial_subscription(db_session, c)
-        # Push trial_end to the past.
         sub.trial_end = datetime.utcnow() - timedelta(days=1)
         db_session.commit()
 
         result = can_start_interview(db_session, c.id)
-        assert result.allowed is False
-        assert result.reason == "trial_expired"
+        assert result.allowed is True
+        assert result.reason == "ok"
+        assert result.available_credits == 10
 
     def test_no_credits_no_overage_blocks(self, db_session):
         ensure_plans_seeded(db_session)

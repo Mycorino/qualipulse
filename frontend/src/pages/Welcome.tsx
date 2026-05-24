@@ -14,12 +14,17 @@ import {
   runOnboardingCopilot,
   getOnboardingMemory,
   transcribeDemoAudio,
-  createOnboardingStudy,
   type CopilotMessage,
   type DemoTranscribeResponse,
   type ProposedAction,
   type ProposedGuideQuestion,
 } from "../api/copilot";
+import {
+  createProject,
+  patchProjectSettings,
+  createGuideQuestion,
+  createLink,
+} from "../api/projects";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
@@ -78,26 +83,6 @@ function renderItalics(text: string, parentKey: number): ReactNode {
     }
     return <Fragment key={`t-${parentKey}-${j}`}>{seg}</Fragment>;
   });
-}
-
-/**
- * Compute "Day X of Y" for the trial chip on the completion screen.
- * Returns null when the trial has ended or no trial_ends_at is set.
- */
-function trialDayInfo(trialEndsAt: string | null | undefined): {
-  day: number;
-  total: number;
-} | null {
-  if (!trialEndsAt) return null;
-  const end = new Date(trialEndsAt).getTime();
-  if (!Number.isFinite(end)) return null;
-  const now = Date.now();
-  // Assume a 14-day trial (matches backend bootstrap); start = end - 14d.
-  const total = 14;
-  const start = end - total * 24 * 60 * 60 * 1000;
-  if (now < start || now > end) return null;
-  const elapsed = Math.floor((now - start) / (24 * 60 * 60 * 1000));
-  return { day: Math.max(1, Math.min(total, elapsed + 1)), total };
 }
 
 /**
@@ -301,22 +286,45 @@ export default function Welcome() {
     if (creating) return;
     setCreating(true);
     try {
-      const result = await createOnboardingStudy({
-        study_name: study.study_name || "My first study",
-        objective: study.objective,
-        decision_to_inform: study.decision_to_inform,
-        timeline: study.timeline,
-        success_criteria: study.success_criteria,
-        target_customer_description: study.target_customer_description,
-        questions: ((study.questions ?? []) as ProposedGuideQuestion[]).map(
-          (q) => ({
-            section_title: q.section_title,
-            main_question: q.main_question,
-            desired_learning: q.desired_learning,
-          }),
-        ),
+      const project = await createProject({
+        name: study.study_name || "My first study",
         language: "en",
+        questions: [],
       });
+      // Write the objective plus V2 strategic context (decision /
+      // timeline / success criteria / audience) in a single PATCH so
+      // the Project carries everything captured into downstream
+      // personalisation. ProjectSettingsPatch only updates non-None values.
+      const patch: Record<string, string | undefined> = {};
+      if (study.objective) patch.research_objective = study.objective;
+      if (study.decision_to_inform)
+        patch.decision_to_inform = study.decision_to_inform;
+      if (study.timeline) patch.timeline = study.timeline;
+      if (study.success_criteria)
+        patch.success_criteria = study.success_criteria;
+      if (study.target_customer_description)
+        patch.target_customer_description = study.target_customer_description;
+      if (Object.keys(patch).length > 0) {
+        await patchProjectSettings(project.id, patch);
+      }
+      for (const q of (study.questions ?? []) as ProposedGuideQuestion[]) {
+        await createGuideQuestion(project.id, {
+          section_title: q.section_title,
+          main_question: q.main_question,
+          desired_learning: q.desired_learning,
+        });
+      }
+      // Auto-create the first interview link so the completion screen's
+      // "Take your own interview" + "Share your link" CTAs are usable
+      // immediately. If link creation fails the user can still create
+      // one from the project page, so we don't block.
+      let interviewToken: string | null = null;
+      try {
+        const link = await createLink(project.id);
+        interviewToken = link.token;
+      } catch {
+        interviewToken = null;
+      }
       await completeOnboarding({});
       setCachedOnboarded(true);
       const recap = await getOnboardingMemory().catch(() => ({
@@ -324,11 +332,11 @@ export default function Welcome() {
         profile_summary: "",
       }));
       setDone({
-        projectId: result.project_id,
-        studyName: result.study_name || "Your study",
+        projectId: project.id,
+        studyName: study.study_name || "Your study",
         memory: recap.memory,
         profileSummary: recap.profile_summary,
-        interviewToken: result.interview_token,
+        interviewToken,
       });
       setCreating(false);
     } catch {
@@ -464,7 +472,6 @@ export default function Welcome() {
         : "profile";
 
   if (done) {
-    const trial = trialDayInfo(me.trial_ends_at);
     const interviewUrl = done.interviewToken
       ? `${window.location.origin}/interview/${done.interviewToken}`
       : null;
@@ -513,14 +520,6 @@ export default function Welcome() {
       <div className="onboarding">
         <header className="onboarding__bar">
           <span className="onboarding__brand">QualiPulse</span>
-          {trial && (
-            <span
-              className="onboarding-trial-chip"
-              title={t("done.trial_chip", { day: trial.day, total: trial.total })}
-            >
-              {t("done.trial_chip", { day: trial.day, total: trial.total })}
-            </span>
-          )}
         </header>
         <div className="onboarding-done">
           <div className="onboarding-done__eyebrow">

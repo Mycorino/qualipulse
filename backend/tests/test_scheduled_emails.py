@@ -189,73 +189,25 @@ class TestDryRun:
         ), "dry-run must not persist"
 
 
-# ── Trial half over (Day-7) ──────────────────────────────────────────────────
+# Calendar-trial emails (Day-7 / Day-12) were retired alongside the
+# credits-native billing model — credits gate usage, not days. The
+# endpoint no longer reports `trial_half_over` or `trial_ending` in
+# its events dict, so the old test classes for those have been removed.
 
-class TestTrialHalfOver:
-    def test_sends_when_5_to_7_days_remain(self, client, db_session):
+
+class TestRetiredTrialEmails:
+    def test_endpoint_no_longer_reports_calendar_trial_events(
+        self, client, db_session
+    ):
         _make_company(
             db_session,
             email="h@ex.com",
             created_days_ago=8,
             trial_days_left=6,
         )
-        with patch("app.routers.scheduled_emails.send_trial_half_over") as mock:
-            resp = client.post(
-                "/admin/scheduled-emails/run", headers=_admin_headers()
-            )
-        assert resp.json()["events"]["trial_half_over"]["sent"] == 1
-        assert mock.called
-        kwargs = mock.call_args.kwargs
-        # Plan suggestion picked up from company_size "11–50" → Team €299
-        assert kwargs["plan_name"] == "Team"
-        assert kwargs["plan_monthly"] == "€299"
-
-    def test_skips_paid_users(self, client, db_session):
-        _make_company(
-            db_session,
-            email="paid@ex.com",
-            created_days_ago=8,
-            trial_days_left=6,
-            subscription_status="active",
+        resp = client.post(
+            "/admin/scheduled-emails/run", headers=_admin_headers()
         )
-        with patch("app.routers.scheduled_emails.send_trial_half_over") as mock:
-            client.post(
-                "/admin/scheduled-emails/run", headers=_admin_headers()
-            )
-        assert not mock.called
-
-
-# ── Trial ending (Day-12) ────────────────────────────────────────────────────
-
-class TestTrialEnding:
-    def test_sends_in_last_2_days(self, client, db_session):
-        _make_company(
-            db_session,
-            email="end@ex.com",
-            created_days_ago=13,
-            trial_days_left=1,
-            company_size="1–10",
-        )
-        with patch("app.routers.scheduled_emails.send_trial_ending") as mock:
-            resp = client.post(
-                "/admin/scheduled-emails/run", headers=_admin_headers()
-            )
-        assert resp.json()["events"]["trial_ending"]["sent"] == 1
-        assert mock.called
-        # Solo (1–10) → Exploration €89.
-        kwargs = mock.call_args.kwargs
-        assert kwargs["plan_name"] == "Exploration"
-        assert kwargs["plan_monthly"] == "€89"
-
-    def test_skips_when_trial_already_ended(self, client, db_session):
-        _make_company(
-            db_session,
-            email="dead@ex.com",
-            created_days_ago=20,
-            trial_days_left=-2,  # already past trial_ends_at
-        )
-        with patch("app.routers.scheduled_emails.send_trial_ending") as mock:
-            client.post(
-                "/admin/scheduled-emails/run", headers=_admin_headers()
-            )
-        assert not mock.called
+        body = resp.json()
+        assert "trial_half_over" not in body["events"]
+        assert "trial_ending" not in body["events"]
