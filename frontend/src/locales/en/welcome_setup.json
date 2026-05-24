@@ -1,0 +1,62 @@
+{
+  "header_skip": "Skip setup",
+  "progress_aria": "Setup progress",
+
+  "step_1_label": "About you",
+  "step_2_label": "Your study",
+  "step_3_label": "The deal",
+
+  "step_1_title": "Let's get the basics down",
+  "step_1_sub": "Three quick questions so the Research Copilot can talk to you like a peer instead of a stranger.",
+  "step_1_cta": "Continue",
+
+  "field_company": "Company",
+  "field_company_placeholder": "Acme Inc.",
+  "field_role": "Your role",
+  "field_team_size": "Team size",
+
+  "step_2_title": "What brings you here?",
+  "step_2_sub": "Pick what's closest — you can change direction anytime in the chat that follows.",
+  "step_2_cta": "Continue",
+
+  "field_use_case": "What you'll use it for",
+  "field_intent": "Who's making the call",
+  "field_readiness": "Where you're at",
+
+  "intent_solo": "I'll decide — I run my own research",
+  "intent_team": "I'm helping someone else decide",
+  "solo": "Solo",
+  "team": "Team",
+
+  "readiness_concrete": "I have a concrete study in mind",
+  "readiness_evaluating": "I'm evaluating QualiPulse first",
+
+  "step_3_eyebrow": "Here's the deal",
+  "step_3_title": "Try it on us — no card, no trial countdown",
+  "step_3_sub": "Three numbers tell the whole story. Unlock the rest whenever it's earning its keep.",
+
+  "deal_run_label": "Interviews to run",
+  "deal_run_body": "Real participant interviews, on us. Each one costs you nothing until you decide QualiPulse is worth keeping.",
+  "deal_view_label": "Full transcripts to read",
+  "deal_view_body": "Read three transcripts end-to-end forever. After that, you'll see analysis summaries — full reads unlock with a plan.",
+  "deal_unlock_label": "Unlock anytime",
+  "deal_unlock_body_generic": "When you're ready, pick a plan that fits — monthly, no surprises.",
+  "deal_unlock_body_with_plan": "Teams like yours usually start on <strong>{{planName}}</strong> ({{monthly}}/mo). No pressure — only when it's earning its keep.",
+
+  "verify_eyebrow": "One quick thing",
+  "verify_body": "We sent a verification link to {{email}}. Click it to unlock your 10 free interviews — credits are gated on a verified email.",
+  "verify_resend": "Resend the link",
+  "verify_hint_post_action": "Check your inbox — it takes a second.",
+  "verify_done": "Email verified — {{email}}",
+
+  "step_3_cta": "Talk to the Copilot →",
+
+  "back": "Back",
+  "saving": "Saving…",
+
+  "foot_dashboard": "Skip the whole thing — take me to my dashboard",
+
+  "toast_save_failed": "Couldn't save that — try again?",
+  "toast_resend_ok": "Sent — check your inbox.",
+  "toast_resend_failed": "Couldn't resend just now — try again in a moment."
+}
