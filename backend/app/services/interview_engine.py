@@ -987,14 +987,26 @@ def process_interview_turn(
             from app.services.email import send_email
             if participant.email:
                 project_name = participant.project.name
-                send_email(
-                    to=participant.email,
-                    subject=f"Thank you for your interview — {project_name}",
-                    body_html=f"""
-                    <p>Hi{' ' + participant.display_name if participant.display_name else ''},</p>
+                lang = (participant.project.language or "en").lower()[:2]
+                greeting = f" {participant.display_name}" if participant.display_name else ""
+                if lang == "fr":
+                    subject = f"Merci pour votre entretien — {project_name}"
+                    body_html = f"""
+                    <p>Bonjour{greeting},</p>
+                    <p>Merci d'avoir complété l'entretien <strong>{project_name}</strong>. Vos réponses ont bien été enregistrées et contribueront à enrichir la recherche.</p>
+                    <p>Vous pouvez fermer cet e-mail — aucune action supplémentaire n'est requise.</p>
+                    """
+                else:
+                    subject = f"Thank you for your interview — {project_name}"
+                    body_html = f"""
+                    <p>Hi{greeting},</p>
                     <p>Thank you for completing the <strong>{project_name}</strong> interview. Your responses have been recorded and will help shape the research.</p>
                     <p>You can close this email — no further action is needed.</p>
-                    """,
+                    """
+                send_email(
+                    to=participant.email,
+                    subject=subject,
+                    body_html=body_html,
                 )
         except Exception:
             pass  # Never fail the interview flow due to email errors
