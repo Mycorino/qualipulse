@@ -65,7 +65,7 @@ class CanStartResult:
     """Outcome of a pre-interview quota check."""
 
     allowed: bool
-    reason: str  # 'ok' | 'no_subscription' | 'quota_exceeded' | 'trial_expired' | 'past_due'
+    reason: str  # 'ok' | 'no_subscription' | 'quota_exceeded' | 'trial_expired' | 'past_due' | 'email_not_verified'
     plan_id: str | None = None
     available_credits: int | None = None
     overage_will_apply: bool = False
@@ -267,6 +267,20 @@ def can_start_interview(db: Session, workspace_id: str) -> CanStartResult:
             reason="ok",
             plan_id=plan.id,
             is_legacy=True,
+        )
+
+    # Fraud floor — credit consumption is gated on a verified email.
+    # Disposable / typo-pad-style accounts that never verify can't
+    # spend the 10 free trial credits. Verified accounts (real users
+    # who clicked the link) pass through normally.
+    from app.models.company import Company  # local import to avoid cycle
+
+    company = db.query(Company).filter(Company.id == workspace_id).first()
+    if company is not None and not company.email_verified:
+        return CanStartResult(
+            allowed=False,
+            reason="email_not_verified",
+            plan_id=plan.id,
         )
 
     # Trial that's expired

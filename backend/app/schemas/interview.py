@@ -71,6 +71,10 @@ class ParticipantResponse(BaseModel):
     quality_issues: list[str] | None = None
     avg_response_words: float | None = None
     short_answer_pct: float | None = None
+    # V4 paywall — True when this participant's transcript is locked
+    # behind the free-preview paywall for the current workspace. The
+    # frontend renders a paywall card instead of the transcript body.
+    is_locked: bool = False
 
     model_config = {"from_attributes": True}
 

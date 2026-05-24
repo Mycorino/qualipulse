@@ -45,6 +45,10 @@ def _make_company(db_session, *, tier: str = "starter", email: str | None = None
         email=email or f"u-{uuid.uuid4().hex[:8]}@example.com",
         password_hash="x",
         subscription_tier=tier,
+        # V4 paywall — can_start_interview now gates on verified email.
+        # These tests are about credit math, not the verification gate,
+        # so we mark email_verified=True up front.
+        email_verified=True,
     )
     db_session.add(company)
     db_session.commit()

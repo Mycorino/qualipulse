@@ -326,6 +326,41 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             ),
         },
     },
+    "free_preview_full": {
+        "en": {
+            "subject": "Your 3 free transcripts are unlocked — more waiting",
+            "heading": "All 3 free transcripts are ready",
+            "body": (
+                "You've now collected 3+ responses for <strong>{project_name}"
+                "</strong> — and you can listen to, tag, and annotate "
+                "every one of them. Any further responses are waiting to "
+                "be unlocked. Subscribe (or grab a credit pack) to read "
+                "the rest and run AI analysis across the full study."
+            ),
+            "cta": "Unlock the rest",
+            "foot": (
+                "The first 3 stay free forever — no time pressure on the "
+                "ones you've already explored."
+            ),
+        },
+        "fr": {
+            "subject": "Vos 3 transcriptions gratuites sont débloquées — d'autres attendent",
+            "heading": "Vos 3 transcriptions gratuites sont prêtes",
+            "body": (
+                "Vous avez désormais collecté 3+ réponses pour <strong>"
+                "{project_name}</strong> — et vous pouvez les écouter, "
+                "les taguer et les annoter toutes. Les réponses "
+                "supplémentaires attendent d'être débloquées. Abonnez-"
+                "vous (ou prenez un pack de crédits) pour lire la suite "
+                "et lancer l'analyse IA sur l'étude complète."
+            ),
+            "cta": "Débloquer le reste",
+            "foot": (
+                "Les 3 premières restent gratuites pour toujours — pas "
+                "de pression sur celles que vous avez déjà explorées."
+            ),
+        },
+    },
     "first_response_in": {
         "en": {
             "subject": "Your first response is in — {project_name}",
@@ -698,6 +733,31 @@ def send_analysis_ready(to: str, project_name: str, project_url: str, lang: str 
     return send_email(
         to=to,
         subject=_c("analysis_ready", lang, "subject", project_name=project_name),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_free_preview_full(
+    to: str,
+    project_name: str,
+    project_url: str,
+    lang: str = "en",
+) -> bool:
+    """V4 paywall milestone — fires when the workspace's 3rd
+    participant completes. Acknowledges the free-tier value delivered
+    and pitches the unlock path for further transcripts."""
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("free_preview_full", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("free_preview_full", lang, "body", project_name=project_name)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{project_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("free_preview_full", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;line-height:1.55;margin:24px 0 0;">{_c("free_preview_full", lang, "foot")}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("free_preview_full", lang, "subject"),
         body_html=_wrap_email(content, lang),
     )
 

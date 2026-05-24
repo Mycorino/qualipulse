@@ -112,6 +112,24 @@ class Company(Base):
         DateTime, nullable=True
     )
 
+    # Sticky flag set the first time a real paid subscription becomes
+    # active. Once true, never resets — even on cancellation, ex-paying
+    # customers retain read-only access to data they collected. Drives
+    # the free-tier "first 3 transcripts visible" paywall: paid OR
+    # ever-paid = no paywall; pure free = first 3 visible only. Alembic
+    # 0034. Backfilled at migration time for legacy paid accounts.
+    has_ever_paid: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0"
+    )
+
+    # V4 paywall milestone — set when the 3rd participant completes
+    # and we send the "free preview full, unlock the rest" email.
+    # Idempotency guard so we don't re-pitch on every subsequent
+    # completion. Alembic 0034.
+    free_preview_full_email_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
 

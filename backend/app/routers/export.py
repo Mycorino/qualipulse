@@ -91,6 +91,35 @@ def list_participants(
         .all()
     )
 
+    # V4 paywall — bulk-compute visibility once for the whole list
+    # rather than per-row, to avoid N+1 queries. We do this by
+    # gathering the first FREE_PREVIEW_COUNT completed participant IDs
+    # across the workspace and treating everything else as locked
+    # (unless the workspace has paid).
+    from app.services.paywall import (
+        FREE_PREVIEW_COUNT,
+        _PAID_STATUSES,
+    )
+    fully_unlocked = (
+        company.has_ever_paid
+        or (company.subscription_status or "") in _PAID_STATUSES
+    )
+    visible_ids: set[str] = set()
+    if not fully_unlocked:
+        first_completed_ids = (
+            db.query(Participant.id)
+            .join(Project, Participant.project_id == Project.id)
+            .filter(
+                Project.company_id == company.id,
+                Project.is_demo.is_(False),
+                Participant.status == "completed",
+            )
+            .order_by(Participant.completed_at.asc())
+            .limit(FREE_PREVIEW_COUNT)
+            .all()
+        )
+        visible_ids = {row[0] for row in first_completed_ids}
+
     result = []
     for p in participants:
         # Use persisted quality score if available, otherwise compute heuristic
@@ -98,6 +127,14 @@ def list_participants(
             q_score, q_label = p.quality_score, p.quality_label
         else:
             q_score, q_label = _compute_quality(p.turns)
+        # Locked iff completed AND not fully unlocked AND not in the
+        # first-3 visible set. In-progress participants are always
+        # visible (no body to gate).
+        is_locked = (
+            not fully_unlocked
+            and p.status == "completed"
+            and p.id not in visible_ids
+        )
         result.append(
             ParticipantResponse(
                 id=p.id,
@@ -116,6 +153,7 @@ def list_participants(
                 quality_issues=json.loads(p.quality_issues) if p.quality_issues else None,
                 avg_response_words=p.avg_response_words,
                 short_answer_pct=p.short_answer_pct,
+                is_locked=is_locked,
             )
         )
     return result
@@ -144,6 +182,38 @@ def get_transcript(
     if participant is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found"
+        )
+
+    # V4 paywall — gate transcript body for free workspaces past
+    # the first FREE_PREVIEW_COUNT completed participants. The
+    # frontend renders a paywall card from the 402 response.
+    from app.services.paywall import (
+        is_participant_visible,
+        paywall_payload,
+        get_visibility_state,
+    )
+
+    if not is_participant_visible(db, company, participant):
+        state = get_visibility_state(db, company)
+        # Approximate "how many transcripts are locked" — total
+        # completed minus the free preview count.
+        from sqlalchemy import and_
+        total_completed = (
+            db.query(Participant)
+            .join(Project, Participant.project_id == Project.id)
+            .filter(
+                and_(
+                    Project.company_id == company.id,
+                    Project.is_demo.is_(False),
+                    Participant.status == "completed",
+                )
+            )
+            .count()
+        )
+        locked = max(0, total_completed - (state.free_used or 0))
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=paywall_payload(company, locked),
         )
 
     turns = sorted(participant.turns, key=lambda t: t.turn_index)

@@ -115,6 +115,23 @@ export interface ParticipantResponse {
   quality_issues?: string[] | null;
   avg_response_words?: number | null;
   short_answer_pct?: number | null;
+  /** V4 paywall — true when this participant's transcript body is
+   *  hidden behind the free-preview paywall for the current
+   *  workspace. List view shows a locked row; transcript endpoint
+   *  returns 402. */
+  is_locked?: boolean;
+}
+
+/** V4 paywall response body — returned with HTTP 402 from gated
+ *  endpoints (transcript view, analysis). */
+export interface PaywallDetail {
+  paywall: true;
+  reason: "free_preview_exhausted";
+  free_preview_count: number;
+  locked_completed_count: number;
+  unlock_paths: ("subscription" | "credit_pack")[];
+  has_ever_paid: boolean;
+  feature?: "transcript" | "analysis";
 }
 
 export interface QualityAssessment {

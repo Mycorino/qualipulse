@@ -1,0 +1,36 @@
+{
+  "locked_aria": "Locked transcript",
+  "anonymous_participant": "Someone",
+  "from": "from",
+  "of_voice": "of voice",
+  "answered_all": "answered all questions",
+  "pitch_transcript": "{{count}} more transcripts are waiting — unlock them with a plan. Your first {{preview}} stay free forever.",
+  "pitch_analysis": "AI analysis runs across your full study. Unlock all {{count}} transcripts with a plan to synthesize themes — your first {{preview}} stay free for tagging and memos.",
+  "unlock_cta": "Unlock transcripts",
+
+  "close": "Close",
+  "dismiss": "Maybe later",
+  "modal_eyebrow": "Unlock your full study",
+  "modal_title": "{{count}} more transcripts ready to listen to",
+  "modal_body": "You've already collected the data — choose how to access it. Subscriptions also include monthly new credits to keep researching.",
+
+  "subscription_eyebrow": "Ongoing research",
+  "subscription_title": "Monthly plan",
+  "subscription_body": "Best if you'll run more studies. Includes a fresh batch of credits each month, AI analysis, and unlocks everything you've collected so far.",
+  "subscription_perk_1": "Unlocks all current + future transcripts",
+  "subscription_perk_2": "AI analysis on full studies",
+  "subscription_perk_3": "New credits every month",
+  "subscription_cta_exploration": "Subscribe to Exploration — €89/mo",
+  "subscription_cta_team": "Subscribe to Team — €299/mo",
+
+  "pack_eyebrow": "Pay as you go",
+  "pack_title": "Credit pack",
+  "pack_body": "Best if this is a one-off study. Buy a pack to unlock and keep going — no subscription.",
+  "pack_perk_1": "Unlocks all current transcripts",
+  "pack_perk_2": "Extra credits for more interviews",
+  "pack_cta": "Buy {{credits}} credits — {{price}}",
+  "other_packs": "Or another size:",
+  "credits_label": "credits",
+
+  "redirecting": "Redirecting to checkout…"
+}
