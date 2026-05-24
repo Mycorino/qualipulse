@@ -14,6 +14,7 @@ import enSettings from "./locales/en/settings.json";
 import enAffiliate from "./locales/en/affiliate.json";
 import enOnboarding from "./locales/en/onboarding.json";
 import enPaywall from "./locales/en/paywall.json";
+import enWelcomeSetup from "./locales/en/welcome_setup.json";
 
 // FR namespaces
 import frCommon from "./locales/fr/common.json";
@@ -27,6 +28,7 @@ import frSettings from "./locales/fr/settings.json";
 import frAffiliate from "./locales/fr/affiliate.json";
 import frOnboarding from "./locales/fr/onboarding.json";
 import frPaywall from "./locales/fr/paywall.json";
+import frWelcomeSetup from "./locales/fr/welcome_setup.json";
 
 i18n
   .use(LanguageDetector)
@@ -45,6 +47,7 @@ i18n
         affiliate: enAffiliate,
         onboarding: enOnboarding,
         paywall: enPaywall,
+        welcome_setup: enWelcomeSetup,
       },
       fr: {
         common: frCommon,
@@ -58,12 +61,13 @@ i18n
         affiliate: frAffiliate,
         onboarding: frOnboarding,
         paywall: frPaywall,
+        welcome_setup: frWelcomeSetup,
       },
     },
     lng: undefined, // rely on detector
     fallbackLng: "en",
     defaultNS: "common",
-    ns: ["common", "auth", "dashboard", "project", "interview", "analysis", "marketing", "settings", "affiliate", "onboarding", "paywall"],
+    ns: ["common", "auth", "dashboard", "project", "interview", "analysis", "marketing", "settings", "affiliate", "onboarding", "paywall", "welcome_setup"],
     detection: {
       order: ["localStorage", "navigator"],
       lookupLocalStorage: "qp_language",

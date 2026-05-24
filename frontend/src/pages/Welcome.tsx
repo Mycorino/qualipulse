@@ -14,20 +14,16 @@ import {
   runOnboardingCopilot,
   getOnboardingMemory,
   transcribeDemoAudio,
+  createOnboardingStudy,
   type CopilotMessage,
   type DemoTranscribeResponse,
   type ProposedAction,
   type ProposedGuideQuestion,
 } from "../api/copilot";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
-import {
-  createProject,
-  patchProjectSettings,
-  createGuideQuestion,
-  createLink,
-} from "../api/projects";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
+import WelcomeSetup from "./WelcomeSetup";
 
 /**
  * Welcome — the conversational onboarding.
@@ -186,10 +182,21 @@ export default function Welcome() {
           return;
         }
         setMe(m);
+        // If the user came through the structured wizard, the agent's
+        // canned greeting acknowledges what we already know rather
+        // than re-asking. Different greeting key, same shape.
+        const greetingKey =
+          m.role && m.company_size && m.use_case
+            ? "greeting_post_wizard"
+            : "greeting";
         setThread([
           {
             role: "assistant",
-            text: t("greeting", { firstName: m.first_name || "there" }),
+            text: t(greetingKey, {
+              firstName: m.first_name || "there",
+              role: m.role || "",
+              useCase: (m.use_case || "").toLowerCase(),
+            }),
           },
         ]);
       })
@@ -294,46 +301,22 @@ export default function Welcome() {
     if (creating) return;
     setCreating(true);
     try {
-      const project = await createProject({
-        name: study.study_name || "My first study",
+      const result = await createOnboardingStudy({
+        study_name: study.study_name || "My first study",
+        objective: study.objective,
+        decision_to_inform: study.decision_to_inform,
+        timeline: study.timeline,
+        success_criteria: study.success_criteria,
+        target_customer_description: study.target_customer_description,
+        questions: ((study.questions ?? []) as ProposedGuideQuestion[]).map(
+          (q) => ({
+            section_title: q.section_title,
+            main_question: q.main_question,
+            desired_learning: q.desired_learning,
+          }),
+        ),
         language: "en",
-        questions: [],
       });
-      // Write the objective plus the V2 strategic context (decision,
-      // timeline, success criteria, audience) in a single PATCH so the
-      // Project carries everything we captured into downstream
-      // personalisation. Empty strings on these fields are fine —
-      // ProjectSettingsPatch only updates non-None values.
-      const patch: Record<string, string | undefined> = {};
-      if (study.objective) patch.research_objective = study.objective;
-      if (study.decision_to_inform)
-        patch.decision_to_inform = study.decision_to_inform;
-      if (study.timeline) patch.timeline = study.timeline;
-      if (study.success_criteria)
-        patch.success_criteria = study.success_criteria;
-      if (study.target_customer_description)
-        patch.target_customer_description = study.target_customer_description;
-      if (Object.keys(patch).length > 0) {
-        await patchProjectSettings(project.id, patch);
-      }
-      for (const q of (study.questions ?? []) as ProposedGuideQuestion[]) {
-        await createGuideQuestion(project.id, {
-          section_title: q.section_title,
-          main_question: q.main_question,
-          desired_learning: q.desired_learning,
-        });
-      }
-      // Auto-create the first interview link so the completion screen's
-      // "Take your own interview" + "Share your link" CTAs are usable
-      // immediately — no extra click. If link creation fails the user
-      // can still create one from the project page, so we don't block.
-      let interviewToken: string | null = null;
-      try {
-        const link = await createLink(project.id);
-        interviewToken = link.token;
-      } catch {
-        interviewToken = null;
-      }
       await completeOnboarding({});
       setCachedOnboarded(true);
       const recap = await getOnboardingMemory().catch(() => ({
@@ -341,11 +324,11 @@ export default function Welcome() {
         profile_summary: "",
       }));
       setDone({
-        projectId: project.id,
-        studyName: study.study_name || "Your study",
+        projectId: result.project_id,
+        studyName: result.study_name || "Your study",
         memory: recap.memory,
         profileSummary: recap.profile_summary,
-        interviewToken,
+        interviewToken: result.interview_token,
       });
       setCreating(false);
     } catch {
@@ -396,6 +379,37 @@ export default function Welcome() {
   };
 
   if (!me) return null;
+
+  // Hybrid Phase 1 → Phase 2 handoff. Show the structured 3-step
+  // wizard FIRST (unless the user has skipped it, already completed
+  // the qualification fields, or made chat progress on a refresh).
+  const wizardSkipped = (() => {
+    try {
+      return localStorage.getItem("qp_welcome_setup_skipped") === "1";
+    } catch {
+      return false;
+    }
+  })();
+  const phase1Complete = !!me.role && !!me.company_size && !!me.use_case;
+  const hasChatProgress = thread.length > 1;
+  const showSetupWizard =
+    !done && !wizardSkipped && !phase1Complete && !hasChatProgress;
+  if (showSetupWizard) {
+    return (
+      <WelcomeSetup
+        me={me}
+        onProfileSaved={setMe}
+        onComplete={() => {
+          try {
+            localStorage.setItem("qp_welcome_setup_skipped", "1");
+          } catch {
+            /* private-mode no-op */
+          }
+          getMe().then(setMe).catch(() => undefined);
+        }}
+      />
+    );
+  }
 
   // Phase: tell-me-about-your-work until 2+ profile fields are set; frame
   // your study until the agent has proposed one; launch once accepted.

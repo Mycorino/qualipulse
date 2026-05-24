@@ -6,6 +6,8 @@
 
   "greeting": "Bonjour {{firstName}} — je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planning et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager — et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : quelle est la chose la plus importante que vous avez besoin d'apprendre sur vos utilisateurs en ce moment ?",
 
+  "greeting_post_wizard": "Bienvenue, {{firstName}} — c'est noté. Vous êtes {{role}}, focus sur {{useCase}}.\n\nMaintenant, rédigeons votre première étude. Quelle décision repose sur cette recherche ?",
+
   "goal_suggestions_label": "Ou choisissez un point de départ :",
   "goal_suggestions": [
     "Pourquoi les utilisateurs en essai partent",

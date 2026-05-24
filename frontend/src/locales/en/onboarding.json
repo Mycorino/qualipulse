@@ -6,6 +6,8 @@
 
   "greeting": "Hi {{firstName}} — I'm your Research Copilot. I help you run interviews and surveys without the scheduling-and-analysis grind.\n\nIn about two minutes we'll have a real study ready to share — and I'll start learning what your research looks like so I can be more useful next time.\n\nTo start: what's the one thing you most need to learn about your users right now?",
 
+  "greeting_post_wizard": "Welcome, {{firstName}} — got it. You're a {{role}} focused on {{useCase}}.\n\nNow let's draft your first study. What's the one decision riding on this research?",
+
   "goal_suggestions_label": "Or pick one to start:",
   "goal_suggestions": [
     "Why trial users churn",
