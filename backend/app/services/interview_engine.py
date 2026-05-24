@@ -362,16 +362,27 @@ WHY: generic answer with no behaviour or example.
     # non-English interview language.
     effective_system_prompt = (system_prompt or INTERVIEWER_SYSTEM_PROMPT) + _language_instruction(language)
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=512,
-        # 0.4: the action choice is a near-classification task — lower temp
-        # reduces premature "close" decisions and runaway follow-up loops.
-        # Question phrasing still has enough variation to feel human.
-        temperature=0.4,
-        system=effective_system_prompt,
-        messages=[{"role": "user", "content": user_message}],
-    )
+    import time as _time
+
+    _max_retries = 2
+    response = None
+    for _attempt in range(_max_retries + 1):
+        try:
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=512,
+                temperature=0.4,
+                system=effective_system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+            )
+            break
+        except (anthropic.APIStatusError, httpx.TimeoutException) as exc:
+            if _attempt < _max_retries:
+                _time.sleep(1.5 ** _attempt)
+                continue
+            raise RuntimeError(
+                "Interview AI temporarily unavailable — please retry."
+            ) from exc
 
     if db is not None:
         log_claude_usage(
@@ -392,14 +403,20 @@ WHY: generic answer with no behaviour or example.
     try:
         result = json.loads(text_to_parse)
     except json.JSONDecodeError:
-        # Fallback: treat entire response as a follow-up question
-        result = {"action": "follow_up", "question": raw_text}
+        cleaned = raw_text.strip()
+        if (
+            len(cleaned) > 200
+            or cleaned.startswith("{")
+            or "```" in cleaned
+            or "\n" in cleaned
+        ):
+            cleaned = "Could you tell me more about that?"
+        result = {"action": "follow_up", "question": cleaned}
 
-    # Validate keys
     if "action" not in result:
         result["action"] = "follow_up"
     if "question" not in result:
-        result["question"] = raw_text
+        result["question"] = "Could you tell me more about that?"
 
     return result
 
@@ -643,10 +660,14 @@ def start_interview(participant_id: str, db: Session) -> dict:
     else:
         question_text, q_index = _get_first_question(project, db=db, participant_id=participant_id)
 
-    # Generate TTS audio and upload
-    tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-    tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
-    log_tts_usage(db, question_text, company_id=company_id, project_id=proj_id, participant_id=participant_id)
+    # Generate TTS audio and upload (non-fatal — text-only fallback if TTS is down)
+    tts_audio_url = None
+    try:
+        tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
+        tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
+        log_tts_usage(db, question_text, company_id=company_id, project_id=proj_id, participant_id=participant_id)
+    except Exception:
+        logger.warning("TTS failed for start_interview participant=%s; text-only fallback", participant_id)
 
     # Save the interviewer turn
     turn = InterviewTurn(
@@ -691,6 +712,18 @@ def process_interview_turn(
     # for silent/inaudible clips. Saving that and passing it to Claude produces
     # garbage follow-ups. Signal the caller to prompt a re-record instead.
     if not transcript or not transcript.strip():
+        raise EmptyTranscriptError(
+            "No speech detected in the recording. Please try again in a quieter environment."
+        )
+
+    # 1b. Whisper hallucination guard — common phantom phrases on silent audio
+    _HALLUCINATION_PHRASES = (
+        "thank you for watching", "thanks for watching", "please subscribe",
+        "like and subscribe", "see you in the next", "merci d'avoir regardé",
+        "sous-titres réalisés", "sous-titrage",
+    )
+    _lower_transcript = transcript.strip().lower()
+    if any(p in _lower_transcript for p in _HALLUCINATION_PHRASES):
         raise EmptyTranscriptError(
             "No speech detected in the recording. Please try again in a quieter environment."
         )
@@ -987,15 +1020,23 @@ def process_interview_turn(
             from app.services.email import send_email
             if participant.email:
                 project_name = participant.project.name
-                send_email(
-                    to=participant.email,
-                    subject=f"Thank you for your interview — {project_name}",
-                    body_html=f"""
-                    <p>Hi{' ' + participant.display_name if participant.display_name else ''},</p>
+                lang = (participant.project.language or "en").lower()[:2]
+                greeting = f" {participant.display_name}" if participant.display_name else ""
+                if lang == "fr":
+                    subject = f"Merci pour votre entretien — {project_name}"
+                    body_html = f"""
+                    <p>Bonjour{greeting},</p>
+                    <p>Merci d'avoir complété l'entretien <strong>{project_name}</strong>. Vos réponses ont bien ét�� enregistrées et contribueront à enrichir la recherche.</p>
+                    <p>Vous pouvez fermer cet e-mail — aucune action supplémentaire n'est requise.</p>
+                    """
+                else:
+                    subject = f"Thank you for your interview — {project_name}"
+                    body_html = f"""
+                    <p>Hi{greeting},</p>
                     <p>Thank you for completing the <strong>{project_name}</strong> interview. Your responses have been recorded and will help shape the research.</p>
                     <p>You can close this email — no further action is needed.</p>
-                    """,
-                )
+                    """
+                send_email(to=participant.email, subject=subject, body_html=body_html)
         except Exception:
             pass  # Never fail the interview flow due to email errors
 

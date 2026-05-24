@@ -18,7 +18,6 @@ export interface ScreeningQuestion {
   id: string;
   question: string;
   options: string[];
-  disqualifying_options: string[];
   sort_order: number;
 }
 
@@ -144,24 +143,29 @@ export async function submitScreening(token: string, answers: Record<string, str
   return data;
 }
 
+const MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024;
+
 export async function submitAudio(
   token: string,
   participantId: string,
   audioBlob: Blob
 ): Promise<SubmitAudioResponse> {
+  if (audioBlob.size > MAX_AUDIO_UPLOAD_BYTES) {
+    throw new Error("Recording is too large. Please try a shorter response.");
+  }
   const form = new FormData();
   const ext = audioBlob.type.includes("mp4") ? "mp4" : audioBlob.type.includes("ogg") ? "ogg" : "webm";
   form.append("audio", audioBlob, `recording.${ext}`);
   const { data } = await client.post<SubmitAudioResponse>(
     `/interview/${token}/${participantId}/respond`,
     form,
-    { headers: { "Content-Type": "multipart/form-data" } }
+    { headers: { "Content-Type": "multipart/form-data" }, timeout: 90_000 }
   );
   return data;
 }
 
 export async function checkResume(token: string, email: string): Promise<ResumeCheck> {
-  const { data } = await client.get<ResumeCheck>(`/interview/${token}/resume`, { params: { email } });
+  const { data } = await client.post<ResumeCheck>(`/interview/${token}/resume`, { email });
   return data;
 }
 

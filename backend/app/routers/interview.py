@@ -40,6 +40,10 @@ class ScreenRequest(BaseModel):
     answers: dict[str, str]  # question_id → selected option
 
 
+class ResumeCheckRequest(BaseModel):
+    email: str
+
+
 class VerificationRequest(BaseModel):
     email: str
 
@@ -270,7 +274,6 @@ def get_screening_questions(request: Request, token: str, db: Session = Depends(
             "id": q.id,
             "question": q.question,
             "options": q.options_list,
-            "disqualifying_options": q.disqualifying_options_list,
             "sort_order": q.sort_order,
         }
         for q in sorted(link.project.screening_questions, key=lambda q: q.sort_order)
@@ -318,16 +321,17 @@ def validate_link(
     }
 
 
-@router.get("/{token}/resume", response_model=ResumeCheckResponse)
+@router.post("/{token}/resume", response_model=ResumeCheckResponse)
 @limiter.limit("60/minute")
 def check_resume_by_email(
     request: Request,
     token: str,
-    email: str,
+    body: ResumeCheckRequest,
     db: Session = Depends(get_db),
 ):
     """Check if an in-progress interview exists for this email address."""
     link = _get_active_link_or_404(token, db)
+    email = body.email
     participant = (
         db.query(Participant)
         .filter(
