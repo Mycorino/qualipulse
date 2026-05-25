@@ -101,8 +101,11 @@ auto-interview/
 │   │   └── services/
 │   │       ├── interview_engine.py  # Core AI orchestration (Claude Sonnet)
 │   │       ├── analysis.py          # AI synthesis + refined analysis
-│   │       ├── copilot.py           # Research Copilot turn engine (Opus 4.7, SSE streaming, scoped memory, tool dispatch)
-│   │       ├── copilot_onboarding.py # ONBOARDING_ADAPTER (save_profile, propose_study, suggest_replies, request_website, remember) — drives /welcome
+│   │       ├── copilot.py           # Research Copilot turn engine (Opus 4.7, SSE streaming, scoped memory, tool dispatch, proposal-turn filter)
+│   │       ├── copilot_onboarding.py # ONBOARDING_ADAPTER (save_profile, propose_research_plan, propose_study, suggest_replies, request_website, propose_participant_demo, remember) — drives /welcome Phase 2
+│   │       ├── onboarding_personalisation.py  # Haiku-cached welcome greeting + starter chips (Wave B)
+│   │       ├── company_name_lookup.py  # Haiku-only backfill of business_summary + industry from a typed company name (for freemail signups)
+│   │       ├── demo_bundles.py      # Backend-served sample-study bundles for the /welcome sample modal (3 industry variants × 2 locales)
 │   │       ├── signup_prefetch.py   # W2.5 — background website pre-fetch keyed off the user's email domain at signup
 │   │       ├── analytics.py         # Funnel-event INFO logger (signup / onboarding_completed / study_created / link_shared / participant_completed / paid_converted)
 │   │       ├── quality.py           # Heuristic quality scoring
@@ -145,7 +148,13 @@ auto-interview/
 │   │       ├── 0019_warmup_enabled.py
 │   │       ├── 0020_fix_audio_recording_urls.py
 │   │       ├── 0021_response_segments.py
-│   │       └── 0022_credits_system.py
+│   │       ├── 0022_credits_system.py
+│   │       ├── 0023_google_sso.py
+│   │       ├── 0024-0033_*.py        # iterative onboarding + billing schema
+│   │       ├── 0034_paywall_visibility.py    # has_ever_paid + free_preview_full_email_sent_at
+│   │       ├── 0035_copilot_conversation_version.py
+│   │       ├── 0036_onboarding_personalisation_cache.py  # welcome_greeting_text / starter_suggestions_json on Company
+│   │       └── 0037_research_plan.py  # ResearchPlan + ResearchPlanStep (Wave E)
 │   ├── tests/
 │   │   ├── conftest.py          # SQLite in-memory fixtures, rate limiter disabled
 │   │   ├── test_auth.py         # Signup, login, refresh, email verification, password reset
@@ -387,9 +396,14 @@ starter, `solo` → starter, `pro` → lab.
 | Custom Branding | No | No | Yes | Yes |
 | Team Members | 1 | 3 | 10 | Unlimited |
 
-**14-day trial:** New signups on Starter tier get `trial_ends_at` set 14
-days ahead. While the trial is active, `get_effective_limits()` returns
-Team-level limits. After expiry, limits revert to Starter.
+**14-day trial (LEGACY ACCOUNTS ONLY):** Existing Starter-tier accounts
+have `trial_ends_at` set 14 days from signup. While the trial is active,
+`get_effective_limits()` returns Team-level limits. After expiry, limits
+revert to Starter. The credits-native flow **ignores `trial_ends_at`
+entirely** — credits gate consumption, not days. `BillingService.can_start_interview`
+used to return `reason="trial_expired"`; that branch was retired alongside
+the trial-half/trial-end calendar emails. The column stays in the schema
+for the legacy `feature_gates.py` upgrade path.
 
 **Where the legacy gates run:**
 - `projects.py` → `create_project`, `import_project_from_csv` (project limit + question limit)
@@ -449,21 +463,50 @@ Each adapter exposes: `methodology` (system prompt fragment with rules and caps)
 
 **Memory.** `CopilotMemory` rows are scoped at company / study / instrument tiers. The `remember` tool writes durable notes; the snapshot embeds recent memory at each turn. `CopilotConversation` persists turn history per instrument so the panel can reopen mid-thread.
 
+**Proposal-turn filter.** `_filter_proposal_turn_actions` in `services/copilot.py` runs at the end of every turn. When the turn contains a primary-proposal action (`create_research_plan` or `create_first_study`), it strips any `suggest_replies` actions whose `context` is a lightweight-signal capture (`referral_source` / `current_tool` / `research_experience`) — so the user's attention stays on the accept CTA. Belt-and-suspenders to the "PROPOSAL TURN OWNS THE SCREEN" methodology rule.
+
+**Onboarding methodology hard rules** (`_ONBOARDING_METHODOLOGY` in `copilot_onboarding.py`):
+- **RULE 1: One question per turn.** Bundling questions ("1. Quel canal... 2. Quelle décision...") is forbidden.
+- **RULE 2: Every discrete question MUST attach `suggest_replies`.** Free-text only for genuinely open questions (research goal, success-criterion wording, study objective).
+- **Research success criteria = research outcomes, NOT business KPIs.** Chips must be about evidence + decisions (ranked friction list, clear rebuild/iterate decision, citable quotes, mental models) — never conversion lift / NPS / CSAT.
+- **Timeline shapes the plan.** 2 weeks → 1-step plan. 1 month → 2-step. 1 quarter → 3-step.
+- **PREFERRED proposal path is `propose_research_plan`**, not `propose_study`. A real researcher rarely fires 50 interviews from a 2-minute chat.
+- **HYBRID-WIZARD-AWARE.** The wizard captures role / company_size / use_case / decision_role before the chat starts. The agent must NEVER re-ask for these in turn 1 — it should reference them naturally and dive into the research goal.
+
 **Mission + NBA + Nudges.** Each surface declares a one-line **mission** shown in the panel header. A deterministic **NBA resolver** (`frontend/src/copilot/nextAction.ts` — `resolveProjectNextAction`, `resolveSurveyNextAction`, `resolveWorkspaceNextAction`, `resolveStudySummaryAction`) picks a single best next action from a priority ladder — **no LLM call**, runs on every render. Rendered as a chip in the dock or inline in empty states via `NextActionChip`. **Nudges** are localStorage-diffed events (`frontend/src/copilot/signals.ts`, key `copilot_signals_v2`): `analysis_ready`, `analysis_stale`, `data_milestone`, `quality_flag`, `study_report_ready`. 24h TTL, dismiss persists, and nudges for the current tab auto-suppress to avoid noise. New nudges are announced once via aria-live (`useNudgeAnnounce.ts`).
 
-### Onboarding Flow (conversational)
-After signup users land on `/welcome` — a **full-screen Research Copilot conversation** with structured product UI alongside the chat, not a multi-step form. The page opens with an instant canned greeting so there's no API latency before something is on screen. The model is only called once the researcher answers.
+### Onboarding Flow (hybrid: wizard → conversational → plan)
+After signup users land on `/welcome` — a **hybrid two-phase flow**: a 3-step structured wizard first, then a full-screen Research Copilot conversation that ends in a multi-step research plan. The Welcome.tsx mode-switch picks which to show based on profile state + `localStorage.qp_welcome_setup_skipped_v2`.
 
-Layout: a 2-column shell under a milestone bar.
-- **Milestone bar** — three deterministic phases (*Tell me about your work → Frame your study → Launch*). Advances based on profile completeness + study proposal — no LLM call.
-- **Sticky sidebar (left, 280 px)** — "What I know about you" with checked rows for role / team size / industry / use case. Includes a company-summary block once the website lookup runs. Refetches `GET /auth/me` after every turn so `save_profile` writes appear in real time.
-- **Conversation (right)** — streaming Copilot chat. Assistant turns can carry attachments:
-  - **Quick-reply chips** — server-enforced canonical options for `role` / `company_size` / `industry` / `use_case`. The `suggest_replies` tool's `context` is an `enum`; whenever it matches a profile key the server discards whatever the model emitted and substitutes the canonical set (instruction + post-processing = two safety layers). Always includes "Other" as the escape hatch. Free typing remains available.
-  - **Website-lookup card** — URL input + "Look it up" button that calls the existing `/auth/website-intel`, persists `business_summary`, and injects the summary back into the conversation as the user's next message.
-  - **Domain pre-fetch at signup (W2.5)** — for corporate emails (anything not in the freemail allowlist in `services/signup_prefetch.py`), a background thread fires `fetch_website_summary` against the email's domain right after the Company row commits. Writes `website_url` + `business_summary` + `industry` if those fields aren't already user-set. The agent's snapshot picks up the pre-fetched summary on the very first turn, and the methodology explicitly tells it to reference the company naturally in its second message rather than calling `request_website`. Daemonised thread — never blocks signup, swallows every error path.
-  - **Study proposal card** — `propose_study` emits `create_first_study`; one-click accept runs `POST /projects/` + `PATCH settings` (objective) + 5–7 `POST /guide` calls.
+**Phase 1 — Structured wizard (`WelcomeSetup.tsx`).** 3 steps capturing the qualification data we need for personalisation:
+- Step 1: company name + role chips + team size
+- Step 2: use case chips + intent (solo / team) + readiness (concrete / evaluating)
+- Step 3: "the deal" screen — 10 free interviews / 3 free transcripts / unlock with plan, plus email-verify CTA
 
-Once a study is accepted: `POST /auth/onboarding` marks `onboarding_completed = true`, and a completion screen shows the study name + a memory recap fetched from `GET /onboarding/copilot/memory` ("Here's what I'll remember about your research"). The header **"Skip — just take me in"** bypasses everything; email verification is non-blocking (yellow banner with Resend link until verified).
+The wizard's "Other" chip on `role` / `use_case` reveals an inline free-text input — the typed value lands in `Company.role` / `Company.use_case` verbatim instead of being lost to the literal "Other".
+
+At step 2 → step 3 transition, the frontend fires `prepWelcomeGreeting()` + `getStarterSuggestions()` in the background so the Phase 2 personalisation cache is warm before the user lands.
+
+**Phase 2 — Conversational chat.** 2-column shell under a milestone bar.
+- **Milestone bar** — three deterministic phases (*Tell me about your work → Frame your study → Launch*). Advances based on profile completeness + study/plan proposal — no LLM call.
+- **Sticky chat shell** — header / verify-banner / milestone bar are pinned at top, input bar pinned at bottom, only the thread scrolls. Auto-scroll-to-bottom respects `isAtBottomRef` so users scrolled up to re-read don't get yanked back down.
+- **Sidebar (left)** — "What I know about you" with rich rows for captured profile fields. Identity rows (name + company) seed from signup data on first render. Click-to-edit on canonical fields (`role`, `company_size`, `use_case`) opens a chip-picker popover; clicking a chip commits immediately. When the saved value is non-canonical (user typed via "Other"), the picker surfaces it as an active italic pill plus a free-text input so the typed string is recoverable.
+- **Conversation (right)** — streaming Copilot chat. Personalised first greeting (Haiku, quotes one concrete detail from `business_summary`) replaces the canned bubble once it lands; falls back to static i18n if API fails or wizard was skipped. Goal-chip starters are also Haiku-personalised (3 industry-specific research questions). Assistant turns can carry attachments:
+  - **Quick-reply chips** — server-enforced canonical options for profile contexts (locale-aware via `_CANONICAL_REPLIES_EN` / `_CANONICAL_REPLIES_FR`). Synonym dedupe ensures FR users never see `[Autre][Other]` side-by-side. The `suggest_replies` tool's `context` is an `enum`; whenever it matches a profile key the server substitutes the canonical set. Methodology enforces **one question per turn** and **every discrete question MUST attach chips**.
+  - **Website-lookup card** — URL input that calls `/auth/website-intel`, persists `business_summary`, and injects the summary into chat.
+  - **Participant-demo invite card** — opens an iPhone-framed mock interview (`ParticipantDemoModal`). On close or skip, auto-fires a synthetic user message ("Compris, et le plan ?") so the conversation advances to the plan proposal without a manual nudge.
+  - **Research-plan proposal card (PREFERRED)** — `propose_research_plan` emits `create_research_plan`. A 2-3 step timeline shaped by the captured timeline: 2 weeks → 1-step plan, 1 month → 2-step, 1 quarter → 3-step. Each step has method + N + duration_weeks + purpose + deliverable. Step rendered as `<ResearchPlanCard>`. One-click accept hits `POST /onboarding/research-plan`, which creates the `ResearchPlan` + `ResearchPlanStep` rows and drafts the first `voice_interview` step (regardless of position in the plan) as a real Project + interview link. Quant / workshop / etc. steps stay `status="pending"` placeholders for now.
+  - **Study proposal card (FALLBACK)** — `propose_study` emits `create_first_study` for users who explicitly want one quick study. One-click accept hits `POST /onboarding/study` (creates Project + guide + link in one transaction).
+
+**Proposal turn owns the screen.** When a turn contains `create_research_plan` or `create_first_study`, server-side `_filter_proposal_turn_actions` strips any `suggest_replies` chips for lightweight-signal contexts (`referral_source`, `current_tool`, `research_experience`) so the user's attention stays on the accept CTA.
+
+**Business-context backfill from typed name.** For freemail signups (gmail / outlook / etc.) the email-domain prefetch is skipped on purpose. `PATCH /auth/onboarding` schedules a background `backfill_business_from_name` (`services/company_name_lookup.py`) — a Haiku call that recognises well-known companies (Legalstart, RATP, BNP Paribas, …) and populates `business_summary` + `industry`. Re-runs whenever the typed name materially changes (case-insensitive) so a domain-prefetched summary doesn't go stale when the user types a different company name in the wizard. For unrecognised names Haiku returns null, leaving prior values intact.
+
+**Personalisation race protection.** Both `prepWelcomeGreeting` and `getStarterSuggestions` poll up to 3 times with 3s/6s back-off — gives the company-name backfill time to land before falling back to static copy.
+
+**Domain pre-fetch at signup (W2.5).** For corporate emails (anything not in the freemail allowlist in `services/signup_prefetch.py`), a background thread fires `fetch_website_summary` against the email's domain right after the Company row commits. Daemonised thread — never blocks signup, swallows every error path.
+
+Once a plan/study is accepted: `POST /auth/onboarding` marks `onboarding_completed = true`, and a completion screen shows the study name + a Haiku-generated memory recap fetched from `GET /onboarding/copilot/memory` (entirely in the user's locale, skips literal "Other"). The CTAs are reordered: **Primary: "Ouvrir votre étude →"** / Secondary: "Copier le lien à partager" / Tertiary: "Tester votre propre entretien" (90s hint, no mention of "Claude"). The header **"Skip — just take me in"** bypasses everything; email verification is non-blocking (yellow banner with Resend link until verified).
 
 Login checks `onboarding_completed` — if false, redirects to `/welcome`.
 
@@ -946,10 +989,16 @@ gcloud builds list --region=europe-west1 --limit=5
 ## Data Models Summary
 
 ### Company (auth)
-`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at`, `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience`, `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at` (idempotency guard for showcase demo), `created_at`
+`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at` (legacy plans only — credits-native flow ignores it), `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience`, `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at`, `has_ever_paid` (sticky paid-once flag for paywall), `welcome_greeting_text` / `welcome_greeting_at` (Haiku-personalised /welcome greeting + 24h cache), `starter_suggestions_json` / `starter_suggestions_at` (Haiku-generated starter chips + 24h cache), `created_at`
 
 ### Project
-`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
+`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `decision_to_inform`, `timeline`, `success_criteria`, `target_customer_description`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
+
+### ResearchPlan (Wave E)
+`id` (uuid str), `company_id` (FK Company, indexed), `name`, `rationale`, `decision_to_inform`, `timeline`, `success_criteria`, `target_customer_description`, `created_at`. The multi-step research program a researcher commits to at the end of onboarding. Has a `steps` relationship to `ResearchPlanStep` ordered by `order_index`.
+
+### ResearchPlanStep (Wave E)
+`id` (uuid str), `plan_id` (FK ResearchPlan, indexed), `order_index` (unique within plan), `method` (`voice_interview` | `quant_survey` | `workshop` | `desk_research` | `usability_test`), `title`, `purpose`, `deliverable`, `n_participants`, `duration_weeks`, `project_id` (FK Project, nullable — set when the step has been drafted as a real study), `status` (`pending` | `drafted` | `in_progress` | `completed`), `created_at`. Today V1 only drafts the first `voice_interview` step (regardless of position) as an immediate Project; other-method steps stay `pending` placeholders until those product surfaces ship.
 
 ### InterviewGuideQuestion
 `id`, `project_id`, `section_index`, `section_title`, `question_index`, `main_question`, `interview_notes`, `desired_learning`, `researcher_notes`, `deprecated_at`, `sort_order`
@@ -1134,9 +1183,15 @@ All `/copilot` endpoints return **SSE** (`text/event-stream`) — events `status
 | GET | `/projects/{id}/copilot/conversation` | Yes | Recent turn history for this project |
 | POST | `/surveys/{id}/copilot` | Yes | Run a Copilot turn for a survey (survey adapter) — SSE stream |
 | GET | `/surveys/{id}/copilot/conversation` | Yes | Recent turn history for this survey |
-| POST | `/onboarding/copilot` | Yes | Run an onboarding Copilot turn — SSE stream; can emit `create_first_study`, `suggest_replies`, `request_website` proposals |
-| GET | `/onboarding/copilot/conversation` | Yes | Onboarding conversation history |
-| GET | `/onboarding/copilot/memory` | Yes | Recap of what the Copilot remembers (used by Welcome completion screen) |
+| POST | `/onboarding/copilot` | Yes | Run an onboarding Copilot turn — SSE stream; can emit `create_research_plan` (PREFERRED), `create_first_study` (fallback), `suggest_replies`, `request_website`, `propose_participant_demo` proposals |
+| GET | `/onboarding/copilot/conversation` | Yes | Onboarding conversation history (used by Welcome.tsx mount to hydrate the thread after refresh / nav round-trip) |
+| PUT | `/onboarding/copilot/conversation` | Yes | Persist the onboarding thread (Wave A — survives reload) |
+| GET | `/onboarding/copilot/memory` | Yes | Haiku-generated locale-correct memory recap (Welcome completion screen). 24h cached on Company. |
+| POST | `/onboarding/copilot/greeting-prep` | Yes | Generate (or fetch cached) personalised /welcome greeting via Haiku — quotes one concrete detail from `business_summary`. Returns `{greeting: str \| null}`; null means fall back to static i18n. |
+| GET | `/onboarding/copilot/starter-suggestions` | Yes | Three industry-aware research-starter chip strings tailored to captured profile (Haiku, 24h cache). |
+| GET | `/onboarding/demo-bundle?variant=<key>` | Yes | Structured demo-study bundle for the sample-study modal (synthesis / quotes / guide). Variant = `saas` (default) / `b2b_specifier` / `consumer`. Locale auto-derived from `preferred_language`. |
+| POST | `/onboarding/study` | Yes | Accept a `create_first_study` proposal — creates Project + guide questions + interview link in one transaction. |
+| POST | `/onboarding/research-plan` | Yes | Accept a `create_research_plan` proposal (Wave E) — creates `ResearchPlan` + `ResearchPlanStep` rows. Drafts the first `voice_interview` step (regardless of position) as a real Project + interview link. Non-voice steps stay `pending`. Returns `{plan_id, project_id, study_name, interview_token}`. |
 
 > The legacy `/research/*` endpoints (parse-brief, suggest-objective, suggest-scope, suggest-questions) have been **removed**. Their flow is now driven by the Copilot via tool calls / proposal actions.
 
@@ -1199,10 +1254,10 @@ gcloud scheduler jobs create http qualipulse-lifecycle-emails \
   --location=europe-west1
 ```
 
-The three events handled:
+**Currently sent:**
 - `day_1_followup` — 18h–7d after signup, only if `onboarding_completed=true` and email verified
-- `trial_half_over` — 5-7 days remaining on `trial_ends_at` (window prevents drops on cron blips)
-- `trial_ending` — 0-2 days remaining on `trial_ends_at`
+
+**Retired:** `trial_half_over` (Day-7) and `trial_ending` (Day-12) were retired with the credits-native billing model — credits gate usage, not calendar days. Their HTML templates remain in `services/email.py` as dead code in case we revive them, but the cron no longer fires them.
 
 Each Company × event sends at most once thanks to the unique constraint on `email_send_log (company_id, event)`. Test with `?dry_run=true` before flipping on the cron.
 
