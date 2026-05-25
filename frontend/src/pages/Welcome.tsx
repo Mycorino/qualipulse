@@ -14,6 +14,8 @@ import {
   runOnboardingCopilot,
   getOnboardingMemory,
   transcribeDemoAudio,
+  prepWelcomeGreeting,
+  getStarterSuggestions,
   type CopilotMessage,
   type DemoTranscribeResponse,
   type ProposedAction,
@@ -199,6 +201,24 @@ export default function Welcome() {
             }),
           },
         ]);
+        // If the wizard was completed and we have business context,
+        // ask the backend for a Haiku-personalised greeting that quotes
+        // a specific detail from their business summary. Replaces the
+        // canned greeting in-place when it lands. Fails silent.
+        const wizardComplete =
+          !!m.role && !!m.company_size && !!m.use_case;
+        if (wizardComplete && m.business_summary) {
+          prepWelcomeGreeting()
+            .then((text) => {
+              if (!text) return;
+              setThread((prev) =>
+                prev.length === 1 && prev[0].role === "assistant"
+                  ? [{ ...prev[0], text }]
+                  : prev,
+              );
+            })
+            .catch(() => undefined);
+        }
       })
       .catch(() => navigate("/login", { replace: true }));
     // eslint-disable-next-line react-hooks/exhaustive-deps — `t` swap would
@@ -1378,8 +1398,28 @@ function GoalSuggestionChips({
   onPick: (text: string) => void;
 }) {
   const { t } = useTranslation("onboarding");
-  const suggestions = t("goal_suggestions", { returnObjects: true }) as unknown;
-  if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
+  const fallback = t("goal_suggestions", { returnObjects: true }) as unknown;
+  const [dynamic, setDynamic] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    // Fetch personalised starter chips. Cached server-side for 24h;
+    // returns null when the wizard wasn't completed enough to support
+    // a sensible Haiku call — in that case we keep the static i18n list.
+    let cancelled = false;
+    getStarterSuggestions()
+      .then((arr) => {
+        if (!cancelled && arr && arr.length === 3) setDynamic(arr);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const suggestions =
+    dynamic ??
+    (Array.isArray(fallback) ? (fallback as string[]) : []);
+  if (suggestions.length === 0) return null;
   return (
     <div
       className="onboarding-goal-chips"

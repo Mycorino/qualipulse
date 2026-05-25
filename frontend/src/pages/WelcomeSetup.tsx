@@ -22,6 +22,10 @@ import {
   type CompanyResponse,
 } from "../api/auth";
 import { useToast } from "../components/Toast";
+import {
+  prepWelcomeGreeting,
+  getStarterSuggestions,
+} from "../api/copilot";
 
 interface WelcomeSetupProps {
   me: CompanyResponse;
@@ -117,6 +121,12 @@ export default function WelcomeSetup({
         });
         onProfileSaved(next);
         setStep(3);
+        // Fire-and-forget: warm the personalisation cache while the
+        // user reads the "deal" screen. By the time they land on
+        // Phase 2, the greeting + starter chips are already cached.
+        // Both fail silent — Phase 2 falls back to static i18n.
+        void prepWelcomeGreeting();
+        void getStarterSuggestions();
       } else {
         onComplete();
       }
