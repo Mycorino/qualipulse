@@ -6693,6 +6693,13 @@ select.field-input {
   flex-direction: column;
   gap: var(--space-4);
   box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+
+.chart-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .chart-card__eyebrow {

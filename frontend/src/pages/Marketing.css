@@ -1,5 +1,6 @@
 /* ============================================
-   Marketing / Landing page
+   Marketing / Landing page — Redesign
+   Gradient / colorful identity refresh
    ============================================ */
 
 .mkt {
@@ -7,6 +8,42 @@
   background: var(--bg-surface);
   color: var(--text);
   font-family: "Inter", sans-serif;
+
+  /* Marketing-scoped gradient variables */
+  --mkt-gradient-hero: linear-gradient(135deg, var(--brand-50) 0%, #f0edff 50%, var(--brand-100) 100%);
+  --mkt-gradient-cta: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%);
+}
+
+/* ---- Scroll animation: fade-up on visible ---- */
+/* Hero and trust bar are above the fold — always visible, no animation delay */
+.mkt-pain,
+.mkt-section,
+.mkt-copilot,
+.mkt-output,
+.mkt-compare {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.mkt-pain.visible,
+.mkt-section.visible,
+.mkt-copilot.visible,
+.mkt-output.visible,
+.mkt-compare.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Staggered card children */
+.visible .mkt-pain-card,
+.visible .mkt-step,
+.visible .mkt-trust-bar-stat {
+  animation: fade-up 0.5s var(--ease-out) both;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ---- Nav ---- */
@@ -16,7 +53,8 @@
   justify-content: space-between;
   padding: 0 48px;
   height: 64px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid transparent;
+  border-image: var(--brand-strip) 1;
   position: sticky;
   top: 0;
   background: rgba(255, 255, 255, 0.95);
@@ -55,7 +93,6 @@
   padding: 8px 18px !important;
 }
 
-/* Ensure primary button always shows white text in nav */
 .mkt-nav-links .btn-primary,
 .mkt-nav-cta.btn-primary {
   color: #fff !important;
@@ -70,6 +107,13 @@
   max-width: 1160px;
   margin: 0 auto;
   padding: 80px 48px 100px;
+  background: var(--mkt-gradient-hero);
+}
+
+.mkt-hero-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .mkt-badge {
@@ -94,6 +138,14 @@
   margin-bottom: 20px;
 }
 
+/* Gradient accent on hero title keyword */
+.mkt-h1 .mkt-gradient-text {
+  background: var(--mkt-gradient-cta);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 .mkt-sub {
   font-size: 1.05rem;
   color: var(--text-secondary);
@@ -113,6 +165,36 @@
   padding: 13px 28px !important;
   font-size: 1rem !important;
   border-radius: 10px !important;
+}
+
+.mkt-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  transition: all 0.15s ease;
+}
+.mkt-btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.mkt-btn-inverted {
+  background: #fff !important;
+  color: var(--brand-600) !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  font-weight: 700 !important;
+}
+.mkt-btn-inverted:hover {
+  background: var(--brand-50) !important;
+  color: var(--brand-700) !important;
 }
 
 .mkt-hero-note {
@@ -240,6 +322,42 @@
   gap: 6px;
 }
 
+/* ---- Trust Bar ---- */
+.mkt-trust-bar {
+  background: var(--bg-sunken);
+  border-top: 3px solid transparent;
+  border-image: var(--brand-strip) 1;
+  padding: 20px 48px;
+}
+
+.mkt-trust-bar-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+}
+
+.mkt-trust-bar-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mkt-trust-bar-number {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -0.5px;
+}
+
+.mkt-trust-bar-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
 /* ---- Pain points ---- */
 .mkt-pain {
   background: var(--bg-sunken);
@@ -264,8 +382,28 @@
 .mkt-pain-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
+  border-top: 3px solid transparent;
+  border-image: var(--brand-strip) 1;
+  border-image-slice: 1 0 0 0;
   border-radius: var(--radius-lg);
   padding: 24px 28px;
+  /* Border-image breaks border-radius; use pseudo-element instead */
+  position: relative;
+  overflow: hidden;
+}
+.mkt-pain-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--brand-strip);
+}
+/* Reset border-image so border-radius works */
+.mkt-pain-card {
+  border-image: none;
+  border-top: none;
 }
 
 .mkt-pain-card h3 {
@@ -316,14 +454,32 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 28px;
+  position: relative;
+  overflow: hidden;
+}
+.mkt-step::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--brand-strip);
 }
 
 .mkt-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--mkt-gradient-cta);
+  color: #fff;
   font-size: 0.78rem;
   font-weight: 700;
-  color: var(--primary);
-  letter-spacing: 1px;
-  margin-bottom: 12px;
+  letter-spacing: 0;
+  margin-bottom: 14px;
 }
 
 .mkt-step-title {
@@ -337,6 +493,148 @@
   font-size: 0.9rem;
   color: var(--text-secondary);
   line-height: 1.6;
+}
+
+/* ---- Mid CTA strip ---- */
+.mkt-mid-cta {
+  display: flex;
+  justify-content: center;
+  padding: 28px 48px;
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- Research Copilot Showcase ---- */
+.mkt-copilot {
+  background: var(--brand-50);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 80px 48px;
+}
+
+.mkt-copilot-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 56px;
+  align-items: center;
+}
+
+.mkt-copilot-text {
+  text-align: left;
+}
+
+.mkt-copilot-subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 12px 0 28px;
+}
+
+.mkt-copilot-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mkt-copilot-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.92rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.mkt-copilot-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Copilot chat mockup */
+.mkt-copilot-mockup {
+  display: flex;
+}
+
+.mkt-copilot-mockup .mkt-preview-card {
+  width: 100%;
+}
+
+.mkt-copilot-chat {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mkt-copilot-bubble {
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  max-width: 90%;
+}
+
+.mkt-copilot-bubble p {
+  margin: 0;
+}
+
+.mkt-copilot-user {
+  background: var(--brand-500);
+  color: #fff;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.mkt-copilot-ai {
+  background: #1e293b;
+  color: #e2e8f0;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+
+.mkt-copilot-proposal {
+  margin-top: 12px;
+  background: rgba(67, 105, 245, 0.12);
+  border: 1px solid rgba(67, 105, 245, 0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.mkt-copilot-proposal-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand-300);
+  margin-bottom: 6px;
+}
+
+.mkt-copilot-proposal-body {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.mkt-copilot-accept {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-500);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mkt-copilot-accept:hover {
+  background: var(--brand-600);
 }
 
 /* ---- Output preview ---- */
@@ -479,35 +777,74 @@
   font-weight: 700;
 }
 
-/* ---- Who it's for ---- */
-.mkt-use-cases {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  text-align: left;
+/* ---- Who it's for — Persona pill selector ---- */
+.mkt-persona-pills {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 32px;
 }
 
-.mkt-use-case {
+.mkt-persona-pill {
+  padding: 8px 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.mkt-persona-pill:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.mkt-persona-pill.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.mkt-persona-card {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: left;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 28px;
-  background: var(--bg-surface);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 32px;
+  animation: card-enter 0.3s var(--ease-out) both;
+  position: relative;
+  overflow: hidden;
+}
+.mkt-persona-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--brand-strip);
+}
+
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .mkt-use-case-title {
   font-size: 1rem;
   font-weight: 700;
   color: var(--primary);
+  margin-bottom: 8px;
 }
 
 .mkt-use-case-desc {
   font-size: 0.9rem;
   color: var(--text-secondary);
   line-height: 1.6;
-  flex: 1;
+  margin-bottom: 12px;
 }
 
 .mkt-use-case-examples {
@@ -515,51 +852,80 @@
   color: var(--text-muted);
   border-top: 1px solid var(--border);
   padding-top: 10px;
-  margin-top: 4px;
+  display: block;
 }
 
-/* ---- Differentiator ---- */
-.mkt-diff {
+/* ---- Comparison Table ---- */
+.mkt-compare {
   background: var(--bg-sunken);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   padding: 80px 48px;
 }
 
-.mkt-diff-inner {
-  max-width: 800px;
+.mkt-compare-inner {
+  max-width: 900px;
   margin: 0 auto;
   text-align: center;
 }
 
-.mkt-diff-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  text-align: left;
-}
-
-.mkt-diff-row {
-  background: var(--bg-surface);
+.mkt-compare-table {
+  margin-top: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 20px 24px;
+  overflow: hidden;
+  background: var(--bg-surface);
 }
 
-.mkt-diff-vs {
-  display: inline-block;
-  font-size: 0.78rem;
+.mkt-compare-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+}
+.mkt-compare-row:last-child { border-bottom: none; }
+
+.mkt-compare-row > div {
+  padding: 14px 20px;
+  font-size: 0.9rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+.mkt-compare-row > div + div {
+  border-left: 1px solid var(--border);
+}
+
+.mkt-compare-head {
+  background: var(--bg-sunken);
+}
+.mkt-compare-head > div {
+  padding: 12px 20px;
   font-weight: 700;
-  color: var(--primary);
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  color: var(--text-secondary);
 }
 
-.mkt-diff-point {
-  font-size: 0.9rem;
+.mkt-compare-feature {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mkt-compare-quali {
+  color: var(--primary);
+  font-weight: 600;
+}
+.mkt-compare-quali::before {
+  content: "\2713";
+  margin-right: 8px;
+  color: var(--success);
+  font-weight: 800;
+}
+
+.mkt-compare-other {
   color: var(--text-secondary);
-  line-height: 1.6;
 }
 
 /* ---- Trust / Founder ---- */
@@ -617,6 +983,45 @@
 }
 
 /* ---- Pricing ---- */
+.mkt-billing-toggle {
+  display: inline-flex;
+  margin: 16px auto 32px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+}
+.mkt-billing-toggle button {
+  padding: 8px 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.mkt-billing-toggle button.active {
+  background: var(--primary);
+  color: #fff;
+}
+.mkt-billing-toggle-save {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--success-bg, #f0fdf4);
+  color: var(--success, #16a34a);
+  border-radius: 999px;
+}
+.mkt-billing-toggle button.active .mkt-billing-toggle-save {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
 .mkt-plans {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -681,6 +1086,23 @@
   margin-bottom: 20px;
 }
 
+.mkt-plan-credits {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  margin: 4px 0 12px;
+}
+.mkt-plan-credits strong {
+  color: var(--text-primary);
+  font-size: 1.05rem;
+}
+
+.mkt-plan-billed-as {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
+
 .mkt-plan-features {
   list-style: none;
   margin-bottom: 24px;
@@ -707,6 +1129,14 @@
   justify-content: center;
 }
 
+.mkt-plans-credit-note {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 24px auto 0;
+  max-width: 640px;
+}
+
 .mkt-plans-enterprise {
   margin-top: 28px;
   font-size: 0.875rem;
@@ -716,7 +1146,7 @@
 
 /* ---- Final CTA ---- */
 .mkt-final-cta {
-  background: linear-gradient(135deg, var(--brand-50), var(--brand-100));
+  background: var(--mkt-gradient-cta);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   padding: 80px 48px;
@@ -731,7 +1161,7 @@
 .mkt-final-cta-inner h2 {
   font-size: 2rem;
   font-weight: 800;
-  color: var(--text-primary);
+  color: #fff;
   letter-spacing: -0.5px;
   margin-bottom: 12px;
   line-height: 1.2;
@@ -739,7 +1169,7 @@
 
 .mkt-final-cta-inner p {
   font-size: 1.05rem;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.8);
   margin-bottom: 28px;
   line-height: 1.6;
 }
@@ -747,35 +1177,71 @@
 /* ---- Footer ---- */
 .mkt-footer {
   border-top: 1px solid var(--border);
-  padding: 24px 48px;
+  padding: 48px 48px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.mkt-footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 40px;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.mkt-footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mkt-footer-col h4 {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.mkt-footer-col a {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.mkt-footer-col a:hover {
+  color: var(--text);
+}
+
+.mkt-footer-brand {
+  gap: 10px;
+}
+
+.mkt-footer-tagline {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 300px;
+}
+
+.mkt-footer-bottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-.mkt-footer-links {
-  display: flex;
-  gap: 20px;
-}
-.mkt-footer-links a {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  text-decoration: none;
-}
-.mkt-footer-links a:hover { color: var(--text); text-decoration: none; }
-
-.mkt-footer-copy {
+.mkt-footer-bottom span {
   font-size: 0.8rem;
   color: var(--text-muted);
-}
-
-.mkt-footer-copy a {
-  color: inherit;
-  text-decoration: none;
-}
-.mkt-footer-copy a:hover {
-  text-decoration: underline;
 }
 
 /* ---- Hamburger menu (mobile) ---- */
@@ -823,254 +1289,11 @@
   justify-content: center;
 }
 
-/* ---- Hero stat, social proof, secondary CTA ---- */
-.mkt-hero-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--brand-50);
-  color: var(--primary);
-  border: 1px solid var(--brand-100);
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin-bottom: 20px;
-}
-.mkt-hero-stat-icon { font-size: 1rem; }
-.mkt-hero-social {
-  margin-top: 16px;
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-.mkt-btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 20px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-  text-decoration: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: transparent;
-  transition: all 0.15s ease;
-}
-.mkt-btn-secondary:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
+/* ================================================================
+   Responsive
+   ================================================================ */
 
-/* ---- Before / After comparison table ---- */
-.mkt-ba {
-  padding: 80px 48px;
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.mkt-ba-inner {
-  max-width: 960px;
-  margin: 0 auto;
-}
-.mkt-ba-table {
-  margin-top: 40px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--bg);
-}
-.mkt-ba-row {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
-  border-bottom: 1px solid var(--border);
-}
-.mkt-ba-row:last-child { border-bottom: none; }
-.mkt-ba-row > div {
-  padding: 16px 20px;
-  font-size: 0.92rem;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-}
-.mkt-ba-row > div + div {
-  border-left: 1px solid var(--border);
-}
-.mkt-ba-head {
-  background: var(--bg-surface);
-  font-weight: 700;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-secondary);
-}
-.mkt-ba-head > div { padding: 12px 20px; }
-.mkt-ba-manual { color: var(--text-secondary); text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.2); }
-.mkt-ba-quali { color: var(--primary); font-weight: 600; }
-.mkt-ba-quali::before {
-  content: "✓";
-  margin-right: 6px;
-  color: var(--success);
-  font-weight: 800;
-}
-.mkt-ba-head .mkt-ba-quali::before { display: none; }
-.mkt-ba-total {
-  background: var(--brand-50);
-  font-weight: 700;
-}
-.mkt-ba-total > div { font-size: 1rem; }
-
-/* ---- Use case "best for" tag ---- */
-.mkt-use-case-best {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--primary);
-  background: var(--brand-50);
-  padding: 4px 10px;
-  border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin: 4px 0 12px;
-}
-
-/* ---- Pricing: billing toggle + 4-column + "all plans" note ---- */
-.mkt-billing-toggle {
-  display: inline-flex;
-  margin: 16px auto 32px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px;
-  gap: 4px;
-}
-.mkt-billing-toggle button {
-  padding: 8px 18px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.88rem;
-  font-weight: 600;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-.mkt-billing-toggle button.active {
-  background: var(--primary);
-  color: #fff;
-}
-.mkt-billing-toggle-save {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  font-size: 11px;
-  font-weight: 700;
-  background: var(--success-bg, #f0fdf4);
-  color: var(--success, #16a34a);
-  border-radius: 999px;
-}
-.mkt-billing-toggle button.active .mkt-billing-toggle-save {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-}
-
-/* PR 3: credit pill + plan body extras */
-.mkt-plan-credits {
-  font-size: 0.92rem;
-  color: var(--text-secondary);
-  margin: 4px 0 12px;
-}
-.mkt-plan-credits strong {
-  color: var(--text-primary);
-  font-size: 1.05rem;
-}
-.mkt-plan-billed-as {
-  font-size: 0.78rem;
-  color: var(--text-tertiary);
-  margin-top: -8px;
-  margin-bottom: 12px;
-}
-.mkt-plans-credit-note {
-  text-align: center;
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  margin: 24px auto 0;
-  max-width: 640px;
-}
-.mkt-plans-4 {
-  grid-template-columns: repeat(4, 1fr);
-}
-.mkt-plans-allincl {
-  margin-top: 24px;
-  padding: 16px 24px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  text-align: center;
-  max-width: 860px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-/* ---- FAQ ---- */
-.mkt-faq {
-  padding: 80px 48px;
-  background: var(--bg);
-}
-.mkt-faq-inner {
-  max-width: 760px;
-  margin: 0 auto;
-}
-.mkt-faq-list {
-  margin-top: 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.mkt-faq-item {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-surface);
-  overflow: hidden;
-  transition: border-color 0.15s ease;
-}
-.mkt-faq-item.open {
-  border-color: var(--primary);
-}
-.mkt-faq-q {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 22px;
-  background: transparent;
-  border: none;
-  text-align: left;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-.mkt-faq-q:hover { color: var(--primary); }
-.mkt-faq-chevron {
-  font-size: 1.4rem;
-  font-weight: 400;
-  color: var(--text-secondary);
-  line-height: 1;
-  flex-shrink: 0;
-}
-.mkt-faq-a {
-  padding: 0 22px 20px;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: var(--text-secondary);
-}
-
-/* ---- Responsive ---- */
+/* ---- 900px ---- */
 @media (max-width: 900px) {
   .mkt-hero {
     grid-template-columns: 1fr;
@@ -1080,16 +1303,35 @@
   .mkt-h1 { font-size: 2.1rem; }
   .mkt-steps { grid-template-columns: 1fr; }
   .mkt-plans { grid-template-columns: 1fr; }
-  .mkt-plans-4 { grid-template-columns: 1fr; }
-  .mkt-use-cases { grid-template-columns: 1fr; }
-  .mkt-ba { padding: 56px 20px; }
-  .mkt-ba-row { grid-template-columns: 1fr; }
-  .mkt-ba-row > div + div { border-left: none; border-top: 1px solid var(--border); }
-  .mkt-ba-head { display: none; }
-  .mkt-faq { padding: 56px 20px; }
+  .mkt-pain { padding: 56px 24px; }
+  .mkt-pain-grid { grid-template-columns: 1fr; }
+  .mkt-output { padding: 56px 24px; }
+  .mkt-output-header { flex-direction: column; }
+
+  /* Trust bar: stack on tablet */
+  .mkt-trust-bar { padding: 20px 24px; }
+  .mkt-trust-bar-inner { flex-wrap: wrap; gap: 24px; }
+
+  /* Copilot: stack text + mockup */
+  .mkt-copilot { padding: 56px 24px; }
+  .mkt-copilot-inner { grid-template-columns: 1fr; gap: 32px; }
+  .mkt-copilot-text { text-align: center; }
+  .mkt-copilot-text .mkt-section-title { text-align: center !important; }
+
+  /* Comparison: stack on tablet */
+  .mkt-compare { padding: 56px 24px; }
+  .mkt-compare-row { grid-template-columns: 1fr; }
+  .mkt-compare-row > div + div { border-left: none; border-top: 1px solid var(--border); }
+  .mkt-compare-head { display: none; }
+  .mkt-compare-quali::before { content: "QualiPulse: "; font-weight: 700; color: var(--primary); }
+  .mkt-compare-other::before { content: "Others: "; font-weight: 600; color: var(--text-muted); }
+
+  /* Persona pills */
+  .mkt-persona-pills { flex-wrap: wrap; }
+
+  /* Nav */
   .mkt-nav { padding: 0 20px; gap: 12px; }
   .mkt-logo { flex-shrink: 0; }
-  .mkt-nav-links { gap: 10px; }
   .mkt-nav-links { display: none; }
   .mkt-hamburger { display: flex; }
   .mkt-mobile-menu {
@@ -1118,24 +1360,26 @@
   .mkt-mobile-menu a:last-child { border-bottom: none; }
   .mkt-mobile-menu a:hover { color: var(--text); }
   .mkt-mobile-menu .btn { margin-top: 8px; }
+
   .mkt-section { padding: 56px 24px; }
-  .mkt-pain { padding: 56px 24px; }
-  .mkt-pain-grid { grid-template-columns: 1fr; }
-  .mkt-output { padding: 56px 24px; }
-  .mkt-output-header { flex-direction: column; }
-  .mkt-diff { padding: 56px 24px; }
   .mkt-trust { padding: 48px 24px; }
   .mkt-final-cta { padding: 56px 24px; }
   .mkt-final-cta-inner h2 { font-size: 1.6rem; }
-  .mkt-footer { flex-direction: column; gap: 8px; text-align: center; padding: 20px 24px; }
 
-  /* Fix 2: Pricing cards — tighter padding on mobile */
+  /* Footer: stack on tablet */
+  .mkt-footer { padding: 32px 24px 20px; }
+  .mkt-footer-grid { grid-template-columns: 1fr; gap: 24px; }
+  .mkt-footer-bottom { flex-direction: column; gap: 8px; text-align: center; }
+
+  /* Pricing cards: tighter on mobile */
   .mkt-plan { padding: 20px; }
   .mkt-plan-features { gap: 6px; }
   .mkt-plan-badge { top: -10px; font-size: 0.7rem; padding: 2px 10px; }
+
+  .mkt-mid-cta { padding: 24px 20px; }
 }
 
-/* ---- 640px: Further mobile reductions for hero and CTA ---- */
+/* ---- 640px ---- */
 @media (max-width: 640px) {
   .mkt-hero { padding: 48px 20px; gap: 32px; }
   .mkt-h1 { font-size: 1.75rem; }
@@ -1143,6 +1387,7 @@
   .mkt-hero-ctas { flex-direction: column; width: 100%; }
   .mkt-hero-ctas .btn,
   .mkt-hero-ctas .mkt-btn-lg { width: 100%; text-align: center; justify-content: center; }
+  .mkt-hero-ctas .mkt-btn-secondary { width: 100%; justify-content: center; }
   .mkt-preview-card { border-radius: 10px; }
   .mkt-preview-body { padding: 16px; gap: 14px; }
   .mkt-section-title { font-size: 1.5rem; }
@@ -1150,6 +1395,15 @@
   .mkt-section { padding: 40px 16px; }
   .mkt-pain { padding: 40px 16px; }
   .mkt-output { padding: 40px 16px; }
-  .mkt-diff { padding: 40px 16px; }
+  .mkt-copilot { padding: 40px 16px; }
+  .mkt-compare { padding: 40px 16px; }
   .mkt-final-cta { padding: 40px 16px; }
+  .mkt-mid-cta { padding: 20px 16px; }
+
+  /* Trust bar: single column */
+  .mkt-trust-bar-inner { flex-direction: column; gap: 12px; }
+
+  /* Persona pills: smaller */
+  .mkt-persona-pill { padding: 6px 14px; font-size: 0.82rem; }
+  .mkt-persona-card { padding: 24px; }
 }

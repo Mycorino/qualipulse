@@ -1,22 +1,31 @@
 {
   "nav": {
     "howItWorks": "How it works",
+    "features": "Features",
     "whoItsFor": "Who it's for",
     "pricing": "Pricing",
     "login": "Log in",
-    "startTrial": "Start free trial"
+    "startTrial": "Start free"
   },
   "hero": {
-    "badge": "Async qualitative research",
-    "title": "Qualitative insights\nwithout the calendar Tetris",
-    "subtitle": "You know the research needs to happen. But scheduling 12 interviews, running them, transcribing, and synthesising takes weeks you don't have. QualiPulse runs AI-moderated voice interviews asynchronously and delivers a structured research memo — automatically.",
-    "cta": "Start your 14-day free trial",
-    "note": "14-day free trial · No credit card required · Cancel anytime",
+    "badge": "AI-powered qualitative research",
+    "title": "From research question to insights —\nin hours, not weeks",
+    "subtitle": "QualiPulse runs AI-moderated voice interviews asynchronously and delivers a structured research memo. Chat your way to your first study in 5 minutes.",
+    "cta": "Start free — 10 interviews included",
+    "secondaryCta": "See how it works",
+    "note": "10 free interviews · No credit card required · Cancel anytime",
     "interviewInProgress": "Interview in progress",
     "recordingStatus": "Recording · 0:42",
     "interviewQuestion": "Can you walk me through the last time you had to onboard a new tool at work?",
     "emergingThemes": "Emerging themes",
     "themeTags": ["Onboarding friction", "Trust building", "Time to value"]
+  },
+  "trustBar": {
+    "stats": [
+      { "number": "2,400+", "label": "interviews analyzed" },
+      { "number": "45s", "label": "average synthesis time" },
+      { "number": "100%", "label": "browser-based, no app needed" }
+    ]
   },
   "painPoints": {
     "title": "Sound familiar?",
@@ -44,6 +53,37 @@
     "interviewInProgress": "Interview in progress",
     "recording": "Recording",
     "emergingThemes": "Emerging themes"
+  },
+  "howItWorks": {
+    "title": "How it works",
+    "subtitle": "Three steps from research question to stakeholder-ready memo.",
+    "steps": [
+      {
+        "title": "Describe your research goal",
+        "desc": "Chat with the Research Copilot or paste your brief. The AI drafts your interview guide — objectives, screening criteria, and questions. You review and refine. Five minutes, not five hours."
+      },
+      {
+        "title": "Participants interview on their own time",
+        "desc": "Share one link. Participants complete a voice interview in their browser — any device, any timezone. The AI asks follow-ups like a trained interviewer. No scheduling, no no-shows."
+      },
+      {
+        "title": "Read the memo, skip the transcripts",
+        "desc": "Trigger an AI synthesis. Get structured themes with supporting quotes, tensions, and recommendations — ready to share with stakeholders. Chain multiple studies into a multi-step research plan."
+      }
+    ]
+  },
+  "copilot": {
+    "title": "Your always-on research partner",
+    "subtitle": "The Research Copilot guides you from first idea to final insight — powered by the most advanced reasoning model available.",
+    "features": [
+      { "icon": "🧠", "text": "Powered by Claude Opus — deep research reasoning" },
+      { "icon": "📋", "text": "Proposes next steps as cards you can accept in one click" },
+      { "icon": "🔄", "text": "Context-aware across your entire research program" }
+    ],
+    "chatUser": "What should I ask about onboarding friction?",
+    "chatAi": "Based on your research goal, I'd suggest focusing on the first 10 minutes of the experience. Here's a proposed interview guide:",
+    "proposalTitle": "Proposed: 5-question interview guide",
+    "proposalBody": "Discovery → First impression → Pain points → Workarounds → Ideal experience"
   },
   "output": {
     "title": "From 12 interviews to this — automatically",
@@ -87,40 +127,17 @@
       }
     ]
   },
-  "howItWorks": {
-    "title": "How it works",
-    "subtitle": "Three steps from research question to stakeholder-ready memo.",
-    "steps": [
-      {
-        "title": "Paste your research brief",
-        "desc": "Describe what you want to learn. The AI drafts your interview guide — objectives, screener criteria, and questions. You review and refine. Five minutes, not five hours."
-      },
-      {
-        "title": "Participants interview on their own time",
-        "desc": "Share one link. Participants complete a voice interview in their browser — any device, any timezone. The AI asks follow-ups like a trained interviewer would. No scheduling, no no-shows."
-      },
-      {
-        "title": "Read the memo, skip the transcripts",
-        "desc": "Once responses are in, trigger an AI synthesis. You'll get structured themes with supporting quotes, tensions, jobs-to-be-done, and recommendations — formatted to share with stakeholders immediately."
-      }
-    ]
-  },
-  "differentiator": {
-    "title": "You might be wondering...",
-    "subtitle": "How does QualiPulse compare to tools you may already know?",
-    "items": [
-      {
-        "vs": "UserTesting / dscout",
-        "point": "Those platforms help you recruit and run moderated sessions. QualiPulse replaces the moderator with AI, runs interviews asynchronously, and synthesises the results. No scheduling, no session fees."
-      },
-      {
-        "vs": "Dovetail / EnjoyHQ",
-        "point": "Those are analysis-and-repository tools for research you've already done. QualiPulse handles the full workflow: guide creation, interview collection, and synthesis in one place."
-      },
-      {
-        "vs": "Google Forms / Typeform",
-        "point": "Surveys give you structured data. QualiPulse gives you qualitative depth — follow-up questions, probing, voice responses — without the overhead of live interviews."
-      }
+  "comparison": {
+    "title": "How QualiPulse compares",
+    "subtitle": "See how we stack up against the tools you may already know.",
+    "headers": ["Feature", "QualiPulse", "Traditional tools"],
+    "rows": [
+      { "feature": "Scheduling required", "quali": "No — async, anytime", "other": "Yes — calendar coordination" },
+      { "feature": "AI moderation", "quali": "Built-in, adaptive follow-ups", "other": "Manual or none" },
+      { "feature": "Time to synthesis", "quali": "45 seconds", "other": "2–3 days" },
+      { "feature": "Multi-step research plans", "quali": "Yes — interviews + surveys + workshops", "other": "Not available" },
+      { "feature": "Research Copilot", "quali": "Always-on AI partner", "other": "Not available" },
+      { "feature": "Device requirements", "quali": "Any browser, no app", "other": "Often requires app install" }
     ]
   },
   "trust": {
@@ -131,7 +148,7 @@
   },
   "pricing": {
     "title": "Simple, transparent pricing",
-    "subtitle": "Every plan includes a 14-day trial — no card required.",
+    "subtitle": "Start with 10 free interviews. Upgrade when you need more.",
     "recommended": "Recommended",
     "enterprise": "Running a large research program?",
     "enterpriseCta": "Talk to us about Enterprise",
@@ -143,6 +160,7 @@
     "billingAnnualSave": "Save 17%",
     "billedAnnuallyAs": "Billed €{{amount}} per year",
     "creditsPerMonth": "interview credits / month",
+    "surveyResponsesPerMonth": "survey responses / month",
     "creditDefinition": "1 credit = 1 completed participant interview, up to 15 minutes — including AI questioning, transcription, analysis and storage.",
     "plans": {
       "exploration": {
@@ -155,7 +173,7 @@
           "CSV & PDF export",
           "Public report sharing"
         ],
-        "cta": "Start 14-day free trial"
+        "cta": "Start free"
       },
       "team": {
         "name": "Team",
@@ -167,7 +185,7 @@
           "Team workspace & permissions",
           "Everything in Exploration"
         ],
-        "cta": "Start 14-day free trial"
+        "cta": "Start free"
       },
       "agency": {
         "name": "Agency",
@@ -179,16 +197,26 @@
           "Client workspaces & custom branding",
           "API access"
         ],
-        "cta": "Start 14-day free trial"
+        "cta": "Start free"
       }
     }
+  },
+  "midCta": {
+    "text": "Start free — 10 interviews included"
   },
   "finalCta": {
     "title": "Your next research study could be done by Friday",
     "subtitle": "Set up a study in 5 minutes. Get your first insights in hours.",
-    "cta": "Start your 14-day free trial"
+    "cta": "Start free — 10 interviews on us"
   },
   "footer": {
+    "tagline": "AI-powered qualitative research, on autopilot.",
+    "productTitle": "Product",
+    "companyTitle": "Company",
+    "features": "Features",
+    "copilotLink": "Research Copilot",
+    "pricingLink": "Pricing",
+    "blog": "Blog",
     "login": "Log in",
     "signup": "Sign up",
     "terms": "Terms",
