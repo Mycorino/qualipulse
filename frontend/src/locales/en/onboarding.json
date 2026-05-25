@@ -73,7 +73,7 @@
     "memory_label": "Here's what I'll remember about your research",
     "memory_fallback": "I'll learn more about your research as we work together.",
     "cta_take_interview": "Take your own interview",
-    "cta_take_interview_hint": "90 seconds — hear Claude ask + adapt",
+    "cta_take_interview_hint": "90 seconds — hear the Copilot ask + adapt",
     "cta_copy_link": "Copy shareable link",
     "cta_open_study": "Open your study →",
     "plan_hint": "Teams like yours usually start on <strong>{{planName}}</strong> ({{monthly}}/mo). No pressure — pick it up when QualiPulse is earning its keep."

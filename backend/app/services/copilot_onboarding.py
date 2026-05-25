@@ -423,7 +423,12 @@ _PROFILE_FIELDS = (
 # Canonical chip sets. These are enforced server-side whenever the agent
 # calls `suggest_replies` with a profile `context`, so the UI is identical
 # every time regardless of what the model happened to emit.
-_CANONICAL_REPLIES: dict[str, list[str]] = {
+#
+# Two parallel dicts keyed by locale — French researchers should NEVER see
+# English-only labels. Picked at substitution time by
+# ``company.preferred_language``. Falls back to EN for any unrecognised
+# locale.
+_CANONICAL_REPLIES_EN: dict[str, list[str]] = {
     "role": [
         "Product Manager",
         "UX Researcher",
@@ -487,6 +492,107 @@ _CANONICAL_REPLIES: dict[str, list[str]] = {
         "Just exploring",
     ],
 }
+
+_CANONICAL_REPLIES_FR: dict[str, list[str]] = {
+    "role": [
+        "Product Manager",
+        "UX Researcher",
+        "Designer",
+        "Fondateur·rice / CEO",
+        "Marketing",
+        "Autre",
+    ],
+    "company_size": [
+        "1–10",
+        "11–50",
+        "51–200",
+        "201–1000",
+        "1000+",
+        "Autre",
+    ],
+    "industry": [
+        "SaaS / Tech",
+        "E-commerce / Retail",
+        "Services financiers",
+        "Santé",
+        "Grande conso",
+        "Médias / Éducation",
+        "Autre",
+    ],
+    "use_case": [
+        "Découverte produit",
+        "Test de concept",
+        "Recherche d'onboarding",
+        "Marque / messaging",
+        "Utilisabilité",
+        "Autre",
+    ],
+    "referral_source": [
+        "Google",
+        "LinkedIn",
+        "Un collègue",
+        "Autre",
+    ],
+    "current_tool": [
+        "SurveyMonkey",
+        "Typeform",
+        "Entretiens utilisateurs en propre",
+        "Rien pour l'instant",
+        "Autre",
+    ],
+    "timeline": [
+        "2 semaines",
+        "1 mois",
+        "1 trimestre",
+        "Pas de deadline",
+    ],
+    "research_experience": [
+        "Première étude",
+        "Quelques projets passés",
+        "Chercheur·euse aguerri·e",
+    ],
+    "decision_role": [
+        "C'est moi qui décide",
+        "J'aide quelqu'un à décider",
+        "J'explore",
+    ],
+}
+
+# Backwards compatibility — some call sites still import the legacy name.
+_CANONICAL_REPLIES = _CANONICAL_REPLIES_EN
+
+
+def _canonical_replies_for(language: str | None) -> dict[str, list[str]]:
+    """Pick the canonical chip set for the user's preferred language.
+    Defaults to EN for any unknown locale."""
+    if (language or "").strip().lower().startswith("fr"):
+        return _CANONICAL_REPLIES_FR
+    return _CANONICAL_REPLIES_EN
+
+
+# Synonym map — collapses agent-emitted free chips that are semantically
+# duplicates of canonical chips (e.g. the agent emits "Other" and we
+# also append the canonical "Autre"). Case-insensitive match. Add new
+# entries here whenever a new locale introduces a near-synonym.
+_CHIP_SYNONYMS: dict[str, list[str]] = {
+    "other": ["other", "autre"],
+    "i'll decide": ["i'll decide", "c'est moi qui décide"],
+    "skip": ["skip", "passer"],
+    "just exploring": ["just exploring", "j'explore"],
+}
+
+
+def _chip_synonym_keys(label: str) -> set[str]:
+    """Return the set of synonym-group keys this chip label belongs to.
+    Used to dedupe agent chips against canonical ones."""
+    norm = (label or "").strip().lower()
+    keys: set[str] = set()
+    for key, members in _CHIP_SYNONYMS.items():
+        if norm in (m.lower() for m in members):
+            keys.add(key)
+    if not keys and norm:
+        keys.add(norm)
+    return keys
 
 # Recommended participant N per company-size bucket. The agent can emit
 # its own `recommended_participants` but the server normalises it to the
@@ -590,20 +696,41 @@ def _onboarding_run_tool(
 
     if name == "suggest_replies":
         context = (tool_input.get("context") or "").strip()
-        # For the four profile questions, ignore what the model emitted
-        # and use the canonical set — UI is then identical every time.
-        if context in _CANONICAL_REPLIES:
-            options = list(_CANONICAL_REPLIES[context])
+        # Pick the canonical set in the researcher's preferred language —
+        # FR users must never see English-only labels mixed in.
+        canonical = _canonical_replies_for(
+            getattr(company, "preferred_language", None)
+        )
+        if context in canonical:
+            options = list(canonical[context])
         else:
-            options = [
+            # Custom context — keep what the model emitted (capped at 6)
+            # but dedupe synonyms against the canonical escape-hatch
+            # we're about to append, so we don't end up with both
+            # "Other" and "Autre".
+            raw = [
                 (opt or "").strip()
                 for opt in (tool_input.get("options") or [])
                 if (opt or "").strip()
             ][:6]
-            # Always finish a custom set with "Other" so the user has a
-            # clear escape hatch.
-            if options and "Other" not in options and "other" not in options:
-                options.append("Other")
+            # Determine the locale-correct escape-hatch label.
+            is_fr = canonical is _CANONICAL_REPLIES_FR
+            escape_hatch = "Autre" if is_fr else "Other"
+            escape_keys = _chip_synonym_keys(escape_hatch)
+            options = []
+            seen_keys: set[str] = set()
+            for opt in raw:
+                keys = _chip_synonym_keys(opt)
+                # Drop chips that synonym-collide with the escape hatch
+                # we're about to add OR with an earlier chip in this set.
+                if keys & escape_keys:
+                    continue
+                if keys & seen_keys:
+                    continue
+                seen_keys.update(keys)
+                options.append(opt)
+            if options:
+                options.append(escape_hatch)
         if not options:
             return "No chip options provided — skipping."
         turn.actions.append(
