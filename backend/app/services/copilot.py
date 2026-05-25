@@ -58,6 +58,9 @@ def get_memory(
     )
 
 
+MAX_MEMORY_CHARS = 10_000
+
+
 def append_memory(
     db: Session,
     company_id: str,
@@ -69,22 +72,28 @@ def append_memory(
 
     Uses a single-statement UPDATE for existing rows to avoid a
     read-modify-write race when concurrent requests append to the same
-    scope.
+    scope. Memory is capped at ``MAX_MEMORY_CHARS`` (keeping the most
+    recent tail) to prevent unbounded growth from long conversations.
     """
     note = (note or "").strip()
     if not note:
         return
     row = get_memory(db, scope_kind, scope_id)
     if row is None:
+        content = f"- {note}"
+        if len(content) > MAX_MEMORY_CHARS:
+            content = content[-MAX_MEMORY_CHARS:]
         row = CopilotMemory(
             company_id=company_id,
             scope_kind=scope_kind,
             scope_id=scope_id,
-            content=f"- {note}",
+            content=content,
         )
         db.add(row)
         db.commit()
     else:
+        # Append in SQL to avoid read-modify-write race, then truncate
+        # in Python on the refreshed row.
         (
             db.query(CopilotMemory)
             .filter(CopilotMemory.id == row.id)
@@ -97,6 +106,11 @@ def append_memory(
             )
         )
         db.commit()
+        # Re-read and truncate if over the cap (keeps the most recent tail).
+        db.refresh(row)
+        if row.content and len(row.content) > MAX_MEMORY_CHARS:
+            row.content = row.content[-MAX_MEMORY_CHARS:]
+            db.commit()
 
 
 # ── Conversation persistence (keyed by scope_kind / scope_id) ────────────────
@@ -164,6 +178,10 @@ def save_conversation(
         db.commit()
         return 1
     if expected_version is not None and row.version != expected_version:
+        logger.warning(
+            "Stale conversation write discarded: scope=%s/%s expected_v=%d actual_v=%d",
+            scope_kind, scope_id, expected_version, row.version,
+        )
         return row.version
     row.thread = payload
     row.version += 1

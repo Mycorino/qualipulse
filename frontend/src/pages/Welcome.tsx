@@ -21,6 +21,7 @@ import {
   getDemoBundle,
   getDemoOpeningQuestion,
   createResearchPlan,
+  createOnboardingStudy,
   type CopilotMessage,
   type DemoTranscribeResponse,
   type ProposedAction,
@@ -29,12 +30,8 @@ import {
   type DemoBundleExample,
   type DemoBundleTheme,
 } from "../api/copilot";
-import {
-  createProject,
-  patchProjectSettings,
-  createGuideQuestion,
-  createLink,
-} from "../api/projects";
+// Project-level APIs no longer needed here — study creation uses the
+// atomic /onboarding/study endpoint via createOnboardingStudy.
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
@@ -59,7 +56,13 @@ const CANONICAL_BY_FIELD: Partial<Record<keyof CompanyResponse, string[]>> = {
  * API); the model is only called once the researcher answers.
  */
 
+let _threadItemId = 0;
+function nextThreadId(): string {
+  return `ti-${++_threadItemId}-${Date.now()}`;
+}
+
 type ThreadItem = {
+  id: string;
   role: "user" | "assistant";
   text: string;
   /** Attached to an assistant turn that proposed the first study. */
@@ -138,7 +141,7 @@ function planSuggestion(companySize: string | null | undefined): {
 export default function Welcome() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t } = useTranslation("onboarding");
+  const { t, i18n } = useTranslation("onboarding");
 
   const [me, setMe] = useState<CompanyResponse | null>(null);
   const [thread, setThread] = useState<ThreadItem[]>([]);
@@ -172,10 +175,16 @@ export default function Welcome() {
   // W3.5 — controls the "want a recap by email?" verify modal on the
   // completion screen. Initial value reads localStorage so a refresh
   // doesn't re-pop the modal once the user dismissed it.
+  // Key is scoped to company ID so multi-account browsers don't cross-leak.
+  const verifyDismissKey = me ? `verify_modal_dismissed_${me.id}` : "verify_modal_dismissed";
   const [verifyModalDismissed, setVerifyModalDismissed] = useState<boolean>(
     () => {
       try {
-        return localStorage.getItem("verify_modal_dismissed") === "1";
+        // Check both legacy (unscoped) and scoped keys for backwards compat.
+        return (
+          localStorage.getItem("verify_modal_dismissed") === "1" ||
+          localStorage.getItem(verifyDismissKey) === "1"
+        );
       } catch {
         return false;
       }
@@ -224,7 +233,7 @@ export default function Welcome() {
                     : typeof raw.content === "string"
                       ? (raw.content as string)
                       : "";
-                return text ? ({ role, text } as ThreadItem) : null;
+                return text ? ({ id: nextThreadId(), role, text } as ThreadItem) : null;
               })
               .filter((x): x is ThreadItem => x !== null);
             if (hydrated.length === 0) hydrated = null;
@@ -246,6 +255,7 @@ export default function Welcome() {
             : "greeting";
         setThread([
           {
+            id: nextThreadId(),
             role: "assistant",
             text: t(greetingKey, {
               firstName: m.first_name || "there",
@@ -333,10 +343,10 @@ export default function Welcome() {
   const send = async (raw: string) => {
     const text = raw.trim();
     if (!text || busy) return;
-    const next: ThreadItem[] = [...thread, { role: "user", text }];
+    const next: ThreadItem[] = [...thread, { id: nextThreadId(), role: "user", text }];
     // Push the user turn AND an empty assistant draft — streaming deltas
     // fill it in, the final `done` event finalises with the study proposal.
-    setThread([...next, { role: "assistant", text: "" }]);
+    setThread([...next, { id: nextThreadId(), role: "assistant", text: "" }]);
     setInput("");
     setBusy(true);
     try {
@@ -455,7 +465,7 @@ export default function Welcome() {
         timeline: plan.timeline,
         success_criteria: plan.success_criteria,
         target_customer_description: plan.target_customer_description,
-        language: "en",
+        language: i18n.language || "en",
       });
       await completeOnboarding({});
       setCachedOnboarded(true);
@@ -490,45 +500,20 @@ export default function Welcome() {
     if (creating) return;
     setCreating(true);
     try {
-      const project = await createProject({
-        name: study.study_name || "My first study",
-        language: "en",
-        questions: [],
-      });
-      // Write the objective plus V2 strategic context (decision /
-      // timeline / success criteria / audience) in a single PATCH so
-      // the Project carries everything captured into downstream
-      // personalisation. ProjectSettingsPatch only updates non-None values.
-      const patch: Record<string, string | undefined> = {};
-      if (study.objective) patch.research_objective = study.objective;
-      if (study.decision_to_inform)
-        patch.decision_to_inform = study.decision_to_inform;
-      if (study.timeline) patch.timeline = study.timeline;
-      if (study.success_criteria)
-        patch.success_criteria = study.success_criteria;
-      if (study.target_customer_description)
-        patch.target_customer_description = study.target_customer_description;
-      if (Object.keys(patch).length > 0) {
-        await patchProjectSettings(project.id, patch);
-      }
-      for (const q of (study.questions ?? []) as ProposedGuideQuestion[]) {
-        await createGuideQuestion(project.id, {
+      const result = await createOnboardingStudy({
+        study_name: study.study_name || "My first study",
+        language: i18n.language || "en",
+        objective: study.objective,
+        decision_to_inform: study.decision_to_inform,
+        timeline: study.timeline,
+        success_criteria: study.success_criteria,
+        target_customer_description: study.target_customer_description,
+        questions: ((study.questions ?? []) as ProposedGuideQuestion[]).map((q) => ({
           section_title: q.section_title,
           main_question: q.main_question,
           desired_learning: q.desired_learning,
-        });
-      }
-      // Auto-create the first interview link so the completion screen's
-      // "Take your own interview" + "Share your link" CTAs are usable
-      // immediately. If link creation fails the user can still create
-      // one from the project page, so we don't block.
-      let interviewToken: string | null = null;
-      try {
-        const link = await createLink(project.id);
-        interviewToken = link.token;
-      } catch {
-        interviewToken = null;
-      }
+        })),
+      });
       await completeOnboarding({});
       setCachedOnboarded(true);
       const recap = await getOnboardingMemory().catch(() => ({
@@ -536,11 +521,11 @@ export default function Welcome() {
         profile_summary: "",
       }));
       setDone({
-        projectId: project.id,
-        studyName: study.study_name || "Your study",
+        projectId: result.project_id,
+        studyName: result.study_name || "Your study",
         memory: recap.memory,
         profileSummary: recap.profile_summary,
-        interviewToken,
+        interviewToken: result.interview_token,
       });
       setCreating(false);
     } catch {
@@ -719,7 +704,7 @@ export default function Welcome() {
     const showVerifyModal = !me.email_verified && !verifyModalDismissed;
     const dismissVerifyModal = () => {
       try {
-        localStorage.setItem("verify_modal_dismissed", "1");
+        localStorage.setItem(verifyDismissKey, "1");
       } catch {
         /* no-op — sessionStorage / private mode */
       }
@@ -919,7 +904,7 @@ export default function Welcome() {
               const showAttachments = lastTurn && !it.consumed && !busy;
               return (
                 <div
-                  key={i}
+                  key={it.id}
                   className={`onboarding-msg onboarding-msg--${it.role}`}
                 >
                   {it.text && (
@@ -1689,7 +1674,7 @@ function GoalSuggestionChips({
       getStarterSuggestions()
         .then((arr) => {
           if (cancelled) return;
-          if (arr && arr.length === 3) {
+          if (arr && arr.length >= 1) {
             setDynamic(arr);
             return;
           }

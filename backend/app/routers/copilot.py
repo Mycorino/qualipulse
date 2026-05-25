@@ -13,12 +13,14 @@ it resumes when the researcher navigates away and back.
 
 import json
 import secrets
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
+from app.limiter import limiter
 from app.models.company import Company
 from app.models.project import Project
 from app.models.survey import Survey
@@ -238,7 +240,9 @@ def put_project_conversation(
 
 
 @router.post("/onboarding/copilot")
+@limiter.limit("30/minute")
 def onboarding_copilot(
+    request: Request,
     body: CopilotRequest,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
@@ -256,7 +260,9 @@ def onboarding_copilot(
 
 
 @router.get("/onboarding/copilot/conversation", response_model=ConversationState)
+@limiter.limit("60/minute")
 def get_onboarding_conversation(
+    request: Request,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ConversationState:
@@ -265,7 +271,9 @@ def get_onboarding_conversation(
 
 
 @router.put("/onboarding/copilot/conversation", response_model=ConversationState)
+@limiter.limit("60/minute")
 def put_onboarding_conversation(
+    request: Request,
     body: ConversationState,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
@@ -277,7 +285,9 @@ def put_onboarding_conversation(
 
 
 @router.get("/onboarding/copilot/memory")
+@limiter.limit("60/minute")
 def get_onboarding_memory(
+    request: Request,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> dict:
@@ -309,7 +319,9 @@ def get_onboarding_memory(
 
 
 @router.post("/onboarding/copilot/greeting-prep")
+@limiter.limit("30/minute")
 def prep_welcome_greeting(
+    request: Request,
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -328,7 +340,9 @@ def prep_welcome_greeting(
 
 
 @router.get("/onboarding/copilot/demo-opening-question")
+@limiter.limit("60/minute")
 def get_demo_opening_question(
+    request: Request,
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -348,7 +362,9 @@ def get_demo_opening_question(
 
 
 @router.get("/onboarding/demo-bundle")
+@limiter.limit("60/minute")
 def get_demo_bundle_endpoint(
+    request: Request,
     variant: str = "saas",
     company: Company = Depends(get_current_company),
 ) -> dict:
@@ -368,7 +384,9 @@ def get_demo_bundle_endpoint(
 
 
 @router.get("/onboarding/copilot/starter-suggestions")
+@limiter.limit("60/minute")
 def get_starter_suggestions(
+    request: Request,
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -627,7 +645,9 @@ _BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 
 @router.post("/onboarding/study", status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 def create_onboarding_study(
+    request: Request,
     body: OnboardingStudyCreate,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
@@ -637,6 +657,30 @@ def create_onboarding_study(
     used to perform during onboarding acceptance."""
     from app.models.interview import InterviewLink
     from app.models.project import InterviewGuideQuestion, Project
+
+    # Idempotency: if a project with the same name was created by this
+    # company in the last 60 seconds, return it instead of duplicating.
+    cutoff = datetime.utcnow() - timedelta(seconds=60)
+    existing = (
+        db.query(Project)
+        .filter(
+            Project.company_id == company.id,
+            Project.name == body.study_name,
+            Project.created_at >= cutoff,
+        )
+        .first()
+    )
+    if existing:
+        link = (
+            db.query(InterviewLink)
+            .filter(InterviewLink.project_id == existing.id)
+            .first()
+        )
+        return {
+            "project_id": existing.id,
+            "study_name": existing.name,
+            "interview_token": link.token if link else None,
+        }
 
     project = Project(
         company_id=company.id,
@@ -705,7 +749,9 @@ class _ResearchPlanCreate(BaseModel):
 
 
 @router.post("/onboarding/research-plan", status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 def create_research_plan(
+    request: Request,
     body: _ResearchPlanCreate,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
@@ -719,6 +765,46 @@ def create_research_plan(
     from app.models.interview import InterviewLink
     from app.models.project import InterviewGuideQuestion, Project
     from app.models.research_plan import ResearchPlan, ResearchPlanStep
+
+    # Idempotency: if a plan with the same name was created by this
+    # company in the last 60 seconds, return it instead of duplicating.
+    cutoff = datetime.utcnow() - timedelta(seconds=60)
+    existing_plan = (
+        db.query(ResearchPlan)
+        .filter(
+            ResearchPlan.company_id == company.id,
+            ResearchPlan.name == body.plan_name,
+            ResearchPlan.created_at >= cutoff,
+        )
+        .first()
+    )
+    if existing_plan:
+        # Find the voice-interview project if one was drafted.
+        voice_step = (
+            db.query(ResearchPlanStep)
+            .filter(
+                ResearchPlanStep.plan_id == existing_plan.id,
+                ResearchPlanStep.method == "voice_interview",
+                ResearchPlanStep.project_id.isnot(None),
+            )
+            .first()
+        )
+        project_id = voice_step.project_id if voice_step else None
+        study_name = voice_step.title if voice_step else None
+        interview_token = None
+        if project_id:
+            link = (
+                db.query(InterviewLink)
+                .filter(InterviewLink.project_id == project_id)
+                .first()
+            )
+            interview_token = link.token if link else None
+        return {
+            "plan_id": existing_plan.id,
+            "project_id": project_id,
+            "study_name": study_name,
+            "interview_token": interview_token,
+        }
 
     plan = ResearchPlan(
         company_id=company.id,

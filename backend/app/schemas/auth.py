@@ -82,6 +82,7 @@ class OnboardingProfileRequest(BaseModel):
     occupation_description: Optional[str] = None
     selected_use_cases: Optional[str] = None
     onboarding_recap: Optional[str] = None
+    study_readiness: Optional[str] = None
 
 
 class CompanyResponse(BaseModel):

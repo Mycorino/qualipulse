@@ -78,6 +78,8 @@ export interface OnboardingProfile {
   decision_role?: string;
   // V2 onboarding marketing-attribution signal.
   referral_source?: string;
+  // Study readiness from wizard step 2
+  study_readiness?: string;
 }
 
 export async function signup(

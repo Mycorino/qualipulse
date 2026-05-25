@@ -176,8 +176,9 @@ export interface CopilotTarget {
   applyAction: (action: ProposedAction) => Promise<void>;
 }
 
-/** Idle stream timeout — abort if the server stops emitting for this long. */
-const STREAM_IDLE_MS = 60_000;
+/** Idle stream timeout — abort if the server stops emitting for this long.
+ *  90s to accommodate Opus 4.7 adaptive thinking on complex tool-use chains. */
+const STREAM_IDLE_MS = 90_000;
 
 /**
  * POST a copilot request and consume the SSE stream. Status + delta
@@ -248,6 +249,7 @@ async function streamCopilot(
         try {
           event = JSON.parse(frame.slice(6));
         } catch {
+          console.warn("[copilot] Failed to parse SSE frame:", frame.slice(6));
           continue;
         }
         if (event.type === "status" && handlers?.onStatus) {
