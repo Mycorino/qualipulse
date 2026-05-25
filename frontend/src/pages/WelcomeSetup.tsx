@@ -114,7 +114,7 @@ export default function WelcomeSetup({
 
   const handleSkip = () => {
     try {
-      localStorage.setItem("qp_welcome_setup_skipped", "1");
+      localStorage.setItem("qp_welcome_setup_skipped_v2", "1");
     } catch {
       /* private-mode no-op */
     }

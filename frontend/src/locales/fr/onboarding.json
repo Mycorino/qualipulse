@@ -33,7 +33,10 @@
     "referral_source": "Trouvé via",
     "research_experience": "Expérience",
     "decision_role": "Rôle dans la décision",
-    "company": "Votre entreprise"
+    "company": "Entreprise",
+    "name": "Vous",
+    "business_summary_label": "Activité",
+    "empty_hint": "Je remplirai au fur et à mesure — votre rôle, ce que vous cherchez à apprendre, sur qui."
   },
 
   "input_placeholder": "Dites au copilot ce que vous voulez apprendre…",
@@ -87,19 +90,68 @@
   "sample_modal": {
     "close": "Fermer",
     "eyebrow": "Étude exemple",
-    "title": "Voici ce que nous construirons ensemble",
-    "body": "Une étude finie a un objectif précis, un nombre de participants recommandé pour votre équipe et un guide d'entretien synthétique. Le Copilot rédige tout cela à partir d'une conversation de 2 minutes. Quand vous êtes prêt·e, fermez et dites-moi ce que vous voulez apprendre.",
+    "title": "Voici ce que vous verrez à la fin",
+    "body": "Pas seulement un guide — une lecture synthétisée de ce que 25 participants vous ont dit, regroupée en thèmes avec des verbatims à citer dans un deck. Rédigée à partir d'une conversation de 2 minutes.",
     "cta": "Compris — rédigeons la mienne",
+    "tabs_aria": "Sections de l'étude exemple",
+    "tab_synthesis": "Synthèse",
+    "tab_quotes": "Verbatims",
+    "tab_guide": "Guide",
+    "meta_participants": "{{count}} participants",
+    "meta_completed": "Terminée la semaine dernière",
     "example": {
-      "name": "Pourquoi les PM mid-market choisissent Linear plutôt que Jira",
-      "objective": "Comprendre le moment de décision quand les équipes produit changent d'outil, pour affiner notre positionnement sur le segment mid-market.",
+      "name": "Pourquoi les nouveaux inscrits ne lancent jamais leur premier entretien",
+      "objective": "Comprendre ce qui empêche les utilisateurs en essai de lancer leur première étude, pour savoir quel frein d'onboarding traiter en priorité.",
       "q1_section": "CONTEXTE",
-      "q1_question": "Parlez-moi de la dernière fois que votre équipe a choisi un nouvel outil — qu'est-ce qui a déclenché la réflexion ?",
-      "q2_section": "MOMENT DE DÉCISION",
-      "q2_question": "Racontez-moi comment vous avez évalué les options. Qu'est-ce qui a compté le plus ?",
+      "q1_question": "Racontez-moi ce que vous essayiez de faire la première fois que vous vous êtes connecté·e.",
+      "q2_section": "MOMENT D'ABANDON",
+      "q2_question": "Y a-t-il eu un moment où vous vous êtes dit « ce n'est pas pour moi maintenant » ? Parlez-moi de ça.",
       "q3_section": "CE QUI AURAIT AIDÉ",
-      "q3_question": "Avec le recul, qu'est-ce qui aurait rendu la décision plus simple ou plus rapide ?"
-    }
+      "q3_question": "Si vous aviez pu sauter une étape, laquelle ?"
+    },
+    "themes": [
+      {
+        "title": "« Je ne savais pas qui interviewer »",
+        "finding": "12 sur 25 ont calé avant de lancer car ils n'avaient pas de participants. Ils s'attendaient à ce que l'outil les trouve pour eux.",
+        "quote": "Je pensais qu'il y aurait un panel à qui je pouvais juste l'envoyer. Quand j'ai compris qu'il fallait amener ma propre liste, j'ai fermé l'onglet.",
+        "speaker": "Maya, PM dans une SaaS de 40 personnes"
+      },
+      {
+        "title": "La première étude semblait à enjeu",
+        "finding": "Les utilisateurs en essai décrivaient la première étude comme « leur seule chance ». Ils sur-éditaient le guide et ne l'envoyaient jamais.",
+        "quote": "J'ai réécrit ces cinq questions sept fois. J'étais sûr que j'allais faire perdre du temps aux participants.",
+        "speaker": "Jonas, fondateur, fintech B2B"
+      },
+      {
+        "title": "Le vocal semblait risqué sans voir le rendu",
+        "finding": "Les utilisateurs qui n'avaient pas vu un exemple de transcription avant de lancer abandonnaient 3 fois plus. L'IA semblait opaque.",
+        "quote": "Je ne savais pas ce que l'IA allait vraiment faire une fois que les gens commenceraient à parler. Il me fallait voir un entretien fini avant de lui faire confiance.",
+        "speaker": "Lina, UX researcher dans une marketplace"
+      }
+    ],
+    "quotes": [
+      {
+        "speaker": "Maya, PM",
+        "text": "Je pensais qu'il y aurait un panel à qui je pouvais juste l'envoyer. Quand j'ai compris qu'il fallait amener ma propre liste, j'ai fermé l'onglet.",
+        "highlight": "il fallait amener ma propre liste",
+        "code": "Sourcing participants",
+        "codeColor": "#4f46e5"
+      },
+      {
+        "speaker": "Jonas, fondateur",
+        "text": "J'ai réécrit ces cinq questions sept fois. J'étais sûr que j'allais faire perdre du temps aux participants.",
+        "highlight": "j'allais faire perdre du temps aux participants",
+        "code": "Anxiété première étude",
+        "codeColor": "#0ea5e9"
+      },
+      {
+        "speaker": "Lina, researcher",
+        "text": "Il me fallait voir un entretien fini avant de lui faire confiance. L'IA semblait être une boîte noire.",
+        "highlight": "voir un entretien fini avant de lui faire confiance",
+        "code": "Exigence de transparence",
+        "codeColor": "#10b981"
+      }
+    ]
   },
 
   "participant_demo": {

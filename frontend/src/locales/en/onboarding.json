@@ -33,7 +33,10 @@
     "referral_source": "Found us via",
     "research_experience": "Experience level",
     "decision_role": "Decision role",
-    "company": "Your company"
+    "company": "Company",
+    "name": "You",
+    "business_summary_label": "Business",
+    "empty_hint": "I'll fill this in as we chat — your role, what you'll use it for, who you're trying to learn about."
   },
 
   "input_placeholder": "Tell the copilot what you want to learn…",
@@ -87,19 +90,68 @@
   "sample_modal": {
     "close": "Close",
     "eyebrow": "Sample study",
-    "title": "Here's what we'll build together",
-    "body": "A finished study has a sharp objective, a recommended participant count for your team, and a lean interview guide. The Copilot drafts all of it from a 2-minute conversation. When you're ready, close this and tell me what you want to learn.",
+    "title": "Here's what you'll see at the end",
+    "body": "Not just a guide — a synthesised read of what 25 participants told you, grouped into themes with verbatims you can quote in a deck. Drafted from a 2-minute conversation.",
     "cta": "Got it — let's draft mine",
+    "tabs_aria": "Sample study sections",
+    "tab_synthesis": "Synthesis",
+    "tab_quotes": "Quotes",
+    "tab_guide": "Guide",
+    "meta_participants": "{{count}} participants",
+    "meta_completed": "Completed last week",
     "example": {
-      "name": "Why mid-market PMs choose Linear over Jira",
-      "objective": "Understand the decision moment when product teams switch tools, so we can sharpen our positioning for the mid-market segment.",
+      "name": "Why new signups never run their first interview",
+      "objective": "Understand what stops trial users from launching their first study so we know which onboarding friction to fix first.",
       "q1_section": "CONTEXT",
-      "q1_question": "Tell me about the last time your team chose a new tool — what was the spark?",
-      "q2_section": "DECISION MOMENT",
-      "q2_question": "Walk me through how you evaluated the options. What mattered most?",
+      "q1_question": "Walk me through what you were trying to do the first time you logged in.",
+      "q2_section": "MOMENT OF DROP-OFF",
+      "q2_question": "Was there a moment you thought \"this isn't for me right now\"? Tell me about it.",
       "q3_section": "WHAT WOULD HAVE HELPED",
-      "q3_question": "Looking back, what would have made the decision easier or faster?"
-    }
+      "q3_question": "If you could have skipped one step, which one would it have been?"
+    },
+    "themes": [
+      {
+        "title": "\"I didn't know who I'd interview\"",
+        "finding": "12 of 25 stalled before launching because they hadn't lined up participants. They expected the tool to find people for them.",
+        "quote": "I assumed there'd be a panel I could just send it to. When I realised I had to bring my own list, I closed the tab.",
+        "speaker": "Maya, PM at a 40-person SaaS"
+      },
+      {
+        "title": "The first study felt high-stakes",
+        "finding": "Trial users described the first study as \"my one shot.\" They over-edited the question guide and never sent it.",
+        "quote": "I rewrote those five questions seven times. I was sure I was going to waste my participants' time.",
+        "speaker": "Jonas, founder, B2B fintech"
+      },
+      {
+        "title": "Voice felt risky without seeing the output",
+        "finding": "Users who didn't see a sample transcript before launching were 3x more likely to abandon. The AI felt opaque.",
+        "quote": "I didn't know what the AI would actually do once people started talking. I needed to see one finished interview before trusting it.",
+        "speaker": "Lina, UX researcher at a marketplace"
+      }
+    ],
+    "quotes": [
+      {
+        "speaker": "Maya, PM",
+        "text": "I assumed there'd be a panel I could just send it to. When I realised I had to bring my own list, I closed the tab.",
+        "highlight": "I had to bring my own list",
+        "code": "Participant-sourcing gap",
+        "codeColor": "#4f46e5"
+      },
+      {
+        "speaker": "Jonas, founder",
+        "text": "I rewrote those five questions seven times. I was sure I was going to waste my participants' time.",
+        "highlight": "I was sure I was going to waste my participants' time",
+        "code": "First-study anxiety",
+        "codeColor": "#0ea5e9"
+      },
+      {
+        "speaker": "Lina, researcher",
+        "text": "I needed to see one finished interview before trusting it. The AI felt like a black box.",
+        "highlight": "see one finished interview before trusting it",
+        "code": "Transparency requirement",
+        "codeColor": "#10b981"
+      }
+    ]
   },
 
   "participant_demo": {

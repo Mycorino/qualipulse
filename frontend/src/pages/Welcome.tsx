@@ -391,17 +391,29 @@ export default function Welcome() {
   // Hybrid Phase 1 → Phase 2 handoff. Show the structured 3-step
   // wizard FIRST (unless the user has skipped it, already completed
   // the qualification fields, or made chat progress on a refresh).
+  //
+  // Bumped the skip-flag key to _v2 so anyone who saw the original v1
+  // wizard (and then never again, because the v1 key was sticky) sees
+  // the new design. Server-side check: even if the v2 skip flag is
+  // set, force the wizard back on if the qualification fields are
+  // ALL empty — that means the user almost certainly never finished
+  // it on this account.
   const wizardSkipped = (() => {
     try {
-      return localStorage.getItem("qp_welcome_setup_skipped") === "1";
+      return localStorage.getItem("qp_welcome_setup_skipped_v2") === "1";
     } catch {
       return false;
     }
   })();
+  const profileEmpty = !me.role && !me.company_size && !me.use_case;
   const phase1Complete = !!me.role && !!me.company_size && !!me.use_case;
   const hasChatProgress = thread.length > 1;
+  // The skip flag only suppresses when there's evidence the user
+  // genuinely engaged — at least one captured field — otherwise we
+  // assume the flag is stale and re-show the wizard.
+  const skipRespected = wizardSkipped && !profileEmpty;
   const showSetupWizard =
-    !done && !wizardSkipped && !phase1Complete && !hasChatProgress;
+    !done && !skipRespected && !phase1Complete && !hasChatProgress;
   if (showSetupWizard) {
     return (
       <WelcomeSetup
@@ -409,7 +421,7 @@ export default function Welcome() {
         onProfileSaved={setMe}
         onComplete={() => {
           try {
-            localStorage.setItem("qp_welcome_setup_skipped", "1");
+            localStorage.setItem("qp_welcome_setup_skipped_v2", "1");
           } catch {
             /* private-mode no-op */
           }
@@ -819,14 +831,21 @@ export default function Welcome() {
 }
 
 /**
- * V2 — modal preview of what a finished study card looks like.
- * Surfaces the deliverable BEFORE the user has to commit to drafting
- * their own. Hard-coded sample content (intentionally — this is
- * marketing, not user data).
+ * V3 — modal preview of what a finished study DELIVERS, not just what
+ * questions it asks. Three tabs:
+ *   Synthesis (default)  — theme cards with quote pull-outs
+ *   Quotes               — verbatims with highlight + code tag
+ *   Guide                — the interview question list
+ *
+ * Demoted the question list from "the demo" to "the appendix", and
+ * led with the synthesis — what the researcher actually pays for.
  */
+type SampleTab = "synthesis" | "quotes" | "guide";
+
 function SampleStudyPreview({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation("onboarding");
-  // Capture Escape to close
+  const [tab, setTab] = useState<SampleTab>("synthesis");
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -834,6 +853,20 @@ function SampleStudyPreview({ onClose }: { onClose: () => void }) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  const themes = (t("sample_modal.themes", { returnObjects: true }) as
+    | Array<{ title: string; finding: string; quote: string; speaker: string }>
+    | undefined) || [];
+  const quotes = (t("sample_modal.quotes", { returnObjects: true }) as
+    | Array<{
+        speaker: string;
+        text: string;
+        highlight: string;
+        code: string;
+        codeColor: string;
+      }>
+    | undefined) || [];
+
   return (
     <div
       className="onboarding-sample-modal"
@@ -844,7 +877,7 @@ function SampleStudyPreview({ onClose }: { onClose: () => void }) {
         if (e.currentTarget === e.target) onClose();
       }}
     >
-      <div className="onboarding-sample-modal__card">
+      <div className="onboarding-sample-modal__card onboarding-sample-modal__card--v3">
         <button
           type="button"
           className="onboarding-sample-modal__close"
@@ -865,45 +898,147 @@ function SampleStudyPreview({ onClose }: { onClose: () => void }) {
         <p className="onboarding-sample-modal__body">
           {t("sample_modal.body")}
         </p>
-        <div className="onboarding-sample-modal__example">
-          <div className="onboarding-study__eyebrow">
-            ✦ {t("study.eyebrow")}
-          </div>
-          <div className="onboarding-study__name">
+
+        <div className="onboarding-sample-modal__study-head">
+          <div className="onboarding-sample-modal__study-name">
             {t("sample_modal.example.name")}
           </div>
-          <p className="onboarding-study__objective">
-            {t("sample_modal.example.objective")}
-          </p>
-          <div className="onboarding-study__recommend">
-            <span className="onboarding-study__recommend-label">
-              {t("study.recommended_label")}
-            </span>
-            <span className="onboarding-study__recommend-value">
-              {t("study.recommended_value", { count: 25 })}
-            </span>
+          <div className="onboarding-sample-modal__meta">
+            <span>{t("sample_modal.meta_participants", { count: 25 })}</span>
+            <span aria-hidden>·</span>
+            <span>{t("sample_modal.meta_completed")}</span>
           </div>
-          <ol className="onboarding-study__questions">
-            <li>
-              <span className="onboarding-study__section">
-                {t("sample_modal.example.q1_section")}
-              </span>
-              {t("sample_modal.example.q1_question")}
-            </li>
-            <li>
-              <span className="onboarding-study__section">
-                {t("sample_modal.example.q2_section")}
-              </span>
-              {t("sample_modal.example.q2_question")}
-            </li>
-            <li>
-              <span className="onboarding-study__section">
-                {t("sample_modal.example.q3_section")}
-              </span>
-              {t("sample_modal.example.q3_question")}
-            </li>
-          </ol>
         </div>
+
+        <div
+          className="onboarding-sample-modal__tabs"
+          role="tablist"
+          aria-label={t("sample_modal.tabs_aria")}
+        >
+          {(
+            [
+              { id: "synthesis", label: t("sample_modal.tab_synthesis") },
+              { id: "quotes", label: t("sample_modal.tab_quotes") },
+              { id: "guide", label: t("sample_modal.tab_guide") },
+            ] as { id: SampleTab; label: string }[]
+          ).map((tabDef) => (
+            <button
+              key={tabDef.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === tabDef.id}
+              className={`onboarding-sample-modal__tab ${
+                tab === tabDef.id
+                  ? "onboarding-sample-modal__tab--active"
+                  : ""
+              }`}
+              onClick={() => setTab(tabDef.id)}
+            >
+              {tabDef.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="onboarding-sample-modal__pane">
+          {tab === "synthesis" && (
+            <div className="onboarding-sample-modal__synthesis">
+              <p className="onboarding-sample-modal__objective">
+                {t("sample_modal.example.objective")}
+              </p>
+              <div className="onboarding-sample-modal__themes">
+                {themes.map((th, i) => (
+                  <article
+                    key={i}
+                    className="onboarding-sample-theme"
+                  >
+                    <div className="onboarding-sample-theme__rank">
+                      {i + 1}
+                    </div>
+                    <div className="onboarding-sample-theme__body">
+                      <h3 className="onboarding-sample-theme__title">
+                        {th.title}
+                      </h3>
+                      <p className="onboarding-sample-theme__finding">
+                        {th.finding}
+                      </p>
+                      <blockquote className="onboarding-sample-theme__quote">
+                        “{th.quote}”
+                        <cite>— {th.speaker}</cite>
+                      </blockquote>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {tab === "quotes" && (
+            <div className="onboarding-sample-modal__quotes">
+              {quotes.map((q, i) => {
+                const idx = q.text.indexOf(q.highlight);
+                const before = idx >= 0 ? q.text.slice(0, idx) : q.text;
+                const hl = idx >= 0 ? q.highlight : "";
+                const after =
+                  idx >= 0 ? q.text.slice(idx + q.highlight.length) : "";
+                return (
+                  <article
+                    key={i}
+                    className="onboarding-sample-quote"
+                    style={
+                      {
+                        ["--quote-code-color" as string]: q.codeColor,
+                      } as Record<string, string>
+                    }
+                  >
+                    <div className="onboarding-sample-quote__speaker">
+                      {q.speaker}
+                    </div>
+                    <p className="onboarding-sample-quote__text">
+                      {before}
+                      {hl && (
+                        <mark className="onboarding-sample-quote__highlight">
+                          {hl}
+                        </mark>
+                      )}
+                      {after}
+                    </p>
+                    <span className="onboarding-sample-quote__code">
+                      <span
+                        className="onboarding-sample-quote__code-dot"
+                        aria-hidden
+                      />
+                      {q.code}
+                    </span>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {tab === "guide" && (
+            <ol className="onboarding-study__questions onboarding-study__questions--in-modal">
+              <li>
+                <span className="onboarding-study__section">
+                  {t("sample_modal.example.q1_section")}
+                </span>
+                {t("sample_modal.example.q1_question")}
+              </li>
+              <li>
+                <span className="onboarding-study__section">
+                  {t("sample_modal.example.q2_section")}
+                </span>
+                {t("sample_modal.example.q2_question")}
+              </li>
+              <li>
+                <span className="onboarding-study__section">
+                  {t("sample_modal.example.q3_section")}
+                </span>
+                {t("sample_modal.example.q3_question")}
+              </li>
+            </ol>
+          )}
+        </div>
+
         <div className="onboarding-sample-modal__actions">
           <button
             type="button"
@@ -983,20 +1118,57 @@ function ProfileSidebar({
     }
   };
 
+  // Identity rows seeded from the signup form. Always visible — sells
+  // "the system already knows you" from the very first render, instead
+  // of an empty checkmark list.
+  const identityRows: { label: string; value: string }[] = [];
+  const fullName = [me.first_name, me.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  if (fullName) {
+    identityRows.push({ label: t("sidebar.name", "You"), value: fullName });
+  }
+  if (me.name) {
+    identityRows.push({ label: t("sidebar.company"), value: me.name });
+  }
+
+  // Only render captured-during-chat rows when they have a value.
+  // Hollow circles for un-captured fields read as a chore list — we
+  // surface those inline in the chat instead (via `suggest_replies`).
+  const filledFields = profileFields.filter(
+    (f) => !!(me[f.key] as string | null | undefined),
+  );
+
   return (
     <aside className="onboarding-sidebar" aria-label={t("sidebar.eyebrow")}>
       <div className="onboarding-sidebar__eyebrow">{t("sidebar.eyebrow")}</div>
       <ul className="onboarding-sidebar__list">
-        {profileFields.map((f) => {
+        {identityRows.map((r) => (
+          <li
+            key={r.label}
+            className="onboarding-sidebar__row onboarding-sidebar__row--filled onboarding-sidebar__row--identity"
+          >
+            <span className="onboarding-sidebar__check" aria-hidden>✓</span>
+            <span className="onboarding-sidebar__label">{r.label}</span>
+            <span
+              className="onboarding-sidebar__value"
+              title={r.value}
+            >
+              {r.value}
+            </span>
+          </li>
+        ))}
+        {filledFields.map((f) => {
           const value = (me[f.key] as string | null | undefined) || "";
           const isEditing = editing === f.key;
           return (
             <li
               key={String(f.key)}
-              className={`onboarding-sidebar__row onboarding-sidebar__row--${value ? "filled" : "empty"} ${isEditing ? "onboarding-sidebar__row--editing" : ""}`}
+              className={`onboarding-sidebar__row onboarding-sidebar__row--filled ${isEditing ? "onboarding-sidebar__row--editing" : ""}`}
             >
               <span className="onboarding-sidebar__check" aria-hidden>
-                {value ? "✓" : "○"}
+                ✓
               </span>
               <span className="onboarding-sidebar__label">{f.label}</span>
               {isEditing ? (
@@ -1032,11 +1204,16 @@ function ProfileSidebar({
             </li>
           );
         })}
+        {identityRows.length === 0 && filledFields.length === 0 && (
+          <li className="onboarding-sidebar__empty">
+            {t("sidebar.empty_hint")}
+          </li>
+        )}
       </ul>
       {summary && (
         <div className="onboarding-sidebar__summary">
           <div className="onboarding-sidebar__summary-label">
-            {t("sidebar.company")}
+            {t("sidebar.business_summary_label", "Business")}
           </div>
           <p className="onboarding-sidebar__summary-text">{summary}</p>
         </div>
