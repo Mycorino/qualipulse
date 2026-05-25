@@ -58,6 +58,21 @@
     "context_success": "Success criteria"
   },
 
+  "plan": {
+    "eyebrow": "Your research plan",
+    "accept_cta": "Accept this plan & draft step 1",
+    "hint": "Step 1 becomes your first study now — later steps wait for your go-ahead.",
+    "meta_participants": "{{count}} participants",
+    "meta_duration": "{{count}}w",
+    "method": {
+      "voice_interview": "Voice interview",
+      "quant_survey": "Quant survey",
+      "workshop": "Workshop",
+      "desk_research": "Desk research",
+      "usability_test": "Usability test"
+    }
+  },
+
   "website": {
     "eyebrow": "Quick lookup",
     "default_prompt": "Paste your company URL and I'll take a look.",

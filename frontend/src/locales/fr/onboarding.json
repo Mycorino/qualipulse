@@ -58,6 +58,21 @@
     "context_success": "Critère de réussite"
   },
 
+  "plan": {
+    "eyebrow": "Votre plan de recherche",
+    "accept_cta": "Accepter ce plan et lancer l'étape 1",
+    "hint": "L'étape 1 devient votre première étude maintenant — les suivantes attendent votre feu vert.",
+    "meta_participants": "{{count}} participants",
+    "meta_duration": "{{count}}s",
+    "method": {
+      "voice_interview": "Entretien vocal",
+      "quant_survey": "Étude quanti",
+      "workshop": "Atelier",
+      "desk_research": "Étude documentaire",
+      "usability_test": "Test d'utilisabilité"
+    }
+  },
+
   "website": {
     "eyebrow": "Vérification rapide",
     "default_prompt": "Collez l'URL de votre entreprise et je vais y jeter un œil.",

@@ -53,6 +53,7 @@ export interface ProposedAction {
     | "run_analysis"
     | "refine_analysis"
     | "create_first_study"
+    | "create_research_plan"
     | "suggest_replies"
     | "request_website"
     | "propose_participant_demo";
@@ -90,6 +91,50 @@ export interface ProposedAction {
   /** propose_participant_demo (onboarding) — lead-in text shown in
    *  the chat above the demo card. */
   intro?: string;
+  /** create_research_plan (Wave E) — multi-step plan card. */
+  plan_name?: string;
+  steps?: Array<{
+    order_index: number;
+    method: string;
+    title: string;
+    purpose?: string;
+    deliverable?: string;
+    n_participants?: number | null;
+    duration_weeks?: number | null;
+  }>;
+}
+
+/** Result of POST /onboarding/research-plan — Wave E. */
+export interface ResearchPlanCreated {
+  plan_id: string;
+  project_id: string | null;
+  study_name: string | null;
+  interview_token: string | null;
+}
+
+export async function createResearchPlan(payload: {
+  plan_name: string;
+  rationale: string;
+  steps: Array<{
+    order_index: number;
+    method: string;
+    title: string;
+    purpose?: string;
+    deliverable?: string;
+    n_participants?: number | null;
+    duration_weeks?: number | null;
+  }>;
+  decision_to_inform?: string;
+  timeline?: string;
+  success_criteria?: string;
+  target_customer_description?: string;
+  language?: string;
+}): Promise<ResearchPlanCreated> {
+  const resp = await client.post<ResearchPlanCreated>(
+    "/onboarding/research-plan",
+    payload,
+  );
+  return resp.data;
 }
 
 export interface CopilotResponse {

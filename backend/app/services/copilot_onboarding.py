@@ -187,15 +187,28 @@ faster. Don't repeat this calibration aloud — just use it.
 - Call `remember` (scope "company") to durably record their research \
 goal, audience, and what their company does — this is the memory you \
 will carry into every future session.
-- Then call `propose_study`: a study name, a sharp decision-oriented \
-objective (one sentence), and a lean 5-7 question grand-tour interview \
-guide. Open, non-leading questions; one idea each; broad context \
-questions first. This is the one proposal card — make it genuinely good.
+- Then call `propose_research_plan` (PREFERRED) — a 2-3 step plan that \
+sequences methods properly. A real researcher doesn't jump to 50 voice \
+interviews from a 2-minute chat. For a friction-discovery question, the \
+right shape is: (1) quant_survey ~200 participants to size + segment \
+the problem; (2) voice_interview ~8-12 with the worst-affected segment \
+to surface the why; (3) quant_survey ~200 to validate post-redesign. \
+For a concept-test question: (1) usability_test ~6 on the prototype; \
+(2) voice_interview ~10 on the underlying need. Adapt the sequence to \
+the question. Right-size each step by method: voice_interview is 8-12, \
+quant_survey is 150-300, usability_test is 5-8. NEVER propose 50+ for \
+voice — that's a different scale of project. The rationale field MUST \
+explain the logic of the sequence in plain language ("first we size, \
+then we deep-dive, then we validate") — that's how the user sees we \
+understand methodology, not just AI interviews.
+- Fall back to `propose_study` (single study) ONLY when the user \
+explicitly says they want one quick study and you've offered the plan \
+path first and they declined. Default to the plan.
 - If the researcher says they are just exploring or truly do not know \
-what to research, do NOT force a study — say so and suggest they start \
-from the worked example instead.
+what to research, do NOT force a plan or a study — say so and suggest \
+they start from the worked example instead.
 
-Be concise and warm. Three exchanges, then a real study on screen."""
+Be concise and warm. Three exchanges, then a real plan on screen."""
 
 
 _SAVE_PROFILE_TOOL = {
@@ -456,8 +469,97 @@ _REQUEST_WEBSITE_TOOL = {
     },
 }
 
+_PROPOSE_RESEARCH_PLAN_TOOL = {
+    "name": "propose_research_plan",
+    "description": (
+        "Propose a multi-step research plan (typically 2-3 methods over "
+        "time, e.g. quant survey → qual interviews → quant validation) "
+        "instead of a single oversized study. This is the preferred "
+        "proposal path: a real researcher rarely jumps to 50 voice "
+        "interviews from a 2-minute chat. The plan card lets the user "
+        "accept a sensible sequence; step 1 becomes their first real "
+        "study, later steps stay as placeholders they activate when "
+        "ready. Use `propose_study` only if the user explicitly says "
+        "they just want one quick study."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "The overall research program name.",
+            },
+            "rationale": {
+                "type": "string",
+                "description": (
+                    "1-2 sentences in the user's locale explaining "
+                    "WHY this plan structure — what's the logic of "
+                    "the sequence. Plain language, not pitch."
+                ),
+            },
+            "steps": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 4,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "method": {
+                            "type": "string",
+                            "enum": [
+                                "voice_interview",
+                                "quant_survey",
+                                "workshop",
+                                "desk_research",
+                                "usability_test",
+                            ],
+                        },
+                        "title": {"type": "string"},
+                        "purpose": {
+                            "type": "string",
+                            "description": (
+                                "One short sentence: WHY this step in "
+                                "this position. What it unlocks for "
+                                "the next step."
+                            ),
+                        },
+                        "deliverable": {
+                            "type": "string",
+                            "description": (
+                                "What the step delivers — e.g. "
+                                "'Ranked friction list', 'Theme cards "
+                                "with verbatims', 'Before/after "
+                                "comparison'."
+                            ),
+                        },
+                        "n_participants": {
+                            "type": "integer",
+                            "description": (
+                                "Right-size by method: voice_interview "
+                                "≈ 8-12, quant_survey ≈ 150-300, "
+                                "usability_test ≈ 5-8. Never propose "
+                                "50+ for voice — that's a different "
+                                "scale of project."
+                            ),
+                        },
+                        "duration_weeks": {"type": "integer"},
+                    },
+                    "required": ["method", "title", "purpose"],
+                },
+            },
+            "decision_to_inform": {"type": "string"},
+            "timeline": {"type": "string"},
+            "success_criteria": {"type": "string"},
+            "target_customer_description": {"type": "string"},
+        },
+        "required": ["name", "rationale", "steps", "decision_to_inform"],
+    },
+}
+
+
 _ONBOARDING_TOOLS = [
     _SAVE_PROFILE_TOOL,
+    _PROPOSE_RESEARCH_PLAN_TOOL,
     _PROPOSE_STUDY_TOOL,
     _SUGGEST_REPLIES_TOOL,
     _REQUEST_WEBSITE_TOOL,
@@ -693,6 +795,52 @@ def _onboarding_run_tool(
             db.commit()
             return f"Saved to the researcher's profile: {', '.join(saved)}."
         return "Nothing to save — no profile fields provided."
+
+    if name == "propose_research_plan":
+        plan_name = (tool_input.get("name") or "").strip()
+        rationale = (tool_input.get("rationale") or "").strip()
+        raw_steps = tool_input.get("steps") or []
+        steps = []
+        for i, s in enumerate(raw_steps):
+            method = (s.get("method") or "").strip()
+            title = (s.get("title") or "").strip()
+            if not method or not title:
+                continue
+            steps.append(
+                {
+                    "order_index": i + 1,
+                    "method": method,
+                    "title": title,
+                    "purpose": (s.get("purpose") or "").strip(),
+                    "deliverable": (s.get("deliverable") or "").strip(),
+                    "n_participants": s.get("n_participants"),
+                    "duration_weeks": s.get("duration_weeks"),
+                }
+            )
+        if not plan_name or not rationale or len(steps) < 2:
+            return (
+                "A research plan needs a name, rationale, and at least "
+                "2 steps."
+            )
+        turn.actions.append(
+            {
+                "type": "create_research_plan",
+                "plan_name": plan_name,
+                "rationale": rationale,
+                "steps": steps,
+                "decision_to_inform": (
+                    tool_input.get("decision_to_inform") or ""
+                ).strip(),
+                "timeline": (tool_input.get("timeline") or "").strip(),
+                "success_criteria": (
+                    tool_input.get("success_criteria") or ""
+                ).strip(),
+                "target_customer_description": (
+                    tool_input.get("target_customer_description") or ""
+                ).strip(),
+            }
+        )
+        return f"Proposed a research plan with {len(steps)} steps."
 
     if name == "propose_study":
         study_name = (tool_input.get("study_name") or "").strip()
