@@ -25,6 +25,7 @@ import { useToast } from "../components/Toast";
 import {
   prepWelcomeGreeting,
   getStarterSuggestions,
+  getDemoOpeningQuestion,
 } from "../api/copilot";
 
 interface WelcomeSetupProps {
@@ -123,10 +124,12 @@ export default function WelcomeSetup({
         setStep(3);
         // Fire-and-forget: warm the personalisation cache while the
         // user reads the "deal" screen. By the time they land on
-        // Phase 2, the greeting + starter chips are already cached.
-        // Both fail silent — Phase 2 falls back to static i18n.
+        // Phase 2, the greeting + starter chips + participant-demo
+        // opening question are already cached. All fail silent —
+        // Phase 2 falls back to static i18n.
         void prepWelcomeGreeting();
         void getStarterSuggestions();
+        void getDemoOpeningQuestion();
       } else {
         onComplete();
       }

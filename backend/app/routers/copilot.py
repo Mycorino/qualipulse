@@ -327,6 +327,26 @@ def prep_welcome_greeting(
     return {"greeting": text}
 
 
+@router.get("/onboarding/copilot/demo-opening-question")
+def get_demo_opening_question(
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Return a Haiku-personalised mid-conversation opening question
+    for the participant-demo modal. 24h cached on Company. Returns
+    `{question: null}` when the wizard wasn't completed enough to
+    support a sensible generation — frontend falls back to the static
+    i18n question."""
+    from app.services.onboarding_personalisation import (
+        generate_demo_opening_question,
+    )
+
+    text = generate_demo_opening_question(company)
+    if text and company.demo_opening_question_at:
+        db.commit()
+    return {"question": text}
+
+
 @router.get("/onboarding/demo-bundle")
 def get_demo_bundle_endpoint(
     variant: str = "saas",
