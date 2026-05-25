@@ -46,13 +46,22 @@ _MAX_PAGE_TEXT_CHARS = 12_000
 # to prefer one of these when possible, but it can return a custom label and
 # the UI will render it as a new chip.
 _PREDEFINED_INDUSTRIES = [
-    "Consumer Brands",
-    "SaaS / Tech",
-    "Agency",
-    "Healthcare",
-    "Academia",
-    "Government",
-    "Travel & Hospitality",
+    "SaaS / Software",
+    "Fintech / Banking / Insurance",
+    "E-commerce / Retail",
+    "Consumer goods / D2C",
+    "Healthcare / Pharma / Biotech",
+    "Media / Entertainment",
+    "Education / EdTech",
+    "Construction / Real estate / PropTech",
+    "Manufacturing / Industrial",
+    "Transportation / Logistics / Mobility",
+    "Energy / Utilities / Sustainability",
+    "Public sector / NGO / Non-profit",
+    "Professional services / Consulting",
+    "Hospitality / Travel / F&B",
+    "Telecoms",
+    "Agriculture / Food production",
     "Other",
 ]
 
@@ -77,9 +86,18 @@ _OUTPUT_SPEC = (
     '  "summary": "<2-3 sentence factual description: what the company does, '
     'who their customers are, what market they operate in. Third person, no '
     'marketing fluff, no emojis.>",\n'
-    '  "industry": "<one of: Consumer Brands | SaaS / Tech | Agency | '
-    'Healthcare | Academia | Government | Travel & Hospitality | Other — OR a '
-    'short custom label (max 3 words) if none of the predefined options fit.>",\n'
+    '  "industry": "<one of: SaaS / Software | Fintech / Banking / Insurance | '
+    'E-commerce / Retail | Consumer goods / D2C | Healthcare / Pharma / Biotech | '
+    'Media / Entertainment | Education / EdTech | Construction / Real estate / '
+    'PropTech | Manufacturing / Industrial | Transportation / Logistics / '
+    'Mobility | Energy / Utilities / Sustainability | Public sector / NGO / '
+    'Non-profit | Professional services / Consulting | Hospitality / Travel / '
+    'F&B | Telecoms | Agriculture / Food production | Other. Classify by the '
+    'business\'s primary revenue activity, NOT by whether it uses software, has '
+    'a website, or operates digitally. A transport operator with a mobile app '
+    'is Transportation, not SaaS. A bank that builds fintech products is '
+    'Fintech, not SaaS. Quote the deciding evidence from the summary before '
+    'answering. When sparse, return \\"Other\\" rather than confabulating.>",\n'
     '  "primary_country": "<the company\'s main market as one of: fr | be | '
     'ch | de | uk | es | it | nl | pt | europe | us | ca | global | other. '
     'Use the lowercase ISO alpha-2 code for a single country; use '

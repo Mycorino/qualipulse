@@ -308,6 +308,41 @@ def get_onboarding_memory(
     }
 
 
+@router.post("/onboarding/copilot/greeting-prep")
+def prep_welcome_greeting(
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Generate (or fetch cached) a personalised /welcome greeting from
+    the wizard-captured profile. Cached for 24h on the Company row.
+    Returns ``{"greeting": str | null}``. Null means we couldn't
+    generate (sparse profile, API failure, missing key) and the
+    frontend should fall back to the static i18n greeting."""
+    from app.services.onboarding_personalisation import generate_welcome_greeting
+
+    text = generate_welcome_greeting(company)
+    if text and company.welcome_greeting_at:
+        # Generation refreshed the cache — persist.
+        db.commit()
+    return {"greeting": text}
+
+
+@router.get("/onboarding/copilot/starter-suggestions")
+def get_starter_suggestions(
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Return three personalised research starter chips based on the
+    captured profile + business summary. Cached for 24h. Falls back to
+    static i18n chips on the frontend when we return ``{"suggestions": null}``."""
+    from app.services.onboarding_personalisation import generate_starter_suggestions
+
+    arr = generate_starter_suggestions(company)
+    if arr and company.starter_suggestions_at:
+        db.commit()
+    return {"suggestions": arr}
+
+
 def _build_profile_summary(
     db: Session, company: Company, project=None
 ) -> str:

@@ -301,6 +301,37 @@ export async function getOnboardingMemory(): Promise<OnboardingMemory> {
   };
 }
 
+/** Trigger or fetch the cached personalised /welcome greeting generated
+ *  by Haiku from the wizard-captured profile. Returns null when we
+ *  can't generate (sparse profile, API failure) — caller falls back
+ *  to the static i18n greeting. */
+export async function prepWelcomeGreeting(): Promise<string | null> {
+  try {
+    const resp = await client.post<{ greeting: string | null }>(
+      "/onboarding/copilot/greeting-prep",
+    );
+    return resp.data.greeting || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch the 3 personalised starter-question chips. Returns null when
+ *  the backend can't generate (sparse profile or API failure) — caller
+ *  falls back to the static i18n `goal_suggestions` list. */
+export async function getStarterSuggestions(): Promise<string[] | null> {
+  try {
+    const resp = await client.get<{ suggestions: string[] | null }>(
+      "/onboarding/copilot/starter-suggestions",
+    );
+    return resp.data.suggestions && resp.data.suggestions.length === 3
+      ? resp.data.suggestions
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** V3 participant-experience demo response. */
 export interface DemoTranscribeResponse {
   transcript: string;
