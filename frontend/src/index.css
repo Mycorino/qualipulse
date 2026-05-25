@@ -12371,3 +12371,23 @@ select.field-input {
     gap: var(--space-1);
   }
 }
+
+/* Sidebar picker — custom (non-canonical) value affordances */
+.onboarding-sidebar__chip--custom {
+  font-style: italic;
+}
+.onboarding-sidebar__custom-input {
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+.onboarding-sidebar__custom-input:focus {
+  outline: 2px solid var(--brand-600);
+  outline-offset: -1px;
+  border-color: var(--brand-600);
+}
