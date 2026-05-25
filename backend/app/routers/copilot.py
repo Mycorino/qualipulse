@@ -730,21 +730,29 @@ def create_research_plan(
         step_rows.append(row)
     db.flush()
 
-    # Draft step 1 as a real Project iff it's a voice_interview. Other
-    # methods stay pending — the actual drafting of survey / workshop
-    # / desk_research / usability_test studies is a follow-up.
+    # Draft the FIRST voice_interview step (regardless of position) as a
+    # real Project so the user lands on a study they can actually run.
+    # Other-method steps (quant_survey, workshop, desk_research,
+    # usability_test) stay pending — drafting them as actual product
+    # surfaces is a follow-up. The plan's quant-first sequencing is
+    # preserved in the ResearchPlan row; the user just opens the
+    # voice step first and the quant ones surface from the dashboard
+    # when those methods ship.
     project_id: str | None = None
     interview_token: str | None = None
     study_name: str | None = None
-    if step_rows and step_rows[0].method == "voice_interview":
-        first = step_rows[0]
+    voice_step = next(
+        (s for s in step_rows if s.method == "voice_interview"),
+        None,
+    )
+    if voice_step is not None:
         project = Project(
             company_id=company.id,
-            name=first.title,
+            name=voice_step.title,
             language=body.language,
             research_objective=(
-                first.purpose
-                or f"Step 1 of plan: {body.plan_name}"
+                voice_step.purpose
+                or f"Voice step of plan: {body.plan_name}"
             ),
             decision_to_inform=body.decision_to_inform,
             timeline=body.timeline,
@@ -754,14 +762,14 @@ def create_research_plan(
         )
         db.add(project)
         db.flush()
-        first.project_id = project.id
-        first.status = "drafted"
+        voice_step.project_id = project.id
+        voice_step.status = "drafted"
 
         token = "".join(secrets.choice(_BASE58) for _ in range(43))
         db.add(InterviewLink(project_id=project.id, token=token))
         project_id = project.id
         interview_token = token
-        study_name = first.title
+        study_name = voice_step.title
 
     db.commit()
 
