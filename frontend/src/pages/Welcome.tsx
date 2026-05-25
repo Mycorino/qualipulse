@@ -19,6 +19,7 @@ import {
   prepWelcomeGreeting,
   getStarterSuggestions,
   getDemoBundle,
+  getDemoOpeningQuestion,
   createResearchPlan,
   type CopilotMessage,
   type DemoTranscribeResponse,
@@ -2132,6 +2133,23 @@ function ParticipantDemoModal({
   const [phase, setPhase] = useState<DemoPhase>("intro");
   const [result, setResult] = useState<DemoTranscribeResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  // Haiku-personalised mid-conversation question, fetched on mount.
+  // Falls back to the static i18n question when null (wizard skipped
+  // / API failure / sparse context).
+  const [personalisedQuestion, setPersonalisedQuestion] = useState<
+    string | null
+  >(null);
+  useEffect(() => {
+    let cancelled = false;
+    getDemoOpeningQuestion()
+      .then((q) => {
+        if (!cancelled && q) setPersonalisedQuestion(q);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const { isRecording, error: recorderError, startRecording, stopRecording } =
     useAudioRecorder();
 
@@ -2246,7 +2264,8 @@ function ParticipantDemoModal({
         {phase !== "reveal" ? (
           <DemoPhoneFrame>
             <div className="onboarding-demo-phone__bot-question">
-              {t("participant_demo.question", { firstName })}
+              {personalisedQuestion ||
+                t("participant_demo.question", { firstName })}
             </div>
             <div className="onboarding-demo-phone__controls">
               {phase === "intro" && (

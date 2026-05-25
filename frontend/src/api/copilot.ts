@@ -396,6 +396,23 @@ export async function getDemoBundle(
   }
 }
 
+/** Return a Haiku-personalised mid-conversation opening question for
+ *  the participant-demo modal — sounds like turn 2 of a real research
+ *  conversation, referencing the researcher's captured context.
+ *  Returns null when the wizard wasn't completed enough to generate
+ *  a sensible question — caller falls back to the static i18n
+ *  question. */
+export async function getDemoOpeningQuestion(): Promise<string | null> {
+  try {
+    const resp = await client.get<{ question: string | null }>(
+      "/onboarding/copilot/demo-opening-question",
+    );
+    return resp.data.question || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Trigger or fetch the cached personalised /welcome greeting generated
  *  by Haiku from the wizard-captured profile. Returns null when we
  *  can't generate (sparse profile, API failure) — caller falls back

@@ -224,3 +224,80 @@ def generate_starter_suggestions(
     except Exception:  # noqa: BLE001 — silent fallback to static chips
         logger.exception("Starter suggestions Haiku call failed")
         return None
+
+
+def generate_demo_opening_question(
+    company: Company, *, force: bool = False
+) -> Optional[str]:
+    """Return a cached or freshly generated participant-demo opening
+    question. None if we can't generate. Caller commits the session.
+
+    The demo modal asks the user one question and records their answer
+    to show what the participant experience feels like. Without
+    personalisation it's a generic "tell me about onboarding" which
+    feels disconnected; this version produces a question that opens
+    LIKE TURN 2 of a conversation — referencing the researcher's
+    captured context so the demo lands like a real follow-up rather
+    than a cold prompt."""
+    if not _wizard_complete(company):
+        return None
+
+    if not force and _is_fresh(company.demo_opening_question_at):
+        cached = (company.demo_opening_question_text or "").strip()
+        if cached:
+            return cached
+
+    if not settings.ANTHROPIC_API_KEY:
+        return None
+
+    first_name = (company.first_name or company.name or "there").strip()
+    role = (company.role or "").strip()
+    company_name = (company.name or "").strip()
+    industry = (company.industry or "").strip()
+    use_case = (company.use_case or "").strip()
+    summary = (company.business_summary or "").strip()[:400]
+    lang = _lang(company)
+    lang_label = "French" if lang == "fr" else "English"
+
+    system = (
+        f"You are the Research Copilot demonstrating the participant "
+        f"interview experience to {first_name} — a {role} at "
+        f"{company_name} ({industry}), focused on {use_case}.\n\n"
+        f"Business context: {summary}\n\n"
+        "Write a single follow-up question that sounds like TURN 2 "
+        "of a real research conversation — the kind of question a "
+        "researcher would ASK their participants if they were running "
+        "THIS researcher's study. Open with a brief acknowledgement "
+        "(\"Vous m'avez dit que…\" / \"You mentioned earlier that…\") "
+        "then ask one open-ended question that probes a moment, a "
+        "decision, or a friction relevant to their use_case.\n\n"
+        f"Constraints:\n"
+        f"- Write in {lang_label}.\n"
+        "- 50-80 words. ONE question only — no multi-part.\n"
+        "- Reference their world (transit / fintech / retail / etc.) "
+        "  — NOT a generic 'tell me about your onboarding'.\n"
+        "- Sound like a participant interviewer, not a chatbot.\n"
+        "- Plain prose. No JSON, no preamble."
+    )
+
+    try:
+        client = anthropic.Anthropic(
+            api_key=settings.ANTHROPIC_API_KEY,
+            timeout=httpx.Timeout(15.0),
+        )
+        resp = client.messages.create(
+            model=_MODEL,
+            max_tokens=250,
+            temperature=0.5,
+            system=system,
+            messages=[{"role": "user", "content": "Generate the question now."}],
+        )
+        text = (resp.content[0].text or "").strip()
+        if not text:
+            return None
+        company.demo_opening_question_text = text
+        company.demo_opening_question_at = datetime.utcnow()
+        return text
+    except Exception:  # noqa: BLE001 — silent fallback to static question
+        logger.exception("Demo opening question Haiku call failed")
+        return None
