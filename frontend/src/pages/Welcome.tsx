@@ -28,7 +28,17 @@ import {
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
-import WelcomeSetup from "./WelcomeSetup";
+import WelcomeSetup, { ROLES, TEAM_SIZES, USE_CASES } from "./WelcomeSetup";
+
+// Per-key canonical option sets — when the user clicks one of these
+// sidebar rows we render a chip picker rather than a free-text input,
+// because the agent + plan-recommendation logic both key off these
+// exact strings.
+const CANONICAL_BY_FIELD: Partial<Record<keyof CompanyResponse, string[]>> = {
+  role: ROLES,
+  company_size: TEAM_SIZES,
+  use_case: USE_CASES,
+};
 
 /**
  * Welcome — the conversational onboarding.
@@ -156,6 +166,11 @@ export default function Welcome() {
     },
   );
   const threadRef = useRef<HTMLDivElement>(null);
+  // Auto-scroll bookkeeping. We only yank the thread to the bottom when
+  // the user is already near the bottom — otherwise they're reading
+  // earlier in the conversation and we must not steal their scroll.
+  const isAtBottomRef = useRef(true);
+  const prevThreadLenRef = useRef(0);
 
   // Load the researcher, redirect out if already onboarded, and seed the
   // instant canned greeting.
@@ -192,8 +207,35 @@ export default function Welcome() {
     // load (matches the user's chosen account language at signup).
   }, [navigate]);
 
+  // Track whether the thread is currently scrolled to (within 50px of)
+  // the bottom — used to gate auto-scroll on new content.
   useEffect(() => {
-    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight });
+    const el = threadRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const slack = el.scrollHeight - el.scrollTop - el.clientHeight;
+      isAtBottomRef.current = slack < 50;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Auto-scroll on new content — but only when the user was already at
+  // the bottom. Smooth when a brand-new turn is added; instant during
+  // token-by-token streaming deltas (smooth would be jittery at ~30 fps).
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el) return;
+    if (!isAtBottomRef.current) {
+      prevThreadLenRef.current = thread.length;
+      return;
+    }
+    const newTurnAdded = thread.length > prevThreadLenRef.current;
+    prevThreadLenRef.current = thread.length;
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: newTurnAdded ? "smooth" : "auto",
+    });
   }, [thread, busy]);
 
   const send = async (raw: string) => {
@@ -1168,6 +1210,18 @@ function ProfileSidebar({
       setDraft("");
     }
   };
+  // Chip-picker commit path — bypass the draft text state and write the
+  // canonical option directly. Used by the canonical-options popover.
+  const commitValue = async (key: keyof CompanyResponse, value: string) => {
+    setSaving(true);
+    try {
+      await onChange(key, value);
+    } finally {
+      setSaving(false);
+      setEditing(null);
+      setDraft("");
+    }
+  };
 
   // Identity rows seeded from the signup form. Always visible — sells
   // "the system already knows you" from the very first render, instead
@@ -1223,25 +1277,61 @@ function ProfileSidebar({
               </span>
               <span className="onboarding-sidebar__label">{f.label}</span>
               {isEditing ? (
-                <span className="onboarding-sidebar__editor">
-                  <input
-                    type="text"
-                    autoFocus
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                CANONICAL_BY_FIELD[f.key] ? (
+                  // Canonical option set — render a chip popover so we
+                  // never write a free-text value the agent / plan logic
+                  // wouldn't recognise. Esc closes, click commits.
+                  <span
+                    className="onboarding-sidebar__editor onboarding-sidebar__chip-picker"
+                    role="radiogroup"
+                    aria-label={f.label}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        commitEdit();
-                      } else if (e.key === "Escape") {
+                      if (e.key === "Escape") {
                         e.preventDefault();
                         cancelEdit();
                       }
                     }}
-                    disabled={saving}
-                    aria-label={f.label}
-                  />
-                </span>
+                  >
+                    {CANONICAL_BY_FIELD[f.key]!.map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        role="radio"
+                        aria-checked={value === opt}
+                        className={`onboarding-sidebar__chip ${
+                          value === opt
+                            ? "onboarding-sidebar__chip--active"
+                            : ""
+                        }`}
+                        onClick={() => commitValue(f.key, opt)}
+                        disabled={saving}
+                        autoFocus={value === opt}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="onboarding-sidebar__editor">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          commitEdit();
+                        } else if (e.key === "Escape") {
+                          e.preventDefault();
+                          cancelEdit();
+                        }
+                      }}
+                      disabled={saving}
+                      aria-label={f.label}
+                    />
+                  </span>
+                )
               ) : value ? (
                 <button
                   type="button"

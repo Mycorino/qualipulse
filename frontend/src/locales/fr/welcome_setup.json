@@ -20,6 +20,8 @@
   "step_2_cta": "Continuer",
 
   "field_use_case": "Cas d'usage",
+  "role_other_placeholder": "Décrivez votre rôle…",
+  "use_case_other_placeholder": "Décrivez votre cas d'usage…",
   "field_intent": "Qui décide",
   "field_readiness": "Où en êtes-vous",
 

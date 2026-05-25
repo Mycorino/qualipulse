@@ -10013,10 +10013,15 @@ select.field-input {
 .copilot-nudge__dismiss:hover { opacity: 1; }
 
 /* ── Conversational onboarding ─────────────────────────────────────────── */
+/* Three-zone sticky shell: header (auto) / verify+milestone (auto) /
+ * body fills the rest. The body is itself a 2-col grid where the chat
+ * column has its own thread/input split so the input bar stays pinned to
+ * the bottom while the thread scrolls independently. */
 .onboarding {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  height: 100vh;
+  overflow: hidden;
   background: var(--bg-base);
 }
 .onboarding__bar {
@@ -10047,7 +10052,6 @@ select.field-input {
   cursor: pointer;
 }
 .onboarding__layout {
-  flex: 1;
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
@@ -10057,11 +10061,13 @@ select.field-input {
   padding: 0 var(--space-6);
   box-sizing: border-box;
   min-height: 0;
+  overflow: hidden;
 }
 .onboarding__main {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 1fr auto;
   min-height: 0;
+  overflow: hidden;
 }
 @media (max-width: 880px) {
   .onboarding__layout {
@@ -10070,10 +10076,9 @@ select.field-input {
   }
 }
 .onboarding__thread {
-  flex: 1;
   overflow-y: auto;
   width: 100%;
-  padding: var(--space-5) 0;
+  padding: var(--space-5) 0 var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -10116,8 +10121,9 @@ select.field-input {
   display: flex;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border-default);
+  background: var(--bg-surface);
   box-sizing: border-box;
 }
 .onboarding__input textarea {
@@ -10203,9 +10209,12 @@ select.field-input {
 
 /* ── "What I know about you" sidebar ─────────────────────────────────── */
 .onboarding-sidebar {
-  align-self: start;
-  position: sticky;
-  top: var(--space-5);
+  /* Sticky shell — the parent layout caps height to the viewport, so we
+   * scroll the sidebar independently when its content overflows. */
+  align-self: stretch;
+  margin: var(--space-5) 0;
+  max-height: 100%;
+  overflow-y: auto;
   padding: var(--space-4);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
@@ -10280,7 +10289,11 @@ select.field-input {
 }
 @media (max-width: 880px) {
   .onboarding-sidebar {
-    position: static;
+    /* Above the chat on narrow screens — drop the fixed scroll cap so it
+     * just contributes its natural height to the column flow. The main
+     * column inherits the remaining viewport space. */
+    margin: var(--space-3) 0 0;
+    max-height: 38vh;
   }
 }
 
@@ -10707,6 +10720,46 @@ select.field-input {
   border: 1px solid var(--brand-400);
   border-radius: 4px;
   background: var(--bg-surface);
+}
+/* Chip popover for canonical-options sidebar rows — narrow column means
+ * we wrap onto multiple lines and shrink the chip padding compared to
+ * the wizard. The picker spans the full row width below the label. */
+.onboarding-sidebar__row--editing.onboarding-sidebar__row--filled {
+  grid-template-columns: 18px 1fr;
+}
+.onboarding-sidebar__chip-picker {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.onboarding-sidebar__chip {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.onboarding-sidebar__chip:hover:not(:disabled) {
+  border-color: var(--brand-600);
+  color: var(--brand-700);
+}
+.onboarding-sidebar__chip--active {
+  background: var(--brand-600);
+  border-color: var(--brand-600);
+  color: #fff;
+}
+.onboarding-sidebar__chip:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* V2 — "Sample study" preview modal opened from below the greeting. */
@@ -11802,6 +11855,26 @@ select.field-input {
 .welcome-setup__chip:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Revealed under the chip group when the user picks "Other" — captures
+ * the free-text label so we don't ship literal "Other" downstream. */
+.welcome-setup__other-input {
+  margin-top: var(--space-2);
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--brand-400, var(--border-default));
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.welcome-setup__other-input:focus {
+  outline: none;
+  border-color: var(--brand-600);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
 
 .welcome-setup__radio-list {

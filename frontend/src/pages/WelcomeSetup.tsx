@@ -31,7 +31,10 @@ interface WelcomeSetupProps {
 
 type StepId = 1 | 2 | 3;
 
-const ROLES = [
+// Canonical option sets — also consumed by `Welcome.tsx` (`ProfileSidebar`)
+// so the in-chat inline edit picker uses the same labels the agent + plan
+// recommendation logic depend on.
+export const ROLES = [
   "Product Manager",
   "UX Researcher",
   "Designer",
@@ -39,8 +42,8 @@ const ROLES = [
   "Marketing",
   "Other",
 ];
-const TEAM_SIZES = ["1–10", "11–50", "51–200", "201–1000", "1000+"];
-const USE_CASES = [
+export const TEAM_SIZES = ["1–10", "11–50", "51–200", "201–1000", "1000+"];
+export const USE_CASES = [
   "Product discovery",
   "Concept testing",
   "Onboarding research",
@@ -62,8 +65,14 @@ export default function WelcomeSetup({
 
   const [companyName, setCompanyName] = useState(me.name || "");
   const [role, setRole] = useState(me.role || "");
+  const [roleOther, setRoleOther] = useState(
+    me.role && !ROLES.includes(me.role) ? me.role : "",
+  );
   const [teamSize, setTeamSize] = useState(me.company_size || "");
   const [useCase, setUseCase] = useState(me.use_case || "");
+  const [useCaseOther, setUseCaseOther] = useState(
+    me.use_case && !USE_CASES.includes(me.use_case) ? me.use_case : "",
+  );
   const [intent, setIntent] = useState<"team" | "solo" | "">(
     me.company_size && me.company_size !== "1–10" ? "team" : "",
   );
@@ -71,8 +80,14 @@ export default function WelcomeSetup({
     "concrete" | "evaluating" | ""
   >("");
 
-  const step1Valid = !!companyName.trim() && !!role && !!teamSize;
-  const step2Valid = !!useCase && !!intent && !!studyReadiness;
+  // If the user picked the "Other" chip we require some free-text — saving
+  // the literal string "Other" gives the agent nothing to personalise on.
+  const roleResolved =
+    role === "Other" ? roleOther.trim() : role;
+  const useCaseResolved =
+    useCase === "Other" ? useCaseOther.trim() : useCase;
+  const step1Valid = !!companyName.trim() && !!roleResolved && !!teamSize;
+  const step2Valid = !!useCaseResolved && !!intent && !!studyReadiness;
 
   const recommendedPlan = useMemo(() => {
     if (teamSize === "1–10") return { name: "Exploration", monthly: "€89" };
@@ -89,14 +104,14 @@ export default function WelcomeSetup({
       if (step === 1) {
         const next = await saveOnboardingProfile({
           name: companyName.trim(),
-          role,
+          role: roleResolved || role,
           company_size: teamSize,
         });
         onProfileSaved(next);
         setStep(2);
       } else if (step === 2) {
         const next = await saveOnboardingProfile({
-          use_case: useCase,
+          use_case: useCaseResolved || useCase,
           decision_role:
             intent === "team" ? "I'm helping someone decide" : "I'll decide",
         });
@@ -213,6 +228,18 @@ export default function WelcomeSetup({
                   </button>
                 ))}
               </div>
+              {role === "Other" && (
+                <input
+                  type="text"
+                  className="welcome-setup__other-input"
+                  value={roleOther}
+                  onChange={(e) => setRoleOther(e.target.value)}
+                  placeholder={t("role_other_placeholder")}
+                  aria-label={t("role_other_placeholder")}
+                  autoFocus
+                  disabled={saving}
+                />
+              )}
             </div>
 
             <div className="welcome-setup__field">
@@ -277,6 +304,18 @@ export default function WelcomeSetup({
                   </button>
                 ))}
               </div>
+              {useCase === "Other" && (
+                <input
+                  type="text"
+                  className="welcome-setup__other-input"
+                  value={useCaseOther}
+                  onChange={(e) => setUseCaseOther(e.target.value)}
+                  placeholder={t("use_case_other_placeholder")}
+                  aria-label={t("use_case_other_placeholder")}
+                  autoFocus
+                  disabled={saving}
+                />
+              )}
             </div>
 
             <div className="welcome-setup__field">
