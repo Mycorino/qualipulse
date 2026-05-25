@@ -206,6 +206,14 @@ def list_projects(
     projects = query.order_by(Project.created_at.desc()).all()
 
     from app.models.interview import ProjectAnalysis
+
+    # Wave E — bulk-load plan context for all listed projects in one
+    # query. The dashboard card renders "Step N of M in <plan name>"
+    # when a project is the drafted step of a research plan.
+    plan_contexts_by_project = _bulk_plan_contexts(
+        db, [p.id for p in projects]
+    )
+
     results = []
     for p in projects:
         completed_participants = [pt for pt in p.participants if pt.status == "completed"]
@@ -240,9 +248,62 @@ def list_projects(
                 analysis_status=latest_analysis.status if latest_analysis else None,
                 last_response_at=last_response_at,
                 is_demo=getattr(p, "is_demo", False),
+                plan_context=plan_contexts_by_project.get(p.id),
             )
         )
     return results
+
+
+def _bulk_plan_contexts(db: Session, project_ids: list[str]) -> dict:
+    """Wave E — for each project_id that is linked to a ResearchPlanStep,
+    return a dict {project_id: PlanContext(plan_id, plan_name,
+    step_index, total_steps, step_method)}. One query for the steps
+    that match, one for the plans + step counts. Projects with no
+    plan link map to absent — caller defaults to None."""
+    from app.models.research_plan import ResearchPlan, ResearchPlanStep
+    from app.schemas.project import PlanContext
+
+    if not project_ids:
+        return {}
+    steps = (
+        db.query(ResearchPlanStep)
+        .filter(ResearchPlanStep.project_id.in_(project_ids))
+        .all()
+    )
+    if not steps:
+        return {}
+    plan_ids = list({s.plan_id for s in steps})
+    plans = {
+        p.id: p
+        for p in db.query(ResearchPlan)
+        .filter(ResearchPlan.id.in_(plan_ids))
+        .all()
+    }
+    # Count steps per plan in a single grouped query (works on Postgres
+    # + SQLite). For the small N here a list-comprehension over each
+    # plan's `steps` relationship is fine — but we already loaded the
+    # steps once, so just count from them.
+    step_counts: dict[str, int] = {}
+    for s in (
+        db.query(ResearchPlanStep)
+        .filter(ResearchPlanStep.plan_id.in_(plan_ids))
+        .all()
+    ):
+        step_counts[s.plan_id] = step_counts.get(s.plan_id, 0) + 1
+
+    out: dict = {}
+    for s in steps:
+        plan = plans.get(s.plan_id)
+        if plan is None:
+            continue
+        out[s.project_id] = PlanContext(
+            plan_id=plan.id,
+            plan_name=plan.name,
+            step_index=s.order_index,
+            total_steps=step_counts.get(s.plan_id, 1),
+            step_method=s.method,
+        )
+    return out
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -533,6 +594,36 @@ def _get_project_or_404(project_id: str, company_id: str, db: Session) -> Projec
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
 
+def _plan_context_for_project(project: Project) -> "PlanContext | None":
+    """Return PlanContext for one project, or None when not linked to
+    any ResearchPlanStep. Used by the detail endpoint where bulk
+    loading is overkill."""
+    from app.models.research_plan import ResearchPlanStep
+    from app.schemas.project import PlanContext
+
+    step = (
+        Session.object_session(project)
+        .query(ResearchPlanStep)
+        .filter(ResearchPlanStep.project_id == project.id)
+        .first()
+        if Session.object_session(project) is not None
+        else None
+    )
+    if step is None:
+        return None
+    plan = step.plan
+    if plan is None:
+        return None
+    total = len(plan.steps)
+    return PlanContext(
+        plan_id=plan.id,
+        plan_name=plan.name,
+        step_index=step.order_index,
+        total_steps=total,
+        step_method=step.method,
+    )
+
+
 def _project_to_response(project: Project) -> ProjectResponse:
     questions = [
         QuestionResponse(
@@ -577,4 +668,5 @@ def _project_to_response(project: Project) -> ProjectResponse:
         created_at=project.created_at,
         questions=questions,
         screening_questions=screening,
+        plan_context=_plan_context_for_project(project),
     )

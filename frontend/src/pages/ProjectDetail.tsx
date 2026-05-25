@@ -1533,7 +1533,11 @@ export default function ProjectDetail() {
           { label: project.name },
         ];
       })()}
-      eyebrow="Interview round"
+      eyebrow={
+        project.plan_context
+          ? `Step ${project.plan_context.step_index} of ${project.plan_context.total_steps} · ${project.plan_context.plan_name}`
+          : "Interview round"
+      }
       title={
         <input
           type="text"
