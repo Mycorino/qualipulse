@@ -566,15 +566,19 @@ def save_onboarding_profile(
     db.commit()
     logger.info("Onboarding profile saved for %s", company.email)
 
-    # Backfill business context when the typed company name lands +
-    # we don't yet have a business_summary (likely a freemail signup
-    # where the email-domain prefetch was skipped). Fire-and-forget
-    # in a background thread — never block the wizard.
+    # Re-run business-context backfill whenever the typed company name
+    # materially changes — not just when business_summary is empty.
+    # Why: a user signing up with corino@legalstart.fr triggers a
+    # domain prefetch that populates business_summary with Legalstart's
+    # description. If they then type "Acme Corp" in the wizard, the
+    # summary becomes stale. We re-run so the summary always matches
+    # the typed name. Conservative: skip when the change is trivial
+    # (case-only or whitespace-only) to avoid spurious Haiku calls.
     name_after = (company.name or "").strip()
     if (
         name_after
-        and name_after != name_before
-        and not (company.business_summary or "").strip()
+        and name_after.lower() != name_before.lower()
+        and len(name_after) >= 2
     ):
         _schedule_company_name_backfill(company.id)
 
@@ -604,7 +608,10 @@ def _schedule_company_name_backfill(company_id: str) -> None:
             )
             if c is None:
                 return
-            if backfill_business_from_name(c):
+            # Force=True — the scheduler only fires when the typed
+            # name materially changed, which is exactly when we want
+            # to overwrite a potentially-stale prior summary.
+            if backfill_business_from_name(c, force=True):
                 bg_db.commit()
                 logger.info(
                     "Backfilled business context for %s from typed name '%s'",
