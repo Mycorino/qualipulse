@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth, getCachedOnboarded, setCachedOnboarded } from "./hooks/useAuth";
 import { getMe } from "./api/auth";
+import i18n from "./i18n";
 import { ToastProvider } from "./components/Toast";
 // Eager-load the hot path: marketing, login, signup, interview, and dashboard
 // are what 99% of users see first and we don't want a chunk fetch on first
@@ -73,6 +74,15 @@ function OnboardedRoute({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setCachedOnboarded(!!me.onboarding_completed);
         setStatus(me.onboarding_completed ? "onboarded" : "incomplete");
+        // Sync i18n language with the server's stored preference so
+        // child routes render in the correct locale from the first paint.
+        if (me.preferred_language) {
+          const current = i18n.language?.startsWith("fr") ? "fr" : "en";
+          if (me.preferred_language !== current) {
+            i18n.changeLanguage(me.preferred_language);
+          }
+          localStorage.setItem("qp_language", me.preferred_language);
+        }
       })
       .catch(() => {
         // If /auth/me fails (401, network), fall through — ProtectedRoute

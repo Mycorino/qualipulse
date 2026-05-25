@@ -1,22 +1,31 @@
 {
   "nav": {
     "howItWorks": "Comment ça marche",
+    "features": "Fonctionnalités",
     "whoItsFor": "Pour qui",
     "pricing": "Tarifs",
     "login": "Se connecter",
     "startTrial": "Essai gratuit"
   },
   "hero": {
-    "badge": "Recherche qualitative asynchrone",
-    "title": "Des insights qualitatifs\nsans le casse-tête des plannings",
-    "subtitle": "Vous savez que la recherche doit avoir lieu. Mais coordonner 12 entretiens, les conduire, transcrire et synthétiser prend des semaines que vous n'avez pas. QualiPulse mène des entretiens vocaux animés par l'IA de manière asynchrone et produit un mémo de recherche structuré — automatiquement.",
-    "cta": "Commencer votre essai de 14 jours",
-    "note": "Essai gratuit de 14 jours · Aucune carte de crédit requise · Annulable à tout moment",
+    "badge": "Recherche qualitative par IA",
+    "title": "De la question de recherche aux insights —\nen heures, pas en semaines",
+    "subtitle": "QualiPulse mène des entretiens vocaux par IA de manière asynchrone et produit un mémo de recherche structuré. Créez votre première étude en 5 minutes par simple conversation.",
+    "cta": "Commencer — 10 entretiens inclus",
+    "secondaryCta": "Voir comment ça marche",
+    "note": "10 entretiens gratuits · Sans carte bancaire · Annulable à tout moment",
     "interviewInProgress": "Entretien en cours",
     "recordingStatus": "Enregistrement · 0:42",
     "interviewQuestion": "Pouvez-vous me décrire la dernière fois que vous avez dû intégrer un nouvel outil au travail ?",
     "emergingThemes": "Thèmes émergents",
     "themeTags": ["Friction d'intégration", "Construction de confiance", "Valeur immédiate"]
+  },
+  "trustBar": {
+    "stats": [
+      { "number": "2 400+", "label": "entretiens analysés" },
+      { "number": "45s", "label": "synthèse moyenne" },
+      { "number": "100%", "label": "dans le navigateur, sans appli" }
+    ]
   },
   "painPoints": {
     "title": "Ça vous parle ?",
@@ -44,6 +53,37 @@
     "interviewInProgress": "Entretien en cours",
     "recording": "Enregistrement",
     "emergingThemes": "Thèmes émergents"
+  },
+  "howItWorks": {
+    "title": "Comment ça marche",
+    "subtitle": "Trois étapes, de la question de recherche au mémo prêt à partager.",
+    "steps": [
+      {
+        "title": "Décrivez votre objectif de recherche",
+        "desc": "Discutez avec le Copilote Recherche ou collez votre brief. L'IA rédige votre guide d'entretien — objectifs, critères de sélection et questions. Vous relisez et affinez. Cinq minutes, pas cinq heures."
+      },
+      {
+        "title": "Les participants répondent à leur rythme",
+        "desc": "Partagez un lien. Les participants réalisent un entretien vocal dans leur navigateur — sur n'importe quel appareil, dans n'importe quel fuseau horaire. L'IA pose des questions de suivi comme un interviewer expérimenté."
+      },
+      {
+        "title": "Lisez le mémo, passez les transcriptions",
+        "desc": "Déclenchez une synthèse IA. Obtenez des thèmes structurés avec des citations, des tensions et des recommandations — prêts à partager. Enchaînez plusieurs études dans un plan de recherche multi-étapes."
+      }
+    ]
+  },
+  "copilot": {
+    "title": "Votre partenaire de recherche, toujours disponible",
+    "subtitle": "Le Copilote Recherche vous guide de la première idée à l'insight final — propulsé par le modèle de raisonnement le plus avancé.",
+    "features": [
+      { "icon": "🧠", "text": "Propulsé par Claude Opus — raisonnement approfondi" },
+      { "icon": "📋", "text": "Propose les prochaines étapes sous forme de cartes à accepter en un clic" },
+      { "icon": "🔄", "text": "Contextuel sur l'ensemble de votre programme de recherche" }
+    ],
+    "chatUser": "Que devrais-je demander sur les frictions d'intégration ?",
+    "chatAi": "D'après votre objectif, je suggère de vous concentrer sur les 10 premières minutes. Voici un guide d'entretien proposé :",
+    "proposalTitle": "Proposition : guide d'entretien en 5 questions",
+    "proposalBody": "Découverte → Première impression → Points de friction → Solutions de contournement → Expérience idéale"
   },
   "output": {
     "title": "De 12 entretiens à ceci — automatiquement",
@@ -87,40 +127,17 @@
       }
     ]
   },
-  "howItWorks": {
-    "title": "Comment ça marche",
-    "subtitle": "Trois étapes, de la question de recherche au mémo prêt à partager.",
-    "steps": [
-      {
-        "title": "Collez votre brief de recherche",
-        "desc": "Décrivez ce que vous voulez apprendre. L'IA rédige votre guide d'entretien — objectifs, critères de sélection et questions. Vous relisez et affinez. Cinq minutes, pas cinq heures."
-      },
-      {
-        "title": "Les participants répondent à leur rythme",
-        "desc": "Partagez un lien. Les participants réalisent un entretien vocal dans leur navigateur — sur n'importe quel appareil, dans n'importe quel fuseau horaire. L'IA pose des questions de suivi comme un interviewer expérimenté. Aucune planification, aucun absent."
-      },
-      {
-        "title": "Lisez le mémo, passez les transcriptions",
-        "desc": "Une fois les réponses collectées, déclenchez une synthèse IA. Vous obtenez des thèmes structurés avec des citations, des tensions, des jobs-to-be-done et des recommandations — prêts à partager avec vos parties prenantes."
-      }
-    ]
-  },
-  "differentiator": {
-    "title": "Vous vous posez peut-être des questions...",
-    "subtitle": "Comment QualiPulse se compare-t-il aux outils que vous connaissez déjà ?",
-    "items": [
-      {
-        "vs": "UserTesting / dscout",
-        "point": "Ces plateformes vous aident à recruter et à conduire des sessions modérées. QualiPulse remplace le modérateur par l'IA, mène les entretiens de manière asynchrone et synthétise les résultats. Aucune planification, aucun frais de session."
-      },
-      {
-        "vs": "Dovetail / EnjoyHQ",
-        "point": "Ce sont des outils d'analyse et de dépôt pour les recherches déjà réalisées. QualiPulse gère l'ensemble du flux de travail : création du guide, collecte des entretiens et synthèse en un seul endroit."
-      },
-      {
-        "vs": "Google Forms / Typeform",
-        "point": "Les sondages vous donnent des données structurées. QualiPulse vous offre la profondeur qualitative — questions de suivi, sondages, réponses vocales — sans la contrainte des entretiens en direct."
-      }
+  "comparison": {
+    "title": "Comment QualiPulse se compare",
+    "subtitle": "Voyez comment nous nous positionnons face aux outils que vous connaissez.",
+    "headers": ["Fonctionnalité", "QualiPulse", "Outils traditionnels"],
+    "rows": [
+      { "feature": "Planification nécessaire", "quali": "Non — asynchrone, à tout moment", "other": "Oui — coordination d'agendas" },
+      { "feature": "Modération IA", "quali": "Intégrée, relances adaptatives", "other": "Manuelle ou inexistante" },
+      { "feature": "Temps de synthèse", "quali": "45 secondes", "other": "2 à 3 jours" },
+      { "feature": "Plans de recherche multi-étapes", "quali": "Oui — entretiens + sondages + ateliers", "other": "Non disponible" },
+      { "feature": "Copilote Recherche", "quali": "Partenaire IA toujours disponible", "other": "Non disponible" },
+      { "feature": "Appareils compatibles", "quali": "Tout navigateur, sans appli", "other": "Souvent une appli requise" }
     ]
   },
   "trust": {
@@ -131,7 +148,7 @@
   },
   "pricing": {
     "title": "Des tarifs simples et transparents",
-    "subtitle": "Essai de 14 jours inclus sur tous les plans — sans carte bancaire.",
+    "subtitle": "Commencez avec 10 entretiens gratuits. Passez au plan supérieur quand vous en avez besoin.",
     "recommended": "Recommandé",
     "enterprise": "Vous gérez un programme de recherche important ?",
     "enterpriseCta": "Parlons Enterprise",
@@ -143,6 +160,7 @@
     "billingAnnualSave": "Économisez 17%",
     "billedAnnuallyAs": "Facturé {{amount}} € par an",
     "creditsPerMonth": "crédits d'entretien / mois",
+    "surveyResponsesPerMonth": "réponses sondage / mois",
     "creditDefinition": "1 crédit = 1 entretien participant complété, jusqu'à 15 minutes — incluant questions IA, transcription, analyse et stockage.",
     "plans": {
       "exploration": {
@@ -155,10 +173,10 @@
           "Export CSV et PDF",
           "Partage public des rapports"
         ],
-        "cta": "Essai gratuit de 14 jours"
+        "cta": "Commencer gratuitement"
       },
       "team": {
-        "name": "Team",
+        "name": "Équipe",
         "desc": "Pour les équipes de recherche menant plusieurs études en parallèle",
         "features": [
           "100 crédits d'entretien / mois",
@@ -167,10 +185,10 @@
           "Espace de travail équipe et permissions",
           "Tout ce qui est dans Exploration"
         ],
-        "cta": "Essai gratuit de 14 jours"
+        "cta": "Commencer gratuitement"
       },
       "agency": {
-        "name": "Agency",
+        "name": "Agence",
         "desc": "Pour les agences qui mènent des études pour plusieurs clients",
         "features": [
           "300 crédits d'entretien / mois",
@@ -179,16 +197,26 @@
           "Workspaces clients et branding personnalisé",
           "Accès API"
         ],
-        "cta": "Essai gratuit de 14 jours"
+        "cta": "Commencer gratuitement"
       }
     }
+  },
+  "midCta": {
+    "text": "Commencer — 10 entretiens inclus"
   },
   "finalCta": {
     "title": "Votre prochaine étude pourrait être prête vendredi",
     "subtitle": "Configurez une étude en 5 minutes. Obtenez vos premiers insights en quelques heures.",
-    "cta": "Commencer votre essai de 14 jours"
+    "cta": "Commencer — 10 entretiens offerts"
   },
   "footer": {
+    "tagline": "Recherche qualitative par IA, en pilote automatique.",
+    "productTitle": "Produit",
+    "companyTitle": "Entreprise",
+    "features": "Fonctionnalités",
+    "copilotLink": "Copilote Recherche",
+    "pricingLink": "Tarifs",
+    "blog": "Blog",
     "login": "Se connecter",
     "signup": "S'inscrire",
     "terms": "CGU",

@@ -102,6 +102,7 @@ export default function AccountSettings() {
   // Slack integration
   const [slackUrl, setSlackUrl] = useState("");
   const [slackSaving, setSlackSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [slackTesting, setSlackTesting] = useState(false);
   const [slackMessage, setSlackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -117,21 +118,27 @@ export default function AccountSettings() {
 
   useEffect(() => {
     Promise.all([
-      client.get("/auth/me").then(r => r.data),
+      client.get("/auth/me").then(r => r.data).catch(() => null),
       client.get("/billing/status").then(r => r.data).catch(() => null),
       client.get("/billing/plans").then(r => r.data).catch(() => []),
       client.get("/billing/credit-packs").then(r => r.data).catch(() => []),
     ]).then(([meData, billingData, plansData, packsData]) => {
-      setMe(meData);
-      setName(meData.name);
-      setSlackUrl(meData.slack_webhook_url ?? "");
+      if (meData) {
+        setMe(meData);
+        setName(meData.name);
+        setSlackUrl(meData.slack_webhook_url ?? "");
+        // Sync UI language with user's stored preference
+        if (meData.preferred_language && meData.preferred_language !== i18n.language?.slice(0, 2)) {
+          i18n.changeLanguage(meData.preferred_language);
+          localStorage.setItem("qp_language", meData.preferred_language);
+        }
+      }
       setBilling(billingData);
       setPlans(plansData);
       setPacks(packsData);
-      // Sync UI language with user's stored preference
-      if (meData.preferred_language && meData.preferred_language !== i18n.language?.slice(0, 2)) {
-        i18n.changeLanguage(meData.preferred_language);
-      }
+    }).catch((err) => {
+      console.error("Account data load failed:", err);
+      setLoadError(true);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -316,6 +323,20 @@ export default function AccountSettings() {
   }
 
   if (loading) return <div className="dashboard-page"><p className="muted-text">{t("common:loading")}</p></div>;
+
+  if (loadError) return (
+    <div className="dashboard-page">
+      <div style={{ maxWidth: 480, margin: "var(--space-16) auto", textAlign: "center" }}>
+        <h2 style={{ marginBottom: "var(--space-4)" }}>{t("settings:loadErrorTitle", { defaultValue: "Unable to load account settings" })}</h2>
+        <p className="muted-text" style={{ marginBottom: "var(--space-6)" }}>
+          {t("settings:loadErrorMessage", { defaultValue: "Something went wrong while loading your account data. Please try again." })}
+        </p>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>
+          {t("common:retry", { defaultValue: "Retry" })}
+        </button>
+      </div>
+    </div>
+  );
 
   // Tier badge rendering — picks an appropriate semantic colour
   const tier = billing?.tier ?? "starter";

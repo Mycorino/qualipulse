@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import "./Marketing.css";
@@ -6,15 +6,12 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 
 // Credits-based plan catalogue (PR 3). Prices match the plans seeded in the
 // backend ``billing_plans.py`` — keep in sync if either side changes.
-// Trial isn't shown on the public pricing page (it's automatic on signup).
 const MARKETING_PLANS = [
   {
     id: "exploration",
     monthlyEur: 89,
-    annualEur: 890,  // 12-month savings handled in copy
+    annualEur: 890,
     credits: 25,
-    // Sprint 12: survey response cap per period. Surveys are quota-based,
-    // not credit-priced (roadmap section 1.6).
     surveyResponses: 500,
     highlight: false,
   },
@@ -36,13 +33,39 @@ const MARKETING_PLANS = [
   },
 ] as const;
 
+/* ---- Scroll-triggered animation hook ---- */
+function useInView(threshold = 0.15) {
+  const ref = useRef<HTMLElement | null>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return { ref, visible };
+}
+
 export default function Marketing() {
   const { t } = useTranslation("marketing");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Pricing toggle (PR 3) — defaults to annual since the savings are noticeable.
   const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("annual");
+  const [activePersona, setActivePersona] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
+
+  // Scroll-triggered sections (hero + trust bar are above the fold, always visible)
+  const painAnim = useInView();
+  const howAnim = useInView();
+  const copilotAnim = useInView();
+  const outputAnim = useInView();
+  const whoAnim = useInView();
+  const compareAnim = useInView();
+  const pricingAnim = useInView();
 
   // Close menu on outside click
   useEffect(() => {
@@ -59,15 +82,20 @@ export default function Marketing() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [mobileMenuOpen]);
 
-  const closeMobileMenu = () => setMobileMenuOpen(false);
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
+  const personas = t("whoItsFor.items", { returnObjects: true }) as Array<{ title: string; desc: string; examples: string }>;
+  const comparisonRows = t("comparison.rows", { returnObjects: true }) as Array<{ feature: string; quali: string; other: string }>;
+  const comparisonHeaders = t("comparison.headers", { returnObjects: true }) as string[];
 
   return (
     <div className="mkt">
-      {/* Nav */}
+      {/* ---- Nav ---- */}
       <nav className="mkt-nav">
         <span className="mkt-logo">QualiPulse</span>
         <div className="mkt-nav-links">
           <a href="#how">{t("nav.howItWorks")}</a>
+          <a href="#copilot">{t("nav.features")}</a>
           <a href="#who">{t("nav.whoItsFor")}</a>
           <a href="#pricing">{t("nav.pricing")}</a>
           <LanguageSwitcher style={{ marginRight: 4 }} />
@@ -88,6 +116,7 @@ export default function Marketing() {
         {mobileMenuOpen && (
           <div className="mkt-mobile-menu" ref={menuRef}>
             <a href="#how" onClick={closeMobileMenu}>{t("nav.howItWorks")}</a>
+            <a href="#copilot" onClick={closeMobileMenu}>{t("nav.features")}</a>
             <a href="#who" onClick={closeMobileMenu}>{t("nav.whoItsFor")}</a>
             <a href="#pricing" onClick={closeMobileMenu}>{t("nav.pricing")}</a>
             <LanguageSwitcher style={{ marginRight: 4 }} />
@@ -97,7 +126,7 @@ export default function Marketing() {
         )}
       </nav>
 
-      {/* Hero */}
+      {/* ---- Hero ---- */}
       <section className="mkt-hero">
         <div className="mkt-hero-inner">
           <div className="mkt-badge">{t("hero.badge")}</div>
@@ -109,6 +138,7 @@ export default function Marketing() {
           <p className="mkt-sub">{t("hero.subtitle")}</p>
           <div className="mkt-hero-ctas">
             <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("hero.cta")}</Link>
+            <a href="#how" className="mkt-btn-secondary">{t("hero.secondaryCta")} ↓</a>
           </div>
           <p className="mkt-hero-note">{t("hero.note")}</p>
         </div>
@@ -143,14 +173,26 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* Pain points */}
-      <section className="mkt-pain">
+      {/* ---- Trust Bar ---- */}
+      <section className="mkt-trust-bar">
+        <div className="mkt-trust-bar-inner">
+          {(t("trustBar.stats", { returnObjects: true }) as Array<{ number: string; label: string }>).map((stat, i) => (
+            <div key={i} className="mkt-trust-bar-stat">
+              <span className="mkt-trust-bar-number">{stat.number}</span>
+              <span className="mkt-trust-bar-label">{stat.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ---- Pain points ---- */}
+      <section className={`mkt-pain${painAnim.visible ? " visible" : ""}`} ref={painAnim.ref as React.RefObject<HTMLElement>}>
         <div className="mkt-pain-inner">
           <h2 className="mkt-section-title">{t("painPoints.title")}</h2>
           <p className="mkt-section-sub">{t("painPoints.subtitle")}</p>
           <div className="mkt-pain-grid">
-            {(t("painPoints.items", { returnObjects: true }) as Array<{ title: string; desc: string }>).map((p) => (
-              <div key={p.title} className="mkt-pain-card">
+            {(t("painPoints.items", { returnObjects: true }) as Array<{ title: string; desc: string }>).map((p, i) => (
+              <div key={p.title} className="mkt-pain-card" style={{ animationDelay: `${i * 0.08}s` }}>
                 <h3>{p.title}</h3>
                 <p>{p.desc}</p>
               </div>
@@ -159,13 +201,13 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="mkt-section" id="how">
+      {/* ---- How it works ---- */}
+      <section className={`mkt-section${howAnim.visible ? " visible" : ""}`} id="how" ref={howAnim.ref as React.RefObject<HTMLElement>}>
         <h2 className="mkt-section-title">{t("howItWorks.title")}</h2>
         <p className="mkt-section-sub">{t("howItWorks.subtitle")}</p>
         <div className="mkt-steps">
           {(t("howItWorks.steps", { returnObjects: true }) as Array<{ title: string; desc: string }>).map((s, i) => (
-            <div key={i} className="mkt-step">
+            <div key={i} className="mkt-step" style={{ animationDelay: `${i * 0.1}s` }}>
               <div className="mkt-step-num">0{i + 1}</div>
               <h3 className="mkt-step-title">{s.title}</h3>
               <p className="mkt-step-desc">{s.desc}</p>
@@ -174,8 +216,55 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* Output preview */}
-      <section className="mkt-output">
+      {/* ---- Mid CTA ---- */}
+      <div className="mkt-mid-cta">
+        <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("midCta.text")}</Link>
+      </div>
+
+      {/* ---- Research Copilot Showcase ---- */}
+      <section className={`mkt-copilot${copilotAnim.visible ? " visible" : ""}`} id="copilot" ref={copilotAnim.ref as React.RefObject<HTMLElement>}>
+        <div className="mkt-copilot-inner">
+          <div className="mkt-copilot-text">
+            <div className="mkt-badge">Research Copilot</div>
+            <h2 className="mkt-section-title" style={{ textAlign: "left" }}>{t("copilot.title")}</h2>
+            <p className="mkt-copilot-subtitle">{t("copilot.subtitle")}</p>
+            <ul className="mkt-copilot-features">
+              {(t("copilot.features", { returnObjects: true }) as Array<{ icon: string; text: string }>).map((f, i) => (
+                <li key={i}>
+                  <span className="mkt-copilot-icon">{f.icon}</span>
+                  <span>{f.text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="mkt-copilot-mockup">
+            <div className="mkt-preview-card">
+              <div className="mkt-preview-header">
+                <span className="mkt-preview-dot red" />
+                <span className="mkt-preview-dot yellow" />
+                <span className="mkt-preview-dot green" />
+                <span className="mkt-preview-title">Research Copilot</span>
+              </div>
+              <div className="mkt-copilot-chat">
+                <div className="mkt-copilot-bubble mkt-copilot-user">
+                  {t("copilot.chatUser")}
+                </div>
+                <div className="mkt-copilot-bubble mkt-copilot-ai">
+                  <p>{t("copilot.chatAi")}</p>
+                  <div className="mkt-copilot-proposal">
+                    <div className="mkt-copilot-proposal-title">{t("copilot.proposalTitle")}</div>
+                    <div className="mkt-copilot-proposal-body">{t("copilot.proposalBody")}</div>
+                    <button className="mkt-copilot-accept">✓ Accept</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Output preview ---- */}
+      <section className={`mkt-output${outputAnim.visible ? " visible" : ""}`} ref={outputAnim.ref as React.RefObject<HTMLElement>}>
         <div className="mkt-output-inner">
           <h2 className="mkt-section-title">{t("output.title")}</h2>
           <p className="mkt-section-sub">{t("output.subtitle")}</p>
@@ -219,38 +308,56 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* Who it's for */}
-      <section className="mkt-section" id="who">
+      {/* ---- Mid CTA ---- */}
+      <div className="mkt-mid-cta">
+        <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("midCta.text")}</Link>
+      </div>
+
+      {/* ---- Who it's for — Pill selector ---- */}
+      <section className={`mkt-section${whoAnim.visible ? " visible" : ""}`} id="who" ref={whoAnim.ref as React.RefObject<HTMLElement>}>
         <h2 className="mkt-section-title">{t("whoItsFor.title")}</h2>
         <p className="mkt-section-sub">{t("whoItsFor.subtitle")}</p>
-        <div className="mkt-use-cases">
-          {(t("whoItsFor.items", { returnObjects: true }) as Array<{ title: string; desc: string; examples: string }>).map((uc) => (
-            <div key={uc.title} className="mkt-use-case">
-              <h3 className="mkt-use-case-title">{uc.title}</h3>
-              <p className="mkt-use-case-desc">{uc.desc}</p>
-              <span className="mkt-use-case-examples">{uc.examples}</span>
-            </div>
+        <div className="mkt-persona-pills">
+          {personas.map((p, i) => (
+            <button
+              key={i}
+              className={`mkt-persona-pill${activePersona === i ? " active" : ""}`}
+              onClick={() => setActivePersona(i)}
+            >
+              {p.title}
+            </button>
           ))}
+        </div>
+        <div className="mkt-persona-card" key={activePersona}>
+          <h3 className="mkt-use-case-title">{personas[activePersona].title}</h3>
+          <p className="mkt-use-case-desc">{personas[activePersona].desc}</p>
+          <span className="mkt-use-case-examples">{personas[activePersona].examples}</span>
         </div>
       </section>
 
-      {/* Differentiator */}
-      <section className="mkt-diff">
-        <div className="mkt-diff-inner">
-          <h2 className="mkt-section-title">{t("differentiator.title")}</h2>
-          <p className="mkt-section-sub">{t("differentiator.subtitle")}</p>
-          <div className="mkt-diff-list">
-            {(t("differentiator.items", { returnObjects: true }) as Array<{ vs: string; point: string }>).map((c) => (
-              <div key={c.vs} className="mkt-diff-row">
-                <span className="mkt-diff-vs">vs. {c.vs}</span>
-                <p className="mkt-diff-point">{c.point}</p>
+      {/* ---- Comparison Table ---- */}
+      <section className={`mkt-compare${compareAnim.visible ? " visible" : ""}`} ref={compareAnim.ref as React.RefObject<HTMLElement>}>
+        <div className="mkt-compare-inner">
+          <h2 className="mkt-section-title">{t("comparison.title")}</h2>
+          <p className="mkt-section-sub">{t("comparison.subtitle")}</p>
+          <div className="mkt-compare-table">
+            <div className="mkt-compare-row mkt-compare-head">
+              {comparisonHeaders.map((h, i) => (
+                <div key={i}>{h}</div>
+              ))}
+            </div>
+            {comparisonRows.map((row, i) => (
+              <div key={i} className="mkt-compare-row">
+                <div className="mkt-compare-feature">{row.feature}</div>
+                <div className="mkt-compare-quali">{row.quali}</div>
+                <div className="mkt-compare-other">{row.other}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Trust */}
+      {/* ---- Trust ---- */}
       <section className="mkt-trust">
         <div className="mkt-trust-inner">
           <h3>{t("trust.quote")}</h3>
@@ -266,13 +373,11 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* Pricing — credits-based plans (PR 3 rebuild) */}
-      <section className="mkt-section" id="pricing">
+      {/* ---- Pricing ---- */}
+      <section className={`mkt-section${pricingAnim.visible ? " visible" : ""}`} id="pricing" ref={pricingAnim.ref as React.RefObject<HTMLElement>}>
         <h2 className="mkt-section-title">{t("pricing.title")}</h2>
         <p className="mkt-section-sub">{t("pricing.subtitle")}</p>
 
-        {/* Monthly / annual toggle. Uses the existing .mkt-billing-toggle
-            shape (pill group with .active state) — see Marketing.css. */}
         <div className="mkt-billing-toggle" role="tablist" aria-label={t("pricing.billingToggleLabel", { defaultValue: "Billing interval" })}>
           <button
             role="tab"
@@ -298,12 +403,8 @@ export default function Marketing() {
         <div className="mkt-plans">
           {MARKETING_PLANS.map((p) => {
             const features = t(`pricing.plans.${p.id}.features`, { returnObjects: true }) as string[];
-            const monthlyAmount = p.monthlyEur;
-            const annualAmount = p.annualEur;
             const isAnnual = billingInterval === "annual";
-            const display = isAnnual
-              ? Math.round(annualAmount / 12)  // monthly equivalent of annual price
-              : monthlyAmount;
+            const display = isAnnual ? Math.round(p.annualEur / 12) : p.monthlyEur;
             return (
               <div key={p.id} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
                 {p.highlight && <div className="mkt-plan-badge">{t("pricing.recommended")}</div>}
@@ -314,7 +415,7 @@ export default function Marketing() {
                 </div>
                 {isAnnual && (
                   <div className="mkt-plan-billed-as">
-                    {t("pricing.billedAnnuallyAs", { amount: annualAmount, defaultValue: "Billed €{{amount}} per year" })}
+                    {t("pricing.billedAnnuallyAs", { amount: p.annualEur, defaultValue: "Billed €{{amount}} per year" })}
                   </div>
                 )}
                 <div className="mkt-plan-credits">
@@ -342,9 +443,7 @@ export default function Marketing() {
           })}
         </div>
         <p className="mkt-plans-credit-note">
-          {t("pricing.creditDefinition", {
-            defaultValue: "1 credit = 1 completed participant interview, up to 15 minutes."
-          })}
+          {t("pricing.creditDefinition", { defaultValue: "1 credit = 1 completed participant interview, up to 15 minutes." })}
         </p>
         <p className="mkt-plans-enterprise">
           {t("pricing.enterprise")}{" "}
@@ -352,31 +451,42 @@ export default function Marketing() {
         </p>
       </section>
 
-      {/* Final CTA */}
+      {/* ---- Final CTA ---- */}
       <section className="mkt-final-cta">
         <div className="mkt-final-cta-inner">
           <h2>{t("finalCta.title")}</h2>
           <p>{t("finalCta.subtitle")}</p>
-          <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("finalCta.cta")}</Link>
+          <Link to="/signup" className="btn mkt-btn-lg mkt-btn-inverted">{t("finalCta.cta")}</Link>
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ---- Footer ---- */}
       <footer className="mkt-footer">
-        <span className="mkt-logo">QualiPulse</span>
-        <div className="mkt-footer-links">
-          <Link to="/login">{t("footer.login")}</Link>
-          <Link to="/signup">{t("footer.signup")}</Link>
-          <Link to="/terms">{t("footer.terms")}</Link>
-          <Link to="/privacy">{t("footer.privacy")}</Link>
-          <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
+        <div className="mkt-footer-grid">
+          <div className="mkt-footer-col mkt-footer-brand">
+            <span className="mkt-logo">QualiPulse</span>
+            <p className="mkt-footer-tagline">{t("footer.tagline")}</p>
+          </div>
+          <div className="mkt-footer-col">
+            <h4>{t("footer.productTitle")}</h4>
+            <a href="#copilot">{t("footer.features")}</a>
+            <a href="#copilot">{t("footer.copilotLink")}</a>
+            <a href="#pricing">{t("footer.pricingLink")}</a>
+            <Link to="/blog">{t("footer.blog")}</Link>
+          </div>
+          <div className="mkt-footer-col">
+            <h4>{t("footer.companyTitle")}</h4>
+            <Link to="/login">{t("footer.login")}</Link>
+            <Link to="/signup">{t("footer.signup")}</Link>
+            <Link to="/terms">{t("footer.terms")}</Link>
+            <Link to="/privacy">{t("footer.privacy")}</Link>
+            <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
+          </div>
         </div>
-        {/* The "Got an interview link?" text used to wrap a <Link to="/i/demo">
-            that pointed at a non-existent demo token — Googlebot crawled it from
-            every public page and Search Console flagged it as 404. Participants
-            don't need a link here anyway (they already have their own from the
-            invitation email), so we keep the helper copy but drop the broken link. */}
-        <span className="mkt-footer-copy">{t("footer.copy")} &middot; {t("footer.interviewLink")}</span>
+        <div className="mkt-footer-bottom">
+          <span>{t("footer.copy")}</span>
+          <span>{t("footer.interviewLink")}</span>
+        </div>
       </footer>
     </div>
   );
