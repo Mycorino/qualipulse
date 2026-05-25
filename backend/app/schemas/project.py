@@ -101,6 +101,18 @@ class QuestionResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PlanContext(BaseModel):
+    """Wave E — when a Project is the drafted step of a ResearchPlan,
+    this surfaces the plan context so dashboard cards + the project
+    header can render 'Step N of M in <plan name>'."""
+
+    plan_id: str
+    plan_name: str
+    step_index: int  # 1-based, the order_index of this step
+    total_steps: int  # how many steps the plan has total
+    step_method: str  # e.g. 'voice_interview'
+
+
 class ProjectResponse(BaseModel):
     id: str
     company_id: str
@@ -122,6 +134,7 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     questions: list[QuestionResponse] = []
     screening_questions: list[ScreeningQuestionResponse] = []
+    plan_context: PlanContext | None = None
 
     model_config = {"from_attributes": True}
 
@@ -142,5 +155,6 @@ class ProjectListResponse(BaseModel):
     # a full project-state (and the Claude headline) for every tile.
     last_response_at: datetime | None = None
     is_demo: bool = False
+    plan_context: PlanContext | None = None
 
     model_config = {"from_attributes": True}

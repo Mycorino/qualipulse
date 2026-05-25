@@ -73,6 +73,18 @@ export interface ProjectResponse {
   created_at: string;
   questions: QuestionResponse[];
   screening_questions: ScreeningQuestionResponse[];
+  plan_context?: PlanContext | null;
+}
+
+export interface PlanContext {
+  plan_id: string;
+  plan_name: string;
+  /** 1-based order_index of this step in the plan. */
+  step_index: number;
+  /** Total number of steps in the parent plan. */
+  total_steps: number;
+  /** e.g. "voice_interview". */
+  step_method: string;
 }
 
 export interface ProjectListItem {
@@ -89,6 +101,9 @@ export interface ProjectListItem {
    *  finishes an interview. Used for "N days since last response" nudges. */
   last_response_at: string | null;
   is_demo?: boolean;
+  /** Wave E — surfaces when this project is the drafted step of a
+   *  ResearchPlan. Dashboard shows "Step N of M in <plan name>". */
+  plan_context?: PlanContext | null;
 }
 
 export interface InterviewLink {
