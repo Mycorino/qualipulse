@@ -266,6 +266,31 @@ export interface OnboardingMemory {
   profile_summary: string;
 }
 
+/**
+ * Wave A Fix 4 — fetch the persisted onboarding conversation thread so
+ * Welcome.tsx can hydrate prior turns on mount instead of losing them
+ * to a router round-trip. Shape mirrors `getConversation` but the
+ * onboarding endpoint lives at a fixed (no-id) path because the
+ * instrument is the workspace itself.
+ */
+export async function getOnboardingConversation(): Promise<ConversationSnapshot> {
+  const resp = await client.get<{ thread: unknown[]; version: number }>(
+    "/onboarding/copilot/conversation",
+  );
+  return { thread: resp.data.thread ?? [], version: resp.data.version ?? 0 };
+}
+
+export async function saveOnboardingConversation(
+  thread: unknown[],
+  version: number,
+): Promise<number> {
+  const resp = await client.put<{ version: number }>(
+    "/onboarding/copilot/conversation",
+    { thread, version },
+  );
+  return resp.data.version ?? version;
+}
+
 export async function getOnboardingMemory(): Promise<OnboardingMemory> {
   const resp = await client.get<OnboardingMemory>(
     "/onboarding/copilot/memory",

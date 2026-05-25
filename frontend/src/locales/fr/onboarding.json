@@ -73,7 +73,7 @@
     "memory_label": "Voici ce que je retiendrai de votre recherche",
     "memory_fallback": "J'en apprendrai davantage sur votre recherche au fil de notre collaboration.",
     "cta_take_interview": "Passer votre propre entretien",
-    "cta_take_interview_hint": "90 secondes — écoutez Claude poser ses questions et s'adapter",
+    "cta_take_interview_hint": "90 secondes — écoutez le Copilot poser ses questions et s'adapter",
     "cta_copy_link": "Copier le lien à partager",
     "cta_open_study": "Ouvrir votre étude →",
     "plan_hint": "Les équipes comme la vôtre commencent souvent sur <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — passez au plan quand QualiPulse aura fait ses preuves."

@@ -278,3 +278,77 @@ class TestV2StrategicCapture:
         assert "Other" in _CANONICAL_REPLIES["referral_source"]
         assert "Nothing yet" in _CANONICAL_REPLIES["current_tool"]
         assert "2 weeks" in _CANONICAL_REPLIES["timeline"]
+
+    def test_copilot_onboarding_no_locale_duplicate_chips(self, db_session):
+        """Wave A Fix 2 — FR researchers must never see English-only labels
+        leaking into a canonical chip set. The substitution path picks
+        ``_CANONICAL_REPLIES_FR`` based on ``company.preferred_language``."""
+        company = Company(
+            id="r-fr",
+            name="Acme FR",
+            email="fr@acme.com",
+            password_hash="x",
+            preferred_language="fr",
+        )
+        db_session.add(company)
+        db_session.commit()
+        turn = SimpleNamespace(actions=[])
+        # Agent emits English options for `decision_role` — server must
+        # discard them and substitute the FR canonical set.
+        _onboarding_run_tool(
+            db_session, company, company, turn, "suggest_replies",
+            {
+                "context": "decision_role",
+                "options": ["I'll decide", "Just exploring", "Other"],
+            },
+        )
+        assert len(turn.actions) == 1
+        options = turn.actions[0]["options"]
+        # No English-only labels — every label must be in the FR set.
+        from app.services.copilot_onboarding import _CANONICAL_REPLIES_FR
+        for label in options:
+            assert label in _CANONICAL_REPLIES_FR["decision_role"], (
+                f"FR researcher saw non-FR chip: {label!r}"
+            )
+        # Specifically, "Other" must not appear when "Autre" would be
+        # used as the escape hatch (decision_role has no "Autre"
+        # canonically — it has "J'explore" etc., so just guard against
+        # the bilingual mix).
+        assert "Other" not in options
+        assert "I'll decide" not in options
+
+    def test_custom_context_dedupes_other_against_autre(self, db_session):
+        """When the agent emits a free `custom` chip set that already
+        contains 'Other' and the locale is FR, we must end up with one
+        escape hatch ('Autre'), not both 'Other' AND 'Autre'."""
+        company = Company(
+            id="r-fr2",
+            name="Acme FR2",
+            email="fr2@acme.com",
+            password_hash="x",
+            preferred_language="fr",
+        )
+        db_session.add(company)
+        db_session.commit()
+        turn = SimpleNamespace(actions=[])
+        _onboarding_run_tool(
+            db_session, company, company, turn, "suggest_replies",
+            {
+                "context": "custom",
+                "options": [
+                    "Taux de complétion +X%",
+                    "Réduction",
+                    "Validation",
+                    "Other",
+                ],
+            },
+        )
+        options = turn.actions[0]["options"]
+        # "Autre" appended as the escape hatch; the agent's "Other" is
+        # dropped via the synonym map.
+        assert "Autre" in options
+        assert "Other" not in options
+        # The genuine custom chips survive.
+        assert "Taux de complétion +X%" in options
+        assert "Réduction" in options
+        assert "Validation" in options

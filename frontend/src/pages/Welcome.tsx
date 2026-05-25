@@ -13,6 +13,8 @@ import {
 import {
   runOnboardingCopilot,
   getOnboardingMemory,
+  getOnboardingConversation,
+  saveOnboardingConversation,
   transcribeDemoAudio,
   type CopilotMessage,
   type DemoTranscribeResponse,
@@ -171,17 +173,56 @@ export default function Welcome() {
   // earlier in the conversation and we must not steal their scroll.
   const isAtBottomRef = useRef(true);
   const prevThreadLenRef = useRef(0);
+  // Server-side conversation version (Wave A Fix 4). Held in a ref
+  // because writes are fire-and-forget — a stale read just clobbers
+  // the version cheaply.
+  const convoVersionRef = useRef<number>(0);
 
-  // Load the researcher, redirect out if already onboarded, and seed the
+  // Load the researcher, redirect out if already onboarded, hydrate the
+  // persisted conversation thread when present, and otherwise seed the
   // instant canned greeting.
   useEffect(() => {
     getMe()
-      .then((m) => {
+      .then(async (m) => {
         if (m.onboarding_completed) {
           navigate("/dashboard", { replace: true });
           return;
         }
         setMe(m);
+        // Wave A Fix 4 — hydrate any prior turns first. If the fetch
+        // succeeds and returns turns, render them as the seed (drop
+        // attachments — restoring `study` / `replies` / `website` /
+        // `participantDemo` from history is a separate task). If empty
+        // or failing, fall back to the canned greeting.
+        let hydrated: ThreadItem[] | null = null;
+        try {
+          const convo = await getOnboardingConversation();
+          convoVersionRef.current = convo.version || 0;
+          if (Array.isArray(convo.thread) && convo.thread.length > 0) {
+            hydrated = (convo.thread as Array<Record<string, unknown>>)
+              .map((raw) => {
+                const role = raw.role === "user" ? "user" : "assistant";
+                // Tolerate either `text` or `content` — different writers
+                // may have used either shape.
+                const text =
+                  typeof raw.text === "string"
+                    ? (raw.text as string)
+                    : typeof raw.content === "string"
+                      ? (raw.content as string)
+                      : "";
+                return text ? ({ role, text } as ThreadItem) : null;
+              })
+              .filter((x): x is ThreadItem => x !== null);
+            if (hydrated.length === 0) hydrated = null;
+          }
+        } catch {
+          // Silent fallback — never block onboarding on a hydration miss.
+          hydrated = null;
+        }
+        if (hydrated) {
+          setThread(hydrated);
+          return;
+        }
         // If the user came through the structured wizard, the agent's
         // canned greeting acknowledges what we already know rather
         // than re-asking. Different greeting key, same shape.
@@ -293,8 +334,8 @@ export default function Welcome() {
               "Want to see what your participants will experience?",
           }
         : undefined;
-      setThread((prev) =>
-        prev.map((it, i) =>
+      setThread((prev) => {
+        const updated = prev.map((it, i) =>
           i === prev.length - 1 && it.role === "assistant"
             ? {
                 ...it,
@@ -305,8 +346,23 @@ export default function Welcome() {
                 participantDemo,
               }
             : it,
-        ),
-      );
+        );
+        // Wave A Fix 4 — persist the conversation so a router round-trip
+        // (verify-email, sample modal, etc.) doesn't wipe the thread.
+        // Drop attachments — only role + plain text survives to the
+        // server. Fire-and-forget; never block the UI.
+        const plain = updated
+          .filter((it) => (it.text || "").trim().length > 0)
+          .map((it) => ({ role: it.role, text: it.text }));
+        saveOnboardingConversation(plain, convoVersionRef.current)
+          .then((v) => {
+            convoVersionRef.current = v;
+          })
+          .catch(() => {
+            /* swallow — persistence is best-effort */
+          });
+        return updated;
+      });
       // Profile fields may have been written by `save_profile` —
       // refresh `me` so the "What I know about you" panel updates.
       getMe().then(setMe).catch(() => undefined);
@@ -601,9 +657,34 @@ export default function Welcome() {
           )}
 
           <div className="onboarding-done__actions">
+            {/* Wave A Fix 1c — primary CTA is "Open your study" because
+             *  that's the natural next action after onboarding. The
+             *  test-interview button is demoted to a tertiary ghost
+             *  with its hint underneath. */}
             <button
               type="button"
               className="btn btn-primary onboarding-done__cta--primary"
+              onClick={() =>
+                navigate(`/projects/${done.projectId}`, { replace: true })
+              }
+            >
+              <span className="onboarding-done__cta-label">
+                {t("done.cta_open_study")}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleShareLink}
+              disabled={!interviewUrl}
+            >
+              {t("done.cta_copy_link")}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-ghost onboarding-done__cta--tertiary"
               disabled={!interviewUrl}
               onClick={() => {
                 if (!interviewUrl) {
@@ -620,26 +701,6 @@ export default function Welcome() {
                 {t("done.cta_take_interview_hint")}
               </span>
             </button>
-
-            <div className="onboarding-done__cta-row">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleShareLink}
-                disabled={!interviewUrl}
-              >
-                {t("done.cta_copy_link")}
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() =>
-                  navigate(`/projects/${done.projectId}`, { replace: true })
-                }
-              >
-                {t("done.cta_open_study")}
-              </button>
-            </div>
           </div>
         </div>
 
@@ -779,7 +840,13 @@ export default function Welcome() {
                     <ParticipantDemoInvite
                       intro={it.participantDemo.intro}
                       disabled={busy || creating}
-                      onOpen={() => setShowParticipantDemo(true)}
+                      onOpen={() => {
+                        // Wave A Fix 3 — engaging with the card either
+                        // way removes it. Without consuming on Open the
+                        // invite re-renders after the modal closes.
+                        consumeAttachment(i);
+                        setShowParticipantDemo(true);
+                      }}
                       onSkip={() => consumeAttachment(i)}
                     />
                   )}
