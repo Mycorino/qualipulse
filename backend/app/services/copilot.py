@@ -175,6 +175,35 @@ def save_conversation(
 # ── Surface adapter ──────────────────────────────────────────────────────────
 
 
+# When a primary proposal (research plan or first study) is in a turn,
+# strip secondary lightweight-capture chips so the user's attention
+# stays on the accept CTA. Belt-and-suspenders to the methodology rule.
+_PRIMARY_PROPOSAL_TYPES = {"create_research_plan", "create_first_study"}
+_SIDE_CAPTURE_CONTEXTS = {
+    "referral_source",
+    "current_tool",
+    "research_experience",
+}
+
+
+def _filter_proposal_turn_actions(actions: list[dict]) -> list[dict]:
+    """If this turn contains a primary proposal card, drop any
+    lightweight-signal suggest_replies chip groups so the proposal
+    owns the screen. Pure function — easy to test."""
+    has_primary = any(
+        a.get("type") in _PRIMARY_PROPOSAL_TYPES for a in actions
+    )
+    if not has_primary:
+        return list(actions)
+    return [
+        a for a in actions
+        if not (
+            a.get("type") == "suggest_replies"
+            and a.get("context") in _SIDE_CAPTURE_CONTEXTS
+        )
+    ]
+
+
 @dataclass
 class CopilotAdapter:
     """Everything surface-specific. The agent core is generic over this.
@@ -544,7 +573,7 @@ def run_copilot_turn_stream(
     yield {
         "type": "done",
         "reply": "\n\n".join(reply_parts).strip() or adapter.default_reply,
-        "proposed_actions": turn.actions,
+        "proposed_actions": _filter_proposal_turn_actions(turn.actions),
         "memory_updated": turn.memory_updated,
     }
 
