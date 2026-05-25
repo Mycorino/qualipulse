@@ -163,6 +163,10 @@ export default function Welcome() {
   // V3 — participant-experience demo modal. Opened from the inline
   // demo card the agent posts after the user's first message.
   const [showParticipantDemo, setShowParticipantDemo] = useState(false);
+  // Track whether the user opened the demo at least once — after
+  // closing, we fire a synthetic "continue" message so the agent
+  // proceeds to the plan proposal without the user having to nudge.
+  const demoOpenedRef = useRef(false);
 
   // W3.5 — controls the "want a recap by email?" verify modal on the
   // completion screen. Initial value reads localStorage so a refresh
@@ -934,9 +938,19 @@ export default function Welcome() {
                         // way removes it. Without consuming on Open the
                         // invite re-renders after the modal closes.
                         consumeAttachment(i);
+                        demoOpenedRef.current = true;
                         setShowParticipantDemo(true);
                       }}
-                      onSkip={() => consumeAttachment(i)}
+                      onSkip={() => {
+                        consumeAttachment(i);
+                        demoOpenedRef.current = true;
+                        // User skipped — fire the auto-continue now so
+                        // the agent moves to the plan proposal without
+                        // requiring a manual nudge.
+                        if (!busy && !creating) {
+                          send(t("participant_demo.auto_continue", "Ok, ready for the plan"));
+                        }
+                      }}
                     />
                   )}
                   {showAttachments && it.replies && (
@@ -1025,7 +1039,20 @@ export default function Welcome() {
       {showParticipantDemo && (
         <ParticipantDemoModal
           firstName={me.first_name || "there"}
-          onClose={() => setShowParticipantDemo(false)}
+          onClose={() => {
+            setShowParticipantDemo(false);
+            // Auto-continue: once the demo modal closes (completed or
+            // bailed), nudge the agent to proceed to the plan
+            // proposal. The agent's methodology says to pick up where
+            // it left off after the demo — but it has no signal that
+            // the demo was dismissed, so we send a synthetic user
+            // message. Guard against double-fire if user types in the
+            // textarea before close.
+            if (demoOpenedRef.current && !busy && !creating) {
+              demoOpenedRef.current = false;
+              send(t("participant_demo.auto_continue", "Ok, ready for the plan"));
+            }
+          }}
         />
       )}
     </div>
@@ -1876,8 +1903,9 @@ function ResearchPlanCard({
                 )}
                 {typeof s.duration_weeks === "number" && s.duration_weeks > 0 && (
                   <span>
-                    {t("plan.meta_duration", "{{count}}w", {
+                    {t("plan.meta_duration", {
                       count: s.duration_weeks,
+                      defaultValue: "{{count}} weeks",
                     })}
                   </span>
                 )}

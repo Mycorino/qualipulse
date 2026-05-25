@@ -63,7 +63,8 @@
     "accept_cta": "Accepter ce plan et lancer l'étape 1",
     "hint": "L'étape 1 devient votre première étude maintenant — les suivantes attendent votre feu vert.",
     "meta_participants": "{{count}} participants",
-    "meta_duration": "{{count}}s",
+    "meta_duration_one": "{{count}} semaine",
+    "meta_duration_other": "{{count}} semaines",
     "method": {
       "voice_interview": "Entretien vocal",
       "quant_survey": "Étude quanti",
@@ -302,6 +303,7 @@
     "try_again": "Réessayer",
     "skip_to_example": "Passer — montrez-moi l'exemple",
     "reveal_cta": "Compris — rédigeons mon étude →",
+    "auto_continue": "Compris, et le plan ?",
     "your_answer": "Votre réponse",
     "reveal_caption": "Les vraies études font émerger des dizaines de ces moments — les codes regroupent automatiquement les passages similaires entre participants.",
     "close": "Fermer",

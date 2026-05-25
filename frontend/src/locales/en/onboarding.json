@@ -63,7 +63,8 @@
     "accept_cta": "Accept this plan & draft step 1",
     "hint": "Step 1 becomes your first study now — later steps wait for your go-ahead.",
     "meta_participants": "{{count}} participants",
-    "meta_duration": "{{count}}w",
+    "meta_duration_one": "{{count}} week",
+    "meta_duration_other": "{{count}} weeks",
     "method": {
       "voice_interview": "Voice interview",
       "quant_survey": "Quant survey",
@@ -302,6 +303,7 @@
     "try_again": "Try again",
     "skip_to_example": "Skip — just show me the example",
     "reveal_cta": "Got it — let's draft my study →",
+    "auto_continue": "Got it, what's the plan?",
     "your_answer": "Your answer",
     "reveal_caption": "Real studies surface dozens of these — the codes group similar moments across participants automatically.",
     "close": "Close",
