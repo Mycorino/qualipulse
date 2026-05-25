@@ -20,6 +20,8 @@
   "step_2_cta": "Continue",
 
   "field_use_case": "What you'll use it for",
+  "role_other_placeholder": "Describe your role…",
+  "use_case_other_placeholder": "Describe your use case…",
   "field_intent": "Who's making the call",
   "field_readiness": "Where you're at",
 
