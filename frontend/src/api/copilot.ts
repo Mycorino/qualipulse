@@ -301,6 +301,56 @@ export async function getOnboardingMemory(): Promise<OnboardingMemory> {
   };
 }
 
+/** Backend-served demo bundle for the sample-study modal. Variant
+ *  routes to the right industry-flavoured fixture; locale comes from
+ *  the company's preferred_language server-side. */
+export interface DemoBundleExample {
+  name: string;
+  objective: string;
+  q1_section: string;
+  q1_question: string;
+  q2_section: string;
+  q2_question: string;
+  q3_section: string;
+  q3_question: string;
+}
+export interface DemoBundleTheme {
+  title: string;
+  finding: string;
+  quote: string;
+  speaker: string;
+}
+export interface DemoBundleQuote {
+  speaker: string;
+  text: string;
+  highlight: string;
+  code: string;
+  code_color: string;
+}
+export interface DemoBundle {
+  variant: string;
+  locale: string;
+  n_participants: number;
+  completed_label: string;
+  example: DemoBundleExample;
+  themes: DemoBundleTheme[];
+  quotes: DemoBundleQuote[];
+}
+
+export async function getDemoBundle(
+  variant: "saas" | "b2b_specifier" | "consumer",
+): Promise<DemoBundle | null> {
+  try {
+    const resp = await client.get<DemoBundle>(
+      "/onboarding/demo-bundle",
+      { params: { variant } },
+    );
+    return resp.data;
+  } catch {
+    return null;
+  }
+}
+
 /** Trigger or fetch the cached personalised /welcome greeting generated
  *  by Haiku from the wizard-captured profile. Returns null when we
  *  can't generate (sparse profile, API failure) — caller falls back

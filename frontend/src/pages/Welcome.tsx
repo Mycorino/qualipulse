@@ -18,10 +18,14 @@ import {
   transcribeDemoAudio,
   prepWelcomeGreeting,
   getStarterSuggestions,
+  getDemoBundle,
   type CopilotMessage,
   type DemoTranscribeResponse,
   type ProposedAction,
   type ProposedGuideQuestion,
+  type DemoBundle,
+  type DemoBundleExample,
+  type DemoBundleTheme,
 } from "../api/copilot";
 import {
   createProject,
@@ -1003,14 +1007,39 @@ function SampleStudyPreview({
 }) {
   const { t } = useTranslation("onboarding");
   const [tab, setTab] = useState<SampleTab>("synthesis");
-  const variant = pickSampleVariant(industry, useCase);
-  // Build the key prefix. When variant data is missing for the
-  // detected industry, fall back to the SaaS default (i18n's lookup
-  // returns the key itself, which we treat as a miss).
-  const k = (suffix: string) =>
-    t(`sample_modal.variants.${variant}.${suffix}`, {
+  const variant = pickSampleVariant(industry, useCase) as
+    | "saas"
+    | "b2b_specifier"
+    | "consumer";
+  // Wave D — fetch the demo bundle from the backend. The bundle is
+  // structured to match what real ProjectAnalysis + QuoteTags look
+  // like, paving the way for a future swap to the real ProjectDetail
+  // subviews (file as follow-up).
+  const [bundle, setBundle] = useState<DemoBundle | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getDemoBundle(variant)
+      .then((b) => {
+        if (!cancelled && b) setBundle(b);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [variant]);
+
+  // Fallback to i18n strings until the bundle arrives (and if it
+  // never arrives — offline / API error — the i18n path still works).
+  const k = (suffix: string): string => {
+    if (bundle && suffix.startsWith("example.")) {
+      const key = suffix.slice("example.".length) as keyof DemoBundleExample;
+      const value = bundle.example[key];
+      if (typeof value === "string" && value) return value;
+    }
+    return t(`sample_modal.variants.${variant}.${suffix}`, {
       defaultValue: t(`sample_modal.variants.saas.${suffix}`),
     });
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1020,10 +1049,10 @@ function SampleStudyPreview({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  // i18next's `returnObjects: true` doesn't honour `defaultValue` for
-  // missing keys — we have to fetch from the chosen variant and fall
-  // back manually when it's empty.
-  const readArray = <T,>(suffix: string): T[] => {
+  // Themes + quotes from the backend bundle when available, with
+  // graceful i18n fallback. Normalise to the camelCase shape the
+  // existing render expects.
+  const readI18nArray = <T,>(suffix: string): T[] => {
     const chosen = t(`sample_modal.variants.${variant}.${suffix}`, {
       returnObjects: true,
     }) as unknown;
@@ -1033,19 +1062,22 @@ function SampleStudyPreview({
     }) as unknown;
     return Array.isArray(fallback) ? (fallback as T[]) : [];
   };
-  const themes = readArray<{
-    title: string;
-    finding: string;
-    quote: string;
-    speaker: string;
-  }>("themes");
-  const quotes = readArray<{
+  const themes: DemoBundleTheme[] = bundle?.themes ?? readI18nArray("themes");
+  const quotes: Array<{
     speaker: string;
     text: string;
     highlight: string;
     code: string;
     codeColor: string;
-  }>("quotes");
+  }> = bundle
+    ? bundle.quotes.map((q) => ({
+        speaker: q.speaker,
+        text: q.text,
+        highlight: q.highlight,
+        code: q.code,
+        codeColor: q.code_color,
+      }))
+    : readI18nArray("quotes");
 
   return (
     <div
