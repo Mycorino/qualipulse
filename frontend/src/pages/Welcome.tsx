@@ -253,23 +253,42 @@ export default function Welcome() {
             }),
           },
         ]);
-        // If the wizard was completed and we have business context,
-        // ask the backend for a Haiku-personalised greeting that quotes
-        // a specific detail from their business summary. Replaces the
-        // canned greeting in-place when it lands. Fails silent.
+        // If the wizard was completed, ask the backend for a Haiku-
+        // personalised greeting. Replaces the canned greeting in-
+        // place when it lands. Fails silent.
+        //
+        // Race: for freemail signups, the company-name backfill runs
+        // async after the wizard completes — business_summary may not
+        // yet exist when this fires. Poll a few times before giving up.
         const wizardComplete =
           !!m.role && !!m.company_size && !!m.use_case;
-        if (wizardComplete && m.business_summary) {
-          prepWelcomeGreeting()
-            .then((text) => {
-              if (!text) return;
-              setThread((prev) =>
-                prev.length === 1 && prev[0].role === "assistant"
-                  ? [{ ...prev[0], text }]
-                  : prev,
-              );
-            })
-            .catch(() => undefined);
+        if (wizardComplete) {
+          let attempt = 0;
+          const maxAttempts = 3;
+          const tryGreeting = () => {
+            attempt += 1;
+            prepWelcomeGreeting()
+              .then((text) => {
+                if (text) {
+                  setThread((prev) =>
+                    prev.length === 1 && prev[0].role === "assistant"
+                      ? [{ ...prev[0], text }]
+                      : prev,
+                  );
+                  // Also refresh `me` so the sidebar picks up the
+                  // backfilled business_summary + industry.
+                  getMe().then(setMe).catch(() => undefined);
+                  return;
+                }
+                if (attempt < maxAttempts) {
+                  // 3s, 6s back-off — covers the typical Haiku +
+                  // backfill round-trip without polling forever.
+                  setTimeout(tryGreeting, 3000 * attempt);
+                }
+              })
+              .catch(() => undefined);
+          };
+          tryGreeting();
         }
       })
       .catch(() => navigate("/login", { replace: true }));
@@ -1492,36 +1511,98 @@ function ProfileSidebar({
                   // Canonical option set — render a chip popover so we
                   // never write a free-text value the agent / plan logic
                   // wouldn't recognise. Esc closes, click commits.
-                  <span
-                    className="onboarding-sidebar__editor onboarding-sidebar__chip-picker"
-                    role="radiogroup"
-                    aria-label={f.label}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        cancelEdit();
-                      }
-                    }}
-                  >
-                    {CANONICAL_BY_FIELD[f.key]!.map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        role="radio"
-                        aria-checked={value === opt}
-                        className={`onboarding-sidebar__chip ${
-                          value === opt
-                            ? "onboarding-sidebar__chip--active"
-                            : ""
-                        }`}
-                        onClick={() => commitValue(f.key, opt)}
-                        disabled={saving}
-                        autoFocus={value === opt}
+                  //
+                  // If the saved value is NOT in the canonical list
+                  // (user picked "Other" + typed a custom string in the
+                  // wizard), surface it as a "Custom" chip + a free-text
+                  // input so the value can be kept or edited without
+                  // losing it.
+                  (() => {
+                    const opts = CANONICAL_BY_FIELD[f.key]!;
+                    const isCustom = !!value && !opts.includes(value);
+                    return (
+                      <span
+                        className="onboarding-sidebar__editor onboarding-sidebar__chip-picker"
+                        role="radiogroup"
+                        aria-label={f.label}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            cancelEdit();
+                          }
+                        }}
                       >
-                        {opt}
-                      </button>
-                    ))}
-                  </span>
+                        {isCustom && (
+                          <>
+                            <button
+                              type="button"
+                              role="radio"
+                              aria-checked={true}
+                              className="onboarding-sidebar__chip onboarding-sidebar__chip--active onboarding-sidebar__chip--custom"
+                              title={value}
+                              disabled={saving}
+                              autoFocus
+                            >
+                              ✓ {value}
+                            </button>
+                            <input
+                              type="text"
+                              className="onboarding-sidebar__custom-input"
+                              defaultValue={value}
+                              placeholder={value}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const v = (e.target as HTMLInputElement)
+                                    .value
+                                    .trim();
+                                  if (!v) return;
+                                  // Auto-snap to canonical if the typed
+                                  // string matches case-insensitive.
+                                  const snap = opts.find(
+                                    (o) => o.toLowerCase() === v.toLowerCase(),
+                                  );
+                                  commitValue(f.key, snap || v);
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  cancelEdit();
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const v = e.target.value.trim();
+                                if (v && v !== value) {
+                                  const snap = opts.find(
+                                    (o) => o.toLowerCase() === v.toLowerCase(),
+                                  );
+                                  commitValue(f.key, snap || v);
+                                }
+                              }}
+                              disabled={saving}
+                              aria-label={f.label}
+                            />
+                          </>
+                        )}
+                        {opts.map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            role="radio"
+                            aria-checked={value === opt}
+                            className={`onboarding-sidebar__chip ${
+                              value === opt
+                                ? "onboarding-sidebar__chip--active"
+                                : ""
+                            }`}
+                            onClick={() => commitValue(f.key, opt)}
+                            disabled={saving}
+                            autoFocus={!isCustom && value === opt}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </span>
+                    );
+                  })()
                 ) : (
                   <span className="onboarding-sidebar__editor">
                     <input
@@ -1595,13 +1676,29 @@ function GoalSuggestionChips({
   useEffect(() => {
     // Fetch personalised starter chips. Cached server-side for 24h;
     // returns null when the wizard wasn't completed enough to support
-    // a sensible Haiku call — in that case we keep the static i18n list.
+    // a sensible Haiku call. Race: for freemail signups, the company-
+    // name backfill runs async — business_summary may land 3-15s
+    // after wizard completion. Retry a couple of times before
+    // giving up to the static fallback.
     let cancelled = false;
-    getStarterSuggestions()
-      .then((arr) => {
-        if (!cancelled && arr && arr.length === 3) setDynamic(arr);
-      })
-      .catch(() => undefined);
+    let attempt = 0;
+    const maxAttempts = 3;
+    const tryFetch = () => {
+      attempt += 1;
+      getStarterSuggestions()
+        .then((arr) => {
+          if (cancelled) return;
+          if (arr && arr.length === 3) {
+            setDynamic(arr);
+            return;
+          }
+          if (attempt < maxAttempts) {
+            setTimeout(tryFetch, 3000 * attempt);
+          }
+        })
+        .catch(() => undefined);
+    };
+    tryFetch();
     return () => {
       cancelled = true;
     };

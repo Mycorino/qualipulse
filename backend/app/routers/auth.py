@@ -561,10 +561,62 @@ def save_onboarding_profile(
     db: Session = Depends(get_db),
 ):
     """Save company profile details during onboarding (intermediate save, doesn't mark complete)."""
+    name_before = (company.name or "").strip()
     _apply_onboarding_fields(company, body)
     db.commit()
     logger.info("Onboarding profile saved for %s", company.email)
+
+    # Backfill business context when the typed company name lands +
+    # we don't yet have a business_summary (likely a freemail signup
+    # where the email-domain prefetch was skipped). Fire-and-forget
+    # in a background thread — never block the wizard.
+    name_after = (company.name or "").strip()
+    if (
+        name_after
+        and name_after != name_before
+        and not (company.business_summary or "").strip()
+    ):
+        _schedule_company_name_backfill(company.id)
+
     return CompanyResponse.model_validate(company)
+
+
+def _schedule_company_name_backfill(company_id: str) -> None:
+    """Background-thread Haiku call to populate business_summary +
+    industry from the typed company name. Daemonised — swallows every
+    error path, never blocks the wizard."""
+    import threading
+
+    from app.database import SessionLocal
+
+    def run() -> None:
+        bg_db = SessionLocal()
+        try:
+            from app.models.company import Company as _Company
+            from app.services.company_name_lookup import (
+                backfill_business_from_name,
+            )
+
+            c = (
+                bg_db.query(_Company)
+                .filter(_Company.id == company_id)
+                .first()
+            )
+            if c is None:
+                return
+            if backfill_business_from_name(c):
+                bg_db.commit()
+                logger.info(
+                    "Backfilled business context for %s from typed name '%s'",
+                    c.email,
+                    c.name,
+                )
+        except Exception:  # noqa: BLE001 — swallow, this is fire-and-forget
+            logger.exception("company-name backfill thread failed")
+        finally:
+            bg_db.close()
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 class GenerateStudyRequest(BaseModel):
