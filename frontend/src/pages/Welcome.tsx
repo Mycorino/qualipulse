@@ -19,6 +19,7 @@ import {
   prepWelcomeGreeting,
   getStarterSuggestions,
   getDemoBundle,
+  createResearchPlan,
   type CopilotMessage,
   type DemoTranscribeResponse,
   type ProposedAction,
@@ -62,6 +63,8 @@ type ThreadItem = {
   text: string;
   /** Attached to an assistant turn that proposed the first study. */
   study?: ProposedAction;
+  /** Attached when the agent proposed a multi-step research plan (Wave E). */
+  plan?: ProposedAction;
   /** Tap-to-answer chips the agent attached to this turn. */
   replies?: { context?: string; options: string[] };
   /** Website-lookup card the agent attached to this turn. */
@@ -336,6 +339,9 @@ export default function Welcome() {
       const study = resp.proposed_actions.find(
         (a) => a.type === "create_first_study",
       );
+      const plan = resp.proposed_actions.find(
+        (a) => a.type === "create_research_plan",
+      );
       const repliesAction = resp.proposed_actions.find(
         (a) => a.type === "suggest_replies",
       );
@@ -365,6 +371,7 @@ export default function Welcome() {
                 ...it,
                 text: resp.reply,
                 study,
+                plan,
                 replies,
                 website,
                 participantDemo,
@@ -401,6 +408,57 @@ export default function Welcome() {
     } finally {
       setBusy(false);
       setStatusLabel(null);
+    }
+  };
+
+  const acceptPlan = async (plan: ProposedAction) => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const result = await createResearchPlan({
+        plan_name: plan.plan_name || "Research plan",
+        rationale: plan.rationale || "",
+        steps: (plan.steps || []).map((s) => ({
+          order_index: s.order_index,
+          method: s.method,
+          title: s.title,
+          purpose: s.purpose,
+          deliverable: s.deliverable,
+          n_participants: s.n_participants,
+          duration_weeks: s.duration_weeks,
+        })),
+        decision_to_inform: plan.decision_to_inform,
+        timeline: plan.timeline,
+        success_criteria: plan.success_criteria,
+        target_customer_description: plan.target_customer_description,
+        language: "en",
+      });
+      await completeOnboarding({});
+      setCachedOnboarded(true);
+      const recap = await getOnboardingMemory().catch(() => ({
+        memory: "",
+        profile_summary: "",
+      }));
+      if (result.project_id) {
+        // Step 1 was a voice interview — Project was drafted. Land on
+        // the same "your study is ready" completion screen as today.
+        setDone({
+          projectId: result.project_id,
+          studyName: result.study_name || plan.plan_name || "Your study",
+          memory: recap.memory,
+          profileSummary: recap.profile_summary,
+          interviewToken: result.interview_token,
+        });
+      } else {
+        // Step 1 wasn't a voice_interview — no Project drafted yet. Land
+        // them on the dashboard; their plan is saved and step 1 awaits
+        // activation. (v1 limitation — other methods come later.)
+        navigate("/dashboard", { replace: true });
+      }
+      setCreating(false);
+    } catch {
+      toast(t("toast.study_setup_failed"), "error");
+      setCreating(false);
     }
   };
 
@@ -849,6 +907,13 @@ export default function Welcome() {
                     <StudyCard
                       study={it.study}
                       onAccept={() => acceptStudy(it.study!)}
+                      disabled={creating}
+                    />
+                  )}
+                  {it.plan && (
+                    <ResearchPlanCard
+                      plan={it.plan}
+                      onAccept={() => acceptPlan(it.plan!)}
                       disabled={creating}
                     />
                   )}
@@ -1749,6 +1814,125 @@ function StudyCard({
           {t("study.create_cta")}
         </button>
         <span className="onboarding-study__hint">{t("study.hint")}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Wave E — research-plan proposal card. A 2-3 step timeline that the
+ * researcher accepts as a whole. Step 1 (if voice_interview) gets
+ * drafted as a real Project immediately; later steps stay pending
+ * placeholders the user activates from the dashboard.
+ */
+function ResearchPlanCard({
+  plan,
+  onAccept,
+  disabled,
+}: {
+  plan: ProposedAction;
+  onAccept: () => void;
+  disabled: boolean;
+}) {
+  const { t } = useTranslation("onboarding");
+  const steps = plan.steps ?? [];
+  const decision = (plan.decision_to_inform || "").trim();
+  const timeline = (plan.timeline || "").trim();
+  const success = (plan.success_criteria || "").trim();
+  const audience = (plan.target_customer_description || "").trim();
+  const hasContext = decision || timeline || success || audience;
+
+  return (
+    <div className="onboarding-plan">
+      <div className="onboarding-plan__eyebrow">
+        ✦ {t("plan.eyebrow", "Your research plan")}
+      </div>
+      <div className="onboarding-plan__name">{plan.plan_name}</div>
+      {plan.rationale && (
+        <p className="onboarding-plan__rationale">{plan.rationale}</p>
+      )}
+
+      <ol className="onboarding-plan__steps">
+        {steps.map((s) => (
+          <li key={s.order_index} className="onboarding-plan-step">
+            <span className="onboarding-plan-step__num">{s.order_index}</span>
+            <div className="onboarding-plan-step__body">
+              <div className="onboarding-plan-step__head">
+                <span className="onboarding-plan-step__title">{s.title}</span>
+                <span className="onboarding-plan-step__method">
+                  {t(`plan.method.${s.method}`, { defaultValue: s.method })}
+                </span>
+              </div>
+              {s.purpose && (
+                <p className="onboarding-plan-step__purpose">{s.purpose}</p>
+              )}
+              <div className="onboarding-plan-step__meta">
+                {typeof s.n_participants === "number" && s.n_participants > 0 && (
+                  <span>
+                    {t("plan.meta_participants", "{{count}} participants", {
+                      count: s.n_participants,
+                    })}
+                  </span>
+                )}
+                {typeof s.duration_weeks === "number" && s.duration_weeks > 0 && (
+                  <span>
+                    {t("plan.meta_duration", "{{count}}w", {
+                      count: s.duration_weeks,
+                    })}
+                  </span>
+                )}
+                {s.deliverable && (
+                  <span className="onboarding-plan-step__deliverable">
+                    → {s.deliverable}
+                  </span>
+                )}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      {hasContext && (
+        <dl className="onboarding-study__context">
+          {decision && (
+            <>
+              <dt>{t("study.context_decision")}</dt>
+              <dd>{decision}</dd>
+            </>
+          )}
+          {timeline && (
+            <>
+              <dt>{t("study.context_timeline")}</dt>
+              <dd>{timeline}</dd>
+            </>
+          )}
+          {audience && (
+            <>
+              <dt>{t("study.context_audience")}</dt>
+              <dd>{audience}</dd>
+            </>
+          )}
+          {success && (
+            <>
+              <dt>{t("study.context_success")}</dt>
+              <dd>{success}</dd>
+            </>
+          )}
+        </dl>
+      )}
+
+      <div className="onboarding-plan__actions">
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onAccept}
+          disabled={disabled}
+        >
+          {t("plan.accept_cta", "Accept this plan & draft step 1")}
+        </button>
+        <span className="onboarding-study__hint">
+          {t("plan.hint", "Step 1 becomes your first study now — later steps wait for your go-ahead.")}
+        </span>
       </div>
     </div>
   );

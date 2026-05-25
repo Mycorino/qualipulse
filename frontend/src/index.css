@@ -12249,3 +12249,125 @@ select.field-input {
     grid-template-columns: 28px 1fr;
   }
 }
+
+/* Wave E — research-plan proposal card */
+
+.onboarding-plan {
+  background: var(--bg-surface);
+  border: 1px solid var(--brand-300, var(--brand-600));
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.onboarding-plan__eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-700);
+}
+.onboarding-plan__name {
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.onboarding-plan__rationale {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.onboarding-plan__steps {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.onboarding-plan-step {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-canvas, #fafaf9);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--brand-600);
+}
+.onboarding-plan-step__num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--brand-600);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  flex-shrink: 0;
+}
+.onboarding-plan-step__body {
+  min-width: 0;
+}
+.onboarding-plan-step__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.onboarding-plan-step__title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.onboarding-plan-step__method {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--brand-700);
+  background: var(--brand-50, #faf5ff);
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.onboarding-plan-step__purpose {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: var(--space-2) 0;
+  line-height: 1.5;
+}
+.onboarding-plan-step__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.onboarding-plan-step__deliverable {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.onboarding-plan__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .onboarding-plan-step__head {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+}

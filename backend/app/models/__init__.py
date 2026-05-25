@@ -9,6 +9,7 @@ from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 from app.models.blog import BlogPost
 from app.models.copilot import CopilotConversation, CopilotMemory
+from app.models.research_plan import ResearchPlan, ResearchPlanStep
 from app.models.team import WorkspaceInvitation, WorkspaceMember
 from app.models.billing import (
     CreditBalance,

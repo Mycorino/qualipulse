@@ -656,3 +656,118 @@ def create_onboarding_study(
         "study_name": body.study_name,
         "interview_token": token,
     }
+
+
+# ── Wave E — accept-research-plan ────────────────────────────────────────────
+
+from pydantic import BaseModel
+
+
+class _ResearchPlanStep(BaseModel):
+    order_index: int
+    method: str
+    title: str
+    purpose: str | None = None
+    deliverable: str | None = None
+    n_participants: int | None = None
+    duration_weeks: int | None = None
+
+
+class _ResearchPlanCreate(BaseModel):
+    plan_name: str
+    rationale: str
+    steps: list[_ResearchPlanStep]
+    decision_to_inform: str | None = None
+    timeline: str | None = None
+    success_criteria: str | None = None
+    target_customer_description: str | None = None
+    language: str = "en"
+
+
+@router.post("/onboarding/research-plan", status_code=status.HTTP_201_CREATED)
+def create_research_plan(
+    body: _ResearchPlanCreate,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> dict:
+    """Accept a multi-step research plan. Creates the ResearchPlan +
+    all ResearchPlanStep rows. For the FIRST step (and only the first),
+    if the method is `voice_interview`, also create the real Project +
+    guide-question scaffold + interview link so the user can start
+    immediately. Steps 2+ stay as 'pending' placeholders the user
+    activates from the dashboard later."""
+    from app.models.interview import InterviewLink
+    from app.models.project import InterviewGuideQuestion, Project
+    from app.models.research_plan import ResearchPlan, ResearchPlanStep
+
+    plan = ResearchPlan(
+        company_id=company.id,
+        name=body.plan_name,
+        rationale=body.rationale,
+        decision_to_inform=body.decision_to_inform,
+        timeline=body.timeline,
+        success_criteria=body.success_criteria,
+        target_customer_description=body.target_customer_description,
+    )
+    db.add(plan)
+    db.flush()
+
+    sorted_steps = sorted(body.steps, key=lambda s: s.order_index)
+    step_rows: list[ResearchPlanStep] = []
+    for s in sorted_steps:
+        row = ResearchPlanStep(
+            plan_id=plan.id,
+            order_index=s.order_index,
+            method=s.method,
+            title=s.title,
+            purpose=s.purpose,
+            deliverable=s.deliverable,
+            n_participants=s.n_participants,
+            duration_weeks=s.duration_weeks,
+            status="pending",
+        )
+        db.add(row)
+        step_rows.append(row)
+    db.flush()
+
+    # Draft step 1 as a real Project iff it's a voice_interview. Other
+    # methods stay pending — the actual drafting of survey / workshop
+    # / desk_research / usability_test studies is a follow-up.
+    project_id: str | None = None
+    interview_token: str | None = None
+    study_name: str | None = None
+    if step_rows and step_rows[0].method == "voice_interview":
+        first = step_rows[0]
+        project = Project(
+            company_id=company.id,
+            name=first.title,
+            language=body.language,
+            research_objective=(
+                first.purpose
+                or f"Step 1 of plan: {body.plan_name}"
+            ),
+            decision_to_inform=body.decision_to_inform,
+            timeline=body.timeline,
+            success_criteria=body.success_criteria,
+            target_customer_description=body.target_customer_description,
+            interview_duration_minutes=20,
+        )
+        db.add(project)
+        db.flush()
+        first.project_id = project.id
+        first.status = "drafted"
+
+        token = "".join(secrets.choice(_BASE58) for _ in range(43))
+        db.add(InterviewLink(project_id=project.id, token=token))
+        project_id = project.id
+        interview_token = token
+        study_name = first.title
+
+    db.commit()
+
+    return {
+        "plan_id": plan.id,
+        "project_id": project_id,
+        "study_name": study_name,
+        "interview_token": interview_token,
+    }
