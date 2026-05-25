@@ -817,7 +817,11 @@ export default function Welcome() {
       </div>
 
       {showSamplePreview && (
-        <SampleStudyPreview onClose={() => setShowSamplePreview(false)} />
+        <SampleStudyPreview
+          industry={me?.industry || ""}
+          useCase={me?.use_case || ""}
+          onClose={() => setShowSamplePreview(false)}
+        />
       )}
 
       {showParticipantDemo && (
@@ -842,9 +846,42 @@ export default function Welcome() {
  */
 type SampleTab = "synthesis" | "quotes" | "guide";
 
-function SampleStudyPreview({ onClose }: { onClose: () => void }) {
+/**
+ * Maps an industry / use-case signal onto a sample-study variant key.
+ * Each variant has its own example block in onboarding.json under
+ * `sample_modal.variants.<key>.{example,themes,quotes}`. Unknown
+ * industries fall through to the default SaaS-flavoured variant.
+ */
+function pickSampleVariant(industry: string, useCase: string): string {
+  const haystack = `${industry} ${useCase}`.toLowerCase();
+  if (/(construct|real estate|proptech|bâtiment|immobilier|btp)/.test(haystack)) {
+    return "b2b_specifier";
+  }
+  if (/(retail|ecommerce|e-commerce|consumer|d2c|grande conso)/.test(haystack)) {
+    return "consumer";
+  }
+  return "saas";
+}
+
+function SampleStudyPreview({
+  industry,
+  useCase,
+  onClose,
+}: {
+  industry: string;
+  useCase: string;
+  onClose: () => void;
+}) {
   const { t } = useTranslation("onboarding");
   const [tab, setTab] = useState<SampleTab>("synthesis");
+  const variant = pickSampleVariant(industry, useCase);
+  // Build the key prefix. When variant data is missing for the
+  // detected industry, fall back to the SaaS default (i18n's lookup
+  // returns the key itself, which we treat as a miss).
+  const k = (suffix: string) =>
+    t(`sample_modal.variants.${variant}.${suffix}`, {
+      defaultValue: t(`sample_modal.variants.saas.${suffix}`),
+    });
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -854,18 +891,32 @@ function SampleStudyPreview({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const themes = (t("sample_modal.themes", { returnObjects: true }) as
-    | Array<{ title: string; finding: string; quote: string; speaker: string }>
-    | undefined) || [];
-  const quotes = (t("sample_modal.quotes", { returnObjects: true }) as
-    | Array<{
-        speaker: string;
-        text: string;
-        highlight: string;
-        code: string;
-        codeColor: string;
-      }>
-    | undefined) || [];
+  // i18next's `returnObjects: true` doesn't honour `defaultValue` for
+  // missing keys — we have to fetch from the chosen variant and fall
+  // back manually when it's empty.
+  const readArray = <T,>(suffix: string): T[] => {
+    const chosen = t(`sample_modal.variants.${variant}.${suffix}`, {
+      returnObjects: true,
+    }) as unknown;
+    if (Array.isArray(chosen) && chosen.length > 0) return chosen as T[];
+    const fallback = t(`sample_modal.variants.saas.${suffix}`, {
+      returnObjects: true,
+    }) as unknown;
+    return Array.isArray(fallback) ? (fallback as T[]) : [];
+  };
+  const themes = readArray<{
+    title: string;
+    finding: string;
+    quote: string;
+    speaker: string;
+  }>("themes");
+  const quotes = readArray<{
+    speaker: string;
+    text: string;
+    highlight: string;
+    code: string;
+    codeColor: string;
+  }>("quotes");
 
   return (
     <div
@@ -901,7 +952,7 @@ function SampleStudyPreview({ onClose }: { onClose: () => void }) {
 
         <div className="onboarding-sample-modal__study-head">
           <div className="onboarding-sample-modal__study-name">
-            {t("sample_modal.example.name")}
+            {k("example.name")}
           </div>
           <div className="onboarding-sample-modal__meta">
             <span>{t("sample_modal.meta_participants", { count: 25 })}</span>
@@ -943,7 +994,7 @@ function SampleStudyPreview({ onClose }: { onClose: () => void }) {
           {tab === "synthesis" && (
             <div className="onboarding-sample-modal__synthesis">
               <p className="onboarding-sample-modal__objective">
-                {t("sample_modal.example.objective")}
+                {k("example.objective")}
               </p>
               <div className="onboarding-sample-modal__themes">
                 {themes.map((th, i) => (
@@ -1019,21 +1070,21 @@ function SampleStudyPreview({ onClose }: { onClose: () => void }) {
             <ol className="onboarding-study__questions onboarding-study__questions--in-modal">
               <li>
                 <span className="onboarding-study__section">
-                  {t("sample_modal.example.q1_section")}
+                  {k("example.q1_section")}
                 </span>
-                {t("sample_modal.example.q1_question")}
+                {k("example.q1_question")}
               </li>
               <li>
                 <span className="onboarding-study__section">
-                  {t("sample_modal.example.q2_section")}
+                  {k("example.q2_section")}
                 </span>
-                {t("sample_modal.example.q2_question")}
+                {k("example.q2_question")}
               </li>
               <li>
                 <span className="onboarding-study__section">
-                  {t("sample_modal.example.q3_section")}
+                  {k("example.q3_section")}
                 </span>
-                {t("sample_modal.example.q3_question")}
+                {k("example.q3_question")}
               </li>
             </ol>
           )}

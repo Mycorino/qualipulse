@@ -99,59 +99,173 @@
     "tab_guide": "Guide",
     "meta_participants": "{{count}} participants",
     "meta_completed": "Completed last week",
-    "example": {
-      "name": "Why new signups never run their first interview",
-      "objective": "Understand what stops trial users from launching their first study so we know which onboarding friction to fix first.",
-      "q1_section": "CONTEXT",
-      "q1_question": "Walk me through what you were trying to do the first time you logged in.",
-      "q2_section": "MOMENT OF DROP-OFF",
-      "q2_question": "Was there a moment you thought \"this isn't for me right now\"? Tell me about it.",
-      "q3_section": "WHAT WOULD HAVE HELPED",
-      "q3_question": "If you could have skipped one step, which one would it have been?"
-    },
-    "themes": [
-      {
-        "title": "\"I didn't know who I'd interview\"",
-        "finding": "12 of 25 stalled before launching because they hadn't lined up participants. They expected the tool to find people for them.",
-        "quote": "I assumed there'd be a panel I could just send it to. When I realised I had to bring my own list, I closed the tab.",
-        "speaker": "Maya, PM at a 40-person SaaS"
+    "variants": {
+      "saas": {
+        "example": {
+          "name": "Why new signups never run their first interview",
+          "objective": "Understand what stops trial users from launching their first study so we know which onboarding friction to fix first.",
+          "q1_section": "CONTEXT",
+          "q1_question": "Walk me through what you were trying to do the first time you logged in.",
+          "q2_section": "MOMENT OF DROP-OFF",
+          "q2_question": "Was there a moment you thought \"this isn't for me right now\"? Tell me about it.",
+          "q3_section": "WHAT WOULD HAVE HELPED",
+          "q3_question": "If you could have skipped one step, which one would it have been?"
+        },
+        "themes": [
+          {
+            "title": "\"I didn't know who I'd interview\"",
+            "finding": "12 of 25 stalled before launching because they hadn't lined up participants. They expected the tool to find people for them.",
+            "quote": "I assumed there'd be a panel I could just send it to. When I realised I had to bring my own list, I closed the tab.",
+            "speaker": "Maya, PM at a 40-person SaaS"
+          },
+          {
+            "title": "The first study felt high-stakes",
+            "finding": "Trial users described the first study as \"my one shot.\" They over-edited the question guide and never sent it.",
+            "quote": "I rewrote those five questions seven times. I was sure I was going to waste my participants' time.",
+            "speaker": "Jonas, founder, B2B fintech"
+          },
+          {
+            "title": "Voice felt risky without seeing the output",
+            "finding": "Users who didn't see a sample transcript before launching were 3x more likely to abandon. The AI felt opaque.",
+            "quote": "I didn't know what the AI would actually do once people started talking. I needed to see one finished interview before trusting it.",
+            "speaker": "Lina, UX researcher at a marketplace"
+          }
+        ],
+        "quotes": [
+          {
+            "speaker": "Maya, PM",
+            "text": "I assumed there'd be a panel I could just send it to. When I realised I had to bring my own list, I closed the tab.",
+            "highlight": "I had to bring my own list",
+            "code": "Participant-sourcing gap",
+            "codeColor": "#4f46e5"
+          },
+          {
+            "speaker": "Jonas, founder",
+            "text": "I rewrote those five questions seven times. I was sure I was going to waste my participants' time.",
+            "highlight": "I was sure I was going to waste my participants' time",
+            "code": "First-study anxiety",
+            "codeColor": "#0ea5e9"
+          },
+          {
+            "speaker": "Lina, researcher",
+            "text": "I needed to see one finished interview before trusting it. The AI felt like a black box.",
+            "highlight": "see one finished interview before trusting it",
+            "code": "Transparency requirement",
+            "codeColor": "#10b981"
+          }
+        ]
       },
-      {
-        "title": "The first study felt high-stakes",
-        "finding": "Trial users described the first study as \"my one shot.\" They over-edited the question guide and never sent it.",
-        "quote": "I rewrote those five questions seven times. I was sure I was going to waste my participants' time.",
-        "speaker": "Jonas, founder, B2B fintech"
+      "b2b_specifier": {
+        "example": {
+          "name": "Why architects pick one specification database over another",
+          "objective": "Understand the moment architects choose which product database to trust for a project, so we know which credibility signals matter most.",
+          "q1_section": "CONTEXT",
+          "q1_question": "Walk me through the last project where you had to specify a product you hadn't used before. What was the trigger?",
+          "q2_section": "DECISION MOMENT",
+          "q2_question": "What made you trust one source over another when comparing options? Tell me about a specific moment.",
+          "q3_section": "WHAT BREAKS THE CHOICE",
+          "q3_question": "When have you walked away from a product you'd otherwise have specified? Why?"
+        },
+        "themes": [
+          {
+            "title": "Reference projects beat brochures every time",
+            "finding": "18 of 25 architects said a built example near their site weighed more than any technical sheet — but only 2 said brands made finding one easy.",
+            "quote": "If I can't find a project like mine where it's already been installed, I move on. I'm not the first person to test it on a client.",
+            "speaker": "Anne, architect, mid-sized firm"
+          },
+          {
+            "title": "BIM-ready or it doesn't get specified",
+            "finding": "If the BIM object wasn't downloadable in under a minute, the product dropped out of the shortlist. Brand recognition didn't save it.",
+            "quote": "I'm not going to model it myself. If their Revit file isn't there, I pick the competitor whose file is.",
+            "speaker": "Marc, BIM coordinator, design-build firm"
+          },
+          {
+            "title": "The client's compliance officer has veto power",
+            "finding": "Architects pre-filter for certifications because the legal/compliance team will kill the spec late if missing. They route around products that look risky.",
+            "quote": "I learned the hard way — picked the better product, compliance threw it out at month four. Now I sort by certification first.",
+            "speaker": "Sophie, architect, public-sector work"
+          }
+        ],
+        "quotes": [
+          {
+            "speaker": "Anne, architect",
+            "text": "If I can't find a project like mine where it's already been installed, I move on. I'm not the first person to test it on a client.",
+            "highlight": "I'm not the first person to test it on a client",
+            "code": "Reference-project gating",
+            "codeColor": "#4f46e5"
+          },
+          {
+            "speaker": "Marc, BIM coordinator",
+            "text": "I'm not going to model it myself. If their Revit file isn't there, I pick the competitor whose file is.",
+            "highlight": "I pick the competitor whose file is",
+            "code": "BIM availability",
+            "codeColor": "#0ea5e9"
+          },
+          {
+            "speaker": "Sophie, architect",
+            "text": "I learned the hard way — picked the better product, compliance threw it out at month four. Now I sort by certification first.",
+            "highlight": "Now I sort by certification first",
+            "code": "Compliance pre-filter",
+            "codeColor": "#10b981"
+          }
+        ]
       },
-      {
-        "title": "Voice felt risky without seeing the output",
-        "finding": "Users who didn't see a sample transcript before launching were 3x more likely to abandon. The AI felt opaque.",
-        "quote": "I didn't know what the AI would actually do once people started talking. I needed to see one finished interview before trusting it.",
-        "speaker": "Lina, UX researcher at a marketplace"
+      "consumer": {
+        "example": {
+          "name": "Why first-time buyers abandon the cart at shipping",
+          "objective": "Understand what tips buyers from \"interested\" to \"forget it\" in the last 60 seconds of checkout, so we know which friction to remove first.",
+          "q1_section": "CONTEXT",
+          "q1_question": "Tell me about the last time you put something in a cart and didn't buy it. What were you trying to do?",
+          "q2_section": "THE TIPPING POINT",
+          "q2_question": "What was the exact moment you thought \"actually, no\"? Walk me through it.",
+          "q3_section": "WHAT WOULD HAVE WORKED",
+          "q3_question": "If they'd done one thing differently, would you have bought? Which thing?"
+        },
+        "themes": [
+          {
+            "title": "Shipping cost surprise is the killer, not the amount",
+            "finding": "14 of 25 abandoned not because shipping was high, but because it appeared only at the final step. Even €4.99 felt like a trap when revealed late.",
+            "quote": "It wasn't the five euros. It was that I'd spent ten minutes choosing and they'd been hiding it from me the whole time.",
+            "speaker": "Élise, urban professional, monthly online shopper"
+          },
+          {
+            "title": "Account creation = exit",
+            "finding": "Forced account creation at checkout closed the tab for 9 of 25 — half explicitly said \"I'll come back later,\" and none did.",
+            "quote": "Why do I need an account to buy a t-shirt? I came to spend money, not to sign up for a relationship.",
+            "speaker": "Tom, occasional buyer"
+          },
+          {
+            "title": "Trust collapses without familiar payment options",
+            "finding": "Buyers expected Apple Pay / PayPal as escape hatches when the brand was new to them. Missing them = perceived sketchiness, not just inconvenience.",
+            "quote": "I'd never heard of them. If they don't take PayPal I assume my card info goes who-knows-where.",
+            "speaker": "Camille, first-time buyer from social ad"
+          }
+        ],
+        "quotes": [
+          {
+            "speaker": "Élise, shopper",
+            "text": "It wasn't the five euros. It was that I'd spent ten minutes choosing and they'd been hiding it from me the whole time.",
+            "highlight": "they'd been hiding it from me the whole time",
+            "code": "Late-reveal trust break",
+            "codeColor": "#4f46e5"
+          },
+          {
+            "speaker": "Tom, buyer",
+            "text": "Why do I need an account to buy a t-shirt? I came to spend money, not to sign up for a relationship.",
+            "highlight": "not to sign up for a relationship",
+            "code": "Forced-account friction",
+            "codeColor": "#0ea5e9"
+          },
+          {
+            "speaker": "Camille, first-time buyer",
+            "text": "I'd never heard of them. If they don't take PayPal I assume my card info goes who-knows-where.",
+            "highlight": "my card info goes who-knows-where",
+            "code": "Trust signal: payment options",
+            "codeColor": "#10b981"
+          }
+        ]
       }
-    ],
-    "quotes": [
-      {
-        "speaker": "Maya, PM",
-        "text": "I assumed there'd be a panel I could just send it to. When I realised I had to bring my own list, I closed the tab.",
-        "highlight": "I had to bring my own list",
-        "code": "Participant-sourcing gap",
-        "codeColor": "#4f46e5"
-      },
-      {
-        "speaker": "Jonas, founder",
-        "text": "I rewrote those five questions seven times. I was sure I was going to waste my participants' time.",
-        "highlight": "I was sure I was going to waste my participants' time",
-        "code": "First-study anxiety",
-        "codeColor": "#0ea5e9"
-      },
-      {
-        "speaker": "Lina, researcher",
-        "text": "I needed to see one finished interview before trusting it. The AI felt like a black box.",
-        "highlight": "see one finished interview before trusting it",
-        "code": "Transparency requirement",
-        "codeColor": "#10b981"
-      }
-    ]
+    }
   },
 
   "participant_demo": {
