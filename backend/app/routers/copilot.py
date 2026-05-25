@@ -327,6 +327,26 @@ def prep_welcome_greeting(
     return {"greeting": text}
 
 
+@router.get("/onboarding/demo-bundle")
+def get_demo_bundle_endpoint(
+    variant: str = "saas",
+    company: Company = Depends(get_current_company),
+) -> dict:
+    """Return a structured demo bundle for the sample-study modal —
+    themes + verbatims + interview guide, shaped like a real
+    ProjectAnalysis + QuoteTag + GuideQuestion graph.
+
+    Variant routing matches frontend `pickSampleVariant()`:
+    `saas` (default), `b2b_specifier`, `consumer`. Locale derived from
+    the company's `preferred_language`. Unknown variant/locale falls
+    back to (saas, en)."""
+    from app.services.demo_bundles import get_demo_bundle
+
+    locale = (company.preferred_language or "en").lower()
+    bundle = get_demo_bundle(variant=variant, locale=locale)
+    return dict(bundle)
+
+
 @router.get("/onboarding/copilot/starter-suggestions")
 def get_starter_suggestions(
     company: Company = Depends(get_current_company),
