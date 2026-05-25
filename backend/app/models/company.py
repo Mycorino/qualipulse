@@ -90,6 +90,7 @@ class Company(Base):
     occupation_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     selected_use_cases: Mapped[str | None] = mapped_column(Text, nullable=True)
     onboarding_recap: Mapped[str | None] = mapped_column(Text, nullable=True)
+    study_readiness: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Current priority — monthly re-prompt on the Dashboard so the researcher's
     # top-of-mind focus stays fresh. The UI nudges them to update this every

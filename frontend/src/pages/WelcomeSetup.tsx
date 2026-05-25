@@ -119,6 +119,7 @@ export default function WelcomeSetup({
           use_case: useCaseResolved || useCase,
           decision_role:
             intent === "team" ? "I'm helping someone decide" : "I'll decide",
+          study_readiness: studyReadiness || undefined,
         });
         onProfileSaved(next);
         setStep(3);
@@ -158,6 +159,8 @@ export default function WelcomeSetup({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
+    // saveAndAdvance is intentionally omitted — it closes over form state
+    // but only fires when step1Valid/step2Valid pass, which already re-subscribe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, step1Valid, step2Valid, saving]);
 

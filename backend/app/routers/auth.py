@@ -552,6 +552,8 @@ def _apply_onboarding_fields(company: Company, body: OnboardingProfileRequest) -
         company.selected_use_cases = body.selected_use_cases
     if body.onboarding_recap is not None:
         company.onboarding_recap = body.onboarding_recap
+    if body.study_readiness is not None:
+        company.study_readiness = body.study_readiness
 
 
 @router.patch("/onboarding")
@@ -608,10 +610,11 @@ def _schedule_company_name_backfill(company_id: str) -> None:
             )
             if c is None:
                 return
-            # Force=True — the scheduler only fires when the typed
-            # name materially changed, which is exactly when we want
-            # to overwrite a potentially-stale prior summary.
-            if backfill_business_from_name(c, force=True):
+            # Only force-overwrite if no domain-prefetched summary exists.
+            # Domain-prefetch is higher quality (from the actual website)
+            # than a Haiku guess from a typed company name.
+            has_domain_summary = bool((c.business_summary or "").strip())
+            if backfill_business_from_name(c, force=not has_domain_summary):
                 bg_db.commit()
                 logger.info(
                     "Backfilled business context for %s from typed name '%s'",
@@ -817,6 +820,11 @@ def change_password(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
+        )
+    if len(body.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters",
         )
     company.password_hash = hash_password(body.new_password)
     db.commit()
