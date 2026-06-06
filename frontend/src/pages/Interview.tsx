@@ -1080,13 +1080,17 @@ export default function Interview() {
               ) : null}
               {(info.interview_duration_minutes || info.question_count) ? "." : null}
             </p>
-            {info.privacy_policy_url && (
-              <p className="consent-privacy-link">
+            <p className="consent-privacy-link">
+              <a href="/participant-notice" target="_blank" rel="noopener noreferrer">
+                {t("consent.participantNotice")}
+              </a>
+              {info.privacy_policy_url && " · "}
+              {info.privacy_policy_url && (
                 <a href={info.privacy_policy_url} target="_blank" rel="noopener noreferrer">
-                  {t("consent.privacyPolicy")} →
+                  {t("consent.privacyPolicy")}
                 </a>
-              </p>
-            )}
+              )}
+            </p>
           </div>
 
           {/* Panel-join surface intentionally not shown on consent.
@@ -1833,6 +1837,15 @@ export default function Interview() {
           textAlign: "center",
           lineHeight: 1.6,
         }}>
+          <a
+            href="/participant-notice"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit", textDecoration: "underline" }}
+          >
+            {t("consent.participantNotice")}
+          </a>
+          {info?.privacy_policy_url && " · "}
           {info?.privacy_policy_url && (
             <a
               href={info.privacy_policy_url}
@@ -1843,7 +1856,7 @@ export default function Interview() {
               {t("consent.privacyPolicy")}
             </a>
           )}
-          {info?.privacy_policy_url && " · "}
+          {" · "}
           <span>
             {t("completion.dataRights", {
               defaultValue: "To request deletion of your data, contact the researcher who shared this link.",

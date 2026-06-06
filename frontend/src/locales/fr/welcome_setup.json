@@ -46,7 +46,7 @@
   "deal_unlock_body_with_plan": "Les équipes comme la vôtre commencent souvent sur <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — seulement quand ça vous rapporte.",
 
   "verify_eyebrow": "Un petit détail",
-  "verify_body": "Nous avons envoyé un lien de vérification à {{email}}. Cliquez dessus pour débloquer vos 10 entretiens gratuits — les crédits sont conditionnés à un email vérifié.",
+  "verify_body": "Nous avons envoyé un lien de vérification à {{email}}. Cliquez dessus pour débloquer vos 3 entretiens gratuits — les crédits sont conditionnés à un email vérifié.",
   "verify_resend": "Renvoyer le lien",
   "verify_hint_post_action": "Regardez votre boîte — ça arrive en quelques secondes.",
   "verify_done": "Email vérifié — {{email}}",

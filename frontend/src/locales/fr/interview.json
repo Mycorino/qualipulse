@@ -39,6 +39,7 @@
     "desc": "Cet entretien est conduit par une IA. Vos réponses seront enregistrées et analysées afin d'aider à améliorer des produits et services.",
     "dataUse": "Vos données seront traitées conformément à la",
     "privacyPolicy": "Consulter notre politique de confidentialité",
+    "participantNotice": "Consulter la notice participant",
     "consentLabel": "J'accepte de participer et que mes réponses soient enregistrées",
     "panelConsentLabel": "Je souhaite rejoindre la communauté de recherche pour être invité·e à de futures études",
     "accept": "Je suis prêt·e — commencer",

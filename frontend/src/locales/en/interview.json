@@ -39,6 +39,7 @@
     "desc": "This interview is conducted by AI. Your responses will be recorded and analysed to help improve products and services.",
     "dataUse": "Your data will be processed according to the",
     "privacyPolicy": "Read our privacy policy",
+    "participantNotice": "Read the participant notice",
     "consentLabel": "I agree to participate and have my responses recorded",
     "panelConsentLabel": "I'd like to join the research panel to be invited to future studies",
     "accept": "I'm ready — start",

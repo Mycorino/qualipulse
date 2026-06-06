@@ -1,7 +1,7 @@
 /**
  * Phase 1 of the hybrid onboarding — a 3-step structured wizard that
  * sits in front of the conversational Research Copilot. Sets the deal
- * upfront (10 free interview credits / 3 free transcript views /
+ * upfront (3 free interview credits / 3 free transcript views /
  * unlock with a plan), captures the qualification data we need for
  * downstream personalisation, and surfaces email verification as a
  * load-bearing action (credits are gated on verified email).
@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -440,12 +440,19 @@ export default function WelcomeSetup({
                   {t("deal_unlock_label")}
                 </div>
                 <p className="welcome-setup__deal-body">
-                  {recommendedPlan
-                    ? t("deal_unlock_body_with_plan", {
+                  {recommendedPlan ? (
+                    <Trans
+                      t={t}
+                      i18nKey="deal_unlock_body_with_plan"
+                      values={{
                         planName: recommendedPlan.name,
                         monthly: recommendedPlan.monthly,
-                      })
-                    : t("deal_unlock_body_generic")}
+                      }}
+                      components={{ strong: <strong /> }}
+                    />
+                  ) : (
+                    t("deal_unlock_body_generic")
+                  )}
                 </p>
               </div>
             </div>

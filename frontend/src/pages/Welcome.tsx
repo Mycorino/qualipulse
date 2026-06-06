@@ -200,6 +200,14 @@ export default function Welcome() {
   // because writes are fire-and-forget — a stale read just clobbers
   // the version cheaply.
   const convoVersionRef = useRef<number>(0);
+  // Latch the wizard-vs-chat decision on the first render where `me` is
+  // loaded. Without this, step 1/2 saving a profile field (role,
+  // company_size, use_case) flips `phase1Complete` to true mid-wizard,
+  // which unmounts WelcomeSetup BEFORE step 3 ("Le deal") can render —
+  // making the deal screen dead code. Once the wizard owns the screen it
+  // keeps it until the user finishes or skips (via onComplete).
+  const wizardLatchRef = useRef<boolean | null>(null);
+  const [wizardFinished, setWizardFinished] = useState(false);
 
   // Load the researcher, redirect out if already onboarded, hydrate the
   // persisted conversation thread when present, and otherwise seed the
@@ -601,8 +609,14 @@ export default function Welcome() {
   // genuinely engaged — at least one captured field — otherwise we
   // assume the flag is stale and re-show the wizard.
   const skipRespected = wizardSkipped && !profileEmpty;
-  const showSetupWizard =
-    !done && !skipRespected && !phase1Complete && !hasChatProgress;
+  // First-render decision, latched (see wizardLatchRef above): once the
+  // wizard owns the screen it keeps it through all 3 steps even as the
+  // profile fields fill in, until the user finishes or skips.
+  if (wizardLatchRef.current === null) {
+    wizardLatchRef.current =
+      !done && !skipRespected && !phase1Complete && !hasChatProgress;
+  }
+  const showSetupWizard = !wizardFinished && wizardLatchRef.current === true;
   if (showSetupWizard) {
     return (
       <WelcomeSetup
@@ -614,6 +628,7 @@ export default function Welcome() {
           } catch {
             /* private-mode no-op */
           }
+          setWizardFinished(true);
           getMe().then(setMe).catch(() => undefined);
         }}
       />

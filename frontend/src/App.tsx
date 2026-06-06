@@ -27,6 +27,7 @@ const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const GoogleFinish = lazy(() => import("./pages/GoogleFinish"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
+const LegalDocument = lazy(() => import("./pages/LegalDocument"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AffiliatePortal = lazy(() => import("./pages/AffiliatePortal"));
 const Blog = lazy(() => import("./pages/Blog"));
@@ -123,6 +124,11 @@ export default function App() {
       <Route path="/team/accept" element={<AcceptInvitation />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/dpa" element={<LegalDocument />} />
+      <Route path="/subprocessors" element={<LegalDocument />} />
+      <Route path="/participant-notice" element={<LegalDocument />} />
+      <Route path="/ai-use-policy" element={<LegalDocument />} />
+      <Route path="/retention-policy" element={<LegalDocument />} />
       <Route
         path="/welcome"
         element={

@@ -11,7 +11,7 @@ const MARKETING_PLANS = [
     id: "exploration",
     monthlyEur: 89,
     annualEur: 890,
-    credits: 25,
+    credits: 10,
     surveyResponses: 500,
     highlight: false,
   },
@@ -19,7 +19,7 @@ const MARKETING_PLANS = [
     id: "team",
     monthlyEur: 299,
     annualEur: 2990,
-    credits: 100,
+    credits: 50,
     surveyResponses: 2500,
     highlight: true,
   },
@@ -27,16 +27,16 @@ const MARKETING_PLANS = [
     id: "agency",
     monthlyEur: 799,
     annualEur: 7990,
-    credits: 300,
+    credits: 150,
     surveyResponses: 10000,
     highlight: false,
   },
 ] as const;
 
 /* ---- Scroll-triggered animation hook ---- */
-function useInView(threshold = 0.15) {
+function useInView(threshold = 0.15, initiallyVisible = false) {
   const ref = useRef<HTMLElement | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(initiallyVisible);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -57,15 +57,25 @@ export default function Marketing() {
   const [activePersona, setActivePersona] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const initialHash = typeof window !== "undefined" ? window.location.hash : "";
 
   // Scroll-triggered sections (hero + trust bar are above the fold, always visible)
   const painAnim = useInView();
-  const howAnim = useInView();
-  const copilotAnim = useInView();
+  const howAnim = useInView(0.15, initialHash === "#how");
+  const copilotAnim = useInView(0.15, initialHash === "#copilot");
+  const qualityAnim = useInView();
   const outputAnim = useInView();
-  const whoAnim = useInView();
+  const whoAnim = useInView(0.15, initialHash === "#who");
   const compareAnim = useInView();
-  const pricingAnim = useInView();
+  const pricingAnim = useInView(0.15, initialHash === "#pricing");
+
+  useEffect(() => {
+    if (!initialHash) return;
+    const id = initialHash.slice(1);
+    window.requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView();
+    });
+  }, [initialHash]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -87,6 +97,8 @@ export default function Marketing() {
   const personas = t("whoItsFor.items", { returnObjects: true }) as Array<{ title: string; desc: string; examples: string }>;
   const comparisonRows = t("comparison.rows", { returnObjects: true }) as Array<{ feature: string; quali: string; other: string }>;
   const comparisonHeaders = t("comparison.headers", { returnObjects: true }) as string[];
+  const qualityItems = t("quality.items", { returnObjects: true }) as Array<{ eyebrow: string; title: string; desc: string }>;
+  const faqs = t("faq.items", { returnObjects: true }) as Array<{ question: string; answer: string }>;
 
   return (
     <div className="mkt">
@@ -143,32 +155,52 @@ export default function Marketing() {
           <p className="mkt-hero-note">{t("hero.note")}</p>
         </div>
 
-        {/* Fake UI preview */}
-        <div className="mkt-hero-preview">
-          <div className="mkt-preview-card">
-            <div className="mkt-preview-header">
+        <div className="mkt-hero-preview" aria-label={t("hero.previewLabel")}>
+          <div className="mkt-hero-report">
+            <div className="mkt-hero-report-header">
+              <div>
+                <span className="mkt-report-kicker">{t("hero.reportKicker")}</span>
+                <strong>{t("output.projectName")}</strong>
+              </div>
+              <span>{t("hero.reportMeta")}</span>
+            </div>
+            <div className="mkt-hero-report-summary">
+              <span>{t("output.summaryTitle")}</span>
+              <p>{t("hero.reportSummary")}</p>
+            </div>
+            <div className="mkt-hero-report-grid">
+              {(t("hero.reportMetrics", { returnObjects: true }) as Array<{ value: string; label: string }>).map((metric) => (
+                <div key={metric.label}>
+                  <strong>{metric.value}</strong>
+                  <span>{metric.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mkt-hero-report-theme">
+              <div>
+                <strong>{t("output.theme1Title")}</strong>
+                <span>{t("output.theme1Count")}</span>
+              </div>
+              <blockquote>{t("output.theme1Quote")}</blockquote>
+            </div>
+            <div className="mkt-hero-report-actions">
+              {(t("hero.reportActions", { returnObjects: true }) as string[]).map((action) => (
+                <span key={action}>{action}</span>
+              ))}
+            </div>
+          </div>
+          <div className="mkt-hero-interview-strip" aria-hidden="true">
+            <div>
               <span className="mkt-preview-dot red" />
               <span className="mkt-preview-dot yellow" />
               <span className="mkt-preview-dot green" />
-              <span className="mkt-preview-title">{t("preview.interviewInProgress")}</span>
             </div>
-            <div className="mkt-preview-body">
-              <div className="mkt-preview-question">
-                "{t("hero.interviewQuestion")}"
-              </div>
-              <div className="mkt-preview-wave">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <span key={i} className="mkt-wave-bar" style={{ animationDelay: `${i * 0.07}s` }} />
-                ))}
-              </div>
-              <div className="mkt-preview-status">{t("preview.recording")} · 0:42</div>
+            <p>"{t("hero.interviewQuestion")}"</p>
+            <div className="mkt-preview-wave">
+              {Array.from({ length: 14 }).map((_, i) => (
+                <span key={i} className="mkt-wave-bar" style={{ animationDelay: `${i * 0.07}s` }} />
+              ))}
             </div>
-          </div>
-          <div className="mkt-preview-stat mkt-stat-themes">
-            <span className="mkt-stat-label">{t("preview.emergingThemes")}</span>
-            {(t("hero.themeTags", { returnObjects: true }) as string[]).map((tag) => (
-              <span key={tag} className="mkt-stat-tag">{tag}</span>
-            ))}
           </div>
         </div>
       </section>
@@ -254,11 +286,33 @@ export default function Marketing() {
                   <div className="mkt-copilot-proposal">
                     <div className="mkt-copilot-proposal-title">{t("copilot.proposalTitle")}</div>
                     <div className="mkt-copilot-proposal-body">{t("copilot.proposalBody")}</div>
-                    <button className="mkt-copilot-accept">✓ Accept</button>
+                    <span className="mkt-copilot-accept" aria-hidden="true">
+                      {t("copilot.acceptLabel")}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Interview Quality ---- */}
+      <section className={`mkt-quality${qualityAnim.visible ? " visible" : ""}`} ref={qualityAnim.ref as React.RefObject<HTMLElement>}>
+        <div className="mkt-quality-inner">
+          <div className="mkt-quality-heading">
+            <div className="mkt-badge">{t("quality.badge")}</div>
+            <h2 className="mkt-section-title">{t("quality.title")}</h2>
+            <p className="mkt-section-sub">{t("quality.subtitle")}</p>
+          </div>
+          <div className="mkt-quality-grid">
+            {qualityItems.map((item, i) => (
+              <article key={item.title} className="mkt-quality-card" style={{ animationDelay: `${i * 0.08}s` }}>
+                <span>{item.eyebrow}</span>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
@@ -322,6 +376,7 @@ export default function Marketing() {
             <button
               key={i}
               className={`mkt-persona-pill${activePersona === i ? " active" : ""}`}
+              aria-pressed={activePersona === i}
               onClick={() => setActivePersona(i)}
             >
               {p.title}
@@ -378,18 +433,18 @@ export default function Marketing() {
         <h2 className="mkt-section-title">{t("pricing.title")}</h2>
         <p className="mkt-section-sub">{t("pricing.subtitle")}</p>
 
-        <div className="mkt-billing-toggle" role="tablist" aria-label={t("pricing.billingToggleLabel", { defaultValue: "Billing interval" })}>
+        <div className="mkt-billing-toggle" role="group" aria-label={t("pricing.billingToggleLabel", { defaultValue: "Billing interval" })}>
           <button
-            role="tab"
-            aria-selected={billingInterval === "monthly"}
+            type="button"
+            aria-pressed={billingInterval === "monthly"}
             className={billingInterval === "monthly" ? "active" : ""}
             onClick={() => setBillingInterval("monthly")}
           >
             {t("pricing.billingMonthly", { defaultValue: "Monthly" })}
           </button>
           <button
-            role="tab"
-            aria-selected={billingInterval === "annual"}
+            type="button"
+            aria-pressed={billingInterval === "annual"}
             className={billingInterval === "annual" ? "active" : ""}
             onClick={() => setBillingInterval("annual")}
           >
@@ -449,6 +504,17 @@ export default function Marketing() {
           {t("pricing.enterprise")}{" "}
           <a href="mailto:hello@qualipulse.com">{t("pricing.enterpriseCta")}</a>
         </p>
+        <div className="mkt-faq">
+          <h3>{t("faq.title")}</h3>
+          <div className="mkt-faq-grid">
+            {faqs.map((item) => (
+              <details key={item.question} className="mkt-faq-item">
+                <summary>{item.question}</summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ---- Final CTA ---- */}
@@ -478,9 +544,17 @@ export default function Marketing() {
             <h4>{t("footer.companyTitle")}</h4>
             <Link to="/login">{t("footer.login")}</Link>
             <Link to="/signup">{t("footer.signup")}</Link>
+            <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
+          </div>
+          <div className="mkt-footer-col">
+            <h4>{t("footer.legalTitle")}</h4>
             <Link to="/terms">{t("footer.terms")}</Link>
             <Link to="/privacy">{t("footer.privacy")}</Link>
-            <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
+            <Link to="/dpa">{t("footer.dpa")}</Link>
+            <Link to="/subprocessors">{t("footer.subprocessors")}</Link>
+            <Link to="/participant-notice">{t("footer.participantNotice")}</Link>
+            <Link to="/ai-use-policy">{t("footer.aiUsePolicy")}</Link>
+            <Link to="/retention-policy">{t("footer.retentionPolicy")}</Link>
           </div>
         </div>
         <div className="mkt-footer-bottom">

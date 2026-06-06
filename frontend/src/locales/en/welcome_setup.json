@@ -46,7 +46,7 @@
   "deal_unlock_body_with_plan": "Teams like yours usually start on <strong>{{planName}}</strong> ({{monthly}}/mo). No pressure — only when it's earning its keep.",
 
   "verify_eyebrow": "One quick thing",
-  "verify_body": "We sent a verification link to {{email}}. Click it to unlock your 10 free interviews — credits are gated on a verified email.",
+  "verify_body": "We sent a verification link to {{email}}. Click it to unlock your 3 free interviews — credits are gated on a verified email.",
   "verify_resend": "Resend the link",
   "verify_hint_post_action": "Check your inbox — it takes a second.",
   "verify_done": "Email verified — {{email}}",

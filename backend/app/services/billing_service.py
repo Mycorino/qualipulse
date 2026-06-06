@@ -271,7 +271,7 @@ def can_start_interview(db: Session, workspace_id: str) -> CanStartResult:
 
     # Fraud floor — credit consumption is gated on a verified email.
     # Disposable / typo-pad-style accounts that never verify can't
-    # spend the 10 free trial credits. Verified accounts (real users
+    # spend the 3 free trial credits. Verified accounts (real users
     # who clicked the link) pass through normally.
     from app.models.company import Company  # local import to avoid cycle
 
@@ -567,7 +567,7 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
         subscription_id=sub.id,
         period_start=now,
         period_end=now + timedelta(days=14),
-        included_credits=10,
+        included_credits=3,
     )
     db.add(bal)
     db.flush()
@@ -578,8 +578,8 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
             workspace_id=company.id,
             balance_id=bal.id,
             event_type=EVT_GRANT_INCLUDED,
-            credits_delta=10,
-            balance_after=10,
+            credits_delta=3,
+            balance_after=3,
             source="trial_signup",
         )
     )

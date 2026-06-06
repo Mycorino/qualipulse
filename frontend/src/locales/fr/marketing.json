@@ -8,12 +8,22 @@
     "startTrial": "Essai gratuit"
   },
   "hero": {
-    "badge": "Recherche qualitative par IA",
-    "title": "De la question de recherche aux insights —\nen heures, pas en semaines",
-    "subtitle": "QualiPulse mène des entretiens vocaux par IA de manière asynchrone et produit un mémo de recherche structuré. Créez votre première étude en 5 minutes par simple conversation.",
-    "cta": "Commencer — 10 entretiens inclus",
-    "secondaryCta": "Voir comment ça marche",
-    "note": "10 entretiens gratuits · Sans carte bancaire · Annulable à tout moment",
+    "badge": "Recherche utilisateur modérée par IA",
+    "title": "Entretiens utilisateurs par IA.\nMémos prêts à décider.",
+    "subtitle": "Lancez des entretiens vocaux asynchrones, laissez les participants répondre à leur rythme, et obtenez un mémo de recherche avec thèmes, citations, tensions et recommandations.",
+    "cta": "Commencer — 3 entretiens inclus",
+    "secondaryCta": "Voir le workflow",
+    "note": "3 entretiens gratuits · Sans carte bancaire · Seuls les entretiens complétés comptent",
+    "previewLabel": "Aperçu d'un mémo de recherche",
+    "reportKicker": "Mémo de recherche IA",
+    "reportMeta": "12 entretiens · prêt à partager",
+    "reportSummary": "Le principal frein à l'adoption n'est pas l'envie d'essayer le produit, mais la confiance dans la première session de configuration. Les participants veulent voir la valeur avant d'investir du temps.",
+    "reportMetrics": [
+      { "value": "12", "label": "entretiens" },
+      { "value": "2", "label": "tensions nettes" },
+      { "value": "5", "label": "citations utiles" }
+    ],
+    "reportActions": ["Partager", "Taguer les citations", "Planifier la suite"],
     "interviewInProgress": "Entretien en cours",
     "recordingStatus": "Enregistrement · 0:42",
     "interviewQuestion": "Pouvez-vous me décrire la dernière fois que vous avez dû intégrer un nouvel outil au travail ?",
@@ -22,9 +32,9 @@
   },
   "trustBar": {
     "stats": [
-      { "number": "2 400+", "label": "entretiens analysés" },
-      { "number": "45s", "label": "synthèse moyenne" },
-      { "number": "100%", "label": "dans le navigateur, sans appli" }
+      { "number": "3", "label": "entretiens complétés gratuits pour commencer" },
+      { "number": "15 min", "label": "durée d'entretien par défaut" },
+      { "number": "Sans appli", "label": "les participants répondent dans le navigateur" }
     ]
   },
   "painPoints": {
@@ -74,22 +84,45 @@
   },
   "copilot": {
     "title": "Votre partenaire de recherche, toujours disponible",
-    "subtitle": "Le Copilote Recherche vous guide de la première idée à l'insight final — propulsé par le modèle de raisonnement le plus avancé.",
+    "subtitle": "Le Copilote Recherche transforme une question brute en étude utilisable, propose les prochaines actions et garde le contexte de votre programme.",
     "features": [
-      { "icon": "🧠", "text": "Propulsé par Claude Opus — raisonnement approfondi" },
+      { "icon": "🧠", "text": "Transforme un objectif en critères de sélection, objectifs et questions d'entretien" },
       { "icon": "📋", "text": "Propose les prochaines étapes sous forme de cartes à accepter en un clic" },
-      { "icon": "🔄", "text": "Contextuel sur l'ensemble de votre programme de recherche" }
+      { "icon": "🔄", "text": "Garde le contexte entre études, sondages, entretiens et rapports" }
     ],
     "chatUser": "Que devrais-je demander sur les frictions d'intégration ?",
     "chatAi": "D'après votre objectif, je suggère de vous concentrer sur les 10 premières minutes. Voici un guide d'entretien proposé :",
     "proposalTitle": "Proposition : guide d'entretien en 5 questions",
-    "proposalBody": "Découverte → Première impression → Points de friction → Solutions de contournement → Expérience idéale"
+    "proposalBody": "Découverte → Première impression → Points de friction → Solutions de contournement → Expérience idéale",
+    "acceptLabel": "Accepter"
+  },
+  "quality": {
+    "badge": "Qualité des entretiens",
+    "title": "Naturel pour les participants, vérifiable pour les chercheurs",
+    "subtitle": "La modération IA n'a de valeur que si les participants répondent confortablement et si chaque insight reste relié à sa source.",
+    "items": [
+      {
+        "eyebrow": "Relances adaptatives",
+        "title": "Le guide s'adapte quand une réponse compte",
+        "desc": "QualiPulse suit votre guide d'entretien, puis pose des relances contextuelles lorsqu'un participant mentionne une douleur, un contournement, un moment de décision ou une contradiction."
+      },
+      {
+        "eyebrow": "Expérience participant",
+        "title": "Un entretien vocal dans le navigateur",
+        "desc": "Les participants ouvrent un lien, répondent sur ordinateur ou mobile, et terminent l'entretien à leur rythme. Sans appli, sans coordination d'agenda."
+      },
+      {
+        "eyebrow": "Traçabilité",
+        "title": "Chaque thème reste relié aux preuves",
+        "desc": "Les mémos incluent des citations et le contexte participant, avec les transcriptions disponibles pour relecture, tagging, export et suivi avec les parties prenantes."
+      }
+    ]
   },
   "output": {
     "title": "De 12 entretiens à ceci — automatiquement",
     "subtitle": "Voici à quoi ressemble votre mémo de recherche généré par IA. Thèmes, citations, tensions et recommandations — prêt à partager.",
     "projectName": "Étude d'expérience d'intégration SaaS",
-    "meta": "12 participants · Généré en 45 secondes",
+    "meta": "12 participants · Généré en quelques minutes",
     "summaryTitle": "Résumé",
     "summaryText": "Les participants ont systématiquement signalé que la complexité de la configuration initiale est le principal frein à l'adoption. La plupart appréciaient une expérience d'intégration guidée, mais trouvaient les implémentations actuelles trop génériques. Trois thèmes clés sont apparus autour des attentes de valeur rapide, du rôle de la preuve sociale et des frustrations liées à la découverte des fonctionnalités.",
     "keyThemesTitle": "Thèmes clés",
@@ -134,8 +167,8 @@
     "rows": [
       { "feature": "Planification nécessaire", "quali": "Non — asynchrone, à tout moment", "other": "Oui — coordination d'agendas" },
       { "feature": "Modération IA", "quali": "Intégrée, relances adaptatives", "other": "Manuelle ou inexistante" },
-      { "feature": "Temps de synthèse", "quali": "45 secondes", "other": "2 à 3 jours" },
-      { "feature": "Plans de recherche multi-étapes", "quali": "Oui — entretiens + sondages + ateliers", "other": "Non disponible" },
+      { "feature": "Mémo de recherche", "quali": "Quelques minutes après les réponses", "other": "Synthèse manuelle" },
+      { "feature": "Plans de recherche multi-étapes", "quali": "Oui — entretiens + sondages", "other": "Souvent assemblé à la main" },
       { "feature": "Copilote Recherche", "quali": "Partenaire IA toujours disponible", "other": "Non disponible" },
       { "feature": "Appareils compatibles", "quali": "Tout navigateur, sans appli", "other": "Souvent une appli requise" }
     ]
@@ -144,11 +177,11 @@
     "quote": "\"Nous avons créé QualiPulse parce que nous en avions assez de passer 80 % de notre temps de recherche sur la logistique et 20 % à réfléchir. Nous voulions inverser ce ratio.\"",
     "name": "Corino Fontana",
     "role": "Fondateur, QualiPulse",
-    "badges": ["Conforme RGPD", "Données chiffrées au repos", "Infrastructure hébergée en UE"]
+    "badges": ["Workflows pensés RGPD", "Stockage chiffré", "Hébergement UE possible"]
   },
   "pricing": {
     "title": "Des tarifs simples et transparents",
-    "subtitle": "Commencez avec 10 entretiens gratuits. Passez au plan supérieur quand vous en avez besoin.",
+    "subtitle": "Commencez avec 3 entretiens gratuits. Passez au plan supérieur quand vous en avez besoin.",
     "recommended": "Recommandé",
     "enterprise": "Vous gérez un programme de recherche important ?",
     "enterpriseCta": "Parlons Enterprise",
@@ -159,15 +192,15 @@
     "billingAnnual": "Annuel",
     "billingAnnualSave": "Économisez 17%",
     "billedAnnuallyAs": "Facturé {{amount}} € par an",
-    "creditsPerMonth": "crédits d'entretien / mois",
+    "creditsPerMonth": "entretiens IA complétés / mois",
     "surveyResponsesPerMonth": "réponses sondage / mois",
-    "creditDefinition": "1 crédit = 1 entretien participant complété, jusqu'à 15 minutes — incluant questions IA, transcription, analyse et stockage.",
+    "creditDefinition": "1 crédit = 1 entretien participant complété, jusqu'à 15 minutes. Les participants écartés ou abandonnés ne consomment pas de crédits.",
     "plans": {
       "exploration": {
         "name": "Exploration",
         "desc": "Pour les chercheurs en solo qui mènent quelques études par mois",
         "features": [
-          "25 crédits d'entretien / mois",
+          "Seuls les entretiens complétés comptent",
           "Jusqu'à 3 projets actifs",
           "Guide d'entretien et analyse IA",
           "Export CSV et PDF",
@@ -179,7 +212,7 @@
         "name": "Équipe",
         "desc": "Pour les équipes de recherche menant plusieurs études en parallèle",
         "features": [
-          "100 crédits d'entretien / mois",
+          "Seuls les entretiens complétés comptent",
           "Jusqu'à 20 projets actifs",
           "3 éditeurs + viewers illimités",
           "Espace de travail équipe et permissions",
@@ -191,7 +224,7 @@
         "name": "Agence",
         "desc": "Pour les agences qui mènent des études pour plusieurs clients",
         "features": [
-          "300 crédits d'entretien / mois",
+          "Seuls les entretiens complétés comptent",
           "Projets illimités",
           "8 éditeurs + viewers illimités",
           "Workspaces clients et branding personnalisé",
@@ -201,18 +234,40 @@
       }
     }
   },
+  "faq": {
+    "title": "Questions fréquentes avant de commencer",
+    "items": [
+      {
+        "question": "Dois-je recruter les participants ?",
+        "answer": "QualiPulse vous donne des liens partageables pour vos propres participants. Le recrutement panel est séparé, vous gardez donc le contrôle sur les personnes interrogées."
+      },
+      {
+        "question": "Qu'est-ce qui consomme un crédit ?",
+        "answer": "Seuls les entretiens participants complétés consomment des crédits. Les participants écartés, abandonnés ou en échec technique ne consomment rien."
+      },
+      {
+        "question": "Que doivent installer les participants ?",
+        "answer": "Rien. Ils ouvrent un lien et réalisent un entretien vocal dans leur navigateur, sur ordinateur ou mobile."
+      },
+      {
+        "question": "Puis-je acheter plus d'entretiens ?",
+        "answer": "Oui. Vous pouvez passer à un plan supérieur ou acheter des packs de crédits prépayés lorsqu'une étude a besoin de plus de réponses."
+      }
+    ]
+  },
   "midCta": {
-    "text": "Commencer — 10 entretiens inclus"
+    "text": "Commencer — 3 entretiens inclus"
   },
   "finalCta": {
     "title": "Votre prochaine étude pourrait être prête vendredi",
     "subtitle": "Configurez une étude en 5 minutes. Obtenez vos premiers insights en quelques heures.",
-    "cta": "Commencer — 10 entretiens offerts"
+    "cta": "Commencer — 3 entretiens offerts"
   },
   "footer": {
     "tagline": "Recherche qualitative par IA, en pilote automatique.",
     "productTitle": "Produit",
     "companyTitle": "Entreprise",
+    "legalTitle": "Juridique",
     "features": "Fonctionnalités",
     "copilotLink": "Copilote Recherche",
     "pricingLink": "Tarifs",
@@ -221,6 +276,11 @@
     "signup": "S'inscrire",
     "terms": "CGU",
     "privacy": "Confidentialité",
+    "dpa": "DPA",
+    "subprocessors": "Sous-traitants",
+    "participantNotice": "Notice participant",
+    "aiUsePolicy": "Politique IA",
+    "retentionPolicy": "Conservation",
     "contact": "Contact",
     "copy": "© 2026 QualiPulse · Conforme RGPD",
     "interviewLink": "Vous avez un lien d'entretien ?"

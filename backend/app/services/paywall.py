@@ -1,8 +1,8 @@
 """V4 paywall — first-3-transcripts-free visibility model.
 
-The pricing motion: free workspaces can RUN 10 interviews on starter
+The pricing motion: free workspaces can RUN 3 interviews on starter
 credits, but only the first 3 completed transcripts are viewable. The
-remaining 7 (or however many they collected) are paywall-locked —
+remaining completed responses beyond the preview are paywall-locked —
 unlocked by subscribing OR buying a credit pack.
 
 Visibility is **derived, not stored** — a single source of truth based

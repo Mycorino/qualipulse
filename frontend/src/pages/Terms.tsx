@@ -61,6 +61,13 @@ function TermsContentEN() {
         As a researcher using QualiPulse, you act as a data controller for the personal data
         of your interview participants. You are responsible for ensuring that you have an
         appropriate legal basis for collecting and processing participant data.
+        Our <Link to="/dpa">Data Processing Agreement</Link> applies where QualiPulse processes
+        personal data on your behalf.
+      </p>
+      <p>
+        Your use of AI features is also subject to our{" "}
+        <Link to="/ai-use-policy">AI Use Policy</Link>, including restrictions on high-risk,
+        sensitive, deceptive, discriminatory, or unlawful uses.
       </p>
 
       <h2 id="section-6" style={{ scrollMarginTop: "80px" }}>6. Payment Terms</h2>
@@ -188,7 +195,13 @@ function TermsContentFR() {
         En tant que chercheur utilisant QualiPulse, vous agissez en qualit{"\u00e9"} de responsable du
         traitement des donn{"\u00e9"}es personnelles de vos participants. Vous {"\u00ea"}tes responsable de vous
         assurer que vous disposez d{"\u2019"}une base juridique appropri{"\u00e9"}e pour la collecte et le traitement
-        des donn{"\u00e9"}es des participants.
+        des donn{"\u00e9"}es des participants. Notre <Link to="/dpa">Accord de traitement des donn{"\u00e9"}es</Link>{" "}
+        s{"\u2019"}applique lorsque QualiPulse traite des donn{"\u00e9"}es personnelles pour votre compte.
+      </p>
+      <p>
+        Votre utilisation des fonctionnalit{"\u00e9"}s IA est {"\u00e9"}galement soumise {"\u00e0"} notre{" "}
+        <Link to="/ai-use-policy">Politique d{"\u2019"}utilisation de l{"\u2019"}IA</Link>, y compris les restrictions
+        relatives aux usages sensibles, {"\u00e0"} haut risque, trompeurs, discriminatoires ou illicites.
       </p>
 
       <h2 id="section-6" style={{ scrollMarginTop: "80px" }}>6. Conditions de paiement</h2>

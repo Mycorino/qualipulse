@@ -139,7 +139,7 @@ class TestCanStartInterviewCredits:
         result = can_start_interview(db_session, c.id)
         assert result.allowed is True
         assert result.is_legacy is False
-        assert result.available_credits == 10
+        assert result.available_credits == 3
 
     def test_expired_trial_still_allowed_if_credits_remain(self, db_session):
         # Credits-native model: trial expiry no longer gates. As long as
@@ -154,7 +154,7 @@ class TestCanStartInterviewCredits:
         result = can_start_interview(db_session, c.id)
         assert result.allowed is True
         assert result.reason == "ok"
-        assert result.available_credits == 10
+        assert result.available_credits == 3
 
     def test_no_credits_no_overage_blocks(self, db_session):
         ensure_plans_seeded(db_session)
@@ -162,7 +162,7 @@ class TestCanStartInterviewCredits:
         bootstrap_trial_subscription(db_session, c)
         # Drain the balance.
         bal = get_active_balance(db_session, c.id)
-        bal.used_credits = 10
+        bal.used_credits = 3
         db_session.commit()
 
         result = can_start_interview(db_session, c.id)
@@ -177,7 +177,7 @@ class TestCanStartInterviewCredits:
         sub.plan_id = "team"
         sub.overage_enabled = True
         bal = get_active_balance(db_session, c.id)
-        bal.used_credits = 10
+        bal.used_credits = 3
         db_session.commit()
 
         result = can_start_interview(db_session, c.id)
@@ -192,7 +192,7 @@ class TestConsumeIdempotency:
         sub = bootstrap_trial_subscription(db_session, c)
         # Move from 'trial' to 'team' so credits are credited via the
         # shared bootstrap path; the bootstrap creates a balance with
-        # included_credits=10 for trial. Re-use it.
+        # included_credits=3 for trial. Re-use it.
         participant_id = str(uuid.uuid4())
 
         ledger = consume_interview_credit(
@@ -204,7 +204,7 @@ class TestConsumeIdempotency:
 
         bal = get_active_balance(db_session, c.id)
         assert bal.used_credits == 1
-        assert bal.available == 9
+        assert bal.available == 2
 
     def test_second_consume_for_same_participant_is_noop(self, db_session):
         ensure_plans_seeded(db_session)
@@ -270,8 +270,8 @@ class TestTrialBootstrap:
 
         bal = get_active_balance(db_session, c.id)
         assert bal is not None
-        assert bal.included_credits == 10
-        assert bal.available == 10
+        assert bal.included_credits == 3
+        assert bal.available == 3
 
     def test_replaces_legacy_starter_from_backfill(self, db_session):
         """Common path: company exists, startup created legacy_starter,
@@ -380,7 +380,7 @@ class TestStripeLifecycle:
         )
         bal1 = grant_period_credits(db_session, sub)
         assert bal1 is not None
-        assert bal1.included_credits == 100  # team plan default
+        assert bal1.included_credits == 50  # team plan default
 
         # Replay → same balance, no double grant.
         bal2 = grant_period_credits(db_session, sub)
@@ -490,8 +490,9 @@ class TestUsageWarningEmails:
     def test_no_warning_under_80_percent(self, db_session, monkeypatch):
         from app.services.billing_service import (
             _maybe_send_usage_warning,
-            bootstrap_trial_subscription,
             get_active_balance,
+            grant_period_credits,
+            upsert_subscription_from_stripe,
         )
 
         sent: list[dict] = []
@@ -503,9 +504,22 @@ class TestUsageWarningEmails:
 
         ensure_plans_seeded(db_session)
         c = _make_company(db_session)
-        bootstrap_trial_subscription(db_session, c)
+        now = datetime.utcnow()
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id="cus_warn",
+            stripe_subscription_id="sub_warn",
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        grant_period_credits(db_session, sub)
         bal = get_active_balance(db_session, c.id)
-        bal.used_credits = 5  # 50%
+        bal.used_credits = 20  # 40%
         db_session.commit()
 
         _maybe_send_usage_warning(db_session, c.id, bal)
@@ -514,8 +528,9 @@ class TestUsageWarningEmails:
     def test_fires_at_80_percent_then_idempotent(self, db_session, monkeypatch):
         from app.services.billing_service import (
             _maybe_send_usage_warning,
-            bootstrap_trial_subscription,
             get_active_balance,
+            grant_period_credits,
+            upsert_subscription_from_stripe,
         )
         from app.models.billing import UsageEvent
 
@@ -528,9 +543,22 @@ class TestUsageWarningEmails:
 
         ensure_plans_seeded(db_session)
         c = _make_company(db_session)
-        bootstrap_trial_subscription(db_session, c)
+        now = datetime.utcnow()
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id="cus_warn",
+            stripe_subscription_id="sub_warn",
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        grant_period_credits(db_session, sub)
         bal = get_active_balance(db_session, c.id)
-        bal.used_credits = 8  # 80%
+        bal.used_credits = 40  # 80%
         db_session.commit()
 
         _maybe_send_usage_warning(db_session, c.id, bal)
@@ -550,8 +578,9 @@ class TestUsageWarningEmails:
     def test_fires_at_100_percent(self, db_session, monkeypatch):
         from app.services.billing_service import (
             _maybe_send_usage_warning,
-            bootstrap_trial_subscription,
             get_active_balance,
+            grant_period_credits,
+            upsert_subscription_from_stripe,
         )
 
         sent: list[dict] = []
@@ -563,9 +592,22 @@ class TestUsageWarningEmails:
 
         ensure_plans_seeded(db_session)
         c = _make_company(db_session)
-        bootstrap_trial_subscription(db_session, c)
+        now = datetime.utcnow()
+        sub = upsert_subscription_from_stripe(
+            db_session,
+            workspace_id=c.id,
+            plan_id="team",
+            stripe_customer_id="cus_warn",
+            stripe_subscription_id="sub_warn",
+            stripe_price_id="price_x",
+            status="active",
+            billing_interval="monthly",
+            current_period_start=now,
+            current_period_end=now + timedelta(days=30),
+        )
+        grant_period_credits(db_session, sub)
         bal = get_active_balance(db_session, c.id)
-        bal.used_credits = 10  # 100%
+        bal.used_credits = 50  # 100%
         db_session.commit()
 
         _maybe_send_usage_warning(db_session, c.id, bal)
@@ -609,7 +651,7 @@ class TestRolloverPolicy:
         )
         bal = grant_period_credits(db_session, sub)
         assert bal.rollover_credits == 0
-        assert bal.included_credits == 100  # team plan default
+        assert bal.included_credits == 50  # team plan default
 
     def test_unused_purchased_rolls_forward_unused_included_expires(self, db_session):
         from app.services.billing_service import (
@@ -642,7 +684,7 @@ class TestRolloverPolicy:
         )
         bal2 = grant_period_credits(db_session, sub)
         assert bal2.id != bal1.id
-        assert bal2.included_credits == 100
+        assert bal2.included_credits == 50
         assert bal2.rollover_credits == 25
         assert bal2.purchased_credits == 0
 
@@ -665,7 +707,7 @@ class TestRolloverPolicy:
             .all()
         )
         assert len(expire_events) == 1
-        assert expire_events[0].credits_delta == -70
+        assert expire_events[0].credits_delta == -20
 
     def test_consumption_drains_included_first_then_rollover_then_purchased(self, db_session):
         from app.services.billing_service import (
@@ -679,7 +721,7 @@ class TestRolloverPolicy:
         )
         bal1 = grant_period_credits(db_session, sub)
         bal1.purchased_credits = 50
-        bal1.used_credits = 130
+        bal1.used_credits = 80
         db_session.commit()
 
         sub = upsert_subscription_from_stripe(
@@ -709,7 +751,7 @@ class TestRolloverPolicy:
         )
         bal1 = grant_period_credits(db_session, sub)
         bal1.rollover_credits = 40
-        bal1.used_credits = 100
+        bal1.used_credits = 50
         db_session.commit()
 
         sub = upsert_subscription_from_stripe(
@@ -739,7 +781,7 @@ class TestRolloverPolicy:
         )
         bal1 = grant_period_credits(db_session, sub)
         bal1.purchased_credits = 25
-        bal1.used_credits = 125
+        bal1.used_credits = 75
         db_session.commit()
 
         sub = upsert_subscription_from_stripe(

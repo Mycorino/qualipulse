@@ -65,7 +65,7 @@ function PrivacyContentEN() {
       <ul>
         <li><strong>Contract performance:</strong> Processing necessary to provide the Service you have subscribed to.</li>
         <li><strong>Legitimate interest:</strong> Security monitoring, fraud prevention, and service improvement.</li>
-        <li><strong>Consent:</strong> Interview participants provide consent before beginning an interview. Researchers are responsible for ensuring appropriate consent mechanisms.</li>
+        <li><strong>Consent or other customer-selected lawful basis:</strong> Interview participants see a notice before beginning an interview. Researchers are responsible for selecting and documenting the appropriate lawful basis for their study.</li>
         <li><strong>Legal obligation:</strong> Where we are required to process data to comply with applicable laws.</li>
       </ul>
 
@@ -89,6 +89,9 @@ function PrivacyContentEN() {
         safeguards are in place, such as Standard Contractual Clauses (SCCs) or the
         EU-US Data Privacy Framework.
       </p>
+      <p>
+        See our current <Link to="/subprocessors">Subprocessors</Link> page for the operational list.
+      </p>
 
       <h2 id="section-7" style={{ scrollMarginTop: "80px" }}>7. Data Storage and Security</h2>
       <p>
@@ -109,6 +112,9 @@ function PrivacyContentEN() {
         <li><strong>Audio recordings:</strong> Retained as long as the associated interview exists. Deleted when the participant or project is deleted.</li>
         <li><strong>Technical logs:</strong> Retained for up to 90 days for security and debugging purposes.</li>
       </ul>
+      <p>
+        See our <Link to="/retention-policy">Data Retention Policy</Link> for additional operational detail.
+      </p>
 
       <h2 id="section-9" style={{ scrollMarginTop: "80px" }}>9. Your Rights</h2>
       <p>Under the GDPR, you have the following rights:</p>
@@ -130,6 +136,7 @@ function PrivacyContentEN() {
         <strong>Interview participants:</strong> If you participated in an interview and wish
         to exercise your rights, you may contact us directly or reach out to the researcher
         who created the interview. Researchers can delete participant data through the platform.
+        You can also read the <Link to="/participant-notice">Participant Interview Notice</Link>.
       </p>
 
       <h2 id="section-10" style={{ scrollMarginTop: "80px" }}>10. Cookies</h2>
@@ -239,7 +246,7 @@ function PrivacyContentFR() {
       <ul>
         <li><strong>Ex{"\u00e9"}cution du contrat{"\u00a0"}:</strong> Traitement n{"\u00e9"}cessaire {"\u00e0"} la fourniture du Service auquel vous avez souscrit.</li>
         <li><strong>Int{"\u00e9"}r{"\u00ea"}t l{"\u00e9"}gitime{"\u00a0"}:</strong> Surveillance de la s{"\u00e9"}curit{"\u00e9"}, pr{"\u00e9"}vention de la fraude et am{"\u00e9"}lioration du service.</li>
-        <li><strong>Consentement{"\u00a0"}:</strong> Les participants aux entretiens donnent leur consentement avant de commencer un entretien. Les chercheurs sont responsables de la mise en place de m{"\u00e9"}canismes de consentement appropri{"\u00e9"}s.</li>
+        <li><strong>Consentement ou autre base juridique choisie par le client{"\u00a0"}:</strong> Les participants voient une notice avant de commencer un entretien. Les chercheurs sont responsables de choisir et documenter la base juridique appropri{"\u00e9"}e pour leur {"\u00e9"}tude.</li>
         <li><strong>Obligation l{"\u00e9"}gale{"\u00a0"}:</strong> Lorsque nous sommes tenus de traiter des donn{"\u00e9"}es pour nous conformer aux lois applicables.</li>
       </ul>
 
@@ -263,6 +270,9 @@ function PrivacyContentFR() {
         l{"\u2019"}UE/EEE, nous veillons {"\u00e0"} ce que des garanties appropri{"\u00e9"}es soient en place, telles que
         les Clauses Contractuelles Types (CCT) ou le Cadre de Protection des Donn{"\u00e9"}es UE-{"\u00c9"}tats-Unis.
       </p>
+      <p>
+        Consultez notre page <Link to="/subprocessors">Sous-traitants</Link> pour la liste op{"\u00e9"}rationnelle actuelle.
+      </p>
 
       <h2 id="section-7" style={{ scrollMarginTop: "80px" }}>7. Stockage et s{"\u00e9"}curit{"\u00e9"} des donn{"\u00e9"}es</h2>
       <p>
@@ -283,6 +293,9 @@ function PrivacyContentFR() {
         <li><strong>Enregistrements audio{"\u00a0"}:</strong> Conserv{"\u00e9"}s tant que l{"\u2019"}entretien associ{"\u00e9"} existe. Supprim{"\u00e9"}s lors de la suppression du participant ou du projet.</li>
         <li><strong>Journaux techniques{"\u00a0"}:</strong> Conserv{"\u00e9"}s jusqu{"\u2019"}{"\u00e0"} 90 jours {"\u00e0"} des fins de s{"\u00e9"}curit{"\u00e9"} et de d{"\u00e9"}bogage.</li>
       </ul>
+      <p>
+        Consultez notre <Link to="/retention-policy">Politique de conservation des donn{"\u00e9"}es</Link> pour plus de d{"\u00e9"}tails op{"\u00e9"}rationnels.
+      </p>
 
       <h2 id="section-9" style={{ scrollMarginTop: "80px" }}>9. Vos droits</h2>
       <p>En vertu du RGPD, vous disposez des droits suivants{"\u00a0"}:</p>
@@ -304,7 +317,8 @@ function PrivacyContentFR() {
         <strong>Participants aux entretiens{"\u00a0"}:</strong> Si vous avez particip{"\u00e9"} {"\u00e0"} un entretien et
         souhaitez exercer vos droits, vous pouvez nous contacter directement ou vous adresser
         au chercheur qui a cr{"\u00e9"}{"\u00e9"} l{"\u2019"}entretien. Les chercheurs peuvent supprimer les donn{"\u00e9"}es des
-        participants via la plateforme.
+        participants via la plateforme. Vous pouvez aussi consulter la{" "}
+        <Link to="/participant-notice">Notice participant</Link>.
       </p>
 
       <h2 id="section-10" style={{ scrollMarginTop: "80px" }}>10. Cookies</h2>

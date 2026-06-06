@@ -8,12 +8,22 @@
     "startTrial": "Start free"
   },
   "hero": {
-    "badge": "AI-powered qualitative research",
-    "title": "From research question to insights —\nin hours, not weeks",
-    "subtitle": "QualiPulse runs AI-moderated voice interviews asynchronously and delivers a structured research memo. Chat your way to your first study in 5 minutes.",
-    "cta": "Start free — 10 interviews included",
-    "secondaryCta": "See how it works",
-    "note": "10 free interviews · No credit card required · Cancel anytime",
+    "badge": "AI-moderated user research",
+    "title": "AI user interviews.\nDecision-ready memos.",
+    "subtitle": "Launch asynchronous voice interviews, let participants answer in their own time, and get a research memo with themes, quotes, tensions, and recommendations.",
+    "cta": "Start free — 3 interviews included",
+    "secondaryCta": "See the workflow",
+    "note": "3 free interviews · No credit card required · Completed interviews only",
+    "previewLabel": "Example research memo preview",
+    "reportKicker": "AI research memo",
+    "reportMeta": "12 interviews · ready to share",
+    "reportSummary": "The primary adoption barrier is not willingness to try the product — it is confidence in the first setup session. Participants need proof of value before they invest time in configuration.",
+    "reportMetrics": [
+      { "value": "12", "label": "interviews" },
+      { "value": "2", "label": "sharp tensions" },
+      { "value": "5", "label": "citable quotes" }
+    ],
+    "reportActions": ["Share report", "Tag quotes", "Plan follow-up"],
     "interviewInProgress": "Interview in progress",
     "recordingStatus": "Recording · 0:42",
     "interviewQuestion": "Can you walk me through the last time you had to onboard a new tool at work?",
@@ -22,9 +32,9 @@
   },
   "trustBar": {
     "stats": [
-      { "number": "2,400+", "label": "interviews analyzed" },
-      { "number": "45s", "label": "average synthesis time" },
-      { "number": "100%", "label": "browser-based, no app needed" }
+      { "number": "3", "label": "free completed interviews to start" },
+      { "number": "15 min", "label": "default interview length" },
+      { "number": "No app", "label": "participants answer in browser" }
     ]
   },
   "painPoints": {
@@ -74,22 +84,45 @@
   },
   "copilot": {
     "title": "Your always-on research partner",
-    "subtitle": "The Research Copilot guides you from first idea to final insight — powered by the most advanced reasoning model available.",
+    "subtitle": "The Research Copilot turns a rough question into a usable study, suggests next actions, and keeps context across your research program.",
     "features": [
-      { "icon": "🧠", "text": "Powered by Claude Opus — deep research reasoning" },
+      { "icon": "🧠", "text": "Turns a research goal into objectives, screening criteria, and guide questions" },
       { "icon": "📋", "text": "Proposes next steps as cards you can accept in one click" },
-      { "icon": "🔄", "text": "Context-aware across your entire research program" }
+      { "icon": "🔄", "text": "Keeps context across studies, surveys, interviews, and reports" }
     ],
     "chatUser": "What should I ask about onboarding friction?",
     "chatAi": "Based on your research goal, I'd suggest focusing on the first 10 minutes of the experience. Here's a proposed interview guide:",
     "proposalTitle": "Proposed: 5-question interview guide",
-    "proposalBody": "Discovery → First impression → Pain points → Workarounds → Ideal experience"
+    "proposalBody": "Discovery → First impression → Pain points → Workarounds → Ideal experience",
+    "acceptLabel": "Accept"
+  },
+  "quality": {
+    "badge": "Interview quality",
+    "title": "Built to feel natural, and stay auditable",
+    "subtitle": "AI moderation is only useful if participants can answer comfortably and researchers can trace every insight back to the source.",
+    "items": [
+      {
+        "eyebrow": "Adaptive follow-ups",
+        "title": "The guide flexes when an answer matters",
+        "desc": "QualiPulse follows your interview guide, then asks contextual probes when participants mention a pain point, workaround, decision moment, or contradiction."
+      },
+      {
+        "eyebrow": "Participant experience",
+        "title": "A voice interview in the browser",
+        "desc": "Participants open one link, answer on desktop or mobile, and complete the interview in their own time. No app install, no calendar coordination."
+      },
+      {
+        "eyebrow": "Traceability",
+        "title": "Every theme stays connected to evidence",
+        "desc": "Research memos include supporting quotes and participant context, with transcripts available for review, tagging, export, and stakeholder follow-up."
+      }
+    ]
   },
   "output": {
     "title": "From 12 interviews to this — automatically",
     "subtitle": "This is what your AI-generated research memo looks like. Themes, quotes, tensions, and recommendations — ready to share.",
     "projectName": "SaaS Onboarding Experience Study",
-    "meta": "12 participants · Generated in 45 seconds",
+    "meta": "12 participants · Generated in minutes",
     "summaryTitle": "Summary",
     "summaryText": "Participants consistently reported that initial setup complexity is the primary barrier to adoption. Most valued a guided onboarding experience but found current implementations overly generic. Three key themes emerged around time-to-value expectations, the role of social proof in building confidence, and frustrations with feature discovery.",
     "keyThemesTitle": "Key Themes",
@@ -134,8 +167,8 @@
     "rows": [
       { "feature": "Scheduling required", "quali": "No — async, anytime", "other": "Yes — calendar coordination" },
       { "feature": "AI moderation", "quali": "Built-in, adaptive follow-ups", "other": "Manual or none" },
-      { "feature": "Time to synthesis", "quali": "45 seconds", "other": "2–3 days" },
-      { "feature": "Multi-step research plans", "quali": "Yes — interviews + surveys + workshops", "other": "Not available" },
+      { "feature": "Research memo", "quali": "Minutes after responses are in", "other": "Manual synthesis work" },
+      { "feature": "Multi-step research plans", "quali": "Yes — interviews + surveys", "other": "Usually stitched together manually" },
       { "feature": "Research Copilot", "quali": "Always-on AI partner", "other": "Not available" },
       { "feature": "Device requirements", "quali": "Any browser, no app", "other": "Often requires app install" }
     ]
@@ -144,11 +177,11 @@
     "quote": "\"We built QualiPulse because we were tired of spending 80% of our research time on logistics and 20% on thinking. We wanted to flip that ratio.\"",
     "name": "Corino Fontana",
     "role": "Founder, QualiPulse",
-    "badges": ["GDPR compliant", "Data encrypted at rest", "EU-hosted infrastructure"]
+    "badges": ["GDPR-conscious workflows", "Encrypted storage", "EU-hosting ready"]
   },
   "pricing": {
     "title": "Simple, transparent pricing",
-    "subtitle": "Start with 10 free interviews. Upgrade when you need more.",
+    "subtitle": "Start with 3 free interviews. Upgrade when you need more.",
     "recommended": "Recommended",
     "enterprise": "Running a large research program?",
     "enterpriseCta": "Talk to us about Enterprise",
@@ -159,15 +192,15 @@
     "billingAnnual": "Annual",
     "billingAnnualSave": "Save 17%",
     "billedAnnuallyAs": "Billed €{{amount}} per year",
-    "creditsPerMonth": "interview credits / month",
+    "creditsPerMonth": "completed AI interviews / month",
     "surveyResponsesPerMonth": "survey responses / month",
-    "creditDefinition": "1 credit = 1 completed participant interview, up to 15 minutes — including AI questioning, transcription, analysis and storage.",
+    "creditDefinition": "1 credit = 1 completed participant interview, up to 15 minutes. Screened-out or abandoned participants do not consume credits.",
     "plans": {
       "exploration": {
         "name": "Exploration",
         "desc": "For solo researchers running a few studies a month",
         "features": [
-          "25 interview credits / month",
+          "Only completed interviews count",
           "Up to 3 active projects",
           "AI interview guide & analysis",
           "CSV & PDF export",
@@ -179,7 +212,7 @@
         "name": "Team",
         "desc": "For research teams running studies in parallel",
         "features": [
-          "100 interview credits / month",
+          "Only completed interviews count",
           "Up to 20 active projects",
           "3 editors + unlimited viewers",
           "Team workspace & permissions",
@@ -191,7 +224,7 @@
         "name": "Agency",
         "desc": "For agencies running research for multiple clients",
         "features": [
-          "300 interview credits / month",
+          "Only completed interviews count",
           "Unlimited projects",
           "8 editors + unlimited viewers",
           "Client workspaces & custom branding",
@@ -201,18 +234,40 @@
       }
     }
   },
+  "faq": {
+    "title": "Questions teams ask before starting",
+    "items": [
+      {
+        "question": "Do I need to recruit participants?",
+        "answer": "QualiPulse gives you shareable links for your own participants. Panel recruitment is separate, so you stay in control of who you interview."
+      },
+      {
+        "question": "What counts as a credit?",
+        "answer": "Only completed participant interviews consume credits. Screened-out, abandoned, and technically failed interviews do not."
+      },
+      {
+        "question": "What do participants install?",
+        "answer": "Nothing. They open a link and complete a voice interview in the browser on desktop or mobile."
+      },
+      {
+        "question": "Can I buy more interviews?",
+        "answer": "Yes. You can upgrade plans or buy prepaid credit packs when a study needs more responses."
+      }
+    ]
+  },
   "midCta": {
-    "text": "Start free — 10 interviews included"
+    "text": "Start free — 3 interviews included"
   },
   "finalCta": {
     "title": "Your next research study could be done by Friday",
     "subtitle": "Set up a study in 5 minutes. Get your first insights in hours.",
-    "cta": "Start free — 10 interviews on us"
+    "cta": "Start free — 3 interviews on us"
   },
   "footer": {
     "tagline": "AI-powered qualitative research, on autopilot.",
     "productTitle": "Product",
     "companyTitle": "Company",
+    "legalTitle": "Legal",
     "features": "Features",
     "copilotLink": "Research Copilot",
     "pricingLink": "Pricing",
@@ -221,6 +276,11 @@
     "signup": "Sign up",
     "terms": "Terms",
     "privacy": "Privacy",
+    "dpa": "DPA",
+    "subprocessors": "Subprocessors",
+    "participantNotice": "Participant notice",
+    "aiUsePolicy": "AI use policy",
+    "retentionPolicy": "Retention policy",
     "contact": "Contact",
     "copy": "© 2026 QualiPulse · GDPR-compliant",
     "interviewLink": "Got an interview link?"
