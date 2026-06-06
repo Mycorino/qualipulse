@@ -193,6 +193,7 @@ auto-interview/
 │   │   │   ├── VerifyEmail.tsx       # Token-based email verification page
 │   │   │   ├── Terms.tsx             # Terms of Service
 │   │   │   ├── Privacy.tsx           # Privacy Policy (GDPR-compliant)
+│   │   │   ├── LegalDocument.tsx     # DPA, subprocessors, participant notice, AI use policy, retention policy
 │   │   │   ├── Dashboard.tsx         # Project list + archive + getting-started + trial banner
 │   │   │   ├── CreateProjectWizard.tsx  # 4-step wizard (Brief → Objective → Scope → Questionnaire)
 │   │   │   ├── ProjectDetail.tsx     # 4-tab detail view (Overview / Setup / Responses / Analysis)
@@ -363,6 +364,7 @@ See `.env.example` at repo root for Docker/production template.
 - Affiliate (public + affiliate JWT): `/affiliates/apply`, `/affiliates/login`, `/affiliates/me`, `/affiliates/admin/*`
 - Admin (X-Admin-Key header): `/admin/users`, `/admin/stats`, `/admin/costs`, `/admin/blog`
 - Blog (public): `/blog/posts`, `/blog/posts/:slug`
+- Legal pages (public frontend routes): `/terms`, `/privacy`, `/dpa`, `/subprocessors`, `/participant-notice`, `/ai-use-policy`, `/retention-policy`
 - Health checks: `GET /` (shallow), `GET /health` (deep — verifies DB connection)
 
 ### Database
@@ -421,10 +423,10 @@ lives on `credit_balances`; every credit movement is appended to
 
 | Plan | Monthly | Annual | Credits/period | Editors | Active projects | Overage |
 |---|---|---|---|---|---|---|
-| Trial | €0 | — | 10 / 14 days total | 1 | 1 | — |
-| Exploration | €89 | €890 | 25 / month | 1 | 3 | €7/credit |
-| Team | €299 | €2,990 | 100 / month | 3 | 20 | €6/credit |
-| Agency | €799 | €7,990 | 300 / month | 8 | unlimited | €5/credit |
+| Trial | €0 | — | 3 / 14 days total | 1 | 1 | — |
+| Exploration | €89 | €890 | 10 / month | 1 | 3 | €7/credit |
+| Team | €299 | €2,990 | 50 / month | 3 | 20 | €6/credit |
+| Agency | €799 | €7,990 | 150 / month | 8 | unlimited | €5/credit |
 | Enterprise | custom | custom | custom annual | custom | unlimited | per contract |
 
 **1 credit = 1 completed participant interview (≤15 min).** Consumed
@@ -447,6 +449,7 @@ boot, no-ops after the first.
 - ✅ PR 3 — marketing pricing page rebuilt for the credits model with monthly/annual toggle ("Save 17%"), prepaid credit packs (`pack_25` / `pack_50` / `pack_100`) with `GET /billing/credit-packs` + `POST /billing/checkout/credits` (one-time Stripe `mode=payment`) + `checkout.session.completed` webhook handler granting via `grant_purchased_credits` (idempotent per Stripe session id), admin `POST /admin/workspaces/{id}/credits/adjust` for support-led top-ups/clawbacks (auditable in `credit_ledger` with `event_type='adjustment_admin'`), `PATCH /billing/overage` toggle, usage-warning emails fire at 80% + 100% credits used (idempotent per period via `usage_events`).
 - ✅ V2.1 — frontend completions: credit-pack purchase grid in AccountSettings, admin "Adjust credits" modal in Admin.tsx, dashboard usage warning banner (≥80% dismissable, 100% non-dismissable).
 - ✅ V2.2 (this) — rollover policy. Purchased + prior-rollover credits roll forever; included credits expire at period end. Consumption attributes to buckets in this order: included → rollover → purchased, so unused purchased credits survive even when usage exceeds the included grant. Implemented in `grant_period_credits`: at each new period it looks up the most recent prior balance, computes carryover via `_compute_rollover_from_prior_balance`, seeds the new balance's `rollover_credits` bucket, and writes `grant_rollover` + `expire_credits` ledger rows for audit. Idempotent (replay returns existing balance, no double-grant). Tests cover: no-prior, all-unused, partial-overflow, rollover-of-rollover, fully-drained, replay.
+- ✅ Launch pricing/marketing/legal refresh — trial lowered to 3 completed interviews; paid monthly included credits lowered to Exploration 10, Team 50, Agency 150. Marketing page now leads with outcome-first AI interviews + decision-ready memo positioning, includes an interview-quality trust section (adaptive follow-ups, browser participant experience, transcript/quote traceability), a pricing FAQ, and direct mobile `/#pricing` anchor support. Legal pack added at `/dpa`, `/subprocessors`, `/participant-notice`, `/ai-use-policy`, `/retention-policy`; interview consent links the participant notice by default.
 - ⏳ Deferred — metered overage settlement (Stripe invoice items at period end). Credit-pack flow shipped in V2.1 covers the same need; revisit if real customers ask. The `overage_enabled` toggle stays in the schema but settlement is a no-op.
 
 ### Research Copilot architecture
@@ -907,7 +910,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Conversational onboarding via Research Copilot (`/welcome`): canned greeting → SSE chat with `ONBOARDING_ADAPTER` → milestone bar + "What I know about you" sidebar + canonical quick-reply chips + inline website-lookup card → `propose_study` proposal → one-click accept creates real first study + objective + guide questions → memory recap screen. Replaces the legacy 4-step form. Server enforces canonical chip option sets for the four profile contexts.
 - [x] Research Copilot (always-on): dock + open panel on every authenticated page; per-surface adapters (interview/survey/onboarding); SSE streaming (status/delta/done); deterministic NBA chip; nudge tier with 5 event types and aria-live announcer; mission header per surface; scoped memory (company/study/instrument); Opus 4.7 + adaptive thinking + prompt cache
 - [x] Centralized error messages (frontend `utils/errorMessages.ts`)
-- [x] Terms of Service + Privacy Policy pages
+- [x] Terms of Service + Privacy Policy pages, plus launch legal pack (`LegalDocument.tsx`): DPA, subprocessors, participant interview notice, AI use policy, and data retention policy. Marketing footer links all legal docs; participant consent screen links `/participant-notice` by default.
 - [x] SendGrid email integration (domain-authenticated, branded HTML templates)
 - [x] Getting-started checklist on empty dashboard
 - [x] Auto-seeded showcase demo project on onboarding completion — mono-language by `preferred_language` (EN = streaming-services study, FR = online-grocery study, both using real consumer brands). 4 participants in the company's language with a realistic quality spread (1 low / 1 good / 2 strong), 7–9 turns each, 3 guide questions, 3 codes, 4 tagged quotes, 2 analysis versions with annotations, 3 memos. `is_demo=True` exposed in API, never counts against tier quota. Demo CTA banner prompts first real project creation. Idempotent via `Company.demo_seeded_at`.
@@ -927,7 +930,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] UX audit fixes (82 items): CSS variable cleanup (~50 hardcoded hex→vars), password show/hide + strength indicator, focus-visible outlines, ARIA labels + keyboard nav, sticky TOC on Terms/Privacy, responsive analysis toolbar, 44px touch targets, interview profiling card styling
 - [x] EN/FR i18n foundation: react-i18next with namespaced JSON files (`frontend/src/locales/{en,fr}/`) covering marketing, auth, dashboard, project, interview, analysis, settings, affiliate, common
 - [x] LanguageSwitcher component (`components/LanguageSwitcher.tsx`): pill-shaped toggle, light/dark variant prop, 44px WCAG touch target, CSS classes (no inline styles), shown on marketing nav and auth pages
-- [x] Marketing page fully translated (EN/FR): all hardcoded strings replaced with `t()` calls including hero widget, output preview section, who-it's-for, differentiator, trust quote, **pricing cards** (plan names, features, CTAs)
+- [x] Marketing page fully translated (EN/FR): all hardcoded strings replaced with `t()` calls including outcome-first hero memo preview, interview-quality trust section, output preview section, who-it's-for, differentiator, trust quote, pricing FAQ, **pricing cards** (plan names, features, CTAs)
 - [x] Shared report (SharedReport.tsx) fully i18n'd: 17 keys in analysis namespace (EN/FR)
 - [x] Project templates language-aware: wizard passes `i18n.language` to template API for FR content
 - [x] Transcript translation as researcher reading aid: per-participant pill toggle in the dark participant card (shown only when researcher UI language ≠ project language). Original = data, translation = reading aid. Claude (Sonnet 4) translates all turns in one batched call, preserving voice (hedges, fillers, colloquialisms). Cached on `InterviewTurn.translated_response/translated_question/translation_language` so it never re-translates. `POST /projects/{id}/participants/{pid}/translate` (202, background thread). In translated view, precise text-selection tagging is disabled — researchers tag the **whole turn** via a "Tag turn" button, persisted with `QuoteTag.tagged_from_translation=True` so analysts know the provenance. Quote tags always stored against original text. Alembic 0018.
