@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -103,6 +104,42 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def _recover_empty_dev_keys_from_env_file() -> None:
+    """Dev safety net: recover AI keys that an empty *exported* env var shadowed.
+
+    pydantic-settings ranks real environment variables above the ``.env``
+    file, so a shell that exports ``ANTHROPIC_API_KEY=`` (empty) — as some
+    launch environments do — silently wins over a perfectly good key in
+    ``.env``. The copilot then drops into its offline stub with no obvious
+    cause. Outside production we re-read the ``.env`` file directly and fill
+    in any AI key that resolved empty.
+
+    Scoped to non-production and to AI keys only: production injects secrets
+    via the real environment (Secret Manager) and never ships a ``.env``, so
+    this is a no-op there.
+    """
+    # Tests deliberately run with empty AI keys to exercise the offline
+    # stub path; never let the .env override that.
+    if settings.is_production or "pytest" in sys.modules or not _ENV_FILE.exists():
+        return
+    file_values: dict[str, str] = {}
+    try:
+        for raw in _ENV_FILE.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            file_values[key.strip()] = value.strip().strip("\"'")
+    except OSError:
+        return
+    for field in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        if not getattr(settings, field, "") and file_values.get(field):
+            setattr(settings, field, file_values[field])
+
+
+_recover_empty_dev_keys_from_env_file()
 
 
 # Hard fail in production if SECRET_KEY is still the default placeholder —
