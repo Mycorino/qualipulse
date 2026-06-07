@@ -38,6 +38,7 @@ interface BillingStatus {
     name: string;
     is_legacy: boolean;
     is_custom: boolean;
+    is_trial?: boolean;
     monthly_price_cents: number | null;
     annual_price_cents: number | null;
     billing_interval: string | null;
@@ -47,6 +48,14 @@ interface BillingStatus {
     trial_end: string | null;
     cancel_at_period_end: boolean;
     overage_enabled: boolean;
+  } | null;
+  // Canonical display block for credit-native accounts — one source of
+  // truth so the UI stops mixing legacy tier with subscription status.
+  display?: {
+    plan_name: string;
+    is_trial: boolean;
+    status: string;
+    show_trial_end: boolean;
   } | null;
   credits?: {
     included_credits: number;
@@ -344,18 +353,25 @@ export default function AccountSettings() {
     </div>
   );
 
-  // Tier badge rendering — picks an appropriate semantic colour
+  // Tier badge rendering — picks an appropriate semantic colour.
+  // Prefer the canonical credit-native ``display`` block when present so the
+  // band stops showing the legacy tier (e.g. "Starter") for an account that
+  // is really on a credits plan. The non-time-based trial shows "Free trial"
+  // with no day countdown.
   const tier = billing?.tier ?? "starter";
-  const isTrialing = billing?.status === "trialing";
-  const trialEndsAt = (me as unknown as { trial_ends_at?: string | null })?.trial_ends_at ?? null;
-  const trialDaysLeft = trialEndsAt
-    ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : null;
   let tierBadgeClass = "eyebrow-tag eyebrow-tag--info";
   let tierBadgeText: string = billing?.tier_name ?? tier;
-  if (isTrialing && trialDaysLeft !== null) {
-    if (trialDaysLeft < 3) tierBadgeClass = "eyebrow-tag eyebrow-tag--warning";
-    tierBadgeText = t("hubHeader.trialBadge", { count: trialDaysLeft, defaultValue: "Trial · {{count}} days left" });
+  if (billing?.display) {
+    if (billing.display.is_trial) {
+      tierBadgeText = t("billing.freeTrial", { defaultValue: "Free trial" });
+      tierBadgeClass = "eyebrow-tag eyebrow-tag--info";
+    } else {
+      tierBadgeText = billing.display.plan_name;
+      tierBadgeClass =
+        billing.display.status === "active"
+          ? "eyebrow-tag eyebrow-tag--success"
+          : "eyebrow-tag eyebrow-tag--warning";
+    }
   } else if (billing?.status === "active") {
     tierBadgeClass = "eyebrow-tag eyebrow-tag--success";
   }
@@ -704,14 +720,29 @@ export default function AccountSettings() {
               <h2 className="settings-section-title">{t("billing.usageThisPeriod", { defaultValue: "Usage this period" })}</h2>
               <div className="billing-current-plan">
                 <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-                  <span className={`plan-badge plan-badge--${billing.plan.id}`}>{billing.plan.name}</span>
-                  <span className="billing-status-badge">{billing.plan.subscription_status}</span>
-                  {billing.plan.trial_end && billing.plan.subscription_status === "trialing" && (
+                  <span className={`plan-badge plan-badge--${billing.plan.id}`}>{billing.display?.plan_name ?? billing.plan.name}</span>
+                  {/* Canonical status — for a (non-time-based) trial this reads
+                      "Free trial" rather than the internal "trialing", and no
+                      expiry date is shown because trial credits never lapse. */}
+                  <span className="billing-status-badge">
+                    {billing.display?.is_trial
+                      ? t("billing.freeTrial", { defaultValue: "Free trial" })
+                      : (billing.display?.status ?? billing.plan.subscription_status)}
+                  </span>
+                  {/* Only paid plans ever surface a trial-end date. */}
+                  {billing.display?.show_trial_end && billing.plan.trial_end && (
                     <span className="muted-text" style={{ fontSize: 13 }}>
                       {t("billing.trialEndsOn", { defaultValue: "Trial ends" })} {new Date(billing.plan.trial_end).toLocaleDateString()}
                     </span>
                   )}
                 </div>
+                {billing.display?.is_trial && (
+                  <p className="muted-text" style={{ fontSize: 13, marginTop: 8 }}>
+                    {t("billing.trialCreditsHint", {
+                      defaultValue: "Your free interview credits don't expire. No credit card required.",
+                    })}
+                  </p>
+                )}
                 <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
                   <div className="billing-credit-stat">
                     <div style={{ fontSize: 28, fontWeight: 700 }}>{billing.credits.available_credits}</div>
