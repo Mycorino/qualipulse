@@ -20,7 +20,13 @@ const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const InterviewVerify = lazy(() => import("./pages/InterviewVerify"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const AccountSettings = lazy(() => import("./pages/AccountSettings"));
+const AccountLayout = lazy(() => import("./pages/account/AccountLayout"));
+const AccountHome = lazy(() => import("./pages/account/AccountHome"));
+const AccountProfile = lazy(() => import("./pages/account/AccountProfile"));
+const AccountSecurity = lazy(() => import("./pages/account/AccountSecurity"));
+const AccountWorkspace = lazy(() => import("./pages/account/AccountWorkspace"));
+const AccountIntegrations = lazy(() => import("./pages/account/AccountIntegrations"));
+const AccountBilling = lazy(() => import("./pages/account/AccountBilling"));
 const SharedReport = lazy(() => import("./pages/SharedReport"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
@@ -221,10 +227,17 @@ export default function App() {
         path="/account"
         element={
           <OnboardedRoute>
-            <AccountSettings />
+            <AccountLayout />
           </OnboardedRoute>
         }
-      />
+      >
+        <Route index element={<AccountHome />} />
+        <Route path="profile" element={<AccountProfile />} />
+        <Route path="security" element={<AccountSecurity />} />
+        <Route path="workspace" element={<AccountWorkspace />} />
+        <Route path="integrations" element={<AccountIntegrations />} />
+        <Route path="billing" element={<AccountBilling />} />
+      </Route>
       {/* Catch-all 404 — renders a real "Page not found" UI with
           noindex,follow so Search Console stops flagging unknown URLs as
           soft 404s. Must stay last; React Router matches in order. */}
