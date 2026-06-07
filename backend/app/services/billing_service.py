@@ -515,7 +515,7 @@ def _maybe_send_usage_warning(db: Session, workspace_id: str, balance: CreditBal
 
 
 def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubscription | None:
-    """Place ``company`` on the 14-day trial plan with an initial 10-credit balance.
+    """Place ``company`` on the 14-day trial plan with an initial 3-credit balance.
 
     Behaviour matrix:
 

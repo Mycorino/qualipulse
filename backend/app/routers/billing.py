@@ -275,13 +275,14 @@ def create_checkout_session(
 
     price_id = stripe_price_id_for(plan_id, interval)
     if not price_id:
-        # Legacy compat: caller might be sending a legacy tier name like
-        # `team` or `lab` directly. Map through.
+        # Legacy compat: caller might be sending a legacy tier name.
+        # IMPORTANT: do NOT include 'team' here — it collides with the new
+        # credits-based Team plan (€299/mo). Only map aliases that are
+        # unambiguously legacy.
         legacy_map = {
-            "team": stripe_price_id_for("legacy_team", "monthly"),
-            "lab":  stripe_price_id_for("legacy_lab",  "monthly"),
+            "lab":     stripe_price_id_for("legacy_lab",  "monthly"),
             "starter": stripe_price_id_for("legacy_team", "monthly"),  # legacy alias
-            "pro": stripe_price_id_for("legacy_lab",  "monthly"),
+            "pro":     stripe_price_id_for("legacy_lab",  "monthly"),
         }
         price_id = legacy_map.get(plan_id)
     if not price_id:

@@ -162,7 +162,7 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
                 "Thanks for signing up. Click the button below to confirm this "
                 "is your email so we know account alerts, research analysis "
                 "notifications, and your magic links are reaching the right "
-                "inbox. Your 14-day trial starts the moment you verify."
+                "inbox."
             ),
             "cta": "Verify my email",
             "subfoot": (
@@ -183,8 +183,7 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
                 "pour confirmer que cet email vous appartient : nous "
                 "utiliserons cette adresse pour vos alertes de compte, les "
                 "notifications d\u2019analyses de recherche et vos liens "
-                "magiques. Votre essai de 14 jours d\u00e9marre au moment de "
-                "la v\u00e9rification."
+                "magiques."
             ),
             "cta": "Vérifier mon email",
             "subfoot": (
