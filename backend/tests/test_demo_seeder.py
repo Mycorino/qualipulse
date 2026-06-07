@@ -416,8 +416,9 @@ class TestDemoProjectExcludedFromQuota:
         )
         assert demo_count == 1
 
-        # On a 14-day trial, starter users get team-level limits = 5 projects.
-        # We should be able to create 5 real projects on top of the demo.
+        # Starter users (no legacy trial) get starter limits = 1 project.
+        # The demo project should NOT count against that limit — we should be
+        # able to create 1 real project on top of the demo.
         question = {
             "section_index": 0,
             "section_title": "Background",
@@ -433,15 +434,14 @@ class TestDemoProjectExcludedFromQuota:
             "questions": [question],
             "screening_questions": [],
         }
-        for i in range(5):
-            resp = client.post(
-                "/projects/",
-                json={**payload, "name": f"Real {i}"},
-                headers=auth_headers,
-            )
-            assert resp.status_code == 201, resp.text
+        resp = client.post(
+            "/projects/",
+            json={**payload, "name": "Real 0"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
 
-        # 6th real project should be blocked even though demo exists alongside.
+        # 2nd real project should be blocked (starter limit = 1).
         resp = client.post(
             "/projects/",
             json={**payload, "name": "Over limit"},
