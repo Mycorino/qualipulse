@@ -44,8 +44,8 @@ class EmailSendLog(Base):
     # Event vocabulary — keep this stable, downstream dashboards rely on
     # the values:
     #   - day_1_followup     : 18h after signup, study-recap nudge
-    #   - trial_half_over    : Day 7 of a 14-day trial
-    #   - trial_ending       : Day 12 of a 14-day trial
+    #   - trial_half_over    : (RETIRED) was Day 7 of the legacy calendar trial
+    #   - trial_ending       : (RETIRED) was Day 12 of the legacy calendar trial
     event: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     sent_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow

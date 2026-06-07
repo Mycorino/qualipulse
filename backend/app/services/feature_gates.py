@@ -108,18 +108,21 @@ def get_limits(tier: str) -> TierLimits:
 
 
 def get_effective_limits(company) -> TierLimits:
-    """Get limits for a company, accounting for active trial.
+    """Get limits for a company, accounting for active trial (LEGACY ONLY).
 
-    If the company is on the starter tier but has an active trial
-    (trial_ends_at is in the future), return team-level limits.
+    This function only matters for accounts created before the credits-based
+    billing launch. New accounts no longer set ``trial_ends_at`` — their
+    access is gated by credits in ``billing_service.can_start_interview``.
+
+    For legacy accounts: if the company is on the starter tier but has an
+    active trial (trial_ends_at is in the future), return team-level limits.
     """
     tier = company.subscription_tier or DEFAULT_TIER
     limits = TIER_LIMITS.get(tier, TIER_LIMITS[DEFAULT_TIER])
 
-    # Starter/solo users with active trial get team-level limits.
-    # Free tier does NOT get a trial upgrade — they stay on free forever until
-    # they upgrade. (Free is for people who want to test indefinitely; Starter
-    # is for people who paid and get a 14-day team-level bonus.)
+    # Legacy starter/solo users with active trial get team-level limits.
+    # New accounts don't have trial_ends_at set so this branch is dead
+    # for them — kept only for backward compat with pre-credits accounts.
     if tier in ("starter", "solo") and getattr(company, "trial_ends_at", None):
         if company.trial_ends_at > datetime.utcnow():
             limits = TIER_LIMITS["team"]
