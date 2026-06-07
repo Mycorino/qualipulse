@@ -234,6 +234,14 @@ def update_trial(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ) -> AdminUserSummary:
+    """Extend/reset/expire the legacy calendar trial (trial_ends_at).
+
+    DEPRECATED for new accounts — they use credits-based trials where access
+    is gated by credit balance, not calendar. This endpoint only has a real
+    effect on legacy accounts with ``trial_ends_at`` set. For new accounts,
+    use ``POST /admin/workspaces/{id}/credits/adjust`` to grant additional
+    credits instead.
+    """
     valid_actions = {"extend_7", "extend_14", "extend_30", "reset", "expire"}
     if body.action not in valid_actions:
         raise HTTPException(status_code=422, detail=f"action must be one of {sorted(valid_actions)}")

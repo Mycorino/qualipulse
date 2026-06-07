@@ -9,7 +9,7 @@ class SignupRequest(BaseModel):
     email: EmailStr
     password: str
     # Plan selected on the landing page (free/starter/team/lab). Optional —
-    # defaults to "starter" with 14-day Team-level trial if omitted.
+    # defaults to "starter" with credits-based trial if omitted.
     plan: Optional[str] = None
     # Affiliate referral code, if present
     ref_code: Optional[str] = None

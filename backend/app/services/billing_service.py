@@ -515,7 +515,12 @@ def _maybe_send_usage_warning(db: Session, workspace_id: str, balance: CreditBal
 
 
 def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubscription | None:
-    """Place ``company`` on the 14-day trial plan with an initial 3-credit balance.
+    """Place ``company`` on the credits-based trial plan with 3 free interview credits.
+
+    The trial window (14 days) defines credit expiry — after that the
+    unused credits lapse. Access is gated by credits, not by calendar:
+    a user who exhausts their 3 credits on day 1 is blocked immediately,
+    and a user with credits remaining can use them until period_end.
 
     Behaviour matrix:
 

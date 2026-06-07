@@ -102,15 +102,11 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
         )
 
     # Resolve plan selection from the landing page.
-    # Free tier → no trial (they get the free tier limits permanently).
-    # Paid tiers → default starter + 14-day team-level trial.
+    # All new accounts start on "starter" tier. The credits-based trial
+    # (3 free interview credits) is bootstrapped on onboarding completion
+    # via bootstrap_trial_subscription() — no calendar-based trial_ends_at.
     requested_plan = (body.plan or "").strip().lower()
-    if requested_plan == "free":
-        tier = "free"
-        trial_ends = None
-    else:
-        tier = "starter"
-        trial_ends = datetime.utcnow() + timedelta(days=14)
+    tier = "free" if requested_plan == "free" else "starter"
 
     # Honour the UI locale from the landing page (falls back to "fr" for
     # historical reasons — the model default). Anything other than en/fr
@@ -124,7 +120,7 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
         email=canonical_email,
         password_hash=hash_password(body.password),
         subscription_tier=tier,
-        trial_ends_at=trial_ends,
+        trial_ends_at=None,
         preferred_language=signup_lang,
         first_name=body.first_name.strip() if body.first_name else None,
         last_name=body.last_name.strip() if body.last_name else None,
@@ -903,7 +899,8 @@ def test_slack_webhook(
 #   3. Backend exchanges the code for an id_token + access_token, fetches
 #      userinfo, then creates or links the local Company. New accounts get
 #      email_verified=True (Google has already verified the address) and
-#      the same 14-day starter trial as password signups.
+#      the same starter tier as password signups (credits trial bootstrapped
+#      on onboarding completion).
 #   4. Backend redirects to {APP_BASE_URL}/auth/google/finish with our JWT
 #      access + refresh tokens in the URL fragment, plus the onboarded flag
 #      so the frontend can route to /welcome vs /dashboard.
@@ -1104,8 +1101,8 @@ def google_callback(
     is_new_account = company is None
 
     if company is None:
-        # Brand-new signup via Google — same trial behaviour as a paid-tier
-        # password signup (14-day team-level trial on starter tier).
+        # Brand-new signup via Google — starts on starter tier, credits-based
+        # trial bootstrapped on onboarding completion (no calendar trial).
         # Don't use Google's full name (e.g. "Corino Fontana") as the
         # workspace name — the onboarding wizard then says "Your role at
         # Corino Fontana" which is awkward. Derive a placeholder from the
@@ -1120,7 +1117,7 @@ def google_callback(
             google_sub=google_sub,
             email_verified=email_verified_g,
             subscription_tier="starter",
-            trial_ends_at=datetime.utcnow() + timedelta(days=14),
+            trial_ends_at=None,
             preferred_language=signup_lang,
             first_name=given_name,
             last_name=family_name,
