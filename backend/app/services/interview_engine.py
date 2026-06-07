@@ -973,7 +973,7 @@ def process_interview_turn(
                 and (
                     cefe.has_ever_paid
                     or (cefe.subscription_status or "")
-                    in ("active", "trialing-paid", "past_due")
+                    in ("active", "past_due")
                 )
             )
             if (

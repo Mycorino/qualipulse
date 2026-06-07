@@ -42,7 +42,7 @@ FREE_PREVIEW_COUNT = 3
 # Subscription statuses that count as "currently has an active paid
 # plan." Trial / canceled / unpaid do NOT — but if has_ever_paid is
 # True they still get access via that path.
-_PAID_STATUSES = frozenset({"active", "trialing-paid", "past_due"})
+_PAID_STATUSES = frozenset({"active", "past_due"})
 
 
 @dataclass

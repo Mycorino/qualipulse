@@ -63,12 +63,17 @@ interface BillingStatus {
 interface Plan {
   id: string;
   name: string;
-  price_monthly_usd: number;
-  max_projects: number;
-  max_participants_per_project: number;
-  ai_analysis: boolean;
-  export_csv: boolean;
-  team_members: number;
+  description: string;
+  monthly_price_cents: number | null;
+  annual_price_cents: number | null;
+  currency: string;
+  included_credits: number | null;
+  credit_period: string;
+  max_editors: number | null;
+  max_active_projects: number | null;
+  overage_price_cents: number | null;
+  is_custom: boolean;
+  entitlements: Record<string, any>;
 }
 
 interface CreditPack {
@@ -157,10 +162,11 @@ export default function AccountSettings() {
     }
   }
 
-  async function handleUpgrade(tierId: string) {
+  async function handleUpgrade(planId: string) {
     try {
       const { data } = await client.post("/billing/checkout", {
-        tier: tierId,
+        plan_id: planId,
+        billing_interval: "monthly",
         success_url: window.location.origin + "/account?upgraded=true",
         cancel_url: window.location.origin + "/account",
       });
@@ -847,26 +853,33 @@ export default function AccountSettings() {
             <h2 className="settings-section-title">{t("billing.upgradePlan")}</h2>
             <div className="plans-grid">
               {plans.map(plan => {
-                const effectiveTier = billing?.tier === "free" ? "starter" : billing?.tier === "solo" ? "starter" : billing?.tier === "pro" ? "lab" : billing?.tier;
-                const isCurrent = effectiveTier === plan.id;
+                const currentPlanId = billing?.plan?.id;
+                const isCurrent = currentPlanId === plan.id;
+                const priceMonthly = plan.monthly_price_cents ? Math.round(plan.monthly_price_cents / 100) : null;
                 return (
                 <div key={plan.id} className={`plan-card ${isCurrent ? "plan-card--current" : ""}`}>
                   <div className="plan-card-header">
                     <h3 className="plan-name">{plan.name}</h3>
                     <p className="plan-price">
-                      {plan.price_monthly_usd === 0 ? t("common:custom") : `€${plan.price_monthly_usd}/mo`}
+                      {plan.is_custom ? t("common:custom") : priceMonthly != null ? `€${priceMonthly}/mo` : ""}
                     </p>
                   </div>
                   <ul className="plan-features">
-                    <li>{plan.max_projects === -1 ? t("common:unlimited") + " projects" : `${plan.max_projects} projects`}</li>
-                    <li>{plan.max_participants_per_project === -1 ? t("common:unlimited") + " participants" : `${plan.max_participants_per_project} participants/project`}</li>
-                    <li>{plan.ai_analysis ? "✓ AI analysis" : "✗ AI analysis"}</li>
-                    <li>{plan.export_csv ? "✓ CSV export" : "✗ CSV export"}</li>
-                    <li>{plan.team_members === -1 ? t("common:unlimited") + " team members" : `${plan.team_members} team members`}</li>
+                    {plan.included_credits != null && (
+                      <li>{plan.included_credits} credits/{plan.credit_period === "monthly" ? "mo" : plan.credit_period}</li>
+                    )}
+                    <li>{plan.max_active_projects == null ? t("common:unlimited") + " projects" : `${plan.max_active_projects} projects`}</li>
+                    <li>{plan.max_editors == null ? t("common:unlimited") + " editors" : `${plan.max_editors} editor${plan.max_editors > 1 ? "s" : ""}`}</li>
+                    {plan.entitlements?.csv_export && <li>CSV export</li>}
+                    {plan.entitlements?.custom_branding && <li>Custom branding</li>}
+                    {plan.entitlements?.team_workspace && <li>Team workspace</li>}
+                    {plan.overage_price_cents != null && (
+                      <li>Overage: €{(plan.overage_price_cents / 100).toFixed(0)}/credit</li>
+                    )}
                   </ul>
                   {isCurrent ? (
                     <button className="btn btn-ghost btn-sm" disabled>{t("common:active")}</button>
-                  ) : plan.id === "enterprise" ? (
+                  ) : plan.is_custom ? (
                     <a href="mailto:hello@qualipulse.com" className="btn btn-ghost btn-sm">{t("billing.contactUs")}</a>
                   ) : (
                     <button className="btn btn-primary btn-sm" onClick={() => handleUpgrade(plan.id)}>

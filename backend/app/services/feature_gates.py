@@ -1,8 +1,12 @@
 """
-Feature gating based on subscription tier.
-Centralises all tier limit checks.
+Feature gating based on subscription tier (LEGACY plans only).
 
-Canonical tiers: free (€0) | starter (€49) | team (€99) | lab (€199) | enterprise (custom)
+These gates apply to accounts on legacy tier plans (``is_legacy=True``).
+New accounts use the credits-based system in ``billing_service.py`` /
+``billing_plans.py``. The dual-track routing is in
+``billing_service.can_start_interview``.
+
+Legacy tiers: free (€0) | starter (€49) | team (€99) | lab (€199) | enterprise (custom)
 Legacy DB aliases: solo → starter, pro → lab
 """
 from dataclasses import dataclass
