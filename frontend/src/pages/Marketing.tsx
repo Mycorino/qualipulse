@@ -65,6 +65,8 @@ export default function Marketing() {
   const copilotAnim = useInView(0.15, initialHash === "#copilot");
   const qualityAnim = useInView();
   const outputAnim = useInView();
+  const mixedAnim = useInView();
+  const credibilityAnim = useInView();
   const whoAnim = useInView(0.15, initialHash === "#who");
   const compareAnim = useInView();
   const pricingAnim = useInView(0.15, initialHash === "#pricing");
@@ -248,10 +250,75 @@ export default function Marketing() {
         </div>
       </section>
 
+      {/* ---- Output preview (the memo — pays off the hero promise) ---- */}
+      <section className={`mkt-output${outputAnim.visible ? " visible" : ""}`} ref={outputAnim.ref as React.RefObject<HTMLElement>}>
+        <div className="mkt-output-inner">
+          <h2 className="mkt-section-title">{t("output.title")}</h2>
+          <p className="mkt-section-sub">{t("output.subtitle")}</p>
+          <div className="mkt-output-card">
+            <div className="mkt-output-header">
+              <span className="mkt-output-project">{t("output.projectName")}</span>
+              <span className="mkt-output-meta">{t("output.meta")}</span>
+            </div>
+            <div className="mkt-output-summary">
+              <h4>{t("output.summaryTitle")}</h4>
+              <p>{t("output.summaryText")}</p>
+            </div>
+            <div className="mkt-output-themes">
+              <h4>{t("output.keyThemesTitle")}</h4>
+              <div className="mkt-output-theme">
+                <div className="mkt-output-theme-header">
+                  <span className="mkt-output-theme-title">{t("output.theme1Title")}</span>
+                  <span className="mkt-output-theme-count">{t("output.theme1Count")}</span>
+                </div>
+                <blockquote>{t("output.theme1Quote")}</blockquote>
+                <span className="mkt-output-theme-attr">{t("output.theme1Attr")}</span>
+              </div>
+              <div className="mkt-output-theme">
+                <div className="mkt-output-theme-header">
+                  <span className="mkt-output-theme-title">{t("output.theme2Title")}</span>
+                  <span className="mkt-output-theme-count">{t("output.theme2Count")}</span>
+                </div>
+                <blockquote>{t("output.theme2Quote")}</blockquote>
+                <span className="mkt-output-theme-attr">{t("output.theme2Attr")}</span>
+              </div>
+            </div>
+            <div className="mkt-output-recs">
+              <h4>{t("output.recsTitle")}</h4>
+              <ul>
+                <li>{t("output.rec1")}</li>
+                <li>{t("output.rec2")}</li>
+                <li>{t("output.rec3")}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ---- Mid CTA ---- */}
       <div className="mkt-mid-cta">
         <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("midCta.text")}</Link>
       </div>
+
+      {/* ---- Quant + qual: mixed methods (the differentiating wedge) ---- */}
+      <section className={`mkt-quality${mixedAnim.visible ? " visible" : ""}`} ref={mixedAnim.ref as React.RefObject<HTMLElement>}>
+        <div className="mkt-quality-inner">
+          <div className="mkt-quality-heading">
+            <div className="mkt-badge">{t("mixedMethods.badge")}</div>
+            <h2 className="mkt-section-title">{t("mixedMethods.title")}</h2>
+            <p className="mkt-section-sub">{t("mixedMethods.subtitle")}</p>
+          </div>
+          <div className="mkt-quality-grid">
+            {(t("mixedMethods.items", { returnObjects: true }) as Array<{ eyebrow: string; title: string; desc: string }>).map((item, i) => (
+              <article key={item.title} className="mkt-quality-card" style={{ animationDelay: `${i * 0.08}s` }}>
+                <span>{item.eyebrow}</span>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ---- Research Copilot Showcase ---- */}
       <section className={`mkt-copilot${copilotAnim.visible ? " visible" : ""}`} id="copilot" ref={copilotAnim.ref as React.RefObject<HTMLElement>}>
@@ -317,54 +384,28 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* ---- Output preview ---- */}
-      <section className={`mkt-output${outputAnim.visible ? " visible" : ""}`} ref={outputAnim.ref as React.RefObject<HTMLElement>}>
-        <div className="mkt-output-inner">
-          <h2 className="mkt-section-title">{t("output.title")}</h2>
-          <p className="mkt-section-sub">{t("output.subtitle")}</p>
-          <div className="mkt-output-card">
-            <div className="mkt-output-header">
-              <span className="mkt-output-project">{t("output.projectName")}</span>
-              <span className="mkt-output-meta">{t("output.meta")}</span>
-            </div>
-            <div className="mkt-output-summary">
-              <h4>{t("output.summaryTitle")}</h4>
-              <p>{t("output.summaryText")}</p>
-            </div>
-            <div className="mkt-output-themes">
-              <h4>{t("output.keyThemesTitle")}</h4>
-              <div className="mkt-output-theme">
-                <div className="mkt-output-theme-header">
-                  <span className="mkt-output-theme-title">{t("output.theme1Title")}</span>
-                  <span className="mkt-output-theme-count">{t("output.theme1Count")}</span>
-                </div>
-                <blockquote>{t("output.theme1Quote")}</blockquote>
-                <span className="mkt-output-theme-attr">{t("output.theme1Attr")}</span>
+      {/* ---- Credibility: try before you trust (honest pre-proof play) ---- */}
+      <section className={`mkt-quality${credibilityAnim.visible ? " visible" : ""}`} ref={credibilityAnim.ref as React.RefObject<HTMLElement>}>
+        <div className="mkt-quality-inner">
+          <div className="mkt-quality-heading">
+            <div className="mkt-badge">{t("credibility.badge")}</div>
+            <h2 className="mkt-section-title">{t("credibility.title")}</h2>
+            <p className="mkt-section-sub">{t("credibility.subtitle")}</p>
+          </div>
+          <div className="mkt-pain-grid">
+            {(t("credibility.items", { returnObjects: true }) as Array<{ title: string; desc: string }>).map((item, i) => (
+              <div key={item.title} className="mkt-pain-card" style={{ animationDelay: `${i * 0.08}s` }}>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
               </div>
-              <div className="mkt-output-theme">
-                <div className="mkt-output-theme-header">
-                  <span className="mkt-output-theme-title">{t("output.theme2Title")}</span>
-                  <span className="mkt-output-theme-count">{t("output.theme2Count")}</span>
-                </div>
-                <blockquote>{t("output.theme2Quote")}</blockquote>
-                <span className="mkt-output-theme-attr">{t("output.theme2Attr")}</span>
-              </div>
-            </div>
-            <div className="mkt-output-recs">
-              <h4>{t("output.recsTitle")}</h4>
-              <ul>
-                <li>{t("output.rec1")}</li>
-                <li>{t("output.rec2")}</li>
-                <li>{t("output.rec3")}</li>
-              </ul>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* ---- Mid CTA ---- */}
       <div className="mkt-mid-cta">
-        <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("midCta.text")}</Link>
+        <Link to="/signup" className="btn btn-primary mkt-btn-lg">{t("midCta.text2")}</Link>
       </div>
 
       {/* ---- Who it's for — Pill selector ---- */}
@@ -415,6 +456,7 @@ export default function Marketing() {
       {/* ---- Trust ---- */}
       <section className="mkt-trust">
         <div className="mkt-trust-inner">
+          <div className="mkt-badge">{t("trust.eyebrow")}</div>
           <h3>{t("trust.quote")}</h3>
           <div className="mkt-trust-meta">
             <span className="mkt-trust-name">{t("trust.name")}</span>
