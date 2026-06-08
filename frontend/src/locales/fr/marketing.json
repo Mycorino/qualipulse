@@ -5,7 +5,8 @@
     "whoItsFor": "Pour qui",
     "pricing": "Tarifs",
     "login": "Se connecter",
-    "startTrial": "Essai gratuit"
+    "startTrial": "Essai gratuit",
+    "toggleMenu": "Ouvrir le menu"
   },
   "hero": {
     "badge": "Recherche utilisateur modérée par IA",
@@ -70,7 +71,7 @@
     "steps": [
       {
         "title": "Décrivez votre objectif de recherche",
-        "desc": "Discutez avec le Copilote Recherche ou collez votre brief. L'IA rédige votre guide d'entretien — objectifs, critères de sélection et questions. Vous relisez et affinez. Cinq minutes, pas cinq heures."
+        "desc": "Discutez avec le Copilote de recherche ou collez votre brief. L'IA rédige votre guide d'entretien — objectifs, critères de sélection et questions. Vous relisez et affinez. Cinq minutes, pas cinq heures."
       },
       {
         "title": "Les participants répondent à leur rythme",
@@ -83,8 +84,10 @@
     ]
   },
   "copilot": {
+    "badge": "Copilote de recherche",
+    "previewTitle": "Copilote de recherche",
     "title": "Votre partenaire de recherche, toujours disponible",
-    "subtitle": "Le Copilote Recherche transforme une question brute en étude utilisable, propose les prochaines actions et garde le contexte de votre programme.",
+    "subtitle": "Le Copilote de recherche transforme une question brute en étude utilisable, propose les prochaines actions et garde le contexte de votre programme.",
     "features": [
       { "icon": "🧠", "text": "Transforme un objectif en critères de sélection, objectifs et questions d'entretien" },
       { "icon": "📋", "text": "Propose les prochaines étapes sous forme de cartes à accepter en un clic" },
@@ -169,7 +172,7 @@
       { "feature": "Modération IA", "quali": "Intégrée, relances adaptatives", "other": "Manuelle ou inexistante" },
       { "feature": "Mémo de recherche", "quali": "Quelques minutes après les réponses", "other": "Synthèse manuelle" },
       { "feature": "Plans de recherche multi-étapes", "quali": "Oui — entretiens + sondages", "other": "Souvent assemblé à la main" },
-      { "feature": "Copilote Recherche", "quali": "Partenaire IA toujours disponible", "other": "Non disponible" },
+      { "feature": "Copilote de recherche", "quali": "Partenaire IA toujours disponible", "other": "Non disponible" },
       { "feature": "Appareils compatibles", "quali": "Tout navigateur, sans appli", "other": "Souvent une appli requise" }
     ]
   },
@@ -269,7 +272,7 @@
     "companyTitle": "Entreprise",
     "legalTitle": "Juridique",
     "features": "Fonctionnalités",
-    "copilotLink": "Copilote Recherche",
+    "copilotLink": "Copilote de recherche",
     "pricingLink": "Tarifs",
     "blog": "Blog",
     "login": "Se connecter",

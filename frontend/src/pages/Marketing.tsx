@@ -118,7 +118,7 @@ export default function Marketing() {
           ref={hamburgerRef}
           className={`mkt-hamburger${mobileMenuOpen ? " open" : ""}`}
           onClick={() => setMobileMenuOpen((v) => !v)}
-          aria-label="Toggle menu"
+          aria-label={t("nav.toggleMenu")}
           aria-expanded={mobileMenuOpen}
         >
           <span className="mkt-hamburger-line" />
@@ -257,7 +257,7 @@ export default function Marketing() {
       <section className={`mkt-copilot${copilotAnim.visible ? " visible" : ""}`} id="copilot" ref={copilotAnim.ref as React.RefObject<HTMLElement>}>
         <div className="mkt-copilot-inner">
           <div className="mkt-copilot-text">
-            <div className="mkt-badge">Research Copilot</div>
+            <div className="mkt-badge">{t("copilot.badge")}</div>
             <h2 className="mkt-section-title" style={{ textAlign: "left" }}>{t("copilot.title")}</h2>
             <p className="mkt-copilot-subtitle">{t("copilot.subtitle")}</p>
             <ul className="mkt-copilot-features">
@@ -275,7 +275,7 @@ export default function Marketing() {
                 <span className="mkt-preview-dot red" />
                 <span className="mkt-preview-dot yellow" />
                 <span className="mkt-preview-dot green" />
-                <span className="mkt-preview-title">Research Copilot</span>
+                <span className="mkt-preview-title">{t("copilot.previewTitle")}</span>
               </div>
               <div className="mkt-copilot-chat">
                 <div className="mkt-copilot-bubble mkt-copilot-user">
