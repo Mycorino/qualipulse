@@ -121,6 +121,10 @@ class CompanyResponse(BaseModel):
     occupation_description: Optional[str] = None
     selected_use_cases: Optional[str] = None
     onboarding_recap: Optional[str] = None
+    suspended_at: Optional[datetime] = None
+
+    is_impersonation: bool = False
+    impersonation_admin: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

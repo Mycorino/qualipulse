@@ -1,3 +1,4 @@
+from app.models.admin_audit import AdminAuditLog
 from app.models.company import Company, PasswordResetToken
 from app.models.interview import InterviewLink, InterviewTurn, Participant, ProjectAnalysis
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
@@ -29,6 +30,7 @@ from app.models.survey import (
 )
 
 __all__ = [
+    "AdminAuditLog",
     "AIUsageLog",
     "EmailSendLog",
     "Affiliate",

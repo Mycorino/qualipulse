@@ -4,6 +4,7 @@ import { useAuth, getCachedOnboarded, setCachedOnboarded } from "./hooks/useAuth
 import { getMe } from "./api/auth";
 import i18n from "./i18n";
 import { ToastProvider } from "./components/Toast";
+import ImpersonationBanner from "./components/ImpersonationBanner";
 // Eager-load the hot path: marketing, login, signup, interview, and dashboard
 // are what 99% of users see first and we don't want a chunk fetch on first
 // paint. Everything else is lazy so the main bundle shrinks from ~1.2MB to
@@ -31,6 +32,7 @@ const SharedReport = lazy(() => import("./pages/SharedReport"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const GoogleFinish = lazy(() => import("./pages/GoogleFinish"));
+const ImpersonateFinish = lazy(() => import("./pages/ImpersonateFinish"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const LegalDocument = lazy(() => import("./pages/LegalDocument"));
@@ -118,6 +120,7 @@ function HomeRoute() {
 export default function App() {
   return (
     <ToastProvider>
+    <ImpersonationBanner />
     <Suspense fallback={null}>
     <Routes>
       <Route path="/" element={<HomeRoute />} />
@@ -127,6 +130,7 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/auth/google/finish" element={<GoogleFinish />} />
+      <Route path="/auth/impersonate-finish" element={<ImpersonateFinish />} />
       <Route path="/team/accept" element={<AcceptInvitation />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />

@@ -26,6 +26,19 @@ interface AdminUser {
   interview_count: number;
   business_summary?: string | null;
   projects?: AdminProject[];
+  suspended_at?: string | null;
+  suspension_reason?: string | null;
+}
+
+interface AuditEntry {
+  id: string;
+  admin_identity: string;
+  action: string;
+  target_company_id: string | null;
+  target_company_email: string;
+  details: Record<string, unknown> | null;
+  is_impersonation: boolean;
+  created_at: string;
 }
 
 interface AdminStats {
@@ -62,11 +75,10 @@ interface CostsReport {
 
 // ── API helpers ────────────────────────────────────────────────────────────
 
-function adminClient(key: string) {
-  return axios.create({
-    baseURL: "/api",
-    headers: { Authorization: `Bearer ${key}` },
-  });
+function adminClient(key: string, identity?: string) {
+  const headers: Record<string, string> = { Authorization: `Bearer ${key}` };
+  if (identity) headers["X-Admin-Identity"] = identity;
+  return axios.create({ baseURL: "/api", headers });
 }
 
 // ── Tier badge ─────────────────────────────────────────────────────────────
@@ -210,7 +222,11 @@ export default function Admin() {
   const [adminKey, setAdminKey] = useState<string>(
     () => sessionStorage.getItem("admin_key") ?? ""
   );
+  const [adminIdentity, setAdminIdentity] = useState<string>(
+    () => sessionStorage.getItem("admin_identity") ?? ""
+  );
   const [keyInput, setKeyInput] = useState("");
+  const [identityInput, setIdentityInput] = useState("");
   const [keyError, setKeyError] = useState("");
   const [authed, setAuthed] = useState(false);
 
@@ -237,24 +253,39 @@ export default function Admin() {
 
   const [costs, setCosts] = useState<CostsReport | null>(null);
 
-  // Affiliates management
-  const [tab, setTab] = useState<"users" | "affiliates" | "blog">("users");
+  const [tab, setTab] = useState<"users" | "affiliates" | "blog" | "audit">("users");
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [affiliatesLoading, setAffiliatesLoading] = useState(false);
 
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditAction, setAuditAction] = useState("");
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditPage, setAuditPage] = useState(1);
+
+  const [suspendDialog, setSuspendDialog] = useState<AdminUser | null>(null);
+  const [suspendReason, setSuspendReason] = useState("");
+  const [suspendSubmitting, setSuspendSubmitting] = useState(false);
+
   const client = useCallback(
-    () => adminClient(adminKey),
-    [adminKey]
+    () => adminClient(adminKey, adminIdentity),
+    [adminKey, adminIdentity]
   );
 
   // Verify key and load data
-  const login = useCallback(async (key: string) => {
+  const login = useCallback(async (key: string, identity: string) => {
     setKeyError("");
+    if (!identity.trim()) {
+      setKeyError("Enter your name so actions are traceable");
+      return;
+    }
     try {
-      const res = await adminClient(key).get<AdminStats>("/admin/stats");
+      const res = await adminClient(key, identity).get<AdminStats>("/admin/stats");
       setStats(res.data);
       sessionStorage.setItem("admin_key", key);
+      sessionStorage.setItem("admin_identity", identity.trim());
       setAdminKey(key);
+      setAdminIdentity(identity.trim());
       setAuthed(true);
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 403) {
@@ -267,8 +298,8 @@ export default function Admin() {
 
   // Auto-login if key already in sessionStorage
   useEffect(() => {
-    if (adminKey) {
-      login(adminKey);
+    if (adminKey && adminIdentity) {
+      login(adminKey, adminIdentity);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -318,6 +349,22 @@ export default function Admin() {
     }
   }, [client]);
 
+  const loadAuditLog = useCallback(async (page = 1) => {
+    setAuditLoading(true);
+    try {
+      const params: Record<string, string | number> = { page, limit: 50 };
+      if (auditAction) params.action = auditAction;
+      if (auditSearch) params.search = auditSearch;
+      const res = await client().get<AuditEntry[]>("/admin/audit-log", { params });
+      setAuditLog(res.data);
+      setAuditPage(page);
+    } catch {
+      setError("Failed to load audit log");
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [client, auditAction, auditSearch]);
+
   useEffect(() => {
     if (authed) {
       if (tab === "users") {
@@ -325,6 +372,8 @@ export default function Admin() {
         loadCosts();
       } else if (tab === "affiliates") {
         loadAffiliates();
+      } else if (tab === "audit") {
+        loadAuditLog(1);
       }
       loadStats();
     }
@@ -430,6 +479,74 @@ export default function Admin() {
     }
   }
 
+  async function handleSuspend() {
+    if (!suspendDialog) return;
+    if (!suspendReason.trim()) return;
+    setSuspendSubmitting(true);
+    try {
+      const res = await client().post<AdminUser>(
+        `/admin/users/${suspendDialog.id}/suspend`,
+        { reason: suspendReason.trim() }
+      );
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === suspendDialog.id
+            ? { ...u, suspended_at: res.data.suspended_at, suspension_reason: res.data.suspension_reason }
+            : u
+        )
+      );
+      showSuccess("Account suspended");
+      setSuspendDialog(null);
+      setSuspendReason("");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setError(detail ?? "Failed to suspend");
+    } finally {
+      setSuspendSubmitting(false);
+    }
+  }
+
+  async function handleUnsuspend(user: AdminUser) {
+    setActionLoading(`unsuspend-${user.id}`);
+    try {
+      const res = await client().post<AdminUser>(`/admin/users/${user.id}/unsuspend`);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id
+            ? { ...u, suspended_at: res.data.suspended_at, suspension_reason: res.data.suspension_reason }
+            : u
+        )
+      );
+      showSuccess("Account unsuspended");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setError(detail ?? "Failed to unsuspend");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleImpersonate(user: AdminUser) {
+    setActionLoading(`impersonate-${user.id}`);
+    try {
+      const res = await client().post<{ access_token: string; company_name: string; company_email: string }>(
+        `/admin/users/${user.id}/impersonate`
+      );
+      const params = new URLSearchParams({
+        access_token: res.data.access_token,
+        name: res.data.company_name,
+        email: res.data.company_email,
+      });
+      window.open(`/auth/impersonate-finish#${params.toString()}`, "_blank");
+      showSuccess("Impersonation tab opened");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setError(detail ?? "Failed to impersonate");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   function showSuccess(msg: string) {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(""), 2500);
@@ -463,13 +580,34 @@ export default function Admin() {
             QualiPulse internal
           </p>
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
+            Your name
+          </label>
+          <input
+            type="text"
+            value={identityInput}
+            onChange={(e) => setIdentityInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && login(keyInput, identityInput)}
+            placeholder="e.g. Corin"
+            style={{
+              display: "block",
+              width: "100%",
+              marginTop: 6,
+              marginBottom: 16,
+              padding: "10px 12px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border)",
+              fontSize: 14,
+              outline: "none",
+            }}
+          />
+          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
             Admin key
           </label>
           <input
             type="password"
             value={keyInput}
             onChange={(e) => setKeyInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && login(keyInput)}
+            onKeyDown={(e) => e.key === "Enter" && login(keyInput, identityInput)}
             placeholder="Enter admin secret key"
             style={{
               display: "block",
@@ -489,7 +627,7 @@ export default function Admin() {
             </p>
           )}
           <button
-            onClick={() => login(keyInput)}
+            onClick={() => login(keyInput, identityInput)}
             style={{
               width: "100%",
               background: "var(--primary)",
@@ -559,8 +697,10 @@ export default function Admin() {
           }}
           onClick={() => {
             sessionStorage.removeItem("admin_key");
+            sessionStorage.removeItem("admin_identity");
             setAuthed(false);
             setAdminKey("");
+            setAdminIdentity("");
           }}
         >
           Sign out
@@ -748,6 +888,21 @@ export default function Admin() {
             }}
           >
             Blog
+          </button>
+          <button
+            onClick={() => setTab("audit")}
+            style={{
+              padding: "12px 0",
+              border: "none",
+              background: "none",
+              borderBottom: tab === "audit" ? "2px solid var(--primary)" : "none",
+              color: tab === "audit" ? "var(--primary)" : "var(--text-secondary)",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: tab === "audit" ? 600 : 500,
+            }}
+          >
+            Audit Log
           </button>
         </div>
 
@@ -1137,9 +1292,7 @@ export default function Admin() {
                     );
                   })()}
 
-                  {/* Manual credit adjust — only meaningful for non-legacy plans, but
-                      we show it always; the endpoint refuses with a 400 for legacy. */}
-                  <div style={{ marginBottom: 12 }}>
+                  <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
                       onClick={() => {
                         setCreditDialog(user);
@@ -1160,7 +1313,80 @@ export default function Admin() {
                     >
                       Adjust credits
                     </button>
+                    <button
+                      disabled={actionLoading === `impersonate-${user.id}`}
+                      onClick={() => handleImpersonate(user)}
+                      style={{
+                        background: "none",
+                        border: "1px solid var(--border)",
+                        color: "var(--text-primary)",
+                        borderRadius: "var(--radius-xs)",
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        fontWeight: 500,
+                        opacity: actionLoading === `impersonate-${user.id}` ? 0.5 : 1,
+                      }}
+                    >
+                      {actionLoading === `impersonate-${user.id}` ? "…" : "Login As"}
+                    </button>
+                    {user.suspended_at ? (
+                      <button
+                        disabled={actionLoading === `unsuspend-${user.id}`}
+                        onClick={() => handleUnsuspend(user)}
+                        style={{
+                          background: "none",
+                          border: "1px solid var(--success-border)",
+                          color: "var(--success)",
+                          borderRadius: "var(--radius-xs)",
+                          padding: "4px 10px",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          fontWeight: 500,
+                          opacity: actionLoading === `unsuspend-${user.id}` ? 0.5 : 1,
+                        }}
+                      >
+                        {actionLoading === `unsuspend-${user.id}` ? "…" : "Unsuspend"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setSuspendDialog(user);
+                          setSuspendReason("");
+                        }}
+                        style={{
+                          background: "none",
+                          border: "1px solid var(--warning-border, var(--border))",
+                          color: "var(--warning-text, #92400e)",
+                          borderRadius: "var(--radius-xs)",
+                          padding: "4px 10px",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Suspend
+                      </button>
+                    )}
                   </div>
+
+                  {user.suspended_at && (
+                    <div style={{
+                      marginBottom: 12,
+                      padding: "8px 12px",
+                      background: "var(--warning-bg, #fffbeb)",
+                      border: "1px solid var(--warning-border, #fcd34d)",
+                      borderRadius: "var(--radius-sm)",
+                      fontSize: 12,
+                      color: "var(--warning-text, #92400e)",
+                    }}>
+                      <strong>Suspended</strong>
+                      {user.suspension_reason && <> — {user.suspension_reason}</>}
+                      <span style={{ marginLeft: 8, opacity: 0.7 }}>
+                        ({new Date(user.suspended_at).toLocaleDateString()})
+                      </span>
+                    </div>
+                  )}
 
                   {users.find((u) => u.id === expandedId)?.business_summary && (
                     <div style={{ marginBottom: 12 }}>
@@ -1224,6 +1450,286 @@ export default function Admin() {
 
         {/* Blog management tab */}
         {tab === "blog" && <AdminBlog adminKey={adminKey} />}
+
+        {/* Audit log tab */}
+        {tab === "audit" && (
+          <div>
+            <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+              <select
+                value={auditAction}
+                onChange={(e) => { setAuditAction(e.target.value); loadAuditLog(1); }}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border)",
+                  fontSize: 13,
+                  background: "var(--bg-surface)",
+                  cursor: "pointer",
+                  outline: "none",
+                }}
+              >
+                <option value="">All actions</option>
+                <option value="tier_change">Tier change</option>
+                <option value="trial_update">Trial update</option>
+                <option value="credit_adjustment">Credit adjustment</option>
+                <option value="user_delete">User delete</option>
+                <option value="suspend">Suspend</option>
+                <option value="unsuspend">Unsuspend</option>
+                <option value="impersonation_start">Impersonation</option>
+              </select>
+              <input
+                type="search"
+                placeholder="Search by email…"
+                value={auditSearch}
+                onChange={(e) => setAuditSearch(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && loadAuditLog(1)}
+                style={{
+                  flex: 1,
+                  maxWidth: 300,
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--border)",
+                  fontSize: 14,
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={() => loadAuditLog(1)}
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                Search
+              </button>
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-lg)",
+                overflow: "hidden",
+              }}
+            >
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "var(--bg-sunken)", borderBottom: "1px solid var(--border)" }}>
+                    {["When", "Admin", "Action", "Target", "Details"].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "10px 12px",
+                          textAlign: "left",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "var(--text-muted)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLoading && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>
+                        Loading…
+                      </td>
+                    </tr>
+                  )}
+                  {!auditLoading && auditLog.length === 0 && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>
+                        No audit entries found
+                      </td>
+                    </tr>
+                  )}
+                  {!auditLoading &&
+                    auditLog.map((entry) => (
+                      <tr key={entry.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+                        <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                          {new Date(entry.created_at).toLocaleString()}
+                        </td>
+                        <td style={{ padding: "10px 12px", fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>
+                          {entry.admin_identity}
+                        </td>
+                        <td style={{ padding: "10px 12px", fontSize: 12 }}>
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              background: entry.action === "user_delete" ? "var(--danger-bg)"
+                                : entry.action === "suspend" ? "var(--warning-bg, #fffbeb)"
+                                : entry.action === "impersonation_start" ? "#fef3c7"
+                                : "var(--bg-sunken)",
+                              color: entry.action === "user_delete" ? "var(--danger)"
+                                : entry.action === "suspend" ? "var(--warning-text, #92400e)"
+                                : entry.action === "impersonation_start" ? "#92400e"
+                                : "var(--text-secondary)",
+                            }}
+                          >
+                            {entry.action.replace(/_/g, " ")}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-secondary)" }}>
+                          {entry.target_company_email}
+                        </td>
+                        <td style={{ padding: "10px 12px", fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {entry.details ? JSON.stringify(entry.details) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+
+              {/* Pagination */}
+              {!auditLoading && auditLog.length > 0 && (
+                <div style={{ display: "flex", gap: 8, padding: "12px 16px", justifyContent: "flex-end", borderTop: "1px solid var(--border)" }}>
+                  <button
+                    disabled={auditPage <= 1}
+                    onClick={() => loadAuditLog(auditPage - 1)}
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-xs)",
+                      padding: "4px 12px",
+                      fontSize: 12,
+                      cursor: auditPage <= 1 ? "default" : "pointer",
+                      opacity: auditPage <= 1 ? 0.4 : 1,
+                    }}
+                  >
+                    ← Prev
+                  </button>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "center" }}>
+                    Page {auditPage}
+                  </span>
+                  <button
+                    disabled={auditLog.length < 50}
+                    onClick={() => loadAuditLog(auditPage + 1)}
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-xs)",
+                      padding: "4px 12px",
+                      fontSize: 12,
+                      cursor: auditLog.length < 50 ? "default" : "pointer",
+                      opacity: auditLog.length < 50 ? 0.4 : 1,
+                    }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      {/* Suspend dialog */}
+      {suspendDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+          onClick={() => !suspendSubmitting && setSuspendDialog(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: 24,
+              width: 420,
+              maxWidth: "100%",
+              boxShadow: "var(--shadow-lg)",
+            }}
+          >
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+              Suspend account
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+              {suspendDialog.name} · {suspendDialog.email}
+            </p>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
+              This will block login and all API access. The user will see "Account suspended" with the reason below.
+            </p>
+            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              Reason (shown to user)
+            </label>
+            <textarea
+              value={suspendReason}
+              onChange={(e) => setSuspendReason(e.target.value)}
+              placeholder="e.g. Terms of service violation"
+              disabled={suspendSubmitting}
+              rows={2}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                fontSize: 13,
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-xs)",
+                marginBottom: 16,
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                fontFamily: "inherit",
+                resize: "vertical",
+              }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setSuspendDialog(null)}
+                disabled={suspendSubmitting}
+                style={{
+                  background: "none",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-primary)",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSuspend}
+                disabled={suspendSubmitting || !suspendReason.trim()}
+                style={{
+                  background: "var(--danger)",
+                  border: "none",
+                  color: "white",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "6px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  opacity: suspendSubmitting || !suspendReason.trim() ? 0.6 : 1,
+                }}
+              >
+                {suspendSubmitting ? "Suspending…" : "Suspend"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Credit adjustment dialog */}
       {creditDialog && (

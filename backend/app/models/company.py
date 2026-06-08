@@ -162,6 +162,10 @@ class Company(Base):
         DateTime, nullable=True
     )
 
+    # Admin — account suspension
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    suspension_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
 

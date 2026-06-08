@@ -24,6 +24,17 @@ client.interceptors.response.use(
       !originalRequest.url?.includes("/auth/refresh")
     ) {
       originalRequest._retried = true;
+
+      if (localStorage.getItem("impersonation") === "true") {
+        localStorage.removeItem("token");
+        localStorage.removeItem("impersonation");
+        localStorage.removeItem("impersonation_name");
+        localStorage.removeItem("impersonation_email");
+        window.close();
+        window.location.href = "/admin";
+        return Promise.reject(error);
+      }
+
       const storedRefreshToken = localStorage.getItem("refresh_token");
 
       if (storedRefreshToken) {

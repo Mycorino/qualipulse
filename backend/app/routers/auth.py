@@ -212,6 +212,13 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -
             detail="Invalid email or password",
         )
 
+    if company.suspended_at is not None:
+        reason = company.suspension_reason or "Contact support for details."
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account suspended: {reason}",
+        )
+
     logger.info("Login: %s", company.email)
     return TokenResponse(
         access_token=create_access_token({"sub": company.id}),
@@ -229,6 +236,12 @@ def refresh_token(request: Request, body: RefreshRequest, db: Session = Depends(
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found")
+    if company.suspended_at is not None:
+        reason = company.suspension_reason or "Contact support for details."
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account suspended: {reason}",
+        )
     return TokenResponse(
         access_token=create_access_token({"sub": company.id}),
         refresh_token=create_refresh_token({"sub": company.id}),
@@ -364,7 +377,10 @@ def confirm_password_reset(body: PasswordResetConfirm, db: Session = Depends(get
 
 @router.get("/me", response_model=CompanyResponse)
 def get_me(company: Company = Depends(get_current_company)) -> CompanyResponse:
-    return CompanyResponse.model_validate(company)
+    resp = CompanyResponse.model_validate(company)
+    resp.is_impersonation = getattr(company, "_is_impersonation", False)
+    resp.impersonation_admin = getattr(company, "_impersonation_admin", None)
+    return resp
 
 
 class ChangePasswordRequest(BaseModel):
