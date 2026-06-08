@@ -4202,6 +4202,7 @@ select.field-input {
   margin-bottom: 28px;
 }
 .settings-tab {
+  display: inline-block;
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
@@ -4209,10 +4210,12 @@ select.field-input {
   background: none;
   cursor: pointer;
   color: var(--text-secondary);
+  text-decoration: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   transition: color 0.15s, border-color 0.15s;
 }
+.settings-tab:hover { color: var(--text-primary); }
 .settings-tab.active { color: var(--brand-500); border-bottom-color: var(--brand-500); }
 .settings-section { max-width: 720px; }
 .settings-card {
@@ -4222,6 +4225,74 @@ select.field-input {
   padding: 24px;
 }
 .settings-section-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px; }
+
+/* ── Account: compact identity row (replaces the oversized hub band) ───────── */
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 20px;
+}
+.account-identity__avatar {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--brand-500);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+.account-identity__text { flex: 1; min-width: 0; }
+.account-identity__name { font-size: 20px; font-weight: 700; margin: 0; color: var(--text-primary); }
+.account-identity__email { font-size: 14px; color: var(--text-tertiary); margin: 2px 0 0; }
+
+/* ── Account Home: status-card grid ───────────────────────────────────────── */
+.account-home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.account-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+.account-card--action {
+  border-color: var(--brand-400, var(--brand-500));
+  box-shadow: 0 0 0 1px var(--brand-400, var(--brand-500));
+}
+.account-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.account-card__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+.account-card__status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.account-card__status.is-ok { background: #dcfce7; color: #166534; }
+.account-card__status.is-warn { background: #fef3c7; color: #92400e; }
+.account-card__status.is-neutral { background: var(--bg-sunken); color: var(--text-secondary); }
+.account-card__value { font-size: 15px; color: var(--text-primary); margin: 4px 0 0; }
+.account-card__foot { margin-top: auto; padding-top: 14px; }
 
 /* ── Billing / Plans ─────────────────────────────────────────────────────── */
 .billing-current-plan { }

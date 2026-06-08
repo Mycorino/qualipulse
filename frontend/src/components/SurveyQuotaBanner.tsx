@@ -97,7 +97,7 @@ export function SurveyQuotaBanner() {
       <button
         type="button"
         className="btn btn-secondary btn-sm"
-        onClick={() => navigate("/account?tab=billing")}
+        onClick={() => navigate("/account/billing")}
       >
         View plans
       </button>

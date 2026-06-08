@@ -1,28 +1,21 @@
 {
   "skip": "Passer pour le moment",
-
   "verify_banner": "Pensez à vérifier votre adresse email quand vous avez un moment — regardez votre boîte de réception.",
   "verify_resend": "Renvoyer",
-
   "greeting": "Bonjour {{firstName}} — je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planning et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager — et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : quelle est la chose la plus importante que vous avez besoin d'apprendre sur vos utilisateurs en ce moment ?",
-
   "greeting_post_wizard": "Bienvenue, {{firstName}} — c'est noté. Vous êtes {{role}}, focus sur {{useCase}}.\n\nMaintenant, rédigeons votre première étude. Quelle décision repose sur cette recherche ?",
-
   "goal_suggestions_label": "Ou choisissez un point de départ :",
   "goal_suggestions": [
     "Pourquoi les utilisateurs en essai partent",
     "Tester un nouveau parcours d'onboarding",
     "Comprendre une nouvelle audience"
   ],
-
   "see_sample_link": "Ou voir d'abord à quoi ressemble une étude finie →",
-
   "phase": {
     "profile": "Parlez-moi de votre travail",
     "frame": "Cadrez votre étude",
     "launch": "Lancez"
   },
-
   "sidebar": {
     "eyebrow": "Ce que je sais de vous",
     "role": "Rôle",
@@ -38,12 +31,10 @@
     "business_summary_label": "Activité",
     "empty_hint": "Je remplirai au fur et à mesure — votre rôle, ce que vous cherchez à apprendre, sur qui."
   },
-
   "input_placeholder": "Dites au copilot ce que vous voulez apprendre…",
   "send": "Envoyer",
   "thinking_fallback": "Rédaction…",
   "setting_up": "Préparation de votre étude…",
-
   "study": {
     "eyebrow": "Votre première étude",
     "create_cta": "Créer cette étude",
@@ -57,7 +48,6 @@
     "context_audience": "Qui vous allez interviewer",
     "context_success": "Critère de réussite"
   },
-
   "plan": {
     "eyebrow": "Votre plan de recherche",
     "accept_cta": "Accepter ce plan et lancer l'étape 1",
@@ -73,7 +63,6 @@
       "usability_test": "Test d'utilisabilité"
     }
   },
-
   "website": {
     "eyebrow": "Vérification rapide",
     "default_prompt": "Collez l'URL de votre entreprise et je vais y jeter un œil.",
@@ -82,7 +71,6 @@
     "reading": "Lecture…",
     "skip": "Je préfère vous le dire moi-même"
   },
-
   "done": {
     "eyebrow": "Votre étude est prête",
     "sub": "Choisissez la prochaine étape — la plupart des équipes commencent par tester leur propre entretien pour entendre l'IA en action.",
@@ -92,9 +80,9 @@
     "cta_take_interview_hint": "90 secondes — écoutez le Copilot poser ses questions et s'adapter",
     "cta_copy_link": "Copier le lien à partager",
     "cta_open_study": "Ouvrir votre étude →",
-    "plan_hint": "Les équipes comme la vôtre commencent souvent sur <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — passez au plan quand QualiPulse aura fait ses preuves."
+    "plan_hint": "Les équipes comme la vôtre commencent souvent sur <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — passez au plan quand QualiPulse aura fait ses preuves.",
+    "cta_upgrade": "Passer à {{plan}} →"
   },
-
   "verify_modal": {
     "eyebrow": "Un petit détail",
     "title": "Souhaitez-vous un récapitulatif de cette conversation par email ?",
@@ -102,7 +90,6 @@
     "accept": "Oui, envoyer le lien de vérification",
     "dismiss": "Plus tard"
   },
-
   "sample_modal": {
     "close": "Fermer",
     "eyebrow": "Étude exemple",
@@ -283,7 +270,6 @@
       }
     }
   },
-
   "participant_demo": {
     "invite_eyebrow": "Aperçu de 30 secondes",
     "invite_open": "Tester un entretien de 30 s",
@@ -313,9 +299,7 @@
     "canned_highlight": "guidé pour configurer mon premier projet en moins de deux minutes",
     "canned_code": "Moment de premier succès"
   },
-
   "chat_error": "Désolé — je n'ai pas pu répondre à l'instant. Merci de réessayer.",
-
   "toast": {
     "resend_success": "Email de vérification envoyé.",
     "resend_error": "Impossible de renvoyer pour l'instant.",
@@ -326,6 +310,7 @@
     "no_link_short": "Ouvrez votre étude pour configurer un lien d'entretien.",
     "study_setup_failed": "Impossible de préparer votre étude — merci de réessayer.",
     "skip_failed": "Une erreur est survenue — merci de réessayer.",
-    "website_unreadable": "Impossible de lire ce site — essayez une autre URL."
+    "website_unreadable": "Impossible de lire ce site — essayez une autre URL.",
+    "upgrade_failed": "Impossible de démarrer le paiement — vous pourrez améliorer à tout moment depuis Facturation."
   }
 }

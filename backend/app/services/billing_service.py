@@ -56,6 +56,12 @@ EVT_REFUND_INTERVIEW = "refund_interview"
 EVT_ADJUSTMENT_ADMIN = "adjustment_admin"
 EVT_EXPIRE_CREDITS = "expire_credits"
 
+# The trial's credit balance needs a ``period_end`` for the "current period"
+# query in ``get_active_balance`` to match, but the trial is NOT time-based —
+# its credits never expire by calendar. We give it a far-future horizon so the
+# balance always reads as "current" without ever surfacing a real expiry date.
+TRIAL_CREDIT_HORIZON = timedelta(days=3650)  # ~10 years = "never" for a trial
+
 
 # ── Public dataclasses ────────────────────────────────────────────────────────
 
@@ -517,10 +523,12 @@ def _maybe_send_usage_warning(db: Session, workspace_id: str, balance: CreditBal
 def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubscription | None:
     """Place ``company`` on the credits-based trial plan with 3 free interview credits.
 
-    The trial window (14 days) defines credit expiry — after that the
-    unused credits lapse. Access is gated by credits, not by calendar:
-    a user who exhausts their 3 credits on day 1 is blocked immediately,
-    and a user with credits remaining can use them until period_end.
+    The trial is NOT time-based. Access is gated purely by the credit
+    balance: a user who exhausts their 3 credits is blocked immediately,
+    and a user with credits remaining keeps them indefinitely (no calendar
+    expiry). ``trial_end`` is left NULL and the balance gets a far-future
+    ``period_end`` (see ``TRIAL_CREDIT_HORIZON``) so nothing surfaces a
+    misleading "trial ends" date.
 
     Behaviour matrix:
 
@@ -545,6 +553,13 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
         # Paid or enterprise — never downgrade.
         return None
 
+    # The trial is NOT time-based — its 3 credits never expire by calendar.
+    # We therefore leave ``trial_end`` NULL (no "trial ends" date to surface)
+    # and give the credit balance a far-future period_end purely so the
+    # ``get_active_balance`` "current period" query keeps matching. Users
+    # never see this date; the credits-first UI shows the balance instead.
+    trial_period_end = now + TRIAL_CREDIT_HORIZON
+
     if existing is None:
         sub = WorkspaceSubscription(
             id=str(uuid.uuid4()),
@@ -553,7 +568,7 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
             status="trialing",
             billing_interval=None,
             trial_start=now,
-            trial_end=now + timedelta(days=14),
+            trial_end=None,
         )
         db.add(sub)
     else:
@@ -562,7 +577,7 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
         sub.status = "trialing"
         sub.billing_interval = None
         sub.trial_start = now
-        sub.trial_end = now + timedelta(days=14)
+        sub.trial_end = None
         sub.updated_at = now
     db.flush()
 
@@ -571,7 +586,7 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
         workspace_id=company.id,
         subscription_id=sub.id,
         period_start=now,
-        period_end=now + timedelta(days=14),
+        period_end=trial_period_end,
         included_credits=3,
     )
     db.add(bal)

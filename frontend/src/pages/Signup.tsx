@@ -51,8 +51,9 @@ export default function Signup() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  // Plan chosen on landing page (?plan=free|starter|team|lab)
+  // Plan chosen on landing page (?plan=exploration|team|agency, ?interval=monthly|annual)
   const selectedPlan = searchParams.get("plan") ?? undefined;
+  const selectedInterval = searchParams.get("interval") ?? undefined;
   const refCode = searchParams.get("ref") ?? undefined;
 
   async function handleSubmit(e: FormEvent) {
@@ -101,6 +102,18 @@ export default function Signup() {
       });
       saveToken(res.access_token, res.refresh_token);
       setCachedOnboarded(false);
+      // Direction #1 (free-first PLG): if the user clicked a PAID plan card on
+      // pricing, remember it so the onboarding completion screen can offer a
+      // one-click "Upgrade to <plan>" CTA. They still "start free" as promised
+      // — we just don't throw away the strongest purchase signal in the funnel.
+      const PAID_PLAN_IDS = ["exploration", "team", "agency"];
+      if (selectedPlan && PAID_PLAN_IDS.includes(selectedPlan.toLowerCase())) {
+        localStorage.setItem("qp_signup_plan", selectedPlan.toLowerCase());
+        localStorage.setItem(
+          "qp_signup_interval",
+          (selectedInterval || "monthly").toLowerCase() === "annual" ? "annual" : "monthly",
+        );
+      }
       toast(t("signup.accountCreated"), "success");
       navigate("/welcome", { replace: true });
     } catch (err: unknown) {

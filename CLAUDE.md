@@ -423,7 +423,7 @@ lives on `credit_balances`; every credit movement is appended to
 
 | Plan | Monthly | Annual | Credits/period | Editors | Active projects | Overage |
 |---|---|---|---|---|---|---|
-| Trial | €0 | — | 3 / 14 days total | 1 | 1 | — |
+| Trial | €0 | — | 3 total (no time expiry) | 1 | 1 | — |
 | Exploration | €89 | €890 | 10 / month | 1 | 3 | €7/credit |
 | Team | €299 | €2,990 | 50 / month | 3 | 20 | €6/credit |
 | Agency | €799 | €7,990 | 150 / month | 8 | unlimited | €5/credit |
@@ -434,6 +434,19 @@ when `participant.status` flips to `"completed"` in
 `process_interview_turn`. Idempotent per participant — replayed or
 concurrent completions never double-charge. Screened-out, abandoned,
 and technically-failed participants never consume.
+
+**The trial is NOT time-based.** Its 3 credits never expire by calendar.
+`bootstrap_trial_subscription` leaves `WorkspaceSubscription.trial_end`
+NULL and gives the trial `CreditBalance` a far-future `period_end`
+(`TRIAL_CREDIT_HORIZON`, ~10y) purely so the active-balance query keeps
+matching — that date is never shown to users. `/billing/status`
+suppresses `trial_end` + credit `period_end` for trial plans
+(`credit_period == "trial_total"`) and emits a canonical `display` block
+(`plan_name` / `is_trial` / `status` / `show_trial_end`) so the account
+UI shows "Free trial" with no expiry instead of mixing the legacy tier
+with the subscription status. The legacy `Company.trial_ends_at` column
+is no longer set on signup (credits gate usage, not days) — it survives
+only for pre-credits accounts on the `feature_gates.py` upgrade path.
 
 **Plan name collision:** new plan `team` (€299) ≠ legacy plan `legacy_team` (€99). The legacy plans are prefixed `legacy_*` in the catalogue.
 

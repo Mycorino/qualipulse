@@ -56,7 +56,9 @@
       "teamMembers": "Team members",
       "included": "✓ Included",
       "upgrade": "— Upgrade to unlock"
-    }
+    },
+    "freeTrial": "Free trial",
+    "trialCreditsHint": "Your free interview credits don't expire. No credit card required."
   },
   "language": {
     "title": "Language",
@@ -118,6 +120,47 @@
       "testSent": "✓ Test message sent — check your Slack channel.",
       "testFailed": "We couldn't reach Slack. Double-check the URL and try again.",
       "saveError": "We couldn't save your webhook URL. Please try again."
+    }
+  },
+  "nav": {
+    "aria": "Account sections",
+    "home": "Account home",
+    "profile": "Profile",
+    "security": "Security",
+    "workspace": "Workspace",
+    "integrations": "Integrations",
+    "billing": "Billing"
+  },
+  "home": {
+    "emailCard": {
+      "label": "Email verification",
+      "verified": "Verified",
+      "unverified": "Not verified",
+      "body": "Verify your email to secure your account and unlock interview credits.",
+      "resend": "Resend verification email",
+      "resent": "Verification email sent — check your inbox."
+    },
+    "planCard": {
+      "label": "Plan & credits",
+      "creditsRemaining": "credits remaining",
+      "creditsUsed": "{{used}} of {{total}} used",
+      "noExpiry": "never expire",
+      "upgradeCta": "View plans & upgrade →",
+      "manageCta": "Manage billing →"
+    },
+    "workspaceCard": {
+      "label": "Workspace",
+      "seats": "team seats",
+      "cta": "Manage members →"
+    },
+    "slackCard": {
+      "label": "Slack notifications",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "body": "Get a ping in Slack when an interview completes.",
+      "connectedBody": "Completed-interview alerts are delivered to your channel.",
+      "connectCta": "Connect Slack →",
+      "manageCta": "Manage →"
     }
   }
 }

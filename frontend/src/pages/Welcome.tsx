@@ -35,7 +35,30 @@ import {
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
+import client from "../api/client";
 import WelcomeSetup, { ROLES, TEAM_SIZES, USE_CASES } from "./WelcomeSetup";
+
+// Direction #1 (free-first PLG): the paid plan a user clicked on the pricing
+// page is stashed in localStorage at signup. On the completion screen we offer
+// a one-click upgrade so the strongest purchase signal isn't lost to a hunt
+// for the billing page. Display names map plan id → label.
+const SIGNUP_PLAN_LABELS: Record<string, string> = {
+  exploration: "Exploration",
+  team: "Team",
+  agency: "Agency",
+};
+
+function readSignupUpgrade(): { planId: string; interval: string; label: string } | null {
+  try {
+    const planId = (localStorage.getItem("qp_signup_plan") || "").toLowerCase();
+    const label = SIGNUP_PLAN_LABELS[planId];
+    if (!label) return null;
+    const interval = localStorage.getItem("qp_signup_interval") === "annual" ? "annual" : "monthly";
+    return { planId, interval, label };
+  } catch {
+    return null;
+  }
+}
 
 // Per-key canonical option sets — when the user clicks one of these
 // sidebar rows we render a chip picker rather than a free-text input,
@@ -152,6 +175,9 @@ export default function Welcome() {
    *  place of the generic "Drafting…" string. Cleared between turns. */
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  // Direction #1 — paid-plan upgrade offered on the completion screen.
+  const [upgrading, setUpgrading] = useState(false);
+  const signupUpgrade = readSignupUpgrade();
   const [done, setDone] = useState<{
     projectId: string;
     studyName: string;
@@ -703,6 +729,30 @@ export default function Welcome() {
         toast(t("toast.link_copy_failed"), "error");
       }
     };
+    const handleUpgradeFromSignup = async () => {
+      if (!signupUpgrade) return;
+      setUpgrading(true);
+      try {
+        const { data } = await client.post("/billing/checkout", {
+          plan_id: signupUpgrade.planId,
+          billing_interval: signupUpgrade.interval,
+          success_url: window.location.origin + "/account/billing?upgraded=true",
+          cancel_url: window.location.origin + "/account/billing",
+        });
+        // Decision made — clear the stash so we don't keep nudging.
+        localStorage.removeItem("qp_signup_plan");
+        localStorage.removeItem("qp_signup_interval");
+        window.location.href = data.checkout_url;
+      } catch {
+        setUpgrading(false);
+        toast(
+          t("toast.upgrade_failed", {
+            defaultValue: "Couldn't start checkout — you can upgrade anytime from Billing.",
+          }),
+          "error",
+        );
+      }
+    };
     // Prefer the deterministic profile summary (concrete facts the
     // server built from captured fields) over the agent's free-form
     // memory note. Fall back gracefully.
@@ -778,6 +828,25 @@ export default function Welcome() {
                 {t("done.cta_open_study")}
               </span>
             </button>
+
+            {/* Direction #1: one-click upgrade for users who arrived via a
+             *  paid plan card. They still started free; this just makes the
+             *  buy button reachable without hunting for /account/billing. */}
+            {signupUpgrade && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={upgrading}
+                onClick={handleUpgradeFromSignup}
+              >
+                {upgrading
+                  ? t("common:loading", { defaultValue: "Loading…" })
+                  : t("done.cta_upgrade", {
+                      defaultValue: "Upgrade to {{plan}} →",
+                      plan: signupUpgrade.label,
+                    })}
+              </button>
+            )}
 
             <button
               type="button"

@@ -181,24 +181,47 @@ def billing_status(
     }
 
     if sub and plan:
+        # The trial is not time-based — never surface a trial-end date for it,
+        # even if a legacy row still carries one. (Pre-credits accounts had
+        # trial_end = signup + 14d; suppressing it here fixes the stale
+        # "Trial ends 31/05/2026" the account page showed.)
+        is_trial = plan.credit_period == "trial_total"
+        trial_end_display = (
+            None if is_trial else (sub.trial_end.isoformat() if sub.trial_end else None)
+        )
         response["plan"] = {
             "id": plan.id,
             "name": plan.public_name,
             "is_legacy": plan.is_legacy,
             "is_custom": plan.is_custom,
+            "is_trial": is_trial,
             "monthly_price_cents": plan.monthly_price_cents,
             "annual_price_cents": plan.annual_price_cents,
             "billing_interval": sub.billing_interval,
             "subscription_status": sub.status,
             "current_period_start": sub.current_period_start.isoformat() if sub.current_period_start else None,
             "current_period_end": sub.current_period_end.isoformat() if sub.current_period_end else None,
-            "trial_end": sub.trial_end.isoformat() if sub.trial_end else None,
+            "trial_end": trial_end_display,
             "cancel_at_period_end": sub.cancel_at_period_end,
             "overage_enabled": sub.overage_enabled,
         }
         balance = billing_service.get_active_balance(db, company.id)
         if balance and not plan.is_legacy:
-            response["credits"] = _credits_payload(balance)
+            response["credits"] = _credits_payload(balance, hide_period=is_trial)
+
+        # Canonical display block — ONE source of truth for credit-native
+        # accounts so the UI stops mixing the legacy tier (e.g. "Starter
+        # active") with the subscription truth (e.g. "Trial trialing").
+        # Legacy-plan accounts keep using the top-level tier shape.
+        if not plan.is_legacy:
+            response["display"] = {
+                "plan_name": plan.public_name,
+                "is_trial": is_trial,
+                # For a trial we present "active" rather than the internal
+                # "trialing" status — there's nothing time-bound to convey.
+                "status": "active" if is_trial else sub.status,
+                "show_trial_end": False if is_trial else bool(sub.trial_end),
+            }
     return response
 
 
@@ -225,10 +248,17 @@ def billing_usage(
             status_code=404,
             detail={"code": "no_balance", "message": "No active credit balance."},
         )
-    return _credits_payload(balance)
+    return _credits_payload(balance, hide_period=(plan.credit_period == "trial_total"))
 
 
-def _credits_payload(balance) -> dict:
+def _credits_payload(balance, hide_period: bool = False) -> dict:
+    """Serialize a credit balance.
+
+    ``hide_period=True`` (trial plans) nulls out the period dates so the UI
+    never renders a "Period ends …" line for credits that don't expire by
+    calendar. The far-future trial horizon is an internal query artifact, not
+    a user-facing date.
+    """
     return {
         "included_credits":  balance.included_credits or 0,
         "purchased_credits": balance.purchased_credits or 0,
@@ -236,8 +266,8 @@ def _credits_payload(balance) -> dict:
         "used_credits":      balance.used_credits or 0,
         "overage_credits":   balance.overage_credits or 0,
         "available_credits": balance.available,
-        "period_start":      balance.period_start.isoformat() if balance.period_start else None,
-        "period_end":        balance.period_end.isoformat() if balance.period_end else None,
+        "period_start":      None if hide_period else (balance.period_start.isoformat() if balance.period_start else None),
+        "period_end":        None if hide_period else (balance.period_end.isoformat() if balance.period_end else None),
     }
 
 

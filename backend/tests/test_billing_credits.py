@@ -266,7 +266,8 @@ class TestTrialBootstrap:
         assert sub is not None
         assert sub.plan_id == "trial"
         assert sub.status == "trialing"
-        assert sub.trial_end is not None
+        # Trial is NOT time-based — no calendar expiry date is encoded.
+        assert sub.trial_end is None
 
         bal = get_active_balance(db_session, c.id)
         assert bal is not None
