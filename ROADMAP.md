@@ -173,7 +173,7 @@ A SaaS platform that lets companies run AI-driven voice interviews at scale. Res
 | 6.8 | Stripe webhook handler (subscription created/updated/deleted) | ✅ Done | P0 | |
 | 6.9 | Usage fields on Company model (`interview_count`, `storage_bytes`) | ✅ Done | P1 | Fields exist; not incremented yet |
 | 6.10 | Usage limits enforcement (gates called at request time) | ⬜ Planned | P0 | Gate functions exist but not enforced on create endpoints |
-| 6.11 | Free trial period (14 days) | ⬜ Planned | P1 | `trial_ends_at` field exists on Company |
+| 6.11 | Free trial (credits-based, not time-based) | ✅ Done | P1 | 3 free interview credits, no calendar expiry; `trial_ends_at` retired for new accounts |
 | 6.12 | Overage alerts | ⬜ Planned | P2 | |
 | 6.13 | Annual billing discount | ⬜ Planned | P2 | |
 | 6.14 | Usage invoice / receipt emails | ⬜ Planned | P2 | |
@@ -217,7 +217,6 @@ A SaaS platform that lets companies run AI-driven voice interviews at scale. Res
 - [ ] 5.11 Staging environment
 - [ ] 3.3 Team member invite flow
 - [ ] 2.32 Email invitations to participants (endpoint needed)
-- [ ] 6.11 Free trial period (use existing `trial_ends_at` field)
 - [ ] 4.16 Database backups
 - [ ] 6.15 Increment usage counters
 - [ ] 2.38 Wire profile save in AccountSettings

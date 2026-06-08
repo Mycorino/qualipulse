@@ -582,7 +582,7 @@ export default function Admin() {
             <StatCard label="Total users" value={stats.total_users} />
             <StatCard label="Total projects" value={stats.total_projects} />
             <StatCard label="Completed interviews" value={stats.total_interviews_completed} />
-            <StatCard label="Active trials" value={stats.active_trials} />
+            <StatCard label="Active trials (legacy)" value={stats.active_trials} />
             <StatCard label="Signups (7d)" value={stats.signups_last_7_days} />
             <StatCard label="Signups (30d)" value={stats.signups_last_30_days} />
             {Object.entries(stats.users_by_tier).map(([tier, count]) => (
@@ -1075,7 +1075,7 @@ export default function Admin() {
                     }}
                   >
                     <option value="" disabled>
-                      Trial…
+                      Trial (legacy)…
                     </option>
                     <option value="extend_7">+7 days</option>
                     <option value="extend_14">+14 days</option>
@@ -1083,6 +1083,10 @@ export default function Admin() {
                     <option value="reset">Reset (14d)</option>
                     <option value="expire">Expire now</option>
                   </select>
+                  {/* Trial is calendar-based for LEGACY accounts only. New
+                      accounts are credits-based — use "Adjust credits" to
+                      grant/claw back interview credits instead of touching a
+                      trial date that doesn't gate their access. */}
 
                   {/* Delete */}
                   <button
