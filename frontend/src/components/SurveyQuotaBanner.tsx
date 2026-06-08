@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import client from "../api/client";
 
@@ -33,6 +34,7 @@ interface SurveyQuotaSnapshot {
 export function SurveyQuotaBanner() {
   const [quota, setQuota] = useState<SurveyQuotaSnapshot | null>(null);
   const navigate = useNavigate();
+  const { t } = useTranslation("survey");
 
   useEffect(() => {
     client
@@ -56,12 +58,14 @@ export function SurveyQuotaBanner() {
   const tone: "warn" | "danger" = quota.is_over_response_cap ? "danger" : "warn";
 
   const headline = quota.is_over_response_cap
-    ? `Survey response cap reached`
-    : `Nearing your survey response cap`;
+    ? t("quotaBanner.capReached")
+    : t("quotaBanner.nearingCap");
 
   const detail = cap
-    ? `${quota.responses_used} of ${cap} responses used this period${pct !== null ? ` (${pct}%)` : ""}.`
-    : `${quota.responses_used} responses this period.`;
+    ? pct !== null
+      ? t("quotaBanner.detailWithCap", { used: quota.responses_used, cap, pct })
+      : t("quotaBanner.detailWithCapNoPct", { used: quota.responses_used, cap })
+    : t("quotaBanner.detailNoCap", { used: quota.responses_used });
 
   return (
     <div
@@ -89,7 +93,7 @@ export function SurveyQuotaBanner() {
           {detail}
           {quota.is_over_response_cap && cap !== null && (
             <>
-              {" "}New survey submissions will be paused until your plan resets, or upgrade to keep collecting.
+              {" "}{t("quotaBanner.pausedSuffix")}
             </>
           )}
         </div>
@@ -99,7 +103,7 @@ export function SurveyQuotaBanner() {
         className="btn btn-secondary btn-sm"
         onClick={() => navigate("/account/billing")}
       >
-        View plans
+        {t("quotaBanner.viewPlans")}
       </button>
     </div>
   );

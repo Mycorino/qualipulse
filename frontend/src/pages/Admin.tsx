@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import axios from "axios";
 import AdminBlog from "./AdminBlog";
 
@@ -112,13 +113,16 @@ function TierBadge({ tier }: { tier: string }) {
 
 // ── Trial status ───────────────────────────────────────────────────────────
 
-function trialLabel(trial_ends_at: string | null): string {
-  if (!trial_ends_at) return "—";
+function trialLabel(
+  trial_ends_at: string | null,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
+  if (!trial_ends_at) return t("users.trialNone");
   const end = new Date(trial_ends_at);
   const now = new Date();
-  if (end <= now) return "Expired";
+  if (end <= now) return t("users.trialExpired");
   const days = Math.ceil((end.getTime() - now.getTime()) / 86400000);
-  return `${days}d left`;
+  return t("users.trialDaysLeft", { count: days });
 }
 
 function trialColor(trial_ends_at: string | null): string {
@@ -165,6 +169,7 @@ function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation("admin");
   return (
     <div
       style={{
@@ -193,7 +198,7 @@ function ConfirmDialog({
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button className="btn-secondary" onClick={onCancel}>
-            Cancel
+            {t("deleteDialog.cancel")}
           </button>
           <button
             style={{
@@ -208,7 +213,7 @@ function ConfirmDialog({
             }}
             onClick={onConfirm}
           >
-            Delete
+            {t("deleteDialog.confirm")}
           </button>
         </div>
       </div>
@@ -219,6 +224,7 @@ function ConfirmDialog({
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function Admin() {
+  const { t } = useTranslation("admin");
   const [adminKey, setAdminKey] = useState<string>(
     () => sessionStorage.getItem("admin_key") ?? ""
   );
@@ -276,7 +282,7 @@ export default function Admin() {
   const login = useCallback(async (key: string, identity: string) => {
     setKeyError("");
     if (!identity.trim()) {
-      setKeyError("Enter your name so actions are traceable");
+      setKeyError(t("login.errorIdentityRequired"));
       return;
     }
     try {
@@ -289,12 +295,12 @@ export default function Admin() {
       setAuthed(true);
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 403) {
-        setKeyError("Invalid admin key");
+        setKeyError(t("login.errorInvalidKey"));
       } else {
-        setKeyError("Could not connect to backend");
+        setKeyError(t("login.errorConnect"));
       }
     }
-  }, []);
+  }, [t]);
 
   // Auto-login if key already in sessionStorage
   useEffect(() => {
@@ -313,11 +319,11 @@ export default function Admin() {
       const res = await client().get<AdminUser[]>("/admin/users", { params });
       setUsers(res.data);
     } catch {
-      setError("Failed to load users");
+      setError(t("toasts.loadUsersFailed"));
     } finally {
       setLoading(false);
     }
-  }, [client, search, tierFilter]);
+  }, [client, search, tierFilter, t]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -343,11 +349,11 @@ export default function Admin() {
       const res = await client().get("/affiliates/admin/list");
       setAffiliates(res.data.affiliates || []);
     } catch {
-      setError("Failed to load affiliates");
+      setError(t("toasts.loadAffiliatesFailed"));
     } finally {
       setAffiliatesLoading(false);
     }
-  }, [client]);
+  }, [client, t]);
 
   const loadAuditLog = useCallback(async (page = 1) => {
     setAuditLoading(true);
@@ -359,11 +365,11 @@ export default function Admin() {
       setAuditLog(res.data);
       setAuditPage(page);
     } catch {
-      setError("Failed to load audit log");
+      setError(t("toasts.loadAuditFailed"));
     } finally {
       setAuditLoading(false);
     }
-  }, [client, auditAction, auditSearch]);
+  }, [client, auditAction, auditSearch, t]);
 
   useEffect(() => {
     if (authed) {
@@ -407,9 +413,9 @@ export default function Admin() {
             : u
         )
       );
-      showSuccess("Tier updated");
+      showSuccess(t("toasts.tierUpdated"));
     } catch {
-      setError("Failed to update tier");
+      setError(t("toasts.tierUpdateFailed"));
     } finally {
       setActionLoading(null);
     }
@@ -426,9 +432,9 @@ export default function Admin() {
           u.id === user.id ? { ...u, trial_ends_at: res.data.trial_ends_at } : u
         )
       );
-      showSuccess("Trial updated");
+      showSuccess(t("toasts.trialUpdated"));
     } catch {
-      setError("Failed to update trial");
+      setError(t("toasts.trialUpdateFailed"));
     } finally {
       setActionLoading(null);
     }
@@ -438,11 +444,11 @@ export default function Admin() {
     if (!creditDialog) return;
     const delta = parseInt(creditDelta, 10);
     if (Number.isNaN(delta) || delta === 0) {
-      setCreditDialogError("Enter a non-zero integer");
+      setCreditDialogError(t("creditsDialog.errorNonZero"));
       return;
     }
     if (!creditReason.trim()) {
-      setCreditDialogError("Reason is required");
+      setCreditDialogError(t("creditsDialog.errorReasonRequired"));
       return;
     }
     setCreditDialogSubmitting(true);
@@ -452,13 +458,17 @@ export default function Admin() {
         credits_delta: delta,
         reason: creditReason.trim(),
       });
-      showSuccess(`${delta > 0 ? "Granted" : "Clawed back"} ${Math.abs(delta)} credit${Math.abs(delta) !== 1 ? "s" : ""}`);
+      showSuccess(
+        t(delta > 0 ? "toasts.creditsGranted" : "toasts.creditsClawedBack", {
+          count: Math.abs(delta),
+        })
+      );
       setCreditDialog(null);
       setCreditDelta("");
       setCreditReason("");
     } catch (err: unknown) {
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
-      setCreditDialogError(detail ?? "Failed to adjust credits");
+      setCreditDialogError(detail ?? t("toasts.creditsAdjustFailed"));
     } finally {
       setCreditDialogSubmitting(false);
     }
@@ -471,9 +481,9 @@ export default function Admin() {
       await client().delete(`/admin/users/${user.id}`);
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
       await loadStats();
-      showSuccess("User deleted");
+      showSuccess(t("toasts.userDeleted"));
     } catch {
-      setError("Failed to delete user");
+      setError(t("toasts.userDeleteFailed"));
     } finally {
       setActionLoading(null);
     }
@@ -495,12 +505,12 @@ export default function Admin() {
             : u
         )
       );
-      showSuccess("Account suspended");
+      showSuccess(t("toasts.accountSuspended"));
       setSuspendDialog(null);
       setSuspendReason("");
     } catch (err: unknown) {
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
-      setError(detail ?? "Failed to suspend");
+      setError(detail ?? t("toasts.suspendFailed"));
     } finally {
       setSuspendSubmitting(false);
     }
@@ -517,10 +527,10 @@ export default function Admin() {
             : u
         )
       );
-      showSuccess("Account unsuspended");
+      showSuccess(t("toasts.accountUnsuspended"));
     } catch (err: unknown) {
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
-      setError(detail ?? "Failed to unsuspend");
+      setError(detail ?? t("toasts.unsuspendFailed"));
     } finally {
       setActionLoading(null);
     }
@@ -538,10 +548,10 @@ export default function Admin() {
         email: res.data.company_email,
       });
       window.open(`/auth/impersonate-finish#${params.toString()}`, "_blank");
-      showSuccess("Impersonation tab opened");
+      showSuccess(t("toasts.impersonationOpened"));
     } catch (err: unknown) {
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
-      setError(detail ?? "Failed to impersonate");
+      setError(detail ?? t("toasts.impersonateFailed"));
     } finally {
       setActionLoading(null);
     }
@@ -575,19 +585,19 @@ export default function Admin() {
             boxShadow: "var(--shadow-md)",
           }}
         >
-          <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Admin Panel</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{t("login.title")}</h1>
           <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 24 }}>
-            QualiPulse internal
+            {t("login.subtitle")}
           </p>
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
-            Your name
+            {t("login.yourName")}
           </label>
           <input
             type="text"
             value={identityInput}
             onChange={(e) => setIdentityInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && login(keyInput, identityInput)}
-            placeholder="e.g. Corin"
+            placeholder={t("login.namePlaceholder")}
             style={{
               display: "block",
               width: "100%",
@@ -601,14 +611,14 @@ export default function Admin() {
             }}
           />
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
-            Admin key
+            {t("login.adminKey")}
           </label>
           <input
             type="password"
             value={keyInput}
             onChange={(e) => setKeyInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && login(keyInput, identityInput)}
-            placeholder="Enter admin secret key"
+            placeholder={t("login.adminKeyPlaceholder")}
             style={{
               display: "block",
               width: "100%",
@@ -640,7 +650,7 @@ export default function Admin() {
               cursor: "pointer",
             }}
           >
-            Sign in
+            {t("login.signIn")}
           </button>
         </div>
       </div>
@@ -671,7 +681,7 @@ export default function Admin() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: "var(--text-primary)" }}>
-            QualiPulse Admin
+            {t("header.title")}
           </span>
           <span
             style={{
@@ -684,7 +694,7 @@ export default function Admin() {
               fontWeight: 600,
             }}
           >
-            INTERNAL
+            {t("header.internalBadge")}
           </span>
         </div>
         <button
@@ -703,7 +713,7 @@ export default function Admin() {
             setAdminIdentity("");
           }}
         >
-          Sign out
+          {t("header.signOut")}
         </button>
       </div>
 
@@ -719,14 +729,14 @@ export default function Admin() {
               marginBottom: 28,
             }}
           >
-            <StatCard label="Total users" value={stats.total_users} />
-            <StatCard label="Total projects" value={stats.total_projects} />
-            <StatCard label="Completed interviews" value={stats.total_interviews_completed} />
-            <StatCard label="Active trials (legacy)" value={stats.active_trials} />
-            <StatCard label="Signups (7d)" value={stats.signups_last_7_days} />
-            <StatCard label="Signups (30d)" value={stats.signups_last_30_days} />
+            <StatCard label={t("stats.totalUsers")} value={stats.total_users} />
+            <StatCard label={t("stats.totalProjects")} value={stats.total_projects} />
+            <StatCard label={t("stats.completedInterviews")} value={stats.total_interviews_completed} />
+            <StatCard label={t("stats.activeTrials")} value={stats.active_trials} />
+            <StatCard label={t("stats.signups7d")} value={stats.signups_last_7_days} />
+            <StatCard label={t("stats.signups30d")} value={stats.signups_last_30_days} />
             {Object.entries(stats.users_by_tier).map(([tier, count]) => (
-              <StatCard key={tier} label={`${tier} users`} value={count} />
+              <StatCard key={tier} label={t("stats.tierUsers", { tier })} value={count} />
             ))}
           </div>
         )}
@@ -752,7 +762,7 @@ export default function Admin() {
                 marginBottom: 16,
               }}
             >
-              AI Spend
+              {t("costs.title")}
             </div>
 
             {/* Top-line numbers */}
@@ -762,7 +772,7 @@ export default function Admin() {
                   ${costs.total_cost_usd.toFixed(2)}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  All time
+                  {t("costs.allTime")}
                 </div>
               </div>
               <div>
@@ -770,7 +780,7 @@ export default function Admin() {
                   ${costs.this_month_usd.toFixed(2)}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  This month
+                  {t("costs.thisMonth")}
                 </div>
               </div>
               <div>
@@ -778,7 +788,7 @@ export default function Admin() {
                   ${costs.avg_cost_per_interview_usd.toFixed(3)}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  Avg / interview ({costs.total_interviews} total)
+                  {t("costs.avgPerInterview", { count: costs.total_interviews })}
                 </div>
               </div>
             </div>
@@ -794,7 +804,7 @@ export default function Admin() {
               >
                 <thead>
                   <tr>
-                    {["Operation", "Calls", "Total cost"].map((h) => (
+                    {["costs.colOperation", "costs.colCalls", "costs.colTotalCost"].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -808,7 +818,7 @@ export default function Admin() {
                           borderBottom: "1px solid var(--border-subtle)",
                         }}
                       >
-                        {h}
+                        {t(h)}
                       </th>
                     ))}
                   </tr>
@@ -857,7 +867,7 @@ export default function Admin() {
               fontWeight: tab === "users" ? 600 : 500,
             }}
           >
-            Users
+            {t("tabs.users")}
           </button>
           <button
             onClick={() => setTab("affiliates")}
@@ -872,7 +882,7 @@ export default function Admin() {
               fontWeight: tab === "affiliates" ? 600 : 500,
             }}
           >
-            Affiliates
+            {t("tabs.affiliates")}
           </button>
           <button
             onClick={() => setTab("blog")}
@@ -887,7 +897,7 @@ export default function Admin() {
               fontWeight: tab === "blog" ? 600 : 500,
             }}
           >
-            Blog
+            {t("tabs.blog")}
           </button>
           <button
             onClick={() => setTab("audit")}
@@ -902,7 +912,7 @@ export default function Admin() {
               fontWeight: tab === "audit" ? 600 : 500,
             }}
           >
-            Audit Log
+            {t("tabs.audit")}
           </button>
         </div>
 
@@ -918,7 +928,7 @@ export default function Admin() {
           >
             <input
               type="search"
-              placeholder="Search by name or email…"
+              placeholder={t("users.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -944,11 +954,11 @@ export default function Admin() {
                 outline: "none",
               }}
             >
-              <option value="">All tiers</option>
-              <option value="solo">Solo</option>
-              <option value="team">Team</option>
-              <option value="lab">Lab</option>
-              <option value="enterprise">Enterprise</option>
+              <option value="">{t("users.allTiers")}</option>
+              <option value="solo">{t("users.tierSolo")}</option>
+              <option value="team">{t("users.tierTeam")}</option>
+              <option value="lab">{t("users.tierLab")}</option>
+              <option value="enterprise">{t("users.tierEnterprise")}</option>
             </select>
             <button
               onClick={loadUsers}
@@ -962,7 +972,7 @@ export default function Admin() {
                 color: "var(--text-secondary)",
               }}
             >
-              Refresh
+              {t("users.refresh")}
             </button>
           </div>
         )}
@@ -1011,7 +1021,7 @@ export default function Admin() {
           >
             <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Affiliate Program</h2>
+                <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{t("affiliates.title")}</h2>
                 <button
                   onClick={loadAffiliates}
                   style={{
@@ -1024,14 +1034,14 @@ export default function Admin() {
                     color: "var(--text-secondary)",
                   }}
                 >
-                  Refresh
+                  {t("affiliates.refresh")}
                 </button>
               </div>
             </div>
-            {affiliatesLoading && <div style={{ padding: "24px", textAlign: "center" }}>Loading...</div>}
+            {affiliatesLoading && <div style={{ padding: "24px", textAlign: "center" }}>{t("affiliates.loading")}</div>}
             {!affiliatesLoading && affiliates.length === 0 && (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text-secondary)" }}>
-                No affiliates yet.
+                {t("affiliates.none")}
               </div>
             )}
             {!affiliatesLoading && affiliates.length > 0 && (
@@ -1039,14 +1049,14 @@ export default function Admin() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "var(--bg-sunken)", borderBottom: "1px solid var(--border)" }}>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Name</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Email</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Code</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Status</th>
-                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Commission %</th>
-                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Signups</th>
-                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Conversions</th>
-                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Earned</th>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colName")}</th>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colEmail")}</th>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colCode")}</th>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colStatus")}</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colCommission")}</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colSignups")}</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colConversions")}</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colEarned")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1106,23 +1116,23 @@ export default function Admin() {
               letterSpacing: "0.06em",
             }}
           >
-            <span>Name</span>
-            <span>Email</span>
-            <span>Tier</span>
-            <span>Trial</span>
-            <span>Projects</span>
-            <span>Signed up</span>
-            <span>Actions</span>
+            <span>{t("users.colName")}</span>
+            <span>{t("users.colEmail")}</span>
+            <span>{t("users.colTier")}</span>
+            <span>{t("users.colTrial")}</span>
+            <span>{t("users.colProjects")}</span>
+            <span>{t("users.colSignedUp")}</span>
+            <span>{t("users.colActions")}</span>
           </div>
 
           {loading && (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
-              Loading…
+              {t("users.loading")}
             </div>
           )}
           {!loading && users.length === 0 && (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
-              No users found
+              {t("users.noUsers")}
             </div>
           )}
 
@@ -1148,7 +1158,7 @@ export default function Admin() {
                     {user.name}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>
-                    {user.email_verified ? "✓ verified" : "unverified"}
+                    {user.email_verified ? t("users.verified") : t("users.unverified")}
                   </div>
                 </div>
 
@@ -1172,7 +1182,7 @@ export default function Admin() {
                     fontWeight: 500,
                   }}
                 >
-                  {trialLabel(user.trial_ends_at)}
+                  {trialLabel(user.trial_ends_at, t)}
                 </div>
 
                 {/* Projects */}
@@ -1205,10 +1215,10 @@ export default function Admin() {
                       outline: "none",
                     }}
                   >
-                    <option value="solo">Solo</option>
-                    <option value="team">Team</option>
-                    <option value="lab">Lab</option>
-                    <option value="enterprise">Enterprise</option>
+                    <option value="solo">{t("users.tierSolo")}</option>
+                    <option value="team">{t("users.tierTeam")}</option>
+                    <option value="lab">{t("users.tierLab")}</option>
+                    <option value="enterprise">{t("users.tierEnterprise")}</option>
                   </select>
 
                   {/* Trial selector */}
@@ -1230,13 +1240,13 @@ export default function Admin() {
                     }}
                   >
                     <option value="" disabled>
-                      Trial (legacy)…
+                      {t("users.trialOption")}
                     </option>
-                    <option value="extend_7">+7 days</option>
-                    <option value="extend_14">+14 days</option>
-                    <option value="extend_30">+30 days</option>
-                    <option value="reset">Reset (14d)</option>
-                    <option value="expire">Expire now</option>
+                    <option value="extend_7">{t("users.trialExtend7")}</option>
+                    <option value="extend_14">{t("users.trialExtend14")}</option>
+                    <option value="extend_30">{t("users.trialExtend30")}</option>
+                    <option value="reset">{t("users.trialReset")}</option>
+                    <option value="expire">{t("users.trialExpire")}</option>
                   </select>
                   {/* Trial is calendar-based for LEGACY accounts only. New
                       accounts are credits-based — use "Adjust credits" to
@@ -1259,7 +1269,7 @@ export default function Admin() {
                       opacity: actionLoading === `delete-${user.id}` ? 0.5 : 1,
                     }}
                   >
-                    {actionLoading === `delete-${user.id}` ? "…" : "Delete"}
+                    {actionLoading === `delete-${user.id}` ? "…" : t("users.delete")}
                   </button>
                 </div>
               </div>
@@ -1279,15 +1289,15 @@ export default function Admin() {
                     if (!co) return null;
                     return (
                       <div style={{ marginBottom: 12, fontSize: 12, color: "var(--text-muted)" }}>
-                        AI spend:{" "}
+                        {t("users.aiSpendLabel")}{" "}
                         <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
                           ${co.total_cost_usd.toFixed(4)}
                         </span>{" "}
-                        total ·{" "}
+                        {t("users.aiSpendTotal")} ·{" "}
                         <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
                           ${co.this_month_usd.toFixed(4)}
                         </span>{" "}
-                        this month
+                        {t("users.aiSpendThisMonth")}
                       </div>
                     );
                   })()}
@@ -1311,7 +1321,7 @@ export default function Admin() {
                         fontWeight: 500,
                       }}
                     >
-                      Adjust credits
+                      {t("users.adjustCredits")}
                     </button>
                     <button
                       disabled={actionLoading === `impersonate-${user.id}`}
@@ -1328,7 +1338,7 @@ export default function Admin() {
                         opacity: actionLoading === `impersonate-${user.id}` ? 0.5 : 1,
                       }}
                     >
-                      {actionLoading === `impersonate-${user.id}` ? "…" : "Login As"}
+                      {actionLoading === `impersonate-${user.id}` ? "…" : t("users.loginAs")}
                     </button>
                     {user.suspended_at ? (
                       <button
@@ -1346,7 +1356,7 @@ export default function Admin() {
                           opacity: actionLoading === `unsuspend-${user.id}` ? 0.5 : 1,
                         }}
                       >
-                        {actionLoading === `unsuspend-${user.id}` ? "…" : "Unsuspend"}
+                        {actionLoading === `unsuspend-${user.id}` ? "…" : t("users.unsuspend")}
                       </button>
                     ) : (
                       <button
@@ -1365,7 +1375,7 @@ export default function Admin() {
                           fontWeight: 500,
                         }}
                       >
-                        Suspend
+                        {t("users.suspend")}
                       </button>
                     )}
                   </div>
@@ -1380,7 +1390,7 @@ export default function Admin() {
                       fontSize: 12,
                       color: "var(--warning-text, #92400e)",
                     }}>
-                      <strong>Suspended</strong>
+                      <strong>{t("users.suspendedBadge")}</strong>
                       {user.suspension_reason && <> — {user.suspension_reason}</>}
                       <span style={{ marginLeft: 8, opacity: 0.7 }}>
                         ({new Date(user.suspended_at).toLocaleDateString()})
@@ -1391,7 +1401,7 @@ export default function Admin() {
                   {users.find((u) => u.id === expandedId)?.business_summary && (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-                        Business summary
+                        {t("users.businessSummary")}
                       </div>
                       <p style={{ fontSize: 12, color: "var(--text-secondary)", fontStyle: "italic", margin: 0, lineHeight: 1.5 }}>
                         {users.find((u) => u.id === expandedId)?.business_summary}
@@ -1408,13 +1418,15 @@ export default function Admin() {
                       marginBottom: 10,
                     }}
                   >
-                    Projects ({expandLoading ? "…" : expandedProjects.length})
+                    {expandLoading
+                      ? `${t("users.colProjects")} (${t("users.projectsLoading")})`
+                      : t("users.projectsCount", { count: expandedProjects.length })}
                   </div>
                   {expandLoading && (
-                    <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading…</div>
+                    <div style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("users.loadingShort")}</div>
                   )}
                   {!expandLoading && expandedProjects.length === 0 && (
-                    <div style={{ color: "var(--text-muted)", fontSize: 13 }}>No projects</div>
+                    <div style={{ color: "var(--text-muted)", fontSize: 13 }}>{t("users.noProjects")}</div>
                   )}
                   {!expandLoading &&
                     expandedProjects.map((p) => (
@@ -1435,7 +1447,7 @@ export default function Admin() {
                           {p.name}
                         </span>
                         <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                          {p.participant_count} participant{p.participant_count !== 1 ? "s" : ""}{" "}
+                          {t("users.participants", { count: p.participant_count })}{" "}
                           · {new Date(p.created_at).toLocaleDateString()}
                         </span>
                       </div>
@@ -1468,18 +1480,18 @@ export default function Admin() {
                   outline: "none",
                 }}
               >
-                <option value="">All actions</option>
-                <option value="tier_change">Tier change</option>
-                <option value="trial_update">Trial update</option>
-                <option value="credit_adjustment">Credit adjustment</option>
-                <option value="user_delete">User delete</option>
-                <option value="suspend">Suspend</option>
-                <option value="unsuspend">Unsuspend</option>
-                <option value="impersonation_start">Impersonation</option>
+                <option value="">{t("audit.allActions")}</option>
+                <option value="tier_change">{t("audit.actionTierChange")}</option>
+                <option value="trial_update">{t("audit.actionTrialUpdate")}</option>
+                <option value="credit_adjustment">{t("audit.actionCreditAdjustment")}</option>
+                <option value="user_delete">{t("audit.actionUserDelete")}</option>
+                <option value="suspend">{t("audit.actionSuspend")}</option>
+                <option value="unsuspend">{t("audit.actionUnsuspend")}</option>
+                <option value="impersonation_start">{t("audit.actionImpersonation")}</option>
               </select>
               <input
                 type="search"
-                placeholder="Search by email…"
+                placeholder={t("audit.searchPlaceholder")}
                 value={auditSearch}
                 onChange={(e) => setAuditSearch(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && loadAuditLog(1)}
@@ -1505,7 +1517,7 @@ export default function Admin() {
                   color: "var(--text-secondary)",
                 }}
               >
-                Search
+                {t("audit.search")}
               </button>
             </div>
 
@@ -1520,7 +1532,7 @@ export default function Admin() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "var(--bg-sunken)", borderBottom: "1px solid var(--border)" }}>
-                    {["When", "Admin", "Action", "Target", "Details"].map((h) => (
+                    {["audit.colWhen", "audit.colAdmin", "audit.colAction", "audit.colTarget", "audit.colDetails"].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -1533,7 +1545,7 @@ export default function Admin() {
                           letterSpacing: "0.06em",
                         }}
                       >
-                        {h}
+                        {t(h)}
                       </th>
                     ))}
                   </tr>
@@ -1542,14 +1554,14 @@ export default function Admin() {
                   {auditLoading && (
                     <tr>
                       <td colSpan={5} style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>
-                        Loading…
+                        {t("audit.loading")}
                       </td>
                     </tr>
                   )}
                   {!auditLoading && auditLog.length === 0 && (
                     <tr>
                       <td colSpan={5} style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>
-                        No audit entries found
+                        {t("audit.noEntries")}
                       </td>
                     </tr>
                   )}
@@ -1609,10 +1621,10 @@ export default function Admin() {
                       opacity: auditPage <= 1 ? 0.4 : 1,
                     }}
                   >
-                    ← Prev
+                    {t("audit.prev")}
                   </button>
                   <span style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "center" }}>
-                    Page {auditPage}
+                    {t("audit.page", { page: auditPage })}
                   </span>
                   <button
                     disabled={auditLog.length < 50}
@@ -1627,7 +1639,7 @@ export default function Admin() {
                       opacity: auditLog.length < 50 ? 0.4 : 1,
                     }}
                   >
-                    Next →
+                    {t("audit.next")}
                   </button>
                 </div>
               )}
@@ -1663,21 +1675,21 @@ export default function Admin() {
             }}
           >
             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
-              Suspend account
+              {t("suspendDialog.title")}
             </h2>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
               {suspendDialog.name} · {suspendDialog.email}
             </p>
             <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
-              This will block login and all API access. The user will see "Account suspended" with the reason below.
+              {t("suspendDialog.warning")}
             </p>
             <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              Reason (shown to user)
+              {t("suspendDialog.reasonLabel")}
             </label>
             <textarea
               value={suspendReason}
               onChange={(e) => setSuspendReason(e.target.value)}
-              placeholder="e.g. Terms of service violation"
+              placeholder={t("suspendDialog.reasonPlaceholder")}
               disabled={suspendSubmitting}
               rows={2}
               style={{
@@ -1707,7 +1719,7 @@ export default function Admin() {
                   cursor: "pointer",
                 }}
               >
-                Cancel
+                {t("suspendDialog.cancel")}
               </button>
               <button
                 onClick={handleSuspend}
@@ -1724,7 +1736,7 @@ export default function Admin() {
                   opacity: suspendSubmitting || !suspendReason.trim() ? 0.6 : 1,
                 }}
               >
-                {suspendSubmitting ? "Suspending…" : "Suspend"}
+                {suspendSubmitting ? t("suspendDialog.submitting") : t("suspendDialog.submit")}
               </button>
             </div>
           </div>
@@ -1759,19 +1771,19 @@ export default function Admin() {
             }}
           >
             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
-              Adjust credits
+              {t("creditsDialog.title")}
             </h2>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
               {creditDialog.name} · {creditDialog.email}
             </p>
             <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              Credits delta (positive = grant, negative = claw back)
+              {t("creditsDialog.deltaLabel")}
             </label>
             <input
               type="number"
               value={creditDelta}
               onChange={(e) => setCreditDelta(e.target.value)}
-              placeholder="e.g. 10 or -5"
+              placeholder={t("creditsDialog.deltaPlaceholder")}
               disabled={creditDialogSubmitting}
               style={{
                 width: "100%",
@@ -1785,12 +1797,12 @@ export default function Admin() {
               }}
             />
             <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              Reason (logged for audit)
+              {t("creditsDialog.reasonLabel")}
             </label>
             <textarea
               value={creditReason}
               onChange={(e) => setCreditReason(e.target.value)}
-              placeholder="e.g. Goodwill grant after failed interview"
+              placeholder={t("creditsDialog.reasonPlaceholder")}
               disabled={creditDialogSubmitting}
               rows={2}
               style={{
@@ -1825,7 +1837,7 @@ export default function Admin() {
                   cursor: "pointer",
                 }}
               >
-                Cancel
+                {t("creditsDialog.cancel")}
               </button>
               <button
                 onClick={handleAdjustCredits}
@@ -1842,7 +1854,7 @@ export default function Admin() {
                   opacity: creditDialogSubmitting ? 0.6 : 1,
                 }}
               >
-                {creditDialogSubmitting ? "Applying…" : "Apply"}
+                {creditDialogSubmitting ? t("creditsDialog.submitting") : t("creditsDialog.submit")}
               </button>
             </div>
           </div>
@@ -1852,7 +1864,7 @@ export default function Admin() {
       {/* Confirm delete dialog */}
       {confirmDelete && (
         <ConfirmDialog
-          message={`Delete account for "${confirmDelete.name}" (${confirmDelete.email})? This permanently removes all their data and cannot be undone.`}
+          message={t("deleteDialog.message", { name: confirmDelete.name, email: confirmDelete.email })}
           onConfirm={() => handleDelete(confirmDelete)}
           onCancel={() => setConfirmDelete(null)}
         />

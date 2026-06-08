@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import { getPublishedPosts, type BlogPost } from "../api/blog";
 
 export default function Blog() {
+  const { t } = useTranslation("blog");
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -36,10 +38,10 @@ export default function Blog() {
   return (
     <>
       <Helmet>
-        <title>Blog — QualiPulse</title>
-        <meta name="description" content="Insights on qualitative research, AI-driven interviews, and product discovery from the QualiPulse team." />
-        <meta property="og:title" content="Blog — QualiPulse" />
-        <meta property="og:description" content="Insights on qualitative research, AI-driven interviews, and product discovery." />
+        <title>{t("list.metaTitle")}</title>
+        <meta name="description" content={t("list.metaDescription")} />
+        <meta property="og:title" content={t("list.ogTitle")} />
+        <meta property="og:description" content={t("list.ogDescription")} />
         <meta property="og:type" content="website" />
       </Helmet>
 
@@ -57,8 +59,8 @@ export default function Blog() {
             QualiPulse
           </Link>
           <nav style={{ display: "flex", gap: "24px", alignItems: "center" }}>
-            <Link to="/blog" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 500, fontSize: "14px" }}>Blog</Link>
-            <Link to="/login" style={{ color: "var(--text-secondary)", textDecoration: "none", fontSize: "14px" }}>Log in</Link>
+            <Link to="/blog" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 500, fontSize: "14px" }}>{t("footer.blog")}</Link>
+            <Link to="/login" style={{ color: "var(--text-secondary)", textDecoration: "none", fontSize: "14px" }}>{t("footer.logIn")}</Link>
             <Link to="/signup" style={{
               background: "var(--primary)",
               color: "#fff",
@@ -67,7 +69,7 @@ export default function Blog() {
               textDecoration: "none",
               fontSize: "14px",
               fontWeight: 500,
-            }}>Get started free</Link>
+            }}>{t("footer.getStartedFree")}</Link>
           </nav>
         </header>
 
@@ -79,10 +81,10 @@ export default function Blog() {
           textAlign: "center",
         }}>
           <h1 style={{ fontSize: "36px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "12px" }}>
-            The QualiPulse Blog
+            {t("list.heroTitle")}
           </h1>
           <p style={{ fontSize: "18px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Practical guides on qualitative research, AI-assisted interviews, and turning user conversations into product decisions.
+            {t("list.heroSubtitle")}
           </p>
         </section>
 
@@ -101,7 +103,7 @@ export default function Blog() {
                 cursor: "pointer",
                 fontWeight: 500,
               }}
-            >All</button>
+            >{t("list.allTags")}</button>
             {allTags.map((tag) => (
               <button
                 key={tag}
@@ -124,11 +126,11 @@ export default function Blog() {
         {/* Posts grid */}
         <section style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 24px 64px" }}>
           {loading ? (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)" }}>Loading...</div>
+            <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)" }}>{t("list.loading")}</div>
           ) : posts.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px 20px" }}>
-              <p style={{ fontSize: "16px", color: "var(--text-secondary)", marginBottom: "12px" }}>No posts yet</p>
-              <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>We're working on great content. Check back soon!</p>
+              <p style={{ fontSize: "16px", color: "var(--text-secondary)", marginBottom: "12px" }}>{t("list.emptyTitle")}</p>
+              <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>{t("list.emptyBody")}</p>
             </div>
           ) : (
             <>
@@ -186,7 +188,7 @@ export default function Blog() {
                           </p>
                         )}
                         <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                          {post.author_name} &middot; {formatDate(post.published_at)}
+                          {t("list.byline", { author: post.author_name, date: formatDate(post.published_at) })}
                         </div>
                       </div>
                     </article>
@@ -209,9 +211,9 @@ export default function Blog() {
                       cursor: page <= 1 ? "default" : "pointer",
                       fontSize: "14px",
                     }}
-                  >Previous</button>
+                  >{t("list.previous")}</button>
                   <span style={{ padding: "8px 12px", fontSize: "14px", color: "var(--text-secondary)" }}>
-                    Page {page} of {totalPages}
+                    {t("list.pageOf", { page, totalPages })}
                   </span>
                   <button
                     disabled={page >= totalPages}
@@ -225,7 +227,7 @@ export default function Blog() {
                       cursor: page >= totalPages ? "default" : "pointer",
                       fontSize: "14px",
                     }}
-                  >Next</button>
+                  >{t("list.next")}</button>
                 </div>
               )}
             </>
@@ -245,12 +247,12 @@ export default function Blog() {
           color: "var(--text-muted)",
         }}>
           <div style={{ display: "flex", gap: "24px", justifyContent: "center", marginBottom: "12px" }}>
-            <Link to="/" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Home</Link>
-            <Link to="/blog" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Blog</Link>
-            <Link to="/terms" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Terms</Link>
-            <Link to="/privacy" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Privacy</Link>
+            <Link to="/" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{t("footer.home")}</Link>
+            <Link to="/blog" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{t("footer.blog")}</Link>
+            <Link to="/terms" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{t("footer.terms")}</Link>
+            <Link to="/privacy" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{t("footer.privacy")}</Link>
           </div>
-          &copy; {new Date().getFullYear()} QualiPulse. All rights reserved.
+          {t("footer.copyright", { year: new Date().getFullYear() })}
         </footer>
       </div>
     </>
@@ -258,6 +260,7 @@ export default function Blog() {
 }
 
 export function NewsletterCTA() {
+  const { t } = useTranslation("blog");
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -273,11 +276,11 @@ export function NewsletterCTA() {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.detail || "Something went wrong");
+        throw new Error(data.detail || t("newsletter.errorGeneric"));
       }
       setSubmitted(true);
     } catch (err: any) {
-      setError(err.message || "Something went wrong");
+      setError(err.message || t("newsletter.errorGeneric"));
     }
   }
 
@@ -295,19 +298,19 @@ export function NewsletterCTA() {
         padding: "40px 32px",
       }}>
         <h3 style={{ fontSize: "22px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>
-          Stay in the loop
+          {t("newsletter.heading")}
         </h3>
         <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "20px", lineHeight: 1.5 }}>
-          Get practical research tips and QualiPulse updates. No spam, unsubscribe anytime.
+          {t("newsletter.body")}
         </p>
         {submitted ? (
-          <p style={{ color: "var(--success)", fontWeight: 500 }}>You're subscribed!</p>
+          <p style={{ color: "var(--success)", fontWeight: 500 }}>{t("newsletter.subscribed")}</p>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: "flex", gap: "8px", maxWidth: "400px", margin: "0 auto" }}>
             <input
               type="email"
               required
-              placeholder="you@company.com"
+              placeholder={t("newsletter.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{
@@ -329,7 +332,7 @@ export function NewsletterCTA() {
               fontWeight: 500,
               cursor: "pointer",
               whiteSpace: "nowrap",
-            }}>Subscribe</button>
+            }}>{t("newsletter.subscribe")}</button>
           </form>
         )}
         {error && <p style={{ color: "var(--danger)", fontSize: "13px", marginTop: "8px" }}>{error}</p>}

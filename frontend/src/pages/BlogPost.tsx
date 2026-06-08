@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
 import DOMPurify from "dompurify";
 import { getPublishedPost, type BlogPost } from "../api/blog";
 import { NewsletterCTA } from "./Blog";
 
 export default function BlogPostPage() {
+  const { t } = useTranslation("blog");
   const { slug } = useParams<{ slug: string }>();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,7 +36,7 @@ export default function BlogPostPage() {
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg-base)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "var(--text-muted)" }}>Loading...</p>
+        <p style={{ color: "var(--text-muted)" }}>{t("post.loading")}</p>
       </div>
     );
   }
@@ -42,8 +44,8 @@ export default function BlogPostPage() {
   if (notFound || !post) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg-base)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px" }}>
-        <h1 style={{ fontSize: "24px", color: "var(--text-primary)" }}>Post not found</h1>
-        <Link to="/blog" style={{ color: "var(--primary)", textDecoration: "none" }}>Back to blog</Link>
+        <h1 style={{ fontSize: "24px", color: "var(--text-primary)" }}>{t("post.notFoundTitle")}</h1>
+        <Link to="/blog" style={{ color: "var(--primary)", textDecoration: "none" }}>{t("post.backToBlog")}</Link>
       </div>
     );
   }
@@ -55,7 +57,7 @@ export default function BlogPostPage() {
   return (
     <>
       <Helmet>
-        <title>{metaTitle} — QualiPulse Blog</title>
+        <title>{t("post.metaTitle", { title: metaTitle })}</title>
         <meta name="description" content={metaDescription} />
         <meta property="og:title" content={metaTitle} />
         <meta property="og:description" content={metaDescription} />
@@ -100,8 +102,8 @@ export default function BlogPostPage() {
             QualiPulse
           </Link>
           <nav style={{ display: "flex", gap: "24px", alignItems: "center" }}>
-            <Link to="/blog" style={{ color: "var(--text-secondary)", textDecoration: "none", fontWeight: 500, fontSize: "14px" }}>Blog</Link>
-            <Link to="/login" style={{ color: "var(--text-secondary)", textDecoration: "none", fontSize: "14px" }}>Log in</Link>
+            <Link to="/blog" style={{ color: "var(--text-secondary)", textDecoration: "none", fontWeight: 500, fontSize: "14px" }}>{t("footer.blog")}</Link>
+            <Link to="/login" style={{ color: "var(--text-secondary)", textDecoration: "none", fontSize: "14px" }}>{t("footer.logIn")}</Link>
             <Link to="/signup" style={{
               background: "var(--primary)",
               color: "#fff",
@@ -110,7 +112,7 @@ export default function BlogPostPage() {
               textDecoration: "none",
               fontSize: "14px",
               fontWeight: 500,
-            }}>Get Started</Link>
+            }}>{t("post.getStarted")}</Link>
           </nav>
         </header>
 
@@ -184,7 +186,7 @@ export default function BlogPostPage() {
             paddingBottom: "24px",
             borderBottom: "1px solid var(--border-subtle)",
           }}>
-            {post.author_name} &middot; {formatDate(post.published_at)}
+            {t("post.byline", { author: post.author_name, date: formatDate(post.published_at) })}
           </div>
 
           {/* Content */}
@@ -206,7 +208,7 @@ export default function BlogPostPage() {
             textDecoration: "none",
             fontSize: "14px",
             fontWeight: 500,
-          }}>&larr; Back to all posts</Link>
+          }}>{t("post.backToAllPosts")}</Link>
         </div>
 
         {/* Newsletter */}
@@ -222,12 +224,12 @@ export default function BlogPostPage() {
           color: "var(--text-muted)",
         }}>
           <div style={{ display: "flex", gap: "24px", justifyContent: "center", marginBottom: "12px" }}>
-            <Link to="/" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Home</Link>
-            <Link to="/blog" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Blog</Link>
-            <Link to="/terms" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Terms</Link>
-            <Link to="/privacy" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>Privacy</Link>
+            <Link to="/" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{t("footer.home")}</Link>
+            <Link to="/blog" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{t("footer.blog")}</Link>
+            <Link to="/terms" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{t("footer.terms")}</Link>
+            <Link to="/privacy" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>{t("footer.privacy")}</Link>
           </div>
-          &copy; {new Date().getFullYear()} QualiPulse. All rights reserved.
+          {t("footer.copyright", { year: new Date().getFullYear() })}
         </footer>
       </div>
     </>

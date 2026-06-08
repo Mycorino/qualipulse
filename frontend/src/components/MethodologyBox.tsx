@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 /**
  * MethodologyBox — credibility anchor for every shared mixed-methods report.
  *
@@ -20,8 +22,9 @@ interface MethodologyBoxProps {
 }
 
 export function MethodologyBox({ fields, note }: MethodologyBoxProps) {
+  const { t } = useTranslation("study");
   return (
-    <aside className="methodology-box" role="complementary" aria-label="Study methodology">
+    <aside className="methodology-box" role="complementary" aria-label={t("methodology.ariaLabel")}>
       {fields.map(({ label, value }) => (
         <div key={label} className="methodology-box__field">
           <span className="methodology-box__label">{label}</span>
@@ -40,9 +43,10 @@ interface SmallNWarningProps {
 
 /** Inline variant — small-n warning chip for use inside dashboards. */
 export function SmallNWarning({ n, minN = 30 }: SmallNWarningProps) {
+  const { t } = useTranslation("study");
   return (
     <span className="methodology-box methodology-box--inline">
-      ⚠ Insufficient sample for inference — n={n} (min {minN})
+      {t("methodology.smallNWarning", { n, minN })}
     </span>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * SurveyQuestionEditor — the question-being-built editor surface.
@@ -29,15 +30,16 @@ export interface SurveyQuestionEditorProps {
 }
 
 export function SurveyQuestionEditor({ type, initialPrompt = "", onChange }: SurveyQuestionEditorProps) {
+  const { t } = useTranslation("survey");
   const [prompt, setPrompt] = useState(initialPrompt);
 
   return (
     <div className="survey-q-editor">
       <div className="survey-q-editor__head">
-        <span className="survey-q-editor__type-pill">{labelForType(type)}</span>
-        <span className="survey-q-editor__id">Q · draft</span>
+        <span className="survey-q-editor__type-pill">{t(`questionEditor.typeLabels.${type}`)}</span>
+        <span className="survey-q-editor__id">{t("questionEditor.draftId")}</span>
       </div>
-      <label className="survey-q-editor__prompt-label">Question prompt</label>
+      <label className="survey-q-editor__prompt-label">{t("questionEditor.questionPrompt")}</label>
       <textarea
         className="survey-q-editor__prompt"
         value={prompt}
@@ -45,7 +47,7 @@ export function SurveyQuestionEditor({ type, initialPrompt = "", onChange }: Sur
           setPrompt(e.target.value);
           onChange?.({ type, prompt: e.target.value, config: {} });
         }}
-        placeholder={placeholderForType(type)}
+        placeholder={t(`questionEditor.placeholders.${type}`)}
         rows={2}
       />
       <PromptGuardrails prompt={prompt} />
@@ -60,50 +62,33 @@ export function SurveyQuestionEditor({ type, initialPrompt = "", onChange }: Sur
   );
 }
 
-function labelForType(t: QuestionType): string {
-  switch (t) {
-    case "likert": return "Likert · 5-point";
-    case "multi_choice": return "Multiple choice";
-    case "nps": return "Net Promoter Score";
-    case "open_text": return "Open text";
-  }
-}
-
-function placeholderForType(t: QuestionType): string {
-  switch (t) {
-    case "likert": return "How strongly do you agree with the following statement: …";
-    case "multi_choice": return "Which of the following best describes …";
-    case "nps": return "How likely are you to recommend us to a friend or colleague?";
-    case "open_text": return "What's the one thing we could change to make this better?";
-  }
-}
-
 /* ────────────────────────────────────────────────────────────────────
    Real-time prompt guardrails — Claude-equivalent, but client-side
    regex for the showcase. Production will call a backend that gives
    suggestion text alongside the flag.
    ──────────────────────────────────────────────────────────────────── */
 function PromptGuardrails({ prompt }: { prompt: string }) {
+  const { t } = useTranslation("survey");
   const flags: { tone: "warn" | "info"; label: string; detail: string }[] = [];
   if (/\b(and|or)\b/i.test(prompt) && prompt.split(" ").length > 6) {
     flags.push({
       tone: "warn",
-      label: "Possible double-barreled question",
-      detail: "Splitting 'speed and reliability' into two questions usually produces cleaner data.",
+      label: t("questionEditor.guardrails.doubleBarreledLabel"),
+      detail: t("questionEditor.guardrails.doubleBarreledDetail"),
     });
   }
   if (/\b(love|hate|amazing|terrible|brilliant|awful)\b/i.test(prompt)) {
     flags.push({
       tone: "warn",
-      label: "Leading wording detected",
-      detail: "Loaded adjectives bias responses. Try a neutral framing.",
+      label: t("questionEditor.guardrails.leadingLabel"),
+      detail: t("questionEditor.guardrails.leadingDetail"),
     });
   }
   if (prompt.length > 0 && prompt.length < 8) {
     flags.push({
       tone: "info",
-      label: "Prompt looks short",
-      detail: "A question under 8 characters often confuses respondents.",
+      label: t("questionEditor.guardrails.shortLabel"),
+      detail: t("questionEditor.guardrails.shortDetail"),
     });
   }
   if (flags.length === 0) return null;
@@ -127,32 +112,31 @@ function PromptGuardrails({ prompt }: { prompt: string }) {
    ──────────────────────────────────────────────────────────────────── */
 
 function LikertConfig() {
+  const { t } = useTranslation("survey");
   // Balanced 5-point scale, enforced. The middle anchor is editable but
   // the four side anchors are paired so users can't unbalance the scale.
   const [anchors, setAnchors] = useState({
-    strongDisagree: "Strongly disagree",
-    disagree: "Disagree",
-    neutral: "Neither agree nor disagree",
-    agree: "Agree",
-    strongAgree: "Strongly agree",
+    strongDisagree: t("questionEditor.likert.strongDisagree"),
+    disagree: t("questionEditor.likert.disagree"),
+    neutral: t("questionEditor.likert.neutral"),
+    agree: t("questionEditor.likert.agree"),
+    strongAgree: t("questionEditor.likert.strongAgree"),
   });
   return (
     <div className="survey-q-editor__config">
       <div className="survey-q-editor__config-head">
-        <span className="survey-q-editor__config-title">Scale anchors</span>
-        <span className="survey-q-editor__config-flag">Balance enforced</span>
+        <span className="survey-q-editor__config-title">{t("questionEditor.likert.scaleAnchors")}</span>
+        <span className="survey-q-editor__config-flag">{t("questionEditor.likert.balanceEnforced")}</span>
       </div>
       <div className="survey-q-editor__likert-row">
-        <LikertAnchor label="STRONGLY DISAGREE" value={anchors.strongDisagree} onChange={(v) => setAnchors({ ...anchors, strongDisagree: v })} tone="strong-neg" />
-        <LikertAnchor label="DISAGREE" value={anchors.disagree} onChange={(v) => setAnchors({ ...anchors, disagree: v })} tone="neg" />
-        <LikertAnchor label="NEUTRAL" value={anchors.neutral} onChange={(v) => setAnchors({ ...anchors, neutral: v })} tone="mid" />
-        <LikertAnchor label="AGREE" value={anchors.agree} onChange={(v) => setAnchors({ ...anchors, agree: v })} tone="pos" />
-        <LikertAnchor label="STRONGLY AGREE" value={anchors.strongAgree} onChange={(v) => setAnchors({ ...anchors, strongAgree: v })} tone="strong-pos" />
+        <LikertAnchor label={t("questionEditor.likert.labelStrongDisagree")} value={anchors.strongDisagree} onChange={(v) => setAnchors({ ...anchors, strongDisagree: v })} tone="strong-neg" />
+        <LikertAnchor label={t("questionEditor.likert.labelDisagree")} value={anchors.disagree} onChange={(v) => setAnchors({ ...anchors, disagree: v })} tone="neg" />
+        <LikertAnchor label={t("questionEditor.likert.labelNeutral")} value={anchors.neutral} onChange={(v) => setAnchors({ ...anchors, neutral: v })} tone="mid" />
+        <LikertAnchor label={t("questionEditor.likert.labelAgree")} value={anchors.agree} onChange={(v) => setAnchors({ ...anchors, agree: v })} tone="pos" />
+        <LikertAnchor label={t("questionEditor.likert.labelStrongAgree")} value={anchors.strongAgree} onChange={(v) => setAnchors({ ...anchors, strongAgree: v })} tone="strong-pos" />
       </div>
       <p className="survey-q-editor__config-note">
-        Anchors are paired across the scale. You can rephrase each label, but the count of positive
-        and negative options always stays equal — unbalanced scales bias responses toward the
-        majority side.
+        {t("questionEditor.likert.note")}
       </p>
     </div>
   );
@@ -174,18 +158,19 @@ function LikertAnchor({ label, value, onChange, tone }: { label: string; value: 
 }
 
 function MultiChoiceConfig() {
+  const { t } = useTranslation("survey");
   const [options, setOptions] = useState([
-    { text: "Pricing clarity", anchored: false },
-    { text: "Faster onboarding", anchored: false },
-    { text: "Better integrations", anchored: false },
-    { text: "More AI features", anchored: false },
-    { text: "Other", anchored: true },
+    { text: t("questionEditor.multiChoice.optionPricing"), anchored: false },
+    { text: t("questionEditor.multiChoice.optionOnboarding"), anchored: false },
+    { text: t("questionEditor.multiChoice.optionIntegrations"), anchored: false },
+    { text: t("questionEditor.multiChoice.optionAiFeatures"), anchored: false },
+    { text: t("questionEditor.multiChoice.optionOther"), anchored: true },
   ]);
   return (
     <div className="survey-q-editor__config">
       <div className="survey-q-editor__config-head">
-        <span className="survey-q-editor__config-title">Options</span>
-        <span className="survey-q-editor__config-flag">Order randomized</span>
+        <span className="survey-q-editor__config-title">{t("questionEditor.multiChoice.options")}</span>
+        <span className="survey-q-editor__config-flag">{t("questionEditor.multiChoice.orderRandomized")}</span>
       </div>
       <ul className="survey-q-editor__option-list">
         {options.map((opt, i) => (
@@ -210,9 +195,9 @@ function MultiChoiceConfig() {
                 setOptions(next);
               }}
               aria-pressed={opt.anchored}
-              title={opt.anchored ? "Anchored — won't be randomized" : "Anchor this option"}
+              title={opt.anchored ? t("questionEditor.multiChoice.anchored") : t("questionEditor.multiChoice.anchorThis")}
             >
-              📌 Anchor
+              📌 {t("questionEditor.multiChoice.anchor")}
             </button>
           </li>
         ))}
@@ -222,36 +207,37 @@ function MultiChoiceConfig() {
         className="survey-q-editor__add-option"
         onClick={() => setOptions([...options, { text: "", anchored: false }])}
       >
-        + Add option
+        {t("questionEditor.multiChoice.addOption")}
       </button>
     </div>
   );
 }
 
 function NpsConfig() {
+  const { t } = useTranslation("survey");
   return (
     <div className="survey-q-editor__config">
       <div className="survey-q-editor__config-head">
-        <span className="survey-q-editor__config-title">Scale</span>
-        <span className="survey-q-editor__config-flag">Standard 0–10</span>
+        <span className="survey-q-editor__config-title">{t("questionEditor.nps.scale")}</span>
+        <span className="survey-q-editor__config-flag">{t("questionEditor.nps.standard")}</span>
       </div>
       <p className="survey-q-editor__config-note">
-        NPS uses the validated 0–10 scale with fixed Detractor (0–6) / Passive (7–8) / Promoter (9–10) buckets.
-        Anchor wording is locked: 0 = "Not at all likely", 10 = "Extremely likely".
+        {t("questionEditor.nps.note")}
       </p>
     </div>
   );
 }
 
 function OpenTextConfig() {
+  const { t } = useTranslation("survey");
   const [maxLength, setMaxLength] = useState(500);
   return (
     <div className="survey-q-editor__config">
       <div className="survey-q-editor__config-head">
-        <span className="survey-q-editor__config-title">Response settings</span>
+        <span className="survey-q-editor__config-title">{t("questionEditor.openText.responseSettings")}</span>
       </div>
       <label className="survey-q-editor__inline-label">
-        Max length
+        {t("questionEditor.openText.maxLength")}
         <input
           type="number"
           className="survey-q-editor__inline-input tabular"
@@ -261,11 +247,10 @@ function OpenTextConfig() {
           max={5000}
           step={50}
         />
-        characters
+        {t("questionEditor.openText.characters")}
       </label>
       <p className="survey-q-editor__config-note">
-        Open text responses are AI-clustered into themes in the dashboard — a max length under 500
-        characters keeps clustering quality high.
+        {t("questionEditor.openText.note")}
       </p>
     </div>
   );

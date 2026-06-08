@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { verifyInterviewToken } from "../api/interviews";
 
 export default function InterviewVerify() {
+  const { t } = useTranslation("shell");
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -16,11 +18,9 @@ export default function InterviewVerify() {
         navigate(`/i/${link_token}`, { replace: true });
       })
       .catch(() => {
-        setError(
-          "This verification link has expired or has already been used. Please go back and request a new one."
-        );
+        setError(t("interviewVerify.expiredMessage"));
       });
-  }, [token, navigate]);
+  }, [token, navigate, t]);
 
   if (error) {
     return (
@@ -41,7 +41,7 @@ export default function InterviewVerify() {
           </div>
           <div style={{ fontSize: 48, marginBottom: 16 }}>⏰</div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>
-            Link expired
+            {t("interviewVerify.expiredTitle")}
           </h1>
           <p
             style={{
@@ -61,7 +61,7 @@ export default function InterviewVerify() {
   return (
     <div className="interview-page">
       <div className="interview-container" style={{ textAlign: "center" }}>
-        <p className="muted-text">Verifying your email…</p>
+        <p className="muted-text">{t("interviewVerify.verifying")}</p>
       </div>
     </div>
   );

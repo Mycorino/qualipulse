@@ -1,4 +1,7 @@
+import { useTranslation } from "react-i18next";
+
 export default function ImpersonationBanner() {
+  const { t } = useTranslation("shell");
   const active = localStorage.getItem("impersonation") === "true";
   if (!active) return null;
 
@@ -36,7 +39,7 @@ export default function ImpersonationBanner() {
       }}
     >
       <span>
-        Viewing as <strong>{name}</strong> — {email}
+        {t("impersonation.viewingAs")} <strong>{name}</strong> — {email}
       </span>
       <button
         onClick={handleExit}
@@ -51,7 +54,7 @@ export default function ImpersonationBanner() {
           cursor: "pointer",
         }}
       >
-        Exit
+        {t("impersonation.exit")}
       </button>
     </div>
   );

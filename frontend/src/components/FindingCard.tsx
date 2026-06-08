@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * FindingCard — the MBB action-title page unit for mixed-methods reports.
@@ -55,6 +56,7 @@ export function FindingCard({
   confidence = "supported",
   layout = "evidence-right",
 }: FindingCardProps) {
+  const { t } = useTranslation("study");
   return (
     <article className={`finding-card finding-card--${layout}`}>
       <header className="finding-card__head">
@@ -68,7 +70,7 @@ export function FindingCard({
       </div>
       <footer className="finding-card__foot">
         <div className="finding-card__implication">
-          <span className="finding-card__implication-label">So what</span>
+          <span className="finding-card__implication-label">{t("findingCard.soWhat")}</span>
           <p className="finding-card__implication-text">{implication}</p>
         </div>
         <div className="finding-card__sample-row">
@@ -81,15 +83,11 @@ export function FindingCard({
 }
 
 function ConfidencePill({ level }: { level: FindingConfidence }) {
-  const labels: Record<FindingConfidence, string> = {
-    directional: "Directional",
-    supported: "Supported",
-    strong: "Strong evidence",
-  };
+  const { t } = useTranslation("study");
   return (
     <span className={`confidence-pill confidence-pill--${level}`}>
       <span className="confidence-pill__dot" aria-hidden="true" />
-      {labels[level]}
+      {t(`findingCard.confidence.${level}`)}
     </span>
   );
 }

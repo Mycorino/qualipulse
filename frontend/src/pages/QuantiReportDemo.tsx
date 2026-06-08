@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { ChartCard } from "../components/ChartCard";
 import { VerbatimCard } from "../components/VerbatimCard";
 import { MethodologyBox } from "../components/MethodologyBox";
@@ -27,91 +28,88 @@ const A3 = `${SILENT_WAV}#a-3`;
 const A4 = `${SILENT_WAV}#a-4`;
 
 export default function QuantiReportDemo() {
+  const { t } = useTranslation("quantiDemo");
   return (
     <ReportScroll
       cover={
         <div style={{ maxWidth: "980px", margin: "0 auto" }}>
           <div style={{ fontSize: "var(--text-eyebrow)", fontWeight: "var(--weight-semibold)", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--surface-emphasis-text-soft)", marginBottom: "var(--space-3)" }}>
-            Mixed-methods report · Q2 2026
+            {t("reportDemo.cover.eyebrow")}
           </div>
           <h1 style={{ fontFamily: "var(--font-serif)", fontSize: "3.6rem", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.05, marginBottom: "var(--space-5)", maxWidth: "20ch" }}>
-            Why new users churn — pricing, trust, and the checkout cliff.
+            {t("reportDemo.cover.title")}
           </h1>
           <p style={{ fontSize: "var(--text-lg)", color: "var(--surface-emphasis-text-soft)", lineHeight: 1.5, maxWidth: "60ch", marginBottom: "var(--space-8)" }}>
-            A study of 247 first-month users combining a structured survey with 18 follow-up
-            interviews — to size the churn drivers we suspected and surface the ones we didn't.
+            {t("reportDemo.cover.lede")}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-6)", color: "var(--surface-emphasis-text-soft)", fontSize: "var(--text-sm)" }}>
-            <div><span style={{ display: "block", fontSize: "var(--text-eyebrow)", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--surface-emphasis-text-muted)", marginBottom: "4px" }}>Sample</span><span className="tabular">n=247 + 18 interviews</span></div>
-            <div><span style={{ display: "block", fontSize: "var(--text-eyebrow)", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--surface-emphasis-text-muted)", marginBottom: "4px" }}>Field window</span><span className="tabular">Apr 14 – May 02, 2026</span></div>
-            <div><span style={{ display: "block", fontSize: "var(--text-eyebrow)", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--surface-emphasis-text-muted)", marginBottom: "4px" }}>Author</span>Camille Dubois, Sr. Researcher</div>
+            <div><span style={{ display: "block", fontSize: "var(--text-eyebrow)", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--surface-emphasis-text-muted)", marginBottom: "4px" }}>{t("reportDemo.cover.sampleLabel")}</span><span className="tabular">{t("reportDemo.cover.sampleValue")}</span></div>
+            <div><span style={{ display: "block", fontSize: "var(--text-eyebrow)", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--surface-emphasis-text-muted)", marginBottom: "4px" }}>{t("reportDemo.cover.fieldWindowLabel")}</span><span className="tabular">{t("reportDemo.cover.fieldWindowValue")}</span></div>
+            <div><span style={{ display: "block", fontSize: "var(--text-eyebrow)", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--surface-emphasis-text-muted)", marginBottom: "4px" }}>{t("reportDemo.cover.authorLabel")}</span>{t("reportDemo.cover.authorValue")}</div>
           </div>
         </div>
       }
       sections={[
         {
           id: "methodology",
-          label: "Methodology",
-          group: "Context",
+          label: t("reportDemo.sections.methodology"),
+          group: t("reportDemo.groups.context"),
           content: (
             <MethodologyBox
               fields={[
-                { label: "Sample size", value: "n=247 completers" },
-                { label: "Fielding window", value: "Apr 14 – May 02, 2026" },
-                { label: "Method", value: "Mixed (survey + 18 interviews)" },
-                { label: "Segments", value: "Role · Company size · Region" },
-                { label: "Margin of error", value: "±5.4pp at 95% confidence" },
-                { label: "Sampling", value: "Stratified panel quota" },
+                { label: t("reportDemo.methodology.fields.sampleSize.label"), value: t("reportDemo.methodology.fields.sampleSize.value") },
+                { label: t("reportDemo.methodology.fields.fieldingWindow.label"), value: t("reportDemo.methodology.fields.fieldingWindow.value") },
+                { label: t("reportDemo.methodology.fields.method.label"), value: t("reportDemo.methodology.fields.method.value") },
+                { label: t("reportDemo.methodology.fields.segments.label"), value: t("reportDemo.methodology.fields.segments.value") },
+                { label: t("reportDemo.methodology.fields.marginOfError.label"), value: t("reportDemo.methodology.fields.marginOfError.value") },
+                { label: t("reportDemo.methodology.fields.sampling.label"), value: t("reportDemo.methodology.fields.sampling.value") },
               ]}
-              note="Weighted to match B2B SaaS PM / researcher composition by company size and region. Unweighted counts shown alongside weighted percentages throughout. Segment splits below n=30 are reported as counts only."
+              note={t("reportDemo.methodology.note")}
             />
           ),
         },
         {
           id: "executive-summary",
-          label: "Executive summary",
-          group: "Context",
+          label: t("reportDemo.sections.executiveSummary"),
+          group: t("reportDemo.groups.context"),
           pageBreak: true,
           content: (
             <ExecutiveSummary
-              headline="Three things — checkout fixes the trust gap, the AI report drives renewal, designers may be a separate ICP."
-              subheadline="If we ship one change before EOQ, it's the checkout. The other two are signals to act on, not commitments."
+              headline={t("reportDemo.executiveSummary.headline")}
+              subheadline={t("reportDemo.executiveSummary.subheadline")}
               thoughts={[
                 {
-                  thesis: "Trust gaps cost 30% of new users — and the cause is the checkout, not the pricing page.",
-                  elaboration:
-                    "Detractors who churned consistently flagged the checkout as opaque, even when their stated objection was price. The pricing page tested clean across all segments; the checkout did not. Reordering the line items to mirror pricing recovers an estimated 18-22% of first-month churn.",
-                  findingRef: "Finding 03",
+                  thesis: t("reportDemo.executiveSummary.thought1.thesis"),
+                  elaboration: t("reportDemo.executiveSummary.thought1.elaboration"),
+                  findingRef: t("reportDemo.executiveSummary.thought1.findingRef"),
                 },
                 {
-                  thesis: "Promoters renew because of the AI synthesis report — not because of the interview tool.",
-                  elaboration:
-                    "When asked what they'd cancel last, promoters named the report 2× more often than the interview surface. Lead the marketing site with the report; the interviews are plumbing that gets paid for via the analysis.",
-                  findingRef: "Finding 04",
+                  thesis: t("reportDemo.executiveSummary.thought2.thesis"),
+                  elaboration: t("reportDemo.executiveSummary.thought2.elaboration"),
+                  findingRef: t("reportDemo.executiveSummary.thought2.findingRef"),
                 },
                 {
-                  thesis: "Designers may be a separate ICP — but the sample is too thin to commit.",
-                  elaboration:
-                    "Designers (n=12) reported a different primary use case (concept testing, not customer research). The signal is interesting but not yet bankable; we recommend a 30-respondent designer-only survey before any product work.",
-                  findingRef: "Finding 05",
+                  thesis: t("reportDemo.executiveSummary.thought3.thesis"),
+                  elaboration: t("reportDemo.executiveSummary.thought3.elaboration"),
+                  findingRef: t("reportDemo.executiveSummary.thought3.findingRef"),
                 },
               ]}
-              author={{ name: "Camille Dubois", role: "Sr. Researcher", date: "May 06, 2026" }}
+              author={{ name: t("reportDemo.executiveSummary.author.name"), role: t("reportDemo.executiveSummary.author.role"), date: t("reportDemo.executiveSummary.author.date") }}
             />
           ),
         },
         {
           id: "headline-stat",
-          label: "Headline metric",
-          group: "Findings",
+          label: t("reportDemo.sections.headlineMetric"),
+          group: t("reportDemo.groups.findings"),
           content: (
             <StatHero
-              eyebrow="Onboarding · Q2"
+              eyebrow={t("reportDemo.headlineStat.eyebrow")}
               stat="73%"
-              description="of new users abandon the onboarding flow before reaching the third step."
-              meta="n=247 · 95% CI ±5.4pp"
+              description={t("reportDemo.headlineStat.description")}
+              meta={t("reportDemo.headlineStat.meta")}
               quote={{
-                text: "I almost cancelled last week. The pricing page never explained what 'team' actually meant — I was paying for seats I didn't need.",
+                text: t("reportDemo.headlineStat.quote"),
                 audioSrc: A1,
                 segments: ["PM", "31–40", "United States"],
               }}
@@ -120,18 +118,18 @@ export default function QuantiReportDemo() {
         },
         {
           id: "finding-03",
-          label: "Finding 03 — Checkout cliff",
-          group: "Findings",
+          label: t("reportDemo.sections.finding03"),
+          group: t("reportDemo.groups.findings"),
           pageBreak: true,
           content: (
             <FindingCard
-              index="Finding 03 of 07"
-              actionTitle="Trust gaps cost us 30% of new users — driven by checkout, not pricing."
-              context="Detractors who churned in their first month consistently flagged the checkout as opaque — even when their stated objection was price. The pricing page tested clean; the checkout did not."
+              index={t("reportDemo.finding03.index")}
+              actionTitle={t("reportDemo.finding03.actionTitle")}
+              context={t("reportDemo.finding03.context")}
               evidence={
                 <ChartCard
-                  eyebrow="Likert · Q3 — Checkout clarity"
-                  takeaway="Detractors rate checkout 3× more confusing than promoters."
+                  eyebrow={t("reportDemo.finding03.evidenceEyebrow")}
+                  takeaway={t("reportDemo.finding03.evidenceTakeaway")}
                   n={247}
                   completionRate={92}
                   ciHalfWidth={5.4}
@@ -142,60 +140,60 @@ export default function QuantiReportDemo() {
               verbatims={
                 <>
                   <VerbatimCard
-                    quote="The pricing page made sense. The checkout asked for things I didn't expect — that's where I bailed."
+                    quote={t("reportDemo.finding03.verbatim1")}
                     audioSrc={A2}
                     segments={["PM", "31–40", "United States"]}
                   />
                   <VerbatimCard
-                    quote="I genuinely thought I was being charged twice. The line items don't match what's on the pricing page."
+                    quote={t("reportDemo.finding03.verbatim2")}
                     audioSrc={A3}
                     segments={["Designer", "26–30", "Canada"]}
                     compact
                   />
                 </>
               }
-              implication="Reorder the checkout to mirror the pricing page line-by-line. The pricing copy is the trust-builder; the checkout currently undoes that work in 30 seconds."
-              sampleNote="n=247 survey · 18 follow-up interviews · 4 segments"
+              implication={t("reportDemo.finding03.implication")}
+              sampleNote={t("reportDemo.finding03.sampleNote")}
               confidence="strong"
             />
           ),
         },
         {
           id: "finding-04",
-          label: "Finding 04 — AI as the renewal driver",
-          group: "Findings",
+          label: t("reportDemo.sections.finding04"),
+          group: t("reportDemo.groups.findings"),
           pageBreak: true,
           content: (
             <FindingCard
-              index="Finding 04 of 07"
-              actionTitle="Promoters cite the AI synthesis as their reason to renew — not the interview tool."
+              index={t("reportDemo.finding04.index")}
+              actionTitle={t("reportDemo.finding04.actionTitle")}
               evidence={
                 <ChartCard
-                  eyebrow="Multiple choice · Q5"
-                  takeaway="The AI report is the most-cited renewal reason, twice as often as the interview tool itself."
+                  eyebrow={t("reportDemo.finding04.evidenceEyebrow")}
+                  takeaway={t("reportDemo.finding04.evidenceTakeaway")}
                   n={89}
                   completionRate={94}
                   ciHalfWidth={6.2}
                 >
                   <HBars
                     bars={[
-                      { label: "AI synthesis report", value: 71 },
-                      { label: "Adaptive interviews", value: 38 },
-                      { label: "Sharing & exports", value: 26 },
-                      { label: "Recruiting panel", value: 17 },
+                      { label: t("reportDemo.finding04.bars.aiReport"), value: 71 },
+                      { label: t("reportDemo.finding04.bars.adaptiveInterviews"), value: 38 },
+                      { label: t("reportDemo.finding04.bars.sharingExports"), value: 26 },
+                      { label: t("reportDemo.finding04.bars.recruitingPanel"), value: 17 },
                     ]}
                   />
                 </ChartCard>
               }
               verbatims={
                 <VerbatimCard
-                  quote="If you took away the analysis I'd cancel. The interviews are nice but I can do those anywhere."
+                  quote={t("reportDemo.finding04.verbatim")}
                   audioSrc={A4}
                   segments={["Researcher", "31–40", "United Kingdom"]}
                 />
               }
-              implication="Lead the marketing site with the report, not the interview. The interview is plumbing; the report is what gets paid for."
-              sampleNote="n=89 promoters · 6 renewal interviews"
+              implication={t("reportDemo.finding04.implication")}
+              sampleNote={t("reportDemo.finding04.sampleNote")}
               confidence="supported"
               layout="evidence-left"
             />
@@ -203,35 +201,35 @@ export default function QuantiReportDemo() {
         },
         {
           id: "segment-matrix",
-          label: "Segment landscape",
-          group: "Segmentation",
+          label: t("reportDemo.sections.segmentLandscape"),
+          group: t("reportDemo.groups.segmentation"),
           pageBreak: true,
           content: (
             <Segment2x2
-              xAxisLabel="Solution sophistication →"
-              yAxisLabel="Need intensity →"
+              xAxisLabel={t("reportDemo.segmentMatrix.xAxisLabel")}
+              yAxisLabel={t("reportDemo.segmentMatrix.yAxisLabel")}
               quadrants={[
                 {
-                  label: "High need · Low solution",
-                  quote: "I gave up trying to make our existing tool do this. I just need it to work.",
+                  label: t("reportDemo.segmentMatrix.q1.label"),
+                  quote: t("reportDemo.segmentMatrix.q1.quote"),
                   segment: "PM · 31–40",
                   n: 89,
                 },
                 {
-                  label: "High need · High solution",
-                  quote: "We switched to a workaround last year. We'd switch back if you fixed the export.",
+                  label: t("reportDemo.segmentMatrix.q2.label"),
+                  quote: t("reportDemo.segmentMatrix.q2.quote"),
                   segment: "Founder · 41–50",
                   n: 142,
                 },
                 {
-                  label: "Low need · Low solution",
-                  quote: "Honestly, this isn't a daily problem for me. Maybe quarterly.",
+                  label: t("reportDemo.segmentMatrix.q3.label"),
+                  quote: t("reportDemo.segmentMatrix.q3.quote"),
                   segment: "Designer · 26–30",
                   n: 38,
                 },
                 {
-                  label: "Low need · High solution",
-                  quote: "Nice to have but our team uses Notion docs and that covers 80% of it.",
+                  label: t("reportDemo.segmentMatrix.q4.label"),
+                  quote: t("reportDemo.segmentMatrix.q4.quote"),
                   segment: "Engineer · 31–40",
                   n: 18,
                 },
@@ -241,38 +239,44 @@ export default function QuantiReportDemo() {
         },
         {
           id: "cross-tab",
-          label: "Themes by segment",
-          group: "Segmentation",
+          label: t("reportDemo.sections.themesBySegment"),
+          group: t("reportDemo.groups.segmentation"),
           content: (
             <CrossTabTable
-              columns={["PMs", "Researchers", "Designers", "Engineers", "Founders"]}
+              columns={[
+                t("reportDemo.crossTab.columns.pms"),
+                t("reportDemo.crossTab.columns.researchers"),
+                t("reportDemo.crossTab.columns.designers"),
+                t("reportDemo.crossTab.columns.engineers"),
+                t("reportDemo.crossTab.columns.founders"),
+              ]}
               columnNs={[89, 64, 12, 38, 14]}
               rows={[
-                { label: "Onboarding friction", values: [62, 48, 67, 31, 71], counts: [55, 31, 8, 12, 10] },
-                { label: "Pricing clarity", values: [54, 39, 58, 24, 64], counts: [48, 25, 7, 9, 9] },
-                { label: "Export quality", values: [38, 71, 33, 18, 28], counts: [34, 45, 4, 7, 4] },
-                { label: "AI accuracy", values: [42, 56, 42, 21, 35], counts: [37, 36, 5, 8, 5] },
-                { label: "Mobile parity", values: [18, 12, 17, 14, 21], counts: [16, 8, 2, 5, 3] },
+                { label: t("reportDemo.crossTab.rows.onboardingFriction"), values: [62, 48, 67, 31, 71], counts: [55, 31, 8, 12, 10] },
+                { label: t("reportDemo.crossTab.rows.pricingClarity"), values: [54, 39, 58, 24, 64], counts: [48, 25, 7, 9, 9] },
+                { label: t("reportDemo.crossTab.rows.exportQuality"), values: [38, 71, 33, 18, 28], counts: [34, 45, 4, 7, 4] },
+                { label: t("reportDemo.crossTab.rows.aiAccuracy"), values: [42, 56, 42, 21, 35], counts: [37, 36, 5, 8, 5] },
+                { label: t("reportDemo.crossTab.rows.mobileParity"), values: [18, 12, 17, 14, 21], counts: [16, 8, 2, 5, 3] },
               ]}
-              note="Designer and Founder columns show counts because n<30 falls below the inference threshold. Themes are AI-clustered from open-text responses."
+              note={t("reportDemo.crossTab.note")}
             />
           ),
         },
         {
           id: "prioritization",
-          label: "What to do next",
-          group: "Action",
+          label: t("reportDemo.sections.whatToDoNext"),
+          group: t("reportDemo.groups.action"),
           pageBreak: true,
           content: (
             <PrioritizationMatrix
               recommendations={[
-                { id: "1", title: "Mirror checkout line items to pricing page", impact: 88, feasibility: 78, effort: "quick", findingRef: "Finding 03" },
-                { id: "2", title: "Lead the homepage with the AI report demo", impact: 72, feasibility: 82, effort: "medium", findingRef: "Finding 04" },
-                { id: "3", title: "Add inline 'team plan' explainer in signup", impact: 64, feasibility: 90, effort: "quick", findingRef: "Finding 03" },
-                { id: "4", title: "Designer-targeted survey wave (n=30)", impact: 52, feasibility: 70, effort: "medium", findingRef: "Finding 05" },
-                { id: "5", title: "Rebuild export pipeline for Researchers", impact: 78, feasibility: 32, effort: "large", findingRef: "Finding 04" },
-                { id: "6", title: "Mobile parity for transcript review", impact: 42, feasibility: 28, effort: "large", findingRef: "Finding 06" },
-                { id: "7", title: "Renewal-trigger AI report email digest", impact: 58, feasibility: 64, effort: "medium", findingRef: "Finding 04" },
+                { id: "1", title: t("reportDemo.prioritization.rec1"), impact: 88, feasibility: 78, effort: "quick", findingRef: t("reportDemo.prioritization.ref03") },
+                { id: "2", title: t("reportDemo.prioritization.rec2"), impact: 72, feasibility: 82, effort: "medium", findingRef: t("reportDemo.prioritization.ref04") },
+                { id: "3", title: t("reportDemo.prioritization.rec3"), impact: 64, feasibility: 90, effort: "quick", findingRef: t("reportDemo.prioritization.ref03") },
+                { id: "4", title: t("reportDemo.prioritization.rec4"), impact: 52, feasibility: 70, effort: "medium", findingRef: t("reportDemo.prioritization.ref05") },
+                { id: "5", title: t("reportDemo.prioritization.rec5"), impact: 78, feasibility: 32, effort: "large", findingRef: t("reportDemo.prioritization.ref04") },
+                { id: "6", title: t("reportDemo.prioritization.rec6"), impact: 42, feasibility: 28, effort: "large", findingRef: t("reportDemo.prioritization.ref06") },
+                { id: "7", title: t("reportDemo.prioritization.rec7"), impact: 58, feasibility: 64, effort: "medium", findingRef: t("reportDemo.prioritization.ref04") },
               ]}
             />
           ),
@@ -288,6 +292,7 @@ export default function QuantiReportDemo() {
    ────────────────────────────────────────────────────────────────── */
 
 function DivergingLikert() {
+  const { t } = useTranslation("quantiDemo");
   const segs = [
     { pct: 12, color: "var(--viz-div-strong-neg)", side: "neg" as const },
     { pct: 18, color: "var(--viz-div-neg)", side: "neg" as const },
@@ -310,9 +315,9 @@ function DivergingLikert() {
         </div>
       </div>
       <div className="tabular" style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-        <span>{neg}% disagree</span>
-        <span>{mid}% neutral</span>
-        <span>{pos}% agree</span>
+        <span>{t("reportDemo.charts.likert.disagreeFooter", { pct: neg })}</span>
+        <span>{t("reportDemo.charts.likert.neutralFooter", { pct: mid })}</span>
+        <span>{t("reportDemo.charts.likert.agreeFooter", { pct: pos })}</span>
       </div>
     </div>
   );

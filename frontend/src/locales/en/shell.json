@@ -1,0 +1,69 @@
+{
+  "topBar": {
+    "homeAriaLabel": "Home — your studies",
+    "breadcrumbAriaLabel": "Breadcrumb"
+  },
+  "dashboardShell": {
+    "summaryAriaLabel": "Dashboard summary"
+  },
+  "subNav": {
+    "defaultAriaLabel": "Sections"
+  },
+  "audio": {
+    "unavailable": "Audio unavailable",
+    "pause": "Pause",
+    "play": "Play",
+    "seek": "Seek",
+    "labelWithDuration": "{{label}}, {{duration}}"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "text": "An unexpected error occurred. Please refresh the page.",
+    "refresh": "Refresh page"
+  },
+  "impersonation": {
+    "viewingAs": "Viewing as",
+    "exit": "Exit"
+  },
+  "publicResponse": {
+    "notAvailable": "This survey is not available.",
+    "submitError": "Something went wrong submitting your response. Please try again.",
+    "errorContactHint": "If you think this is a mistake, contact the person who shared the link.",
+    "loading": "Loading…",
+    "thanksTitle": "Thanks for your response.",
+    "thanksBody": "Your answers have been recorded. You can close this tab.",
+    "anonymousNote": "This survey is anonymous — your responses are not linked to your identity.",
+    "emailLabel": "Email (optional)",
+    "emailPlaceholder": "you@example.com",
+    "emailHelp": "Lets us link your response if you come back, and lets the researcher invite you to a follow-up interview. Never shared outside this study.",
+    "validation_one": "Please answer the {{count}} required question above.",
+    "validation_other": "Please answer the {{count}} required questions above.",
+    "submitting": "Submitting…",
+    "submit": "Submit response",
+    "required": "required",
+    "likertLow": "Strongly disagree",
+    "likertHigh": "Strongly agree",
+    "npsLow": "Not at all likely",
+    "npsHigh": "Extremely likely",
+    "openTextPlaceholder": "Up to {{maxChars}} characters…"
+  },
+  "interviewVerify": {
+    "expiredMessage": "This verification link has expired or has already been used. Please go back and request a new one.",
+    "expiredTitle": "Link expired",
+    "verifying": "Verifying your email…"
+  },
+  "verifyEmail": {
+    "noToken": "No verification token provided.",
+    "invalidOrExpired": "This verification link is invalid or has expired.",
+    "verifyingTitle": "Verifying your email…",
+    "verifyingSubtitle": "Just a moment.",
+    "successTitle": "Email verified!",
+    "successSubtitle": "Your email has been confirmed. You're all set.",
+    "goToDashboard": "Go to Dashboard",
+    "failedTitle": "Verification failed",
+    "resendHint": "You can resend the verification email from your dashboard."
+  },
+  "googleFinish": {
+    "signingIn": "Signing you in…"
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "overview": {
+    "tabs": {
+      "overview": "Overview",
+      "surveys": "Surveys",
+      "interviews": "Interviews",
+      "participants": "Participants",
+      "report": "Report"
+    },
+    "toast": {
+      "surveyCreateFailed": "Could not create the survey",
+      "interviewCreateFailed": "Could not create the interview round",
+      "validationCreated_one": "Validation survey created with {{count}} question",
+      "validationCreated_other": "Validation survey created with {{count}} questions",
+      "validationGenerateFailed": "Could not generate validation survey",
+      "generationFailed": "Generation failed",
+      "reportGenerated": "Report generated",
+      "reportGenerateFailed": "Could not generate report"
+    },
+    "untitledSurvey": "Untitled survey",
+    "untitledInterview": "Untitled interview round",
+    "studyNotFound": "Study not found",
+    "loading": "Loading…",
+    "studiesCrumb": "Studies",
+    "allStudies": "← All studies",
+    "studyWorkspace": "Study workspace",
+    "sectionsNav": "Study sections",
+    "surveys": {
+      "roleStatus": "{{role}} · {{status}}",
+      "questions_one": "{{count}} question",
+      "questions_other": "{{count}} questions",
+      "completed": "{{count}} completed",
+      "total": "{{count}} total",
+      "empty": "No surveys yet. Add one to start collecting structured responses in this study.",
+      "newSurvey": "+ New survey"
+    },
+    "interviews": {
+      "eyebrow": "INTERVIEW · {{language}}",
+      "completed": "{{count}} completed",
+      "inProgress": "{{count}} in progress",
+      "links_one": "{{count}} link",
+      "links_other": "{{count}} links",
+      "empty": "No interview track yet. Add an interview round to talk to respondents in depth — or use the Screener Bridge from a survey dashboard to auto-create one from a filtered segment.",
+      "addRound": "+ Add interview round"
+    },
+    "participants": {
+      "intro": "Participant identity is the join key across instruments — the same person across survey answers and interview transcripts.",
+      "surveyCompleters": "Survey completers",
+      "interviewCompleters": "Interview completers",
+      "inferenceThreshold": "Inference threshold",
+      "thresholdValue": "n≥30"
+    },
+    "report": {
+      "loading": "Loading…",
+      "generateHeadline": "Generate the Quantified Themes report",
+      "generateBody": "Combines survey aggregates with interview transcripts into themes that pair what people said with how often they said it. Each theme carries a recommended next step and a confidence pill — the same methodology contract used everywhere else in the workspace.",
+      "lowResponseWarning_one": "⚠ You have {{count}} survey response. Themes below n=30 will be marked \"directional\" — collect more responses for stronger evidence.",
+      "lowResponseWarning_other": "⚠ You have {{count}} survey responses. Themes below n=30 will be marked \"directional\" — collect more responses for stronger evidence.",
+      "generating": "Generating… (≈10s)",
+      "generate": "Generate report",
+      "versionEyebrow": "Quantified Themes · v{{version}}",
+      "generatedAt": "Generated {{date}}",
+      "generatedAtUnknown": "Generated —",
+      "exportPdf": "Export PDF",
+      "exportPdfTitle": "Print or save the report as a PDF",
+      "validateThemes": "Validate these themes →",
+      "validateGenerating": "Generating…",
+      "validateThemesTitle": "Spawn a validation micro-survey from these themes",
+      "regenerate": "Regenerate",
+      "regenerating": "Regenerating…",
+      "lastGenerationFailed": "⚠ Last generation failed: {{error}}",
+      "unknownError": "unknown error",
+      "executiveSummary": "Executive summary",
+      "themes_one": "{{count}} theme",
+      "themes_other": "{{count}} themes",
+      "methodology": "Methodology",
+      "methodologyStats_survey_one": "{{count}} survey",
+      "methodologyStats_survey_other": "{{count}} surveys",
+      "methodologyStats_responses": "{{count}} responses",
+      "methodologyStats_interview_one": "{{count}} interview",
+      "methodologyStats_interview_other": "{{count}} interviews",
+      "metaSeparator": " · "
+    },
+    "validationBanner": {
+      "title": "Theme validation · {{status}}",
+      "progress": "{{completed}} of {{total}} respondents completed",
+      "draftSuffix": " — survey is in draft, share it to start collecting",
+      "editPublish": "Edit + publish →",
+      "openSurvey": "Open survey →"
+    },
+    "theme": {
+      "confidence": {
+        "directional": "Directional",
+        "supported": "Supported",
+        "strong": "Strong evidence"
+      },
+      "kind": {
+        "product": "Product action",
+        "marketing": "Marketing action",
+        "next_research": "Next research step"
+      },
+      "surveySignal": "Survey signal",
+      "n": "n={{count}}",
+      "interviewEvidence": "Interview evidence · {{xOfY}}",
+      "overIndex": " · over-index {{value}}×",
+      "segmentLabel": " · {{label}}"
+    },
+    "themeValidation": {
+      "awaiting": "Awaiting validation responses for this theme.",
+      "title": "Theme validation · n={{count}}",
+      "agreedCounts": "{{agreed}} of {{total}} respondents agreed (below n=30; counts only)",
+      "agreedPct": "agreed this theme resonates",
+      "ci": " · 95% CI {{low}}–{{high}}%"
+    },
+    "recommendedAction": {
+      "eyebrow": "Recommended next step",
+      "takeAction": "Take action →"
+    },
+    "checklist": {
+      "title": "Study progress",
+      "surveyPublished": "Survey published",
+      "live": "Live",
+      "notYet": "Not yet",
+      "responsesCollected": "Responses collected",
+      "completed": "{{count}} completed",
+      "inferenceThreshold": "Inference threshold reached",
+      "segmentCutsAllowed": "n≥30 — segment cuts allowed",
+      "moreResponsesNeeded": "{{count}} more responses needed",
+      "interviewsCompleted": "Interviews completed",
+      "mixedMethodsReport": "Mixed-methods report",
+      "ready": "Ready"
+    },
+    "summary": {
+      "surveys": "Surveys",
+      "live": "Live",
+      "drafts": "Drafts",
+      "surveyResponses": "Survey responses",
+      "inferenceGrade": "Inference-grade",
+      "buildingSample": "Building sample",
+      "interviews": "Interviews",
+      "projects_one": "{{count}} project",
+      "projects_other": "{{count}} projects"
+    }
+  },
+  "chartCard": {
+    "completion": "{{count}}% completion",
+    "ci": "95% CI ±{{value}}pp",
+    "n": "n={{count}}",
+    "smallNWarning": "⚠ Directional only (n<{{minN}})",
+    "smallNTitle": "Sample too small for inference; treat as directional"
+  },
+  "executiveSummary": {
+    "eyebrow": "Executive summary",
+    "seeRef": "↳ See {{ref}}"
+  },
+  "findingCard": {
+    "soWhat": "So what",
+    "confidence": {
+      "directional": "Directional",
+      "supported": "Supported",
+      "strong": "Strong evidence"
+    }
+  },
+  "crossTab": {
+    "ariaLabel": "Cross-tabulation",
+    "themeHeader": "Theme",
+    "columnN": "n={{count}}",
+    "smallNTitle": "Segment too small for inference (n={{columnN}} < {{minN}}). Showing count instead.",
+    "empty": "—"
+  },
+  "prioritization": {
+    "ariaLabel": "Recommendations plotted by impact and feasibility",
+    "quadrant": {
+      "doNow": "DO NOW",
+      "consider": "CONSIDER",
+      "park": "PARK",
+      "quickWins": "QUICK WINS"
+    },
+    "axis": {
+      "impact": "Impact →",
+      "feasibility": "Feasibility →"
+    }
+  },
+  "segment2x2": {
+    "ariaLabel": "Segment 2x2 matrix",
+    "n": "n={{count}}"
+  },
+  "verbatim": {
+    "audioLabel": "Verbatim audio",
+    "audioLabelNamed": "Verbatim audio — {{name}}"
+  },
+  "reportScroll": {
+    "tocLabel": "Report table of contents"
+  },
+  "methodology": {
+    "ariaLabel": "Study methodology",
+    "smallNWarning": "⚠ Insufficient sample for inference — n={{n}} (min {{minN}})"
+  },
+  "compareChips": {
+    "ariaLabel": "Filter by segment",
+    "all": "All"
+  }
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { getMe } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
@@ -30,6 +31,7 @@ interface QuantiTopBarProps {
 export function QuantiTopBar({ crumbs }: QuantiTopBarProps) {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { t } = useTranslation("shell");
   const [initial, setInitial] = useState("?");
 
   useEffect(() => {
@@ -47,11 +49,11 @@ export function QuantiTopBar({ crumbs }: QuantiTopBarProps) {
         type="button"
         className="quanti-topbar__logo"
         onClick={() => navigate("/dashboard")}
-        aria-label="Home — your studies"
+        aria-label={t("topBar.homeAriaLabel")}
       >
         QualiPulse
       </button>
-      <nav className="quanti-topbar__crumbs" aria-label="Breadcrumb">
+      <nav className="quanti-topbar__crumbs" aria-label={t("topBar.breadcrumbAriaLabel")}>
         {crumbs.map((crumb, i) => {
           const isLast = i === crumbs.length - 1;
           return (
