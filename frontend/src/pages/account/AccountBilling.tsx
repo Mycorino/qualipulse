@@ -135,7 +135,7 @@ export default function AccountBilling() {
               return (
                 <div key={pack.id} className="plan-card">
                   <div className="plan-card-header">
-                    <h3 className="plan-name">{pack.name}</h3>
+                    <h3 className="plan-name">{t("billing.packName", { count: pack.credits })}</h3>
                     <p className="plan-price">€{priceEur}</p>
                   </div>
                   <ul className="plan-features">
@@ -225,20 +225,44 @@ export default function AccountBilling() {
                 <div className="plan-card-header">
                   <h3 className="plan-name">{plan.name}</h3>
                   <p className="plan-price">
-                    {plan.is_custom ? t("common:custom") : priceMonthly != null ? `€${priceMonthly}/mo` : ""}
+                    {plan.is_custom
+                      ? t("common:custom")
+                      : priceMonthly != null
+                      ? t("billing.priceMonthly", { price: priceMonthly })
+                      : ""}
                   </p>
                 </div>
                 <ul className="plan-features">
                   {plan.included_credits != null && (
-                    <li>{plan.included_credits} credits/{plan.credit_period === "monthly" ? "mo" : plan.credit_period}</li>
+                    <li>
+                      {t("billing.planFeatures.creditsLine", {
+                        count: plan.included_credits,
+                        unit:
+                          plan.credit_period === "monthly"
+                            ? t("billing.planFeatures.perMonthUnit")
+                            : plan.credit_period,
+                      })}
+                    </li>
                   )}
-                  <li>{plan.max_active_projects == null ? t("common:unlimited") + " projects" : `${plan.max_active_projects} projects`}</li>
-                  <li>{plan.max_editors == null ? t("common:unlimited") + " editors" : `${plan.max_editors} editor${plan.max_editors > 1 ? "s" : ""}`}</li>
-                  {Boolean(plan.entitlements?.csv_export) && <li>CSV export</li>}
-                  {Boolean(plan.entitlements?.custom_branding) && <li>Custom branding</li>}
-                  {Boolean(plan.entitlements?.team_workspace) && <li>Team workspace</li>}
+                  <li>
+                    {plan.max_active_projects == null
+                      ? t("billing.planFeatures.projectsUnlimited")
+                      : t("billing.planFeatures.projects", { count: plan.max_active_projects })}
+                  </li>
+                  <li>
+                    {plan.max_editors == null
+                      ? t("billing.planFeatures.editorsUnlimited")
+                      : t("billing.planFeatures.editors", { count: plan.max_editors })}
+                  </li>
+                  {Boolean(plan.entitlements?.csv_export) && <li>{t("billing.planFeatures.csvExport")}</li>}
+                  {Boolean(plan.entitlements?.custom_branding) && <li>{t("billing.planFeatures.customBranding")}</li>}
+                  {Boolean(plan.entitlements?.team_workspace) && <li>{t("billing.planFeatures.teamWorkspace")}</li>}
                   {plan.overage_price_cents != null && (
-                    <li>Overage: €{(plan.overage_price_cents / 100).toFixed(0)}/credit</li>
+                    <li>
+                      {t("billing.planFeatures.overage", {
+                        price: (plan.overage_price_cents / 100).toFixed(0),
+                      })}
+                    </li>
                   )}
                 </ul>
                 {isCurrent ? (

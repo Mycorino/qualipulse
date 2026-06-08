@@ -58,7 +58,29 @@
       "upgrade": "— Mettez à niveau pour débloquer"
     },
     "freeTrial": "Essai gratuit",
-    "trialCreditsHint": "Vos crédits d'entretien gratuits n'expirent pas. Aucune carte de crédit requise."
+    "trialCreditsHint": "Vos crédits d'entretien gratuits n'expirent pas. Aucune carte de crédit requise.",
+    "usageThisPeriod": "Utilisation cette période",
+    "creditsRemaining": "Crédits restants",
+    "creditsUsed": "Crédits utilisés",
+    "overageCredits": "Dépassement",
+    "periodEndsOn": "Fin de la période",
+    "cancelAtPeriodEnd": "l'abonnement sera résilié à la fin de la période",
+    "trialEndsOn": "Fin de l'essai",
+    "planFeatures": {
+      "creditsLine": "{{count}} crédits/{{unit}}",
+      "perMonthUnit": "mois",
+      "projects": "{{count}} projets",
+      "projectsUnlimited": "Projets illimités",
+      "editors_one": "{{count}} éditeur",
+      "editors_other": "{{count}} éditeurs",
+      "editorsUnlimited": "Éditeurs illimités",
+      "csvExport": "Export CSV",
+      "customBranding": "Personnalisation de marque",
+      "teamWorkspace": "Espace d'équipe",
+      "overage": "Dépassement : {{price}} €/crédit"
+    },
+    "packName": "Pack de {{count}} crédits",
+    "priceMonthly": "{{price}} €/mois"
   },
   "language": {
     "title": "Langue",
