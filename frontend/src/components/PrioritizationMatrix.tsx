@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 /**
  * PrioritizationMatrix — impact × feasibility 2D plot for recommendations.
  *
@@ -35,6 +37,7 @@ interface PrioritizationMatrixProps {
 }
 
 export function PrioritizationMatrix({ recommendations }: PrioritizationMatrixProps) {
+  const { t } = useTranslation("study");
   return (
     <div className="prio-matrix">
       <div className="prio-matrix__plot">
@@ -43,7 +46,7 @@ export function PrioritizationMatrix({ recommendations }: PrioritizationMatrixPr
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           role="img"
-          aria-label="Recommendations plotted by impact and feasibility"
+          aria-label={t("prioritization.ariaLabel")}
         >
           {/* Quadrant tint — top-right (high impact, high feasibility) is the do-now zone */}
           <rect x={50} y={0} width={50} height={50} fill="var(--viz-seq-2)" opacity={0.6} />
@@ -51,10 +54,10 @@ export function PrioritizationMatrix({ recommendations }: PrioritizationMatrixPr
           <line x1={50} y1={0} x2={50} y2={100} stroke="var(--border-default)" strokeWidth={0.3} />
           <line x1={0} y1={50} x2={100} y2={50} stroke="var(--border-default)" strokeWidth={0.3} />
           {/* Quadrant labels */}
-          <text x={97} y={4} className="prio-matrix__quadrant-label" textAnchor="end">DO NOW</text>
-          <text x={3} y={4} className="prio-matrix__quadrant-label">CONSIDER</text>
-          <text x={3} y={97} className="prio-matrix__quadrant-label">PARK</text>
-          <text x={97} y={97} className="prio-matrix__quadrant-label" textAnchor="end">QUICK WINS</text>
+          <text x={97} y={4} className="prio-matrix__quadrant-label" textAnchor="end">{t("prioritization.quadrant.doNow")}</text>
+          <text x={3} y={4} className="prio-matrix__quadrant-label">{t("prioritization.quadrant.consider")}</text>
+          <text x={3} y={97} className="prio-matrix__quadrant-label">{t("prioritization.quadrant.park")}</text>
+          <text x={97} y={97} className="prio-matrix__quadrant-label" textAnchor="end">{t("prioritization.quadrant.quickWins")}</text>
           {/* Axis labels — rendered outside SVG via CSS for clean typography */}
         </svg>
         {recommendations.map((rec) => {
@@ -83,8 +86,8 @@ export function PrioritizationMatrix({ recommendations }: PrioritizationMatrixPr
             </div>
           );
         })}
-        <div className="prio-matrix__axis prio-matrix__axis--y">Impact →</div>
-        <div className="prio-matrix__axis prio-matrix__axis--x">Feasibility →</div>
+        <div className="prio-matrix__axis prio-matrix__axis--y">{t("prioritization.axis.impact")}</div>
+        <div className="prio-matrix__axis prio-matrix__axis--x">{t("prioritization.axis.feasibility")}</div>
       </div>
       <ol className="prio-matrix__legend">
         {recommendations.map((rec) => (

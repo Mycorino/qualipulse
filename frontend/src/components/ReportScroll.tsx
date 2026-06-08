@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * ReportScroll — the scrollytelling layout for shared mixed-methods reports.
@@ -39,6 +40,7 @@ interface ReportScrollProps {
 }
 
 export function ReportScroll({ cover, sections }: ReportScrollProps) {
+  const { t } = useTranslation("study");
   const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null);
 
   // IntersectionObserver-driven TOC highlight. We pick the first section
@@ -74,7 +76,7 @@ export function ReportScroll({ cover, sections }: ReportScrollProps) {
     <div className="report-scroll">
       <header className="report-scroll__cover">{cover}</header>
       <div className="report-scroll__layout">
-        <aside className="report-scroll__toc" aria-label="Report table of contents">
+        <aside className="report-scroll__toc" aria-label={t("reportScroll.tocLabel")}>
           {Object.entries(tocGroups).map(([group, items]) => (
             <div key={group} className="report-scroll__toc-group">
               {group !== "_" && (

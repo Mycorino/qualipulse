@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * QuestionTypeCard — selectable tile for picking a survey question type.
@@ -48,9 +49,11 @@ export function QuestionTypeCard({
   icon,
   selected,
   disabled,
-  comingSoonLabel = "Coming soon",
+  comingSoonLabel,
   onSelect,
 }: QuestionTypeCardProps) {
+  const { t } = useTranslation("survey");
+  const resolvedComingSoonLabel = comingSoonLabel ?? t("questionTypeCard.comingSoon");
   return (
     <button
       type="button"
@@ -67,7 +70,7 @@ export function QuestionTypeCard({
             <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.5 L6 10.5 L11 4.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </span>
         )}
-        {disabled && <span className="question-type-card__pill">{comingSoonLabel}</span>}
+        {disabled && <span className="question-type-card__pill">{resolvedComingSoonLabel}</span>}
       </div>
       <p className="question-type-card__description">{description}</p>
       {bestFor && <p className="question-type-card__best-for">{bestFor}</p>}

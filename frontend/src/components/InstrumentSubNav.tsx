@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface InstrumentSection {
   key: string;
@@ -28,10 +29,15 @@ export function InstrumentSubNav({
   sections,
   active,
   onChange,
-  ariaLabel = "Sections",
+  ariaLabel,
 }: InstrumentSubNavProps) {
+  const { t } = useTranslation("shell");
   return (
-    <div className="instrument-subnav" role="tablist" aria-label={ariaLabel}>
+    <div
+      className="instrument-subnav"
+      role="tablist"
+      aria-label={ariaLabel ?? t("subNav.defaultAriaLabel")}
+    >
       {sections.map((s) => {
         const isActive = s.key === active;
         return (

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 
 // Reads tokens that the backend bounced back via URL fragment (so they
@@ -9,6 +10,7 @@ import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 export default function GoogleFinish() {
   const navigate = useNavigate();
   const { saveToken } = useAuth();
+  const { t } = useTranslation("shell");
   const ran = useRef(false);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function GoogleFinish() {
   return (
     <div className="auth-page">
       <div className="auth-card" style={{ textAlign: "center" }}>
-        <p>Signing you in…</p>
+        <p>{t("googleFinish.signingIn")}</p>
       </div>
     </div>
   );

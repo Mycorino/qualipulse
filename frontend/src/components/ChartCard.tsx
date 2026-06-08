@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * ChartCard — the dashboard atom for the quanti surface.
@@ -42,15 +43,16 @@ export function ChartCard({
   footerExtras,
   children,
 }: ChartCardProps) {
+  const { t } = useTranslation("study");
   const showSmallN = typeof n === "number" && n < minN;
   const footerItems: ReactNode[] = [];
 
-  if (typeof n === "number") footerItems.push(`n=${n}`);
+  if (typeof n === "number") footerItems.push(t("chartCard.n", { count: n }));
   if (typeof completionRate === "number") {
-    footerItems.push(`${Math.round(completionRate)}% completion`);
+    footerItems.push(t("chartCard.completion", { count: Math.round(completionRate) }));
   }
   if (typeof ciHalfWidth === "number") {
-    footerItems.push(`95% CI ±${ciHalfWidth.toFixed(1)}pp`);
+    footerItems.push(t("chartCard.ci", { value: ciHalfWidth.toFixed(1) }));
   }
   if (footerExtras) footerItems.push(...footerExtras);
 
@@ -68,8 +70,8 @@ export function ChartCard({
             </span>
           ))}
           {showSmallN && (
-            <span className="chart-card__warning" title="Sample too small for inference; treat as directional">
-              ⚠ Directional only (n&lt;{minN})
+            <span className="chart-card__warning" title={t("chartCard.smallNTitle")}>
+              {t("chartCard.smallNWarning", { minN })}
             </span>
           )}
         </div>

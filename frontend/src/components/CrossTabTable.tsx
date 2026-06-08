@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 /**
  * CrossTabTable — dense segment × theme table with conditional formatting.
  *
@@ -39,20 +41,21 @@ export function CrossTabTable({
   columnNs,
   note,
 }: CrossTabTableProps) {
+  const { t } = useTranslation("study");
   const allValues = rows.flatMap((r) => r.values).filter((v): v is number => typeof v === "number");
   const max = Math.max(0, ...allValues);
 
   return (
-    <div className="cross-tab" role="table" aria-label="Cross-tabulation">
+    <div className="cross-tab" role="table" aria-label={t("crossTab.ariaLabel")}>
       <table className="cross-tab__table">
         <thead>
           <tr>
-            <th className="cross-tab__row-header">Theme</th>
+            <th className="cross-tab__row-header">{t("crossTab.themeHeader")}</th>
             {columns.map((col, i) => (
               <th key={col} className="cross-tab__column-header">
                 <div>{col}</div>
                 {columnNs && typeof columnNs[i] === "number" && (
-                  <div className="cross-tab__column-n tabular">n={columnNs[i]}</div>
+                  <div className="cross-tab__column-n tabular">{t("crossTab.columnN", { count: columnNs[i] })}</div>
                 )}
               </th>
             ))}
@@ -70,16 +73,16 @@ export function CrossTabTable({
                 const columnN = columnNs?.[i];
                 const smallN = typeof columnN === "number" && columnN < minN;
                 if (typeof value !== "number") {
-                  return <td key={i} className="cross-tab__cell cross-tab__cell--empty">—</td>;
+                  return <td key={i} className="cross-tab__cell cross-tab__cell--empty">{t("crossTab.empty")}</td>;
                 }
                 if (smallN) {
                   return (
                     <td
                       key={i}
                       className="cross-tab__cell cross-tab__cell--small-n tabular"
-                      title={`Segment too small for inference (n=${columnN} < ${minN}). Showing count instead.`}
+                      title={t("crossTab.smallNTitle", { columnN, minN })}
                     >
-                      {typeof n === "number" ? `${n}/${columnN}` : "—"}
+                      {typeof n === "number" ? `${n}/${columnN}` : t("crossTab.empty")}
                     </td>
                   );
                 }

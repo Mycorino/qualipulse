@@ -1,0 +1,69 @@
+{
+  "topBar": {
+    "homeAriaLabel": "Accueil — vos études",
+    "breadcrumbAriaLabel": "Fil d'Ariane"
+  },
+  "dashboardShell": {
+    "summaryAriaLabel": "Résumé du tableau de bord"
+  },
+  "subNav": {
+    "defaultAriaLabel": "Sections"
+  },
+  "audio": {
+    "unavailable": "Audio indisponible",
+    "pause": "Pause",
+    "play": "Lecture",
+    "seek": "Rechercher",
+    "labelWithDuration": "{{label}}, {{duration}}"
+  },
+  "errorBoundary": {
+    "title": "Une erreur est survenue",
+    "text": "Une erreur inattendue s'est produite. Veuillez actualiser la page.",
+    "refresh": "Actualiser la page"
+  },
+  "impersonation": {
+    "viewingAs": "Vue en tant que",
+    "exit": "Quitter"
+  },
+  "publicResponse": {
+    "notAvailable": "Ce questionnaire n'est pas disponible.",
+    "submitError": "Une erreur est survenue lors de l'envoi de votre réponse. Veuillez réessayer.",
+    "errorContactHint": "Si vous pensez qu'il s'agit d'une erreur, contactez la personne qui vous a partagé le lien.",
+    "loading": "Chargement…",
+    "thanksTitle": "Merci pour votre réponse.",
+    "thanksBody": "Vos réponses ont bien été enregistrées. Vous pouvez fermer cet onglet.",
+    "anonymousNote": "Ce questionnaire est anonyme — vos réponses ne sont pas associées à votre identité.",
+    "emailLabel": "E-mail (facultatif)",
+    "emailPlaceholder": "vous@exemple.com",
+    "emailHelp": "Nous permet d'associer votre réponse si vous revenez, et permet au chercheur de vous inviter à un entretien de suivi. Jamais partagé en dehors de cette étude.",
+    "validation_one": "Veuillez répondre à la {{count}} question obligatoire ci-dessus.",
+    "validation_other": "Veuillez répondre aux {{count}} questions obligatoires ci-dessus.",
+    "submitting": "Envoi…",
+    "submit": "Envoyer ma réponse",
+    "required": "obligatoire",
+    "likertLow": "Pas du tout d'accord",
+    "likertHigh": "Tout à fait d'accord",
+    "npsLow": "Pas du tout probable",
+    "npsHigh": "Extrêmement probable",
+    "openTextPlaceholder": "Jusqu'à {{maxChars}} caractères…"
+  },
+  "interviewVerify": {
+    "expiredMessage": "Ce lien de vérification a expiré ou a déjà été utilisé. Veuillez revenir en arrière et en demander un nouveau.",
+    "expiredTitle": "Lien expiré",
+    "verifying": "Vérification de votre e-mail…"
+  },
+  "verifyEmail": {
+    "noToken": "Aucun jeton de vérification fourni.",
+    "invalidOrExpired": "Ce lien de vérification est invalide ou a expiré.",
+    "verifyingTitle": "Vérification de votre e-mail…",
+    "verifyingSubtitle": "Un instant.",
+    "successTitle": "E-mail vérifié !",
+    "successSubtitle": "Votre e-mail a bien été confirmé. Tout est prêt.",
+    "goToDashboard": "Aller au tableau de bord",
+    "failedTitle": "Échec de la vérification",
+    "resendHint": "Vous pouvez renvoyer l'e-mail de vérification depuis votre tableau de bord."
+  },
+  "googleFinish": {
+    "signingIn": "Connexion en cours…"
+  }
+}

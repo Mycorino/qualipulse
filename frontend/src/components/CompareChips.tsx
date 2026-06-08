@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 /**
  * CompareChips — segment filter row at the top of a dashboard canvas.
  *
@@ -27,6 +29,7 @@ interface CompareChipsProps {
 }
 
 export function CompareChips({ groups, value, onChange }: CompareChipsProps) {
+  const { t } = useTranslation("study");
   const toggle = (dimension: string, optionValue: string) => {
     const current = value[dimension] ?? [];
     const next = current.includes(optionValue)
@@ -42,7 +45,7 @@ export function CompareChips({ groups, value, onChange }: CompareChipsProps) {
   };
 
   return (
-    <div className="compare-chips" role="group" aria-label="Filter by segment">
+    <div className="compare-chips" role="group" aria-label={t("compareChips.ariaLabel")}>
       {groups.map((group) => {
         const selected = value[group.dimension] ?? [];
         const isAll = selected.length === 0;
@@ -55,7 +58,7 @@ export function CompareChips({ groups, value, onChange }: CompareChipsProps) {
               onClick={() => clearGroup(group.dimension)}
               aria-pressed={isAll}
             >
-              All
+              {t("compareChips.all")}
             </button>
             {group.options.map((opt) => {
               const active = selected.includes(opt.value);

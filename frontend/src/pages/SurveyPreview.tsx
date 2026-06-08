@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   QuestionConfigChoice,
@@ -26,6 +27,7 @@ import {
 export default function SurveyPreview() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation("survey");
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [study, setStudy] = useState<{ id: string; name: string } | null>(null);
   const [questions, setQuestions] = useState<SurveyQuestion[]>([]);
@@ -44,7 +46,7 @@ export default function SurveyPreview() {
   if (!survey) {
     return (
       <div className="quanti-showcase">
-        <p className="quanti-showcase__section-meta">Loading…</p>
+        <p className="quanti-showcase__section-meta">{t("preview.loading")}</p>
       </div>
     );
   }
@@ -52,23 +54,23 @@ export default function SurveyPreview() {
   return (
     <InstrumentShell
       crumbs={[
-        { label: "Studies", to: "/studies" },
+        { label: t("preview.crumbStudies"), to: "/studies" },
         ...(study ? [{ label: study.name, to: `/studies/${study.id}` }] : []),
         { label: survey.name },
       ]}
-      eyebrow="Survey"
+      eyebrow={t("preview.eyebrow")}
       title={survey.name}
       status={surveyStatusPill(survey.status)}
       sections={SURVEY_SECTIONS}
       activeSection="preview"
       onSectionChange={(k) => navigate(surveySectionPath(k, survey.id))}
-      subNavLabel="Survey sections"
+      subNavLabel={t("preview.sectionsNavLabel")}
     >
       <p
         className="quanti-showcase__section-meta"
         style={{ textAlign: "center", padding: "var(--space-3) 0 0" }}
       >
-        Preview · how respondents will see it
+        {t("preview.previewLabel")}
       </p>
       <div
         style={{
@@ -103,7 +105,7 @@ export default function SurveyPreview() {
 
         {questions.length === 0 ? (
           <p style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>
-            No questions yet. Add some in the editor to see them here.
+            {t("preview.noQuestions")}
           </p>
         ) : (
           <ol
@@ -132,7 +134,7 @@ export default function SurveyPreview() {
           }}
         >
           <button type="button" className="btn btn-primary" disabled>
-            Submit (preview only)
+            {t("preview.submitPreviewOnly")}
           </button>
         </div>
       </div>
@@ -147,6 +149,7 @@ function PreviewQuestion({
   question: SurveyQuestion;
   index: number;
 }) {
+  const { t } = useTranslation("survey");
   const cfg = question.config;
   return (
     <div>
@@ -161,8 +164,8 @@ function PreviewQuestion({
         }}
         className="tabular"
       >
-        Question {index} of …
-        {question.is_required && <span style={{ color: "var(--danger)" }}> · required</span>}
+        {t("preview.questionOf", { index })}
+        {question.is_required && <span style={{ color: "var(--danger)" }}> · {t("preview.required")}</span>}
       </div>
       <div
         style={{
@@ -175,7 +178,7 @@ function PreviewQuestion({
         }}
       >
         {question.prompt || (
-          <em style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>Untitled question</em>
+          <em style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>{t("preview.untitledQuestion")}</em>
         )}
       </div>
       <PreviewInput type={question.type} config={cfg} />
@@ -190,9 +193,10 @@ function PreviewInput({
   type: SurveyQuestion["type"];
   config: Record<string, unknown>;
 }) {
+  const { t } = useTranslation("survey");
   if (type === "likert") {
     const scale = (config.scale as number) ?? 5;
-    const anchors = (config.anchors as [string, string]) ?? ["Strongly disagree", "Strongly agree"];
+    const anchors = (config.anchors as [string, string]) ?? [t("preview.likertDisagree"), t("preview.likertAgree")];
     return (
       <div>
         <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-2)" }}>
@@ -248,8 +252,8 @@ function PreviewInput({
             marginTop: "var(--space-2)",
           }}
         >
-          <span>Not at all likely</span>
-          <span>Extremely likely</span>
+          <span>{t("preview.npsNotLikely")}</span>
+          <span>{t("preview.npsExtremelyLikely")}</span>
         </div>
       </div>
     );
@@ -285,7 +289,7 @@ function PreviewInput({
       <textarea
         rows={4}
         disabled
-        placeholder={`Up to ${maxChars} characters…`}
+        placeholder={t("preview.upToCharacters", { max: maxChars })}
         style={{
           width: "100%",
           padding: "var(--space-3)",
@@ -304,7 +308,7 @@ function PreviewInput({
       <input
         type="text"
         disabled
-        placeholder={`Up to ${maxChars} characters…`}
+        placeholder={t("preview.upToCharacters", { max: maxChars })}
         style={{
           width: "100%",
           padding: "10px var(--space-3)",
