@@ -44,6 +44,18 @@ def get_current_company(
             detail="Company not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    is_impersonation = payload.get("impersonation", False)
+    if is_impersonation:
+        company._is_impersonation = True  # type: ignore[attr-defined]
+        company._impersonation_admin = payload.get("admin_identity")  # type: ignore[attr-defined]
+    elif company.suspended_at is not None:
+        reason = company.suspension_reason or "Contact support for details."
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account suspended: {reason}",
+        )
+
     return company
 
 
@@ -72,4 +84,9 @@ def get_current_company_optional(
     company_id: str | None = payload.get("sub")
     if company_id is None:
         return None
-    return db.query(Company).filter(Company.id == company_id).first()
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if company is None:
+        return None
+    if not payload.get("impersonation", False) and company.suspended_at is not None:
+        return None
+    return company

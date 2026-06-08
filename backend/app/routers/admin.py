@@ -1,5 +1,7 @@
 import hmac
+import json
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -13,10 +15,12 @@ from app.dependencies import get_db
 from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
+from app.models.admin_audit import AdminAuditLog
 from app.models.billing import CreditLedger
 from app.models.coding import ManualCode, QuoteTag
 from app.models.company import Company, EmailVerificationToken, PasswordResetToken
 from app.services import billing_service
+from app.services.auth import create_impersonation_token
 from app.models.interview import (
     AnalysisThemeAnnotation,
     InterviewLink,
@@ -33,17 +37,42 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 # ── Auth dependency ───────────────────────────────────────────────────────────
 
-def require_admin(authorization: Optional[str] = Header(default=None)) -> None:
+def require_admin(
+    authorization: Optional[str] = Header(default=None),
+    x_admin_identity: Optional[str] = Header(default=None, alias="X-Admin-Identity"),
+) -> str:
+    """Validate admin key and return the admin identity string for audit logging."""
     if not settings.ADMIN_SECRET_KEY:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access is disabled")
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin key required")
     token = authorization[len("Bearer "):]
-    # Use constant-time comparison — a naive `!=` leaks timing info that can
-    # be used to recover the secret key character by character over many
-    # requests. hmac.compare_digest is the stdlib-approved fix.
     if not hmac.compare_digest(token, settings.ADMIN_SECRET_KEY):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin key")
+    return (x_admin_identity or "unknown").strip()[:100]
+
+
+# ── Audit helper ─────────────────────────────────────────────────────────────
+
+def _record_audit(
+    db: Session,
+    admin_identity: str,
+    action: str,
+    target_company_id: str | None,
+    target_company_email: str,
+    details: dict | None = None,
+    is_impersonation: bool = False,
+) -> None:
+    db.add(AdminAuditLog(
+        id=str(uuid.uuid4()),
+        admin_identity=admin_identity,
+        action=action,
+        target_company_id=target_company_id,
+        target_company_email=target_company_email,
+        details=json.dumps(details) if details else None,
+        is_impersonation=is_impersonation,
+    ))
+    db.commit()
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
@@ -69,6 +98,8 @@ class AdminUserSummary(BaseModel):
     project_count: int
     interview_count: int
     business_summary: Optional[str] = None
+    suspended_at: Optional[datetime] = None
+    suspension_reason: Optional[str] = None
 
 
 class AdminUserDetail(AdminUserSummary):
@@ -84,13 +115,11 @@ class TrialUpdate(BaseModel):
 
 
 class CreditAdjustment(BaseModel):
-    """Manual credit adjustment from the admin panel.
-
-    ``credits_delta`` can be positive (goodwill grant, refund) or negative
-    (clawback). Always recorded in ``credit_ledger`` with
-    ``event_type='adjustment_admin'`` and the reason in metadata.
-    """
     credits_delta: int
+    reason: str
+
+
+class SuspendRequest(BaseModel):
     reason: str
 
 
@@ -102,6 +131,17 @@ class AdminStats(BaseModel):
     total_interviews_completed: int
     signups_last_7_days: int
     signups_last_30_days: int
+
+
+class AuditLogEntry(BaseModel):
+    id: str
+    admin_identity: str
+    action: str
+    target_company_id: Optional[str]
+    target_company_email: str
+    details: Optional[dict] = None
+    is_impersonation: bool
+    created_at: datetime
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -136,6 +176,8 @@ def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
         project_count=project_count,
         interview_count=completed_count,
         business_summary=company.business_summary,
+        suspended_at=company.suspended_at,
+        suspension_reason=company.suspension_reason,
     )
 
 
@@ -150,7 +192,7 @@ def list_users(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=500),
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ) -> list[AdminUserSummary]:
     q = db.query(Company)
     if search:
@@ -172,7 +214,7 @@ def get_user(
     request: Request,
     company_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ) -> AdminUserDetail:
     company = db.query(Company).filter(Company.id == company_id).first()
     if company is None:
@@ -208,7 +250,7 @@ def update_tier(
     company_id: str,
     body: TierUpdate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ) -> AdminUserSummary:
     valid_tiers = {"free", "starter", "solo", "team", "lab", "enterprise"}
     if body.tier not in valid_tiers:
@@ -218,10 +260,15 @@ def update_tier(
     if company is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    old_tier = company.subscription_tier
     company.subscription_tier = body.tier
     company.subscription_status = "active"
     db.commit()
     db.refresh(company)
+
+    _record_audit(db, admin_id, "tier_change", company.id, company.email,
+                  {"old_tier": old_tier, "new_tier": body.tier})
+
     return _build_user_summary(company, db)
 
 
@@ -232,16 +279,8 @@ def update_trial(
     company_id: str,
     body: TrialUpdate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ) -> AdminUserSummary:
-    """Extend/reset/expire the legacy calendar trial (trial_ends_at).
-
-    DEPRECATED for new accounts — they use credits-based trials where access
-    is gated by credit balance, not calendar. This endpoint only has a real
-    effect on legacy accounts with ``trial_ends_at`` set. For new accounts,
-    use ``POST /admin/workspaces/{id}/credits/adjust`` to grant additional
-    credits instead.
-    """
     valid_actions = {"extend_7", "extend_14", "extend_30", "reset", "expire"}
     if body.action not in valid_actions:
         raise HTTPException(status_code=422, detail=f"action must be one of {sorted(valid_actions)}")
@@ -267,6 +306,10 @@ def update_trial(
 
     db.commit()
     db.refresh(company)
+
+    _record_audit(db, admin_id, "trial_change", company.id, company.email,
+                  {"action": body.action})
+
     return _build_user_summary(company, db)
 
 
@@ -277,19 +320,8 @@ def adjust_credits(
     workspace_id: str,
     body: CreditAdjustment,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ):
-    """Manually grant or claw back credits for a workspace.
-
-    Used for support cases (failed interview refund, goodwill grant,
-    legacy migration top-up). Always writes a ``credit_ledger`` row with
-    ``event_type='adjustment_admin'`` and the reason in metadata so the
-    movement is auditable. Returns the updated balance snapshot.
-
-    Refuses to adjust workspaces on legacy plans — those don't track
-    credits and the adjustment would be meaningless. Returns 400 in
-    that case.
-    """
     if body.credits_delta == 0:
         raise HTTPException(status_code=422, detail="credits_delta must be non-zero")
     if not body.reason or not body.reason.strip():
@@ -314,9 +346,6 @@ def adjust_credits(
             detail="No active credit balance to adjust.",
         )
 
-    # Apply the adjustment to the balance. Positive deltas grow the
-    # ``purchased`` bucket so they survive rollover; negative deltas
-    # increment ``used`` so the available math stays simple.
     if body.credits_delta > 0:
         balance.purchased_credits = (balance.purchased_credits or 0) + body.credits_delta
     else:
@@ -325,7 +354,7 @@ def adjust_credits(
 
     db.add(
         CreditLedger(
-            id=str(__import__("uuid").uuid4()),
+            id=str(uuid.uuid4()),
             workspace_id=workspace_id,
             balance_id=balance.id,
             event_type=billing_service.EVT_ADJUSTMENT_ADMIN,
@@ -337,6 +366,9 @@ def adjust_credits(
     )
     db.commit()
     db.refresh(balance)
+
+    _record_audit(db, admin_id, "credit_adjust", company.id, company.email,
+                  {"delta": body.credits_delta, "reason": body.reason.strip()})
 
     logger.info(
         "ADMIN_CREDIT_ADJUSTMENT: workspace=%s delta=%d reason=%r balance_after=%d",
@@ -366,21 +398,21 @@ def delete_user(
     request: Request,
     company_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ) -> None:
     company = db.query(Company).filter(Company.id == company_id).first()
     if company is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    email_snapshot = company.email
+    name_snapshot = company.name
+
     logger.warning(
-        "ADMIN_USER_DELETION: company_id=%s email=%s name=%s timestamp=%s",
-        company.id,
-        company.email,
-        company.name,
+        "ADMIN_USER_DELETION: company_id=%s email=%s name=%s admin=%s timestamp=%s",
+        company.id, email_snapshot, name_snapshot, admin_id,
         datetime.utcnow().isoformat(),
     )
 
-    # Collect IDs for cascade deletes in correct FK order
     project_ids = [
         row[0]
         for row in db.query(Project.id).filter(Project.company_id == company_id).all()
@@ -465,11 +497,129 @@ def delete_user(
     db.execute(sql_delete(Company).where(Company.id == company_id))
     db.commit()
 
+    _record_audit(db, admin_id, "user_delete", None, email_snapshot,
+                  {"name": name_snapshot, "company_id": company_id})
+
+
+# ── Suspend / Unsuspend ──────────────────────────────────────────────────────
+
+@router.post("/users/{company_id}/suspend", response_model=AdminUserSummary)
+@limiter.limit("30/minute")
+def suspend_user(
+    request: Request,
+    company_id: str,
+    body: SuspendRequest,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin),
+) -> AdminUserSummary:
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if company is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if company.suspended_at is not None:
+        raise HTTPException(status_code=409, detail="Account is already suspended")
+
+    company.suspended_at = datetime.utcnow()
+    company.suspension_reason = body.reason.strip()
+    db.commit()
+    db.refresh(company)
+
+    _record_audit(db, admin_id, "suspend", company.id, company.email,
+                  {"reason": body.reason.strip()})
+
+    return _build_user_summary(company, db)
+
+
+@router.post("/users/{company_id}/unsuspend", response_model=AdminUserSummary)
+@limiter.limit("30/minute")
+def unsuspend_user(
+    request: Request,
+    company_id: str,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin),
+) -> AdminUserSummary:
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if company is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if company.suspended_at is None:
+        raise HTTPException(status_code=409, detail="Account is not suspended")
+
+    old_reason = company.suspension_reason
+    company.suspended_at = None
+    company.suspension_reason = None
+    db.commit()
+    db.refresh(company)
+
+    _record_audit(db, admin_id, "unsuspend", company.id, company.email,
+                  {"previous_reason": old_reason})
+
+    return _build_user_summary(company, db)
+
+
+# ── Impersonation ────────────────────────────────────────────────────────────
+
+@router.post("/users/{company_id}/impersonate")
+@limiter.limit("10/minute")
+def impersonate_user(
+    request: Request,
+    company_id: str,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin),
+):
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if company is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    token = create_impersonation_token(company.id, admin_id)
+
+    _record_audit(db, admin_id, "impersonation_start", company.id, company.email)
+
+    return {
+        "access_token": token,
+        "company_name": company.name,
+        "company_email": company.email,
+    }
+
+
+# ── Audit Log ────────────────────────────────────────────────────────────────
+
+@router.get("/audit-log", response_model=list[AuditLogEntry])
+@limiter.limit("30/minute")
+def get_audit_log(
+    request: Request,
+    action: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin),
+) -> list[AuditLogEntry]:
+    q = db.query(AdminAuditLog)
+    if action:
+        q = q.filter(AdminAuditLog.action == action)
+    if search:
+        pattern = f"%{search}%"
+        q = q.filter(AdminAuditLog.target_company_email.ilike(pattern))
+    q = q.order_by(AdminAuditLog.created_at.desc())
+    offset = (page - 1) * limit
+    rows = q.offset(offset).limit(limit).all()
+    return [
+        AuditLogEntry(
+            id=r.id,
+            admin_identity=r.admin_identity,
+            action=r.action,
+            target_company_id=r.target_company_id,
+            target_company_email=r.target_company_email,
+            details=json.loads(r.details) if r.details else None,
+            is_impersonation=r.is_impersonation,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
 
 # ── Cost reporting ────────────────────────────────────────────────────────────
 
 def _costs_report(db: Session, company_id: str | None = None) -> dict:
-    """Build the cost report dict, optionally filtered to a single company."""
     now = datetime.utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -477,7 +627,6 @@ def _costs_report(db: Session, company_id: str | None = None) -> dict:
     if company_id is not None:
         base_q = base_q.filter(AIUsageLog.company_id == company_id)
 
-    # Total and monthly spend
     total_cost = db.query(func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0))
     if company_id is not None:
         total_cost = total_cost.filter(AIUsageLog.company_id == company_id)
@@ -490,7 +639,6 @@ def _costs_report(db: Session, company_id: str | None = None) -> dict:
         month_cost = month_cost.filter(AIUsageLog.company_id == company_id)
     this_month_usd = float(month_cost.scalar() or 0.0)
 
-    # By operation
     op_rows = (
         db.query(
             AIUsageLog.operation,
@@ -506,7 +654,6 @@ def _costs_report(db: Session, company_id: str | None = None) -> dict:
         for row in op_rows
     }
 
-    # Interview-level cost and count (STT + TTS + interview_turn)
     interview_ops = ("interview_turn", "tts", "stt")
     interview_cost_q = db.query(
         func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0)
@@ -527,7 +674,6 @@ def _costs_report(db: Session, company_id: str | None = None) -> dict:
 
     avg_cost = (interview_cost / total_interviews) if total_interviews > 0 else 0.0
 
-    # By company (only for platform-wide report)
     by_company = []
     if company_id is None:
         company_rows = (
@@ -589,9 +735,8 @@ def _costs_report(db: Session, company_id: str | None = None) -> dict:
 def get_costs(
     request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ) -> dict:
-    """Platform-wide AI cost report."""
     return _costs_report(db)
 
 
@@ -601,16 +746,14 @@ def get_company_costs(
     request: Request,
     company_id: str,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ) -> dict:
-    """AI cost report for a single company, with per-project breakdown."""
     company = db.query(Company).filter(Company.id == company_id).first()
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
     report = _costs_report(db, company_id=company_id)
 
-    # Add per-project breakdown
     project_rows = (
         db.query(
             AIUsageLog.project_id,
@@ -644,7 +787,7 @@ def get_company_costs(
 def get_stats(
     request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    admin_id: str = Depends(require_admin),
 ) -> AdminStats:
     now = datetime.utcnow()
     seven_days_ago = now - timedelta(days=7)
