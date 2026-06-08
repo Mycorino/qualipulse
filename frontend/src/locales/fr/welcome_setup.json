@@ -1,62 +1,37 @@
 {
-  "header_skip": "Passer la config",
-  "progress_aria": "Progression de la configuration",
+  "header_skip": "Passer",
+  "progress_aria": "Étapes de mise en route",
 
-  "step_1_label": "Vous",
-  "step_2_label": "Votre étude",
-  "step_3_label": "Le deal",
+  "step_1_label": "Entreprise",
+  "step_2_label": "Vous",
+  "step_3_label": "Objectifs",
 
-  "step_1_title": "Calons d'abord les bases",
-  "step_1_sub": "Trois questions rapides pour que le Research Copilot vous parle comme à un pair, pas à un inconnu.",
+  "step_1_title": "Commençons par votre entreprise",
+  "step_1_sub": "Pour mieux adapter QualiPulse à vos besoins.",
   "step_1_cta": "Continuer",
+  "step_1_language_label": "Langue",
 
-  "field_company": "Entreprise",
+  "field_company": "Nom de l'entreprise",
   "field_company_placeholder": "Acme SAS",
   "field_role": "Votre rôle",
   "field_team_size": "Taille de l'équipe",
 
-  "step_2_title": "Qu'est-ce qui vous amène ?",
-  "step_2_sub": "Choisissez ce qui s'en rapproche le plus — vous pourrez ajuster dans la conversation qui suit.",
+  "step_2_title": "Parlez-nous de vous",
+  "step_2_sub": "Ça nous aide à adapter les suggestions à votre quotidien.",
   "step_2_cta": "Continuer",
 
-  "field_use_case": "Cas d'usage",
   "role_other_placeholder": "Décrivez votre rôle…",
-  "use_case_other_placeholder": "Décrivez votre cas d'usage…",
-  "field_intent": "Qui décide",
-  "field_readiness": "Où en êtes-vous",
 
-  "intent_solo": "C'est moi qui décide — je mène ma propre recherche",
-  "intent_team": "J'aide quelqu'un d'autre à décider",
-  "solo": "Solo",
-  "team": "Équipe",
-
-  "readiness_concrete": "J'ai une étude concrète en tête",
-  "readiness_evaluating": "J'évalue d'abord QualiPulse",
-
-  "step_3_eyebrow": "Voici le deal",
-  "step_3_title": "Essayez-le sans engagement — pas de carte, pas de compte à rebours",
-  "step_3_sub": "Trois chiffres résument tout. Débloquez le reste quand QualiPulse aura fait ses preuves.",
-
-  "deal_run_label": "Entretiens à mener",
-  "deal_run_body": "Des vrais entretiens participants, offerts. Chacun ne vous coûte rien tant que vous n'avez pas décidé que QualiPulse mérite d'être gardé.",
-  "deal_view_label": "Transcriptions complètes",
-  "deal_view_body": "Lisez trois transcriptions intégrales pour toujours. Au-delà, vous verrez des synthèses — la lecture complète se débloque avec un plan.",
-  "deal_unlock_label": "Débloquez quand vous voulez",
-  "deal_unlock_body_generic": "Quand vous êtes prêt·e, choisissez un plan adapté — au mois, sans surprise.",
-  "deal_unlock_body_with_plan": "Les équipes comme la vôtre commencent souvent sur <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — seulement quand ça vous rapporte.",
-
-  "verify_eyebrow": "Un petit détail",
-  "verify_body": "Nous avons envoyé un lien de vérification à {{email}}. Cliquez dessus pour débloquer vos 3 entretiens gratuits — les crédits sont conditionnés à un email vérifié.",
-  "verify_resend": "Renvoyer le lien",
-  "verify_hint_post_action": "Regardez votre boîte — ça arrive en quelques secondes.",
-  "verify_done": "Email vérifié — {{email}}",
-
-  "step_3_cta": "Parler au Copilot →",
+  "step_3_title": "Que souhaitez-vous faire avec QualiPulse ?",
+  "step_3_sub": "Choisissez ce qui vous correspond — vous pourrez toujours ajuster plus tard.",
+  "step_3_cta": "C'est parti →",
+  "step_3_loading": "Personnalisation en cours…",
+  "step_3_use_cases_label": "Suggestions pour vous",
+  "step_3_use_cases_hint": "Plusieurs choix possibles",
+  "step_3_summary_label": "Ce qu'on a compris",
 
   "back": "Retour",
-  "saving": "Enregistrement…",
-
-  "foot_dashboard": "Passer tout ça — emmenez-moi sur mon tableau de bord",
+  "saving": "En cours…",
 
   "toast_save_failed": "Impossible d'enregistrer — réessayez ?",
   "toast_resend_ok": "Envoyé — regardez votre boîte.",

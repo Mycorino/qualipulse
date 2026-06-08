@@ -197,55 +197,15 @@ export async function updateCurrentPriority(
   return data;
 }
 
-// ── Study draft (onboarding step 4) ──
+// ── Onboarding suggestions (step 3) ──
 
-export interface StudyDraftQuestion {
-  section_index: number;
-  section_title: string;
-  question_index: number;
-  main_question: string;
-  interview_notes?: string;
-  desired_learning?: string;
+export interface OnboardingSuggestions {
+  use_cases: string[];
+  profile_summary: string | null;
+  business_summary: string | null;
 }
 
-export interface StudyDraft {
-  brief_summary: string;
-  study_title: string;
-  research_objective: string;
-  target_audience: string;
-  // 3 concrete findings the study will surface (shown prominently on Step 4
-  // — the conversion content). Strategic outcomes, not topics or questions.
-  key_insights?: string[];
-  // 1-2 sentence strategic framing for why running this study now matters
-  // for the user's business. Shown on Step 4 above the meta chips.
-  why_this_matters?: string;
-  duration_minutes: number;
-  sample_size: number;
-  questions: StudyDraftQuestion[];
-  // 3 alternative research directions the AI noticed alongside the main
-  // study. Shown on Step 4 as "Other directions" + reused as the email's
-  // 3 study suggestions so the inbox matches the in-app experience.
-  other_directions?: string[];
-}
-
-export interface StudyDraftResponse {
-  draft: StudyDraft | null;
-}
-
-export async function generateStudyDraft(payload: {
-  first_name?: string;
-  company_name?: string;
-  role_title?: string;
-  research_intent?: string;
-  research_experience?: string;
-  industry?: string;
-  business_summary?: string;
-  goals_freeform?: string;
-  language?: string;
-}): Promise<StudyDraftResponse> {
-  const { data } = await client.post<StudyDraftResponse>(
-    "/auth/onboarding/generate-study",
-    payload,
-  );
+export async function getOnboardingSuggestions(): Promise<OnboardingSuggestions> {
+  const { data } = await client.get<OnboardingSuggestions>("/auth/onboarding/suggestions");
   return data;
 }

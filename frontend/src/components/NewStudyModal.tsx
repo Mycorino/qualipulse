@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { createSurvey } from "../api/surveys";
@@ -32,8 +33,9 @@ type Angle = "survey" | "interview" | "both";
 interface AngleCard {
   angle: Angle;
   icon: string;
-  title: string;
-  blurb: string;
+  /** i18n key suffixes under dashboard:newStudyModal.angles */
+  titleKey: string;
+  blurbKey: string;
   recommended?: boolean;
 }
 
@@ -41,25 +43,26 @@ const ANGLES: AngleCard[] = [
   {
     angle: "survey",
     icon: "📊",
-    title: "Survey a lot of people",
-    blurb: "Start broad. Collect structured responses, see the patterns, size the problem.",
+    titleKey: "surveyTitle",
+    blurbKey: "surveyBlurb",
   },
   {
     angle: "interview",
     icon: "🎙",
-    title: "Talk to people in depth",
-    blurb: "Go deep. AI-moderated voice interviews that adapt to each participant.",
+    titleKey: "interviewTitle",
+    blurbKey: "interviewBlurb",
   },
   {
     angle: "both",
     icon: "📊🎙",
-    title: "Both — start broad, then go deep",
-    blurb: "Survey first, then interview the most interesting segments. The full mixed-methods loop.",
+    titleKey: "bothTitle",
+    blurbKey: "bothBlurb",
     recommended: true,
   },
 ];
 
 export function NewStudyModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation("dashboard");
   const navigate = useNavigate();
   const { toast } = useToast();
   const [name, setName] = useState("");
@@ -88,7 +91,7 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
       });
       navigate(`/surveys/${survey.id}/edit`);
     } catch {
-      toast("Could not create the study", "error");
+      toast(t("newStudyModal.createError"), "error");
       setBusy(false);
     }
   };
@@ -97,7 +100,7 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Start a new study"
+      aria-label={t("newStudyModal.aria")}
       className="new-study-modal__overlay"
       onClick={onClose}
     >
@@ -106,20 +109,17 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
           type="button"
           className="new-study-modal__close"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t("newStudyModal.close")}
         >
           ✕
         </button>
 
-        <div className="new-study-modal__eyebrow">New study</div>
-        <h2 className="new-study-modal__title">What do you want to learn?</h2>
-        <p className="new-study-modal__sub">
-          Name your study, then pick how to start. You can always add the other instrument
-          later — the choice just decides what you build first.
-        </p>
+        <div className="new-study-modal__eyebrow">{t("newStudyModal.eyebrow")}</div>
+        <h2 className="new-study-modal__title">{t("newStudyModal.title")}</h2>
+        <p className="new-study-modal__sub">{t("newStudyModal.sub")}</p>
 
         <label className="new-study-modal__label" htmlFor="new-study-name">
-          Study name
+          {t("newStudyModal.nameLabel")}
         </label>
         <input
           id="new-study-name"
@@ -127,7 +127,7 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
           className="new-study-modal__name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Why new users churn"
+          placeholder={t("newStudyModal.namePlaceholder")}
           autoFocus
         />
 
@@ -141,19 +141,19 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
               disabled={busy || !name.trim()}
             >
               {a.recommended && (
-                <span className="new-study-modal__badge">Recommended</span>
+                <span className="new-study-modal__badge">{t("newStudyModal.recommended")}</span>
               )}
               <span className="new-study-modal__angle-icon" aria-hidden="true">
                 {a.icon}
               </span>
-              <span className="new-study-modal__angle-title">{a.title}</span>
-              <span className="new-study-modal__angle-blurb">{a.blurb}</span>
+              <span className="new-study-modal__angle-title">{t(`newStudyModal.angles.${a.titleKey}`)}</span>
+              <span className="new-study-modal__angle-blurb">{t(`newStudyModal.angles.${a.blurbKey}`)}</span>
             </button>
           ))}
         </div>
 
         {!name.trim() && (
-          <p className="new-study-modal__hint">Enter a name to choose an angle.</p>
+          <p className="new-study-modal__hint">{t("newStudyModal.hint")}</p>
         )}
       </div>
     </div>

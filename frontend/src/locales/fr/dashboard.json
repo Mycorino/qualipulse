@@ -99,5 +99,196 @@
     "recsTitleGeneric": "Points de départ populaires",
     "recsSubtitle": "Selon votre profil et vos priorités",
     "recsEmpty": "Nous recommanderons des modèles dès que votre profil sera renseigné dans Paramètres."
+  },
+  "studyList": {
+    "crumb": "Études",
+    "loadError": "Impossible de charger vos études. Actualisez la page.",
+    "eyebrow": "Espace de recherche",
+    "title": "Vos études",
+    "subtitle": "Une étude, c'est un projet de recherche : un questionnaire, une série d'entretiens, ou les deux — chaque carte indique les méthodes utilisées. Quanti, quali, hybride : tout au même endroit.",
+    "newStudy": "+ Nouvelle étude",
+    "loading": "Chargement…",
+    "emptyText": "Aucune étude pour l'instant. Lancez-vous — questionnaire, entretiens, ou les deux. Une étude se crée autour de votre premier instrument et apparaît ici.",
+    "copilotEyebrow": "✦ Copilote de recherche",
+    "dismissUpdate": "Ignorer",
+    "studyType": {
+      "survey": "ÉTUDE QUANTI",
+      "interview": "ÉTUDE ENTRETIENS",
+      "hybrid": "ÉTUDE HYBRIDE",
+      "empty": "ÉTUDE VIDE"
+    },
+    "surveyCount_one": "{{count}} questionnaire",
+    "surveyCount_other": "{{count}} questionnaires",
+    "interviewCount_one": "{{count}} entretien",
+    "interviewCount_other": "{{count}} entretiens",
+    "status": {
+      "needsInstrument": "À configurer",
+      "readyToAnalyse": "Prête à analyser",
+      "collecting": "Collecte en cours",
+      "reportReady": "Rapport prêt",
+      "inProgress": "En cours"
+    }
+  },
+  "newStudyModal": {
+    "aria": "Lancer une nouvelle étude",
+    "close": "Fermer",
+    "eyebrow": "Nouvelle étude",
+    "title": "Que voulez-vous apprendre ?",
+    "sub": "Nommez votre étude, puis choisissez par où commencer. Vous pourrez toujours ajouter l'autre méthode plus tard — ce choix décide seulement de ce que vous construisez en premier.",
+    "nameLabel": "Nom de l'étude",
+    "namePlaceholder": "ex. Pourquoi les nouveaux utilisateurs décrochent",
+    "recommended": "Recommandé",
+    "hint": "Saisissez un nom pour choisir une approche.",
+    "createError": "Impossible de créer l'étude",
+    "angles": {
+      "surveyTitle": "Interroger beaucoup de monde",
+      "surveyBlurb": "Voir large. Recueillez des réponses structurées, repérez les tendances, mesurez le problème.",
+      "interviewTitle": "Échanger en profondeur",
+      "interviewBlurb": "Creuser. Des entretiens vocaux animés par l'IA qui s'adaptent à chaque participant.",
+      "bothTitle": "Les deux — voir large, puis creuser",
+      "bothBlurb": "D'abord un questionnaire, puis des entretiens avec les segments les plus intéressants. La boucle mixte complète."
+    }
+  },
+  "copilot": {
+    "nextEyebrow": "Suivant",
+    "fab": "✦ Demander à l'IA",
+    "openWithUpdates": "Ouvrir le copilote de recherche — nouveautés",
+    "open": "Ouvrir le copilote de recherche",
+    "ariaPanel": "Copilote de recherche",
+    "title": "✦ Copilote de recherche",
+    "missionPrefix": "Pour vous aider à : {{mission}}",
+    "close": "Fermer",
+    "dismissUpdate": "Ignorer",
+    "suggestedNextStep": "✦ Prochaine étape suggérée",
+    "emptyLead": "Je peux rédiger des questions, corriger des problèmes de méthode et structurer votre étude. Dites-moi ce que vous voulez apprendre.",
+    "thinking": "Réflexion…",
+    "inputPlaceholder": "Posez votre question au copilote…",
+    "send": "Envoyer",
+    "unavailable": "Le copilote est indisponible pour le moment",
+    "errorReply": "Désolé — je n'ai pas pu répondre. Réessayez.",
+    "applyError": "Impossible d'appliquer cette modification",
+    "helpMePrefix": "Aidez-moi : {{label}}",
+    "starters": {
+      "scratch": "Aidez-moi à partir de zéro",
+      "methodology": "Vérifiez la méthode de cette étude",
+      "nextQuestion": "Suggérez la prochaine question"
+    },
+    "proposal": {
+      "addQuestion": "Ajouter — {{type}}",
+      "addGuideQuestion": "Ajouter — Question d'entretien",
+      "editQuestion": "Modifier la question",
+      "updateThisQuestion": "Mettre à jour cette question",
+      "setObjective": "Définir l'objectif de recherche",
+      "runAnalysis": "Lancer l'analyse IA",
+      "runAnalysisBody": "Synthétiser thèmes, jobs-to-be-done et tensions à partir des entretiens",
+      "refineAnalysis": "Affiner l'analyse",
+      "refineAnalysisBody": "Re-synthétiser à partir de vos annotations de thèmes et du contexte",
+      "removeQuestion": "Supprimer la question",
+      "removeThisQuestion": "Supprimer cette question",
+      "fallbackQuestion": "question",
+      "accept": "Accepter",
+      "dismiss": "Ignorer",
+      "applied": "✓ Appliqué",
+      "dismissed": "Ignoré"
+    },
+    "type": {
+      "likert": "Échelle de Likert",
+      "mc_single": "Choix unique",
+      "mc_multi": "Choix multiple",
+      "nps": "NPS",
+      "open_text": "Texte libre",
+      "short_text": "Texte court"
+    }
+  },
+  "nba": {
+    "draftGuide": {
+      "label": "Rédiger votre guide d'entretien",
+      "reason": "Cette série n'a pas encore de questions — le copilote peut rédiger un guide complet."
+    },
+    "createLink": {
+      "label": "Créer un lien d'entretien",
+      "reason": "Votre guide est prêt — il vous faut un lien avant que quiconque puisse participer."
+    },
+    "shareLink": {
+      "label": "Partager votre lien d'entretien",
+      "reason": "La série est en ligne mais personne n'a commencé — partagez le lien pour recueillir des réponses."
+    },
+    "runAnalysis": {
+      "label": "Lancer l'analyse",
+      "reason_one": "{{count}} entretien est arrivé et aucun n'est encore analysé.",
+      "reason_other": "{{count}} entretiens sont arrivés et aucun n'est encore analysé."
+    },
+    "refreshAnalysis": {
+      "label": "Actualiser l'analyse",
+      "reason_one": "{{count}} nouvel entretien depuis la dernière analyse.",
+      "reason_other": "{{count}} nouveaux entretiens depuis la dernière analyse."
+    },
+    "reviewThemes": {
+      "label": "Passer les thèmes en revue",
+      "reason": "Votre analyse est prête — confirmez ou contestez chaque thème pour l'affiner."
+    },
+    "refineAnalysis": {
+      "label": "Affiner l'analyse",
+      "reason": "Vous avez annoté des thèmes — affinez pour une v2 plus précise qui en tient compte."
+    },
+    "waitResponses": {
+      "label": "En attente des premières réponses",
+      "reason_one": "{{count}} entretien en cours — rien à faire avant qu'il se termine.",
+      "reason_other": "{{count}} entretiens en cours — rien à faire avant qu'ils se terminent."
+    },
+    "projectDone": {
+      "label": "Cette série est en bonne voie",
+      "reason": "Rien ne requiert votre attention pour le moment."
+    },
+    "addSurveyQuestions": {
+      "label": "Ajouter des questions",
+      "reason": "Ce questionnaire est vide — le copilote peut rédiger un jeu de questions."
+    },
+    "publishSurvey": {
+      "label": "Publier le questionnaire",
+      "reason": "Vos questions sont prêtes — publiez pour commencer à recueillir des réponses."
+    },
+    "shareSurvey": {
+      "label": "Partager le questionnaire",
+      "reason": "{{count}}/{{min}} réponses — partagez le lien pour atteindre un échantillon fiable."
+    },
+    "generateReport": {
+      "label": "Générer le rapport",
+      "reason_one": "{{count}} réponse est arrivée — synthétisez-la en résultats.",
+      "reason_other": "{{count}} réponses sont arrivées — synthétisez-les en résultats."
+    },
+    "refreshReport": {
+      "label": "Actualiser le rapport",
+      "reason_one": "{{count}} nouvelle réponse depuis le dernier rapport.",
+      "reason_other": "{{count}} nouvelles réponses depuis le dernier rapport."
+    },
+    "surveyDone": {
+      "label": "Ce questionnaire est en bonne voie",
+      "reason": "Rien ne requiert votre attention pour le moment."
+    },
+    "startFirstStudy": {
+      "label": "Lancer votre première étude",
+      "reason": "Une étude, c'est un projet de recherche — un questionnaire, une série d'entretiens, ou les deux."
+    },
+    "studyDone": {
+      "label": "« {{name}} » est en bonne voie",
+      "reason": "Cette étude a un rapport — rien ne requiert votre attention pour le moment."
+    },
+    "setUpStudy": {
+      "label": "Configurer « {{name}} »",
+      "reason": "Cette étude n'a encore ni questionnaire ni série d'entretiens."
+    },
+    "analyzeStudy": {
+      "label": "Analyser « {{name}} »",
+      "reason": "Assez de données sont là — synthétisez-les en résultats."
+    },
+    "collectStudy": {
+      "label": "« {{name}} » collecte des réponses",
+      "reason": "Les réponses arrivent encore — partagez les liens pour atteindre un échantillon."
+    },
+    "workspaceDone": {
+      "label": "Vos études avancent toutes",
+      "reason": "Chaque étude a un rapport — rien ne requiert votre attention pour le moment."
+    }
   }
 }

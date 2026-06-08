@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import type {
   CopilotMessage,
@@ -27,15 +28,6 @@ import { useToast } from "./Toast";
  * later surfaces do the same.
  */
 
-const TYPE_LABEL: Record<string, string> = {
-  likert: "Likert scale",
-  mc_single: "Multiple choice",
-  mc_multi: "Multi-select",
-  nps: "NPS",
-  open_text: "Open text",
-  short_text: "Short text",
-};
-
 type PendingAction = ProposedAction & {
   id: string;
   status: "pending" | "accepted" | "rejected";
@@ -45,11 +37,8 @@ type ThreadItem =
   | { kind: "user"; text: string }
   | { kind: "assistant"; text: string; actions: PendingAction[] };
 
-const STARTERS = [
-  "Help me start from scratch",
-  "Review this for methodology issues",
-  "Suggest the next question",
-];
+/** i18n key suffixes under dashboard:copilot.starters */
+const STARTER_KEYS = ["scratch", "methodology", "nextQuestion"];
 
 /**
  * Lightweight inline renderer for the copilot's replies — turns `**bold**`
@@ -84,6 +73,7 @@ export function ResearchCopilotPanel({
   nudges?: Nudge[];
   onDismissNudge?: (id: string) => void;
 }) {
+  const { t } = useTranslation("dashboard");
   const { toast } = useToast();
   const announce = useNudgeAnnounce(nudges);
   const [open, setOpen] = useState(false);
@@ -197,13 +187,14 @@ export function ResearchCopilotPanel({
         ),
       );
     } catch {
-      toast("The copilot is unavailable right now", "error");
-      setThread((t) =>
-        t.map((it, i) =>
-          i === t.length - 1 && it.kind === "assistant"
+      toast(t("copilot.unavailable"), "error");
+      const errorReply = t("copilot.errorReply");
+      setThread((items) =>
+        items.map((it, i) =>
+          i === items.length - 1 && it.kind === "assistant"
             ? {
                 ...it,
-                text: "Sorry — I couldn't respond. Please try again.",
+                text: errorReply,
               }
             : it,
         ),
@@ -235,7 +226,7 @@ export function ResearchCopilotPanel({
       setStatus(action.id, "accepted");
       onApplied();
     } catch {
-      toast("Couldn't apply that change", "error");
+      toast(t("copilot.applyError"), "error");
     }
   };
 
@@ -260,12 +251,10 @@ export function ResearchCopilotPanel({
           className="copilot-fab"
           onClick={() => setOpen(true)}
           aria-label={
-            hasNudge
-              ? "Open the Research Copilot — new updates"
-              : "Open the Research Copilot"
+            hasNudge ? t("copilot.openWithUpdates") : t("copilot.open")
           }
         >
-          ✦ Ask AI
+          {t("copilot.fab")}
           {hasNudge && (
             <span className="copilot-fab__dot" aria-hidden="true" />
           )}
@@ -275,22 +264,22 @@ export function ResearchCopilotPanel({
   }
 
   return (
-    <aside className="copilot-panel" aria-label="Research Copilot">
+    <aside className="copilot-panel" aria-label={t("copilot.ariaPanel")}>
       <div className="sr-only" aria-live="polite" role="status">
         {announce}
       </div>
       <header className="copilot-panel__header">
         <div className="copilot-panel__heading">
-          <span className="copilot-panel__title">✦ Research Copilot</span>
+          <span className="copilot-panel__title">{t("copilot.title")}</span>
           {mission && (
-            <span className="copilot-panel__mission">Here to: {mission}</span>
+            <span className="copilot-panel__mission">{t("copilot.missionPrefix", { mission })}</span>
           )}
         </div>
         <button
           type="button"
           className="copilot-panel__close"
           onClick={() => setOpen(false)}
-          aria-label="Close"
+          aria-label={t("copilot.close")}
         >
           ✕
         </button>
@@ -308,7 +297,7 @@ export function ResearchCopilotPanel({
                 type="button"
                 className="copilot-nudge__dismiss"
                 onClick={() => onDismissNudge?.(n.id)}
-                aria-label="Dismiss update"
+                aria-label={t("copilot.dismissUpdate")}
               >
                 ✕
               </button>
@@ -320,37 +309,37 @@ export function ResearchCopilotPanel({
       <div className="copilot-thread" ref={threadRef}>
         {thread.length === 0 && (
           <div className="copilot-empty">
-            {nextAction && nextAction.kind === "do" && (
-              <button
-                type="button"
-                className="copilot-nba-starter"
-                onClick={() => send(`Help me: ${nextAction.label}`)}
-              >
-                <span className="copilot-nba-starter__eyebrow">
-                  ✦ Suggested next step
-                </span>
-                <span className="copilot-nba-starter__label">
-                  {nextAction.label}
-                </span>
-                <span className="copilot-nba-starter__reason">
-                  {nextAction.reason}
-                </span>
-              </button>
-            )}
-            <p className="copilot-empty__lead">
-              I can draft questions, fix methodology issues, and shape your
-              study. Tell me what you want to learn.
-            </p>
-            {STARTERS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className="copilot-starter"
-                onClick={() => send(s)}
-              >
-                {s}
-              </button>
-            ))}
+            {nextAction && nextAction.kind === "do" && (() => {
+              const nbaLabel = t(nextAction.labelKey, nextAction.params);
+              const nbaReason = t(nextAction.reasonKey, nextAction.params);
+              return (
+                <button
+                  type="button"
+                  className="copilot-nba-starter"
+                  onClick={() => send(t("copilot.helpMePrefix", { label: nbaLabel }))}
+                >
+                  <span className="copilot-nba-starter__eyebrow">
+                    {t("copilot.suggestedNextStep")}
+                  </span>
+                  <span className="copilot-nba-starter__label">{nbaLabel}</span>
+                  <span className="copilot-nba-starter__reason">{nbaReason}</span>
+                </button>
+              );
+            })()}
+            <p className="copilot-empty__lead">{t("copilot.emptyLead")}</p>
+            {STARTER_KEYS.map((key) => {
+              const label = t(`copilot.starters.${key}`);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className="copilot-starter"
+                  onClick={() => send(label)}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -378,7 +367,7 @@ export function ResearchCopilotPanel({
 
         {busy && (
           <div className="copilot-msg copilot-msg--thinking">
-            {statusLabel ?? "Thinking…"}
+            {statusLabel ?? t("copilot.thinking")}
           </div>
         )}
       </div>
@@ -394,7 +383,7 @@ export function ResearchCopilotPanel({
               send(input);
             }
           }}
-          placeholder="Ask the copilot…"
+          placeholder={t("copilot.inputPlaceholder")}
           rows={2}
           disabled={busy}
         />
@@ -404,7 +393,7 @@ export function ResearchCopilotPanel({
           onClick={() => send(input)}
           disabled={busy || !input.trim()}
         >
-          Send
+          {t("copilot.send")}
         </button>
       </div>
     </aside>
@@ -420,35 +409,39 @@ function ProposalCard({
   onAccept: () => void;
   onReject: () => void;
 }) {
+  const { t } = useTranslation("dashboard");
   let heading: string;
   let body: string | undefined;
 
   if (action.type === "add_question") {
     const q = action.question as ProposedSurveyQuestion | undefined;
-    heading = `Add — ${TYPE_LABEL[q?.type ?? ""] ?? q?.type ?? "question"}`;
+    const typeLabel = q?.type
+      ? t(`copilot.type.${q.type}`, { defaultValue: q.type })
+      : t("copilot.proposal.fallbackQuestion");
+    heading = t("copilot.proposal.addQuestion", { type: typeLabel });
     body = q?.prompt;
   } else if (action.type === "add_guide_question") {
     const q = action.question as ProposedGuideQuestion | undefined;
-    heading = "Add — Interview question";
+    heading = t("copilot.proposal.addGuideQuestion");
     body = q?.main_question;
   } else if (action.type === "edit_question") {
-    heading = "Edit question";
-    body = action.new_prompt ?? "Update this question";
+    heading = t("copilot.proposal.editQuestion");
+    body = action.new_prompt ?? t("copilot.proposal.updateThisQuestion");
   } else if (action.type === "edit_guide_question") {
-    heading = "Edit question";
-    body = action.new_main_question ?? "Update this question";
+    heading = t("copilot.proposal.editQuestion");
+    body = action.new_main_question ?? t("copilot.proposal.updateThisQuestion");
   } else if (action.type === "edit_objective") {
-    heading = "Set the research objective";
+    heading = t("copilot.proposal.setObjective");
     body = action.new_objective;
   } else if (action.type === "run_analysis") {
-    heading = "Run AI analysis";
-    body = "Synthesise themes, JTBDs, and tensions from the interviews";
+    heading = t("copilot.proposal.runAnalysis");
+    body = t("copilot.proposal.runAnalysisBody");
   } else if (action.type === "refine_analysis") {
-    heading = "Refine the analysis";
-    body = "Re-synthesise using your theme annotations and context";
+    heading = t("copilot.proposal.refineAnalysis");
+    body = t("copilot.proposal.refineAnalysisBody");
   } else {
-    heading = "Remove question";
-    body = "Remove this question";
+    heading = t("copilot.proposal.removeQuestion");
+    body = t("copilot.proposal.removeThisQuestion");
   }
 
   const rationale =
@@ -473,19 +466,21 @@ function ProposalCard({
             className="btn btn-primary btn-sm"
             onClick={onAccept}
           >
-            Accept
+            {t("copilot.proposal.accept")}
           </button>
           <button
             type="button"
             className="btn btn-ghost btn-sm"
             onClick={onReject}
           >
-            Dismiss
+            {t("copilot.proposal.dismiss")}
           </button>
         </div>
       ) : (
         <div className="copilot-proposal__status">
-          {action.status === "accepted" ? "✓ Applied" : "Dismissed"}
+          {action.status === "accepted"
+            ? t("copilot.proposal.applied")
+            : t("copilot.proposal.dismissed")}
         </div>
       )}
     </div>

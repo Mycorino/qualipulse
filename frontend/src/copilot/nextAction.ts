@@ -7,6 +7,11 @@
  * priority ladder: the first rule whose `test` passes wins. Instant, free,
  * runs on data the pages already hold.
  *
+ * i18n: resolvers are PURE — they return i18n keys (`labelKey` / `reasonKey`,
+ * namespace-qualified) plus interpolation `params`, never literal copy. The
+ * consuming component translates at render time (NextActionChip,
+ * ResearchCopilotPanel) so the same resolver works in any locale.
+ *
  * The LLM agent only engages when the researcher opens the copilot or
  * clicks the action — see ResearchCopilotPanel.
  */
@@ -40,10 +45,12 @@ export interface NextAction {
   /** Stable id — also used to dedupe a dismissed suggestion. */
   id: string;
   actionType: NbaActionType;
-  /** Imperative, short — the chip label. e.g. "Run the analysis". */
-  label: string;
-  /** One line of why — the chip's subtext. */
-  reason: string;
+  /** i18n key (namespace-qualified) for the imperative chip label. */
+  labelKey: string;
+  /** i18n key (namespace-qualified) for the one-line "why" subtext. */
+  reasonKey: string;
+  /** Interpolation values for labelKey / reasonKey (counts, study name). */
+  params?: Record<string, string | number>;
   /** do = actionable (accent), wait = informational (muted), done = quiet. */
   kind: "do" | "wait" | "done";
   /** Priority for cross-scope ranking (workspace NBA = max across studies). */
@@ -51,6 +58,8 @@ export interface NextAction {
   /** Where the action routes — e.g. the study a workspace action points at. */
   targetId?: string;
 }
+
+const NS = "dashboard:nba.";
 
 // ── Interview project ────────────────────────────────────────────────────────
 
@@ -76,8 +85,8 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     action: () => ({
       id: "draft_guide",
       actionType: "draft_guide",
-      label: "Draft your interview guide",
-      reason: "This round has no questions yet — the copilot can draft a full guide.",
+      labelKey: `${NS}draftGuide.label`,
+      reasonKey: `${NS}draftGuide.reason`,
       kind: "do",
       weight: 100,
     }),
@@ -87,8 +96,8 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     action: () => ({
       id: "create_link",
       actionType: "create_link",
-      label: "Create an interview link",
-      reason: "Your guide is ready — you need a link before anyone can take part.",
+      labelKey: `${NS}createLink.label`,
+      reasonKey: `${NS}createLink.reason`,
       kind: "do",
       weight: 90,
     }),
@@ -101,8 +110,8 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     action: () => ({
       id: "share_link",
       actionType: "share_link",
-      label: "Share your interview link",
-      reason: "The round is live but no one has started — share the link to collect responses.",
+      labelKey: `${NS}shareLink.label`,
+      reasonKey: `${NS}shareLink.reason`,
       kind: "do",
       weight: 80,
     }),
@@ -112,8 +121,9 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     action: (s) => ({
       id: "run_analysis",
       actionType: "run_analysis",
-      label: "Run the analysis",
-      reason: `${s.completedCount} interviews are in and none analysed yet.`,
+      labelKey: `${NS}runAnalysis.label`,
+      reasonKey: `${NS}runAnalysis.reason`,
+      params: { count: s.completedCount },
       kind: "do",
       weight: 85,
     }),
@@ -125,8 +135,9 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     action: (s) => ({
       id: "refresh_analysis",
       actionType: "refresh_analysis",
-      label: "Refresh the analysis",
-      reason: `${s.completedCount - s.analysisParticipantCount} new interview(s) landed since the last analysis.`,
+      labelKey: `${NS}refreshAnalysis.label`,
+      reasonKey: `${NS}refreshAnalysis.reason`,
+      params: { count: s.completedCount - s.analysisParticipantCount },
       kind: "do",
       weight: 70,
     }),
@@ -136,8 +147,8 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     action: () => ({
       id: "review_themes",
       actionType: "review_themes",
-      label: "Review the themes",
-      reason: "Your analysis is ready — confirm or challenge each theme to sharpen it.",
+      labelKey: `${NS}reviewThemes.label`,
+      reasonKey: `${NS}reviewThemes.reason`,
       kind: "do",
       weight: 60,
     }),
@@ -147,8 +158,8 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     action: () => ({
       id: "refine_analysis",
       actionType: "refine_analysis",
-      label: "Refine the analysis",
-      reason: "You've annotated themes — refine for a sharper v2 that takes them into account.",
+      labelKey: `${NS}refineAnalysis.label`,
+      reasonKey: `${NS}refineAnalysis.reason`,
       kind: "do",
       weight: 55,
     }),
@@ -158,8 +169,9 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     action: (s) => ({
       id: "wait_responses",
       actionType: "wait",
-      label: "Waiting on first responses",
-      reason: `${s.inProgressCount} interview(s) in progress — nothing to do until they finish.`,
+      labelKey: `${NS}waitResponses.label`,
+      reasonKey: `${NS}waitResponses.reason`,
+      params: { count: s.inProgressCount },
       kind: "wait",
       weight: 40,
     }),
@@ -169,8 +181,8 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
 const PROJECT_DONE: NextAction = {
   id: "project_done",
   actionType: "done",
-  label: "This round is in good shape",
-  reason: "Nothing needs you right now.",
+  labelKey: `${NS}projectDone.label`,
+  reasonKey: `${NS}projectDone.reason`,
   kind: "done",
   weight: 0,
 };
@@ -202,8 +214,8 @@ const SURVEY_RULES: Rule<SurveyNbaInput>[] = [
     action: () => ({
       id: "add_survey_questions",
       actionType: "add_survey_questions",
-      label: "Add survey questions",
-      reason: "This survey is empty — the copilot can draft a question set.",
+      labelKey: `${NS}addSurveyQuestions.label`,
+      reasonKey: `${NS}addSurveyQuestions.reason`,
       kind: "do",
       weight: 100,
     }),
@@ -213,8 +225,8 @@ const SURVEY_RULES: Rule<SurveyNbaInput>[] = [
     action: () => ({
       id: "publish_survey",
       actionType: "publish_survey",
-      label: "Publish the survey",
-      reason: "Your questions are ready — publish to start collecting responses.",
+      labelKey: `${NS}publishSurvey.label`,
+      reasonKey: `${NS}publishSurvey.reason`,
       kind: "do",
       weight: 90,
     }),
@@ -225,8 +237,9 @@ const SURVEY_RULES: Rule<SurveyNbaInput>[] = [
     action: (s) => ({
       id: "share_survey",
       actionType: "share_survey",
-      label: "Share the survey",
-      reason: `${s.completedResponses}/${SURVEY_MIN_RESPONSES} responses — share the link to reach a reliable sample.`,
+      labelKey: `${NS}shareSurvey.label`,
+      reasonKey: `${NS}shareSurvey.reason`,
+      params: { count: s.completedResponses, min: SURVEY_MIN_RESPONSES },
       kind: "do",
       weight: 80,
     }),
@@ -237,8 +250,9 @@ const SURVEY_RULES: Rule<SurveyNbaInput>[] = [
     action: (s) => ({
       id: "generate_report",
       actionType: "generate_report",
-      label: "Generate the report",
-      reason: `${s.completedResponses} responses are in — synthesise them into findings.`,
+      labelKey: `${NS}generateReport.label`,
+      reasonKey: `${NS}generateReport.reason`,
+      params: { count: s.completedResponses },
       kind: "do",
       weight: 85,
     }),
@@ -249,8 +263,9 @@ const SURVEY_RULES: Rule<SurveyNbaInput>[] = [
     action: (s) => ({
       id: "refresh_report",
       actionType: "refresh_report",
-      label: "Refresh the report",
-      reason: `${s.completedResponses - s.reportResponseCount} new response(s) since the last report.`,
+      labelKey: `${NS}refreshReport.label`,
+      reasonKey: `${NS}refreshReport.reason`,
+      params: { count: s.completedResponses - s.reportResponseCount },
       kind: "do",
       weight: 70,
     }),
@@ -260,8 +275,8 @@ const SURVEY_RULES: Rule<SurveyNbaInput>[] = [
 const SURVEY_DONE: NextAction = {
   id: "survey_done",
   actionType: "done",
-  label: "This survey is in good shape",
-  reason: "Nothing needs you right now.",
+  labelKey: `${NS}surveyDone.label`,
+  reasonKey: `${NS}surveyDone.reason`,
   kind: "done",
   weight: 0,
 };
@@ -299,8 +314,9 @@ export function resolveStudySummaryAction(s: StudyNbaSummary): NextAction {
     studyCandidate(s) ?? {
       id: `study_done_${s.id}`,
       actionType: "done",
-      label: `“${s.name}” is in good shape`,
-      reason: "This study has a report — nothing needs you right now.",
+      labelKey: `${NS}studyDone.label`,
+      reasonKey: `${NS}studyDone.reason`,
+      params: { name: s.name },
       kind: "done",
       weight: 0,
       targetId: s.id,
@@ -314,8 +330,9 @@ function studyCandidate(s: StudyNbaSummary): NextAction | null {
     return {
       id: `set_up_${s.id}`,
       actionType: "set_up_study",
-      label: `Set up “${s.name}”`,
-      reason: "This study has no survey or interview round yet.",
+      labelKey: `${NS}setUpStudy.label`,
+      reasonKey: `${NS}setUpStudy.reason`,
+      params: { name: s.name },
       kind: "do",
       weight: 95,
       targetId: s.id,
@@ -328,8 +345,9 @@ function studyCandidate(s: StudyNbaSummary): NextAction | null {
     return {
       id: `analyze_${s.id}`,
       actionType: "analyze_study",
-      label: `Analyse “${s.name}”`,
-      reason: "Enough data is in — synthesise it into findings.",
+      labelKey: `${NS}analyzeStudy.label`,
+      reasonKey: `${NS}analyzeStudy.reason`,
+      params: { name: s.name },
       kind: "do",
       weight: 85,
       targetId: s.id,
@@ -339,8 +357,9 @@ function studyCandidate(s: StudyNbaSummary): NextAction | null {
     return {
       id: `collect_${s.id}`,
       actionType: "collect_study",
-      label: `“${s.name}” is collecting`,
-      reason: "Responses are still coming in — share the links to reach a sample.",
+      labelKey: `${NS}collectStudy.label`,
+      reasonKey: `${NS}collectStudy.reason`,
+      params: { name: s.name },
       kind: "wait",
       weight: 45,
       targetId: s.id,
@@ -360,8 +379,8 @@ export function resolveWorkspaceNextAction(
     return {
       id: "start_first_study",
       actionType: "start_study",
-      label: "Start your first study",
-      reason: "A study is one research effort — a survey, an interview round, or both.",
+      labelKey: `${NS}startFirstStudy.label`,
+      reasonKey: `${NS}startFirstStudy.reason`,
       kind: "do",
       weight: 100,
     };
@@ -377,8 +396,8 @@ export function resolveWorkspaceNextAction(
     best ?? {
       id: "workspace_done",
       actionType: "done",
-      label: "Your studies are all moving",
-      reason: "Every study has a report — nothing needs you right now.",
+      labelKey: `${NS}workspaceDone.label`,
+      reasonKey: `${NS}workspaceDone.reason`,
       kind: "done",
       weight: 0,
     }
