@@ -641,46 +641,121 @@ def _schedule_company_name_backfill(company_id: str) -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
-class GenerateStudyRequest(BaseModel):
-    first_name: Optional[str] = None
-    company_name: Optional[str] = None
-    role_title: Optional[str] = None
-    research_intent: Optional[str] = None
-    research_experience: Optional[str] = None
-    industry: Optional[str] = None
-    business_summary: Optional[str] = None
-    goals_freeform: Optional[str] = None
-    language: Optional[str] = None
+# ── Onboarding suggestions (Haiku) ──────────────────────────────────────────
+
+_FALLBACK_USE_CASES_EN = [
+    "Product discovery",
+    "Concept testing",
+    "Onboarding research",
+    "Brand & messaging",
+    "Usability testing",
+]
+_FALLBACK_USE_CASES_FR = [
+    "Découverte produit",
+    "Test de concept",
+    "Recherche onboarding",
+    "Marque & messaging",
+    "Tests d'utilisabilité",
+]
 
 
-@router.post("/onboarding/generate-study")
-@limiter.limit("3/minute")
-def generate_study(
+@router.get("/onboarding/suggestions")
+@limiter.limit("10/minute")
+def get_onboarding_suggestions(
     request: Request,
-    body: GenerateStudyRequest,
     company: Company = Depends(get_current_company),
 ):
-    """Generate a ready-to-launch study draft (brief + objective + questions).
+    """Return AI-suggested use cases and a profile summary for onboarding step 3.
 
-    Returns the full study draft on success. On failure (no API key, Claude
-    error, malformed JSON) returns {"draft": null} so the frontend can fall
-    back to a blank project.
+    Reads the current Company state (role, company_size, business_summary,
+    industry) and calls Haiku to generate personalised suggestions.
+    Degrades gracefully when data is sparse or the API is unavailable.
     """
-    from app.services.onboarding_intelligence import generate_onboarding_study
+    lang = (company.preferred_language or "en").strip().lower()[:2]
+    fallback_cases = _FALLBACK_USE_CASES_FR if lang == "fr" else _FALLBACK_USE_CASES_EN
 
-    lang = (body.language or company.preferred_language or "en").strip().lower()[:2]
-    draft = generate_onboarding_study(
-        first_name=body.first_name,
-        company_name=body.company_name,
-        role_title=body.role_title,
-        research_intent=body.research_intent,
-        research_experience=body.research_experience,
-        industry=body.industry,
-        business_summary=body.business_summary,
-        goals_freeform=body.goals_freeform,
-        language=lang,
-    )
-    return {"draft": draft}
+    has_context = bool((company.business_summary or "").strip())
+    role = (company.role or "").strip()
+    size = (company.company_size or "").strip()
+    industry = (company.industry or "").strip()
+    summary = (company.business_summary or "").strip()
+    name = (company.name or "").strip()
+
+    if not role and not has_context:
+        return {
+            "use_cases": fallback_cases,
+            "profile_summary": None,
+            "business_summary": summary or None,
+        }
+
+    try:
+        import anthropic
+        from app.config import settings as _settings
+
+        if not _settings.ANTHROPIC_API_KEY:
+            raise ValueError("no key")
+
+        client = anthropic.Anthropic(api_key=_settings.ANTHROPIC_API_KEY)
+
+        context_parts = []
+        if name:
+            context_parts.append(f"Company: {name}")
+        if role:
+            context_parts.append(f"Role: {role}")
+        if size:
+            context_parts.append(f"Team size: {size}")
+        if industry:
+            context_parts.append(f"Industry: {industry}")
+        if summary:
+            context_parts.append(f"About the company: {summary}")
+
+        context_block = "\n".join(context_parts)
+
+        output_lang = "French" if lang == "fr" else "English"
+
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Based on this user profile:\n{context_block}\n\n"
+                    f"1. Suggest 4-5 research use cases this person would likely need. "
+                    f"Each should be 2-4 words, practical and specific to their context.\n"
+                    f"2. Write a 1-2 sentence profile summary confirming what you understand "
+                    f"about them and their company.\n\n"
+                    f"Output ONLY valid JSON in {output_lang}:\n"
+                    f'{{"use_cases": ["...", "..."], "profile_summary": "..."}}'
+                ),
+            }],
+        )
+
+        import json
+        raw = resp.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        data = json.loads(raw)
+
+        use_cases = data.get("use_cases", fallback_cases)
+        if not isinstance(use_cases, list) or len(use_cases) < 2:
+            use_cases = fallback_cases
+        profile_summary = data.get("profile_summary")
+        if not isinstance(profile_summary, str):
+            profile_summary = None
+
+        return {
+            "use_cases": use_cases[:6],
+            "profile_summary": profile_summary,
+            "business_summary": summary or None,
+        }
+
+    except Exception:
+        logger.warning("Onboarding suggestions Haiku call failed", exc_info=True)
+        return {
+            "use_cases": fallback_cases,
+            "profile_summary": None,
+            "business_summary": summary or None,
+        }
 
 
 @router.post("/onboarding")

@@ -46,25 +46,6 @@ class CopilotResponse(BaseModel):
     memory_updated: bool = False
 
 
-class OnboardingStudyQuestion(BaseModel):
-    section_title: str
-    main_question: str
-    desired_learning: str | None = None
-
-
-class OnboardingStudyCreate(BaseModel):
-    """Atomic study creation — project + settings + guide in one call."""
-
-    study_name: str
-    objective: str | None = None
-    decision_to_inform: str | None = None
-    timeline: str | None = None
-    success_criteria: str | None = None
-    target_customer_description: str | None = None
-    questions: list[OnboardingStudyQuestion] = []
-    language: str = "en"
-
-
 class ConversationState(BaseModel):
     """The persisted chat thread for a copilot panel.
 

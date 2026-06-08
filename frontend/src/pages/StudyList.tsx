@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
@@ -42,13 +43,6 @@ function instrumentMix(s: StudySummary): InstrumentMix {
   return "empty";
 }
 
-const MIX_LABEL: Record<InstrumentMix, string> = {
-  survey: "Survey",
-  interview: "Interview",
-  hybrid: "Hybrid",
-  empty: "Empty",
-};
-
 const MIX_ICON: Record<InstrumentMix, string> = {
   survey: "📊",
   interview: "🎙",
@@ -68,15 +62,16 @@ function toNbaSummary(s: StudySummary): StudyNbaSummary {
   };
 }
 
-/** Short, action-oriented footer status per study card. */
-const CARD_STATUS: Partial<Record<NbaActionType, string>> = {
-  set_up_study: "Needs an instrument",
-  analyze_study: "Ready to analyse",
-  collect_study: "Collecting",
-  done: "Report ready",
+/** Short, action-oriented footer status per study card → i18n key suffix. */
+const CARD_STATUS_KEY: Partial<Record<NbaActionType, string>> = {
+  set_up_study: "needsInstrument",
+  analyze_study: "readyToAnalyse",
+  collect_study: "collecting",
+  done: "reportReady",
 };
 
 export default function StudyList() {
+  const { t } = useTranslation("dashboard");
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [nudges, setNudges] = useState<Nudge[]>([]);
@@ -87,8 +82,8 @@ export default function StudyList() {
   useEffect(() => {
     listStudies()
       .then(setStudies)
-      .catch(() => toast("Failed to load studies", "error"));
-  }, [toast]);
+      .catch(() => toast(t("studyList.loadError"), "error"));
+  }, [toast, t]);
 
   // Detect studies that gained a report since the researcher's last visit.
   useEffect(() => {
@@ -108,7 +103,7 @@ export default function StudyList() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
-      <QuantiTopBar crumbs={[{ label: "Studies" }]} />
+      <QuantiTopBar crumbs={[{ label: t("studyList.crumb") }]} />
       <div
         className="quanti-showcase"
         style={{ padding: "var(--space-8) var(--report-canvas-pad-x)" }}
@@ -120,15 +115,12 @@ export default function StudyList() {
           style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="quanti-showcase__eyebrow">Research workspace</div>
-            <h1 className="quanti-showcase__title">Your studies</h1>
-            <p className="quanti-showcase__subtitle">
-              A Study is one research effort. It can be a survey, an interview round, or both — the
-              instrument mix is shown on each card. Quanti, quali, hybrid: one home for all of it.
-            </p>
+            <div className="quanti-showcase__eyebrow">{t("studyList.eyebrow")}</div>
+            <h1 className="quanti-showcase__title">{t("studyList.title")}</h1>
+            <p className="quanti-showcase__subtitle">{t("studyList.subtitle")}</p>
           </div>
           <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
-            + New study
+            {t("studyList.newStudy")}
           </button>
         </header>
 
@@ -140,7 +132,7 @@ export default function StudyList() {
           const nba = resolveWorkspaceNextAction(studies.map(toNbaSummary));
           return (
             <div className="workspace-nba">
-              <span className="workspace-nba__eyebrow">✦ Research Copilot</span>
+              <span className="workspace-nba__eyebrow">{t("studyList.copilotEyebrow")}</span>
               {nudges.map((n) => (
                 <div
                   key={n.id}
@@ -154,7 +146,7 @@ export default function StudyList() {
                       dismissNudge(n.id);
                       setNudges((ns) => ns.filter((x) => x.id !== n.id));
                     }}
-                    aria-label="Dismiss update"
+                    aria-label={t("studyList.dismissUpdate")}
                   >
                     ✕
                   </button>
@@ -171,7 +163,7 @@ export default function StudyList() {
 
         <section className="quanti-showcase__section">
           {studies === null ? (
-            <p className="quanti-showcase__section-meta">Loading…</p>
+            <p className="quanti-showcase__section-meta">{t("studyList.loading")}</p>
           ) : studies.length === 0 ? (
             <div
               style={{
@@ -187,11 +179,10 @@ export default function StudyList() {
               }}
             >
               <p style={{ color: "var(--text-secondary)", maxWidth: 520, margin: 0, lineHeight: 1.5 }}>
-                No studies yet. Start one — survey, interviews, or both. A Study forms around your
-                first instrument and shows up here.
+                {t("studyList.emptyText")}
               </p>
               <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
-                + New study
+                {t("studyList.newStudy")}
               </button>
             </div>
           ) : (
@@ -212,17 +203,17 @@ export default function StudyList() {
                       style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
                     >
                       <span aria-hidden="true">{MIX_ICON[mix]}</span>
-                      <span>{MIX_LABEL[mix].toUpperCase()} STUDY</span>
+                      <span>{t(`studyList.studyType.${mix}`)}</span>
                     </div>
                     <div className="chart-card__takeaway">{s.name}</div>
                     <div className="chart-card__footer tabular">
-                      <span>{s.survey_count} survey{s.survey_count === 1 ? "" : "s"}</span>
+                      <span>{t("studyList.surveyCount", { count: s.survey_count })}</span>
                       <span className="chart-card__footer-divider">·</span>
-                      <span>{s.project_count} interview{s.project_count === 1 ? "" : "s"}</span>
+                      <span>{t("studyList.interviewCount", { count: s.project_count })}</span>
                       <span className="chart-card__footer-divider">·</span>
                       <span className={needsAttention ? "study-card__status--attention" : undefined}>
                         {needsAttention ? "✦ " : ""}
-                        {CARD_STATUS[action.actionType] ?? "In progress"}
+                        {t(`studyList.status.${CARD_STATUS_KEY[action.actionType] ?? "inProgress"}`)}
                       </span>
                     </div>
                   </a>

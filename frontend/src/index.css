@@ -12101,6 +12101,13 @@ select.field-input {
   }
 }
 
+.welcome-setup__summary-card {
+  padding: var(--space-4);
+  background: var(--brand-50, #faf5ff);
+  border: 1px solid var(--brand-300, var(--brand-600));
+  border-radius: var(--radius-sm);
+}
+
 /* ============================================================
  * Onboarding polish — v3 sample modal + richer sidebar empty state
  * ============================================================ */
