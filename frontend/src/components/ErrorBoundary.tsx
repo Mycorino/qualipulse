@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from "react";
+import i18n from "../i18n";
 
 interface Props {
   children: ReactNode;
@@ -30,15 +31,15 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="error-boundary-fallback">
           <div className="error-boundary-icon">⚠️</div>
-          <h2 className="error-boundary-title">Something went wrong</h2>
+          <h2 className="error-boundary-title">{i18n.t("shell:errorBoundary.title")}</h2>
           <p className="error-boundary-text">
-            An unexpected error occurred. Please refresh the page.
+            {i18n.t("shell:errorBoundary.text")}
           </p>
           <button
             className="btn btn-primary"
             onClick={() => window.location.reload()}
           >
-            Refresh page
+            {i18n.t("shell:errorBoundary.refresh")}
           </button>
           {import.meta.env.DEV && this.state.error && (
             <pre className="error-boundary-detail">

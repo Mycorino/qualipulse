@@ -15,6 +15,12 @@ import enAffiliate from "./locales/en/affiliate.json";
 import enOnboarding from "./locales/en/onboarding.json";
 import enPaywall from "./locales/en/paywall.json";
 import enWelcomeSetup from "./locales/en/welcome_setup.json";
+import enSurvey from "./locales/en/survey.json";
+import enStudy from "./locales/en/study.json";
+import enBlog from "./locales/en/blog.json";
+import enAdmin from "./locales/en/admin.json";
+import enShell from "./locales/en/shell.json";
+import enQuantiDemo from "./locales/en/quantiDemo.json";
 
 // FR namespaces
 import frCommon from "./locales/fr/common.json";
@@ -29,6 +35,12 @@ import frAffiliate from "./locales/fr/affiliate.json";
 import frOnboarding from "./locales/fr/onboarding.json";
 import frPaywall from "./locales/fr/paywall.json";
 import frWelcomeSetup from "./locales/fr/welcome_setup.json";
+import frSurvey from "./locales/fr/survey.json";
+import frStudy from "./locales/fr/study.json";
+import frBlog from "./locales/fr/blog.json";
+import frAdmin from "./locales/fr/admin.json";
+import frShell from "./locales/fr/shell.json";
+import frQuantiDemo from "./locales/fr/quantiDemo.json";
 
 i18n
   .use(LanguageDetector)
@@ -48,6 +60,12 @@ i18n
         onboarding: enOnboarding,
         paywall: enPaywall,
         welcome_setup: enWelcomeSetup,
+        survey: enSurvey,
+        study: enStudy,
+        blog: enBlog,
+        admin: enAdmin,
+        shell: enShell,
+        quantiDemo: enQuantiDemo,
       },
       fr: {
         common: frCommon,
@@ -62,12 +80,18 @@ i18n
         onboarding: frOnboarding,
         paywall: frPaywall,
         welcome_setup: frWelcomeSetup,
+        survey: frSurvey,
+        study: frStudy,
+        blog: frBlog,
+        admin: frAdmin,
+        shell: frShell,
+        quantiDemo: frQuantiDemo,
       },
     },
     lng: undefined, // rely on detector
     fallbackLng: "en",
     defaultNS: "common",
-    ns: ["common", "auth", "dashboard", "project", "interview", "analysis", "marketing", "settings", "affiliate", "onboarding", "paywall", "welcome_setup"],
+    ns: ["common", "auth", "dashboard", "project", "interview", "analysis", "marketing", "settings", "affiliate", "onboarding", "paywall", "welcome_setup", "survey", "study", "blog", "admin", "shell", "quantiDemo"],
     detection: {
       order: ["localStorage", "navigator"],
       lookupLocalStorage: "qp_language",

@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { verifyEmail } from "../api/auth";
 
 export default function VerifyEmail() {
+  const { t } = useTranslation("shell");
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -11,7 +13,7 @@ export default function VerifyEmail() {
   useEffect(() => {
     if (!token) {
       setStatus("error");
-      setErrorMsg("No verification token provided.");
+      setErrorMsg(t("verifyEmail.noToken"));
       return;
     }
 
@@ -20,9 +22,9 @@ export default function VerifyEmail() {
       .catch((err) => {
         setStatus("error");
         const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-        setErrorMsg(detail || "This verification link is invalid or has expired.");
+        setErrorMsg(detail || t("verifyEmail.invalidOrExpired"));
       });
-  }, [token]);
+  }, [token, t]);
 
   return (
     <div className="auth-page">
@@ -31,24 +33,24 @@ export default function VerifyEmail() {
 
         {status === "loading" && (
           <>
-            <h1 className="auth-title">Verifying your email...</h1>
-            <p className="auth-subtitle">Just a moment.</p>
+            <h1 className="auth-title">{t("verifyEmail.verifyingTitle")}</h1>
+            <p className="auth-subtitle">{t("verifyEmail.verifyingSubtitle")}</p>
           </>
         )}
 
         {status === "success" && (
           <>
             <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
-            <h1 className="auth-title">Email verified!</h1>
+            <h1 className="auth-title">{t("verifyEmail.successTitle")}</h1>
             <p className="auth-subtitle">
-              Your email has been confirmed. You're all set.
+              {t("verifyEmail.successSubtitle")}
             </p>
             <Link
               to="/dashboard"
               className="btn btn-primary btn-block"
               style={{ textAlign: "center", textDecoration: "none", marginTop: 24 }}
             >
-              Go to Dashboard
+              {t("verifyEmail.goToDashboard")}
             </Link>
           </>
         )}
@@ -56,17 +58,17 @@ export default function VerifyEmail() {
         {status === "error" && (
           <>
             <div style={{ fontSize: 48, marginBottom: 16 }}>✕</div>
-            <h1 className="auth-title">Verification failed</h1>
+            <h1 className="auth-title">{t("verifyEmail.failedTitle")}</h1>
             <p className="auth-subtitle">{errorMsg}</p>
             <Link
               to="/dashboard"
               className="btn btn-primary btn-block"
               style={{ textAlign: "center", textDecoration: "none", marginTop: 24 }}
             >
-              Go to Dashboard
+              {t("verifyEmail.goToDashboard")}
             </Link>
             <p className="auth-footer">
-              You can resend the verification email from your dashboard.
+              {t("verifyEmail.resendHint")}
             </p>
           </>
         )}

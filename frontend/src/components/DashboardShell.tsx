@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * DashboardShell — the layout primitive for any quanti dashboard surface.
@@ -44,8 +45,9 @@ export interface DashboardStripItem {
 }
 
 export function DashboardStrip({ items }: { items: DashboardStripItem[] }) {
+  const { t } = useTranslation("shell");
   return (
-    <div className="dashboard-strip" role="group" aria-label="Dashboard summary">
+    <div className="dashboard-strip" role="group" aria-label={t("dashboardShell.summaryAriaLabel")}>
       {items.map((item) => (
         <div key={item.label} className="dashboard-strip__item">
           <div className="dashboard-strip__label">{item.label}</div>

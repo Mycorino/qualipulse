@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { AudioClip } from "./AudioClip";
 
 /**
@@ -25,6 +26,7 @@ interface VerbatimCardProps {
 }
 
 export function VerbatimCard({ quote, audioSrc, segments, name, compact }: VerbatimCardProps) {
+  const { t } = useTranslation("study");
   return (
     <figure className={`verbatim-card${compact ? " verbatim-card--compact" : ""}`}>
       <blockquote className="verbatim-card__quote">{quote}</blockquote>
@@ -32,7 +34,7 @@ export function VerbatimCard({ quote, audioSrc, segments, name, compact }: Verba
         <div className="verbatim-card__audio">
           <AudioClip
             src={audioSrc}
-            label={`Verbatim audio${name ? ` — ${name}` : ""}`}
+            label={name ? t("verbatim.audioLabelNamed", { name }) : t("verbatim.audioLabel")}
             variant="waveform"
           />
         </div>

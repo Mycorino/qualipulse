@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 /**
  * Segment2x2 — the MECE-forcing page unit.
  *
@@ -34,6 +36,7 @@ interface Segment2x2Props {
 }
 
 export function Segment2x2({ xAxisLabel, yAxisLabel, quadrants }: Segment2x2Props) {
+  const { t } = useTranslation("study");
   const total = quadrants.reduce((a, b) => a + b.n, 0);
   // Map share → sequential scale step (1..5).
   const tints = quadrants.map((q) => {
@@ -46,7 +49,7 @@ export function Segment2x2({ xAxisLabel, yAxisLabel, quadrants }: Segment2x2Prop
   });
 
   return (
-    <div className="segment-2x2" role="figure" aria-label="Segment 2x2 matrix">
+    <div className="segment-2x2" role="figure" aria-label={t("segment2x2.ariaLabel")}>
       <div className="segment-2x2__top-axis">
         <span className="segment-2x2__axis-label segment-2x2__axis-label--x">{xAxisLabel}</span>
       </div>
@@ -64,7 +67,7 @@ export function Segment2x2({ xAxisLabel, yAxisLabel, quadrants }: Segment2x2Prop
             <blockquote className="segment-2x2__quote">{q.quote}</blockquote>
             <div className="segment-2x2__cell-foot">
               <span className="segment-2x2__chip">{q.segment}</span>
-              <span className="segment-2x2__count tabular">n={q.n}</span>
+              <span className="segment-2x2__count tabular">{t("segment2x2.n", { count: q.n })}</span>
             </div>
           </div>
         ))}

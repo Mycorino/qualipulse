@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   DiscoveryConfidence,
@@ -44,6 +45,7 @@ export default function SurveyDashboardPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation("survey");
   const [data, setData] = useState<SurveyDashboard | null>(null);
   const [study, setStudy] = useState<{ id: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,7 @@ export default function SurveyDashboardPage() {
     if (!id) return;
     getDashboard(id)
       .then(setData)
-      .catch(() => setError("Could not load dashboard"));
+      .catch(() => setError(t("dashboard.loadFailed")));
     getSurvey(id)
       .then((s) =>
         getStudy(s.study_id)
@@ -95,9 +97,9 @@ export default function SurveyDashboardPage() {
   }, [id, filters]);
 
   const filterDescription = useMemo(() => {
-    if (!data || filters.length === 0) return "All completed respondents";
-    return filters.map((f) => describeFilter(f, data.questions)).join(" AND ");
-  }, [filters, data]);
+    if (!data || filters.length === 0) return t("dashboard.allCompletedRespondents");
+    return filters.map((f) => describeFilter(f, data.questions, t)).join(t("dashboard.filterAnd"));
+  }, [filters, data, t]);
 
   const onConfirmInvite = async () => {
     if (!id) return;
@@ -105,9 +107,9 @@ export default function SurveyDashboardPage() {
     try {
       const result = await inviteSegment(id, filters);
       toast(
-        `${result.invited_count} invite${result.invited_count === 1 ? "" : "s"} sent` +
+        t("dashboard.invitesSent", { count: result.invited_count }) +
           (result.failed_emails.length > 0
-            ? ` · ${result.failed_emails.length} email failure${result.failed_emails.length === 1 ? "" : "s"}`
+            ? ` · ${t("dashboard.emailFailures", { count: result.failed_emails.length })}`
             : ""),
         result.failed_emails.length === 0 ? "success" : "info",
       );
@@ -115,7 +117,7 @@ export default function SurveyDashboardPage() {
     } catch (e: any) {
       // Backend returns 400 with detail on "no project to invite into"
       const detail = e?.response?.data?.detail;
-      toast(detail || "Invites failed to send", "error");
+      toast(detail || t("dashboard.invitesFailed"), "error");
     } finally {
       setInviting(false);
     }
@@ -132,7 +134,7 @@ export default function SurveyDashboardPage() {
   if (!data) {
     return (
       <div className="quanti-showcase">
-        <p className="quanti-showcase__section-meta">Loading…</p>
+        <p className="quanti-showcase__section-meta">{t("common.loading")}</p>
       </div>
     );
   }
@@ -140,49 +142,50 @@ export default function SurveyDashboardPage() {
   return (
     <InstrumentShell
       crumbs={[
-        { label: "Studies", to: "/studies" },
+        { label: t("dashboard.crumbStudies"), to: "/studies" },
         ...(study ? [{ label: study.name, to: `/studies/${study.id}` }] : []),
         { label: data.name },
       ]}
-      eyebrow="Survey"
+      eyebrow={t("dashboard.eyebrow")}
       title={data.name}
       status={surveyStatusPill(data.status)}
       sections={SURVEY_SECTIONS}
       activeSection="results"
       onSectionChange={(k) => navigate(surveySectionPath(k, data.survey_id))}
-      subNavLabel="Survey sections"
+      subNavLabel={t("dashboard.sectionsNavLabel")}
     >
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "var(--space-6) var(--space-5)" }}>
         <MethodologyBox
           fields={[
             {
-              label: "Sample size",
-              value: `n=${data.n_completed} completers${data.n_started > data.n_completed ? ` · ${data.n_started - data.n_completed} partial` : ""}`,
+              label: t("dashboard.sampleSize"),
+              value: t("dashboard.completers", { count: data.n_completed }) +
+                (data.n_started > data.n_completed ? ` · ${t("dashboard.partial", { count: data.n_started - data.n_completed })}` : ""),
             },
             {
-              label: "Fielding window",
+              label: t("dashboard.fieldingWindow"),
               value: data.fielding_started_at
                 ? `${formatDate(data.fielding_started_at)}${data.fielding_ended_at ? ` – ${formatDate(data.fielding_ended_at)}` : ""}`
                 : "—",
             },
             {
-              label: "Completion rate",
+              label: t("dashboard.completionRate"),
               value:
                 data.completion_rate_percentage !== null
                   ? `${Math.round(data.completion_rate_percentage)}%`
-                  : `Below n=${data.min_n_threshold}`,
+                  : t("dashboard.belowThreshold", { count: data.min_n_threshold }),
             },
             {
-              label: "Status",
+              label: t("dashboard.status"),
               value: data.status.toUpperCase(),
             },
           ]}
           note={
             data.n_started < data.min_n_threshold
-              ? `Total responses below the n=${data.min_n_threshold} threshold for inference. Percentages are suppressed; counts are shown instead.`
-              : "Wilson 95% confidence intervals on every proportion. Segment splits below n=" +
+              ? t("dashboard.noteBelowThreshold", { count: data.min_n_threshold })
+              : t("dashboard.noteWilsonPrefix") +
                 String(data.min_n_threshold) +
-                " are reported as counts only."
+                t("dashboard.noteWilsonSuffix")
           }
         />
 
@@ -206,31 +209,31 @@ export default function SurveyDashboardPage() {
                 filterDescription={filterDescription}
                 onInvite={() => setReviewOpen(true)}
                 onSaveSegment={() =>
-                  toast("Saved segments ship in Sprint 10 — for now, click 'Invite to AI interview'.", "info")
+                  toast(t("dashboard.savedSegmentsInfo"), "info")
                 }
               />
             )}
             <DashboardStrip
               items={[
-                { label: "Respondents", value: String(data.n_started) },
+                { label: t("dashboard.respondents"), value: String(data.n_started) },
                 {
-                  label: "Completed",
+                  label: t("dashboard.completed"),
                   value: String(data.n_completed),
                   delta:
                     data.completion_rate_percentage !== null
-                      ? `${Math.round(data.completion_rate_percentage)}% completion`
-                      : "n too small to compute",
+                      ? t("dashboard.completionPercent", { percent: Math.round(data.completion_rate_percentage) })
+                      : t("dashboard.tooSmall"),
                   deltaTone:
                     data.completion_rate_percentage !== null && data.completion_rate_percentage >= 80
                       ? "positive"
                       : "neutral",
                 },
-                { label: "Questions", value: String(data.questions.length) },
+                { label: t("dashboard.questions"), value: String(data.questions.length) },
               ]}
             />
 
             {data.questions.length === 0 ? (
-              <p className="quanti-showcase__section-meta">No questions yet. Add some in the editor.</p>
+              <p className="quanti-showcase__section-meta">{t("dashboard.noQuestionsEditor")}</p>
             ) : (
               data.questions.map((q) => (
                 <QuestionPanel key={q.question_id} q={q} minN={data.min_n_threshold} />
@@ -257,9 +260,9 @@ export default function SurveyDashboardPage() {
    Sprint 9 sub-components: segment filter rail + draft-review modal
    ──────────────────────────────────────────────────────────────────── */
 
-function describeFilter(filter: SegmentFilter, questions: QuestionAnalytics[]): string {
+function describeFilter(filter: SegmentFilter, questions: QuestionAnalytics[], t: (key: string) => string): string {
   const q = questions.find((x) => x.question_id === filter.question_id);
-  const label = q?.prompt?.slice(0, 40) || "Question";
+  const label = q?.prompt?.slice(0, 40) || t("dashboard.questionFallback");
   if (filter.operator === "lte") return `${label} ≤ ${filter.value}`;
   if (filter.operator === "gte") return `${label} ≥ ${filter.value}`;
   if (filter.operator === "eq") return `${label} = ${filter.value}`;
@@ -283,6 +286,7 @@ function SegmentFilterRail({
   filters: SegmentFilter[];
   onChange: (next: SegmentFilter[]) => void;
 }) {
+  const { t } = useTranslation("survey");
   const filterable = questions.filter(
     (q) => q.type === "likert" || q.type === "nps" || q.type === "mc_single" || q.type === "mc_multi",
   );
@@ -310,11 +314,11 @@ function SegmentFilterRail({
     >
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
         <span style={{ fontSize: "var(--text-eyebrow)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>
-          Filter respondents
+          {t("dashboard.filterRespondents")}
         </span>
         {filters.length > 0 && (
           <button type="button" className="btn btn-ghost btn-xs" onClick={() => onChange([])}>
-            Clear all
+            {t("dashboard.clearAll")}
           </button>
         )}
       </header>
@@ -344,6 +348,7 @@ function QuestionFilterRow({
   onSet: (next: SegmentFilter) => void;
   onClear: () => void;
 }) {
+  const { t } = useTranslation("survey");
   const isLikertOrNps = question.type === "likert" || question.type === "nps";
   if (isLikertOrNps) {
     const op = (filter?.operator as SegmentOperator) ?? "lte";
@@ -352,7 +357,7 @@ function QuestionFilterRow({
     return (
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto auto", gap: "var(--space-2)", alignItems: "center" }}>
         <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {question.prompt || "Untitled question"}
+          {question.prompt || t("common.untitledQuestion")}
         </span>
         <select
           value={filter ? op : ""}
@@ -363,7 +368,7 @@ function QuestionFilterRow({
           }}
           style={{ fontFamily: "inherit", fontSize: "var(--text-sm)", padding: "4px 6px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", background: "var(--bg-surface)" }}
         >
-          <option value="">No filter</option>
+          <option value="">{t("dashboard.noFilter")}</option>
           <option value="lte">≤</option>
           <option value="gte">≥</option>
           <option value="eq">=</option>
@@ -380,7 +385,7 @@ function QuestionFilterRow({
           />
         )}
         {filter && (
-          <button type="button" className="btn btn-ghost btn-xs" onClick={onClear} aria-label="Clear filter">
+          <button type="button" className="btn btn-ghost btn-xs" onClick={onClear} aria-label={t("dashboard.clearFilter")}>
             ×
           </button>
         )}
@@ -403,7 +408,7 @@ function QuestionFilterRow({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
       <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-        {question.prompt || "Untitled question"}
+        {question.prompt || t("common.untitledQuestion")}
       </span>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
         {choices.map((c) => {
@@ -436,9 +441,10 @@ function DiscoveriesSection({
   discoveries: SegmentDiscovery[];
   onApply: (d: SegmentDiscovery) => void;
 }) {
+  const { t } = useTranslation("survey");
   return (
     <section
-      aria-label="Suggested follow-up segments"
+      aria-label={t("dashboard.discoveriesLabel")}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -456,7 +462,7 @@ function DiscoveriesSection({
               color: "var(--brand-700)",
             }}
           >
-            Suggested follow-up segments
+            {t("dashboard.discoveriesEyebrow")}
           </div>
           <h2
             style={{
@@ -466,11 +472,11 @@ function DiscoveriesSection({
               margin: "var(--space-1) 0 0",
             }}
           >
-            We found {discoveries.length} segment{discoveries.length === 1 ? "" : "s"} worth interviewing.
+            {t("dashboard.discoveriesHeadline", { count: discoveries.length })}
           </h2>
         </div>
         <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-          AI detects · researcher decides
+          {t("dashboard.aiDetects")}
         </span>
       </header>
       <div className="quanti-showcase__grid-2">
@@ -489,10 +495,11 @@ function DiscoveryCard({
   discovery: SegmentDiscovery;
   onApply: () => void;
 }) {
+  const { t } = useTranslation("survey");
   const confidenceLabel: Record<DiscoveryConfidence, string> = {
-    directional: "Directional",
-    supported: "Supported",
-    strong: "Strong evidence",
+    directional: t("dashboard.confidence.directional"),
+    supported: t("dashboard.confidence.supported"),
+    strong: t("dashboard.confidence.strong"),
   };
   return (
     <article
@@ -530,12 +537,12 @@ function DiscoveryCard({
         {discovery.description}
       </p>
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }} className="tabular">
-        Based on Q "<em>{shortenPrompt(discovery.metric_question_prompt, 70)}</em>"
-        {discovery.metric_choice_label ? <> · choice: <em>{discovery.metric_choice_label}</em></> : null}
+        {t("dashboard.basedOnQuestion")} "<em>{shortenPrompt(discovery.metric_question_prompt, 70)}</em>"
+        {discovery.metric_choice_label ? <> · {t("dashboard.choice")} <em>{discovery.metric_choice_label}</em></> : null}
       </div>
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
         <button type="button" className="btn btn-primary" onClick={onApply}>
-          Interview this segment →
+          {t("dashboard.interviewSegment")}
         </button>
       </div>
     </article>
@@ -560,11 +567,12 @@ function InviteReviewModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation("survey");
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Review and confirm interview invites"
+      aria-label={t("dashboard.reviewModal.ariaLabel")}
       style={{
         position: "fixed",
         inset: 0,
@@ -593,10 +601,10 @@ function InviteReviewModal({
       >
         <div>
           <div style={{ fontSize: "var(--text-eyebrow)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--brand-600)" }}>
-            Review before sending
+            {t("dashboard.reviewModal.eyebrow")}
           </div>
           <h2 style={{ fontFamily: "var(--font-serif)", fontSize: "var(--text-xl)", letterSpacing: "-0.015em", marginTop: "var(--space-2)" }}>
-            <span className="tabular">{preview.invitable_count}</span> invite{preview.invitable_count === 1 ? "" : "s"} ready to send
+            <span className="tabular">{preview.invitable_count}</span> {t("dashboard.reviewModal.invitesReady", { count: preview.invitable_count })}
           </h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
             {filterDescription}
@@ -606,7 +614,7 @@ function InviteReviewModal({
         {preview.sample_invitees.length > 0 && (
           <div>
             <div style={{ fontSize: "var(--text-eyebrow)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: "var(--space-2)" }}>
-              Sample recipients
+              {t("dashboard.reviewModal.sampleRecipients")}
             </div>
             <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 4 }}>
               {preview.sample_invitees.map((p) => (
@@ -627,7 +635,7 @@ function InviteReviewModal({
               ))}
               {preview.invitable_count > preview.sample_invitees.length && (
                 <li style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", paddingLeft: "var(--space-2)" }}>
-                  …and {preview.invitable_count - preview.sample_invitees.length} more.
+                  {t("dashboard.reviewModal.andMore", { n: preview.invitable_count - preview.sample_invitees.length })}
                 </li>
               )}
             </ul>
@@ -636,21 +644,20 @@ function InviteReviewModal({
 
         {preview.skipped_anonymous_count > 0 && (
           <div className="methodology-box methodology-box--inline">
-            ⚠ {preview.skipped_anonymous_count} matching respondent{preview.skipped_anonymous_count === 1 ? "" : "s"} can't be invited (anonymous, no email)
+            {t("dashboard.reviewModal.skippedAnonymous", { count: preview.skipped_anonymous_count })}
           </div>
         )}
 
         <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-          Each interview consumes one credit when it completes. Anonymous-link respondents and
-          partial responses are excluded from this count automatically.
+          {t("dashboard.reviewModal.creditNote")}
         </p>
 
         <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
           <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={inviting}>
-            Cancel
+            {t("dashboard.reviewModal.cancel")}
           </button>
           <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={inviting}>
-            {inviting ? "Sending…" : `Send ${preview.invitable_count} invite${preview.invitable_count === 1 ? "" : "s"}`}
+            {inviting ? t("dashboard.reviewModal.sending") : t("dashboard.reviewModal.sendInvites", { count: preview.invitable_count })}
           </button>
         </div>
       </div>
@@ -659,17 +666,18 @@ function InviteReviewModal({
 }
 
 function QuestionNav({ questions }: { questions: QuestionAnalytics[] }) {
+  const { t } = useTranslation("survey");
   return (
-    <nav className="shell-nav" aria-label="Questions">
+    <nav className="shell-nav" aria-label={t("dashboard.questionNavLabel")}>
       <div className="shell-nav__group">
-        <span className="shell-nav__group-label">Questions</span>
+        <span className="shell-nav__group-label">{t("dashboard.questions")}</span>
         {questions.map((q, i) => (
           <a key={q.question_id} href={`#q-${q.question_id}`} className="shell-nav__item">
             <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }} className="tabular">
               {String(i + 1).padStart(2, "0")}
             </span>
             <span style={{ flex: 1, marginLeft: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {q.prompt || "Untitled question"}
+              {q.prompt || t("common.untitledQuestion")}
             </span>
             <span className="shell-nav__count">{q.n_answered}</span>
           </a>
@@ -680,13 +688,17 @@ function QuestionNav({ questions }: { questions: QuestionAnalytics[] }) {
 }
 
 function QuestionPanel({ q, minN }: { q: QuestionAnalytics; minN: number }) {
-  const eyebrow = `${typeLabel(q.type)} · Q${q.sort_order || ""}`.replace(/ \· Q$/, "");
+  const { t } = useTranslation("survey");
+  const typeLabel = ["likert", "nps", "mc_single", "mc_multi", "open_text", "short_text"].includes(q.type)
+    ? t(`dashboard.typeLabels.${q.type}`)
+    : q.type;
+  const eyebrow = `${typeLabel} · Q${q.sort_order || ""}`.replace(/ \· Q$/, "");
   // ChartCard handles the small-n warning automatically when n_answered < minN.
   return (
     <div id={`q-${q.question_id}`} style={{ scrollMarginTop: "var(--space-6)" }}>
       <ChartCard
         eyebrow={eyebrow}
-        takeaway={q.prompt || "Untitled question"}
+        takeaway={q.prompt || t("common.untitledQuestion")}
         n={q.n_answered}
         minN={minN}
       >
@@ -696,28 +708,10 @@ function QuestionPanel({ q, minN }: { q: QuestionAnalytics; minN: number }) {
   );
 }
 
-function typeLabel(t: string): string {
-  switch (t) {
-    case "likert":
-      return "Likert";
-    case "nps":
-      return "NPS";
-    case "mc_single":
-      return "Single choice";
-    case "mc_multi":
-      return "Multiple choice";
-    case "open_text":
-      return "Open text";
-    case "short_text":
-      return "Short text";
-    default:
-      return t;
-  }
-}
-
 function BreakdownRenderer({ q, minN }: { q: QuestionAnalytics; minN: number }) {
+  const { t } = useTranslation("survey");
   if (q.n_answered === 0) {
-    return <p className="quanti-showcase__section-meta">No responses yet.</p>;
+    return <p className="quanti-showcase__section-meta">{t("dashboard.noResponsesYet")}</p>;
   }
   if (q.type === "likert" || q.type === "nps") {
     const histogram = (q.breakdown.histogram as Array<{
@@ -751,7 +745,7 @@ function BreakdownRenderer({ q, minN }: { q: QuestionAnalytics; minN: number }) 
               {q.breakdown.nps_score as number}
             </span>
             <span style={{ fontSize: "var(--text-xs)", letterSpacing: "0.08em", color: "var(--text-tertiary)", textTransform: "uppercase" }}>
-              NPS score
+              {t("dashboard.npsScore")}
             </span>
           </div>
         )}
@@ -796,7 +790,7 @@ function BreakdownRenderer({ q, minN }: { q: QuestionAnalytics; minN: number }) 
         )}
         {q.mean !== null && (
           <div className="tabular" style={{ marginTop: "var(--space-3)", fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-            Mean: {q.mean.toFixed(2)}
+            {t("dashboard.mean", { value: q.mean.toFixed(2) })}
           </div>
         )}
       </div>
@@ -867,7 +861,7 @@ function BreakdownRenderer({ q, minN }: { q: QuestionAnalytics; minN: number }) 
           ))}
         </ul>
         <p style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: "var(--space-2)" }}>
-          Showing {Math.min(5, sample.length)} of {total} text responses. AI-clustered themes ship in Sprint 13.
+          {t("dashboard.textResponsesSummary", { shown: Math.min(5, sample.length), total })}
         </p>
       </div>
     );

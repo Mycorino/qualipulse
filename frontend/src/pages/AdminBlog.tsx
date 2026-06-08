@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -36,15 +37,16 @@ function adminClient(key: string) {
 // ── Toolbar ────────────────────────────────────────────────────────────────
 
 function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const { t } = useTranslation("blog");
   if (!editor) return null;
 
   function addImage() {
-    const url = window.prompt("Image URL:");
+    const url = window.prompt(t("admin.imageUrlPrompt"));
     if (url) editor!.chain().focus().setImage({ src: url }).run();
   }
 
   function addLink() {
-    const url = window.prompt("Link URL:");
+    const url = window.prompt(t("admin.linkUrlPrompt"));
     if (url) {
       editor!.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
     } else {
@@ -61,13 +63,13 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <button type="button" onClick={() => editor!.chain().focus().toggleHeading({ level: 2 }).run()} className={editor!.isActive("heading", { level: 2 }) ? "is-active" : ""}>H2</button>
       <button type="button" onClick={() => editor!.chain().focus().toggleHeading({ level: 3 }).run()} className={editor!.isActive("heading", { level: 3 }) ? "is-active" : ""}>H3</button>
       <span style={{ width: 1, background: "var(--border)", margin: "0 4px" }} />
-      <button type="button" onClick={() => editor!.chain().focus().toggleBulletList().run()} className={editor!.isActive("bulletList") ? "is-active" : ""}>List</button>
+      <button type="button" onClick={() => editor!.chain().focus().toggleBulletList().run()} className={editor!.isActive("bulletList") ? "is-active" : ""}>{t("admin.toolbarList")}</button>
       <button type="button" onClick={() => editor!.chain().focus().toggleOrderedList().run()} className={editor!.isActive("orderedList") ? "is-active" : ""}>1.2.3</button>
-      <button type="button" onClick={() => editor!.chain().focus().toggleBlockquote().run()} className={editor!.isActive("blockquote") ? "is-active" : ""}>Quote</button>
-      <button type="button" onClick={() => editor!.chain().focus().toggleCodeBlock().run()} className={editor!.isActive("codeBlock") ? "is-active" : ""}>Code</button>
+      <button type="button" onClick={() => editor!.chain().focus().toggleBlockquote().run()} className={editor!.isActive("blockquote") ? "is-active" : ""}>{t("admin.toolbarQuote")}</button>
+      <button type="button" onClick={() => editor!.chain().focus().toggleCodeBlock().run()} className={editor!.isActive("codeBlock") ? "is-active" : ""}>{t("admin.toolbarCode")}</button>
       <span style={{ width: 1, background: "var(--border)", margin: "0 4px" }} />
-      <button type="button" onClick={addLink}>Link</button>
-      <button type="button" onClick={addImage}>Image</button>
+      <button type="button" onClick={addLink}>{t("admin.toolbarLink")}</button>
+      <button type="button" onClick={addImage}>{t("admin.toolbarImage")}</button>
       <button type="button" onClick={() => editor!.chain().focus().setHorizontalRule().run()}>HR</button>
     </div>
   );
@@ -98,6 +100,7 @@ function PostEditor({
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation("blog");
   const [title, setTitle] = useState(post?.title ?? "");
   const [subtitle, setSubtitle] = useState(post?.subtitle ?? "");
   const [slug, setSlug] = useState(post?.slug ?? "");
@@ -119,7 +122,7 @@ function PostEditor({
       StarterKit,
       Link.configure({ openOnClick: false }),
       Image,
-      Placeholder.configure({ placeholder: "Write your article..." }),
+      Placeholder.configure({ placeholder: t("admin.contentPlaceholder") }),
     ],
     content: post?.content ?? "",
   });
@@ -159,7 +162,7 @@ function PostEditor({
       }
       onSaved();
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Save failed");
+      setError(err.response?.data?.detail || t("admin.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -187,7 +190,7 @@ function PostEditor({
     <div>
       {/* Top bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 600 }}>{post ? "Edit Post" : "New Post"}</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 600 }}>{post ? t("admin.editPost") : t("admin.newPost")}</h2>
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={() => setShowPreview(!showPreview)}
@@ -201,8 +204,8 @@ function PostEditor({
               fontWeight: 500,
               cursor: "pointer",
             }}
-          >{showPreview ? "Hide Preview" : "Preview"}</button>
-          <button onClick={onCancel} style={{ padding: "8px 16px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--bg-surface)", color: "var(--text-secondary)", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          >{showPreview ? t("admin.hidePreview") : t("admin.preview")}</button>
+          <button onClick={onCancel} style={{ padding: "8px 16px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--bg-surface)", color: "var(--text-secondary)", fontSize: 13, cursor: "pointer" }}>{t("admin.cancel")}</button>
           <button
             onClick={handleSave}
             disabled={saving || !title.trim()}
@@ -217,7 +220,7 @@ function PostEditor({
               cursor: saving ? "default" : "pointer",
               opacity: saving || !title.trim() ? 0.6 : 1,
             }}
-          >{saving ? "Saving..." : "Save"}</button>
+          >{saving ? t("admin.saving") : t("admin.save")}</button>
         </div>
       </div>
 
@@ -228,43 +231,43 @@ function PostEditor({
         <div>
           {/* Title */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Title</label>
-            <input value={title} onChange={(e) => handleTitleChange(e.target.value)} style={{ ...inputStyle, fontSize: 18, fontWeight: 600 }} placeholder="Post title" />
+            <label style={labelStyle}>{t("admin.fieldTitle")}</label>
+            <input value={title} onChange={(e) => handleTitleChange(e.target.value)} style={{ ...inputStyle, fontSize: 18, fontWeight: 600 }} placeholder={t("admin.fieldTitlePlaceholder")} />
           </div>
 
           {/* Subtitle */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Subtitle</label>
-            <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} style={inputStyle} placeholder="Optional subtitle" />
+            <label style={labelStyle}>{t("admin.fieldSubtitle")}</label>
+            <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} style={inputStyle} placeholder={t("admin.fieldSubtitlePlaceholder")} />
           </div>
 
           {/* Slug + Status row */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, marginBottom: 12 }}>
             <div>
-              <label style={labelStyle}>Slug</label>
+              <label style={labelStyle}>{t("admin.fieldSlug")}</label>
               <input
                 value={slug}
                 onChange={(e) => { setSlug(e.target.value); setSlugManual(true); }}
                 style={inputStyle}
-                placeholder="post-url-slug"
+                placeholder={t("admin.fieldSlugPlaceholder")}
               />
             </div>
             <div>
-              <label style={labelStyle}>Status</label>
+              <label style={labelStyle}>{t("admin.fieldStatus")}</label>
               <select
                 value={postStatus}
                 onChange={(e) => setPostStatus(e.target.value)}
                 style={{ ...inputStyle, cursor: "pointer" }}
               >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
+                <option value="draft">{t("admin.statusDraft")}</option>
+                <option value="published">{t("admin.statusPublished")}</option>
               </select>
             </div>
           </div>
 
           {/* Content editor */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Content</label>
+            <label style={labelStyle}>{t("admin.fieldContent")}</label>
             <div className="tiptap-editor">
               <Toolbar editor={editor} />
               <EditorContent editor={editor} />
@@ -273,43 +276,43 @@ function PostEditor({
 
           {/* Excerpt */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Excerpt</label>
-            <textarea value={excerpt} onChange={(e) => setExcerpt(e.target.value)} style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} placeholder="Short description for cards and SEO" />
+            <label style={labelStyle}>{t("admin.fieldExcerpt")}</label>
+            <textarea value={excerpt} onChange={(e) => setExcerpt(e.target.value)} style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} placeholder={t("admin.fieldExcerptPlaceholder")} />
           </div>
 
           {/* Cover image + Author row */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
             <div>
-              <label style={labelStyle}>Cover Image URL</label>
+              <label style={labelStyle}>{t("admin.fieldCoverImage")}</label>
               <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} style={inputStyle} placeholder="https://..." />
             </div>
             <div>
-              <label style={labelStyle}>Author</label>
+              <label style={labelStyle}>{t("admin.fieldAuthor")}</label>
               <input value={authorName} onChange={(e) => setAuthorName(e.target.value)} style={inputStyle} />
             </div>
           </div>
 
           {/* Tags */}
           <div style={{ marginBottom: 12 }}>
-            <label style={labelStyle}>Tags (comma-separated)</label>
-            <input value={tagsStr} onChange={(e) => setTagsStr(e.target.value)} style={inputStyle} placeholder="research, product, ux" />
+            <label style={labelStyle}>{t("admin.fieldTags")}</label>
+            <input value={tagsStr} onChange={(e) => setTagsStr(e.target.value)} style={inputStyle} placeholder={t("admin.fieldTagsPlaceholder")} />
           </div>
 
           {/* SEO section */}
           <details style={{ marginBottom: 12 }}>
-            <summary style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer", marginBottom: 8 }}>SEO / Open Graph</summary>
+            <summary style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer", marginBottom: 8 }}>{t("admin.seoSection")}</summary>
             <div style={{ display: "grid", gap: 12 }}>
               <div>
-                <label style={labelStyle}>Meta Title</label>
-                <input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} style={inputStyle} placeholder="Defaults to post title" />
+                <label style={labelStyle}>{t("admin.fieldMetaTitle")}</label>
+                <input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} style={inputStyle} placeholder={t("admin.fieldMetaTitlePlaceholder")} />
               </div>
               <div>
-                <label style={labelStyle}>Meta Description</label>
-                <textarea value={metaDesc} onChange={(e) => setMetaDesc(e.target.value)} style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} placeholder="Defaults to excerpt" />
+                <label style={labelStyle}>{t("admin.fieldMetaDescription")}</label>
+                <textarea value={metaDesc} onChange={(e) => setMetaDesc(e.target.value)} style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} placeholder={t("admin.fieldMetaDescriptionPlaceholder")} />
               </div>
               <div>
-                <label style={labelStyle}>OG Image URL</label>
-                <input value={ogImage} onChange={(e) => setOgImage(e.target.value)} style={inputStyle} placeholder="Defaults to cover image" />
+                <label style={labelStyle}>{t("admin.fieldOgImage")}</label>
+                <input value={ogImage} onChange={(e) => setOgImage(e.target.value)} style={inputStyle} placeholder={t("admin.fieldOgImagePlaceholder")} />
               </div>
             </div>
           </details>
@@ -326,7 +329,7 @@ function PostEditor({
             overflowY: "auto",
           }}>
             <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-muted)", marginBottom: 16, fontWeight: 600 }}>
-              Preview
+              {t("admin.previewLabel")}
             </div>
             {coverUrl && (
               <img src={coverUrl} alt="" style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: "var(--radius)", marginBottom: 16 }} />
@@ -338,7 +341,7 @@ function PostEditor({
                 ))}
               </div>
             )}
-            <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.2, marginBottom: 8 }}>{title || "Untitled"}</h1>
+            <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.2, marginBottom: 8 }}>{title || t("admin.untitled")}</h1>
             {subtitle && <p style={{ fontSize: 18, color: "var(--text-secondary)", marginBottom: 12 }}>{subtitle}</p>}
             <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--border-subtle)" }}>
               {authorName} &middot; {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
@@ -358,6 +361,7 @@ function PostEditor({
 // ── Main Admin Blog Component ──────────────────────────────────────────────
 
 export default function AdminBlog({ adminKey }: { adminKey: string }) {
+  const { t } = useTranslation("blog");
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -386,7 +390,7 @@ export default function AdminBlog({ adminKey }: { adminKey: string }) {
   }, [page, statusFilter, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this post permanently?")) return;
+    if (!window.confirm(t("admin.deleteConfirm"))) return;
     try {
       await client().delete(`/admin/blog/${id}`);
       loadPosts();
@@ -424,11 +428,11 @@ export default function AdminBlog({ adminKey }: { adminKey: string }) {
               color: "var(--text-primary)",
             }}
           >
-            <option value="">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
+            <option value="">{t("admin.allStatuses")}</option>
+            <option value="draft">{t("admin.statusDraft")}</option>
+            <option value="published">{t("admin.statusPublished")}</option>
           </select>
-          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{total} posts</span>
+          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("admin.postCount", { count: total })}</span>
         </div>
         <button
           onClick={() => setEditing("new")}
@@ -442,25 +446,25 @@ export default function AdminBlog({ adminKey }: { adminKey: string }) {
             fontWeight: 600,
             cursor: "pointer",
           }}
-        >New Post</button>
+        >{t("admin.newPost")}</button>
       </div>
 
       {/* Posts list */}
       {loading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>Loading...</div>
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>{t("list.loading")}</div>
       ) : posts.length === 0 ? (
         <div style={{ padding: 60, textAlign: "center", color: "var(--text-muted)" }}>
-          No posts yet. Create your first blog post!
+          {t("admin.emptyList")}
         </div>
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Title</th>
-              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Status</th>
-              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Published</th>
-              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Updated</th>
-              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Actions</th>
+              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>{t("admin.tableTitle")}</th>
+              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>{t("admin.tableStatus")}</th>
+              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>{t("admin.tablePublished")}</th>
+              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>{t("admin.tableUpdated")}</th>
+              <th style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>{t("admin.tableActions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -480,7 +484,7 @@ export default function AdminBlog({ adminKey }: { adminKey: string }) {
                     letterSpacing: "0.05em",
                     background: p.status === "published" ? "var(--success-bg)" : "var(--bg-sunken)",
                     color: p.status === "published" ? "var(--success)" : "var(--text-muted)",
-                  }}>{p.status}</span>
+                  }}>{p.status === "published" ? t("admin.statusPublished") : t("admin.statusDraft")}</span>
                 </td>
                 <td style={{ padding: "12px", fontSize: 13, color: "var(--text-secondary)" }}>
                   {p.published_at ? new Date(p.published_at).toLocaleDateString() : "—"}
@@ -493,19 +497,19 @@ export default function AdminBlog({ adminKey }: { adminKey: string }) {
                     <button
                       onClick={() => setEditing(p)}
                       style={{ padding: "4px 12px", fontSize: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-xs)", background: "var(--bg-surface)", cursor: "pointer", color: "var(--text-secondary)" }}
-                    >Edit</button>
+                    >{t("admin.edit")}</button>
                     {p.status === "published" && (
                       <a
                         href={`/blog/${p.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{ padding: "4px 12px", fontSize: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-xs)", background: "var(--bg-surface)", color: "var(--primary)", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
-                      >View</a>
+                      >{t("admin.view")}</a>
                     )}
                     <button
                       onClick={() => handleDelete(p.id)}
                       style={{ padding: "4px 12px", fontSize: 12, border: "1px solid var(--danger-border)", borderRadius: "var(--radius-xs)", background: "var(--danger-bg)", cursor: "pointer", color: "var(--danger)" }}
-                    >Delete</button>
+                    >{t("admin.delete")}</button>
                   </div>
                 </td>
               </tr>
@@ -517,9 +521,9 @@ export default function AdminBlog({ adminKey }: { adminKey: string }) {
       {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 20 }}>
-          <button disabled={page <= 1} onClick={() => setPage(page - 1)} style={{ padding: "6px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, cursor: page <= 1 ? "default" : "pointer", background: "var(--bg-surface)", color: page <= 1 ? "var(--text-disabled)" : "var(--text-primary)" }}>Prev</button>
-          <span style={{ padding: "6px 10px", fontSize: 13, color: "var(--text-secondary)" }}>Page {page} of {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} style={{ padding: "6px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, cursor: page >= totalPages ? "default" : "pointer", background: "var(--bg-surface)", color: page >= totalPages ? "var(--text-disabled)" : "var(--text-primary)" }}>Next</button>
+          <button disabled={page <= 1} onClick={() => setPage(page - 1)} style={{ padding: "6px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, cursor: page <= 1 ? "default" : "pointer", background: "var(--bg-surface)", color: page <= 1 ? "var(--text-disabled)" : "var(--text-primary)" }}>{t("admin.prev")}</button>
+          <span style={{ padding: "6px 10px", fontSize: 13, color: "var(--text-secondary)" }}>{t("admin.pageOf", { page, totalPages })}</span>
+          <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} style={{ padding: "6px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, cursor: page >= totalPages ? "default" : "pointer", background: "var(--bg-surface)", color: page >= totalPages ? "var(--text-disabled)" : "var(--text-primary)" }}>{t("admin.next")}</button>
         </div>
       )}
     </div>

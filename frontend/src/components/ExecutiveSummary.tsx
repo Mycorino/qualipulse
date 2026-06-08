@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 /**
  * ExecutiveSummary — the standalone-argument scaffold.
  *
@@ -38,10 +40,11 @@ export function ExecutiveSummary({
   thoughts,
   author,
 }: ExecutiveSummaryProps) {
+  const { t: tr } = useTranslation("study");
   return (
     <section className="exec-summary" aria-labelledby="exec-summary-headline">
       <div className="exec-summary__head">
-        <div className="exec-summary__eyebrow">Executive summary</div>
+        <div className="exec-summary__eyebrow">{tr("executiveSummary.eyebrow")}</div>
         <h2 id="exec-summary-headline" className="exec-summary__headline">
           {headline}
         </h2>
@@ -56,7 +59,7 @@ export function ExecutiveSummary({
               <p className="exec-summary__thought-elab">{t.elaboration}</p>
               {t.findingRef && (
                 <a className="exec-summary__thought-ref" href={`#${t.findingRef.toLowerCase().replace(/\s+/g, "-")}`}>
-                  ↳ See {t.findingRef}
+                  {tr("executiveSummary.seeRef", { ref: t.findingRef })}
                 </a>
               )}
             </div>

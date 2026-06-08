@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export default function ImpersonateFinish() {
+  const { t } = useTranslation("admin");
   const navigate = useNavigate();
   const ran = useRef(false);
 
@@ -35,7 +37,7 @@ export default function ImpersonateFinish() {
   return (
     <div className="auth-page">
       <div className="auth-card" style={{ textAlign: "center" }}>
-        <p>Loading account view…</p>
+        <p>{t("impersonate.loading")}</p>
       </div>
     </div>
   );

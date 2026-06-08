@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface AudioClipProps {
   src: string;
@@ -59,6 +60,7 @@ function formatTime(s: number): string {
 
 export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
   ({ src, label, onTimeUpdate, onEnded, variant = "bar", waveformBars = 48 }, ref) => {
+    const { t } = useTranslation("shell");
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [playing, setPlaying] = useState(false);
     const [duration, setDuration] = useState(0);
@@ -127,7 +129,7 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
     if (errored && variant === "bar") {
       return (
         <div className="audio-clip audio-clip--error" aria-label={label}>
-          Audio unavailable
+          {t("audio.unavailable")}
         </div>
       );
     }
@@ -139,7 +141,7 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
       <div
         className={`audio-clip${playing ? " audio-clip--playing" : ""}${variant === "waveform" ? " audio-clip--waveform" : ""}${errored ? " audio-clip--errored" : ""}`}
         role="group"
-        aria-label={`${label}, ${formatTime(duration)}`}
+        aria-label={t("audio.labelWithDuration", { label, duration: formatTime(duration) })}
         onKeyDown={handleKey}
         tabIndex={0}
       >
@@ -148,7 +150,7 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
           className="audio-clip__play"
           onClick={togglePlay}
           disabled={errored}
-          aria-label={playing ? "Pause" : "Play"}
+          aria-label={playing ? t("audio.pause") : t("audio.play")}
           aria-pressed={playing}
         >
           {playing ? (
@@ -167,7 +169,7 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
             className="audio-clip__track audio-clip__track--waveform"
             onClick={handleSeek}
             role="slider"
-            aria-label="Seek"
+            aria-label={t("audio.seek")}
             aria-valuemin={0}
             aria-valuemax={Math.round(duration)}
             aria-valuenow={Math.round(currentTime)}
@@ -202,7 +204,7 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
             className="audio-clip__track"
             onClick={handleSeek}
             role="slider"
-            aria-label="Seek"
+            aria-label={t("audio.seek")}
             aria-valuemin={0}
             aria-valuemax={Math.round(duration)}
             aria-valuenow={Math.round(currentTime)}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   QuantifiedTheme,
@@ -34,15 +35,8 @@ import { QuantiTopBar } from "../components/QuantiTopBar";
 
 type Tab = "overview" | "surveys" | "interviews" | "participants" | "report";
 
-const TAB_LABELS: Record<Tab, string> = {
-  overview: "Overview",
-  surveys: "Surveys",
-  interviews: "Interviews",
-  participants: "Participants",
-  report: "Report",
-};
-
 export default function StudyOverview() {
+  const { t } = useTranslation("study");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,12 +52,12 @@ export default function StudyOverview() {
     if (!study) return;
     try {
       const survey = await createSurvey({
-        name: "Untitled survey",
+        name: t("overview.untitledSurvey"),
         study_id: study.id,
       });
       navigate(`/surveys/${survey.id}/edit`);
     } catch {
-      toast("Could not create the survey", "error");
+      toast(t("overview.toast.surveyCreateFailed"), "error");
     }
   };
 
@@ -73,14 +67,14 @@ export default function StudyOverview() {
     if (!study) return;
     try {
       const project = await createProject({
-        name: "Untitled interview round",
+        name: t("overview.untitledInterview"),
         language: "en",
         study_id: study.id,
         questions: [],
       });
       navigate(`/projects/${project.id}?tab=setup`);
     } catch {
-      toast("Could not create the interview round", "error");
+      toast(t("overview.toast.interviewCreateFailed"), "error");
     }
   };
 
@@ -88,7 +82,7 @@ export default function StudyOverview() {
     if (!id) return;
     getStudy(id)
       .then(setStudy)
-      .catch(() => setError("Study not found"));
+      .catch(() => setError(t("overview.studyNotFound")));
   }, [id]);
 
   const setTabAndUrl = (next: Tab) => {
@@ -110,7 +104,7 @@ export default function StudyOverview() {
   if (!study) {
     return (
       <div className="quanti-showcase">
-        <p className="quanti-showcase__section-meta">Loading…</p>
+        <p className="quanti-showcase__section-meta">{t("overview.loading")}</p>
       </div>
     );
   }
@@ -119,7 +113,7 @@ export default function StudyOverview() {
     <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
       <QuantiTopBar
         crumbs={[
-          { label: "Studies", to: "/studies" },
+          { label: t("overview.studiesCrumb"), to: "/studies" },
           { label: study.name },
         ]}
       />
@@ -138,7 +132,7 @@ export default function StudyOverview() {
           className="btn btn-ghost"
           onClick={() => navigate("/studies")}
         >
-          ← All studies
+          {t("overview.allStudies")}
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
@@ -150,7 +144,7 @@ export default function StudyOverview() {
               color: "var(--text-tertiary)",
             }}
           >
-            Study workspace
+            {t("overview.studyWorkspace")}
           </div>
           <h1
             style={{
@@ -174,26 +168,26 @@ export default function StudyOverview() {
           background: "var(--bg-surface)",
           borderBottom: "1px solid var(--border-default)",
         }}
-        aria-label="Study sections"
+        aria-label={t("overview.sectionsNav")}
       >
-        {(["overview", "surveys", "interviews", "participants", "report"] as Tab[]).map((t) => (
+        {(["overview", "surveys", "interviews", "participants", "report"] as Tab[]).map((tabKey) => (
           <button
-            key={t}
+            key={tabKey}
             type="button"
-            onClick={() => setTabAndUrl(t)}
+            onClick={() => setTabAndUrl(tabKey)}
             style={{
               padding: "var(--space-3) 0",
               background: "transparent",
               border: "none",
-              borderBottom: `2px solid ${tab === t ? "var(--brand-500)" : "transparent"}`,
-              color: tab === t ? "var(--brand-700)" : "var(--text-secondary)",
-              fontWeight: tab === t ? 600 : 500,
+              borderBottom: `2px solid ${tab === tabKey ? "var(--brand-500)" : "transparent"}`,
+              color: tab === tabKey ? "var(--brand-700)" : "var(--text-secondary)",
+              fontWeight: tab === tabKey ? 600 : 500,
               fontFamily: "inherit",
               fontSize: "var(--text-sm)",
               cursor: "pointer",
             }}
           >
-            {TAB_LABELS[t]}
+            {t(`overview.tabs.${tabKey}`)}
           </button>
         ))}
       </nav>
@@ -265,11 +259,12 @@ function SurveysTab({
   study: StudyDetail;
   onCreateSurvey: () => void;
 }) {
+  const { t } = useTranslation("study");
   if (study.surveys.length === 0) {
     return (
       <EmptyState
-        message="No surveys yet. Add one to start collecting structured responses in this study."
-        ctaLabel="+ New survey"
+        message={t("overview.surveys.empty")}
+        ctaLabel={t("overview.surveys.newSurvey")}
         onAct={onCreateSurvey}
       />
     );
@@ -285,15 +280,15 @@ function SurveysTab({
             style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
           >
             <div className="chart-card__eyebrow">
-              {s.role.toUpperCase()} · {s.status.toUpperCase()}
+              {t("overview.surveys.roleStatus", { role: s.role.toUpperCase(), status: s.status.toUpperCase() })}
             </div>
             <div className="chart-card__takeaway">{s.name}</div>
             <div className="chart-card__footer tabular">
-              <span>{s.question_count} questions</span>
+              <span>{t("overview.surveys.questions", { count: s.question_count })}</span>
               <span className="chart-card__footer-divider">·</span>
-              <span>{s.completed_count} completed</span>
+              <span>{t("overview.surveys.completed", { count: s.completed_count })}</span>
               <span className="chart-card__footer-divider">·</span>
-              <span>{s.response_count} total</span>
+              <span>{t("overview.surveys.total", { count: s.response_count })}</span>
             </div>
           </a>
         ))}
@@ -304,7 +299,7 @@ function SurveysTab({
         style={{ alignSelf: "flex-start" }}
         onClick={onCreateSurvey}
       >
-        + New survey
+        {t("overview.surveys.newSurvey")}
       </button>
     </div>
   );
@@ -317,11 +312,12 @@ function InterviewsTab({
   study: StudyDetail;
   onCreateInterview: () => void;
 }) {
+  const { t } = useTranslation("study");
   if (study.projects.length === 0) {
     return (
       <EmptyState
-        message="No interview track yet. Add an interview round to talk to respondents in depth — or use the Screener Bridge from a survey dashboard to auto-create one from a filtered segment."
-        ctaLabel="+ Add interview round"
+        message={t("overview.interviews.empty")}
+        ctaLabel={t("overview.interviews.addRound")}
         onAct={onCreateInterview}
       />
     );
@@ -336,14 +332,14 @@ function InterviewsTab({
             className="chart-card"
             style={{ textDecoration: "none", color: "inherit" }}
           >
-            <div className="chart-card__eyebrow">INTERVIEW · {p.language.toUpperCase()}</div>
+            <div className="chart-card__eyebrow">{t("overview.interviews.eyebrow", { language: p.language.toUpperCase() })}</div>
             <div className="chart-card__takeaway">{p.name}</div>
             <div className="chart-card__footer tabular">
-              <span>{p.completed_participant_count} completed</span>
+              <span>{t("overview.interviews.completed", { count: p.completed_participant_count })}</span>
               <span className="chart-card__footer-divider">·</span>
-              <span>{p.in_progress_participant_count} in progress</span>
+              <span>{t("overview.interviews.inProgress", { count: p.in_progress_participant_count })}</span>
               <span className="chart-card__footer-divider">·</span>
-              <span>{p.interview_link_count} link(s)</span>
+              <span>{t("overview.interviews.links", { count: p.interview_link_count })}</span>
             </div>
           </a>
         ))}
@@ -354,13 +350,14 @@ function InterviewsTab({
         style={{ alignSelf: "flex-start" }}
         onClick={onCreateInterview}
       >
-        + Add interview round
+        {t("overview.interviews.addRound")}
       </button>
     </div>
   );
 }
 
 function ParticipantsTab({ study }: { study: StudyDetail }) {
+  const { t } = useTranslation("study");
   const totalSurveyRespondents = study.surveys.reduce(
     (sum, s) => sum + s.completed_count,
     0,
@@ -372,21 +369,20 @@ function ParticipantsTab({ study }: { study: StudyDetail }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
       <p className="quanti-showcase__section-meta">
-        Participant identity is the join key across instruments — the same person across survey
-        answers and interview transcripts.
+        {t("overview.participants.intro")}
       </p>
       <div className="dashboard-strip">
         <div className="dashboard-strip__item">
-          <div className="dashboard-strip__label">Survey completers</div>
+          <div className="dashboard-strip__label">{t("overview.participants.surveyCompleters")}</div>
           <div className="dashboard-strip__value tabular">{totalSurveyRespondents}</div>
         </div>
         <div className="dashboard-strip__item">
-          <div className="dashboard-strip__label">Interview completers</div>
+          <div className="dashboard-strip__label">{t("overview.participants.interviewCompleters")}</div>
           <div className="dashboard-strip__value tabular">{totalInterviewers}</div>
         </div>
         <div className="dashboard-strip__item">
-          <div className="dashboard-strip__label">Inference threshold</div>
-          <div className="dashboard-strip__value tabular">n≥30</div>
+          <div className="dashboard-strip__label">{t("overview.participants.inferenceThreshold")}</div>
+          <div className="dashboard-strip__value tabular">{t("overview.participants.thresholdValue")}</div>
         </div>
       </div>
     </div>
@@ -400,6 +396,7 @@ function ReportTab({
   studyId: string;
   progress: StudyDetail["progress"];
 }) {
+  const { t } = useTranslation("study");
   const { toast } = useToast();
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState<StudyAnalysis | null>(null);
@@ -435,10 +432,10 @@ function ReportTab({
     setSpawningValidation(true);
     try {
       const result = await createValidationSurvey(studyId, analysis.id);
-      toast(`Validation survey created with ${result.question_count} questions`, "success");
+      toast(t("overview.toast.validationCreated", { count: result.question_count }), "success");
       navigate(`/surveys/${result.survey_id}/edit`);
     } catch (e: any) {
-      const detail = e?.response?.data?.detail || "Could not generate validation survey";
+      const detail = e?.response?.data?.detail || t("overview.toast.validationGenerateFailed");
       toast(detail, "error");
     } finally {
       setSpawningValidation(false);
@@ -451,19 +448,19 @@ function ReportTab({
       const fresh = await triggerAnalysis(studyId);
       setAnalysis(fresh);
       if (fresh.status === "failed") {
-        toast(fresh.error || "Generation failed", "error");
+        toast(fresh.error || t("overview.toast.generationFailed"), "error");
       } else {
-        toast("Report generated", "success");
+        toast(t("overview.toast.reportGenerated"), "success");
       }
     } catch {
-      toast("Could not generate report", "error");
+      toast(t("overview.toast.reportGenerateFailed"), "error");
     } finally {
       setGenerating(false);
     }
   };
 
   if (loading) {
-    return <p className="quanti-showcase__section-meta">Loading…</p>;
+    return <p className="quanti-showcase__section-meta">{t("overview.report.loading")}</p>;
   }
 
   // Empty-state CTA when no analysis exists yet.
@@ -491,7 +488,7 @@ function ReportTab({
               marginBottom: "var(--space-2)",
             }}
           >
-            Generate the Quantified Themes report
+            {t("overview.report.generateHeadline")}
           </h2>
           <p
             style={{
@@ -501,9 +498,7 @@ function ReportTab({
               margin: 0,
             }}
           >
-            Combines survey aggregates with interview transcripts into themes that pair what people
-            said with how often they said it. Each theme carries a recommended next step and a
-            confidence pill — the same methodology contract used everywhere else in the workspace.
+            {t("overview.report.generateBody")}
           </p>
           {progress.total_completed_responses < 30 && (
             <p
@@ -513,8 +508,7 @@ function ReportTab({
                 marginTop: "var(--space-3)",
               }}
             >
-              ⚠ You have {progress.total_completed_responses} survey responses. Themes below n=30
-              will be marked "directional" — collect more responses for stronger evidence.
+              {t("overview.report.lowResponseWarning", { count: progress.total_completed_responses })}
             </p>
           )}
         </div>
@@ -524,7 +518,7 @@ function ReportTab({
           onClick={onGenerate}
           disabled={generating}
         >
-          {generating ? "Generating… (≈10s)" : "Generate report"}
+          {generating ? t("overview.report.generating") : t("overview.report.generate")}
         </button>
       </div>
     );
@@ -551,10 +545,12 @@ function ReportTab({
               color: "var(--brand-700)",
             }}
           >
-            Quantified Themes · v{analysis.version}
+            {t("overview.report.versionEyebrow", { version: analysis.version })}
           </div>
           <span className="tabular" style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-            Generated {analysis.generated_at ? new Date(analysis.generated_at).toLocaleString() : "—"}
+            {analysis.generated_at
+              ? t("overview.report.generatedAt", { date: new Date(analysis.generated_at).toLocaleString() })
+              : t("overview.report.generatedAtUnknown")}
           </span>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
@@ -563,9 +559,9 @@ function ReportTab({
               type="button"
               className="btn btn-secondary"
               onClick={() => window.print()}
-              title="Print or save the report as a PDF"
+              title={t("overview.report.exportPdfTitle")}
             >
-              Export PDF
+              {t("overview.report.exportPdf")}
             </button>
           )}
           {!validation && analysis.status === "ready" && (
@@ -574,9 +570,9 @@ function ReportTab({
               className="btn btn-secondary"
               onClick={onGenerateValidation}
               disabled={spawningValidation}
-              title="Spawn a validation micro-survey from these themes"
+              title={t("overview.report.validateThemesTitle")}
             >
-              {spawningValidation ? "Generating…" : "Validate these themes →"}
+              {spawningValidation ? t("overview.report.validateGenerating") : t("overview.report.validateThemes")}
             </button>
           )}
           <button
@@ -585,7 +581,7 @@ function ReportTab({
             onClick={onGenerate}
             disabled={generating}
           >
-            {generating ? "Regenerating…" : "Regenerate"}
+            {generating ? t("overview.report.regenerating") : t("overview.report.regenerate")}
           </button>
         </div>
       </header>
@@ -594,7 +590,7 @@ function ReportTab({
 
       {analysis.status === "failed" && (
         <div className="methodology-box methodology-box--inline">
-          ⚠ Last generation failed: {analysis.error || "unknown error"}
+          {t("overview.report.lastGenerationFailed", { error: analysis.error || t("overview.report.unknownError") })}
         </div>
       )}
 
@@ -619,7 +615,7 @@ function ReportTab({
                 marginBottom: "var(--space-3)",
               }}
             >
-              Executive summary
+              {t("overview.report.executiveSummary")}
             </div>
             <p
               style={{
@@ -647,7 +643,7 @@ function ReportTab({
                 color: "var(--text-tertiary)",
               }}
             >
-              {analysis.report.themes.length} theme{analysis.report.themes.length === 1 ? "" : "s"}
+              {t("overview.report.themes", { count: analysis.report.themes.length })}
             </div>
             {analysis.report.themes.map((theme, i) => (
               <ThemeCard
@@ -676,7 +672,7 @@ function ReportTab({
                 marginBottom: "var(--space-2)",
               }}
             >
-              Methodology
+              {t("overview.report.methodology")}
             </div>
             <p
               style={{
@@ -696,11 +692,11 @@ function ReportTab({
                 marginTop: "var(--space-2)",
               }}
             >
-              {analysis.report.generated_with_survey_count} survey
-              {analysis.report.generated_with_survey_count === 1 ? "" : "s"} ·{" "}
-              {analysis.report.generated_with_response_count} responses ·{" "}
-              {analysis.report.generated_with_interview_count} interview
-              {analysis.report.generated_with_interview_count === 1 ? "" : "s"}
+              {t("overview.report.methodologyStats_survey", { count: analysis.report.generated_with_survey_count })}
+              {t("overview.report.metaSeparator")}
+              {t("overview.report.methodologyStats_responses", { count: analysis.report.generated_with_response_count })}
+              {t("overview.report.metaSeparator")}
+              {t("overview.report.methodologyStats_interview", { count: analysis.report.generated_with_interview_count })}
             </div>
           </section>
         </>
@@ -716,6 +712,7 @@ function ValidationBanner({
   validation: ValidationSummary;
   studyId: string;
 }) {
+  const { t } = useTranslation("study");
   const navigate = useNavigate();
   const isDraft = validation.survey_status === "draft";
   return (
@@ -734,11 +731,11 @@ function ValidationBanner({
     >
       <div>
         <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>
-          Theme validation · {validation.survey_status.toUpperCase()}
+          {t("overview.validationBanner.title", { status: validation.survey_status.toUpperCase() })}
         </div>
         <div className="tabular" style={{ fontSize: "var(--text-xs)", marginTop: 2 }}>
-          {validation.n_completed} of {validation.n_responses} respondents completed
-          {isDraft && " — survey is in draft, share it to start collecting"}
+          {t("overview.validationBanner.progress", { completed: validation.n_completed, total: validation.n_responses })}
+          {isDraft && t("overview.validationBanner.draftSuffix")}
         </div>
       </div>
       <button
@@ -746,7 +743,7 @@ function ValidationBanner({
         className="btn btn-secondary btn-sm"
         onClick={() => navigate(`/surveys/${validation.survey_id}/edit`)}
       >
-        {isDraft ? "Edit + publish →" : "Open survey →"}
+        {isDraft ? t("overview.validationBanner.editPublish") : t("overview.validationBanner.openSurvey")}
       </button>
     </div>
   );
@@ -759,16 +756,7 @@ function ThemeCard({
   theme: QuantifiedTheme;
   validation: ThemeValidationSnapshot | null;
 }) {
-  const confidenceLabel: Record<QuantifiedTheme["confidence"], string> = {
-    directional: "Directional",
-    supported: "Supported",
-    strong: "Strong evidence",
-  };
-  const kindLabel: Record<QuantifiedTheme["recommendation"]["kind"], string> = {
-    product: "Product action",
-    marketing: "Marketing action",
-    next_research: "Next research step",
-  };
+  const { t } = useTranslation("study");
   return (
     <article
       style={{
@@ -803,7 +791,7 @@ function ThemeCard({
         </h3>
         <span className={`confidence-pill confidence-pill--${theme.confidence}`}>
           <span className="confidence-pill__dot" aria-hidden="true" />
-          {confidenceLabel[theme.confidence]}
+          {t(`overview.theme.confidence.${theme.confidence}`)}
         </span>
       </header>
 
@@ -827,7 +815,7 @@ function ThemeCard({
                 marginBottom: "var(--space-2)",
               }}
             >
-              Survey signal
+              {t("overview.theme.surveySignal")}
             </div>
             <p
               style={{
@@ -848,12 +836,12 @@ function ThemeCard({
                 marginTop: "var(--space-1)",
               }}
             >
-              n={theme.survey_signal.n}
+              {t("overview.theme.n", { count: theme.survey_signal.n })}
               {theme.survey_signal.segment_over_index
-                ? ` · over-index ${theme.survey_signal.segment_over_index.toFixed(1)}×`
+                ? t("overview.theme.overIndex", { value: theme.survey_signal.segment_over_index.toFixed(1) })
                 : ""}
               {theme.survey_signal.segment_label
-                ? ` · ${theme.survey_signal.segment_label}`
+                ? t("overview.theme.segmentLabel", { label: theme.survey_signal.segment_label })
                 : ""}
             </div>
           </div>
@@ -872,7 +860,7 @@ function ThemeCard({
                 marginBottom: "var(--space-2)",
               }}
             >
-              Interview evidence · {theme.interview_evidence.x_of_y}
+              {t("overview.theme.interviewEvidence", { xOfY: theme.interview_evidence.x_of_y })}
             </div>
             <blockquote
               style={{
@@ -911,7 +899,7 @@ function ThemeCard({
             marginBottom: "var(--space-2)",
           }}
         >
-          {kindLabel[theme.recommendation.kind]}
+          {t(`overview.theme.kind.${theme.recommendation.kind}`)}
         </div>
         <p
           style={{
@@ -947,6 +935,7 @@ function ThemeValidationPanel({
 }: {
   validation: ThemeValidationSnapshot;
 }) {
+  const { t } = useTranslation("study");
   if (validation.n_answered === 0) {
     return (
       <div
@@ -958,7 +947,7 @@ function ThemeValidationPanel({
           color: "var(--text-tertiary)",
         }}
       >
-        Awaiting validation responses for this theme.
+        {t("overview.themeValidation.awaiting")}
       </div>
     );
   }
@@ -982,7 +971,7 @@ function ThemeValidationPanel({
           marginBottom: "var(--space-1)",
         }}
       >
-        Theme validation · n={validation.n_answered}
+        {t("overview.themeValidation.title", { count: validation.n_answered })}
       </div>
       <div
         className="tabular"
@@ -994,16 +983,17 @@ function ThemeValidationPanel({
       >
         {pct === null ? (
           <span>
-            {validation.distribution["4"] + validation.distribution["5"]} of{" "}
-            {validation.n_answered} respondents agreed (below n=30; counts only)
+            {t("overview.themeValidation.agreedCounts", {
+              agreed: validation.distribution["4"] + validation.distribution["5"],
+              total: validation.n_answered,
+            })}
           </span>
         ) : (
           <span>
-            <strong>{Math.round(pct)}%</strong> agreed this theme resonates
+            <strong>{Math.round(pct)}%</strong> {t("overview.themeValidation.agreedPct")}
             {validation.ci_low !== null && validation.ci_high !== null && (
               <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-                {" "}
-                · 95% CI {Math.round(validation.ci_low)}–{Math.round(validation.ci_high)}%
+                {t("overview.themeValidation.ci", { low: Math.round(validation.ci_low), high: Math.round(validation.ci_high) })}
               </span>
             )}
           </span>
@@ -1018,6 +1008,7 @@ function ThemeValidationPanel({
    ──────────────────────────────────────────────────────────────────── */
 
 function RecommendedActionCard({ text, onClick }: { text: string; onClick: () => void }) {
+  const { t } = useTranslation("study");
   return (
     <div
       style={{
@@ -1059,7 +1050,7 @@ function RecommendedActionCard({ text, onClick }: { text: string; onClick: () =>
             color: "var(--brand-700)",
           }}
         >
-          Recommended next step
+          {t("overview.recommendedAction.eyebrow")}
         </div>
         <p
           style={{
@@ -1073,41 +1064,42 @@ function RecommendedActionCard({ text, onClick }: { text: string; onClick: () =>
         </p>
       </div>
       <button type="button" className="btn btn-primary" onClick={onClick}>
-        Take action →
+        {t("overview.recommendedAction.takeAction")}
       </button>
     </div>
   );
 }
 
 function ProgressChecklist({ study }: { study: StudyDetail }) {
+  const { t } = useTranslation("study");
   const steps: Array<{ label: string; done: boolean; detail?: string }> = [
     {
-      label: "Survey published",
+      label: t("overview.checklist.surveyPublished"),
       done: study.progress.has_live_survey,
-      detail: study.progress.has_live_survey ? "Live" : "Not yet",
+      detail: study.progress.has_live_survey ? t("overview.checklist.live") : t("overview.checklist.notYet"),
     },
     {
-      label: "Responses collected",
+      label: t("overview.checklist.responsesCollected"),
       done: study.progress.total_completed_responses > 0,
-      detail: `${study.progress.total_completed_responses} completed`,
+      detail: t("overview.checklist.completed", { count: study.progress.total_completed_responses }),
     },
     {
-      label: "Inference threshold reached",
+      label: t("overview.checklist.inferenceThreshold"),
       done: study.progress.segments_identified_placeholder,
       detail:
         study.progress.total_completed_responses >= 30
-          ? "n≥30 — segment cuts allowed"
-          : `${30 - study.progress.total_completed_responses} more responses needed`,
+          ? t("overview.checklist.segmentCutsAllowed")
+          : t("overview.checklist.moreResponsesNeeded", { count: 30 - study.progress.total_completed_responses }),
     },
     {
-      label: "Interviews completed",
+      label: t("overview.checklist.interviewsCompleted"),
       done: study.progress.interviews_completed > 0,
-      detail: `${study.progress.interviews_completed} completed`,
+      detail: t("overview.checklist.completed", { count: study.progress.interviews_completed }),
     },
     {
-      label: "Mixed-methods report",
+      label: t("overview.checklist.mixedMethodsReport"),
       done: study.progress.report_ready_placeholder,
-      detail: study.progress.report_ready_placeholder ? "Ready" : "Not yet",
+      detail: study.progress.report_ready_placeholder ? t("overview.checklist.ready") : t("overview.checklist.notYet"),
     },
   ];
 
@@ -1130,7 +1122,7 @@ function ProgressChecklist({ study }: { study: StudyDetail }) {
             color: "var(--text-tertiary)",
           }}
         >
-          Study progress
+          {t("overview.checklist.title")}
         </div>
       </header>
       <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
@@ -1185,27 +1177,28 @@ function ProgressChecklist({ study }: { study: StudyDetail }) {
 }
 
 function SummaryStrip({ study }: { study: StudyDetail }) {
+  const { t } = useTranslation("study");
   return (
     <div className="dashboard-strip">
       <div className="dashboard-strip__item">
-        <div className="dashboard-strip__label">Surveys</div>
+        <div className="dashboard-strip__label">{t("overview.summary.surveys")}</div>
         <div className="dashboard-strip__value tabular">{study.surveys.length}</div>
         <div className="dashboard-strip__delta dashboard-strip__delta--neutral">
-          {study.progress.has_live_survey ? "Live" : "Drafts"}
+          {study.progress.has_live_survey ? t("overview.summary.live") : t("overview.summary.drafts")}
         </div>
       </div>
       <div className="dashboard-strip__item">
-        <div className="dashboard-strip__label">Survey responses</div>
+        <div className="dashboard-strip__label">{t("overview.summary.surveyResponses")}</div>
         <div className="dashboard-strip__value tabular">{study.progress.total_completed_responses}</div>
         <div className="dashboard-strip__delta dashboard-strip__delta--neutral">
-          {study.progress.total_completed_responses >= 30 ? "Inference-grade" : "Building sample"}
+          {study.progress.total_completed_responses >= 30 ? t("overview.summary.inferenceGrade") : t("overview.summary.buildingSample")}
         </div>
       </div>
       <div className="dashboard-strip__item">
-        <div className="dashboard-strip__label">Interviews</div>
+        <div className="dashboard-strip__label">{t("overview.summary.interviews")}</div>
         <div className="dashboard-strip__value tabular">{study.progress.interviews_completed}</div>
         <div className="dashboard-strip__delta dashboard-strip__delta--neutral">
-          {study.projects.length} project(s)
+          {t("overview.summary.projects", { count: study.projects.length })}
         </div>
       </div>
     </div>

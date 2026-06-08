@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   LintFlag,
@@ -46,28 +47,11 @@ import { resolveSurveyNextAction } from "../copilot/nextAction";
  * would risk losing a fast click.
  */
 
-const TYPE_LABELS: Record<QuestionType, string> = {
-  likert: "Likert · 5-point",
-  mc_single: "Multiple choice · single",
-  mc_multi: "Multiple choice · multi",
-  nps: "Net Promoter Score",
-  open_text: "Open text",
-  short_text: "Short text",
-};
-
-const TYPE_DESCRIPTIONS: Record<QuestionType, string> = {
-  likert: "Measure agreement on a balanced scale.",
-  mc_single: "Pick one of N options.",
-  mc_multi: "Pick one or more from a list.",
-  nps: "Validated 0–10 recommendation scale.",
-  open_text: "Free-form responses, AI-clustered into themes.",
-  short_text: "One-line text answer.",
-};
-
 export default function SurveyEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation("survey");
 
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [study, setStudy] = useState<{ id: string; name: string } | null>(null);
@@ -88,14 +72,14 @@ export default function SurveyEditor() {
           .then((st) => setStudy({ id: st.id, name: st.name }))
           .catch(() => setStudy(null));
       })
-      .catch(() => toast("Survey not found", "error"));
+      .catch(() => toast(t("editor.surveyNotFound"), "error"));
     listQuestions(id)
       .then((qs) => {
         setQuestions(qs);
         if (qs.length > 0) setActiveId(qs[0].id);
         else setShowTypePicker(true);
       })
-      .catch(() => toast("Failed to load questions", "error"));
+      .catch(() => toast(t("editor.loadQuestionsFailed"), "error"));
     listLinks(id).then(setLinks).catch(() => undefined);
   }, [id, toast]);
 
@@ -119,10 +103,10 @@ export default function SurveyEditor() {
         setActiveId(created.id);
         setShowTypePicker(false);
       } catch {
-        toast("Could not add question", "error");
+        toast(t("editor.addQuestionFailed"), "error");
       }
     },
-    [id, toast],
+    [id, toast, t],
   );
 
   /** Debounced autosave for prompt or config edits to a single question. */
@@ -138,12 +122,12 @@ export default function SurveyEditor() {
             prev.map((q) => (q.id === questionId ? updated : q)),
           );
         } catch {
-          toast("Save failed — your edit didn't stick", "error");
+          toast(t("editor.saveFailed"), "error");
         }
       }, 600);
       saveTimers.current.set(questionId, timer);
     },
-    [id, toast],
+    [id, toast, t],
   );
 
   const onDelete = async (questionId: string) => {
@@ -157,7 +141,7 @@ export default function SurveyEditor() {
         if (remaining.length === 0) setShowTypePicker(true);
       }
     } catch {
-      toast("Could not remove question", "error");
+      toast(t("editor.removeQuestionFailed"), "error");
     }
   };
 
@@ -190,7 +174,7 @@ export default function SurveyEditor() {
         sort_order: renumbered.find((q) => q.id === sourceId)!.sort_order,
       });
     } catch {
-      toast("Reorder didn't save", "error");
+      toast(t("editor.reorderFailed"), "error");
     }
   };
 
@@ -201,11 +185,11 @@ export default function SurveyEditor() {
       const updated = await patchSurvey(survey.id, { status: next });
       setSurvey(updated);
       toast(
-        next === "live" ? "Survey is live" : "Survey closed",
+        next === "live" ? t("editor.surveyLive") : t("editor.surveyClosed"),
         "success",
       );
     } catch {
-      toast("Status change failed", "error");
+      toast(t("editor.statusChangeFailed"), "error");
     }
   };
 
@@ -214,16 +198,16 @@ export default function SurveyEditor() {
     try {
       const link = await createLink(survey.id, { is_anonymous: false });
       setLinks((prev) => [...prev, link]);
-      toast("Link created", "success");
+      toast(t("editor.linkCreated"), "success");
     } catch {
-      toast("Could not create link", "error");
+      toast(t("editor.createLinkFailed"), "error");
     }
   };
 
   if (!survey) {
     return (
       <div className="quanti-showcase">
-        <p className="quanti-showcase__section-meta">Loading…</p>
+        <p className="quanti-showcase__section-meta">{t("common.loading")}</p>
       </div>
     );
   }
@@ -232,7 +216,7 @@ export default function SurveyEditor() {
   // editor is the pre-launch surface, so the resolver works off question
   // count and status; post-launch response/report data lives on the
   // survey dashboard (a later phase).
-  const surveyMission = "Get this survey ready to publish.";
+  const surveyMission = t("editor.mission");
   const surveyNextAction = resolveSurveyNextAction({
     questionCount: questions.length,
     status: survey.status,
@@ -244,11 +228,11 @@ export default function SurveyEditor() {
   return (
     <InstrumentShell
       crumbs={[
-        { label: "Studies", to: "/studies" },
+        { label: t("editor.crumbStudies"), to: "/studies" },
         ...(study ? [{ label: study.name, to: `/studies/${study.id}` }] : []),
         { label: survey.name },
       ]}
-      eyebrow="Survey"
+      eyebrow={t("editor.eyebrow")}
       title={
         <input
           type="text"
@@ -257,28 +241,28 @@ export default function SurveyEditor() {
           onChange={(e) => setSurvey({ ...survey, name: e.target.value })}
           onBlur={() =>
             patchSurvey(survey.id, { name: survey.name }).catch(() =>
-              toast("Save failed", "error"),
+              toast(t("editor.saveFailedShort"), "error"),
             )
           }
-          aria-label="Survey name"
+          aria-label={t("editor.surveyNameAria")}
         />
       }
       status={surveyStatusPill(survey.status)}
       actions={
         <button type="button" className="btn btn-primary" onClick={onTogglePublish}>
-          {survey.status === "live" ? "Close survey" : "Publish"}
+          {survey.status === "live" ? t("editor.closeSurvey") : t("editor.publish")}
         </button>
       }
       sections={SURVEY_SECTIONS}
       activeSection="build"
       onSectionChange={(k) => navigate(surveySectionPath(k, survey.id))}
-      subNavLabel="Survey sections"
+      subNavLabel={t("editor.sectionsNavLabel")}
     >
       <div className="survey-editor__layout">
         {/* ── Left rail: question list ───────────────────────────────── */}
         <aside className="survey-editor__rail survey-editor__rail--left">
           <div className="survey-editor__rail-head">
-            <span className="shell-nav__group-label">Questions</span>
+            <span className="shell-nav__group-label">{t("editor.questions")}</span>
             <span className="shell-nav__count tabular">{questions.length}</span>
           </div>
           <ol className="survey-editor__qlist">
@@ -299,9 +283,9 @@ export default function SurveyEditor() {
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span className="survey-editor__qitem-body">
-                  <span className="survey-editor__qitem-type">{TYPE_LABELS[q.type]}</span>
+                  <span className="survey-editor__qitem-type">{t(`editor.typeLabels.${q.type}`)}</span>
                   <span className="survey-editor__qitem-prompt">
-                    {q.prompt || <em style={{ color: "var(--text-tertiary)" }}>Untitled question</em>}
+                    {q.prompt || <em style={{ color: "var(--text-tertiary)" }}>{t("common.untitledQuestion")}</em>}
                   </span>
                 </span>
                 <button
@@ -311,8 +295,8 @@ export default function SurveyEditor() {
                     e.stopPropagation();
                     onDelete(q.id);
                   }}
-                  aria-label="Remove question"
-                  title="Remove"
+                  aria-label={t("editor.removeQuestion")}
+                  title={t("editor.remove")}
                 >
                   ×
                 </button>
@@ -327,7 +311,7 @@ export default function SurveyEditor() {
               setActiveId(null);
             }}
           >
-            + Add question
+            {t("editor.addQuestion")}
           </button>
         </aside>
 
@@ -355,11 +339,11 @@ export default function SurveyEditor() {
         {/* ── Right rail: settings ──────────────────────────────────── */}
         <aside className="survey-editor__rail survey-editor__rail--right">
           <div className="survey-editor__rail-head">
-            <span className="shell-nav__group-label">Public links</span>
+            <span className="shell-nav__group-label">{t("editor.publicLinks")}</span>
           </div>
           {links.length === 0 ? (
             <p className="quanti-showcase__section-meta" style={{ marginTop: 0 }}>
-              No links yet. Publish + create a link to share.
+              {t("editor.noLinksYet")}
             </p>
           ) : (
             <ul className="survey-editor__link-list">
@@ -373,10 +357,10 @@ export default function SurveyEditor() {
                       className="btn btn-ghost btn-xs"
                       onClick={() => {
                         navigator.clipboard?.writeText(url);
-                        toast("Link copied", "success");
+                        toast(t("editor.linkCopied"), "success");
                       }}
                     >
-                      Copy
+                      {t("editor.copy")}
                     </button>
                   </li>
                 );
@@ -389,11 +373,11 @@ export default function SurveyEditor() {
             onClick={onCreatePublicLink}
             disabled={survey.status !== "live"}
           >
-            + Create public link
+            {t("editor.createPublicLink")}
           </button>
           {survey.status !== "live" && (
             <p className="quanti-showcase__section-meta" style={{ marginTop: "var(--space-2)" }}>
-              Publish first to create a sharable link.
+              {t("editor.publishFirstHint")}
             </p>
           )}
         </aside>
@@ -460,18 +444,19 @@ function TypePickerPane({
 }: {
   onPick: (type: QuestionType) => void;
 }) {
+  const { t } = useTranslation("survey");
   const types: QuestionType[] = ["likert", "mc_single", "mc_multi", "nps", "open_text", "short_text"];
   return (
     <div style={{ maxWidth: 720 }}>
-      <h2 className="quanti-showcase__section-title">Add a question</h2>
-      <p className="quanti-showcase__section-meta">Pick a type — you can change config after.</p>
+      <h2 className="quanti-showcase__section-title">{t("editor.typePicker.title")}</h2>
+      <p className="quanti-showcase__section-meta">{t("editor.typePicker.subtitle")}</p>
       <div className="quanti-showcase__grid-2" style={{ marginTop: "var(--space-5)" }}>
-        {types.map((t) => (
+        {types.map((type) => (
           <QuestionTypeCard
-            key={t}
-            name={TYPE_LABELS[t]}
-            description={TYPE_DESCRIPTIONS[t]}
-            onSelect={() => onPick(t)}
+            key={type}
+            name={t(`editor.typeLabels.${type}`)}
+            description={t(`editor.typeDescriptions.${type}`)}
+            onSelect={() => onPick(type)}
           />
         ))}
       </div>
@@ -490,6 +475,7 @@ function ActiveQuestionEditor({
     payload: Partial<{ prompt: string; is_required: boolean; config: Record<string, unknown> }>,
   ) => void;
 }) {
+  const { t } = useTranslation("survey");
   // ── Sprint 13: inline question coach ───────────────────────────
   const [lintFlags, setLintFlags] = useState<LintFlag[]>([]);
   const [linting, setLinting] = useState(false);
@@ -525,7 +511,7 @@ function ActiveQuestionEditor({
   return (
     <div className="survey-q-editor" style={{ maxWidth: 720, margin: "0 auto" }}>
       <div className="survey-q-editor__head">
-        <span className="survey-q-editor__type-pill">{TYPE_LABELS[question.type]}</span>
+        <span className="survey-q-editor__type-pill">{t(`editor.typeLabels.${question.type}`)}</span>
         <label
           style={{
             display: "inline-flex",
@@ -540,15 +526,15 @@ function ActiveQuestionEditor({
             checked={question.is_required}
             onChange={(e) => onChange({ is_required: e.target.checked })}
           />
-          Required
+          {t("editor.required")}
         </label>
       </div>
-      <label className="survey-q-editor__prompt-label">Question prompt</label>
+      <label className="survey-q-editor__prompt-label">{t("editor.questionPrompt")}</label>
       <textarea
         className="survey-q-editor__prompt"
         value={question.prompt}
         onChange={(e) => onChange({ prompt: e.target.value })}
-        placeholder="Type your question…"
+        placeholder={t("editor.promptPlaceholder")}
         rows={2}
       />
 
@@ -580,6 +566,7 @@ function QuestionCoachPanel({
   linting: boolean;
   onApplyRewrite: (rewrite: string) => void;
 }) {
+  const { t } = useTranslation("survey");
   return (
     <div
       role="status"
@@ -610,15 +597,15 @@ function QuestionCoachPanel({
             color: "var(--brand-700)",
           }}
         >
-          Question coach
+          {t("editor.coach.title")}
         </span>
         <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-          {linting ? "Checking…" : "Advisory only — apply at your discretion"}
+          {linting ? t("editor.coach.checking") : t("editor.coach.advisory")}
         </span>
       </div>
       {flags.length === 0 ? (
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)", margin: 0 }}>
-          Looking for double-barreled phrasing, leading wording, and bias patterns…
+          {t("editor.coach.scanning")}
         </p>
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
@@ -650,7 +637,7 @@ function QuestionCoachPanel({
                       marginBottom: 4,
                     }}
                   >
-                    Suggested replacement
+                    {t("editor.coach.suggestedReplacement")}
                   </div>
                   <p
                     style={{
@@ -670,7 +657,7 @@ function QuestionCoachPanel({
                     style={{ marginTop: "var(--space-2)" }}
                     onClick={() => onApplyRewrite(flag.suggested_replacement!)}
                   >
-                    Apply this rewrite
+                    {t("editor.coach.applyRewrite")}
                   </button>
                 </div>
               )}
@@ -691,13 +678,14 @@ function ConfigEditor({
   config: Record<string, unknown>;
   onChange: (config: Record<string, unknown>) => void;
 }) {
+  const { t } = useTranslation("survey");
   if (type === "likert") {
     const scale = (config.scale as number) ?? 5;
     return (
       <div className="survey-q-editor__config">
         <div className="survey-q-editor__config-head">
-          <span className="survey-q-editor__config-title">Scale</span>
-          <span className="survey-q-editor__config-flag">Balance enforced</span>
+          <span className="survey-q-editor__config-title">{t("editor.config.scale")}</span>
+          <span className="survey-q-editor__config-flag">{t("editor.config.balanceEnforced")}</span>
         </div>
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
           {[5, 7].map((s) => (
@@ -707,7 +695,7 @@ function ConfigEditor({
               className={`compare-chips__chip${scale === s ? " compare-chips__chip--active" : ""}`}
               onClick={() => onChange({ ...config, scale: s })}
             >
-              {s}-point
+              {t("editor.config.scalePoint", { n: s })}
             </button>
           ))}
         </div>
@@ -723,7 +711,7 @@ function ConfigEditor({
     };
     const addChoice = () => {
       const newId = String.fromCharCode(97 + choices.length);
-      onChange({ ...config, choices: [...choices, { id: newId, label: `Option ${newId.toUpperCase()}` }] });
+      onChange({ ...config, choices: [...choices, { id: newId, label: t("editor.config.optionDefault", { letter: newId.toUpperCase() }) }] });
     };
     const removeChoice = (i: number) => {
       if (choices.length <= 2) return;
@@ -732,8 +720,8 @@ function ConfigEditor({
     return (
       <div className="survey-q-editor__config">
         <div className="survey-q-editor__config-head">
-          <span className="survey-q-editor__config-title">Options</span>
-          <span className="survey-q-editor__config-flag">Order randomized</span>
+          <span className="survey-q-editor__config-title">{t("editor.config.options")}</span>
+          <span className="survey-q-editor__config-flag">{t("editor.config.orderRandomized")}</span>
         </div>
         <ul className="survey-q-editor__option-list">
           {choices.map((c, i) => (
@@ -750,7 +738,7 @@ function ConfigEditor({
                 className="btn btn-ghost btn-xs"
                 onClick={() => removeChoice(i)}
                 disabled={choices.length <= 2}
-                aria-label="Remove option"
+                aria-label={t("editor.config.removeOption")}
               >
                 ×
               </button>
@@ -758,7 +746,7 @@ function ConfigEditor({
           ))}
         </ul>
         <button type="button" className="survey-q-editor__add-option" onClick={addChoice}>
-          + Add option
+          {t("editor.config.addOption")}
         </button>
       </div>
     );
@@ -769,10 +757,10 @@ function ConfigEditor({
     return (
       <div className="survey-q-editor__config">
         <div className="survey-q-editor__config-head">
-          <span className="survey-q-editor__config-title">Response settings</span>
+          <span className="survey-q-editor__config-title">{t("editor.config.responseSettings")}</span>
         </div>
         <label className="survey-q-editor__inline-label">
-          Max length
+          {t("editor.config.maxLength")}
           <input
             type="number"
             className="survey-q-editor__inline-input tabular"
@@ -782,7 +770,7 @@ function ConfigEditor({
             step={50}
             onChange={(e) => onChange({ ...config, max_chars: Number(e.target.value) })}
           />
-          characters
+          {t("editor.config.characters")}
         </label>
         <label
           style={{
@@ -798,7 +786,7 @@ function ConfigEditor({
             checked={aiCluster}
             onChange={(e) => onChange({ ...config, ai_cluster: e.target.checked })}
           />
-          Recommended: AI-cluster open responses (first run free)
+          {t("editor.config.aiClusterLabel")}
         </label>
       </div>
     );
@@ -808,10 +796,10 @@ function ConfigEditor({
     return (
       <div className="survey-q-editor__config">
         <div className="survey-q-editor__config-head">
-          <span className="survey-q-editor__config-title">Response settings</span>
+          <span className="survey-q-editor__config-title">{t("editor.config.responseSettings")}</span>
         </div>
         <label className="survey-q-editor__inline-label">
-          Max length
+          {t("editor.config.maxLength")}
           <input
             type="number"
             className="survey-q-editor__inline-input tabular"
@@ -821,7 +809,7 @@ function ConfigEditor({
             step={10}
             onChange={(e) => onChange({ ...config, max_chars: Number(e.target.value) })}
           />
-          characters
+          {t("editor.config.characters")}
         </label>
       </div>
     );
@@ -830,12 +818,11 @@ function ConfigEditor({
     return (
       <div className="survey-q-editor__config">
         <div className="survey-q-editor__config-head">
-          <span className="survey-q-editor__config-title">Scale</span>
-          <span className="survey-q-editor__config-flag">Standard 0–10</span>
+          <span className="survey-q-editor__config-title">{t("editor.config.scale")}</span>
+          <span className="survey-q-editor__config-flag">{t("editor.config.npsStandard")}</span>
         </div>
         <p className="survey-q-editor__config-note">
-          NPS uses the validated 0–10 scale with fixed Detractor / Passive / Promoter buckets.
-          Anchor wording is locked: 0 = "Not at all likely", 10 = "Extremely likely".
+          {t("editor.config.npsNote")}
         </p>
       </div>
     );

@@ -1,0 +1,203 @@
+{
+  "overview": {
+    "tabs": {
+      "overview": "Aperçu",
+      "surveys": "Questionnaires",
+      "interviews": "Entretiens",
+      "participants": "Participants",
+      "report": "Rapport"
+    },
+    "toast": {
+      "surveyCreateFailed": "Impossible de créer le questionnaire",
+      "interviewCreateFailed": "Impossible de créer la série d'entretiens",
+      "validationCreated_one": "Questionnaire de validation créé avec {{count}} question",
+      "validationCreated_other": "Questionnaire de validation créé avec {{count}} questions",
+      "validationGenerateFailed": "Impossible de générer le questionnaire de validation",
+      "generationFailed": "Échec de la génération",
+      "reportGenerated": "Rapport généré",
+      "reportGenerateFailed": "Impossible de générer le rapport"
+    },
+    "untitledSurvey": "Questionnaire sans titre",
+    "untitledInterview": "Série d'entretiens sans titre",
+    "studyNotFound": "Étude introuvable",
+    "loading": "Chargement…",
+    "studiesCrumb": "Études",
+    "allStudies": "← Toutes les études",
+    "studyWorkspace": "Espace de travail de l'étude",
+    "sectionsNav": "Sections de l'étude",
+    "surveys": {
+      "roleStatus": "{{role}} · {{status}}",
+      "questions_one": "{{count}} question",
+      "questions_other": "{{count}} questions",
+      "completed": "{{count}} terminés",
+      "total": "{{count}} au total",
+      "empty": "Aucun questionnaire pour l'instant. Ajoutez-en un pour commencer à recueillir des réponses structurées dans cette étude.",
+      "newSurvey": "+ Nouveau questionnaire"
+    },
+    "interviews": {
+      "eyebrow": "ENTRETIEN · {{language}}",
+      "completed": "{{count}} terminés",
+      "inProgress": "{{count}} en cours",
+      "links_one": "{{count}} lien",
+      "links_other": "{{count}} liens",
+      "empty": "Aucune série d'entretiens pour l'instant. Ajoutez une série d'entretiens pour échanger en profondeur avec les répondants — ou utilisez le Screener Bridge depuis le tableau de bord d'un questionnaire pour en créer une automatiquement à partir d'un segment filtré.",
+      "addRound": "+ Ajouter une série d'entretiens"
+    },
+    "participants": {
+      "intro": "L'identité du participant est la clé de jointure entre les instruments — la même personne à travers les réponses au questionnaire et les transcriptions d'entretiens.",
+      "surveyCompleters": "Questionnaires terminés",
+      "interviewCompleters": "Entretiens terminés",
+      "inferenceThreshold": "Seuil d'inférence",
+      "thresholdValue": "n≥30"
+    },
+    "report": {
+      "loading": "Chargement…",
+      "generateHeadline": "Générer le rapport de thèmes quantifiés",
+      "generateBody": "Combine les agrégats du questionnaire avec les transcriptions d'entretiens en thèmes qui associent ce que les gens ont dit à la fréquence à laquelle ils l'ont dit. Chaque thème porte une prochaine étape recommandée et une pastille de confiance — le même contrat méthodologique utilisé partout ailleurs dans l'espace de travail.",
+      "lowResponseWarning_one": "⚠ Vous avez {{count}} réponse au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
+      "lowResponseWarning_other": "⚠ Vous avez {{count}} réponses au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
+      "generating": "Génération… (≈10 s)",
+      "generate": "Générer le rapport",
+      "versionEyebrow": "Thèmes quantifiés · v{{version}}",
+      "generatedAt": "Généré le {{date}}",
+      "generatedAtUnknown": "Généré le —",
+      "exportPdf": "Exporter en PDF",
+      "exportPdfTitle": "Imprimer ou enregistrer le rapport en PDF",
+      "validateThemes": "Valider ces thèmes →",
+      "validateGenerating": "Génération…",
+      "validateThemesTitle": "Lancer un micro-questionnaire de validation à partir de ces thèmes",
+      "regenerate": "Régénérer",
+      "regenerating": "Régénération…",
+      "lastGenerationFailed": "⚠ La dernière génération a échoué : {{error}}",
+      "unknownError": "erreur inconnue",
+      "executiveSummary": "Résumé",
+      "themes_one": "{{count}} thème",
+      "themes_other": "{{count}} thèmes",
+      "methodology": "Méthodologie",
+      "methodologyStats_survey_one": "{{count}} questionnaire",
+      "methodologyStats_survey_other": "{{count}} questionnaires",
+      "methodologyStats_responses": "{{count}} réponses",
+      "methodologyStats_interview_one": "{{count}} entretien",
+      "methodologyStats_interview_other": "{{count}} entretiens",
+      "metaSeparator": " · "
+    },
+    "validationBanner": {
+      "title": "Validation des thèmes · {{status}}",
+      "progress": "{{completed}} répondants sur {{total}} ont terminé",
+      "draftSuffix": " — le questionnaire est à l'état de brouillon, partagez-le pour commencer la collecte",
+      "editPublish": "Modifier + publier →",
+      "openSurvey": "Ouvrir le questionnaire →"
+    },
+    "theme": {
+      "confidence": {
+        "directional": "Indicatif",
+        "supported": "Étayé",
+        "strong": "Preuve solide"
+      },
+      "kind": {
+        "product": "Action produit",
+        "marketing": "Action marketing",
+        "next_research": "Prochaine étape de recherche"
+      },
+      "surveySignal": "Signal du questionnaire",
+      "n": "n={{count}}",
+      "interviewEvidence": "Preuve d'entretien · {{xOfY}}",
+      "overIndex": " · sur-indice {{value}}×",
+      "segmentLabel": " · {{label}}"
+    },
+    "themeValidation": {
+      "awaiting": "En attente des réponses de validation pour ce thème.",
+      "title": "Validation des thèmes · n={{count}}",
+      "agreedCounts": "{{agreed}} répondants sur {{total}} sont d'accord (en dessous de n=30 ; décomptes uniquement)",
+      "agreedPct": "sont d'accord que ce thème résonne",
+      "ci": " · IC à 95 % {{low}}–{{high}} %"
+    },
+    "recommendedAction": {
+      "eyebrow": "Prochaine étape recommandée",
+      "takeAction": "Passer à l'action →"
+    },
+    "checklist": {
+      "title": "Progression de l'étude",
+      "surveyPublished": "Questionnaire publié",
+      "live": "En ligne",
+      "notYet": "Pas encore",
+      "responsesCollected": "Réponses recueillies",
+      "completed": "{{count}} terminés",
+      "inferenceThreshold": "Seuil d'inférence atteint",
+      "segmentCutsAllowed": "n≥30 — découpages par segment autorisés",
+      "moreResponsesNeeded": "{{count}} réponses supplémentaires nécessaires",
+      "interviewsCompleted": "Entretiens terminés",
+      "mixedMethodsReport": "Rapport méthodes mixtes",
+      "ready": "Prêt"
+    },
+    "summary": {
+      "surveys": "Questionnaires",
+      "live": "En ligne",
+      "drafts": "Brouillons",
+      "surveyResponses": "Réponses au questionnaire",
+      "inferenceGrade": "Niveau d'inférence",
+      "buildingSample": "Constitution de l'échantillon",
+      "interviews": "Entretiens",
+      "projects_one": "{{count}} projet",
+      "projects_other": "{{count}} projets"
+    }
+  },
+  "chartCard": {
+    "completion": "{{count}} % de complétion",
+    "ci": "IC à 95 % ±{{value}} pp",
+    "n": "n={{count}}",
+    "smallNWarning": "⚠ Indicatif uniquement (n<{{minN}})",
+    "smallNTitle": "Échantillon trop petit pour l'inférence ; à considérer comme indicatif"
+  },
+  "executiveSummary": {
+    "eyebrow": "Résumé",
+    "seeRef": "↳ Voir {{ref}}"
+  },
+  "findingCard": {
+    "soWhat": "En clair",
+    "confidence": {
+      "directional": "Indicatif",
+      "supported": "Étayé",
+      "strong": "Preuve solide"
+    }
+  },
+  "crossTab": {
+    "ariaLabel": "Tableau croisé",
+    "themeHeader": "Thème",
+    "columnN": "n={{count}}",
+    "smallNTitle": "Segment trop petit pour l'inférence (n={{columnN}} < {{minN}}). Affichage du décompte à la place.",
+    "empty": "—"
+  },
+  "prioritization": {
+    "ariaLabel": "Recommandations positionnées selon l'impact et la faisabilité",
+    "quadrant": {
+      "doNow": "À FAIRE",
+      "consider": "À ÉTUDIER",
+      "park": "EN ATTENTE",
+      "quickWins": "GAINS RAPIDES"
+    },
+    "axis": {
+      "impact": "Impact →",
+      "feasibility": "Faisabilité →"
+    }
+  },
+  "segment2x2": {
+    "ariaLabel": "Matrice de segments 2x2",
+    "n": "n={{count}}"
+  },
+  "verbatim": {
+    "audioLabel": "Audio du verbatim",
+    "audioLabelNamed": "Audio du verbatim — {{name}}"
+  },
+  "reportScroll": {
+    "tocLabel": "Table des matières du rapport"
+  },
+  "methodology": {
+    "ariaLabel": "Méthodologie de l'étude",
+    "smallNWarning": "⚠ Échantillon insuffisant pour l'inférence — n={{n}} (min {{minN}})"
+  },
+  "compareChips": {
+    "ariaLabel": "Filtrer par segment",
+    "all": "Tout"
+  }
+}

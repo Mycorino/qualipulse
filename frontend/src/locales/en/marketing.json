@@ -5,7 +5,8 @@
     "whoItsFor": "Who it's for",
     "pricing": "Pricing",
     "login": "Log in",
-    "startTrial": "Start free"
+    "startTrial": "Start free",
+    "toggleMenu": "Toggle menu"
   },
   "hero": {
     "badge": "AI-moderated user research",
@@ -83,6 +84,8 @@
     ]
   },
   "copilot": {
+    "badge": "Research Copilot",
+    "previewTitle": "Research Copilot",
     "title": "Your always-on research partner",
     "subtitle": "The Research Copilot turns a rough question into a usable study, suggests next actions, and keeps context across your research program.",
     "features": [

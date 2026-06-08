@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   AnswerSubmission,
@@ -27,6 +28,7 @@ interface AnswerMap {
 }
 
 export default function PublicResponse() {
+  const { t } = useTranslation("shell");
   const { token } = useParams<{ token: string }>();
   const [survey, setSurvey] = useState<PublicSurvey | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function PublicResponse() {
     if (!token) return;
     getPublicSurvey(token)
       .then(setSurvey)
-      .catch(() => setError("This survey is not available."));
+      .catch(() => setError(t("publicResponse.notAvailable")));
   }, [token]);
 
   const missingRequired = useMemo(() => {
@@ -73,7 +75,7 @@ export default function PublicResponse() {
       });
       setSubmitted(true);
     } catch {
-      setError("Something went wrong submitting your response. Please try again.");
+      setError(t("publicResponse.submitError"));
     } finally {
       setSubmitting(false);
     }
@@ -84,7 +86,7 @@ export default function PublicResponse() {
       <div className="public-response">
         <div className="public-response__container public-response__error">
           <h1>{error}</h1>
-          <p>If you think this is a mistake, contact the person who shared the link.</p>
+          <p>{t("publicResponse.errorContactHint")}</p>
         </div>
       </div>
     );
@@ -94,7 +96,7 @@ export default function PublicResponse() {
     return (
       <div className="public-response">
         <div className="public-response__container">
-          <p style={{ color: "var(--text-tertiary)" }}>Loading…</p>
+          <p style={{ color: "var(--text-tertiary)" }}>{t("publicResponse.loading")}</p>
         </div>
       </div>
     );
@@ -104,9 +106,9 @@ export default function PublicResponse() {
     return (
       <div className="public-response">
         <div className="public-response__container public-response__thanks">
-          <h1>Thanks for your response.</h1>
+          <h1>{t("publicResponse.thanksTitle")}</h1>
           <p>
-            Your answers have been recorded. You can close this tab.
+            {t("publicResponse.thanksBody")}
           </p>
         </div>
       </div>
@@ -123,7 +125,7 @@ export default function PublicResponse() {
           )}
           {survey.is_anonymous && (
             <p className="public-response__anon-note">
-              This survey is anonymous — your responses are not linked to your identity.
+              {t("publicResponse.anonymousNote")}
             </p>
           )}
         </header>
@@ -147,7 +149,7 @@ export default function PublicResponse() {
         {!survey.is_anonymous && (
           <div className="public-response__email-block">
             <label className="public-response__email-label" htmlFor="resp-email">
-              Email (optional)
+              {t("publicResponse.emailLabel")}
             </label>
             <input
               id="resp-email"
@@ -155,20 +157,18 @@ export default function PublicResponse() {
               className="public-response__email-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("publicResponse.emailPlaceholder")}
               autoComplete="email"
             />
             <p className="public-response__email-help">
-              Lets us link your response if you come back, and lets the researcher invite you to a
-              follow-up interview. Never shared outside this study.
+              {t("publicResponse.emailHelp")}
             </p>
           </div>
         )}
 
         {missingRequired.length > 0 && (
           <div className="public-response__validation">
-            Please answer the {missingRequired.length} required question
-            {missingRequired.length === 1 ? "" : "s"} above.
+            {t("publicResponse.validation", { count: missingRequired.length })}
           </div>
         )}
 
@@ -178,7 +178,7 @@ export default function PublicResponse() {
             className="btn btn-primary"
             disabled={submitting || missingRequired.length > 0}
           >
-            {submitting ? "Submitting…" : "Submit response"}
+            {submitting ? t("publicResponse.submitting") : t("publicResponse.submit")}
           </button>
         </div>
       </form>
@@ -210,12 +210,13 @@ interface QuestionInputProps {
 }
 
 function QuestionInput({ question, index, value, showError, onChange }: QuestionInputProps) {
+  const { t } = useTranslation("shell");
   return (
     <div>
       <div className={`public-response__qhead${showError ? " public-response__qhead--error" : ""}`}>
         <span className="public-response__qnum tabular">
           {String(index).padStart(2, "0")}
-          {question.is_required ? " · required" : ""}
+          {question.is_required ? ` · ${t("publicResponse.required")}` : ""}
         </span>
         <h2 className="public-response__qprompt">{question.prompt}</h2>
       </div>
@@ -233,10 +234,13 @@ function Renderer({
   value: AnswerSubmission | undefined;
   onChange: (next: Omit<AnswerSubmission, "question_id">) => void;
 }) {
+  const { t } = useTranslation("shell");
   const cfg = question.config;
   if (question.type === "likert") {
     const scale = (cfg.scale as number) ?? 5;
-    const anchors = (cfg.anchors as [string, string]) ?? ["Strongly disagree", "Strongly agree"];
+    const anchors =
+      (cfg.anchors as [string, string]) ??
+      [t("publicResponse.likertLow"), t("publicResponse.likertHigh")];
     return (
       <div>
         <div className="public-response__scale">
@@ -283,8 +287,8 @@ function Renderer({
           })}
         </div>
         <div className="public-response__scale-labels tabular">
-          <span>Not at all likely</span>
-          <span>Extremely likely</span>
+          <span>{t("publicResponse.npsLow")}</span>
+          <span>{t("publicResponse.npsHigh")}</span>
         </div>
       </div>
     );
@@ -332,7 +336,7 @@ function Renderer({
         maxLength={maxChars}
         value={value?.value_text ?? ""}
         onChange={(e) => onChange({ value_text: e.target.value })}
-        placeholder={`Up to ${maxChars} characters…`}
+        placeholder={t("publicResponse.openTextPlaceholder", { maxChars })}
       />
     );
   }
