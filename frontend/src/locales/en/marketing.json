@@ -11,7 +11,7 @@
   "hero": {
     "badge": "AI-moderated user research",
     "title": "AI user interviews.\nDecision-ready memos.",
-    "subtitle": "Launch asynchronous voice interviews, let participants answer in their own time, and get a research memo with themes, quotes, tensions, and recommendations.",
+    "subtitle": "Stop guessing what users want. Describe your question, share a link, and get a decision-ready memo in hours — not weeks. No scheduling, no transcript slog.",
     "cta": "Start free — 3 interviews included",
     "secondaryCta": "See the workflow",
     "note": "3 free interviews · No credit card required · Completed interviews only",
@@ -78,8 +78,53 @@
         "desc": "Share one link. Participants complete a voice interview in their browser — any device, any timezone. The AI asks follow-ups like a trained interviewer. No scheduling, no no-shows."
       },
       {
-        "title": "Read the memo, skip the transcripts",
-        "desc": "Trigger an AI synthesis. Get structured themes with supporting quotes, tensions, and recommendations — ready to share with stakeholders. Chain multiple studies into a multi-step research plan."
+        "title": "Read the memo — transcripts one click away",
+        "desc": "Trigger an AI synthesis. Get structured themes with supporting quotes, tensions, and recommendations — every claim linked to the transcript behind it. Chain multiple studies into a multi-step research plan."
+      }
+    ]
+  },
+  "mixedMethods": {
+    "badge": "Quant + qual",
+    "title": "Size the problem. Then understand it.",
+    "subtitle": "Surveys tell you what's happening and how big it is. Interviews tell you why. QualiPulse runs both in one study — so every finding is deep enough to act on and backed by enough scale to defend.",
+    "items": [
+      {
+        "eyebrow": "Survey",
+        "title": "See where it hurts",
+        "desc": "Reach a sample fast with structured questions. Find the patterns, size the problem, and spot the segments worth a closer look."
+      },
+      {
+        "eyebrow": "Interview",
+        "title": "Understand why",
+        "desc": "Turn your most interesting respondents into AI voice interviews. Get the story, the motivation, and the moment things break."
+      },
+      {
+        "eyebrow": "Together",
+        "title": "A finding you can defend",
+        "desc": "The number and the story in one report — depth a stakeholder believes, scale a stakeholder can't argue with."
+      }
+    ]
+  },
+  "credibility": {
+    "badge": "New — early access",
+    "title": "No logos to show off yet. So judge us on the work.",
+    "subtitle": "QualiPulse is new. Instead of a wall of customer logos, we'd rather you see exactly what you get — and risk nothing to find out.",
+    "items": [
+      {
+        "title": "See a real memo before you sign up",
+        "desc": "The sample above is the actual output format. What you see is what you'll ship to stakeholders."
+      },
+      {
+        "title": "3 interviews free, no card",
+        "desc": "Run a real study end to end before you pay anything. Only completed interviews ever count."
+      },
+      {
+        "title": "You stay in control",
+        "desc": "Review and edit every guide and every memo. Each insight links back to the verbatim transcript — nothing is a black box."
+      },
+      {
+        "title": "Your data stays yours",
+        "desc": "Encrypted storage, GDPR-conscious workflows, EU-hosting ready. We never train models on your research."
       }
     ]
   },
@@ -164,9 +209,9 @@
     ]
   },
   "comparison": {
-    "title": "How QualiPulse compares",
-    "subtitle": "See how we stack up against the tools you may already know.",
-    "headers": ["Feature", "QualiPulse", "Traditional tools"],
+    "title": "QualiPulse vs. doing it the hard way",
+    "subtitle": "What qualitative research looks like with and without QualiPulse.",
+    "headers": ["", "QualiPulse", "The DIY way"],
     "rows": [
       { "feature": "Scheduling required", "quali": "No — async, anytime", "other": "Yes — calendar coordination" },
       { "feature": "AI moderation", "quali": "Built-in, adaptive follow-ups", "other": "Manual or none" },
@@ -177,6 +222,7 @@
     ]
   },
   "trust": {
+    "eyebrow": "Why we built QualiPulse",
     "quote": "\"We built QualiPulse because we were tired of spending 80% of our research time on logistics and 20% on thinking. We wanted to flip that ratio.\"",
     "name": "Corino Fontana",
     "role": "Founder, QualiPulse",
@@ -259,7 +305,8 @@
     ]
   },
   "midCta": {
-    "text": "Start free — 3 interviews included"
+    "text": "Start free — 3 interviews included",
+    "text2": "Run your first study free — your memo's waiting"
   },
   "finalCta": {
     "title": "Your next research study could be done by Friday",

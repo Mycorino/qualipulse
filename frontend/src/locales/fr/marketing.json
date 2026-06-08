@@ -11,7 +11,7 @@
   "hero": {
     "badge": "Recherche utilisateur modérée par IA",
     "title": "Entretiens utilisateurs par IA.\nMémos prêts à décider.",
-    "subtitle": "Lancez des entretiens vocaux asynchrones, laissez les participants répondre à leur rythme, et obtenez un mémo de recherche avec thèmes, citations, tensions et recommandations.",
+    "subtitle": "Arrêtez de deviner ce que veulent vos utilisateurs. Décrivez votre question, partagez un lien, et obtenez un mémo prêt à décider en quelques heures — pas en semaines. Sans planification, sans relecture de transcriptions.",
     "cta": "Commencer — 3 entretiens inclus",
     "secondaryCta": "Voir le workflow",
     "note": "3 entretiens gratuits · Sans carte bancaire · Seuls les entretiens complétés comptent",
@@ -78,8 +78,53 @@
         "desc": "Partagez un lien. Les participants réalisent un entretien vocal dans leur navigateur — sur n'importe quel appareil, dans n'importe quel fuseau horaire. L'IA pose des questions de suivi comme un interviewer expérimenté."
       },
       {
-        "title": "Lisez le mémo, passez les transcriptions",
-        "desc": "Déclenchez une synthèse IA. Obtenez des thèmes structurés avec des citations, des tensions et des recommandations — prêts à partager. Enchaînez plusieurs études dans un plan de recherche multi-étapes."
+        "title": "Lisez le mémo — les transcriptions à un clic",
+        "desc": "Déclenchez une synthèse IA. Obtenez des thèmes structurés avec citations, tensions et recommandations — chaque affirmation reliée à la transcription qui la fonde. Enchaînez plusieurs études dans un plan de recherche multi-étapes."
+      }
+    ]
+  },
+  "mixedMethods": {
+    "badge": "Quanti + quali",
+    "title": "Mesurez le problème. Puis comprenez-le.",
+    "subtitle": "Les questionnaires disent ce qui se passe et à quelle échelle. Les entretiens disent pourquoi. QualiPulse combine les deux dans une même étude — chaque résultat est assez profond pour agir et assez large pour être défendu.",
+    "items": [
+      {
+        "eyebrow": "Questionnaire",
+        "title": "Voyez où ça coince",
+        "desc": "Touchez un échantillon rapidement avec des questions structurées. Repérez les tendances, mesurez le problème et identifiez les segments à creuser."
+      },
+      {
+        "eyebrow": "Entretien",
+        "title": "Comprenez pourquoi",
+        "desc": "Transformez vos répondants les plus intéressants en entretiens vocaux IA. Obtenez le récit, la motivation, et le moment où tout bascule."
+      },
+      {
+        "eyebrow": "Ensemble",
+        "title": "Un résultat que vous pouvez défendre",
+        "desc": "Le chiffre et le récit dans un seul rapport — une profondeur à laquelle un décideur croit, une échelle qu'il ne peut pas contester."
+      }
+    ]
+  },
+  "credibility": {
+    "badge": "Nouveau — accès anticipé",
+    "title": "Pas encore de logos à exhiber. Alors jugez-nous sur le travail.",
+    "subtitle": "QualiPulse est récent. Plutôt qu'un mur de logos clients, nous préférons que vous voyiez exactement ce que vous obtenez — sans aucun risque.",
+    "items": [
+      {
+        "title": "Voyez un vrai mémo avant de vous inscrire",
+        "desc": "L'exemple ci-dessus est le format de sortie réel. Ce que vous voyez est ce que vous partagerez à vos parties prenantes."
+      },
+      {
+        "title": "3 entretiens gratuits, sans carte",
+        "desc": "Menez une vraie étude de bout en bout avant de payer quoi que ce soit. Seuls les entretiens complétés comptent."
+      },
+      {
+        "title": "Vous gardez le contrôle",
+        "desc": "Relisez et modifiez chaque guide et chaque mémo. Chaque insight renvoie à la transcription verbatim — rien n'est une boîte noire."
+      },
+      {
+        "title": "Vos données restent les vôtres",
+        "desc": "Stockage chiffré, workflows pensés RGPD, hébergement UE possible. Nous n'entraînons jamais de modèles sur vos recherches."
       }
     ]
   },
@@ -164,9 +209,9 @@
     ]
   },
   "comparison": {
-    "title": "Comment QualiPulse se compare",
-    "subtitle": "Voyez comment nous nous positionnons face aux outils que vous connaissez.",
-    "headers": ["Fonctionnalité", "QualiPulse", "Outils traditionnels"],
+    "title": "QualiPulse face à la méthode artisanale",
+    "subtitle": "À quoi ressemble la recherche qualitative avec et sans QualiPulse.",
+    "headers": ["", "QualiPulse", "À la main"],
     "rows": [
       { "feature": "Planification nécessaire", "quali": "Non — asynchrone, à tout moment", "other": "Oui — coordination d'agendas" },
       { "feature": "Modération IA", "quali": "Intégrée, relances adaptatives", "other": "Manuelle ou inexistante" },
@@ -177,6 +222,7 @@
     ]
   },
   "trust": {
+    "eyebrow": "Pourquoi nous avons créé QualiPulse",
     "quote": "\"Nous avons créé QualiPulse parce que nous en avions assez de passer 80 % de notre temps de recherche sur la logistique et 20 % à réfléchir. Nous voulions inverser ce ratio.\"",
     "name": "Corino Fontana",
     "role": "Fondateur, QualiPulse",
@@ -259,7 +305,8 @@
     ]
   },
   "midCta": {
-    "text": "Commencer — 3 entretiens inclus"
+    "text": "Commencer — 3 entretiens inclus",
+    "text2": "Lancez votre première étude gratuitement — votre mémo vous attend"
   },
   "finalCta": {
     "title": "Votre prochaine étude pourrait être prête vendredi",
