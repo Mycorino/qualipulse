@@ -14,14 +14,21 @@ import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
-const ROLES = [
-  "Product Manager",
-  "UX Researcher",
-  "Designer",
-  "Founder / CEO",
-  "Marketing",
-  "Other",
+// Two-level role picker: job family → specific role. Labels are i18n'd
+// (welcome_setup: roleFamilies.* and roles.*). We persist the canonical
+// EN role label to Company.role so backend personalisation stays stable
+// regardless of UI language. The "other" family reveals a free-text input.
+const ROLE_FAMILIES: { key: string; roles: string[] }[] = [
+  { key: "product", roles: ["product_manager", "head_of_product", "product_owner"] },
+  { key: "design", roles: ["product_designer", "ux_ui_designer", "design_lead"] },
+  { key: "research", roles: ["ux_researcher", "market_researcher", "insights_manager"] },
+  { key: "marketing", roles: ["product_marketing", "growth", "head_of_marketing"] },
+  { key: "leadership", roles: ["founder_ceo", "coo_gm"] },
+  { key: "people", roles: ["hr_people_ops", "recruiting_talent", "hr_business_partner"] },
+  { key: "consulting", roles: ["consultant", "agency_lead", "independent_researcher"] },
+  { key: "other", roles: [] },
 ];
+const ALL_ROLE_KEYS = ROLE_FAMILIES.flatMap((f) => f.roles);
 const TEAM_SIZES = ["1–10", "11–50", "51–200", "201–1000", "1000+"];
 
 type StepId = 1 | 2 | 3;
@@ -34,6 +41,8 @@ function inferStartStep(me: CompanyResponse): StepId {
 
 export default function Welcome() {
   const { t, i18n } = useTranslation("welcome_setup");
+  // Canonical EN role label (used for persistence) regardless of UI language.
+  const enT = i18n.getFixedT("en", "welcome_setup");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -45,8 +54,9 @@ export default function Welcome() {
 
   // Step 1
   const [companyName, setCompanyName] = useState("");
-  // Step 2
-  const [role, setRole] = useState("");
+  // Step 2 — job family → role (two levels)
+  const [roleFamily, setRoleFamily] = useState("");
+  const [roleKey, setRoleKey] = useState("");
   const [roleOther, setRoleOther] = useState("");
   const [teamSize, setTeamSize] = useState("");
   // Step 3
@@ -59,8 +69,17 @@ export default function Welcome() {
       .then((data) => {
         setMe(data);
         setCompanyName(data.name || "");
-        setRole(data.role || "");
-        if (data.role && !ROLES.includes(data.role)) setRoleOther(data.role);
+        const storedRole = (data.role || "").trim();
+        if (storedRole) {
+          const match = ALL_ROLE_KEYS.find((rk) => enT(`roles.${rk}`) === storedRole);
+          if (match) {
+            setRoleKey(match);
+            setRoleFamily(ROLE_FAMILIES.find((f) => f.roles.includes(match))?.key || "");
+          } else {
+            setRoleFamily("other");
+            setRoleOther(storedRole);
+          }
+        }
         setTeamSize(data.company_size || "");
         const rawUc = data.selected_use_cases as unknown;
         if (rawUc && typeof rawUc === "string") {
@@ -77,7 +96,12 @@ export default function Welcome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const roleResolved = role === "Other" ? roleOther.trim() : role;
+  const roleResolved =
+    roleFamily === "other"
+      ? roleOther.trim()
+      : roleKey
+        ? enT(`roles.${roleKey}`)
+        : "";
   const step1Valid = !!companyName.trim();
   const step2Valid = !!roleResolved && !!teamSize;
 
@@ -89,8 +113,8 @@ export default function Welcome() {
     } catch {
       setSuggestions({
         use_cases: i18n.language.startsWith("fr")
-          ? ["Découverte produit", "Test de concept", "Recherche onboarding", "Marque & messaging", "Tests d'utilisabilité"]
-          : ["Product discovery", "Concept testing", "Onboarding research", "Brand & messaging", "Usability testing"],
+          ? ["Pourquoi les utilisateurs décrochent après l'inscription", "Ce qui bloque le premier achat", "Quelles fonctionnalités fidélisent vraiment", "Pourquoi les prospects choisissent un concurrent", "Où la prise en main perd les utilisateurs"]
+          : ["Why users drop off after signup", "What blocks the first purchase", "Which features actually drive retention", "Why prospects pick a competitor", "Where onboarding loses people"],
         profile_summary: null,
         business_summary: null,
       });
@@ -120,7 +144,7 @@ export default function Welcome() {
     setSaving(true);
     try {
       const next = await saveOnboardingProfile({
-        role: roleResolved || role,
+        role: roleResolved,
         company_size: teamSize,
       });
       setMe(next);
@@ -181,7 +205,7 @@ export default function Welcome() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, step1Valid, step2Valid, saving, companyName, role, roleOther, teamSize]);
+  }, [step, step1Valid, step2Valid, saving, companyName, roleFamily, roleKey, roleOther, teamSize]);
 
   if (loading || !me) {
     return (
@@ -276,23 +300,48 @@ export default function Welcome() {
             <p className="welcome-setup__sub">{t("step_2_sub")}</p>
 
             <div className="welcome-setup__field">
-              <span className="welcome-setup__field-label">{t("field_role")}</span>
+              <span className="welcome-setup__field-label">{t("field_role_family")}</span>
               <div className="welcome-setup__chips" role="radiogroup">
-                {ROLES.map((r) => (
+                {ROLE_FAMILIES.map((f) => (
                   <button
-                    key={r}
+                    key={f.key}
                     type="button"
                     role="radio"
-                    aria-checked={role === r}
-                    className={`welcome-setup__chip ${role === r ? "welcome-setup__chip--active" : ""}`}
-                    onClick={() => setRole(r)}
+                    aria-checked={roleFamily === f.key}
+                    className={`welcome-setup__chip ${roleFamily === f.key ? "welcome-setup__chip--active" : ""}`}
+                    onClick={() => { setRoleFamily(f.key); setRoleKey(""); }}
                     disabled={saving}
                   >
-                    {r}
+                    {t(`roleFamilies.${f.key}`)}
                   </button>
                 ))}
               </div>
-              {role === "Other" && (
+            </div>
+
+            {roleFamily && roleFamily !== "other" && (
+              <div className="welcome-setup__field">
+                <span className="welcome-setup__field-label">{t("field_role")}</span>
+                <div className="welcome-setup__chips" role="radiogroup">
+                  {(ROLE_FAMILIES.find((f) => f.key === roleFamily)?.roles ?? []).map((rk) => (
+                    <button
+                      key={rk}
+                      type="button"
+                      role="radio"
+                      aria-checked={roleKey === rk}
+                      className={`welcome-setup__chip ${roleKey === rk ? "welcome-setup__chip--active" : ""}`}
+                      onClick={() => setRoleKey(rk)}
+                      disabled={saving}
+                    >
+                      {t(`roles.${rk}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {roleFamily === "other" && (
+              <div className="welcome-setup__field">
+                <span className="welcome-setup__field-label">{t("field_role")}</span>
                 <input
                   type="text"
                   className="welcome-setup__other-input"
@@ -303,8 +352,8 @@ export default function Welcome() {
                   autoFocus
                   disabled={saving}
                 />
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="welcome-setup__field">
               <span className="welcome-setup__field-label">{t("field_team_size")}</span>
