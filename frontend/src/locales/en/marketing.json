@@ -9,11 +9,11 @@
     "toggleMenu": "Toggle menu"
   },
   "hero": {
-    "badge": "AI-moderated user research",
-    "title": "AI user interviews.\nDecision-ready memos.",
-    "subtitle": "Stop guessing what users want. Describe your question, share a link, and get a decision-ready memo in hours — not weeks. No scheduling, no transcript slog.",
+    "badge": "User research, without the busywork",
+    "title": "Stop guessing\nwhat your users want.",
+    "subtitle": "Every product decision is a bet on what people want — and building the wrong thing is the most expensive mistake there is. QualiPulse interviews your users for you and turns it into clear answers: the top themes, the quotes that back them, and what to do next — in hours, not weeks.",
     "cta": "Start free — 3 interviews included",
-    "secondaryCta": "See the workflow",
+    "secondaryCta": "See how it works",
     "note": "3 free interviews · No credit card required · Completed interviews only",
     "previewLabel": "Example research memo preview",
     "reportKicker": "AI research memo",
