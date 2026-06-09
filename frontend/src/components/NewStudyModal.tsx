@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { createSurvey } from "../api/surveys";
 import { createProject } from "../api/projects";
+import { getErrorMessage } from "../utils/errorMessages";
 import { useToast } from "./Toast";
 
 /**
@@ -90,8 +91,10 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
         role: angle === "both" ? "screener" : "standalone",
       });
       navigate(`/surveys/${survey.id}/edit`);
-    } catch {
-      toast(t("newStudyModal.createError"), "error");
+    } catch (err) {
+      // Surface the real reason (e.g. "Project limit reached — upgrade")
+      // instead of a generic toast that hides why it failed.
+      toast(getErrorMessage(err, t("newStudyModal.createError")), "error");
       setBusy(false);
     }
   };
