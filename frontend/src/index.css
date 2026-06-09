@@ -11445,36 +11445,53 @@ select.field-input {
   padding: 0 4px;
 }
 
-/* Clarifying-question reply chips — full-width answers stacked one under
-   another (uniform size), plus a "type your own answer" affordance that
-   opens an inline field. Mirrors the Claude / ChatGPT pattern. */
+/* Clarifying-question reply panel — a distinct UI card (not loose chat
+   chips): an eyebrow, a stack of uniform full-width answer options, and an
+   always-present free-form field to type a custom answer. Visually echoes
+   the proposal cards so it reads as interface, not conversation. */
 .copilot-replies {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.copilot-replies__eyebrow {
+  font-size: var(--text-eyebrow, var(--text-xs));
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+.copilot-replies__options {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  margin-top: var(--space-3);
 }
-.copilot-reply-chip {
+.copilot-reply-option {
   display: block;
   width: 100%;
-  text-align: center;
+  text-align: left;
   font-family: inherit;
   font-size: var(--text-sm);
   color: var(--text-primary);
-  background: var(--bg-surface);
+  background: var(--bg-base);
   border: 1px solid var(--border-default);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
 }
-.copilot-reply-chip:hover:not(:disabled) {
+.copilot-reply-option:hover:not(:disabled) {
   border-color: var(--brand-400, var(--brand-500));
-  background: var(--bg-base);
+  background: var(--bg-surface);
 }
-.copilot-reply-chip:disabled { opacity: 0.5; cursor: default; }
-.copilot-reply-chip--freeform {
-  color: var(--text-secondary);
-  border-style: dashed;
+.copilot-reply-option:disabled { opacity: 0.5; cursor: default; }
+.copilot-replies__or {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+  margin: var(--space-2) 0;
 }
 .copilot-reply-freeform {
   display: flex;
@@ -11486,10 +11503,14 @@ select.field-input {
   font-family: inherit;
   font-size: var(--text-sm);
   color: var(--text-primary);
-  background: var(--bg-surface);
-  border: 1px solid var(--brand-400, var(--brand-500));
-  border-radius: 999px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
+}
+.copilot-reply-freeform__field:focus {
+  outline: none;
+  border-color: var(--brand-400, var(--brand-500));
 }
 
 .copilot-proposal {
