@@ -91,6 +91,10 @@ export function ResearchCopilotPanel({
   const [thread, setThread] = useState<ThreadItem[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // Which suggest_replies group (by action id) has its inline "type your
+  // own answer" field open, and the text typed into it.
+  const [freeReplyFor, setFreeReplyFor] = useState<string | null>(null);
+  const [freeReplyText, setFreeReplyText] = useState("");
   // Live narration of the agent's current step ("Reading your interviews…")
   // while busy. Falls back to a generic "Thinking…" between status events.
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
@@ -214,6 +218,14 @@ export function ResearchCopilotPanel({
       setStatusLabel(null);
       setBusy(false);
     }
+  };
+
+  const submitFreeReply = () => {
+    const v = freeReplyText.trim();
+    if (!v || busy) return;
+    setFreeReplyFor(null);
+    setFreeReplyText("");
+    send(v);
   };
 
   const setStatus = (actionId: string, status: PendingAction["status"]) => {
@@ -394,6 +406,48 @@ export function ResearchCopilotPanel({
                         {opt}
                       </button>
                     ))}
+                    {freeReplyFor === a.id ? (
+                      <div className="copilot-reply-freeform">
+                        <input
+                          className="copilot-reply-freeform__field"
+                          value={freeReplyText}
+                          onChange={(e) => setFreeReplyText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              submitFreeReply();
+                            }
+                            if (e.key === "Escape") {
+                              setFreeReplyFor(null);
+                              setFreeReplyText("");
+                            }
+                          }}
+                          placeholder={t("copilot.freeReplyPlaceholder")}
+                          autoFocus
+                          disabled={busy}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={submitFreeReply}
+                          disabled={busy || !freeReplyText.trim()}
+                        >
+                          {t("copilot.send")}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="copilot-reply-chip copilot-reply-chip--freeform"
+                        onClick={() => {
+                          setFreeReplyFor(a.id);
+                          setFreeReplyText("");
+                        }}
+                        disabled={busy}
+                      >
+                        {t("copilot.freeReplyButton")}
+                      </button>
+                    )}
                   </div>
                 ))}
             </div>

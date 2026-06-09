@@ -164,6 +164,8 @@
     "thinking": "Réflexion…",
     "inputPlaceholder": "Posez votre question au copilote…",
     "send": "Envoyer",
+    "freeReplyButton": "✏️ Écrire ma réponse",
+    "freeReplyPlaceholder": "Votre réponse…",
     "unavailable": "Le copilote est indisponible pour le moment",
     "errorReply": "Désolé — je n'ai pas pu répondre. Réessayez.",
     "applyError": "Impossible d'appliquer cette modification",
