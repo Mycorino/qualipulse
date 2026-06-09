@@ -731,8 +731,10 @@ def get_onboarding_suggestions(
                     f"usability, comprehension, friction. Ground them in the company's context. "
                     f"Do NOT use commas inside a suggestion. When writing in French, "
                     f"follow French typography (a space before ? ! : ;).\n"
-                    f"2. Write a 1-2 sentence profile summary confirming what you understand "
-                    f"about them and their company.\n\n"
+                    f"2. Write a warm 1-2 sentence summary addressed DIRECTLY to the user in "
+                    f"the second person (\"You…\" / \"Vous…\"), confirming what you understand "
+                    f"about their role and their company. Never describe them in the third "
+                    f"person (never \"This person\" / \"Cette personne\").\n\n"
                     f"Output ONLY valid JSON in {output_lang}:\n"
                     f'{{"use_cases": ["...", "..."], "profile_summary": "..."}}'
                 ),
