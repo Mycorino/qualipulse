@@ -91,10 +91,9 @@ export function ResearchCopilotPanel({
   const [thread, setThread] = useState<ThreadItem[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  // Which suggest_replies group (by action id) has its inline "type your
-  // own answer" field open, and the text typed into it.
-  const [freeReplyFor, setFreeReplyFor] = useState<string | null>(null);
-  const [freeReplyText, setFreeReplyText] = useState("");
+  // Free-form draft per suggest_replies group (keyed by action id) — the
+  // editable field is always shown alongside the option buttons.
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   // Live narration of the agent's current step ("Reading your interviews…")
   // while busy. Falls back to a generic "Thinking…" between status events.
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
@@ -220,11 +219,10 @@ export function ResearchCopilotPanel({
     }
   };
 
-  const submitFreeReply = () => {
-    const v = freeReplyText.trim();
+  const submitFreeReply = (actionId: string) => {
+    const v = (replyDrafts[actionId] ?? "").trim();
     if (!v || busy) return;
-    setFreeReplyFor(null);
-    setFreeReplyText("");
+    setReplyDrafts((d) => ({ ...d, [actionId]: "" }));
     send(v);
   };
 
@@ -395,59 +393,50 @@ export function ResearchCopilotPanel({
                 )
                 .map((a) => (
                   <div key={a.id} className="copilot-replies" role="group">
-                    {(a.options ?? []).map((opt, k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        className="copilot-reply-chip"
-                        onClick={() => send(opt)}
-                        disabled={busy}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                    {freeReplyFor === a.id ? (
-                      <div className="copilot-reply-freeform">
-                        <input
-                          className="copilot-reply-freeform__field"
-                          value={freeReplyText}
-                          onChange={(e) => setFreeReplyText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              submitFreeReply();
-                            }
-                            if (e.key === "Escape") {
-                              setFreeReplyFor(null);
-                              setFreeReplyText("");
-                            }
-                          }}
-                          placeholder={t("copilot.freeReplyPlaceholder")}
-                          autoFocus
-                          disabled={busy}
-                        />
+                    <div className="copilot-replies__eyebrow">
+                      {t("copilot.replyEyebrow")}
+                    </div>
+                    <div className="copilot-replies__options">
+                      {(a.options ?? []).map((opt, k) => (
                         <button
+                          key={k}
                           type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={submitFreeReply}
-                          disabled={busy || !freeReplyText.trim()}
+                          className="copilot-reply-option"
+                          onClick={() => send(opt)}
+                          disabled={busy}
                         >
-                          {t("copilot.send")}
+                          {opt}
                         </button>
-                      </div>
-                    ) : (
+                      ))}
+                    </div>
+                    <div className="copilot-replies__or">
+                      {t("copilot.replyOr")}
+                    </div>
+                    <div className="copilot-reply-freeform">
+                      <input
+                        className="copilot-reply-freeform__field"
+                        value={replyDrafts[a.id] ?? ""}
+                        onChange={(e) =>
+                          setReplyDrafts((d) => ({ ...d, [a.id]: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            submitFreeReply(a.id);
+                          }
+                        }}
+                        placeholder={t("copilot.freeReplyPlaceholder")}
+                        disabled={busy}
+                      />
                       <button
                         type="button"
-                        className="copilot-reply-chip copilot-reply-chip--freeform"
-                        onClick={() => {
-                          setFreeReplyFor(a.id);
-                          setFreeReplyText("");
-                        }}
-                        disabled={busy}
+                        className="btn btn-primary btn-sm"
+                        onClick={() => submitFreeReply(a.id)}
+                        disabled={busy || !(replyDrafts[a.id] ?? "").trim()}
                       >
-                        {t("copilot.freeReplyButton")}
+                        {t("copilot.send")}
                       </button>
-                    )}
+                    </div>
                   </div>
                 ))}
             </div>

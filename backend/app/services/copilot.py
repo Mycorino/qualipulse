@@ -222,6 +222,19 @@ def _filter_proposal_turn_actions(actions: list[dict]) -> list[dict]:
     ]
 
 
+def _suppress_opening_chips(
+    actions: list[dict], adapter: "CopilotAdapter", is_first_turn: bool
+) -> list[dict]:
+    """The interview opener must be a single OPEN context question in free
+    text — never a chip-based targeting question. The methodology says so,
+    but the model doesn't always obey, so we hard-strip any suggest_replies
+    on the very first turn of an interview-guide conversation. Other
+    surfaces (e.g. onboarding) keep their first-turn chips."""
+    if not (is_first_turn and adapter.kind == "interview"):
+        return actions
+    return [a for a in actions if a.get("type") != "suggest_replies"]
+
+
 @dataclass
 class CopilotAdapter:
     """Everything surface-specific. The agent core is generic over this.
@@ -508,6 +521,9 @@ def run_copilot_turn_stream(
     and existing tests that call it directly.
     """
     history = [{"role": m.role, "content": m.content} for m in messages]
+    # First turn = the opening user message is the only user turn so far.
+    # Used to keep the interview opener chip-free (open context question).
+    is_first_turn = sum(1 for m in messages if m.role == "user") <= 1
 
     if not settings.ANTHROPIC_API_KEY:
         # Stub path — no streaming, just emit the canned final.
@@ -632,7 +648,9 @@ def run_copilot_turn_stream(
     yield {
         "type": "done",
         "reply": "\n\n".join(reply_parts).strip() or adapter.default_reply,
-        "proposed_actions": _filter_proposal_turn_actions(turn.actions),
+        "proposed_actions": _filter_proposal_turn_actions(
+            _suppress_opening_chips(turn.actions, adapter, is_first_turn)
+        ),
         "memory_updated": turn.memory_updated,
     }
 

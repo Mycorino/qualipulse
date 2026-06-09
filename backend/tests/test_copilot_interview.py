@@ -9,7 +9,9 @@ from types import SimpleNamespace
 from app.models.company import Company
 from app.models.project import Project
 
+from app.services.copilot import _suppress_opening_chips
 from app.services.copilot_interview import (
+    INTERVIEW_ADAPTER,
     _analysis_snapshot,
     _guide_run_tool,
     _interviews_index,
@@ -388,6 +390,20 @@ class TestResultsCopilotProposals:
             "interview_duration_minutes": 60,
             "target_participants": 12,
         }
+
+    def test_opening_turn_strips_chips(self):
+        """The interview opener must be a chip-free open context question."""
+        actions = [
+            {"type": "suggest_replies", "question_text": "Which market?", "options": ["FR"]},
+            {"type": "edit_objective", "new_objective": "x"},
+        ]
+        out = _suppress_opening_chips(actions, INTERVIEW_ADAPTER, is_first_turn=True)
+        assert [a["type"] for a in out] == ["edit_objective"]
+
+    def test_later_turn_keeps_chips(self):
+        actions = [{"type": "suggest_replies", "options": ["FR"]}]
+        out = _suppress_opening_chips(actions, INTERVIEW_ADAPTER, is_first_turn=False)
+        assert out == actions
 
     def test_propose_screening_drops_disqualifying_not_in_options(self, db_session):
         company, project = self._seed(db_session)
