@@ -230,6 +230,7 @@
     "linkBlockedTitle": "Crédits insuffisants pour votre objectif",
     "creditGateTitle": "Crédits insuffisants pour mener cette étude",
     "creditGateBody": "Votre objectif est de {{target}} entretiens, mais vous avez {{credits}} crédit(s) — 1 crédit = 1 entretien complété. Réduisez votre objectif ou ajoutez des crédits pour générer le lien.",
+    "creditGateBelowMin": "À noter : {{credits}} est en dessous de ~5, le minimum pour des résultats fiables — mieux vaut ajouter des crédits.",
     "creditGateLower": "Fixer l'objectif à {{credits}} et continuer",
     "creditGateLowered": "Objectif fixé à {{credits}} — vous pouvez générer le lien.",
     "creditGateUpgrade": "Obtenir plus de crédits"
@@ -247,6 +248,8 @@
     "planDurationLabel": "Durée de l'entretien (minutes)",
     "planTargetLabel": "Nombre d'entretiens visé",
     "planTargetPlaceholder": "ex. 12",
+    "planTargetHint": "Au moins 5 recommandés pour des résultats fiables.",
+    "planTargetTooLow": "Moins de 5 entretiens : les tendances peuvent ne pas être fiables.",
     "planSaved": "Enregistré",
     "guideTitle": "Guide d'entretien",
     "welcomeMessage": "Message d'accueil",

@@ -230,6 +230,7 @@
     "linkBlockedTitle": "Not enough credits for your target",
     "creditGateTitle": "Not enough credits to field this study",
     "creditGateBody": "Your target is {{target}} interviews, but you have {{credits}} credit(s) — 1 credit = 1 completed interview. Lower your target or get more credits to generate the link.",
+    "creditGateBelowMin": "Heads up: {{credits}} is below ~5, the minimum for reliable findings — topping up is the better call.",
     "creditGateLower": "Set target to {{credits}} & continue",
     "creditGateLowered": "Target set to {{credits}} — you can generate the link now.",
     "creditGateUpgrade": "Get more credits"
@@ -247,6 +248,8 @@
     "planDurationLabel": "Interview length (minutes)",
     "planTargetLabel": "Target number of interviews",
     "planTargetPlaceholder": "e.g. 12",
+    "planTargetHint": "At least 5 recommended for reliable findings.",
+    "planTargetTooLow": "Fewer than 5 interviews may not surface reliable patterns.",
     "planSaved": "Saved",
     "guideTitle": "Interview guide",
     "welcomeMessage": "Welcome message",

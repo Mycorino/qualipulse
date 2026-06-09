@@ -1840,6 +1840,13 @@ export default function ProjectDetail() {
                       defaultValue:
                         "Your target is {{target}} interviews, but you have {{credits}} credit(s) — 1 credit = 1 completed interview. Lower your target or get more credits to generate the link.",
                     })}
+                    {(availableCredits ?? 0) < 5 && (
+                      <> {tProject("overview.creditGateBelowMin", {
+                        credits: availableCredits,
+                        defaultValue:
+                          "Heads up: {{credits}} is below ~5, the minimum for reliable findings — topping up is the better call.",
+                      })}</>
+                    )}
                   </p>
                   <div className="credit-gate__actions">
                     {(availableCredits ?? 0) >= 1 && (
@@ -2049,6 +2056,15 @@ export default function ProjectDetail() {
                       }
                     }}
                   />
+                  {project.target_participants == null ? (
+                    <p className="field-hint" style={{ fontSize: 12, marginTop: 4 }}>
+                      {tProject("setup.planTargetHint", { defaultValue: "At least 5 recommended for reliable findings." })}
+                    </p>
+                  ) : project.target_participants < 5 ? (
+                    <p className="field-hint field-hint--warning" style={{ fontSize: 12, marginTop: 4, color: "var(--warning-text)" }}>
+                      {tProject("setup.planTargetTooLow", { defaultValue: "Fewer than 5 interviews may not surface reliable patterns." })}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </section>
