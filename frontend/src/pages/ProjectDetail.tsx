@@ -1849,7 +1849,11 @@ export default function ProjectDetail() {
                     )}
                   </p>
                   <div className="credit-gate__actions">
-                    {(availableCredits ?? 0) >= 1 && (
+                    {/* Only offer the lower-target shortcut when it still
+                        lands on a genuine sample (>= 5). Below that we don't
+                        nudge an underpowered study — the user can lower it
+                        themselves in Setup if they really want to. */}
+                    {(availableCredits ?? 0) >= 5 && (
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={async () => {
