@@ -241,11 +241,19 @@ export function ResearchCopilotPanel({
     );
   };
 
+  // Accepting a staged proposal (objective / settings) should move the
+  // conversation to the next step instead of leaving it idle — the
+  // Copilot reads the updated snapshot and proposes whatever comes next.
+  const AUTO_CONTINUE_AFTER = new Set(["edit_objective", "edit_settings"]);
+
   const accept = async (action: PendingAction) => {
     try {
       await target.applyAction(action);
       setStatus(action.id, "accepted");
       onApplied();
+      if (AUTO_CONTINUE_AFTER.has(action.type)) {
+        send(t("copilot.continueAfterAccept"));
+      }
     } catch {
       toast(t("copilot.applyError"), "error");
     }
