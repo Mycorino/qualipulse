@@ -21,11 +21,15 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 const ROLE_FAMILIES: { key: string; roles: string[] }[] = [
   { key: "product", roles: ["product_manager", "head_of_product", "product_owner"] },
   { key: "design", roles: ["product_designer", "ux_ui_designer", "design_lead"] },
-  { key: "research", roles: ["ux_researcher", "market_researcher", "insights_manager"] },
-  { key: "marketing", roles: ["product_marketing", "growth", "head_of_marketing"] },
-  { key: "leadership", roles: ["founder_ceo", "coo_gm"] },
-  { key: "people", roles: ["hr_people_ops", "recruiting_talent", "hr_business_partner"] },
-  { key: "consulting", roles: ["consultant", "agency_lead", "independent_researcher"] },
+  { key: "research", roles: ["ux_researcher", "market_researcher", "insights_data"] },
+  { key: "marketing", roles: ["product_marketing", "brand_marketing", "growth"] },
+  { key: "sales_cs", roles: ["sales", "customer_success", "support"] },
+  { key: "data", roles: ["data_analyst", "data_scientist", "product_analyst"] },
+  { key: "ops", roles: ["operations", "strategy_bizops", "project_manager"] },
+  { key: "people", roles: ["hr_people_ops", "recruiting", "learning_dev"] },
+  { key: "engineering", roles: ["engineer", "engineering_manager", "cto"] },
+  { key: "leadership", roles: ["founder_ceo", "exec"] },
+  { key: "consulting", roles: ["consultant", "agency_lead", "independent"] },
   { key: "other", roles: [] },
 ];
 const ALL_ROLE_KEYS = ROLE_FAMILIES.flatMap((f) => f.roles);
@@ -113,8 +117,8 @@ export default function Welcome() {
     } catch {
       setSuggestions({
         use_cases: i18n.language.startsWith("fr")
-          ? ["Pourquoi les utilisateurs décrochent après l'inscription", "Ce qui bloque le premier achat", "Quelles fonctionnalités fidélisent vraiment", "Pourquoi les prospects choisissent un concurrent", "Où la prise en main perd les utilisateurs"]
-          : ["Why users drop off after signup", "What blocks the first purchase", "Which features actually drive retention", "Why prospects pick a competitor", "Where onboarding loses people"],
+          ? ["Pourquoi les utilisateurs décrochent", "Ce qui favorise la fidélité", "Comment les gens font leur choix", "Où l'expérience crée de la friction", "Ce que les clients valorisent le plus"]
+          : ["Why users drop off", "What drives loyalty and repeat use", "How people choose between options", "Where the experience creates friction", "What customers value most"],
         profile_summary: null,
         business_summary: null,
       });
