@@ -168,6 +168,7 @@
     "freeReplyPlaceholder": "Type your own answer…",
     "replyEyebrow": "Choose an answer",
     "replyOr": "or write your own",
+    "continueAfterAccept": "Looks good — let's move to the next step.",
     "unavailable": "The copilot is unavailable right now",
     "errorReply": "Sorry — I couldn't respond. Please try again.",
     "applyError": "Couldn't apply that change",
