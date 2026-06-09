@@ -9,11 +9,11 @@
     "toggleMenu": "Ouvrir le menu"
   },
   "hero": {
-    "badge": "Entretiens utilisateurs animés par IA",
-    "title": "Entretiens utilisateurs par IA.\nDes mémos prêts à décider.",
-    "subtitle": "Arrêtez de deviner ce que veulent vos utilisateurs. Décrivez votre question, partagez un lien, et recevez un mémo prêt à décider en quelques heures — pas en quelques semaines. Sans planification, sans relecture de transcriptions.",
+    "badge": "La recherche utilisateur, sans la corvée",
+    "title": "Arrêtez de deviner\nce que veulent vos utilisateurs.",
+    "subtitle": "Chaque décision produit est un pari sur ce que veulent les gens — et se tromper de produit est l'erreur la plus coûteuse qui soit. QualiPulse interroge vos utilisateurs à votre place et en tire des réponses claires : les thèmes principaux, les citations qui les appuient, et quoi faire ensuite — en quelques heures, pas en quelques semaines.",
     "cta": "Commencer — 3 entretiens inclus",
-    "secondaryCta": "Voir le déroulé",
+    "secondaryCta": "Voir comment ça marche",
     "note": "3 entretiens gratuits · Sans carte bancaire · Seuls les entretiens terminés sont décomptés",
     "previewLabel": "Aperçu d'un mémo de recherche",
     "reportKicker": "Mémo de recherche IA",
