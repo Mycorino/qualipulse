@@ -417,7 +417,7 @@ export default function Welcome() {
                       {t("step_3_use_cases_hint")}
                     </p>
                     <div className="welcome-setup__chips">
-                      {suggestions.use_cases.map((uc) => (
+                      {(Array.isArray(suggestions.use_cases) ? suggestions.use_cases : []).map((uc) => (
                         <button
                           key={uc}
                           type="button"
