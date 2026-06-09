@@ -644,18 +644,18 @@ def _schedule_company_name_backfill(company_id: str) -> None:
 # ── Onboarding suggestions (Haiku) ──────────────────────────────────────────
 
 _FALLBACK_USE_CASES_EN = [
-    "Why users drop off after signup",
-    "What blocks the first purchase",
-    "Which features actually drive retention",
-    "Why prospects pick a competitor",
-    "Where onboarding loses people",
+    "Why users drop off",
+    "What drives loyalty and repeat use",
+    "How people choose between options",
+    "Where the experience creates friction",
+    "What customers value most",
 ]
 _FALLBACK_USE_CASES_FR = [
-    "Pourquoi les utilisateurs décrochent après l'inscription",
-    "Ce qui bloque le premier achat",
-    "Quelles fonctionnalités fidélisent vraiment",
-    "Pourquoi les prospects choisissent un concurrent",
-    "Où la prise en main perd les utilisateurs",
+    "Pourquoi les utilisateurs décrochent",
+    "Ce qui favorise la fidélité",
+    "Comment les gens font leur choix",
+    "Où l'expérience crée de la friction",
+    "Ce que les clients valorisent le plus",
 ]
 
 
@@ -720,17 +720,23 @@ def get_onboarding_suggestions(
                 "role": "user",
                 "content": (
                     f"Based on this user profile:\n{context_block}\n\n"
-                    f"1. Suggest 4-5 research questions this person would genuinely want "
-                    f"answered. Each must be a concrete, valuable research objective phrased "
-                    f"as a short line of 5-8 words — NOT a vague topic tag. The reader should "
-                    f"immediately see why running it is worth their time. Tailor each to their "
-                    f"ROLE'S DOMAIN: a People/HR role -> employee, candidate or onboarding "
-                    f"experience; a Product role -> discovery, adoption, churn, pricing; a "
-                    f"Research/Insights role -> market sizing, competitor choice, segment needs; "
-                    f"a Marketing role -> messaging, positioning, channel; a Design role -> "
-                    f"usability, comprehension, friction. Ground them in the company's context. "
-                    f"Do NOT use commas inside a suggestion. When writing in French, "
-                    f"follow French typography (a space before ? ! : ;).\n"
+                    f"1. Suggest 4-5 BROAD research themes this person could explore — "
+                    f"relevant to their ROLE'S DOMAIN but NOT hyper-specific to one feature, "
+                    f"flow, or the company's exact situation. Think reusable research areas, "
+                    f"4-7 words each, phrased as a clear objective the user instantly "
+                    f"recognises as relevant to their work (e.g. 'Understand why users drop "
+                    f"off', 'Identify friction in the buying journey', 'What drives loyalty "
+                    f"and repeat use'). HARD LIMITS: 6 words maximum, and do NOT mention the "
+                    f"company name, its industry, or its products inside a theme — each theme "
+                    f"must stay generic enough to fit many companies in this role. Tailor the "
+                    f"THEME to the domain: People/HR -> employees, "
+                    f"candidates, onboarding, engagement; Product -> adoption, retention, "
+                    f"prioritisation; Research/Insights -> needs, segments, market; Marketing "
+                    f"-> positioning, messaging, channels; Design -> usability, comprehension; "
+                    f"Sales/CS -> objections, churn, satisfaction; Data -> behaviour patterns, "
+                    f"drivers. Keep them general enough to fit many studies. Do NOT use commas "
+                    f"inside a suggestion. When writing in French, follow French typography "
+                    f"(a space before ? ! : ;).\n"
                     f"2. Write a warm 1-2 sentence summary addressed DIRECTLY to the user in "
                     f"the second person (\"You…\" / \"Vous…\"), confirming what you understand "
                     f"about their role and their company. Never describe them in the third "
