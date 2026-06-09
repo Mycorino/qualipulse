@@ -13,6 +13,9 @@
   "modal_eyebrow": "Unlock your full study",
   "modal_title": "{{count}} more transcripts ready to listen to",
   "modal_body": "You've already collected the data — choose how to access it. Subscriptions also include monthly new credits to keep researching.",
+  "credits_modal_eyebrow": "Field your full study",
+  "credits_modal_title": "Unlock {{count}} more interviews",
+  "credits_modal_body": "Your target needs more credits than your plan includes (1 credit = 1 completed interview). Subscribe to field the whole study and get fresh credits every month.",
 
   "subscription_eyebrow": "Ongoing research",
   "subscription_title": "Monthly plan",

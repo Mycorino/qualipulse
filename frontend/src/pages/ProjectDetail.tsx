@@ -152,6 +152,7 @@ export default function ProjectDetail() {
   const [unlockState, setUnlockState] = useState<{
     open: boolean;
     lockedCount: number;
+    mode?: "transcripts" | "credits";
   }>({ open: false, lockedCount: 0 });
   // Helper — extract paywall payload from an Axios 402 response.
   // Returns null when the error isn't a paywall (so the caller can
@@ -683,7 +684,7 @@ export default function ProjectDetail() {
     // instead of creating a link.
     const tgt = project?.target_participants ?? null;
     if (tgt != null && availableCredits != null && tgt > availableCredits) {
-      setUnlockState({ open: true, lockedCount: tgt - availableCredits });
+      setUnlockState({ open: true, lockedCount: tgt - availableCredits, mode: "credits" });
       return;
     }
     try {
@@ -1887,6 +1888,7 @@ export default function ProjectDetail() {
                         setUnlockState({
                           open: true,
                           lockedCount: (targetParticipants ?? 0) - (availableCredits ?? 0),
+                          mode: "credits",
                         })
                       }
                     >
@@ -3826,6 +3828,7 @@ export default function ProjectDetail() {
         open={unlockState.open}
         onClose={() => setUnlockState({ open: false, lockedCount: 0 })}
         lockedCount={unlockState.lockedCount}
+        mode={unlockState.mode}
       />
     </InstrumentShell>
   );
