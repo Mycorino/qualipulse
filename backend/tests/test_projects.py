@@ -174,3 +174,35 @@ class TestSetupCopilotEndpoints:
         )
         assert resp.status_code == 201, resp.text
         assert resp.json()["disqualifying_options"] == []
+
+
+class TestCreditsAccountProjectLimit:
+    """Credits-based accounts are gated by interview credits, not project
+    count — they can create unlimited studies."""
+
+    def test_credits_account_is_not_capped_by_project_count(
+        self, client, auth_headers, db_session, registered_company
+    ):
+        from app.models.company import Company
+        from app.services import billing_service
+
+        company = (
+            db_session.query(Company)
+            .filter(Company.email == registered_company["email"])
+            .first()
+        )
+        # Seed the plan catalogue into the test DB (startup seeds the app's
+        # engine, not this session), then put the account on the
+        # credits-native trial plan (is_legacy=False).
+        billing_service.ensure_plans_seeded(db_session)
+        billing_service.bootstrap_trial_subscription(db_session, company)
+        db_session.commit()
+
+        # Starter legacy cap is 1 project; credits accounts ignore it.
+        for i in range(3):
+            resp = client.post(
+                "/projects/",
+                json={**PROJECT_PAYLOAD, "name": f"Credits Study {i}"},
+                headers=auth_headers,
+            )
+            assert resp.status_code == 201, f"project {i} should succeed: {resp.text}"

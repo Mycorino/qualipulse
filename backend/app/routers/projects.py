@@ -24,12 +24,29 @@ from app.services.demo_seeder import (
     DEMO_PROJECT_NAME_FR,
     seed_demo_project,
 )
+from app.services import billing_service
 from app.services.feature_gates import require_project_limit, require_question_limit
 from app.services.guide_parser import parse_guide_csv
 from app.services.study_provisioning import study_for_new_project
 from app.services.workspace import accessible_workspace_ids, can_edit, get_member_role
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+def _enforce_project_limit(db: Session, company: Company, current_count: int) -> None:
+    """Gate project creation by plan.
+
+    Credits-based accounts are NOT limited by project count — usage is
+    gated by interview credits (1 credit = 1 completed interview), so a
+    researcher can spin up as many studies as they like. Only genuine
+    legacy-tier accounts fall through to the per-tier ``max_projects``
+    cap in ``feature_gates``.
+    """
+    sub = billing_service.get_current_subscription(db, company.id)
+    plan = billing_service.get_plan(db, sub.plan_id) if sub else None
+    if plan is not None and not plan.is_legacy:
+        return  # credits-native — no project-count cap
+    require_project_limit(company, current_count)
 
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -43,7 +60,7 @@ def create_project(
         .filter(Project.company_id == company.id, Project.is_demo == False)  # noqa: E712
         .count()
     )
-    require_project_limit(company, current_count)
+    _enforce_project_limit(db, company, current_count)
     require_question_limit(company, len(body.questions))
 
     # Sprint 15: every project belongs to a Study. Use the one the caller
@@ -154,7 +171,7 @@ async def import_project_from_csv(
         .filter(Project.company_id == company.id, Project.is_demo == False)  # noqa: E712
         .count()
     )
-    require_project_limit(company, current_count)
+    _enforce_project_limit(db, company, current_count)
 
     content = await csv_file.read()
     questions = parse_guide_csv(content)
