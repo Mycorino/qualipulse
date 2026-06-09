@@ -62,6 +62,7 @@ export interface ProposedAction {
     | "edit_objective"
     | "edit_settings"
     | "add_screening_question"
+    | "suggest_replies"
     | "run_analysis"
     | "refine_analysis";
   /** add_question / add_guide_question */
@@ -80,6 +81,10 @@ export interface ProposedAction {
   settings?: ProposedSettings;
   /** add_screening_question */
   screening?: ProposedScreeningQuestion;
+  /** suggest_replies — clickable answer chips for a clarifying question */
+  question_text?: string;
+  options?: string[];
+  context?: string;
   rationale?: string;
 }
 

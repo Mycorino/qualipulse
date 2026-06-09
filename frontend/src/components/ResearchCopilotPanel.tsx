@@ -41,18 +41,29 @@ type ThreadItem =
 const STARTER_KEYS = ["scratch", "methodology", "nextQuestion"];
 
 /**
- * Lightweight inline renderer for the copilot's replies — turns `**bold**`
- * into <strong>. Newlines/lists are preserved by `white-space: pre-wrap`
- * on .copilot-msg__text, so this only handles bold. Dependency-free.
+ * Lightweight inline renderer for the copilot's replies — turns
+ * `**bold**`, `*italic*`, and `` `code` `` into the matching elements.
+ * Newlines/lists are preserved by `white-space: pre-wrap` on
+ * .copilot-msg__text, so this only handles inline emphasis.
+ * Dependency-free. Bold is matched before italic so `**x**` never
+ * degrades into stray single-asterisk italics.
  */
+const _RICH_TOKEN = /(\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`)/g;
+
 function renderRich(text: string): ReactNode {
-  return text.split("**").map((part, i) =>
-    i % 2 === 1 ? (
-      <strong key={i}>{part}</strong>
-    ) : (
-      <Fragment key={i}>{part}</Fragment>
-    ),
-  );
+  return text.split(_RICH_TOKEN).map((part, i) => {
+    if (!part) return null;
+    if (part.length >= 4 && part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.length >= 2 && part.startsWith("*") && part.endsWith("*")) {
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    }
+    if (part.length >= 2 && part.startsWith("`") && part.endsWith("`")) {
+      return <code key={i}>{part.slice(1, -1)}</code>;
+    }
+    return <Fragment key={i}>{part}</Fragment>;
+  });
 }
 
 export function ResearchCopilotPanel({
@@ -353,14 +364,38 @@ export function ResearchCopilotPanel({
               {it.text && (
                 <div className="copilot-msg__text">{renderRich(it.text)}</div>
               )}
-              {it.actions.map((a) => (
-                <ProposalCard
-                  key={a.id}
-                  action={a}
-                  onAccept={() => accept(a)}
-                  onReject={() => setStatus(a.id, "rejected")}
-                />
-              ))}
+              {it.actions
+                .filter((a) => a.type !== "suggest_replies")
+                .map((a) => (
+                  <ProposalCard
+                    key={a.id}
+                    action={a}
+                    onAccept={() => accept(a)}
+                    onReject={() => setStatus(a.id, "rejected")}
+                  />
+                ))}
+              {/* Clarifying-question chips — one click answers, or the
+                  researcher can still type a custom reply below. */}
+              {it.actions
+                .filter(
+                  (a) =>
+                    a.type === "suggest_replies" && (a.options?.length ?? 0) > 0,
+                )
+                .map((a) => (
+                  <div key={a.id} className="copilot-replies" role="group">
+                    {(a.options ?? []).map((opt, k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        className="copilot-reply-chip"
+                        onClick={() => send(opt)}
+                        disabled={busy}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                ))}
             </div>
           ),
         )}

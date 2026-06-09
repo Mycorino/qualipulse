@@ -230,6 +230,12 @@ THREE exchanges; do not propose a guide on turn one.
 objective first, then the guide. Don't interrogate forever.
 - Open easy: ground your first question in what you already know (the \
 snapshot, the study, the survey) instead of a cold generic prompt.
+- When your clarifying question has a small set of likely answers \
+(geography, device, segmentation, timeline, B2B/B2C…), attach \
+`suggest_replies` with 2-5 short options so the researcher can answer in \
+one click — they can always type something else instead. Ask the \
+question in your reply text too. Never attach options to the turn where \
+you propose the guide (a proposal turn owns the screen).
 
 - Call `read_study` EARLY. If this study already has a survey, you are \
 the deep-dive arm of a mixed-methods study: ground the guide in the \
@@ -437,6 +443,33 @@ _INTERVIEW_TOOLS = [
         },
     },
     {
+        "name": "suggest_replies",
+        "description": (
+            "Offer the researcher a few clickable answer options for a "
+            "clarifying question you are asking THIS turn (geography, "
+            "device, segmentation, timeline, etc.). The researcher can "
+            "still type a custom answer. Use this DURING discovery, before "
+            "you draft, whenever the answer would materially change the "
+            "guide or screener. Always also ask the question in your reply "
+            "text. Do not attach options to a turn that proposes the guide."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The clarifying question (also state it in your reply).",
+                },
+                "options": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "2-5 short, likely answers shown as chips.",
+                },
+            },
+            "required": ["options"],
+        },
+    },
+    {
         "name": "propose_settings",
         "description": (
             "Propose changing this interview round's settings — interview "
@@ -634,6 +667,21 @@ def _guide_run_tool(
             }
         )
         return "Recorded the proposed removal."
+
+    if name == "suggest_replies":
+        options = [
+            str(o).strip() for o in (tool_input.get("options") or []) if str(o).strip()
+        ]
+        if not options:
+            return "No reply options provided. Not recorded."
+        turn.actions.append(
+            {
+                "type": "suggest_replies",
+                "question_text": (tool_input.get("question") or "").strip(),
+                "options": options,
+            }
+        )
+        return "Recorded reply options for the researcher."
 
     if name == "propose_settings":
         settings: dict = {}

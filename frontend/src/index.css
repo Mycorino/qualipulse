@@ -1295,6 +1295,11 @@ select.field-input {
   padding: var(--space-3) var(--space-6);
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
+  /* Pin the instrument tabs to the top while the long setup/analysis
+     body scrolls underneath, so switching tabs is always one click away. */
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
 .instrument-shell__main {
@@ -11431,6 +11436,38 @@ select.field-input {
   font-style: italic;
 }
 .copilot-msg__text { white-space: pre-wrap; }
+.copilot-msg__text code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.92em;
+  background: var(--bg-overlay, var(--bg-base));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+}
+
+/* Clarifying-question reply chips — clickable answers under an assistant
+   turn. Free typing stays available in the input below. */
+.copilot-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.copilot-reply-chip {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+.copilot-reply-chip:hover:not(:disabled) {
+  border-color: var(--brand-400, var(--brand-500));
+  background: var(--bg-base);
+}
+.copilot-reply-chip:disabled { opacity: 0.5; cursor: default; }
 
 .copilot-proposal {
   margin-top: var(--space-3);
