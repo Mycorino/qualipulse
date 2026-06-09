@@ -644,18 +644,18 @@ def _schedule_company_name_backfill(company_id: str) -> None:
 # ── Onboarding suggestions (Haiku) ──────────────────────────────────────────
 
 _FALLBACK_USE_CASES_EN = [
-    "Product discovery",
-    "Concept testing",
-    "Onboarding research",
-    "Brand & messaging",
-    "Usability testing",
+    "Why users drop off after signup",
+    "What blocks the first purchase",
+    "Which features actually drive retention",
+    "Why prospects pick a competitor",
+    "Where onboarding loses people",
 ]
 _FALLBACK_USE_CASES_FR = [
-    "Découverte produit",
-    "Test de concept",
-    "Recherche onboarding",
-    "Marque & messaging",
-    "Tests d'utilisabilité",
+    "Pourquoi les utilisateurs décrochent après l'inscription",
+    "Ce qui bloque le premier achat",
+    "Quelles fonctionnalités fidélisent vraiment",
+    "Pourquoi les prospects choisissent un concurrent",
+    "Où la prise en main perd les utilisateurs",
 ]
 
 
@@ -720,8 +720,17 @@ def get_onboarding_suggestions(
                 "role": "user",
                 "content": (
                     f"Based on this user profile:\n{context_block}\n\n"
-                    f"1. Suggest 4-5 research use cases this person would likely need. "
-                    f"Each should be 2-4 words, practical and specific to their context.\n"
+                    f"1. Suggest 4-5 research questions this person would genuinely want "
+                    f"answered. Each must be a concrete, valuable research objective phrased "
+                    f"as a short line of 5-8 words — NOT a vague topic tag. The reader should "
+                    f"immediately see why running it is worth their time. Tailor each to their "
+                    f"ROLE'S DOMAIN: a People/HR role -> employee, candidate or onboarding "
+                    f"experience; a Product role -> discovery, adoption, churn, pricing; a "
+                    f"Research/Insights role -> market sizing, competitor choice, segment needs; "
+                    f"a Marketing role -> messaging, positioning, channel; a Design role -> "
+                    f"usability, comprehension, friction. Ground them in the company's context. "
+                    f"Do NOT use commas inside a suggestion. When writing in French, "
+                    f"follow French typography (a space before ? ! : ;).\n"
                     f"2. Write a 1-2 sentence profile summary confirming what you understand "
                     f"about them and their company.\n\n"
                     f"Output ONLY valid JSON in {output_lang}:\n"

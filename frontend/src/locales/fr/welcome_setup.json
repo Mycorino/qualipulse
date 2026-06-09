@@ -13,8 +13,42 @@
 
   "field_company": "Nom de l'entreprise",
   "field_company_placeholder": "Acme SAS",
+  "field_role_family": "Votre domaine",
   "field_role": "Votre rôle",
   "field_team_size": "Taille de l'équipe",
+
+  "roleFamilies": {
+    "product": "Produit",
+    "design": "Design & UX",
+    "research": "Recherche",
+    "marketing": "Marketing & Growth",
+    "leadership": "Direction & Fondateur",
+    "people": "RH & People",
+    "consulting": "Conseil & Agence",
+    "other": "Autre"
+  },
+  "roles": {
+    "product_manager": "Product Manager",
+    "head_of_product": "Responsable produit",
+    "product_owner": "Product Owner",
+    "product_designer": "Designer produit",
+    "ux_ui_designer": "Designer UX/UI",
+    "design_lead": "Lead Design",
+    "ux_researcher": "Chercheur·euse UX",
+    "market_researcher": "Chargé·e d'études de marché",
+    "insights_manager": "Responsable Insights",
+    "product_marketing": "Product Marketing",
+    "growth": "Growth",
+    "head_of_marketing": "Responsable marketing",
+    "founder_ceo": "Fondateur·rice / CEO",
+    "coo_gm": "COO / Direction générale",
+    "hr_people_ops": "RH / People Ops",
+    "recruiting_talent": "Recrutement / Talent",
+    "hr_business_partner": "HR Business Partner",
+    "consultant": "Consultant·e",
+    "agency_lead": "Responsable agence / studio",
+    "independent_researcher": "Chercheur·euse indépendant·e"
+  },
 
   "step_2_title": "Parlez-nous de vous",
   "step_2_sub": "Ça nous aide à adapter les suggestions à votre quotidien.",

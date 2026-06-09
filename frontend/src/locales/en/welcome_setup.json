@@ -13,8 +13,42 @@
 
   "field_company": "Company name",
   "field_company_placeholder": "Acme Inc.",
+  "field_role_family": "Your field",
   "field_role": "Your role",
   "field_team_size": "Team size",
+
+  "roleFamilies": {
+    "product": "Product",
+    "design": "Design & UX",
+    "research": "Research",
+    "marketing": "Marketing & Growth",
+    "leadership": "Founder & Leadership",
+    "people": "People & HR",
+    "consulting": "Consulting & Agency",
+    "other": "Other"
+  },
+  "roles": {
+    "product_manager": "Product Manager",
+    "head_of_product": "Head of Product",
+    "product_owner": "Product Owner",
+    "product_designer": "Product Designer",
+    "ux_ui_designer": "UX/UI Designer",
+    "design_lead": "Design Lead",
+    "ux_researcher": "UX Researcher",
+    "market_researcher": "Market Researcher",
+    "insights_manager": "Insights Manager",
+    "product_marketing": "Product Marketing",
+    "growth": "Growth",
+    "head_of_marketing": "Head of Marketing",
+    "founder_ceo": "Founder / CEO",
+    "coo_gm": "COO / General Manager",
+    "hr_people_ops": "HR / People Ops",
+    "recruiting_talent": "Recruiting / Talent",
+    "hr_business_partner": "HR Business Partner",
+    "consultant": "Consultant",
+    "agency_lead": "Agency / Studio Lead",
+    "independent_researcher": "Independent Researcher"
+  },
 
   "step_2_title": "Tell us about yourself",
   "step_2_sub": "This helps us tailor recommendations to your work.",
