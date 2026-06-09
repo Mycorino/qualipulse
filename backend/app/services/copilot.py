@@ -409,6 +409,43 @@ _TOOL_LABELS: dict[str, str] = {
     "propose_participant_demo": "Spinning up a participant preview",
 }
 
+# French equivalents — picked when the company's preferred_language is "fr"
+# so the streamed status line matches the rest of the localized UI.
+_TOOL_LABELS_FR: dict[str, str] = {
+    "remember": "Je note ça",
+    "read_guide": "Lecture de votre guide",
+    "read_study": "Lecture du reste de votre étude",
+    "read_progress": "Vérification de l'avancement",
+    "read_interviews": "Lecture de vos entretiens",
+    "read_interview": "Lecture d'une transcription",
+    "read_analysis": "Lecture de votre analyse",
+    "propose_objective": "Rédaction de l'objectif",
+    "propose_guide_questions": "Rédaction des questions",
+    "edit_guide_question": "Révision d'une question",
+    "remove_guide_question": "Suppression d'une question",
+    "propose_settings": "Ajustement des réglages",
+    "propose_screening_questions": "Rédaction du filtre",
+    "propose_run_analysis": "Préparation de l'analyse",
+    "propose_refine_analysis": "Préparation de l'analyse affinée",
+    "add_question": "Rédaction d'une question",
+    "edit_question": "Révision d'une question",
+    "remove_question": "Suppression d'une question",
+    "save_profile": "Enregistrement de votre profil",
+    "propose_study": "Rédaction de votre étude",
+    "suggest_replies": "Préparation de quelques options",
+    "request_website": "Consultation de votre site",
+    "propose_participant_demo": "Préparation d'un aperçu participant",
+}
+
+_TOOL_LABEL_FALLBACK = {"en": "Working…", "fr": "En cours…"}
+
+
+def _tool_label(name: str, lang: str | None) -> str:
+    """Status label for a tool call, localized to the company's language."""
+    if (lang or "en").startswith("fr"):
+        return _TOOL_LABELS_FR.get(name, _TOOL_LABEL_FALLBACK["fr"])
+    return _TOOL_LABELS.get(name, _TOOL_LABEL_FALLBACK["en"])
+
 
 def _build_system_blocks(
     db: Session,
@@ -530,7 +567,9 @@ def run_copilot_turn_stream(
                 # status sits on the wire while the next iteration thinks.
                 yield {
                     "type": "status",
-                    "label": _TOOL_LABELS.get(block.name, "Working…"),
+                    "label": _tool_label(
+                        block.name, getattr(company, "preferred_language", None)
+                    ),
                 }
                 tool_input = block.input or {}
                 try:

@@ -338,3 +338,74 @@ class TestResultsCopilotProposals:
         )
         assert "No ready analysis" in msg
         assert turn.actions == []
+
+    def test_suggest_replies_records_chip_options(self, db_session):
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, project, turn,
+            "suggest_replies",
+            {
+                "question": "Which market?",
+                "options": ["FR only", " Europe ", "Other", ""],
+            },
+        )
+        assert "Recorded" in msg
+        assert turn.actions == [
+            {
+                "type": "suggest_replies",
+                "question_text": "Which market?",
+                # blanks trimmed/dropped
+                "options": ["FR only", "Europe", "Other"],
+            }
+        ]
+
+    def test_suggest_replies_needs_options(self, db_session):
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, project, turn,
+            "suggest_replies", {"question": "Which market?", "options": []},
+        )
+        assert "No reply options" in msg
+        assert turn.actions == []
+
+    def test_propose_settings_records_changed_fields(self, db_session):
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, project, turn,
+            "propose_settings",
+            {
+                "interview_duration_minutes": 60,
+                "target_participants": 12,
+                "rationale": "In-depth qual round.",
+            },
+        )
+        assert "Recorded" in msg
+        assert turn.actions[0]["type"] == "edit_settings"
+        assert turn.actions[0]["settings"] == {
+            "interview_duration_minutes": 60,
+            "target_participants": 12,
+        }
+
+    def test_propose_screening_drops_disqualifying_not_in_options(self, db_session):
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, project, turn,
+            "propose_screening_questions",
+            {
+                "questions": [
+                    {
+                        "question": "How often do you shop online?",
+                        "options": ["Weekly", "Monthly"],
+                        "disqualifying_options": ["Never"],
+                    }
+                ]
+            },
+        )
+        assert "Recorded 1" in msg
+        action = turn.actions[0]
+        assert action["type"] == "add_screening_question"
+        assert action["screening"]["disqualifying_options"] == []
