@@ -87,8 +87,17 @@ interface UnlockModalProps {
   /** Open/close controlled by parent so it can fire analytics. */
   open: boolean;
   onClose: () => void;
-  /** Total transcripts to unlock — used in pricing math. */
+  /** Count used in copy + pricing math (transcripts to unlock, or, in
+   *  `credits` mode, interviews short of the target). */
   lockedCount: number;
+  /**
+   * `transcripts` (default) — unlock already-collected data; shows both
+   * the subscription and the one-off credit pack.
+   * `credits` — fielding a study without enough credits; subscriptions
+   * ONLY (drives MRR), study-framed copy, no one-off packs (those live in
+   * Account Settings).
+   */
+  mode?: "transcripts" | "credits";
 }
 
 interface CreditPack {
@@ -98,19 +107,26 @@ interface CreditPack {
   currency: string;
 }
 
-export function UnlockModal({ open, onClose, lockedCount }: UnlockModalProps) {
+export function UnlockModal({
+  open,
+  onClose,
+  lockedCount,
+  mode = "transcripts",
+}: UnlockModalProps) {
   const { t } = useTranslation("paywall");
   const [packs, setPacks] = useState<CreditPack[]>([]);
   const [working, setWorking] = useState<string | null>(null);
+  const creditsMode = mode === "credits";
 
-  // Load the available credit packs when the modal opens.
+  // Load the available credit packs when the modal opens — only in
+  // transcript mode; the credits gate is subscription-only.
   useEffect(() => {
-    if (!open) return;
+    if (!open || creditsMode) return;
     client
       .get<CreditPack[]>("/billing/credit-packs")
       .then((r: { data: CreditPack[] }) => setPacks(r.data))
       .catch(() => setPacks([]));
-  }, [open]);
+  }, [open, creditsMode]);
 
   // Escape closes.
   useEffect(() => {
@@ -175,13 +191,21 @@ export function UnlockModal({ open, onClose, lockedCount }: UnlockModalProps) {
         >
           ×
         </button>
-        <div className="unlock-modal__eyebrow">✦ {t("modal_eyebrow")}</div>
+        <div className="unlock-modal__eyebrow">
+          ✦ {t(creditsMode ? "credits_modal_eyebrow" : "modal_eyebrow")}
+        </div>
         <h2 id="unlock-modal-title" className="unlock-modal__title">
-          {t("modal_title", { count: lockedCount })}
+          {creditsMode
+            ? t("credits_modal_title", { count: lockedCount })
+            : t("modal_title", { count: lockedCount })}
         </h2>
-        <p className="unlock-modal__body">{t("modal_body")}</p>
+        <p className="unlock-modal__body">
+          {creditsMode ? t("credits_modal_body") : t("modal_body")}
+        </p>
 
-        <div className="unlock-modal__paths">
+        <div
+          className={`unlock-modal__paths${creditsMode ? " unlock-modal__paths--single" : ""}`}
+        >
           <div className="unlock-modal__path unlock-modal__path--featured">
             <div className="unlock-modal__path-eyebrow">
               {t("subscription_eyebrow")}
@@ -219,6 +243,7 @@ export function UnlockModal({ open, onClose, lockedCount }: UnlockModalProps) {
             </button>
           </div>
 
+          {!creditsMode && (
           <div className="unlock-modal__path">
             <div className="unlock-modal__path-eyebrow">
               {t("pack_eyebrow")}
@@ -271,6 +296,7 @@ export function UnlockModal({ open, onClose, lockedCount }: UnlockModalProps) {
               </div>
             )}
           </div>
+          )}
         </div>
 
         <button

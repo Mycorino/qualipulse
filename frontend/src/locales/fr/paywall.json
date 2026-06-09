@@ -13,6 +13,9 @@
   "modal_eyebrow": "Débloquez votre étude complète",
   "modal_title": "{{count}} transcriptions de plus prêtes à écouter",
   "modal_body": "Vous avez déjà collecté les données — choisissez comment y accéder. Les abonnements incluent aussi des nouveaux crédits chaque mois pour continuer.",
+  "credits_modal_eyebrow": "Menez votre étude complète",
+  "credits_modal_title": "Débloquez {{count}} entretiens de plus",
+  "credits_modal_body": "Votre objectif demande plus de crédits que votre plan n'en inclut (1 crédit = 1 entretien complété). Abonnez-vous pour mener toute l'étude et recevoir de nouveaux crédits chaque mois.",
 
   "subscription_eyebrow": "Recherche continue",
   "subscription_title": "Plan mensuel",

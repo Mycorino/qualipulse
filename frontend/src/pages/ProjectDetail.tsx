@@ -152,6 +152,7 @@ export default function ProjectDetail() {
   const [unlockState, setUnlockState] = useState<{
     open: boolean;
     lockedCount: number;
+    mode?: "transcripts" | "credits";
   }>({ open: false, lockedCount: 0 });
   // Helper — extract paywall payload from an Axios 402 response.
   // Returns null when the error isn't a paywall (so the caller can
@@ -683,7 +684,7 @@ export default function ProjectDetail() {
     // instead of creating a link.
     const tgt = project?.target_participants ?? null;
     if (tgt != null && availableCredits != null && tgt > availableCredits) {
-      setUnlockState({ open: true, lockedCount: tgt - availableCredits });
+      setUnlockState({ open: true, lockedCount: tgt - availableCredits, mode: "credits" });
       return;
     }
     try {
@@ -1849,7 +1850,11 @@ export default function ProjectDetail() {
                     )}
                   </p>
                   <div className="credit-gate__actions">
-                    {(availableCredits ?? 0) >= 1 && (
+                    {/* Only offer the lower-target shortcut when it still
+                        lands on a genuine sample (>= 5). Below that we don't
+                        nudge an underpowered study — the user can lower it
+                        themselves in Setup if they really want to. */}
+                    {(availableCredits ?? 0) >= 5 && (
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={async () => {
@@ -1883,6 +1888,7 @@ export default function ProjectDetail() {
                         setUnlockState({
                           open: true,
                           lockedCount: (targetParticipants ?? 0) - (availableCredits ?? 0),
+                          mode: "credits",
                         })
                       }
                     >
@@ -3822,6 +3828,7 @@ export default function ProjectDetail() {
         open={unlockState.open}
         onClose={() => setUnlockState({ open: false, lockedCount: 0 })}
         lockedCount={unlockState.lockedCount}
+        mode={unlockState.mode}
       />
     </InstrumentShell>
   );

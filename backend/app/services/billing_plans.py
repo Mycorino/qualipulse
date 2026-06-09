@@ -399,26 +399,30 @@ class CreditPackSpec:
     description: str = ""
 
 
+# Pay-as-you-go packs sit at a deliberate premium over every subscription's
+# per-credit rate (€12 / €11 / €10 per credit vs €5.33–8.90 in-plan) so a
+# subscription is always the cheaper way to buy interviews. Packs are the
+# no-commitment escape hatch (one-off study, top-up), priced for convenience.
 CREDIT_PACKS: tuple[CreditPackSpec, ...] = (
     CreditPackSpec(
         id="pack_25",
         public_name="25 credits",
         credits=25,
-        price_cents=15000,  # €150
+        price_cents=30000,  # €300 — €12/credit
         description="Top-up for Exploration workspaces.",
     ),
     CreditPackSpec(
         id="pack_50",
         public_name="50 credits",
         credits=50,
-        price_cents=30000,  # €300
+        price_cents=55000,  # €550 — €11/credit
         description="Top-up for Team workspaces.",
     ),
     CreditPackSpec(
         id="pack_100",
         public_name="100 credits",
         credits=100,
-        price_cents=50000,  # €500
+        price_cents=100000,  # €1000 — €10/credit
         description="Top-up for Agency workspaces.",
     ),
 )
