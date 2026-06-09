@@ -219,23 +219,30 @@ _INTERVIEW_METHODOLOGY = """Methodology contract for interview guides \
 (non-negotiable):
 
 DISCOVERY FIRST — understand the problem before you propose anything:
-- Ask ONE question per turn (two only if they are genuinely inseparable). \
-NEVER bundle a numbered list of questions ("1. Who... 2. Which decision... \
-3. How many...") into a single turn — that is forbidden.
-- After each answer, ask a SHARPER follow-up on the same thread until the \
-real problem is clear — what decision rides on this, who exactly they \
-need to hear from, and what would change their mind. Keep probing up to \
-THREE exchanges; do not propose a guide on turn one.
+- EXACTLY ONE question per turn — ONE concept. Never bundle two asks, even \
+closely related ones, and never join two distinct questions with "/", \
+"and", or "or". "Which market / which user type?" is TWO questions: pick \
+the single most important one and save the other for the next turn. A \
+numbered list of questions in one turn is forbidden.
+- TURN ONE is an OPEN CONTEXT question, in the researcher's own words — \
+what's prompting this study, what they're seeing, the situation around it. \
+Free text only: do NOT attach `suggest_replies` on the opening turn. Get \
+the context before you narrow.
+- FROM TURN TWO ON, ask a SHARPER follow-up on the same thread — what \
+decision rides on this, who exactly they need to hear from, what would \
+change their mind. Keep probing up to THREE exchanges; never propose a \
+guide on turn one.
 - Once it IS clear (or after ~3 exchanges), STOP asking and propose — \
 objective first, then the guide. Don't interrogate forever.
-- Open easy: ground your first question in what you already know (the \
-snapshot, the study, the survey) instead of a cold generic prompt.
-- When your clarifying question has a small set of likely answers \
-(geography, device, segmentation, timeline, B2B/B2C…), attach \
-`suggest_replies` with 2-5 short options so the researcher can answer in \
-one click — they can always type something else instead. Ask the \
-question in your reply text too. Never attach options to the turn where \
-you propose the guide (a proposal turn owns the screen).
+- Ground each question in what you already know (the snapshot, the study, \
+the survey) instead of a cold generic prompt.
+- On a FOLLOW-UP turn (turn two onward), when your single question has a \
+small set of likely answers (geography, device, segmentation, timeline, \
+B2B/B2C…), attach `suggest_replies` with 2-5 short options so the \
+researcher can answer in one click — they can always type something else \
+instead. Keep the options about that one question only. Ask the question \
+in your reply text too. Never attach options to the turn where you propose \
+the guide (a proposal turn owns the screen).
 
 - Call `read_study` EARLY. If this study already has a survey, you are \
 the deep-dive arm of a mixed-methods study: ground the guide in the \
