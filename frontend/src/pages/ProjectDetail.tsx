@@ -53,6 +53,7 @@ import {
   ScreeningQuestionCreate,
 } from "../api/projects";
 import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, type PaywallDetail } from "../api/projects";
+import { getCreditUsage } from "../api/billing";
 import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
 import { NextActionChip } from "../components/NextActionChip";
@@ -109,6 +110,8 @@ export default function ProjectDetail() {
   // ── Core state ─────────────────────────────────────────────────────────────
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [links, setLinks] = useState<InterviewLink[]>([]);
+  // Available interview credits (null = legacy plan / unknown → no gating).
+  const [availableCredits, setAvailableCredits] = useState<number | null>(null);
   const [participants, setParticipants] = useState<ParticipantResponse[]>([]);
   const [transcript, setTranscript] = useState<TranscriptTurn[] | null>(null);
   const [selectedParticipant, setSelectedParticipant] = useState<ParticipantResponse | null>(null);
@@ -405,6 +408,8 @@ export default function ProjectDetail() {
       setLinks(lnks);
       setParticipants(parts);
       setAnalysis(ana);
+      // Credit balance powers the link-gate (target > credits → block).
+      getCreditUsage().then((u) => setAvailableCredits(u?.available_credits ?? null));
       // Only auto-switch to responses if no tab was explicitly requested in URL
       if (parts.length > 0 && !searchParams.get("tab")) setTab("responses");
       if (ana.filters) {
@@ -673,6 +678,14 @@ export default function ProjectDetail() {
   }
 
   async function handleGenerateLink() {
+    // Hard gate: don't field a study you can't pay to complete. 1 credit =
+    // 1 completed interview, so target > credits → open the upgrade modal
+    // instead of creating a link.
+    const tgt = project?.target_participants ?? null;
+    if (tgt != null && availableCredits != null && tgt > availableCredits) {
+      setUnlockState({ open: true, lockedCount: tgt - availableCredits });
+      return;
+    }
     try {
       const link = await createLink(id!);
       setLinks((prev) => [...prev, link]);
@@ -1459,6 +1472,16 @@ export default function ProjectDetail() {
 
   const isCollecting = links.some((l) => l.is_active);
 
+  // Credit gate: a study targeting more interviews than the workspace has
+  // credits (1 credit = 1 completed interview) can't be fielded to target.
+  // We hard-block link generation until the researcher lowers the target or
+  // tops up. Null credits = legacy plan → no gate.
+  const targetParticipants = project?.target_participants ?? null;
+  const insufficientCredits =
+    targetParticipants != null &&
+    availableCredits != null &&
+    targetParticipants > availableCredits;
+
   // Deterministic next-best-action input for this round. Drives the
   // empty-state suggestion today; the Copilot dock (Phase 2b) reuses it.
   const projectNbaInput: ProjectNbaInput = {
@@ -1793,10 +1816,74 @@ export default function ProjectDetail() {
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={handleGenerateLink}
-                  disabled={project.is_demo}
-                  title={project.is_demo ? tProject("overview.demoLinkDisabled") : undefined}
+                  disabled={project.is_demo || insufficientCredits}
+                  title={
+                    project.is_demo
+                      ? tProject("overview.demoLinkDisabled")
+                      : insufficientCredits
+                        ? tProject("overview.linkBlockedTitle", { defaultValue: "Not enough credits for your target" })
+                        : undefined
+                  }
                 >{tProject("overview.newLink")}</button>
               </div>
+              {insufficientCredits && (
+                <div className="credit-gate">
+                  <div className="credit-gate__title">
+                    {tProject("overview.creditGateTitle", {
+                      defaultValue: "Not enough credits to field this study",
+                    })}
+                  </div>
+                  <p className="credit-gate__body">
+                    {tProject("overview.creditGateBody", {
+                      target: targetParticipants,
+                      credits: availableCredits,
+                      defaultValue:
+                        "Your target is {{target}} interviews, but you have {{credits}} credit(s) — 1 credit = 1 completed interview. Lower your target or get more credits to generate the link.",
+                    })}
+                  </p>
+                  <div className="credit-gate__actions">
+                    {(availableCredits ?? 0) >= 1 && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={async () => {
+                        try {
+                          setProject(
+                            await patchProjectSettings(project.id, {
+                              target_participants: availableCredits ?? undefined,
+                            }),
+                          );
+                          toast(
+                            tProject("overview.creditGateLowered", {
+                              credits: availableCredits,
+                              defaultValue: "Target set to {{credits}} — you can generate the link now.",
+                            }),
+                            "success",
+                          );
+                        } catch {
+                          toast(tProject("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
+                        }
+                      }}
+                    >
+                      {tProject("overview.creditGateLower", {
+                        credits: availableCredits,
+                        defaultValue: "Set target to {{credits}} & continue",
+                      })}
+                    </button>
+                    )}
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() =>
+                        setUnlockState({
+                          open: true,
+                          lockedCount: (targetParticipants ?? 0) - (availableCredits ?? 0),
+                        })
+                      }
+                    >
+                      {tProject("overview.creditGateUpgrade", { defaultValue: "Get more credits" })}
+                    </button>
+                  </div>
+                </div>
+              )}
               {links.length === 0 ? (
                 <p className="muted-text">{tProject("overview.noLinksHint")}</p>
               ) : (
