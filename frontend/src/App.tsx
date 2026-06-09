@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth, getCachedOnboarded, setCachedOnboarded } from "./hooks/useAuth";
 import { getMe } from "./api/auth";
@@ -17,39 +17,69 @@ import StudyList from "./pages/StudyList";
 import Interview from "./pages/Interview";
 import Marketing from "./pages/Marketing";
 
-const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
-const InterviewVerify = lazy(() => import("./pages/InterviewVerify"));
-const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const AccountLayout = lazy(() => import("./pages/account/AccountLayout"));
-const AccountHome = lazy(() => import("./pages/account/AccountHome"));
-const AccountProfile = lazy(() => import("./pages/account/AccountProfile"));
-const AccountSecurity = lazy(() => import("./pages/account/AccountSecurity"));
-const AccountWorkspace = lazy(() => import("./pages/account/AccountWorkspace"));
-const AccountIntegrations = lazy(() => import("./pages/account/AccountIntegrations"));
-const AccountBilling = lazy(() => import("./pages/account/AccountBilling"));
-const SharedReport = lazy(() => import("./pages/SharedReport"));
-const Welcome = lazy(() => import("./pages/Welcome"));
-const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
-const GoogleFinish = lazy(() => import("./pages/GoogleFinish"));
-const ImpersonateFinish = lazy(() => import("./pages/ImpersonateFinish"));
-const Terms = lazy(() => import("./pages/Terms"));
-const Privacy = lazy(() => import("./pages/Privacy"));
-const LegalDocument = lazy(() => import("./pages/LegalDocument"));
-const Admin = lazy(() => import("./pages/Admin"));
-const AffiliatePortal = lazy(() => import("./pages/AffiliatePortal"));
-const Blog = lazy(() => import("./pages/Blog"));
-const BlogPostPage = lazy(() => import("./pages/BlogPost"));
-const AcceptInvitation = lazy(() => import("./pages/AcceptInvitation"));
-const QuantiShowcase = lazy(() => import("./pages/QuantiShowcase"));
-const QuantiReportDemo = lazy(() => import("./pages/QuantiReportDemo"));
-const SurveyList = lazy(() => import("./pages/SurveyList"));
-const SurveyEditor = lazy(() => import("./pages/SurveyEditor"));
-const SurveyPreview = lazy(() => import("./pages/SurveyPreview"));
-const SurveyDashboardPage = lazy(() => import("./pages/SurveyDashboard"));
-const PublicResponse = lazy(() => import("./pages/PublicResponse"));
-const StudyOverview = lazy(() => import("./pages/StudyOverview"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+/**
+ * lazy() that survives a deploy. When a new build ships, the chunk hashes
+ * change; a tab still holding the old index.html will 404 on the dynamic
+ * import and crash into the ErrorBoundary ("Une erreur est survenue").
+ * Here we catch that once, set a guard flag, and reload to pull the fresh
+ * index + chunk manifest — the recovery the user was doing by hand. The
+ * sessionStorage guard prevents a reload loop if the import fails for any
+ * other reason.
+ */
+const CHUNK_RELOAD_KEY = "qp_chunk_reloaded";
+function lazyWithRetry<T extends ComponentType<unknown>>(
+  factory: () => Promise<{ default: T }>,
+) {
+  return lazy(async () => {
+    try {
+      const mod = await factory();
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      return mod;
+    } catch (err) {
+      if (!sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+        window.location.reload();
+        // Keep Suspense showing the fallback until the reload takes over.
+        return new Promise<{ default: T }>(() => {});
+      }
+      throw err;
+    }
+  });
+}
+
+const ProjectDetail = lazyWithRetry(() => import("./pages/ProjectDetail"));
+const InterviewVerify = lazyWithRetry(() => import("./pages/InterviewVerify"));
+const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
+const AccountLayout = lazyWithRetry(() => import("./pages/account/AccountLayout"));
+const AccountHome = lazyWithRetry(() => import("./pages/account/AccountHome"));
+const AccountProfile = lazyWithRetry(() => import("./pages/account/AccountProfile"));
+const AccountSecurity = lazyWithRetry(() => import("./pages/account/AccountSecurity"));
+const AccountWorkspace = lazyWithRetry(() => import("./pages/account/AccountWorkspace"));
+const AccountIntegrations = lazyWithRetry(() => import("./pages/account/AccountIntegrations"));
+const AccountBilling = lazyWithRetry(() => import("./pages/account/AccountBilling"));
+const SharedReport = lazyWithRetry(() => import("./pages/SharedReport"));
+const Welcome = lazyWithRetry(() => import("./pages/Welcome"));
+const VerifyEmail = lazyWithRetry(() => import("./pages/VerifyEmail"));
+const GoogleFinish = lazyWithRetry(() => import("./pages/GoogleFinish"));
+const ImpersonateFinish = lazyWithRetry(() => import("./pages/ImpersonateFinish"));
+const Terms = lazyWithRetry(() => import("./pages/Terms"));
+const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
+const LegalDocument = lazyWithRetry(() => import("./pages/LegalDocument"));
+const Admin = lazyWithRetry(() => import("./pages/Admin"));
+const AffiliatePortal = lazyWithRetry(() => import("./pages/AffiliatePortal"));
+const Blog = lazyWithRetry(() => import("./pages/Blog"));
+const BlogPostPage = lazyWithRetry(() => import("./pages/BlogPost"));
+const AcceptInvitation = lazyWithRetry(() => import("./pages/AcceptInvitation"));
+const QuantiShowcase = lazyWithRetry(() => import("./pages/QuantiShowcase"));
+const QuantiReportDemo = lazyWithRetry(() => import("./pages/QuantiReportDemo"));
+const SurveyList = lazyWithRetry(() => import("./pages/SurveyList"));
+const SurveyEditor = lazyWithRetry(() => import("./pages/SurveyEditor"));
+const SurveyPreview = lazyWithRetry(() => import("./pages/SurveyPreview"));
+const SurveyDashboardPage = lazyWithRetry(() => import("./pages/SurveyDashboard"));
+const PublicResponse = lazyWithRetry(() => import("./pages/PublicResponse"));
+const StudyOverview = lazyWithRetry(() => import("./pages/StudyOverview"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
