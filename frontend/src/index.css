@@ -11445,22 +11445,26 @@ select.field-input {
   padding: 0 4px;
 }
 
-/* Clarifying-question reply chips — clickable answers under an assistant
-   turn. Free typing stays available in the input below. */
+/* Clarifying-question reply chips — full-width answers stacked one under
+   another (uniform size), plus a "type your own answer" affordance that
+   opens an inline field. Mirrors the Claude / ChatGPT pattern. */
 .copilot-replies {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
 .copilot-reply-chip {
+  display: block;
+  width: 100%;
+  text-align: center;
   font-family: inherit;
   font-size: var(--text-sm);
   color: var(--text-primary);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 999px;
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
 }
 .copilot-reply-chip:hover:not(:disabled) {
@@ -11468,6 +11472,25 @@ select.field-input {
   background: var(--bg-base);
 }
 .copilot-reply-chip:disabled { opacity: 0.5; cursor: default; }
+.copilot-reply-chip--freeform {
+  color: var(--text-secondary);
+  border-style: dashed;
+}
+.copilot-reply-freeform {
+  display: flex;
+  gap: var(--space-2);
+}
+.copilot-reply-freeform__field {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--brand-400, var(--brand-500));
+  border-radius: 999px;
+  padding: var(--space-2) var(--space-3);
+}
 
 .copilot-proposal {
   margin-top: var(--space-3);

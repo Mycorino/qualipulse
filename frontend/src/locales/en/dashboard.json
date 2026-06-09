@@ -164,6 +164,8 @@
     "thinking": "Thinking…",
     "inputPlaceholder": "Ask the copilot…",
     "send": "Send",
+    "freeReplyButton": "✏️ Type your own answer",
+    "freeReplyPlaceholder": "Type your answer…",
     "unavailable": "The copilot is unavailable right now",
     "errorReply": "Sorry — I couldn't respond. Please try again.",
     "applyError": "Couldn't apply that change",

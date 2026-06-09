@@ -1913,6 +1913,10 @@ export default function ProjectDetail() {
                   </label>
                   <input
                     id="plan-duration"
+                    // Re-key on the project value so the uncontrolled input
+                    // remounts (and shows the new value) when the Copilot
+                    // applies a settings change.
+                    key={`dur-${project.interview_duration_minutes}`}
                     className="field-input"
                     type="number"
                     min={5}
@@ -1937,6 +1941,7 @@ export default function ProjectDetail() {
                   </label>
                   <input
                     id="plan-target"
+                    key={`tgt-${project.target_participants ?? ""}`}
                     className="field-input"
                     type="number"
                     min={1}
