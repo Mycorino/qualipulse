@@ -106,3 +106,71 @@ class TestArchiveProject:
 
         active = client.get("/projects/", headers=auth_headers)
         assert any(p["id"] == project_id for p in active.json())
+
+
+class TestSetupCopilotEndpoints:
+    """Endpoints powering the interview-setup Research Copilot's accept flow."""
+
+    def _make_project(self, client, auth_headers):
+        return client.post("/projects/", json=PROJECT_PAYLOAD, headers=auth_headers).json()["id"]
+
+    def test_patch_settings_duration_and_target(self, client, auth_headers):
+        pid = self._make_project(client, auth_headers)
+        resp = client.patch(
+            f"/projects/{pid}/settings",
+            json={"interview_duration_minutes": 60, "target_participants": 12},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["interview_duration_minutes"] == 60
+        assert data["target_participants"] == 12
+
+    def test_add_guide_question_persists_researcher_notes(self, client, auth_headers):
+        """The Copilot's rationale lands in the question note on accept."""
+        pid = self._make_project(client, auth_headers)
+        resp = client.post(
+            f"/projects/{pid}/questions",
+            json={
+                "section_title": "Experience",
+                "main_question": "Walk me through the last time.",
+                "desired_learning": "A concrete story.",
+                "researcher_notes": "Anchors a real incident, not an opinion.",
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["researcher_notes"] == "Anchors a real incident, not an opinion."
+
+    def test_add_screening_question(self, client, auth_headers):
+        pid = self._make_project(client, auth_headers)
+        resp = client.post(
+            f"/projects/{pid}/screening",
+            json={
+                "question": "Have you used PayPal in the last 6 months?",
+                "options": ["Yes", "No"],
+                "disqualifying_options": ["No"],
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        data = resp.json()
+        assert data["question"].startswith("Have you used PayPal")
+        assert data["disqualifying_options"] == ["No"]
+        # And it shows up on the project.
+        proj = client.get(f"/projects/{pid}", headers=auth_headers).json()
+        assert any(sq["id"] == data["id"] for sq in proj["screening_questions"])
+
+    def test_add_screening_drops_disqualifying_not_in_options(self, client, auth_headers):
+        pid = self._make_project(client, auth_headers)
+        resp = client.post(
+            f"/projects/{pid}/screening",
+            json={
+                "question": "How often do you shop online?",
+                "options": ["Weekly", "Monthly"],
+                "disqualifying_options": ["Never"],  # not an option
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["disqualifying_options"] == []

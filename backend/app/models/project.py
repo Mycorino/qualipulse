@@ -57,6 +57,10 @@ class Project(Base):
     success_criteria: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Who we're interviewing for this specific study (overrides company customer_type)
     target_customer_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # How many completed interviews this round is aiming for. Advisory target
+    # the researcher sets (or the Research Copilot recommends) — drives the
+    # Setup sample-size guidance, not a hard gate. Nullable = not yet decided.
+    target_participants: Mapped[int | None] = mapped_column(Integer, nullable=True)
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     panel_collection_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # PF-3: when True (default), the AI moderator opens the interview with a

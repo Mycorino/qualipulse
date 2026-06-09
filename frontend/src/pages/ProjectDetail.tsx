@@ -52,7 +52,7 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, type PaywallDetail } from "../api/projects";
+import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, type PaywallDetail } from "../api/projects";
 import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
 import { NextActionChip } from "../components/NextActionChip";
@@ -1894,6 +1894,73 @@ export default function ProjectDetail() {
               </label>
             </section>
 
+            {/* Interview plan — length + sample-size target. The Research
+                Copilot recommends + sets these; surfaced here so they're
+                visible and hand-editable. */}
+            <section className="detail-section">
+              <div className="section-header-row">
+                <div>
+                  <h2>{tProject("setup.planTitle", { defaultValue: "Interview plan" })}</h2>
+                  <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>
+                    {tProject("setup.planSubtitle", { defaultValue: "How long each interview runs and how many you're aiming to collect." })}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                <div>
+                  <label className="field-label" htmlFor="plan-duration">
+                    {tProject("setup.planDurationLabel", { defaultValue: "Interview length (minutes)" })}
+                  </label>
+                  <input
+                    id="plan-duration"
+                    className="field-input"
+                    type="number"
+                    min={5}
+                    max={120}
+                    style={{ width: 120 }}
+                    defaultValue={project.interview_duration_minutes}
+                    onBlur={async (e) => {
+                      const n = parseInt(e.target.value, 10);
+                      if (!Number.isFinite(n) || n === project.interview_duration_minutes) return;
+                      try {
+                        setProject(await patchProjectSettings(project.id, { interview_duration_minutes: n }));
+                        toast(tProject("setup.planSaved", { defaultValue: "Saved" }), "success");
+                      } catch {
+                        toast(tProject("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="plan-target">
+                    {tProject("setup.planTargetLabel", { defaultValue: "Target number of interviews" })}
+                  </label>
+                  <input
+                    id="plan-target"
+                    className="field-input"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    style={{ width: 120 }}
+                    placeholder={tProject("setup.planTargetPlaceholder", { defaultValue: "e.g. 12" })}
+                    defaultValue={project.target_participants ?? ""}
+                    onBlur={async (e) => {
+                      const raw = e.target.value.trim();
+                      const n = raw === "" ? null : parseInt(raw, 10);
+                      if (n !== null && !Number.isFinite(n)) return;
+                      if (n === (project.target_participants ?? null)) return;
+                      try {
+                        setProject(await patchProjectSettings(project.id, { target_participants: n ?? undefined }));
+                        toast(tProject("setup.planSaved", { defaultValue: "Saved" }), "success");
+                      } catch {
+                        toast(tProject("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </section>
+
             {/* Screening Questions */}
             <section className="detail-section">
               <div className="section-header-row">
@@ -3587,6 +3654,17 @@ export default function ProjectDetail() {
                 section_title: q.section_title,
                 main_question: q.main_question,
                 desired_learning: q.desired_learning,
+                // Persist the Copilot's "why" as the question's note so the
+                // reasoning survives the accept (it used to be dropped).
+                researcher_notes: q.rationale || undefined,
+              });
+            } else if (action.type === "edit_settings" && action.settings) {
+              await patchProjectSettings(project.id, action.settings);
+            } else if (action.type === "add_screening_question" && action.screening) {
+              await createScreeningQuestion(project.id, {
+                question: action.screening.question,
+                options: action.screening.options,
+                disqualifying_options: action.screening.disqualifying_options,
               });
             } else if (
               action.type === "edit_guide_question" &&

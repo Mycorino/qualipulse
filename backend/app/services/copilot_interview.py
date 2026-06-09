@@ -27,12 +27,41 @@ def _live_guide(project: Project) -> list:
 
 
 def _guide_snapshot(project: Project) -> dict:
-    """Compact JSON view of the interview guide — fed to the model."""
+    """Compact JSON view of the whole interview-round setup — guide,
+    framing, the configurable settings, and the screener — fed to the
+    model every turn so it can SEE what already exists (and never re-ask
+    or blindly propose a duplicate)."""
+    active_links = sum(1 for link in project.interview_links if link.is_active)
     return {
         "name": project.name,
         "language": project.language,
         "research_objective": project.research_objective or "",
         "research_context": project.research_context or "",
+        "decision_to_inform": project.decision_to_inform or "",
+        "timeline": project.timeline or "",
+        "success_criteria": project.success_criteria or "",
+        "target_customer_description": project.target_customer_description or "",
+        # Configurable settings the copilot can recommend + change.
+        "settings": {
+            "interview_duration_minutes": project.interview_duration_minutes,
+            "target_participants": project.target_participants,
+            "warmup_enabled": project.warmup_enabled,
+        },
+        # The screener — runs BEFORE the interview to filter who gets in.
+        # `[]` means there is no screener yet.
+        "screening_questions": [
+            {
+                "id": sq.id,
+                "question": sq.question,
+                "options": sq.options_list,
+                "disqualifying_options": sq.disqualifying_options_list,
+            }
+            for sq in sorted(project.screening_questions, key=lambda s: s.sort_order)
+        ],
+        "interview_links": {
+            "total": len(list(project.interview_links)),
+            "active": active_links,
+        },
         "questions": [
             {
                 "id": q.id,
@@ -188,15 +217,53 @@ def _analysis_snapshot(project: Project) -> dict:
 
 _INTERVIEW_METHODOLOGY = """Methodology contract for interview guides \
 (non-negotiable):
-- Call `read_study` EARLY — before asking the researcher generic \
-questions. If this study already has a survey, you are the deep-dive arm \
-of a mixed-methods study: ground the guide in the survey's questions and \
-findings, and do not ask the researcher what the survey already \
-establishes. Open by referencing what the survey shows and propose a \
-guide that digs into the "why" behind it.
+
+DISCOVERY FIRST — understand the problem before you propose anything:
+- Ask ONE question per turn (two only if they are genuinely inseparable). \
+NEVER bundle a numbered list of questions ("1. Who... 2. Which decision... \
+3. How many...") into a single turn — that is forbidden.
+- After each answer, ask a SHARPER follow-up on the same thread until the \
+real problem is clear — what decision rides on this, who exactly they \
+need to hear from, and what would change their mind. Keep probing up to \
+THREE exchanges; do not propose a guide on turn one.
+- Once it IS clear (or after ~3 exchanges), STOP asking and propose — \
+objective first, then the guide. Don't interrogate forever.
+- Open easy: ground your first question in what you already know (the \
+snapshot, the study, the survey) instead of a cold generic prompt.
+
+- Call `read_study` EARLY. If this study already has a survey, you are \
+the deep-dive arm of a mixed-methods study: ground the guide in the \
+survey's questions and findings, and do not ask the researcher what the \
+survey already establishes. Open by referencing what the survey shows and \
+propose a guide that digs into the "why" behind it.
 - If the research objective is empty, propose one FIRST with \
 `propose_objective` — a single sharp, decision-oriented sentence — before \
 drafting questions. Use the research context if it is provided.
+
+SETTINGS — you can see them in the snapshot under `settings`, and you can \
+recommend AND change them with `propose_settings`:
+- Match interview LENGTH to depth: an in-depth qualitative interview runs \
+45-60 min; a focused discovery interview 20-30 min; a quick reaction \
+check 10-15 min. If the researcher wants depth, recommend ~60 min and set \
+it — don't leave it at the default.
+- Recommend a SAMPLE SIZE (`target_participants`) grounded in the goal: \
+~6-10 for early discovery, ~12-20 to reach saturation across a couple of \
+segments. Say WHY ("with two segments, ~12 gets you saturation"), then \
+set it. Be interactive — react to what they tell you and adjust.
+- Only propose a setting CHANGE when it differs from the current value, \
+and always explain the trade-off in your reply before the researcher \
+accepts.
+
+SCREENING — the snapshot's `screening_questions` shows the current \
+screener (`[]` = none yet):
+- The screener runs BEFORE the interview to filter who gets in; it is NOT \
+part of the interview guide. Closed, factual questions (have they done X, \
+how often, role, recency) with disqualifying options for wrong-fit \
+profiles. Never put rating scales or open narrative there.
+- When fit matters and there is no screener, propose 2-4 screening \
+questions with `propose_screening_questions` and flag which options \
+disqualify. Don't silently assume a screener exists — check the snapshot.
+
 - Questions must be OPEN and non-leading — "Tell me about..." / "Walk me \
 through..." not "Don't you think...".
 - One idea per question — never double-barrelled.
@@ -370,6 +437,78 @@ _INTERVIEW_TOOLS = [
         },
     },
     {
+        "name": "propose_settings",
+        "description": (
+            "Propose changing this interview round's settings — interview "
+            "length, target sample size, and/or the opening warm-up. Staged "
+            "for the researcher to accept. Only include the fields you are "
+            "actually changing, and only when they differ from the current "
+            "values in the snapshot."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "interview_duration_minutes": {
+                    "type": "integer",
+                    "description": "Target length of each interview, in minutes.",
+                },
+                "target_participants": {
+                    "type": "integer",
+                    "description": "How many completed interviews to aim for.",
+                },
+                "warmup_enabled": {
+                    "type": "boolean",
+                    "description": "Open with a light warm-up question before the guide.",
+                },
+                "rationale": {
+                    "type": "string",
+                    "description": "Why these values fit the research goal.",
+                },
+            },
+            "required": ["rationale"],
+        },
+    },
+    {
+        "name": "propose_screening_questions",
+        "description": (
+            "Propose screening questions that run BEFORE the interview to "
+            "filter who qualifies. Staged for the researcher to accept — not "
+            "added directly. Use closed, factual questions and mark which "
+            "options disqualify. Check the snapshot first so you don't "
+            "duplicate an existing screener."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "questions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question": {"type": "string"},
+                            "options": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "The closed answer choices.",
+                            },
+                            "disqualifying_options": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": (
+                                    "Subset of options that screen the "
+                                    "participant OUT."
+                                ),
+                            },
+                            "rationale": {"type": "string"},
+                        },
+                        "required": ["question", "options"],
+                    },
+                }
+            },
+            "required": ["questions"],
+        },
+    },
+    {
         "name": "propose_run_analysis",
         "description": (
             "Propose running the AI analysis pipeline over this round's "
@@ -495,6 +634,63 @@ def _guide_run_tool(
             }
         )
         return "Recorded the proposed removal."
+
+    if name == "propose_settings":
+        settings: dict = {}
+        if tool_input.get("interview_duration_minutes") is not None:
+            try:
+                settings["interview_duration_minutes"] = int(
+                    tool_input["interview_duration_minutes"]
+                )
+            except (TypeError, ValueError):
+                pass
+        if tool_input.get("target_participants") is not None:
+            try:
+                settings["target_participants"] = int(
+                    tool_input["target_participants"]
+                )
+            except (TypeError, ValueError):
+                pass
+        if tool_input.get("warmup_enabled") is not None:
+            settings["warmup_enabled"] = bool(tool_input["warmup_enabled"])
+        if not settings:
+            return "No settings to change were provided. Not recorded."
+        turn.actions.append(
+            {
+                "type": "edit_settings",
+                "settings": settings,
+                "rationale": (tool_input.get("rationale") or "").strip(),
+            }
+        )
+        return "Recorded the proposed settings change."
+
+    if name == "propose_screening_questions":
+        added = 0
+        for q in tool_input.get("questions", []):
+            question = (q.get("question") or "").strip()
+            if not question:
+                continue
+            options = [
+                str(o).strip()
+                for o in (q.get("options") or [])
+                if str(o).strip()
+            ]
+            disqualifying = [
+                d for d in (q.get("disqualifying_options") or []) if d in options
+            ]
+            turn.actions.append(
+                {
+                    "type": "add_screening_question",
+                    "screening": {
+                        "question": question,
+                        "options": options,
+                        "disqualifying_options": disqualifying,
+                        "rationale": (q.get("rationale") or "").strip(),
+                    },
+                }
+            )
+            added += 1
+        return f"Recorded {added} proposed screening question(s) for review."
 
     if name == "propose_run_analysis":
         progress = _progress_snapshot(project)

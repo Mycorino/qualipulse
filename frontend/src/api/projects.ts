@@ -65,6 +65,8 @@ export interface ProjectResponse {
   research_objective?: string;
   decision_to_inform?: string | null;
   target_customer_description?: string | null;
+  /** Completed-interview target for this round (advisory). */
+  target_participants?: number | null;
   welcome_message?: string;
   panel_collection_enabled?: boolean;
   /** PF-3: when true (default), engine opens with a warm-up turn before the first guide question. */
@@ -340,6 +342,8 @@ export async function patchProjectSettings(
     warmup_enabled?: boolean;
     research_objective?: string;
     research_context?: string;
+    interview_duration_minutes?: number;
+    target_participants?: number;
   }
 ): Promise<ProjectResponse> {
   const { data } = await client.patch<ProjectResponse>(`/projects/${id}/settings`, settings);
@@ -382,10 +386,26 @@ export async function createGuideQuestion(
     main_question: string;
     desired_learning?: string;
     interview_notes?: string;
+    researcher_notes?: string;
   },
 ): Promise<QuestionResponse> {
   const { data } = await client.post<QuestionResponse>(
     `/projects/${projectId}/questions`,
+    body,
+  );
+  return data;
+}
+
+export async function createScreeningQuestion(
+  projectId: string,
+  body: {
+    question: string;
+    options: string[];
+    disqualifying_options: string[];
+  },
+): Promise<ScreeningQuestionResponse> {
+  const { data } = await client.post<ScreeningQuestionResponse>(
+    `/projects/${projectId}/screening`,
     body,
   );
   return data;
