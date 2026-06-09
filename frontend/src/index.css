@@ -1481,6 +1481,31 @@ select.field-input {
   box-shadow: var(--shadow-xs);
 }
 
+/* Credit gate — shown when a study's interview target exceeds the
+   workspace's available credits. Blocks link generation gracefully. */
+.credit-gate {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+}
+.credit-gate__title {
+  font-weight: 600;
+  color: var(--warning-text);
+  margin-bottom: var(--space-1);
+}
+.credit-gate__body {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-3);
+}
+.credit-gate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .detail-meta {
   display: flex;
   align-items: center;

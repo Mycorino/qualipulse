@@ -226,7 +226,13 @@
     "interviewLinkTitle": "Interview link",
     "newLink": "+ New link",
     "demoLinkDisabled": "Demo projects don't support live interviews",
-    "noLinksHint": "No links yet. Generate one to share with participants."
+    "noLinksHint": "No links yet. Generate one to share with participants.",
+    "linkBlockedTitle": "Not enough credits for your target",
+    "creditGateTitle": "Not enough credits to field this study",
+    "creditGateBody": "Your target is {{target}} interviews, but you have {{credits}} credit(s) — 1 credit = 1 completed interview. Lower your target or get more credits to generate the link.",
+    "creditGateLower": "Set target to {{credits}} & continue",
+    "creditGateLowered": "Target set to {{credits}} — you can generate the link now.",
+    "creditGateUpgrade": "Get more credits"
   },
   "setup": {
     "conversationStyleTitle": "Conversation style",
