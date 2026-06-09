@@ -15,6 +15,7 @@ from app.schemas.project import (
     ProjectSettingsPatch,
     QuestionPatch,
     QuestionResponse,
+    ScreeningQuestionCreate,
     ScreeningQuestionResponse,
 )
 from app.services.analytics import emit_event
@@ -422,6 +423,10 @@ def patch_project_settings(
         project.success_criteria = body.success_criteria
     if body.target_customer_description is not None:
         project.target_customer_description = body.target_customer_description
+    if body.interview_duration_minutes is not None:
+        project.interview_duration_minutes = body.interview_duration_minutes
+    if body.target_participants is not None:
+        project.target_participants = body.target_participants
     db.commit()
     db.refresh(project)
     return _project_to_response(project)
@@ -493,12 +498,53 @@ def add_guide_question(
         main_question=body.main_question,
         interview_notes=body.interview_notes or "",
         desired_learning=body.desired_learning or "",
+        researcher_notes=body.researcher_notes or None,
         sort_order=sort_order,
     )
     db.add(question)
     db.commit()
     db.refresh(question)
     return QuestionResponse.model_validate(question)
+
+
+@router.post(
+    "/{project_id}/screening",
+    response_model=ScreeningQuestionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_screening_question(
+    project_id: str,
+    body: ScreeningQuestionCreate,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ScreeningQuestionResponse:
+    """Add one screening question. Disqualifying options are kept to the
+    subset that actually appears in `options`. Powers the Research
+    Copilot's accept flow for proposed screeners (and granular edits)."""
+    project = _get_project_or_404(project_id, company.id, db)
+
+    options = [o.strip() for o in body.options if o and o.strip()]
+    disqualifying = [d for d in body.disqualifying_options if d in options]
+    sort_order = (
+        max((sq.sort_order for sq in project.screening_questions), default=-1) + 1
+    )
+    sq = ScreeningQuestion(
+        project_id=project.id,
+        question=body.question.strip(),
+        options=json.dumps(options),
+        disqualifying_options=json.dumps(disqualifying),
+        sort_order=sort_order,
+    )
+    db.add(sq)
+    db.commit()
+    db.refresh(sq)
+    return ScreeningQuestionResponse(
+        id=sq.id,
+        question=sq.question,
+        options=sq.options_list,
+        disqualifying_options=sq.disqualifying_options_list,
+        sort_order=sq.sort_order,
+    )
 
 
 @router.patch("/{project_id}/questions/{question_id}", response_model=QuestionResponse)
@@ -664,6 +710,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
         warmup_enabled=getattr(project, "warmup_enabled", True),
         decision_to_inform=getattr(project, "decision_to_inform", None),
         target_customer_description=getattr(project, "target_customer_description", None),
+        target_participants=getattr(project, "target_participants", None),
         is_demo=getattr(project, "is_demo", False),
         created_at=project.created_at,
         questions=questions,

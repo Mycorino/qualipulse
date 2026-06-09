@@ -21,6 +21,9 @@ class GuideQuestionAdd(BaseModel):
     main_question: str
     desired_learning: str | None = None
     interview_notes: str | None = None
+    # The Copilot's "why" for this question — persisted as the question's
+    # researcher note so the reasoning survives the accept flow.
+    researcher_notes: str | None = None
 
 
 class QuestionPatch(BaseModel):
@@ -74,6 +77,11 @@ class ProjectSettingsPatch(BaseModel):
     name: str | None = None
     panel_collection_enabled: bool | None = None
     warmup_enabled: bool | None = None
+    # How long each interview should run and how many we're aiming to
+    # collect. The Research Copilot recommends + sets these so it can own
+    # interview-round setup ("let's do 1h in-depth interviews, ~10 people").
+    interview_duration_minutes: int | None = None
+    target_participants: int | None = None
     # Granular updates to the research framing — the Research Copilot sets
     # these so it can own interview-round setup without the old wizard.
     research_objective: str | None = None
@@ -130,6 +138,7 @@ class ProjectResponse(BaseModel):
     warmup_enabled: bool = True
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
+    target_participants: int | None = None
     is_demo: bool = False
     created_at: datetime
     questions: list[QuestionResponse] = []

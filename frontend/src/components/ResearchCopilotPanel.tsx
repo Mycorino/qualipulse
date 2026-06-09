@@ -433,6 +433,28 @@ function ProposalCard({
   } else if (action.type === "edit_objective") {
     heading = t("copilot.proposal.setObjective");
     body = action.new_objective;
+  } else if (action.type === "edit_settings") {
+    heading = t("copilot.proposal.editSettings");
+    const s = action.settings ?? {};
+    const parts: string[] = [];
+    if (s.interview_duration_minutes != null)
+      parts.push(
+        t("copilot.proposal.settingsDuration", { n: s.interview_duration_minutes }),
+      );
+    if (s.target_participants != null)
+      parts.push(
+        t("copilot.proposal.settingsSample", { n: s.target_participants }),
+      );
+    if (s.warmup_enabled != null)
+      parts.push(
+        s.warmup_enabled
+          ? t("copilot.proposal.settingsWarmupOn")
+          : t("copilot.proposal.settingsWarmupOff"),
+      );
+    body = parts.join(" · ");
+  } else if (action.type === "add_screening_question") {
+    heading = t("copilot.proposal.addScreening");
+    body = action.screening?.question;
   } else if (action.type === "run_analysis") {
     heading = t("copilot.proposal.runAnalysis");
     body = t("copilot.proposal.runAnalysisBody");
@@ -447,7 +469,7 @@ function ProposalCard({
   const rationale =
     action.question && "rationale" in action.question
       ? (action.question as { rationale?: string }).rationale
-      : action.rationale;
+      : action.screening?.rationale ?? action.rationale;
 
   return (
     <div

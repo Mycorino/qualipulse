@@ -393,6 +393,8 @@ _TOOL_LABELS: dict[str, str] = {
     "propose_guide_questions": "Drafting questions",
     "edit_guide_question": "Revising a question",
     "remove_guide_question": "Removing a question",
+    "propose_settings": "Tuning the setup",
+    "propose_screening_questions": "Drafting a screener",
     "propose_run_analysis": "Setting up the analysis",
     "propose_refine_analysis": "Setting up the refined analysis",
     # survey

@@ -32,6 +32,21 @@ export interface ProposedGuideQuestion {
   rationale: string;
 }
 
+/** A screening question the copilot proposes (runs before the interview). */
+export interface ProposedScreeningQuestion {
+  question: string;
+  options: string[];
+  disqualifying_options: string[];
+  rationale?: string;
+}
+
+/** A settings change the copilot proposes for this interview round. */
+export interface ProposedSettings {
+  interview_duration_minutes?: number;
+  target_participants?: number;
+  warmup_enabled?: boolean;
+}
+
 /**
  * A change the copilot proposes. Intent only — nothing is applied until the
  * researcher accepts it.
@@ -45,6 +60,8 @@ export interface ProposedAction {
     | "edit_guide_question"
     | "remove_guide_question"
     | "edit_objective"
+    | "edit_settings"
+    | "add_screening_question"
     | "run_analysis"
     | "refine_analysis";
   /** add_question / add_guide_question */
@@ -59,6 +76,10 @@ export interface ProposedAction {
   new_desired_learning?: string;
   /** edit_objective */
   new_objective?: string;
+  /** edit_settings */
+  settings?: ProposedSettings;
+  /** add_screening_question */
+  screening?: ProposedScreeningQuestion;
   rationale?: string;
 }
 
