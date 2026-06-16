@@ -35,7 +35,6 @@ export default function AccountHome() {
   const totalGranted = credits
     ? credits.included_credits + credits.purchased_credits + credits.rollover_credits
     : 0;
-  const slackConnected = Boolean(me?.slack_webhook_url);
   const seatLimit = billing?.limits.team_members ?? 1;
 
   return (
@@ -146,35 +145,7 @@ export default function AccountHome() {
           </div>
         </div>
 
-        {/* Slack integration. */}
-        <div className="account-card">
-          <div className="account-card__head">
-            <span className="account-card__label">
-              {t("home.slackCard.label", { defaultValue: "Slack notifications" })}
-            </span>
-            <span className={`account-card__status ${slackConnected ? "is-ok" : "is-neutral"}`}>
-              {slackConnected
-                ? t("home.slackCard.connected", { defaultValue: "Connected" })
-                : t("home.slackCard.notConnected", { defaultValue: "Not connected" })}
-            </span>
-          </div>
-          <p className="muted-text" style={{ fontSize: 13, margin: "4px 0 0" }}>
-            {slackConnected
-              ? t("home.slackCard.connectedBody", {
-                  defaultValue: "Completed-interview alerts are delivered to your channel.",
-                })
-              : t("home.slackCard.body", {
-                  defaultValue: "Get a ping in Slack when an interview completes.",
-                })}
-          </p>
-          <div className="account-card__foot">
-            <Link className="btn btn-ghost btn-sm" to="/account/integrations">
-              {slackConnected
-                ? t("home.slackCard.manageCta", { defaultValue: "Manage →" })
-                : t("home.slackCard.connectCta", { defaultValue: "Connect Slack →" })}
-            </Link>
-          </div>
-        </div>
+        {/* Slack integration card hidden until the integration is tested. */}
       </div>
     </div>
   );

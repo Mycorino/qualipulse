@@ -125,7 +125,7 @@ export default function AccountLayout() {
     { to: "/account/profile", label: t("nav.profile", { defaultValue: "Profile" }) },
     { to: "/account/security", label: t("nav.security", { defaultValue: "Security" }) },
     { to: "/account/workspace", label: t("nav.workspace", { defaultValue: "Workspace" }) },
-    { to: "/account/integrations", label: t("nav.integrations", { defaultValue: "Integrations" }) },
+    // Integrations (Slack) hidden until the integration is tested.
     { to: "/account/billing", label: t("nav.billing", { defaultValue: "Billing" }) },
   ];
 

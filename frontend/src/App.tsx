@@ -56,7 +56,10 @@ const AccountHome = lazyWithRetry(() => import("./pages/account/AccountHome"));
 const AccountProfile = lazyWithRetry(() => import("./pages/account/AccountProfile"));
 const AccountSecurity = lazyWithRetry(() => import("./pages/account/AccountSecurity"));
 const AccountWorkspace = lazyWithRetry(() => import("./pages/account/AccountWorkspace"));
-const AccountIntegrations = lazyWithRetry(() => import("./pages/account/AccountIntegrations"));
+// Integrations (Slack) hidden until the integration is tested — see the
+// redirected /account/integrations route below. Re-enable by restoring this
+// import, the route element, and the nav entry in AccountLayout.
+// const AccountIntegrations = lazyWithRetry(() => import("./pages/account/AccountIntegrations"));
 const AccountBilling = lazyWithRetry(() => import("./pages/account/AccountBilling"));
 const SharedReport = lazyWithRetry(() => import("./pages/SharedReport"));
 const Welcome = lazyWithRetry(() => import("./pages/Welcome"));
@@ -269,7 +272,8 @@ export default function App() {
         <Route path="profile" element={<AccountProfile />} />
         <Route path="security" element={<AccountSecurity />} />
         <Route path="workspace" element={<AccountWorkspace />} />
-        <Route path="integrations" element={<AccountIntegrations />} />
+        {/* Slack integration hidden until tested — redirect stale links home. */}
+        <Route path="integrations" element={<Navigate to="/account" replace />} />
         <Route path="billing" element={<AccountBilling />} />
       </Route>
       {/* Catch-all 404 — renders a real "Page not found" UI with
