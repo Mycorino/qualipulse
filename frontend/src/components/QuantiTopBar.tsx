@@ -2,9 +2,26 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { getMe } from "../api/auth";
+import { getMe, type CompanyResponse } from "../api/auth";
 import { useAuth } from "../hooks/useAuth";
 import { AccountMenu } from "./HeaderControls";
+
+/**
+ * Avatar initials for the *account holder* — not the company. Corino
+ * Fontana → "CF", not "A" for Air France. Prefers first+last initials,
+ * falls back to a single name initial, then the email local-part, and
+ * only uses the company name as a last resort.
+ */
+function personInitials(me: CompanyResponse): string {
+  const first = me.first_name?.trim() || "";
+  const last = me.last_name?.trim() || "";
+  if (first && last) return (first[0] + last[0]).toUpperCase();
+  if (first) return first.slice(0, 2).toUpperCase();
+  const email = me.email?.trim() || "";
+  if (email) return email[0].toUpperCase();
+  const company = me.name?.trim() || "";
+  return company ? company[0].toUpperCase() : "?";
+}
 
 /**
  * QuantiTopBar — the universal app chrome.
@@ -37,8 +54,7 @@ export function QuantiTopBar({ crumbs }: QuantiTopBarProps) {
   useEffect(() => {
     getMe()
       .then((me) => {
-        const source = (me.name || me.email || "?").trim();
-        setInitial(source.charAt(0).toUpperCase() || "?");
+        setInitial(personInitials(me));
       })
       .catch(() => setInitial("?"));
   }, []);
