@@ -89,8 +89,8 @@ def _run_ai_quality_assessment_inner(
     db: Session,
     language: str,
 ) -> None:
-    import anthropic
     from app.config import settings
+    from app.services._clients import get_anthropic_client
     from app.services.usage_logger import log_claude_usage
 
     participant = (
@@ -181,7 +181,7 @@ Return ONLY a JSON object — no markdown fences, no preamble:
 }}
 </output_format>{language_instruction}"""
 
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = get_anthropic_client(60.0)
 
     response = client.messages.create(
         model="claude-sonnet-4-20250514",

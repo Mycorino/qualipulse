@@ -3,8 +3,7 @@
 import json
 from datetime import datetime
 
-import anthropic
-import httpx
+from app.services._clients import get_anthropic_client
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -317,7 +316,7 @@ def run_analysis(
             f"Return the JSON object now. participant_count must be {len(completed)}."
         )
 
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(120.0))
+        client = get_anthropic_client()
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
@@ -516,7 +515,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
             f"Return the JSON object now. participant_count must be {len(all_completed)}."
         )
 
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(120.0))
+        client = get_anthropic_client()
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,

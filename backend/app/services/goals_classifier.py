@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-import anthropic
+from app.services._clients import get_anthropic_client
 
 from app.config import settings
 
@@ -75,7 +75,7 @@ another key — if a specific bucket fits, use that instead.
 Output the keys now."""
 
     try:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = get_anthropic_client(30.0)
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=64,

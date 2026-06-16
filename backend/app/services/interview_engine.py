@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 import anthropic
 import httpx
+
+from app.services._clients import get_anthropic_client
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -238,7 +240,7 @@ def decide_next_action(
 
     Returns a dict with keys: action ("follow_up"|"next_question"|"close"), question (str)
     """
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
+    client = get_anthropic_client(60.0)
 
     # Compute how much of the allotted time has been used and questions answered
     time_used_pct = (elapsed_minutes / total_minutes * 100) if total_minutes > 0 else 100
@@ -529,7 +531,7 @@ def _get_warmup_question(
         return fallback
 
     try:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
+        client = get_anthropic_client(60.0)
         effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -596,7 +598,7 @@ def _get_first_question(
     first_q = guide_questions[0]
 
     # Use Claude to rephrase the first question as a natural conversation opener
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(60.0))
+    client = get_anthropic_client(60.0)
 
     effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
 
@@ -1047,12 +1049,11 @@ def process_interview_turn(
             _proj_id = participant.project_id
             def _assess():
                 try:
-                    from app.database import SessionLocal
+                    from app.database import session_scope
                     from app.services.quality import run_ai_quality_assessment
                     from app.models.project import Project
                     from app.models.company import Company
-                    assess_db = SessionLocal()
-                    try:
+                    with session_scope() as assess_db:
                         proj = assess_db.query(Project).filter(Project.id == _proj_id).first()
                         lang = "en"
                         if proj:
@@ -1060,8 +1061,6 @@ def process_interview_turn(
                             if company and company.preferred_language:
                                 lang = company.preferred_language
                         run_ai_quality_assessment(_pid, assess_db, language=lang)
-                    finally:
-                        assess_db.close()
                 except Exception:
                     pass
             _threading.Thread(target=_assess, daemon=True).start()
@@ -1134,12 +1133,11 @@ def skip_question(participant_id: str, db) -> dict:
             _proj_id = participant.project_id
             def _assess_skip():
                 try:
-                    from app.database import SessionLocal
+                    from app.database import session_scope
                     from app.services.quality import run_ai_quality_assessment
                     from app.models.project import Project
                     from app.models.company import Company
-                    assess_db = SessionLocal()
-                    try:
+                    with session_scope() as assess_db:
                         proj = assess_db.query(Project).filter(Project.id == _proj_id).first()
                         lang = "en"
                         if proj:
@@ -1147,8 +1145,6 @@ def skip_question(participant_id: str, db) -> dict:
                             if company and company.preferred_language:
                                 lang = company.preferred_language
                         run_ai_quality_assessment(_pid, assess_db, language=lang)
-                    finally:
-                        assess_db.close()
                 except Exception:
                     pass
             _threading.Thread(target=_assess_skip, daemon=True).start()

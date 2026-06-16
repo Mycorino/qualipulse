@@ -689,13 +689,13 @@ def get_onboarding_suggestions(
         }
 
     try:
-        import anthropic
+        from app.services._clients import get_anthropic_client
         from app.config import settings as _settings
 
         if not _settings.ANTHROPIC_API_KEY:
             raise ValueError("no key")
 
-        client = anthropic.Anthropic(api_key=_settings.ANTHROPIC_API_KEY)
+        client = get_anthropic_client(30.0)
 
         context_parts = []
         if name:

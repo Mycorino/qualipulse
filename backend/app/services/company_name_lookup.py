@@ -18,8 +18,7 @@ import json
 import logging
 from typing import Optional
 
-import anthropic
-import httpx
+from app.services._clients import get_anthropic_client
 
 from app.config import settings
 from app.models.company import Company
@@ -85,10 +84,7 @@ def backfill_business_from_name(
     user = f"Company name: {name}"
 
     try:
-        client = anthropic.Anthropic(
-            api_key=settings.ANTHROPIC_API_KEY,
-            timeout=httpx.Timeout(15.0),
-        )
+        client = get_anthropic_client(15.0)
         resp = client.messages.create(
             model=_MODEL,
             max_tokens=300,

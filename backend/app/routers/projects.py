@@ -4,7 +4,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_current_company, get_db
+from app.dependencies import (
+    get_accessible_project_or_404 as _get_project_or_404,
+    get_current_company,
+    get_db,
+)
 from app.models.company import Company
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.schemas.project import (
@@ -623,39 +627,6 @@ def patch_question(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _get_project_or_404(project_id: str, company_id: str, db: Session) -> Project:
-    """Fetch a project accessible by this company (as owner or workspace member).
-
-    Projects are accessible if the caller's company owns them, OR if the caller
-    is a member of the workspace that owns the project.
-    """
-    # Direct ownership fast path
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id, Project.company_id == company_id)
-        .first()
-    )
-    if project is not None:
-        return project
-
-    # Workspace membership path — resolve caller to a Company and check access
-    caller = db.query(Company).filter(Company.id == company_id).first()
-    if caller is not None:
-        workspace_ids = accessible_workspace_ids(db, caller)
-        project = (
-            db.query(Project)
-            .filter(
-                Project.id == project_id,
-                Project.company_id.in_(workspace_ids),
-            )
-            .first()
-        )
-        if project is not None:
-            return project
-
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-
 
 def _plan_context_for_project(project: Project) -> "PlanContext | None":
     """Return PlanContext for one project, or None when not linked to

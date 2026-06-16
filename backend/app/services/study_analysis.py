@@ -37,7 +37,6 @@ import os
 import re
 from datetime import datetime, timezone
 
-import httpx
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -297,9 +296,9 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
     )
 
     # Import lazily to avoid a hard dep during tests that mock this service.
-    import anthropic  # noqa: WPS433
+    from app.services._clients import get_anthropic_client
 
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(120.0))
+    client = get_anthropic_client()
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=4096,

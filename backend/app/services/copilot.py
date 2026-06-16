@@ -533,7 +533,9 @@ def run_copilot_turn_stream(
 
     import anthropic  # noqa: WPS433 — lazy import keeps tests AI-free
 
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    from app.services._clients import get_anthropic_client
+
+    client = get_anthropic_client(300.0)
     system = _build_system_blocks(
         db, company, instrument, adapter, active_section, mission
     )
