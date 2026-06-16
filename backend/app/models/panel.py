@@ -40,6 +40,8 @@ class PanelProfile(Base):
     seniority = Column(String, nullable=True)    # "junior","mid","senior","manager","director","c_suite"
     industry = Column(String, nullable=True)
     company_size = Column(String, nullable=True)  # "1","2-10","11-50","51-200","201-1000","1000+"
+    # Preferred language for participant-facing comms (interview + future study invites)
+    preferred_language = Column(String, nullable=True)  # "en","fr","de","es","it","pt"
     # Panel
     panel_consent = Column(Boolean, default=False)
     consent_at = Column(DateTime, nullable=True)

@@ -49,6 +49,9 @@ class Participant(Base):
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Participant-chosen interview language — overrides Project.language for the
+    # AI interviewer + voice when set (en/fr/de/es/it/pt).
+    preferred_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), default="in_progress", nullable=False
     )

@@ -42,6 +42,14 @@ import frAdmin from "./locales/fr/admin.json";
 import frShell from "./locales/fr/shell.json";
 import frQuantiDemo from "./locales/fr/quantiDemo.json";
 
+// Participant-facing languages: only the `interview` namespace is translated.
+// Every other namespace falls back to English via `fallbackLng` — researchers
+// (who see those) use EN/FR; participants only ever see the interview flow.
+import deInterview from "./locales/de/interview.json";
+import esInterview from "./locales/es/interview.json";
+import itInterview from "./locales/it/interview.json";
+import ptInterview from "./locales/pt/interview.json";
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -87,6 +95,10 @@ i18n
         shell: frShell,
         quantiDemo: frQuantiDemo,
       },
+      de: { interview: deInterview },
+      es: { interview: esInterview },
+      it: { interview: itInterview },
+      pt: { interview: ptInterview },
     },
     lng: undefined, // rely on detector
     fallbackLng: "en",
@@ -102,10 +114,11 @@ i18n
     },
   });
 
-// If the detected locale is neither EN nor FR, fall back to English (the
-// declared `fallbackLng`). Previously this block defaulted everyone to French
-// and the second branch was dead code.
-if (!i18n.language || (!i18n.language.startsWith("fr") && !i18n.language.startsWith("en"))) {
+// Participant-facing supported languages. If the detected locale isn't one of
+// these, fall back to English (the declared `fallbackLng`).
+export const SUPPORTED_LANGUAGES = ["en", "fr", "de", "es", "it", "pt"] as const;
+const _detected = (i18n.language || "").slice(0, 2);
+if (!SUPPORTED_LANGUAGES.includes(_detected as (typeof SUPPORTED_LANGUAGES)[number])) {
   i18n.changeLanguage("en");
 }
 

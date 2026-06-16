@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.interview import InterviewTurn, Participant
+from app.models.panel import PanelProfile
 from app.models.project import InterviewGuideQuestion, Project
 from app.services.stt import transcribe_audio
 from app.services.storage import upload_audio, download_audio
@@ -157,6 +158,73 @@ def _build_conversation_history(turns: list[InterviewTurn]) -> str:
     return "\n".join(lines)
 
 
+# Human-readable labels for the coded panel-profile values. Kept terse —
+# this becomes one advisory line in the interviewer prompt, not a form.
+_PROFILE_LABELS = {
+    "age_range": lambda v: f"{v}",
+    "gender": {
+        "male": "man", "female": "woman", "non_binary": "non-binary",
+        "prefer_not": None,
+    },
+    "education": {
+        "high_school": "high-school education", "bachelor": "bachelor's degree",
+        "master": "master's degree", "phd": "PhD", "other": None,
+    },
+    "employment_status": {
+        "full_time": "works full-time", "part_time": "works part-time",
+        "freelance": "freelancer", "student": "student",
+        "unemployed": "not currently employed", "retired": "retired",
+    },
+    "seniority": {
+        "junior": "junior", "mid": "mid-level", "senior": "senior",
+        "manager": "manager", "director": "director", "c_suite": "C-suite",
+    },
+}
+
+
+def _build_participant_profile_context(participant, db: Session) -> str | None:
+    """Build a short, advisory description of who the participant is from their
+    saved panel profile, for the interviewer prompt. Returns None when no
+    profile (or nothing meaningful) is on file. Privacy-safe: never includes
+    email; the interviewer is told not to read it back.
+    """
+    email = getattr(participant, "email", None)
+    if not email:
+        return None
+    profile = db.query(PanelProfile).filter(PanelProfile.email == email).first()
+    if profile is None:
+        return None
+
+    bits: list[str] = []
+    if profile.age_range:
+        bits.append(f"{profile.age_range} years old")
+    gender = _PROFILE_LABELS["gender"].get(profile.gender) if profile.gender else None
+    if gender:
+        bits.append(gender)
+    emp = _PROFILE_LABELS["employment_status"].get(profile.employment_status) if profile.employment_status else None
+    if emp:
+        bits.append(emp)
+    # Role detail only makes sense for workers.
+    if profile.job_function and profile.job_function != "other":
+        role = profile.job_function.replace("_", " ")
+        sen = _PROFILE_LABELS["seniority"].get(profile.seniority) if profile.seniority else None
+        bits.append(f"{sen} {role}".strip() if sen else f"works in {role}")
+    if profile.industry:
+        bits.append(f"in the {profile.industry} industry")
+    edu = _PROFILE_LABELS["education"].get(profile.education) if profile.education else None
+    if edu:
+        bits.append(edu)
+    if profile.country:
+        loc = profile.country
+        if profile.city:
+            loc = f"{profile.city}, {profile.country}"
+        bits.append(f"based in {loc}")
+
+    if not bits:
+        return None
+    return ", ".join(bits)
+
+
 def get_interview_context(
     participant_id: str, db: Session
 ) -> dict:
@@ -203,6 +271,14 @@ def get_interview_context(
     started = participant.started_at.replace(tzinfo=None) if participant.started_at.tzinfo else participant.started_at
     elapsed = (now - started).total_seconds() / 60.0
 
+    # The participant's chosen language overrides the study default for the
+    # AI interviewer + voice; fall back to the project language.
+    language = (
+        getattr(participant, "preferred_language", None)
+        or project.language
+        or "en"
+    )
+
     return {
         "conversation_history": _build_conversation_history(turns),
         "interview_guide": _build_interview_guide_str(project),
@@ -211,7 +287,8 @@ def get_interview_context(
         "total_minutes": project.interview_duration_minutes,
         "all_questions_done": all_questions_done,
         "system_prompt": project.system_prompt,
-        "language": project.language or "en",
+        "language": language,
+        "participant_profile": _build_participant_profile_context(participant, db),
         "project": project,
         "participant": participant,
         "turns": turns,
@@ -231,6 +308,7 @@ def decide_next_action(
     research_objective: str | None = None,
     language: str | None = None,
     short_answer_state: dict | None = None,
+    participant_profile: str | None = None,
     db=None,
     company_id=None,
     project_id=None,
@@ -323,9 +401,21 @@ QUESTION: "What does 'fine' look like for you on a typical day with it?"
 WHY: generic answer with no behaviour or example.
 </examples>"""
 
+    participant_block = ""
+    if participant_profile:
+        participant_block = (
+            f"<participant>\n"
+            f"You are speaking with: {participant_profile}.\n"
+            f"Use this only to calibrate your tone, examples, and assumptions "
+            f"(e.g. don't explain jargon they'd know, do unpack things they likely won't). "
+            f"NEVER read these facts back to them or make them feel profiled.\n"
+            f"</participant>\n\n"
+        )
+
     user_message = (
         f"{examples_block}\n\n"
         f"{objective_block}"
+        f"{participant_block}"
         f"<guide>\n{interview_guide_str}\n</guide>\n\n"
         f"<conversation>\n{conversation_history}\n</conversation>\n\n"
         f"<state>\n"
@@ -496,6 +586,7 @@ def _get_warmup_question(
     project: Project,
     db=None,
     participant_id=None,
+    language_override: str | None = None,
 ) -> str:
     """Generate a warm-up opener — a low-stakes invitation to start talking.
 
@@ -504,7 +595,7 @@ def _get_warmup_question(
     questions arrive. Falls back to a generic opener in the project language
     if Claude is unreachable.
     """
-    language_code = (getattr(project, "language", None) or "en").lower()
+    language_code = (language_override or getattr(project, "language", None) or "en").lower()
     language_name = LANGUAGE_NAMES.get(language_code, "English")
 
     fallbacks = {
@@ -571,13 +662,14 @@ def _get_first_question(
     project: Project,
     db=None,
     participant_id=None,
+    language_override: str | None = None,
 ) -> tuple[str, int]:
     """Get the first non-deprecated question from the interview guide, rephrased as an opener."""
     guide_questions = sorted(
         [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
         key=lambda q: (q.section_index, q.question_index),
     )
-    language_code = (getattr(project, "language", None) or "en").lower()
+    language_code = (language_override or getattr(project, "language", None) or "en").lower()
     language_name = LANGUAGE_NAMES.get(language_code, "English")
 
     if not guide_questions:
@@ -656,11 +748,19 @@ def start_interview(participant_id: str, db: Session) -> dict:
 
     use_warmup = bool(getattr(project, "warmup_enabled", True))
 
+    # The participant's chosen language overrides the study default for the
+    # opening turn (warm-up / first question) too.
+    participant_lang = getattr(participant, "preferred_language", None)
+
     if use_warmup:
-        question_text = _get_warmup_question(project, db=db, participant_id=participant_id)
+        question_text = _get_warmup_question(
+            project, db=db, participant_id=participant_id, language_override=participant_lang
+        )
         q_index = WARMUP_QUESTION_INDEX
     else:
-        question_text, q_index = _get_first_question(project, db=db, participant_id=participant_id)
+        question_text, q_index = _get_first_question(
+            project, db=db, participant_id=participant_id, language_override=participant_lang
+        )
 
     # Generate TTS audio and upload (non-fatal — text-only fallback if TTS is down)
     tts_audio_url = None
@@ -763,7 +863,10 @@ def process_interview_turn(
     # want it consuming the AI's pacing budget or spawning follow-ups.
     last_was_warmup = bool(turns) and turns[-1].question_index == WARMUP_QUESTION_INDEX
     if last_was_warmup:
-        first_q_text, _ = _get_first_question(_proj, db=db, participant_id=participant_id)
+        first_q_text, _ = _get_first_question(
+            _proj, db=db, participant_id=participant_id,
+            language_override=context.get("language"),
+        )
         first_tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
         first_tts_url = upload_audio(generate_speech(first_q_text), first_tts_key)
         log_tts_usage(db, first_q_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
@@ -811,6 +914,7 @@ def process_interview_turn(
         research_objective=_proj.research_objective,
         language=context["language"],
         short_answer_state=short_answer_state,
+        participant_profile=context.get("participant_profile"),
         db=db,
         company_id=_company_id,
         project_id=_project_id,

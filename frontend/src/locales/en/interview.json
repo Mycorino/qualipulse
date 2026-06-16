@@ -132,6 +132,103 @@
     "optional": "(optional)",
     "tagsLabel": "Interests / topics"
   },
+  "questionnaire": {
+    "intro": "First, a few quick questions about you",
+    "introSubtitle": "This helps your interviewer — and we only ask once. Just tap your answer.",
+    "progress": "{{current}} of {{total}}",
+    "back": "Back",
+    "skip": "Skip",
+    "continue": "Continue",
+    "finish": "Start the interview",
+    "saving": "Saving…",
+    "saveError": "We couldn't save your answers. Please try again.",
+    "firstNameQ": "What's your first name?",
+    "firstNameHelp": "Your interviewer will use it to talk to you naturally.",
+    "firstNamePlaceholder": "e.g. Alex",
+    "countryQ": "Which country do you live in?",
+    "countrySearch": "Search for your country…",
+    "ageQ": "Which age group are you in?",
+    "genderQ": "How do you identify?",
+    "educationQ": "What's the highest level of education you've finished?",
+    "employmentQ": "What's your current work situation?",
+    "industryQ": "Which industry do you work in?",
+    "jobFunctionQ": "What kind of work do you do?",
+    "seniorityQ": "What's your level?",
+    "companySizeQ": "How big is the company you work for?",
+    "consentQ": "Can we invite you to future studies?",
+    "consentHelp": "We'll only contact you about paid studies that match your profile. You can opt out anytime.",
+    "consentYes": "Yes, keep me posted",
+    "consentNo": "No thanks",
+    "ageOptions": {
+      "18-24": "18–24",
+      "25-34": "25–34",
+      "35-44": "35–44",
+      "45-54": "45–54",
+      "55-64": "55–64",
+      "65+": "65 or older"
+    },
+    "genderOptions": {
+      "male": "Man",
+      "female": "Woman",
+      "non_binary": "Non-binary",
+      "prefer_not": "Prefer not to say"
+    },
+    "educationOptions": {
+      "high_school": "High school",
+      "bachelor": "Bachelor's degree",
+      "master": "Master's degree",
+      "phd": "PhD / Doctorate",
+      "other": "Other"
+    },
+    "employmentOptions": {
+      "full_time": "Working full-time",
+      "part_time": "Working part-time",
+      "freelance": "Freelance / self-employed",
+      "student": "Student",
+      "unemployed": "Not working right now",
+      "retired": "Retired"
+    },
+    "industryOptions": {
+      "technology": "Technology",
+      "healthcare": "Healthcare",
+      "finance": "Finance & banking",
+      "retail": "Retail & e-commerce",
+      "education": "Education",
+      "manufacturing": "Manufacturing",
+      "media": "Media & entertainment",
+      "public": "Government & public sector",
+      "hospitality": "Travel & hospitality",
+      "other": "Other"
+    },
+    "jobFunctionOptions": {
+      "engineering": "Engineering / tech",
+      "product": "Product",
+      "marketing": "Marketing",
+      "design": "Design",
+      "sales": "Sales",
+      "finance": "Finance",
+      "operations": "Operations",
+      "hr": "HR / people",
+      "executive": "Leadership",
+      "other": "Something else"
+    },
+    "seniorityOptions": {
+      "junior": "Just starting out",
+      "mid": "Mid-level",
+      "senior": "Senior",
+      "manager": "Manager",
+      "director": "Director",
+      "c_suite": "Executive / C-suite"
+    },
+    "companySizeOptions": {
+      "1": "Just me",
+      "2-10": "2–10 people",
+      "11-50": "11–50 people",
+      "51-200": "51–200 people",
+      "201-1000": "201–1,000 people",
+      "1000+": "More than 1,000 people"
+    }
+  },
   "micPrompt": {
     "title": "This interview uses your microphone",
     "subtitle": "When you click below, your browser will ask for microphone permission. Click <strong>Allow</strong> — this is required to record your answers.",

@@ -46,6 +46,9 @@ class ResumeCheckRequest(BaseModel):
 
 class VerificationRequest(BaseModel):
     email: str
+    # Participant-chosen UI/interview language for the magic-link email copy.
+    # Falls back to the project language when omitted.
+    lang: str | None = None
 
 
 class PanelProfileRequest(BaseModel):
@@ -62,6 +65,7 @@ class PanelProfileRequest(BaseModel):
     seniority: str | None = None
     industry: str | None = None
     company_size: str | None = None
+    preferred_language: str | None = None
     panel_consent: bool = False
     tag_ids: list[int] = []
 
@@ -77,6 +81,24 @@ def _create_session_token(email: str, link_token: str) -> str:
         "type": "participant_session",
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _is_profile_complete(profile: "PanelProfile | None") -> bool:
+    """A returning participant counts as 'known' once the core demographics
+    are on file. We deliberately key off the always-asked fields (name,
+    country, age, education, employment) — the work-specific fields are
+    conditional, so requiring them would re-prompt retirees/students forever.
+    """
+    if profile is None:
+        return False
+    required = (
+        profile.first_name,
+        profile.country,
+        profile.age_range,
+        profile.education,
+        profile.employment_status,
+    )
+    return all(bool(v) for v in required)
 
 
 def _decode_session_token(token: str) -> dict | None:
@@ -119,12 +141,18 @@ def request_verification(
     """
     link = _get_active_link_or_404(token, db)
 
-    # Use the project's configured language for the email body so the
-    # participant reads the copy in the same language as the interview.
-    project_lang = getattr(link.project, "language", "en") or "en"
+    # Prefer the participant's chosen language for the email body so the copy
+    # matches the language they'll do the interview in; fall back to the
+    # project's configured language.
+    _SUPPORTED_LANGS = {"en", "fr", "de", "es", "it", "pt"}
+    chosen = (body.lang or "").lower()[:2]
+    if chosen in _SUPPORTED_LANGS:
+        email_lang = chosen
+    else:
+        email_lang = getattr(link.project, "language", "en") or "en"
 
     _, delivered = generate_magic_token(
-        db, body.email, token, lang=project_lang
+        db, body.email, token, lang=email_lang
     )
     if not delivered:
         raise HTTPException(
@@ -152,10 +180,22 @@ def verify_participant_token(
         )
 
     session_token = _create_session_token(record.email, record.interview_link_token)
+
+    # Recognize a returning participant: if a panel profile with the core
+    # demographics already exists, the frontend skips the profiling
+    # questionnaire entirely (the magic link behaves like a login).
+    profile = (
+        db.query(PanelProfile)
+        .filter(PanelProfile.email == record.email)
+        .first()
+    )
     return {
         "session_token": session_token,
         "link_token": record.interview_link_token,
         "email": record.email,
+        "profile_complete": _is_profile_complete(profile),
+        "first_name": profile.first_name if profile else None,
+        "preferred_language": profile.preferred_language if profile else None,
     }
 
 
@@ -214,6 +254,8 @@ def save_panel_profile(
         profile.industry = body.industry
     if body.company_size is not None:
         profile.company_size = body.company_size
+    if body.preferred_language is not None:
+        profile.preferred_language = body.preferred_language
 
     if body.panel_consent:
         profile.panel_consent = True
@@ -473,6 +515,13 @@ def start_interview_session(
     elif body and getattr(body, "email", None):
         verified_email = body.email
 
+    # Validate the participant's chosen interview language against the
+    # supported set; ignore anything else so a junk value can't reach the
+    # AI prompt / TTS.
+    _SUPPORTED_LANGS = {"en", "fr", "de", "es", "it", "pt"}
+    chosen_lang = (getattr(body, "preferred_language", None) or "").lower()[:2] if body else ""
+    preferred_language = chosen_lang if chosen_lang in _SUPPORTED_LANGS else None
+
     participant = Participant(
         link_id=link.id,
         project_id=link.project_id,
@@ -482,6 +531,7 @@ def start_interview_session(
         country=body.country if body else None,
         email=verified_email,
         email_verified=email_was_verified,
+        preferred_language=preferred_language,
         status="in_progress",
     )
     db.add(participant)

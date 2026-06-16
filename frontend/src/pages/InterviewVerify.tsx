@@ -12,9 +12,15 @@ export default function InterviewVerify() {
   useEffect(() => {
     if (!token) return;
     verifyInterviewToken(token)
-      .then(({ session_token, link_token }) => {
+      .then(({ session_token, link_token, profile_complete, first_name, preferred_language }) => {
         // Store session so Interview.tsx can pick it up
         sessionStorage.setItem(`interview_session_${link_token}`, session_token);
+        // Stash returning-participant meta so Interview.tsx can skip the
+        // profiling questionnaire and restore the participant's language.
+        sessionStorage.setItem(
+          `interview_profile_meta_${link_token}`,
+          JSON.stringify({ profile_complete, first_name, preferred_language })
+        );
         navigate(`/i/${link_token}`, { replace: true });
       })
       .catch(() => {
