@@ -86,6 +86,7 @@ export interface PanelProfileData {
   seniority?: string;
   industry?: string;
   company_size?: string;
+  preferred_language?: string;
   panel_consent: boolean;
   tag_ids: number[];
 }
@@ -94,6 +95,11 @@ export interface VerifyTokenResponse {
   session_token: string;
   link_token: string;
   email: string;
+  /** True when a returning participant already has a complete panel profile —
+   *  the frontend skips the profiling questionnaire when set. */
+  profile_complete?: boolean;
+  first_name?: string | null;
+  preferred_language?: string | null;
 }
 
 export async function getInterviewInfo(token: string): Promise<InterviewInfo> {
@@ -113,6 +119,7 @@ export interface StartInterviewParams {
   country?: string;
   email?: string;
   sessionToken?: string;
+  preferredLanguage?: string;
 }
 
 export async function startInterview(
@@ -128,6 +135,7 @@ export async function startInterview(
       country: params.country || undefined,
       email: params.email || undefined,
       session_token: params.sessionToken || undefined,
+      preferred_language: params.preferredLanguage || undefined,
     }
   );
   return data;
@@ -184,8 +192,12 @@ export async function skipQuestion(
   return data;
 }
 
-export async function requestVerification(linkToken: string, email: string): Promise<void> {
-  await client.post(`/interview/${linkToken}/request-verification`, { email });
+export async function requestVerification(
+  linkToken: string,
+  email: string,
+  lang?: string
+): Promise<void> {
+  await client.post(`/interview/${linkToken}/request-verification`, { email, lang });
 }
 
 export async function verifyInterviewToken(magicToken: string): Promise<VerifyTokenResponse> {

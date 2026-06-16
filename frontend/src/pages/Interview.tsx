@@ -21,12 +21,16 @@ import {
   PanelTag,
 } from "../api/interviews";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import LanguagePicker from "../components/LanguagePicker";
+import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/ParticipantQuestionnaire";
+import { SUPPORTED_LANGUAGES } from "../i18n";
 
 type Phase =
   | "email_entry"
   | "email_sent"
   | "consent"
   | "profile"
+  | "questionnaire"
   | "screening"
   | "disqualified"
   | "interview"
@@ -95,6 +99,10 @@ export default function Interview() {
   const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
   const [panelTags, setPanelTags] = useState<PanelTag[]>([]);
   const [panelProfileSaving, setPanelProfileSaving] = useState(false);
+  // Returning-participant recognition: set from the magic-link verify response
+  // (stashed in sessionStorage by InterviewVerify). When the profile is already
+  // complete we skip the questionnaire entirely.
+  const [profileComplete, setProfileComplete] = useState(false);
 
   // Interview state
   const [displayName, setDisplayName] = useState("");
@@ -166,6 +174,10 @@ export default function Interview() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pendingFirstTtsRef = useRef<string | null>(null);
+  // Holds the questionnaire result so doStartInterview reads it synchronously
+  // (setState is async — the no-screening path starts the interview in the
+  // same tick the questionnaire completes).
+  const collectedRef = useRef<QuestionnaireResult | null>(null);
   const { isRecording, error: recError, startRecording, stopRecording } =
     useAudioRecorder();
 
@@ -178,6 +190,27 @@ export default function Interview() {
     const params = new URLSearchParams(location.search);
     const sessionParam = params.get("session");
 
+    // Read the returning-participant meta (profile_complete / first_name /
+    // preferred_language) that InterviewVerify stashed alongside the session.
+    const applyProfileMeta = () => {
+      try {
+        const raw = sessionStorage.getItem(`interview_profile_meta_${token}`);
+        if (!raw) return;
+        const meta = JSON.parse(raw) as {
+          profile_complete?: boolean;
+          first_name?: string | null;
+          preferred_language?: string | null;
+        };
+        if (meta.profile_complete) setProfileComplete(true);
+        if (meta.first_name) setProfile((p) => ({ ...p, firstName: meta.first_name as string }));
+        const ml = (meta.preferred_language || "").slice(0, 2);
+        if (ml && (SUPPORTED_LANGUAGES as readonly string[]).includes(ml)) {
+          localStorage.setItem("qp_interview_lang", ml);
+          i18n.changeLanguage(ml);
+        }
+      } catch { /* meta is best-effort */ }
+    };
+
     if (sessionParam) {
       const payload = parseJwtPayload(sessionParam);
       if (payload?.email) {
@@ -186,6 +219,7 @@ export default function Interview() {
         setSessionToken(sessionParam);
         sessionStorage.setItem(`interview_session_${token}`, sessionParam);
         navigate(`/i/${token}`, { replace: true });
+        applyProfileMeta();
         setPhase("consent");
         return;
       }
@@ -198,6 +232,7 @@ export default function Interview() {
       if (payload?.email) {
         setEmail(String(payload.email));
         setSessionToken(saved);
+        applyProfileMeta();
         setPhase("consent");
         return;
       }
@@ -226,10 +261,19 @@ export default function Interview() {
     getInterviewInfo(token)
       .then((data) => {
         setInfo(data);
-        // Participant-facing interview uses the project's language, not the researcher's UI language
-        if (data.language && (data.language === "fr" || data.language === "en")) {
-          i18n.changeLanguage(data.language);
-        }
+        // Language precedence (participant choice wins, per the redesign):
+        //   1. an explicit pick the participant made via the language picker
+        //   2. their browser/detected language (if we support it)
+        //   3. the study's configured language (if we support it)
+        //   4. English
+        const supported = SUPPORTED_LANGUAGES as readonly string[];
+        const manual = localStorage.getItem("qp_interview_lang") || "";
+        const browser = (i18n.language || "en").slice(0, 2);
+        let target = "en";
+        if (supported.includes(manual)) target = manual;
+        else if (supported.includes(browser)) target = browser;
+        else if (data.language && supported.includes(data.language)) target = data.language;
+        if (target !== i18n.language) i18n.changeLanguage(target);
       })
       .catch(() => setError(t("linkInactive.title")))
       .finally(() => setInfoLoading(false));
@@ -433,7 +477,7 @@ export default function Interview() {
     setSendingVerification(true);
     setError("");
     try {
-      await requestVerification(token, verificationEmail.trim());
+      await requestVerification(token, verificationEmail.trim(), (i18n.language || "en").slice(0, 2));
       setResendCountdown(60);
       setPhase("email_sent");
     } catch {
@@ -446,20 +490,11 @@ export default function Interview() {
   async function handleResendVerification() {
     if (!token || resendCountdown > 0) return;
     try {
-      await requestVerification(token, verificationEmail.trim());
+      await requestVerification(token, verificationEmail.trim(), (i18n.language || "en").slice(0, 2));
       setResendCountdown(60);
     } catch {
       setError(t("emailEntry.resendError"));
     }
-  }
-
-  // Skip path: participants whose mail provider (iCloud, Outlook, strict
-  // corp filters) silently drops our magic link shouldn't get locked out
-  // of the study. This jumps straight to the consent screen and lets the
-  // backend create a participant without a session token.
-  function handleSkipEmail() {
-    setError("");
-    setPhase("consent");
   }
 
   // ── Consent ──────────────────────────────────────────────────────────────
@@ -499,16 +534,17 @@ export default function Interview() {
         setStarting(false);
         return;
       }
-      // Ask for first name before screening/interview unless we already have one
-      // (eg. from session-restored state). The AI moderator addresses the
-      // participant by name in the warm-up so this is meaningful even when no
-      // demographics are collected here.
-      if (!profile.firstName.trim()) {
-        setPhase("profile");
-        setStarting(false);
+      // Returning participant with a complete panel profile → skip the
+      // profiling questionnaire and go straight to screening/interview.
+      if (profileComplete) {
+        await routeAfterProfile();
         return;
       }
-      await routeAfterProfile();
+      // New / incomplete participant → run the profiling questionnaire
+      // (collects demographics into the reusable panel profile).
+      setPhase("questionnaire");
+      setStarting(false);
+      return;
     } catch {
       setError(t("consent.startError"));
     } finally {
@@ -553,6 +589,21 @@ export default function Interview() {
     routeAfterProfile();
   }
 
+  /** Called when the participant finishes (or skips through) the profiling
+   *  questionnaire. The questionnaire already persisted the panel profile;
+   *  here we just carry the few fields needed to create the participant row
+   *  and continue to screening/interview. */
+  async function handleQuestionnaireComplete(data: QuestionnaireResult) {
+    collectedRef.current = data;
+    if (data.firstName) {
+      setProfile((p) => ({ ...p, firstName: data.firstName }));
+      setDisplayName(data.firstName);
+    }
+    if (data.ageRange) setAgeRange(data.ageRange);
+    if (data.country) setCountry(data.country);
+    await routeAfterProfile();
+  }
+
   function toggleTag(id: number) {
     setProfile((p) => {
       const has = p.selectedTagIds.includes(id);
@@ -568,16 +619,18 @@ export default function Interview() {
 
   async function doStartInterview() {
     if (!token) return;
-    // ``sessionToken`` is optional — participants who took the "skip email"
-    // path don't have one and the backend now accepts that. Only attach
-    // the token when we actually have one.
+    // Prefer the just-collected questionnaire data (read synchronously from a
+    // ref to dodge setState lag), then fall back to any restored state.
+    const c = collectedRef.current;
+    const chosenLang = (i18n.language || "en").slice(0, 2);
     const res = await startInterview(token, {
-      displayName: profile.firstName || displayName || undefined,
+      displayName: c?.firstName || profile.firstName || displayName || undefined,
       profession: profile.jobFunction || profession || undefined,
-      ageRange: profile.ageRange || ageRange || undefined,
-      country: profile.city || country || undefined,
+      ageRange: c?.ageRange || profile.ageRange || ageRange || undefined,
+      country: c?.country || country || profile.city || undefined,
       email: email || undefined,
       sessionToken: sessionToken || undefined,
+      preferredLanguage: chosenLang,
     });
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
@@ -908,6 +961,9 @@ export default function Interview() {
           width: "100%",
           margin: "0 auto",
         }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+            <LanguagePicker />
+          </div>
           <ResearcherIdentity />
           <h1 className="interview-project-name" style={{ marginBottom: 8, textAlign: "center" }}>{info?.project_name}</h1>
           {info?.researcher_name && (
@@ -973,38 +1029,6 @@ export default function Interview() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             {t("emailEntry.trustLine")}
           </p>
-
-          {/* Escape hatch for participants whose mail provider drops or
-              heavily delays the magic link (iCloud Hide My Email, strict
-              corporate filters, etc.). The interview will still run, we
-              just won't store a verified email against the participant. */}
-          <div
-            style={{
-              marginTop: 20,
-              paddingTop: 16,
-              borderTop: "1px dashed var(--border, #e5e7eb)",
-              textAlign: "center",
-            }}
-          >
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={handleSkipEmail}
-              style={{ minHeight: 44, fontSize: 14 }}
-            >
-              {t("emailEntry.skipSession")}
-            </button>
-            <p
-              style={{
-                fontSize: 11,
-                color: "var(--text-muted, #9ca3af)",
-                marginTop: 6,
-                lineHeight: 1.5,
-              }}
-            >
-              {t("emailEntry.skipEmailNote")}
-            </p>
-          </div>
         </div>
         </div>
       </div>
@@ -1255,6 +1279,20 @@ export default function Interview() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // ── Profiling questionnaire phase ────────────────────────────────────────
+
+  if (phase === "questionnaire") {
+    return (
+      <ParticipantQuestionnaire
+        linkToken={token!}
+        email={email}
+        sessionToken={sessionToken}
+        initialFirstName={profile.firstName}
+        onComplete={handleQuestionnaireComplete}
+      />
     );
   }
 

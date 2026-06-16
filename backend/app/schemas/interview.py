@@ -24,6 +24,9 @@ class StartInterviewRequest(BaseModel):
     country: str | None = None
     email: str | None = None
     session_token: str | None = None  # JWT from email verification
+    # Participant-chosen interview language (en/fr/de/es/it/pt). Overrides
+    # the study's default language for the AI interviewer + voice.
+    preferred_language: str | None = None
 
 
 class StartInterviewResponse(BaseModel):

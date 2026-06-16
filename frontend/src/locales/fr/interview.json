@@ -132,6 +132,103 @@
     "optional": "(facultatif)",
     "tagsLabel": "Centres d'intérêt / thématiques"
   },
+  "questionnaire": {
+    "intro": "D'abord, quelques questions rapides sur vous",
+    "introSubtitle": "Cela aide votre interviewer — et on ne le demande qu'une fois. Touchez simplement votre réponse.",
+    "progress": "{{current}} sur {{total}}",
+    "back": "Retour",
+    "skip": "Passer",
+    "continue": "Continuer",
+    "finish": "Démarrer l'entretien",
+    "saving": "Enregistrement…",
+    "saveError": "Nous n'avons pas pu enregistrer vos réponses. Veuillez réessayer.",
+    "firstNameQ": "Quel est votre prénom ?",
+    "firstNameHelp": "Votre interviewer l'utilisera pour s'adresser à vous naturellement.",
+    "firstNamePlaceholder": "ex. Alex",
+    "countryQ": "Dans quel pays vivez-vous ?",
+    "countrySearch": "Recherchez votre pays…",
+    "ageQ": "Dans quelle tranche d'âge êtes-vous ?",
+    "genderQ": "Comment vous identifiez-vous ?",
+    "educationQ": "Quel est le plus haut niveau d'études que vous avez terminé ?",
+    "employmentQ": "Quelle est votre situation professionnelle actuelle ?",
+    "industryQ": "Dans quel secteur travaillez-vous ?",
+    "jobFunctionQ": "Quel type de travail faites-vous ?",
+    "seniorityQ": "Quel est votre niveau ?",
+    "companySizeQ": "Quelle est la taille de l'entreprise où vous travaillez ?",
+    "consentQ": "Pouvons-nous vous inviter à de futures études ?",
+    "consentHelp": "Nous vous contacterons uniquement pour des études rémunérées correspondant à votre profil. Vous pouvez vous désinscrire à tout moment.",
+    "consentYes": "Oui, tenez-moi informé",
+    "consentNo": "Non merci",
+    "ageOptions": {
+      "18-24": "18–24",
+      "25-34": "25–34",
+      "35-44": "35–44",
+      "45-54": "45–54",
+      "55-64": "55–64",
+      "65+": "65 ans et plus"
+    },
+    "genderOptions": {
+      "male": "Homme",
+      "female": "Femme",
+      "non_binary": "Non-binaire",
+      "prefer_not": "Je préfère ne pas répondre"
+    },
+    "educationOptions": {
+      "high_school": "Lycée / baccalauréat",
+      "bachelor": "Licence (Bac+3)",
+      "master": "Master (Bac+5)",
+      "phd": "Doctorat",
+      "other": "Autre"
+    },
+    "employmentOptions": {
+      "full_time": "Temps plein",
+      "part_time": "Temps partiel",
+      "freelance": "Indépendant / freelance",
+      "student": "Étudiant",
+      "unemployed": "Sans emploi actuellement",
+      "retired": "Retraité"
+    },
+    "industryOptions": {
+      "technology": "Technologie",
+      "healthcare": "Santé",
+      "finance": "Finance & banque",
+      "retail": "Commerce & e-commerce",
+      "education": "Éducation",
+      "manufacturing": "Industrie",
+      "media": "Médias & divertissement",
+      "public": "Secteur public",
+      "hospitality": "Voyage & hôtellerie",
+      "other": "Autre"
+    },
+    "jobFunctionOptions": {
+      "engineering": "Ingénierie / tech",
+      "product": "Produit",
+      "marketing": "Marketing",
+      "design": "Design",
+      "sales": "Vente",
+      "finance": "Finance",
+      "operations": "Opérations",
+      "hr": "RH",
+      "executive": "Direction",
+      "other": "Autre chose"
+    },
+    "seniorityOptions": {
+      "junior": "Débutant",
+      "mid": "Intermédiaire",
+      "senior": "Senior",
+      "manager": "Manager",
+      "director": "Directeur",
+      "c_suite": "Direction générale"
+    },
+    "companySizeOptions": {
+      "1": "Juste moi",
+      "2-10": "2–10 personnes",
+      "11-50": "11–50 personnes",
+      "51-200": "51–200 personnes",
+      "201-1000": "201–1 000 personnes",
+      "1000+": "Plus de 1 000 personnes"
+    }
+  },
   "micPrompt": {
     "title": "Cet entretien utilise votre microphone",
     "subtitle": "Lorsque vous cliquerez ci-dessous, votre navigateur vous demandera l'autorisation d'accéder au microphone. Cliquez sur <strong>Autoriser</strong> — c'est nécessaire pour enregistrer vos réponses.",

@@ -2824,6 +2824,58 @@ select.field-input {
   color: var(--text);
 }
 
+/* ── Participant profiling questionnaire (pre-screening) ─────────────────── */
+.questionnaire-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 4px 0 16px;
+}
+.questionnaire-help {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: -4px 0 16px;
+}
+.questionnaire-text-input {
+  width: 100%;
+  margin-bottom: 16px;
+}
+.questionnaire-continue {
+  width: 100%;
+  min-height: 48px;
+}
+.questionnaire-country-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-top: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.questionnaire-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+.questionnaire-skip-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary, #9ca3af);
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-left: auto;
+  font-family: inherit;
+  min-height: 44px;
+}
+.questionnaire-skip-btn:hover {
+  color: var(--text-secondary);
+}
+
 /* ============================================
    Project Creation Wizard
    ============================================ */
@@ -5614,6 +5666,46 @@ select.field-input {
 }
 .lang-switcher--dark:hover {
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Participant language picker (6 languages, interview flow) ─────────────── */
+.language-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-xl);
+  padding: 0 10px 0 12px;
+  min-height: 44px;
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out);
+}
+.language-picker:hover {
+  background: rgba(0, 0, 0, 0.09);
+}
+.language-picker__icon {
+  font-size: 15px;
+  line-height: 1;
+}
+.language-picker__select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: #374151;
+  padding: 0 4px;
+  min-height: 42px;
+}
+.language-picker__select:focus-visible {
+  outline: 2px solid var(--brand-500, #4f46e5);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* ── Mobile polish (≤480px) ─────────────────────────────────────────────────
