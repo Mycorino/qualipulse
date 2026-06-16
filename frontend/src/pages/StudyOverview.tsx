@@ -36,7 +36,7 @@ import { QuantiTopBar } from "../components/QuantiTopBar";
 type Tab = "overview" | "surveys" | "interviews" | "participants" | "report";
 
 export default function StudyOverview() {
-  const { t } = useTranslation("study");
+  const { t } = useTranslation(["study", "dashboard"]);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -127,13 +127,6 @@ export default function StudyOverview() {
           gap: "var(--space-4)",
         }}
       >
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => navigate("/studies")}
-        >
-          {t("overview.allStudies")}
-        </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
@@ -163,6 +156,8 @@ export default function StudyOverview() {
       <nav
         style={{
           display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           gap: "var(--space-4)",
           padding: "0 var(--space-6)",
           background: "var(--bg-surface)",
@@ -170,26 +165,42 @@ export default function StudyOverview() {
         }}
         aria-label={t("overview.sectionsNav")}
       >
-        {(["overview", "surveys", "interviews", "participants", "report"] as Tab[]).map((tabKey) => (
-          <button
-            key={tabKey}
-            type="button"
-            onClick={() => setTabAndUrl(tabKey)}
-            style={{
-              padding: "var(--space-3) 0",
-              background: "transparent",
-              border: "none",
-              borderBottom: `2px solid ${tab === tabKey ? "var(--brand-500)" : "transparent"}`,
-              color: tab === tabKey ? "var(--brand-700)" : "var(--text-secondary)",
-              fontWeight: tab === tabKey ? 600 : 500,
-              fontFamily: "inherit",
-              fontSize: "var(--text-sm)",
-              cursor: "pointer",
-            }}
-          >
-            {t(`overview.tabs.${tabKey}`)}
-          </button>
-        ))}
+        <div style={{ display: "flex", gap: "var(--space-4)" }}>
+          {(["overview", "surveys", "interviews", "participants", "report"] as Tab[]).map((tabKey) => (
+            <button
+              key={tabKey}
+              type="button"
+              onClick={() => setTabAndUrl(tabKey)}
+              style={{
+                padding: "var(--space-3) 0",
+                background: "transparent",
+                border: "none",
+                borderBottom: `2px solid ${tab === tabKey ? "var(--brand-500)" : "transparent"}`,
+                color: tab === tabKey ? "var(--brand-700)" : "var(--text-secondary)",
+                fontWeight: tab === tabKey ? 600 : 500,
+                fontFamily: "inherit",
+                fontSize: "var(--text-sm)",
+                cursor: "pointer",
+              }}
+            >
+              {t(`overview.tabs.${tabKey}`)}
+            </button>
+          ))}
+        </div>
+        {/* Right-aligned instrument summary — balances the rule and gives the
+            study an at-a-glance scope on every tab. */}
+        <span
+          className="tabular study-tabs__summary"
+          style={{
+            fontSize: "var(--text-xs)",
+            color: "var(--text-tertiary)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {t("dashboard:studyList.surveyCount", { count: study.surveys.length })}
+          <span style={{ margin: "0 var(--space-2)", color: "var(--border-strong)" }}>·</span>
+          {t("dashboard:studyList.interviewCount", { count: study.projects.length })}
+        </span>
       </nav>
 
       <main style={{ maxWidth: 1120, margin: "0 auto", padding: "var(--space-6)" }}>
@@ -271,18 +282,20 @@ function SurveysTab({
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <div className="quanti-showcase__grid-2">
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {study.surveys.map((s) => (
           <a
             key={s.id}
             href={`/surveys/${s.id}/edit`}
-            className="chart-card"
+            className="chart-card chart-card--row"
             style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
           >
-            <div className="chart-card__eyebrow">
-              {t("overview.surveys.roleStatus", { role: s.role.toUpperCase(), status: s.status.toUpperCase() })}
+            <div className="chart-card__row-main">
+              <div className="chart-card__eyebrow">
+                {t("overview.surveys.roleStatus", { role: s.role.toUpperCase(), status: s.status.toUpperCase() })}
+              </div>
+              <div className="chart-card__takeaway">{s.name}</div>
             </div>
-            <div className="chart-card__takeaway">{s.name}</div>
             <div className="chart-card__footer tabular">
               <span>{t("overview.surveys.questions", { count: s.question_count })}</span>
               <span className="chart-card__footer-divider">·</span>
@@ -324,16 +337,18 @@ function InterviewsTab({
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <div className="quanti-showcase__grid-2">
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {study.projects.map((p) => (
           <a
             key={p.id}
             href={`/projects/${p.id}`}
-            className="chart-card"
+            className="chart-card chart-card--row"
             style={{ textDecoration: "none", color: "inherit" }}
           >
-            <div className="chart-card__eyebrow">{t("overview.interviews.eyebrow", { language: p.language.toUpperCase() })}</div>
-            <div className="chart-card__takeaway">{p.name}</div>
+            <div className="chart-card__row-main">
+              <div className="chart-card__eyebrow">{t("overview.interviews.eyebrow", { language: p.language.toUpperCase() })}</div>
+              <div className="chart-card__takeaway">{p.name}</div>
+            </div>
             <div className="chart-card__footer tabular">
               <span>{t("overview.interviews.completed", { count: p.completed_participant_count })}</span>
               <span className="chart-card__footer-divider">·</span>

@@ -5868,8 +5868,7 @@ select.field-input {
 }
 
 /* Account avatar dropdown — desktop only */
-.account-menu { position: relative; display: none; }
-@media (min-width: 768px) { .account-menu { display: inline-block; } }
+.account-menu { position: relative; display: inline-block; }
 .account-menu__avatar {
   width: 36px;
   height: 36px;
@@ -6856,6 +6855,42 @@ select.field-input {
   font-weight: var(--weight-medium);
 }
 
+/* Row variant — a list of instruments (surveys/interview rounds) reads as a
+   full-width stacked list, not a 2-col grid where a single item floats
+   marooned at half width. Name on the left, meta pinned right. */
+.chart-card--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.chart-card--row .chart-card__row-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.chart-card--row .chart-card__footer {
+  border-top: none;
+  padding-top: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .chart-card--row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .chart-card--row .chart-card__footer {
+    border-top: 1px solid var(--border-subtle);
+    padding-top: var(--space-3);
+  }
+}
+
 /* ============================================
    Quanti — VerbatimCard
    ============================================
@@ -7019,8 +7054,41 @@ select.field-input {
   gap: var(--report-section-gap);
 }
 
+/* List/workspace context (Studies home). The report's 64px section gaps
+   read as editorial breathing room when there's a full page of analysis,
+   but on a sparse list they just maroon a couple of cards in dead space.
+   Tighten the rhythm so the workspace feels composed and worked-in. */
+.quanti-showcase--list {
+  gap: var(--space-8);
+}
+
 .quanti-showcase__hero {
   text-align: left;
+}
+
+/* Hero with a trailing primary action (e.g. "+ New study"). Row on wide
+   screens, but stacks to a full-width button on narrow ones so the CTA
+   never wedges itself alongside the wrapping intro paragraph. */
+.quanti-showcase__hero--bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.quanti-showcase__hero--bar > .quanti-showcase__hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .quanti-showcase__hero--bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .quanti-showcase__hero--bar > .btn {
+    align-self: flex-start;
+  }
 }
 
 .quanti-showcase__eyebrow {
@@ -7378,7 +7446,7 @@ select.field-input {
 }
 
 .dashboard-strip__item {
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -9704,6 +9772,10 @@ select.field-input {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  /* Keep the account menu pinned far-right even when the breadcrumb (the
+     flex:1 spacer) is hidden on narrow viewports — otherwise the avatar
+     collapses next to the wordmark and its dropdown overflows off-screen. */
+  margin-left: auto;
 }
 
 @media (max-width: 640px) {
@@ -9943,6 +10015,25 @@ select.field-input {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--brand-700);
+}
+
+/* Reassurance-only state: drop the card chrome so it reads as a quiet
+   status line on the page, not another card competing with the studies. */
+.workspace-nba--quiet {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  gap: 4px;
+}
+.workspace-nba--quiet .nba-chip__reason {
+  margin-top: 0;
+}
+
+/* The instrument summary in the study tab bar is supplementary — hide it on
+   narrow viewports so the tabs themselves keep the row. */
+@media (max-width: 640px) {
+  .study-tabs__summary { display: none; }
 }
 /* Standalone nudge rows on the home page read as cards, not a flush banner. */
 .workspace-nba .copilot-nudge {
