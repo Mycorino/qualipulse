@@ -43,13 +43,14 @@ export function SurveyQuotaBanner() {
       .catch(() => setQuota(null));
   }, []);
 
-  // Silent below the noise threshold.
+  // Silent below the noise threshold. This is the *response*-quota nudge —
+  // its copy talks only about responses, so it must key off the response
+  // flags alone. The surveys-active cap is a different quota; surfacing it
+  // here rendered a misleading "2 of 100 responses (2%)" message whenever a
+  // workspace had one survey too many, firing far below the 80% response
+  // threshold. The surveys cap is already enforced at survey-creation time.
   if (!quota) return null;
-  if (
-    !quota.is_over_response_cap &&
-    !quota.is_near_response_cap &&
-    !quota.is_over_surveys_cap
-  ) {
+  if (!quota.is_over_response_cap && !quota.is_near_response_cap) {
     return null;
   }
 

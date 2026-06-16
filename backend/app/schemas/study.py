@@ -92,6 +92,10 @@ class StudyDetail(BaseModel):
     surveys: list[SurveyMini]
     projects: list[ProjectMini]
     progress: StudyProgress
+    # True when this Study holds seeded showcase content (a demo project).
+    # The UI suppresses billing/quota chrome on demo studies — they're a
+    # guided tour, not the researcher's real, quota-consuming work.
+    is_demo: bool = False
     # Researcher-facing recommended next action ("Invite N detractors to interview" etc).
     # Computed server-side based on progress flags; Sprint 10 widens the cases.
     recommended_action: str | None = None

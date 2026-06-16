@@ -57,6 +57,7 @@ export interface StudyDetail {
   surveys: SurveyMini[];
   projects: ProjectMini[];
   progress: StudyProgress;
+  is_demo: boolean;
   recommended_action: string | null;
 }
 

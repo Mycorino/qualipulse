@@ -130,6 +130,7 @@ def get_study(
         surveys=survey_minis,
         projects=project_minis,
         progress=progress,
+        is_demo=any(p.is_demo for p in projects),
         recommended_action=recommended,
     )
 

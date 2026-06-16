@@ -204,7 +204,9 @@ export default function StudyOverview() {
       </nav>
 
       <main style={{ maxWidth: 1120, margin: "0 auto", padding: "var(--space-6)" }}>
-        <SurveyQuotaBanner />
+        {/* Demo studies are a guided tour, not quota-consuming work — keep
+            billing chrome out of them. */}
+        {!study.is_demo && <SurveyQuotaBanner />}
         {tab === "overview" && (
           <OverviewTab study={study} navigate={navigate} onCreateSurvey={handleCreateSurvey} />
         )}
