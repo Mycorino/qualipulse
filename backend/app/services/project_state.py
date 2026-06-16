@@ -23,8 +23,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import anthropic
-import httpx
+from app.services._clients import get_anthropic_client
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -290,10 +289,7 @@ def _generate_ai_headline(
             "to analyse yet, say so."
         )
 
-        client = anthropic.Anthropic(
-            api_key=settings.ANTHROPIC_API_KEY,
-            timeout=httpx.Timeout(20.0),
-        )
+        client = get_anthropic_client(20.0)
         response = client.messages.create(
             model=_STATE_MODEL,
             max_tokens=_STATE_MAX_TOKENS,

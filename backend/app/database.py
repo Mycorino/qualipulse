@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -39,5 +40,24 @@ def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def session_scope() -> Generator[Session, None, None]:
+    """Session for background threads / daemon tasks.
+
+    FastAPI's ``get_db`` only covers request scope; threads spawned with
+    ``threading.Thread`` must manage their own session. This guarantees a
+    rollback if the body raises (so a crash can't leave a half-open
+    transaction) and always closes the connection back to the pool.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

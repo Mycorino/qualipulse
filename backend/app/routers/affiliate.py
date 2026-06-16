@@ -1,3 +1,4 @@
+import hmac
 import logging
 import re
 from datetime import datetime
@@ -111,13 +112,18 @@ def _validate_affiliate_code(code: str) -> str:
 
 
 def _get_admin_key(x_admin_key: str | None = Header(None)) -> str:
-    """Verify admin key from header."""
+    """Verify admin key from header (timing-safe, disabled when no key is configured)."""
+    if not settings.ADMIN_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access is disabled",
+        )
     if not x_admin_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing X-Admin-Key header",
         )
-    if x_admin_key != settings.ADMIN_SECRET_KEY:
+    if not hmac.compare_digest(x_admin_key, settings.ADMIN_SECRET_KEY):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid admin key",
@@ -134,12 +140,14 @@ def _get_affiliate_from_jwt(
 
     payload = decode_access_token(credentials)
     sub: str | None = payload.get("sub")
-    if not sub or not sub.startswith("affiliate:"):
+    # Affiliate ids are uuid4 strings — reject anything that isn't exactly
+    # "affiliate:<uuid>" so a crafted sub can't smuggle a different id shape.
+    if not sub or not re.fullmatch(r"affiliate:[0-9a-f-]{36}", sub):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid affiliate token",
         )
-    affiliate_id = sub[9:]  # Remove "affiliate:" prefix
+    affiliate_id = sub[len("affiliate:"):]
     affiliate = db.query(Affiliate).filter(Affiliate.id == affiliate_id).first()
     if not affiliate:
         raise HTTPException(

@@ -46,7 +46,7 @@ class AffiliateReferral(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     affiliate_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("affiliates.id", ondelete="CASCADE"), nullable=False
+        String(36), ForeignKey("affiliates.id", ondelete="CASCADE"), nullable=False, index=True
     )
     referred_company_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, unique=True
@@ -70,7 +70,7 @@ class AffiliatePayout(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     affiliate_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("affiliates.id", ondelete="CASCADE"), nullable=False
+        String(36), ForeignKey("affiliates.id", ondelete="CASCADE"), nullable=False, index=True
     )
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     paid_at: Mapped[datetime] = mapped_column(

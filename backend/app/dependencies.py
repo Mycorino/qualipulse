@@ -19,6 +19,39 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def get_accessible_project_or_404(project_id: str, company_id: str, db: Session):
+    """Fetch a project this caller may access — as owner OR workspace member.
+
+    Direct ownership is the fast path; otherwise the caller is resolved to a
+    Company and checked against every workspace they belong to. Raises 404
+    (never 403) so existence isn't leaked across tenants. This is the single
+    canonical project-access check shared by every project-scoped router.
+    """
+    from app.models.project import Project
+    from app.services.workspace import accessible_workspace_ids
+
+    project = (
+        db.query(Project)
+        .filter(Project.id == project_id, Project.company_id == company_id)
+        .first()
+    )
+    if project is not None:
+        return project
+
+    caller = db.query(Company).filter(Company.id == company_id).first()
+    if caller is not None:
+        workspace_ids = accessible_workspace_ids(db, caller)
+        project = (
+            db.query(Project)
+            .filter(Project.id == project_id, Project.company_id.in_(workspace_ids))
+            .first()
+        )
+        if project is not None:
+            return project
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+
 def get_current_company(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),

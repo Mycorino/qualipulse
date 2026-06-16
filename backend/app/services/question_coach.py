@@ -204,8 +204,7 @@ def _maybe_call_claude_for_rewrite(prompt: str, flag_codes: list[str]) -> str | 
         return None
 
     try:
-        import anthropic  # noqa: WPS433 — keep import lazy for test environments
-        import httpx
+        from app.services._clients import get_anthropic_client
     except ImportError:
         return None
 
@@ -215,9 +214,7 @@ def _maybe_call_claude_for_rewrite(prompt: str, flag_codes: list[str]) -> str | 
         "Return the JSON object now. No prose around it."
     )
     try:
-        client = anthropic.Anthropic(
-            api_key=settings.ANTHROPIC_API_KEY, timeout=httpx.Timeout(10.0)
-        )
+        client = get_anthropic_client(10.0)
         resp = client.messages.create(
             model="claude-haiku-4-5",
             max_tokens=200,

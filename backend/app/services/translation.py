@@ -43,8 +43,8 @@ def _translate_participant_inner(
     db: Session,
     target_language: str,
 ) -> None:
-    import anthropic
     from app.config import settings
+    from app.services._clients import get_anthropic_client
     from app.services.usage_logger import log_claude_usage
 
     target_language = (target_language or "").lower().strip()
@@ -126,7 +126,7 @@ the emotional flavour ("chiant" is stronger than "unpleasant").
 Return ONLY a JSON array with the same length and order. Each item:
 {{"id": "<id>", "question": "<translated>", "response": "<translated>"}}"""
 
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = get_anthropic_client(180.0)
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=8192,

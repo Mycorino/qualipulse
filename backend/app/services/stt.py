@@ -2,6 +2,7 @@ import httpx
 import openai
 
 from app.config import settings
+from app.services._clients import call_openai_with_retries
 
 
 def transcribe_audio(
@@ -18,10 +19,13 @@ def transcribe_audio(
     """
     client = openai.OpenAI(api_key=settings.OPENAI_API_KEY, timeout=httpx.Timeout(60.0))
 
-    transcript = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=(filename, audio_data),
-        response_format="verbose_json",
+    transcript = call_openai_with_retries(
+        lambda: client.audio.transcriptions.create(
+            model="whisper-1",
+            file=(filename, audio_data),
+            response_format="verbose_json",
+        ),
+        label="whisper transcribe",
     )
 
     duration = float(getattr(transcript, "duration", 0.0) or 0.0)

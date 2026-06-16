@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -15,7 +16,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.dependencies import get_db
 from app.limiter import limiter
-from app.logging_config import setup_logging, logger
+from app.logging_config import setup_logging, logger, request_id_ctx
 import app.models  # noqa: F401 — register all models with Base metadata
 
 # Initialise logging before anything else
@@ -123,6 +124,23 @@ async def limit_request_size(request: Request, call_next):
     return await call_next(request)
 
 
+# ── Request ID correlation ────────────────────────────────────────────────────
+# Defined last so it is the OUTERMOST middleware (Starlette runs the
+# most-recently-added middleware first) — the id is then set for every other
+# middleware, the route, and the response header on all code paths.
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    incoming = request.headers.get("X-Request-ID")
+    request_id = (incoming or uuid.uuid4().hex)[:64]
+    token = request_id_ctx.set(request_id)
+    try:
+        response = await call_next(request)
+    finally:
+        request_id_ctx.reset(token)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
 # ── Global error handler ──────────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -164,6 +182,19 @@ app.include_router(scheduled_emails.router)
 @app.get("/", tags=["health"])
 async def health_check():
     return {"status": "ok", "service": "auto-interview-api", "env": settings.ENVIRONMENT}
+
+
+@app.get("/health", tags=["health"])
+def deep_health_check(db=Depends(get_db)):
+    """Deep health check — verifies the database is reachable."""
+    from sqlalchemy import text
+
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        logger.error("Health check DB probe failed: %s", exc)
+        return JSONResponse(status_code=503, content={"status": "degraded", "database": "unreachable"})
+    return {"status": "ok", "database": "ok", "env": settings.ENVIRONMENT}
 
 
 @app.get("/reports/{share_token}", tags=["public"])
