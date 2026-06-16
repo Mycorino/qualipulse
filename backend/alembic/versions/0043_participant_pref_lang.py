@@ -6,14 +6,18 @@ the AI interviewer + voice, so we persist it on the participant. We also
 store it on the reusable panel profile so future study invites can email
 people in their language.
 
-Revision ID: 0043_participant_preferred_language
+Revision ID: 0043_participant_pref_lang
 Revises: 0042_affiliate_fk_indexes
+
+NOTE: keep revision ids <= 32 chars — alembic_version.version_num is
+VARCHAR(32) on Postgres, so a longer id fails the version write at runtime
+(SQLite doesn't enforce the length, so it only surfaces in production).
 """
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0043_participant_preferred_language"
+revision = "0043_participant_pref_lang"
 down_revision = "0042_affiliate_fk_indexes"
 branch_labels = None
 depends_on = None
