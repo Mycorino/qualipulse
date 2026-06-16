@@ -43,12 +43,52 @@ function instrumentMix(s: StudySummary): InstrumentMix {
   return "empty";
 }
 
-const MIX_ICON: Record<InstrumentMix, string> = {
-  survey: "📊",
-  interview: "🎙",
-  hybrid: "📊🎙",
-  empty: "·",
-};
+/** Monochrome instrument glyphs (inherit the eyebrow's colour via
+ *  currentColor). Replaces emoji, which render inconsistently across
+ *  OSes and read casual in a B2B workspace. */
+function SurveyGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="1.5" y="7" width="2.5" height="5.5" rx="0.5" fill="currentColor" />
+      <rect x="5.75" y="4" width="2.5" height="8.5" rx="0.5" fill="currentColor" />
+      <rect x="10" y="1.5" width="2.5" height="11" rx="0.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function MicGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="5" y="1.5" width="4" height="7" rx="2" fill="currentColor" />
+      <path
+        d="M3 6.5a4 4 0 0 0 8 0M7 10.5v2M5 12.5h4"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MixGlyph({ mix }: { mix: InstrumentMix }) {
+  if (mix === "empty") {
+    return (
+      <span aria-hidden="true" style={{ opacity: 0.5 }}>
+        ·
+      </span>
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}
+    >
+      {mix !== "interview" && <SurveyGlyph />}
+      {mix !== "survey" && <MicGlyph />}
+    </span>
+  );
+}
 
 function toNbaSummary(s: StudySummary): StudyNbaSummary {
   return {
@@ -105,16 +145,13 @@ export default function StudyList() {
     <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
       <QuantiTopBar crumbs={[{ label: t("studyList.crumb") }]} />
       <div
-        className="quanti-showcase"
+        className="quanti-showcase quanti-showcase--list"
         style={{ padding: "var(--space-8) var(--report-canvas-pad-x)" }}
       >
         <AccountNudges />
 
-        <header
-          className="quanti-showcase__hero"
-          style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <header className="quanti-showcase__hero quanti-showcase__hero--bar">
+          <div className="quanti-showcase__hero-text">
             <div className="quanti-showcase__eyebrow">{t("studyList.eyebrow")}</div>
             <h1 className="quanti-showcase__title">{t("studyList.title")}</h1>
             <p className="quanti-showcase__subtitle">{t("studyList.subtitle")}</p>
@@ -130,8 +167,12 @@ export default function StudyList() {
 
         {studies && studies.length > 0 && (() => {
           const nba = resolveWorkspaceNextAction(studies.map(toNbaSummary));
+          // When nothing needs the researcher (no actionable NBA, no fresh
+          // nudges) the strip is purely reassurance — demote it to a quiet
+          // inline line so it doesn't out-shout the actual studies below.
+          const quiet = nba.kind === "done" && nudges.length === 0;
           return (
-            <div className="workspace-nba">
+            <div className={`workspace-nba${quiet ? " workspace-nba--quiet" : ""}`}>
               <span className="workspace-nba__eyebrow">{t("studyList.copilotEyebrow")}</span>
               {nudges.map((n) => (
                 <div
@@ -202,7 +243,7 @@ export default function StudyList() {
                       className="chart-card__eyebrow"
                       style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
                     >
-                      <span aria-hidden="true">{MIX_ICON[mix]}</span>
+                      <MixGlyph mix={mix} />
                       <span>{t(`studyList.studyType.${mix}`)}</span>
                     </div>
                     <div className="chart-card__takeaway">{s.name}</div>

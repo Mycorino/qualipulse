@@ -105,10 +105,11 @@ export function ProjectSwitcher({
 }
 
 /**
- * AccountMenu — desktop-only avatar dropdown.
+ * AccountMenu — avatar dropdown, shown at all viewport widths.
  * Renders a circular avatar with the company's first initial. On click,
  * shows a menu with Account Settings, language toggle, Sign Out.
- * On mobile (<768px) it's hidden — pages keep their hamburger nav.
+ * It's the only account affordance on the QuantiTopBar hub (which has no
+ * hamburger nav), so it must stay reachable on mobile too.
  */
 export function AccountMenu({
   initial,
