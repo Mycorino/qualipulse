@@ -53,11 +53,22 @@ def client(db_session):
 
 
 @pytest.fixture
-def registered_company(client):
-    """Sign up a company and return tokens + payload."""
+def registered_company(client, db_session):
+    """Sign up a company and return tokens + payload.
+
+    The company is marked email-verified — creating studies + interview links
+    now requires a verified email (see ``require_verified_company``), and the
+    vast majority of tests exercise that authenticated, post-verification
+    surface. Tests that specifically cover the unverified gate sign up their
+    own company instead.
+    """
     payload = {"name": "Test Co", "email": "test@example.com", "password": "Password123!"}
     resp = client.post("/auth/signup", json=payload)
     assert resp.status_code == 201, resp.text
+    from app.models.company import Company
+    company = db_session.query(Company).filter(Company.email == payload["email"]).first()
+    company.email_verified = True
+    db_session.commit()
     return {"tokens": resp.json(), **payload}
 
 

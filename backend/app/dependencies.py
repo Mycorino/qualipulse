@@ -92,6 +92,28 @@ def get_current_company(
     return company
 
 
+def require_verified_company(
+    company: Company = Depends(get_current_company),
+) -> Company:
+    """Like ``get_current_company`` but also requires a verified email.
+
+    Used to gate outward-facing, data-collecting actions (creating a study,
+    creating an interview link) behind email verification — so a participant
+    can never invest effort in a study owned by an unverified researcher, and
+    unverified accounts can't spin up collection links. Exploring the seeded
+    demo project stays open; only *creating* is gated.
+    """
+    if not company.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "email_unverified",
+                "message": "Please verify your email address to create studies and interview links.",
+            },
+        )
+    return company
+
+
 def get_current_company_optional(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
