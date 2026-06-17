@@ -345,7 +345,8 @@
       "cta": "Sì, invitami agli studi retribuiti",
       "saving": "Salvataggio…",
       "dismiss": "No, grazie"
-    }
+    },
+    "enrichCta": "Aggiungi qualche dettaglio → sblocca più studi"
   },
   "resume": {
     "title": "Bentornato!",

@@ -6,7 +6,13 @@ from app.models.coding import ManualCode, QuoteTag
 from app.models.memo import ProjectMemo
 from app.models.usage import AIUsageLog
 from app.models.email_log import EmailSendLog
-from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
+from app.models.panel import (
+    PanelProfile,
+    PanelTag,
+    ParticipantMagicToken,
+    PanelAttribute,
+    PanelAnswer,
+)
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 from app.models.blog import BlogPost
 from app.models.copilot import CopilotConversation, CopilotMemory
@@ -50,6 +56,8 @@ __all__ = [
     "Participant",
     "PanelProfile",
     "PanelTag",
+    "PanelAttribute",
+    "PanelAnswer",
     "ParticipantMagicToken",
     "PasswordResetToken",
     "Plan",

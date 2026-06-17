@@ -2904,6 +2904,53 @@ select.field-input {
   line-height: 1.5;
 }
 
+/* ── Panel enrichment (progressive profiling) ─────────────────────────────── */
+.panel-enrich { max-width: 560px; margin: 0 auto; }
+.panel-enrich--embedded {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  text-align: left;
+}
+.panel-enrich__header { margin-bottom: 16px; }
+.panel-enrich__title { font-size: 1.15rem; font-weight: 700; margin: 0 0 4px; }
+.panel-enrich__subtitle { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin: 0 0 12px; }
+.panel-enrich__progress { font-size: 0.85rem; color: var(--text-secondary); margin: 6px 0 0; }
+.panel-enrich__foot { font-size: 0.8rem; color: var(--text-tertiary, #9ca3af); text-align: center; margin: 20px 0 8px; line-height: 1.5; }
+.panel-progress-bar { height: 6px; border-radius: 999px; background: var(--border-subtle, #e5e7eb); overflow: hidden; }
+.panel-progress-fill { height: 100%; background: var(--brand-500, #4f46e5); transition: width 0.3s var(--ease-out, ease); }
+.panel-group { margin: 20px 0; }
+.panel-group__title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary, #9ca3af); margin: 0 0 10px; }
+.panel-attr { margin-bottom: 16px; }
+.panel-attr__label { font-size: 0.95rem; font-weight: 600; margin: 0 0 8px; color: var(--text); }
+.panel-attr__options { display: flex; flex-wrap: wrap; gap: 8px; }
+.panel-chip {
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md, 10px);
+  border: 1.5px solid var(--border, #d1d5db);
+  background: var(--bg, #fff);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.panel-chip:hover { border-color: var(--primary, #4f46e5); }
+.panel-chip.selected { background: var(--brand-500, #4f46e5); border-color: var(--brand-500, #4f46e5); color: #fff; }
+.panel-sensitive-card {
+  margin: 24px 0;
+  padding: 16px;
+  background: var(--bg-sunken, #f9fafb);
+  border: 1px dashed var(--border, #d1d5db);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.panel-sensitive-card strong { display: block; color: var(--text); margin-bottom: 6px; font-size: 0.95rem; }
+.panel-sensitive-card p { margin: 0 0 12px; }
+
 /* ============================================
    Project Creation Wizard
    ============================================ */

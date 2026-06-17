@@ -424,6 +424,22 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "foot": "Ce lien expire dans {expiry_minutes} minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.",
         },
     },
+    "panel_access": {
+        "en": {
+            "subject": "Get matched to more (paid) studies",
+            "heading": "You're on the QualiPulse panel 🎉",
+            "body": "Thanks for joining! The more you tell us about yourself, the more relevant — and paid — studies we can invite you to. Add a few details whenever you like, from any device.",
+            "cta": "Add to my profile →",
+            "foot": "Only you can use this link. You can update or opt out at any time.",
+        },
+        "fr": {
+            "subject": "Soyez invité·e à plus d'études (rémunérées)",
+            "heading": "Vous faites partie du panel QualiPulse 🎉",
+            "body": "Merci de nous avoir rejoint ! Plus vous nous en dites sur vous, plus nous pourrons vous proposer d'études pertinentes — et rémunérées. Ajoutez quelques informations quand vous voulez, depuis n'importe quel appareil.",
+            "cta": "Compléter mon profil →",
+            "foot": "Ce lien n'est utilisable que par vous. Vous pouvez modifier vos informations ou vous désinscrire à tout moment.",
+        },
+    },
     "team_invite": {
         "en": {
             "subject": "{inviter_name} invited you to {workspace_name} on QualiPulse",
@@ -987,6 +1003,28 @@ def send_interview_magic_link(
     return send_email(
         to=email,
         subject=_c("interview_magic", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_panel_access_link(email: str, token: str, lang: str = "en") -> bool:
+    """Durable 'manage your panel profile' link for a consented panelist. The
+    token rides in the URL fragment (never sent to the server in logs)."""
+    lang = _normalise_lang(lang)
+    panel_url = f"{settings.APP_BASE_URL}/panel#token={token}"
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("panel_access", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("panel_access", lang, "body")}</p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="{panel_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
+          {_c("panel_access", lang, "cta")}
+        </a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.8rem;margin:0;">{_c("panel_access", lang, "foot")}</p>
+    """
+    return send_email(
+        to=email,
+        subject=_c("panel_access", lang, "subject"),
         body_html=_wrap_email(content, lang),
     )
 

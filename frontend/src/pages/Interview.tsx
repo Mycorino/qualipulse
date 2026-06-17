@@ -24,6 +24,7 @@ import {
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import LanguagePicker from "../components/LanguagePicker";
 import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/ParticipantQuestionnaire";
+import PanelEnrichment from "../components/PanelEnrichment";
 import { SUPPORTED_LANGUAGES } from "../i18n";
 
 type Phase =
@@ -113,6 +114,9 @@ export default function Interview() {
   const [studyUnavailableMsg, setStudyUnavailableMsg] = useState<string | null>(null);
   // Post-interview panel re-prompt state for participants who declined earlier.
   const [repromptState, setRepromptState] = useState<"idle" | "saving" | "done" | "dismissed">("idle");
+  // Inline panel-enrichment ("add more details, get more studies") on the
+  // completion screen for consented panelists.
+  const [showEnrichment, setShowEnrichment] = useState(false);
 
   // Interview state
   const [displayName, setDisplayName] = useState("");
@@ -1940,6 +1944,25 @@ export default function Interview() {
               {t("completion.panelReprompt.dismiss")}
             </button>
           </div>
+        )}
+
+        {/* Panel enrichment — consented panelists can add more profiling
+            details right now ("the more you add, the more studies"). Reuses
+            the still-valid participant session. */}
+        {(panelConsentGiven || repromptState === "done") && sessionToken && (
+          showEnrichment ? (
+            <div style={{ marginTop: 16 }}>
+              <PanelEnrichment token={sessionToken} embedded />
+            </div>
+          ) : (
+            <button
+              className="btn btn-primary"
+              style={{ width: "100%", minHeight: 44, marginTop: 16 }}
+              onClick={() => setShowEnrichment(true)}
+            >
+              {t("completion.enrichCta")}
+            </button>
+          )
         )}
 
         {/* Privacy / data-rights footer — GDPR transparency for participants */}
