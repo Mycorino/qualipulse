@@ -227,7 +227,9 @@
       "51-200": "51–200 personnes",
       "201-1000": "201–1 000 personnes",
       "1000+": "Plus de 1 000 personnes"
-    }
+    },
+    "consentAccept": "Oui, je veux bien",
+    "consentDecline": "Pas pour le moment"
   },
   "micPrompt": {
     "title": "Cet entretien utilise votre microphone",
@@ -334,7 +336,16 @@
     "panelSaveError": "Nous n'avons pas pu enregistrer votre profil. Contactez le support si vous souhaitez rejoindre la communauté de recherche.",
     "futureStudiesTitle": "Envie d'être invité·e à de prochaines études ?",
     "futureStudiesBody": "Répondez à l'email qui vous a amené·e ici et nous vous garderons en tête.",
-    "close": "Fermer"
+    "close": "Fermer",
+    "panelConfirmTitle": "Vous êtes sur la liste.",
+    "panelConfirmBody": "Nous vous contacterons uniquement pour des études rémunérées correspondant à votre profil — et vous pouvez vous désinscrire à tout moment.",
+    "panelReprompt": {
+      "title": "Une dernière chose — envie d'être rémunéré pour des études comme celle-ci ?",
+      "body": "Nous menons des études rémunérées et pouvons vous inviter à celles qui correspondent à votre profil. Uniquement rémunérées, uniquement pertinentes — désinscription à tout moment.",
+      "cta": "Oui, invitez-moi aux études rémunérées",
+      "saving": "Enregistrement…",
+      "dismiss": "Non merci"
+    }
   },
   "resume": {
     "title": "Content de vous revoir !",
@@ -354,5 +365,10 @@
     "desc": "Le lien a peut-être expiré ou été désactivé. Contactez le chercheur pour obtenir un nouveau lien.",
     "expiredHelp": "Ce lien a peut-être expiré. Contactez le chercheur qui vous l'a envoyé.",
     "goBack": "Retour"
+  },
+  "studyUnavailable": {
+    "title": "Cette étude n'accepte pas de réponses pour le moment",
+    "body": "Cette étude n'accepte pas de nouvelles réponses actuellement. Merci de contacter le chercheur qui vous a envoyé ce lien.",
+    "close": "Vous pouvez fermer cette page en toute sécurité."
   }
 }

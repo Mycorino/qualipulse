@@ -51,6 +51,7 @@ export interface QuestionnaireResult {
   ageRange?: string;
   country?: string; // English display name
   preferredLanguage: string;
+  panelConsent: boolean;
 }
 
 interface Props {
@@ -181,6 +182,7 @@ export default function ParticipantQuestionnaire({
         ageRange: a.age || undefined,
         country: englishCountry,
         preferredLanguage: lang,
+        panelConsent: a.consent === "yes",
       });
     } catch {
       setError(t("questionnaire.saveError"));
@@ -241,26 +243,27 @@ export default function ParticipantQuestionnaire({
     }
 
     if (step === "consent") {
+      // Soft, low-pressure framing: a single "accept & continue" primary with
+      // a quiet decline. Anyone who declines here is re-prompted (with a fuller
+      // paid-studies explanation) after the interview.
       return (
         <div className="profiling-question">
           <h2 className="profiling-label">{t("questionnaire.consentQ")}</h2>
           <p className="questionnaire-help">{t("questionnaire.consentHelp")}</p>
-          <div className="profiling-options">
-            <button
-              className={`profiling-option-btn${answers.consent === "yes" ? " selected" : ""}`}
-              onClick={() => pickChip("consent", "yes")}
-              disabled={saving}
-            >
-              ✓ {t("questionnaire.consentYes")}
-            </button>
-            <button
-              className={`profiling-option-btn${answers.consent === "no" ? " selected" : ""}`}
-              onClick={() => pickChip("consent", "no")}
-              disabled={saving}
-            >
-              {t("questionnaire.consentNo")}
-            </button>
-          </div>
+          <button
+            className="btn btn-primary questionnaire-continue"
+            onClick={() => pickChip("consent", "yes")}
+            disabled={saving}
+          >
+            {t("questionnaire.consentAccept")}
+          </button>
+          <button
+            className="questionnaire-decline-btn"
+            onClick={() => pickChip("consent", "no")}
+            disabled={saving}
+          >
+            {t("questionnaire.consentDecline")}
+          </button>
         </div>
       );
     }

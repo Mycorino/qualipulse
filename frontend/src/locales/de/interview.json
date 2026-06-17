@@ -227,7 +227,9 @@
       "51-200": "51–200 Personen",
       "201-1000": "201–1.000 Personen",
       "1000+": "Mehr als 1.000 Personen"
-    }
+    },
+    "consentAccept": "Ja, gerne",
+    "consentDecline": "Im Moment nicht"
   },
   "micPrompt": {
     "title": "Dieses Interview verwendet Ihr Mikrofon",
@@ -334,7 +336,16 @@
     "panelSaveError": "Wir konnten Ihr Profil nicht speichern. Bitte wenden Sie sich an den Support, wenn Sie der Forschungs-Community beitreten möchten.",
     "futureStudiesTitle": "Möchten Sie zu zukünftigen Studien eingeladen werden?",
     "futureStudiesBody": "Antworten Sie auf die E-Mail, die Sie hierher gebracht hat, und wir behalten Sie im Hinterkopf.",
-    "close": "Schließen"
+    "close": "Schließen",
+    "panelConfirmTitle": "Sie sind auf der Liste.",
+    "panelConfirmBody": "Wir melden uns nur zu bezahlten Studien, die zu Ihrem Profil passen — und Sie können sich jederzeit abmelden.",
+    "panelReprompt": {
+      "title": "Noch eine Sache — möchten Sie für Studien wie diese bezahlt werden?",
+      "body": "Wir führen bezahlte Studien durch und können Sie zu passenden einladen. Nur bezahlt, nur relevant — jederzeit abmeldbar.",
+      "cta": "Ja, laden Sie mich zu bezahlten Studien ein",
+      "saving": "Wird gespeichert…",
+      "dismiss": "Nein danke"
+    }
   },
   "resume": {
     "title": "Willkommen zurück!",
@@ -354,5 +365,10 @@
     "desc": "Der Link ist möglicherweise abgelaufen oder wurde deaktiviert. Bitte wenden Sie sich an den Forscher für einen neuen Link.",
     "expiredHelp": "Dieser Link ist möglicherweise abgelaufen. Bitte wenden Sie sich an den Forscher, der Ihnen diesen Link geschickt hat.",
     "goBack": "Zurück"
+  },
+  "studyUnavailable": {
+    "title": "Diese Studie nimmt derzeit keine Antworten an",
+    "body": "Diese Studie nimmt momentan keine neuen Antworten an. Bitte wenden Sie sich an die Person, die Ihnen diesen Link geschickt hat.",
+    "close": "Sie können diese Seite bedenkenlos schließen."
   }
 }

@@ -14,6 +14,7 @@ import {
   skipQuestion,
   requestVerification,
   getPanelTags,
+  savePanelProfile,
   InterviewInfo,
   ScreeningQuestion,
   ResumeCheck,
@@ -33,6 +34,7 @@ type Phase =
   | "questionnaire"
   | "screening"
   | "disqualified"
+  | "study_unavailable"
   | "interview"
   | "complete";
 
@@ -103,6 +105,14 @@ export default function Interview() {
   // (stashed in sessionStorage by InterviewVerify). When the profile is already
   // complete we skip the questionnaire entirely.
   const [profileComplete, setProfileComplete] = useState(false);
+  // Whether the participant opted into the research panel during the
+  // questionnaire — drives the gentler post-interview re-prompt for decliners.
+  const [panelConsentGiven, setPanelConsentGiven] = useState(false);
+  // Set when /start is blocked by the workspace billing gate (403). Shows a
+  // calm terminal message instead of a scary "Something went wrong" + retry.
+  const [studyUnavailableMsg, setStudyUnavailableMsg] = useState<string | null>(null);
+  // Post-interview panel re-prompt state for participants who declined earlier.
+  const [repromptState, setRepromptState] = useState<"idle" | "saving" | "done" | "dismissed">("idle");
 
   // Interview state
   const [displayName, setDisplayName] = useState("");
@@ -595,6 +605,7 @@ export default function Interview() {
    *  and continue to screening/interview. */
   async function handleQuestionnaireComplete(data: QuestionnaireResult) {
     collectedRef.current = data;
+    setPanelConsentGiven(data.panelConsent);
     if (data.firstName) {
       setProfile((p) => ({ ...p, firstName: data.firstName }));
       setDisplayName(data.firstName);
@@ -602,6 +613,25 @@ export default function Interview() {
     if (data.ageRange) setAgeRange(data.ageRange);
     if (data.country) setCountry(data.country);
     await routeAfterProfile();
+  }
+
+  /** Post-interview panel opt-in for participants who declined earlier. Flips
+   *  panel_consent on the existing profile via the same upsert endpoint. */
+  async function handlePostInterviewOptIn() {
+    if (!token || !sessionToken || !email) return;
+    setRepromptState("saving");
+    try {
+      await savePanelProfile(token, {
+        email,
+        session_token: sessionToken,
+        preferred_language: (i18n.language || "en").slice(0, 2),
+        panel_consent: true,
+        tag_ids: [],
+      });
+      setRepromptState("done");
+    } catch {
+      setRepromptState("idle");
+    }
   }
 
   function toggleTag(id: number) {
@@ -623,15 +653,30 @@ export default function Interview() {
     // ref to dodge setState lag), then fall back to any restored state.
     const c = collectedRef.current;
     const chosenLang = (i18n.language || "en").slice(0, 2);
-    const res = await startInterview(token, {
-      displayName: c?.firstName || profile.firstName || displayName || undefined,
-      profession: profile.jobFunction || profession || undefined,
-      ageRange: c?.ageRange || profile.ageRange || ageRange || undefined,
-      country: c?.country || country || profile.city || undefined,
-      email: email || undefined,
-      sessionToken: sessionToken || undefined,
-      preferredLanguage: chosenLang,
-    });
+    let res;
+    try {
+      res = await startInterview(token, {
+        displayName: c?.firstName || profile.firstName || displayName || undefined,
+        profession: profile.jobFunction || profession || undefined,
+        ageRange: c?.ageRange || profile.ageRange || ageRange || undefined,
+        country: c?.country || country || profile.city || undefined,
+        email: email || undefined,
+        sessionToken: sessionToken || undefined,
+        preferredLanguage: chosenLang,
+      });
+    } catch (err: unknown) {
+      // The workspace billing gate returns 403 {code: "study_unavailable"} —
+      // e.g. the researcher hasn't verified their email, or the study is out
+      // of credits. Show a calm terminal message, not a retryable error.
+      const e = err as { response?: { status?: number; data?: { detail?: { code?: string; message?: string } } } };
+      const detail = e?.response?.data?.detail;
+      if (e?.response?.status === 403 && detail?.code === "study_unavailable") {
+        setStudyUnavailableMsg(detail.message || t("studyUnavailable.body"));
+        setPhase("study_unavailable");
+        return;
+      }
+      throw err;
+    }
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
     setTurnCount(1);
@@ -1408,6 +1453,23 @@ export default function Interview() {
     );
   }
 
+  // ── Study unavailable (workspace billing gate) ───────────────────────────
+
+  if (phase === "study_unavailable") {
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-complete">
+          <div className="complete-icon"><span aria-hidden="true">🙏</span></div>
+          <h1 className="interview-complete-title">{t("studyUnavailable.title")}</h1>
+          <p className="interview-complete-text">
+            {studyUnavailableMsg || t("studyUnavailable.body")}
+          </p>
+          <p className="muted-text" style={{ marginTop: 24 }}>{t("studyUnavailable.close")}</p>
+        </div>
+      </div>
+    );
+  }
+
   // ── Mic permission prompt ────────────────────────────────────────────────
 
   if (phase === "interview" && !micTestDone && !micPermissionRequested) {
@@ -1849,21 +1911,36 @@ export default function Interview() {
           )}
         </div>
 
-        {/* Future-studies opt-in — zero-backend, mirrors the disqualified-flow pattern */}
-        <div className="interview-complete-future" style={{
-          marginTop: 16,
-          padding: 12,
-          background: "var(--bg-sunken)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "var(--radius)",
-          textAlign: "center",
-          fontSize: "0.95rem",
-          color: "var(--text-secondary)",
-          lineHeight: 1.5,
-        }}>
-          <strong style={{ color: "var(--text-primary)" }}>{t("completion.futureStudiesTitle")}</strong>{" "}
-          {t("completion.futureStudiesBody")}
-        </div>
+        {/* Panel opt-in. If they accepted pre-interview, just confirm. If they
+            declined (or skipped), re-prompt here with the fuller paid-studies
+            explanation — a softer, better-informed second ask. */}
+        {panelConsentGiven ? (
+          <div className="interview-complete-future">
+            <strong style={{ color: "var(--text-primary)" }}>{t("completion.panelConfirmTitle")}</strong>{" "}
+            {t("completion.panelConfirmBody")}
+          </div>
+        ) : repromptState === "done" ? (
+          <div className="interview-complete-future">
+            <strong style={{ color: "var(--text-primary)" }}>{t("completion.panelConfirmTitle")}</strong>{" "}
+            {t("completion.panelConfirmBody")}
+          </div>
+        ) : repromptState === "dismissed" || !sessionToken ? null : (
+          <div className="interview-complete-future interview-complete-future--prompt">
+            <strong style={{ color: "var(--text-primary)" }}>{t("completion.panelReprompt.title")}</strong>
+            <p style={{ margin: "8px 0 14px" }}>{t("completion.panelReprompt.body")}</p>
+            <button
+              className="btn btn-primary"
+              style={{ width: "100%", minHeight: 44 }}
+              disabled={repromptState === "saving"}
+              onClick={handlePostInterviewOptIn}
+            >
+              {repromptState === "saving" ? t("completion.panelReprompt.saving") : t("completion.panelReprompt.cta")}
+            </button>
+            <button className="questionnaire-decline-btn" onClick={() => setRepromptState("dismissed")}>
+              {t("completion.panelReprompt.dismiss")}
+            </button>
+          </div>
+        )}
 
         {/* Privacy / data-rights footer — GDPR transparency for participants */}
         <div className="interview-complete-footer" style={{

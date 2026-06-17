@@ -2875,6 +2875,34 @@ select.field-input {
 .questionnaire-skip-btn:hover {
   color: var(--text-secondary);
 }
+/* Quiet decline under the soft panel-consent accept (questionnaire + reprompt) */
+.questionnaire-decline-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-tertiary, #9ca3af);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 12px 0 4px;
+  margin-top: 8px;
+  font-family: inherit;
+  min-height: 44px;
+}
+.questionnaire-decline-btn:hover {
+  color: var(--text-secondary);
+}
+.interview-complete-future--prompt {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
 
 /* ============================================
    Project Creation Wizard

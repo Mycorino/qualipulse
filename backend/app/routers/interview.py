@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,8 @@ from app.services.interview_engine import (
 )
 from app.services.storage import upload_audio
 from app.services.verification import generate_magic_token, verify_magic_token
+
+logger = logging.getLogger("auto_interview")
 
 router = APIRouter(prefix="/interview", tags=["interview"])
 
@@ -489,6 +492,14 @@ def start_interview_session(
     if project and project.company:
         decision = can_start_interview(db, project.company_id)
         if not decision.allowed:
+            # Log the real reason so blocked studies are diagnosable — the
+            # most common is the researcher never verifying their own email
+            # (fraud floor), which otherwise looks like a generic failure to
+            # both the participant and the researcher.
+            logger.warning(
+                "interview start blocked: company=%s project=%s reason=%s",
+                project.company_id, project.id, decision.reason,
+            )
             # Translate to the participant-facing message — never reveal
             # credit-balance details on the public endpoint.
             raise HTTPException(
