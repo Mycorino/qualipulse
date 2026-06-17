@@ -345,7 +345,8 @@
       "cta": "Oui, invitez-moi aux études rémunérées",
       "saving": "Enregistrement…",
       "dismiss": "Non merci"
-    }
+    },
+    "enrichCta": "Ajouter quelques infos → débloquer plus d'études"
   },
   "resume": {
     "title": "Content de vous revoir !",

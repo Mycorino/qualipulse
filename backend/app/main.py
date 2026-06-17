@@ -59,6 +59,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:  # pragma: no cover — never block startup on billing
         logger.exception("Billing bootstrap failed; continuing with degraded billing")
 
+    # Panel enrichment: sync the profiling-attribute catalogue (idempotent).
+    try:
+        from app.database import SessionLocal
+        from app.services.panel_catalog import ensure_attributes_seeded
+        with SessionLocal() as bootstrap_db:
+            ensure_attributes_seeded(bootstrap_db)
+    except Exception:  # pragma: no cover — never block startup on the catalogue
+        logger.exception("Panel catalogue seed failed; continuing")
+
     logger.info("AutoInterview API starting (env=%s)", settings.ENVIRONMENT)
     yield
     logger.info("AutoInterview API shutting down")
@@ -153,7 +162,7 @@ from app.routers import (
     auth, projects, links, interview, export, audio,
     analysis, responses, coding, memos, billing, admin, affiliate, blog,
     templates, team, surveys, public_surveys, studies, copilot,
-    scheduled_emails,
+    scheduled_emails, panel,
 )
 
 app.include_router(auth.router)
@@ -177,6 +186,7 @@ app.include_router(public_surveys.router)
 app.include_router(studies.router)
 app.include_router(copilot.router)
 app.include_router(scheduled_emails.router)
+app.include_router(panel.router)
 
 
 @app.get("/", tags=["health"])

@@ -345,7 +345,8 @@
       "cta": "Yes, invite me to paid studies",
       "saving": "Saving…",
       "dismiss": "No thanks"
-    }
+    },
+    "enrichCta": "Add a few more details → unlock more studies"
   },
   "resume": {
     "title": "Welcome back!",

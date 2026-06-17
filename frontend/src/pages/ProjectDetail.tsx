@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
+import { getErrorMessage } from "../utils/errorMessages";
 import { SkeletonTable } from "../components/Skeleton";
 import { AudioClip } from "../components/AudioClip";
 import { InstrumentShell } from "../components/InstrumentShell";
@@ -690,8 +691,10 @@ export default function ProjectDetail() {
     try {
       const link = await createLink(id!);
       setLinks((prev) => [...prev, link]);
-    } catch {
-      toast("Failed to generate link", "error");
+    } catch (err) {
+      // Surfaces the backend message (e.g. "verify your email to create
+      // interview links") instead of a generic failure.
+      toast(getErrorMessage(err, "Failed to generate link"), "error");
     }
   }
 

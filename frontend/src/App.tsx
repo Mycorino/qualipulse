@@ -49,6 +49,7 @@ function lazyWithRetry<T extends ComponentType<unknown>>(
 
 const ProjectDetail = lazyWithRetry(() => import("./pages/ProjectDetail"));
 const InterviewVerify = lazyWithRetry(() => import("./pages/InterviewVerify"));
+const PanelPortal = lazyWithRetry(() => import("./pages/PanelPortal"));
 const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 const AccountLayout = lazyWithRetry(() => import("./pages/account/AccountLayout"));
@@ -200,6 +201,7 @@ export default function App() {
       {/* Legacy alias — backend share URLs use /interview/{token}. Keep both. */}
       <Route path="/interview/:token" element={<Interview />} />
       <Route path="/interview/verify/:token" element={<InterviewVerify />} />
+      <Route path="/panel" element={<PanelPortal />} />
       <Route path="/reports/:token" element={<SharedReport />} />
       <Route path="/affiliate/:section" element={<AffiliatePortal />} />
       <Route path="/affiliate" element={<Navigate to="/affiliate/apply" replace />} />

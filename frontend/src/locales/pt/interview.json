@@ -345,7 +345,8 @@
       "cta": "Sim, convide-me para estudos pagos",
       "saving": "A guardar…",
       "dismiss": "Não, obrigado"
-    }
+    },
+    "enrichCta": "Adicione mais alguns dados → desbloqueie mais estudos"
   },
   "resume": {
     "title": "Bem-vindo(a) de volta!",

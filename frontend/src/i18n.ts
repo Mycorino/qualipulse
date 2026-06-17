@@ -21,6 +21,7 @@ import enBlog from "./locales/en/blog.json";
 import enAdmin from "./locales/en/admin.json";
 import enShell from "./locales/en/shell.json";
 import enQuantiDemo from "./locales/en/quantiDemo.json";
+import enPanel from "./locales/en/panel.json";
 
 // FR namespaces
 import frCommon from "./locales/fr/common.json";
@@ -41,6 +42,7 @@ import frBlog from "./locales/fr/blog.json";
 import frAdmin from "./locales/fr/admin.json";
 import frShell from "./locales/fr/shell.json";
 import frQuantiDemo from "./locales/fr/quantiDemo.json";
+import frPanel from "./locales/fr/panel.json";
 
 // Participant-facing languages: only the `interview` namespace is translated.
 // Every other namespace falls back to English via `fallbackLng` — researchers
@@ -74,6 +76,7 @@ i18n
         admin: enAdmin,
         shell: enShell,
         quantiDemo: enQuantiDemo,
+        panel: enPanel,
       },
       fr: {
         common: frCommon,
@@ -94,6 +97,7 @@ i18n
         admin: frAdmin,
         shell: frShell,
         quantiDemo: frQuantiDemo,
+        panel: frPanel,
       },
       de: { interview: deInterview },
       es: { interview: esInterview },
@@ -103,7 +107,7 @@ i18n
     lng: undefined, // rely on detector
     fallbackLng: "en",
     defaultNS: "common",
-    ns: ["common", "auth", "dashboard", "project", "interview", "analysis", "marketing", "settings", "affiliate", "onboarding", "paywall", "welcome_setup", "survey", "study", "blog", "admin", "shell", "quantiDemo"],
+    ns: ["common", "auth", "dashboard", "project", "interview", "analysis", "marketing", "settings", "affiliate", "onboarding", "paywall", "welcome_setup", "survey", "study", "blog", "admin", "shell", "quantiDemo", "panel"],
     detection: {
       order: ["localStorage", "navigator"],
       lookupLocalStorage: "qp_language",

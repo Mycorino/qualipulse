@@ -345,7 +345,8 @@
       "cta": "Ja, laden Sie mich zu bezahlten Studien ein",
       "saving": "Wird gespeichert…",
       "dismiss": "Nein danke"
-    }
+    },
+    "enrichCta": "Ein paar Angaben mehr → mehr Studien freischalten"
   },
   "resume": {
     "title": "Willkommen zurück!",

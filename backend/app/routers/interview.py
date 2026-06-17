@@ -230,9 +230,12 @@ def save_panel_profile(
         )
 
     profile = db.query(PanelProfile).filter(PanelProfile.email == body.email).first()
+    newly_consented = False
     if profile is None:
         profile = PanelProfile(email=body.email)
         db.add(profile)
+
+    was_consented = bool(profile.panel_consent)
 
     # Update fields
     if body.first_name is not None:
@@ -264,6 +267,7 @@ def save_panel_profile(
         profile.panel_consent = True
         profile.consent_at = datetime.utcnow()
         profile.consent_interview_token = token
+        newly_consented = not was_consented
 
     # Replace tags
     if body.tag_ids:
@@ -272,6 +276,22 @@ def save_panel_profile(
 
     profile.last_active = datetime.utcnow()
     db.commit()
+
+    # On the first opt-in, email the durable "manage your panel" link so the
+    # panelist can keep enriching their profile over time (more profile =
+    # more study invites). Best-effort — never blocks the save.
+    if newly_consented:
+        try:
+            from app.services.panel_service import create_panel_session
+            from app.services.email import send_panel_access_link
+            lang = (profile.preferred_language or "en")[:2]
+            send_panel_access_link(
+                email=profile.email,
+                token=create_panel_session(profile.email),
+                lang=lang,
+            )
+        except Exception:
+            logger.exception("panel access link send failed for %s", body.email)
 
     return {"saved": True}
 

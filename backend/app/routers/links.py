@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
     get_current_company,
+    require_verified_company,
     get_db,
 )
 from app.models.company import Company
@@ -25,7 +26,7 @@ router = APIRouter(tags=["links"])
 def create_link(
     project_id: str,
     db: Session = Depends(get_db),
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(require_verified_company),
 ) -> LinkResponse:
     project = _get_project_or_404(project_id, company.id, db)
 

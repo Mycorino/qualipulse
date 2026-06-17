@@ -345,7 +345,8 @@
       "cta": "Sí, invítame a estudios remunerados",
       "saving": "Guardando…",
       "dismiss": "No, gracias"
-    }
+    },
+    "enrichCta": "Añade unos datos más → desbloquea más estudios"
   },
   "resume": {
     "title": "¡Bienvenido de nuevo!",

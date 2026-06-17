@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
     get_current_company,
+    require_verified_company,
     get_db,
 )
 from app.models.company import Company
@@ -57,7 +58,7 @@ def _enforce_project_limit(db: Session, company: Company, current_count: int) ->
 def create_project(
     body: ProjectCreate,
     db: Session = Depends(get_db),
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(require_verified_company),
 ) -> ProjectResponse:
     current_count = (
         db.query(Project)
@@ -168,7 +169,7 @@ async def import_project_from_csv(
     language: str = Form("en"),
     csv_file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(require_verified_company),
 ) -> ProjectResponse:
     current_count = (
         db.query(Project)
