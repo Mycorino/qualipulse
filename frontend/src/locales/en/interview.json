@@ -227,7 +227,9 @@
       "51-200": "51–200 people",
       "201-1000": "201–1,000 people",
       "1000+": "More than 1,000 people"
-    }
+    },
+    "consentAccept": "Yes, count me in",
+    "consentDecline": "Not right now"
   },
   "micPrompt": {
     "title": "This interview uses your microphone",
@@ -334,7 +336,16 @@
     "panelSaveError": "We couldn't save your profile. Please contact support if you'd like to join the research community.",
     "futureStudiesTitle": "Want to be invited to future studies?",
     "futureStudiesBody": "Reply to the email that brought you here and we'll keep you in mind.",
-    "close": "Close"
+    "close": "Close",
+    "panelConfirmTitle": "You're on the list.",
+    "panelConfirmBody": "We'll only reach out about paid studies that match your profile — and you can opt out anytime.",
+    "panelReprompt": {
+      "title": "One more thing — want to get paid for studies like this?",
+      "body": "We run paid research studies and can invite you to ones that fit your profile. Only paid, only relevant — opt out anytime.",
+      "cta": "Yes, invite me to paid studies",
+      "saving": "Saving…",
+      "dismiss": "No thanks"
+    }
   },
   "resume": {
     "title": "Welcome back!",
@@ -354,5 +365,10 @@
     "desc": "The link may have expired or been deactivated. Please contact the researcher for a new link.",
     "expiredHelp": "This link may have expired. Please contact the researcher who sent you this link.",
     "goBack": "Go back"
+  },
+  "studyUnavailable": {
+    "title": "This study isn't taking responses right now",
+    "body": "This study isn't accepting new responses at the moment. Please reach out to the researcher who shared this link.",
+    "close": "You can safely close this page."
   }
 }

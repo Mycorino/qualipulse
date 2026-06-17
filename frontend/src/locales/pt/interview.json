@@ -227,7 +227,9 @@
       "51-200": "51–200 pessoas",
       "201-1000": "201–1000 pessoas",
       "1000+": "Mais de 1000 pessoas"
-    }
+    },
+    "consentAccept": "Sim, alinho",
+    "consentDecline": "Agora não"
   },
   "micPrompt": {
     "title": "Esta entrevista usa o seu microfone",
@@ -334,7 +336,16 @@
     "panelSaveError": "Não conseguimos guardar o seu perfil. Contacte o apoio ao cliente se quiser aderir à comunidade de investigação.",
     "futureStudiesTitle": "Quer ser convidado(a) para estudos futuros?",
     "futureStudiesBody": "Responda ao email que o(a) trouxe até aqui e teremos isso em conta.",
-    "close": "Fechar"
+    "close": "Fechar",
+    "panelConfirmTitle": "Está na lista.",
+    "panelConfirmBody": "Só o contactaremos sobre estudos pagos que correspondam ao seu perfil — e pode cancelar a qualquer momento.",
+    "panelReprompt": {
+      "title": "Mais uma coisa — quer ser pago por estudos como este?",
+      "body": "Realizamos estudos pagos e podemos convidá-lo para os que correspondem ao seu perfil. Apenas pagos, apenas relevantes — pode sair quando quiser.",
+      "cta": "Sim, convide-me para estudos pagos",
+      "saving": "A guardar…",
+      "dismiss": "Não, obrigado"
+    }
   },
   "resume": {
     "title": "Bem-vindo(a) de volta!",
@@ -354,5 +365,10 @@
     "desc": "O link pode ter expirado ou sido desativado. Contacte o investigador para obter um novo link.",
     "expiredHelp": "Este link pode ter expirado. Contacte o investigador que lhe enviou este link.",
     "goBack": "Voltar"
+  },
+  "studyUnavailable": {
+    "title": "Este estudo não está a aceitar respostas neste momento",
+    "body": "Este estudo não está a aceitar novas respostas de momento. Por favor, contacte o investigador que lhe enviou este link.",
+    "close": "Pode fechar esta página em segurança."
   }
 }

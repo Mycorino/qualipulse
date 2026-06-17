@@ -227,7 +227,9 @@
       "51-200": "51–200 personas",
       "201-1000": "201–1000 personas",
       "1000+": "Más de 1000 personas"
-    }
+    },
+    "consentAccept": "Sí, me apunto",
+    "consentDecline": "Ahora no"
   },
   "micPrompt": {
     "title": "Esta entrevista usa tu micrófono",
@@ -334,7 +336,16 @@
     "panelSaveError": "No pudimos guardar tu perfil. Contacta con soporte si quieres unirte a la comunidad de investigación.",
     "futureStudiesTitle": "¿Quieres que te inviten a futuros estudios?",
     "futureStudiesBody": "Responde al correo que te trajo hasta aquí y te tendremos en cuenta.",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "panelConfirmTitle": "Estás en la lista.",
+    "panelConfirmBody": "Solo te contactaremos para estudios remunerados que encajen con tu perfil, y puedes darte de baja cuando quieras.",
+    "panelReprompt": {
+      "title": "Una última cosa: ¿quieres cobrar por estudios como este?",
+      "body": "Realizamos estudios remunerados y podemos invitarte a los que encajen con tu perfil. Solo remunerados, solo relevantes, y puedes darte de baja cuando quieras.",
+      "cta": "Sí, invítame a estudios remunerados",
+      "saving": "Guardando…",
+      "dismiss": "No, gracias"
+    }
   },
   "resume": {
     "title": "¡Bienvenido de nuevo!",
@@ -354,5 +365,10 @@
     "desc": "El enlace puede haber caducado o haberse desactivado. Contacta con el investigador para obtener un nuevo enlace.",
     "expiredHelp": "Este enlace puede haber caducado. Contacta con el investigador que te lo envió.",
     "goBack": "Volver"
+  },
+  "studyUnavailable": {
+    "title": "Este estudio no acepta respuestas en este momento",
+    "body": "Este estudio no está aceptando nuevas respuestas por ahora. Ponte en contacto con la persona que te compartió este enlace.",
+    "close": "Puedes cerrar esta página con tranquilidad."
   }
 }
