@@ -259,7 +259,33 @@ export default function Admin() {
 
   const [costs, setCosts] = useState<CostsReport | null>(null);
 
-  const [tab, setTab] = useState<"users" | "affiliates" | "blog" | "audit">("users");
+  const [tab, setTab] = useState<"users" | "affiliates" | "blog" | "audit" | "panel">("users");
+  // Panel / consumer-account deletion (GDPR erasure + testing reset).
+  const [panelEmail, setPanelEmail] = useState("");
+  const [panelIncludeInterviews, setPanelIncludeInterviews] = useState(false);
+  const [panelDeleting, setPanelDeleting] = useState(false);
+  const [panelResult, setPanelResult] = useState<string | null>(null);
+
+  async function handleDeletePanelist() {
+    const email = panelEmail.trim();
+    if (!email) return;
+    if (!window.confirm(`Delete panel/consumer account for ${email}? This removes their panel profile, enrichment answers, and magic tokens${panelIncludeInterviews ? ", plus their interview records" : ""}.`)) return;
+    setPanelDeleting(true);
+    setPanelResult(null);
+    try {
+      const res = await client().delete(`/admin/panel/${encodeURIComponent(email)}`, {
+        params: { include_interviews: panelIncludeInterviews },
+      });
+      const d = res.data;
+      setPanelResult(`Deleted ${email} — profile: ${d.panel_profile}, answers: ${d.panel_answers}, magic tokens: ${d.magic_tokens}, participants: ${d.participants}, turns: ${d.interview_turns}`);
+      setPanelEmail("");
+    } catch (err) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setPanelResult(`Failed: ${typeof detail === "string" ? detail : "see console"}`);
+    } finally {
+      setPanelDeleting(false);
+    }
+  }
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [affiliatesLoading, setAffiliatesLoading] = useState(false);
 
@@ -913,6 +939,21 @@ export default function Admin() {
             }}
           >
             {t("tabs.audit")}
+          </button>
+          <button
+            onClick={() => setTab("panel")}
+            style={{
+              padding: "12px 0",
+              border: "none",
+              background: "none",
+              borderBottom: tab === "panel" ? "2px solid var(--primary)" : "none",
+              color: tab === "panel" ? "var(--primary)" : "var(--text-secondary)",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: tab === "panel" ? 600 : 500,
+            }}
+          >
+            {t("tabs.panel", "Panel")}
           </button>
         </div>
 
@@ -1644,6 +1685,46 @@ export default function Admin() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Panel / consumer accounts tab */}
+        {tab === "panel" && (
+          <div style={{ maxWidth: 560 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+              {t("panel.title", "Delete a consumer / panelist account")}
+            </h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.5, marginBottom: 16 }}>
+              {t("panel.help", "Removes their panel profile, all enrichment answers, and outstanding magic tokens. GDPR right-to-erasure — also resets re-testing with the same email (the profiling questionnaire shows again).")}
+            </p>
+            <input
+              type="email"
+              value={panelEmail}
+              onChange={(e) => setPanelEmail(e.target.value)}
+              placeholder="participant@example.com"
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)", fontSize: 14, marginBottom: 12,
+                background: "var(--bg-surface)", outline: "none",
+              }}
+            />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-secondary)", marginBottom: 16, cursor: "pointer" }}>
+              <input type="checkbox" checked={panelIncludeInterviews} onChange={(e) => setPanelIncludeInterviews(e.target.checked)} />
+              {t("panel.includeInterviews", "Also delete their interview records (across all studies)")}
+            </label>
+            <button
+              className="btn btn-danger"
+              disabled={!panelEmail.trim() || panelDeleting}
+              onClick={handleDeletePanelist}
+              style={{ minHeight: 44 }}
+            >
+              {panelDeleting ? t("panel.deleting", "Deleting…") : t("panel.deleteCta", "Delete panelist")}
+            </button>
+            {panelResult && (
+              <p style={{ marginTop: 14, fontSize: 13, color: panelResult.startsWith("Failed") ? "var(--danger, #dc2626)" : "var(--text-secondary)", lineHeight: 1.5 }}>
+                {panelResult}
+              </p>
+            )}
           </div>
         )}
 
