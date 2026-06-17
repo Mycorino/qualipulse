@@ -29,6 +29,7 @@ from app.models.interview import (
     ProjectAnalysis,
 )
 from app.models.memo import ProjectMemo
+from app.models.panel import PanelAnswer, PanelProfile, ParticipantMagicToken
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.models.usage import AIUsageLog
 
@@ -499,6 +500,60 @@ def delete_user(
 
     _record_audit(db, admin_id, "user_delete", None, email_snapshot,
                   {"name": name_snapshot, "company_id": company_id})
+
+
+# ── Consumer / panelist deletion ─────────────────────────────────────────────
+
+@router.delete("/panel/{email}")
+@limiter.limit("20/minute")
+def delete_panelist(
+    request: Request,
+    email: str,
+    include_interviews: bool = False,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin),
+) -> dict:
+    """Delete a consumer / panelist account by email — their panel profile,
+    all enrichment answers, and outstanding magic tokens. Doubles as GDPR
+    right-to-erasure and a clean testing reset (removing the PanelProfile makes
+    magic-link verify stop reporting ``profile_complete`` so the questionnaire
+    shows again).
+
+    By default leaves Participant interview records intact (they belong to the
+    researcher's study). Pass ``?include_interviews=true`` to also delete the
+    participant's interview turns + records across all studies.
+    """
+    email = email.strip().lower()
+    deleted = {"panel_profile": 0, "panel_answers": 0, "magic_tokens": 0, "participants": 0, "interview_turns": 0}
+
+    profile = db.query(PanelProfile).filter(func.lower(PanelProfile.email) == email).first()
+    if profile is not None:
+        deleted["panel_answers"] = db.query(PanelAnswer).filter(PanelAnswer.profile_id == profile.id).count()
+        db.delete(profile)  # cascades answers + tag links via ORM relationships
+
+    deleted["magic_tokens"] = db.execute(
+        sql_delete(ParticipantMagicToken).where(func.lower(ParticipantMagicToken.email) == email)
+    ).rowcount or 0
+
+    if include_interviews:
+        pids = [r[0] for r in db.query(Participant.id).filter(func.lower(Participant.email) == email).all()]
+        if pids:
+            deleted["interview_turns"] = db.execute(
+                sql_delete(InterviewTurn).where(InterviewTurn.participant_id.in_(pids))
+            ).rowcount or 0
+            deleted["participants"] = db.execute(
+                sql_delete(Participant).where(Participant.id.in_(pids))
+            ).rowcount or 0
+
+    deleted["panel_profile"] = 1 if profile is not None else 0
+    db.commit()
+
+    logger.warning(
+        "ADMIN_PANELIST_DELETION: email=%s admin=%s deleted=%s timestamp=%s",
+        email, admin_id, deleted, datetime.utcnow().isoformat(),
+    )
+    _record_audit(db, admin_id, "panelist_delete", None, email, deleted)
+    return {"deleted": True, "email": email, **deleted}
 
 
 # ── Suspend / Unsuspend ──────────────────────────────────────────────────────

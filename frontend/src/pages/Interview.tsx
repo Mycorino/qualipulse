@@ -117,6 +117,13 @@ export default function Interview() {
   // Inline panel-enrichment ("add more details, get more studies") on the
   // completion screen for consented panelists.
   const [showEnrichment, setShowEnrichment] = useState(false);
+  // TEMP dev/testing shortcut: visit any interview link with `?devskip=1` once
+  // to enable a "Skip to end" button (persisted in localStorage; `?devskip=0`
+  // to disable). Lets you jump straight to the completion screen to test the
+  // post-interview panel flow without recording an interview. Remove later.
+  const [devSkip, setDevSkip] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("qp_devskip") === "1"
+  );
 
   // Interview state
   const [displayName, setDisplayName] = useState("");
@@ -299,6 +306,13 @@ export default function Interview() {
       getPanelTags().then(setPanelTags).catch(() => {});
     }
   }, [phase]);
+
+  // TEMP: toggle the dev "skip to end" affordance from the URL (?devskip=1/0).
+  useEffect(() => {
+    const v = new URLSearchParams(location.search).get("devskip");
+    if (v === "1") { localStorage.setItem("qp_devskip", "1"); setDevSkip(true); }
+    else if (v === "0") { localStorage.removeItem("qp_devskip"); setDevSkip(false); }
+  }, [location.search]);
 
   // Resend countdown
   useEffect(() => {
@@ -617,6 +631,15 @@ export default function Interview() {
     if (data.ageRange) setAgeRange(data.ageRange);
     if (data.country) setCountry(data.country);
     await routeAfterProfile();
+  }
+
+  /** TEMP dev shortcut — jump straight to the completion screen (skipping
+   *  questionnaire / screening / interview) to test the post-interview panel
+   *  flow. Treats the panelist as consented so the enrichment CTA shows. */
+  function handleDevSkipToEnd() {
+    setPanelConsentGiven(true);
+    setTurnCount(3);
+    setPhase("complete");
   }
 
   /** Post-interview panel opt-in for participants who declined earlier. Flips
@@ -948,6 +971,23 @@ export default function Interview() {
     );
   }
 
+  // TEMP dev affordance — a small floating "Skip to end" button shown only when
+  // `?devskip=1` was set and a session exists, so the post-interview screen can
+  // be reached without recording an interview. Remove when done testing.
+  const devSkipBtn = devSkip && sessionToken && phase !== "complete" ? (
+    <button
+      onClick={handleDevSkipToEnd}
+      style={{
+        position: "fixed", bottom: 16, right: 16, zIndex: 9999,
+        padding: "8px 14px", fontSize: 13, fontFamily: "inherit",
+        background: "#1f2937", color: "#fff", border: "1px dashed #9ca3af",
+        borderRadius: 8, cursor: "pointer", opacity: 0.85,
+      }}
+    >
+      ⏭ Skip to end (dev)
+    </button>
+  ) : null;
+
   // ── Loading / error states ──────────────────────────────────────────────
 
   if (infoLoading) {
@@ -1122,6 +1162,7 @@ export default function Interview() {
   if (phase === "consent" && info) {
     return (
       <div className="interview-page">
+        {devSkipBtn}
         <div
           className="interview-container consent-card"
           style={{ maxWidth: "var(--participant-card-max-w)" }}
@@ -1335,13 +1376,16 @@ export default function Interview() {
 
   if (phase === "questionnaire") {
     return (
-      <ParticipantQuestionnaire
-        linkToken={token!}
-        email={email}
-        sessionToken={sessionToken}
-        initialFirstName={profile.firstName}
-        onComplete={handleQuestionnaireComplete}
-      />
+      <>
+        {devSkipBtn}
+        <ParticipantQuestionnaire
+          linkToken={token!}
+          email={email}
+          sessionToken={sessionToken}
+          initialFirstName={profile.firstName}
+          onComplete={handleQuestionnaireComplete}
+        />
+      </>
     );
   }
 
@@ -1353,6 +1397,7 @@ export default function Interview() {
     const progress = ((screeningStep + 1) / screeningQuestions.length) * 100;
     return (
       <div className="interview-page">
+        {devSkipBtn}
         <div className="interview-container interview-profiling">
           <div className="profiling-header">
             <p className="profiling-intro">{t("screening.title")}</p>
