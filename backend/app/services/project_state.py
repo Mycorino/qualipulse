@@ -38,7 +38,7 @@ logger = logging.getLogger("auto_interview.project_state")
 # Claude is cheap but not free. Only call it when there's actually something
 # to summarise (at least one completed participant). The helper below handles
 # the "return early with a deterministic fallback" path too.
-_STATE_MODEL = "claude-sonnet-4-20250514"
+_STATE_MODEL = "claude-sonnet-4-6"
 _STATE_MAX_TOKENS = 256
 
 
