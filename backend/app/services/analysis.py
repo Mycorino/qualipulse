@@ -318,7 +318,7 @@ def run_analysis(
 
         client = get_anthropic_client()
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=4096,
             # 0.3: synthesis requires judgment but not creativity. Lower
             # temperature reduces hallucinated quotes and inflated frequency
@@ -517,7 +517,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
 
         client = get_anthropic_client()
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=4096,
             # 0.3: synthesis requires judgment but not creativity. Lower
             # temperature reduces hallucinated quotes and inflated frequency

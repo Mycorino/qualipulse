@@ -77,7 +77,7 @@ Output the keys now."""
     try:
         client = get_anthropic_client(30.0)
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=64,
             temperature=0.3,
             system=system_msg,
