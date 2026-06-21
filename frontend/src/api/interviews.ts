@@ -111,8 +111,10 @@ export interface VerifyTokenResponse {
   preferred_language?: string | null;
 }
 
-export async function getInterviewInfo(token: string): Promise<InterviewInfo> {
-  const { data } = await client.get<InterviewInfo>(`/interview/${token}`);
+export async function getInterviewInfo(token: string, lang?: string): Promise<InterviewInfo> {
+  const { data } = await client.get<InterviewInfo>(`/interview/${token}`, {
+    params: lang ? { lang } : undefined,
+  });
   return data;
 }
 

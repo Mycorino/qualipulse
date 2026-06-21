@@ -34,6 +34,10 @@ class Project(Base):
         String(36), ForeignKey("studies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Per-language localizations of `name` for participant-facing display only.
+    # The canonical `name` stays the researcher's source of truth + identity;
+    # this is filled on demand / in the background. Shape: {"fr": "<name>"}.
+    name_translations: Mapped[str | None] = mapped_column(Text, nullable=True)
     language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     interview_duration_minutes: Mapped[int] = mapped_column(
         Integer, default=20, nullable=False
@@ -104,6 +108,21 @@ class Project(Base):
         "ScreeningQuestion", back_populates="project", cascade="all, delete-orphan",
         order_by="ScreeningQuestion.sort_order",
     )
+
+    @property
+    def name_translations_dict(self) -> dict:
+        try:
+            return json.loads(self.name_translations) if self.name_translations else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def localized_name(self, lang: str | None) -> str:
+        """Participant-facing study name in `lang`, falling back to the
+        canonical `name` when no translation exists."""
+        code = (lang or "").lower()[:2]
+        if not code:
+            return self.name
+        return self.name_translations_dict.get(code) or self.name
 
 
 class InterviewGuideQuestion(Base):

@@ -395,14 +395,23 @@ def screen_participant(request: Request, token: str, body: ScreenRequest, db: Se
 def validate_link(
     request: Request,
     token: str,
+    lang: str = "",
     db: Session = Depends(get_db),
 ):
-    """Validate an interview link and return project info. No auth required."""
+    """Validate an interview link and return project info. No auth required.
+
+    When ``lang`` is supplied the participant-facing study name is localized
+    (translated on demand + cached); the canonical ``project.name`` stays the
+    researcher's source of truth.
+    """
     link = _get_active_link_or_404(token, db)
     project = link.project
+    if lang:
+        from app.services.screening_translation import ensure_study_name_language
+        ensure_study_name_language(project, lang, db)
 
     return {
-        "project_name": project.name,
+        "project_name": project.localized_name(lang) if lang else project.name,
         # Company name powers the participant-facing identity avatar when
         # the project has no explicit researcher_name / logo. Falling back
         # to project_name produced nonsense initials (study title → "PN").

@@ -286,7 +286,13 @@ export default function Interview() {
         });
       return;
     }
-    getInterviewInfo(token)
+    // Best-guess language we already know before the round-trip (explicit pick
+    // or browser) so the study name comes back localized on the first fetch.
+    const supported = SUPPORTED_LANGUAGES as readonly string[];
+    const manual = localStorage.getItem("qp_interview_lang") || "";
+    const browser = (i18n.language || "en").slice(0, 2);
+    const guess = supported.includes(manual) ? manual : supported.includes(browser) ? browser : "";
+    getInterviewInfo(token, guess || undefined)
       .then((data) => {
         setInfo(data);
         // Language precedence (participant choice wins, per the redesign):
@@ -294,14 +300,16 @@ export default function Interview() {
         //   2. their browser/detected language (if we support it)
         //   3. the study's configured language (if we support it)
         //   4. English
-        const supported = SUPPORTED_LANGUAGES as readonly string[];
-        const manual = localStorage.getItem("qp_interview_lang") || "";
-        const browser = (i18n.language || "en").slice(0, 2);
         let target = "en";
         if (supported.includes(manual)) target = manual;
         else if (supported.includes(browser)) target = browser;
         else if (data.language && supported.includes(data.language)) target = data.language;
         if (target !== i18n.language) i18n.changeLanguage(target);
+        // If the resolved language differs from our pre-fetch guess (e.g. it
+        // came from the study's default), refetch so the name is localized.
+        if (target !== guess && target !== "en") {
+          getInterviewInfo(token, target).then(setInfo).catch(() => {});
+        }
       })
       .catch(() => setError(t("linkInactive.title")))
       .finally(() => setInfoLoading(false));
@@ -369,8 +377,15 @@ export default function Interview() {
       if (!code || !(SUPPORTED_LANGUAGES as readonly string[]).includes(code)) return;
       localStorage.setItem("qp_interview_lang", code);
       if (i18n.language?.slice(0, 2) !== code) i18n.changeLanguage(code);
+      // Refetch study info in the locked language so participant-facing copy
+      // (the study name on the completion screen, etc.) is localized too.
+      if (token) {
+        getInterviewInfo(token, code)
+          .then((data) => setInfo(data))
+          .catch(() => { /* keep canonical name on failure */ });
+      }
     },
-    [i18n]
+    [i18n, token]
   );
 
   // ── TTS ────────────────────────────────────────────────────────────────
