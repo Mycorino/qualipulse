@@ -15,12 +15,18 @@ export interface ScreeningQuestionCreate {
   disqualifying_options: string[];
 }
 
+export interface ScreeningTranslation {
+  question: string;
+  options: string[];
+}
+
 export interface ScreeningQuestionResponse {
   id: string;
   question: string;
   options: string[];
   disqualifying_options: string[];
   sort_order: number;
+  translations?: Record<string, ScreeningTranslation>;
 }
 
 export interface ProjectCreate {
@@ -409,6 +415,22 @@ export async function createScreeningQuestion(
     body,
   );
   return data;
+}
+
+export async function patchScreeningTranslation(
+  projectId: string,
+  screeningId: string,
+  body: { lang: string; question: string; options: string[] },
+): Promise<ScreeningQuestionResponse> {
+  const { data } = await client.patch<ScreeningQuestionResponse>(
+    `/projects/${projectId}/screening/${screeningId}/translations`,
+    body,
+  );
+  return data;
+}
+
+export async function regenerateScreeningTranslations(projectId: string): Promise<void> {
+  await client.post(`/projects/${projectId}/screening/regenerate-translations`);
 }
 
 export async function createLink(projectId: string): Promise<InterviewLink> {

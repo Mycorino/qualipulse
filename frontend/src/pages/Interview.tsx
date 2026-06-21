@@ -589,7 +589,7 @@ export default function Interview() {
     setStarting(true);
     setError("");
     try {
-      const questions = await getScreeningQuestions(token);
+      const questions = await getScreeningQuestions(token, (i18n.language || "en").slice(0, 2));
       if (questions.length > 0) {
         setScreeningQuestions(questions);
         setScreeningStep(0);
@@ -1282,7 +1282,7 @@ export default function Interview() {
                 setResumeCheck(null);
                 setResumeSummary(null);
                 try {
-                  const questions = await getScreeningQuestions(token!);
+                  const questions = await getScreeningQuestions(token!, (i18n.language || "en").slice(0, 2));
                   if (questions.length > 0) {
                     setScreeningQuestions(questions);
                     setScreeningStep(0);
@@ -1410,15 +1410,17 @@ export default function Interview() {
             <h2 className="profiling-label" aria-live="polite">{sq.question}</h2>
             <div className="profiling-options">
               {sq.options.map((opt) => {
-                const isSelected = screeningAnswers[sq.id] === opt;
+                // Submit the canonical `value` (the gate's stable identity);
+                // display the localized `label`.
+                const isSelected = screeningAnswers[sq.id] === opt.value;
                 return (
                   <button
-                    key={opt}
+                    key={opt.value}
                     className={`profiling-option-btn${isSelected ? " selected" : ""}`}
-                    onClick={() => !screeningLoading && handleScreeningAnswer(sq.id, opt)}
+                    onClick={() => !screeningLoading && handleScreeningAnswer(sq.id, opt.value)}
                     disabled={screeningLoading}
                   >
-                    {screeningLoading && isSelected ? t("screening.checking") : opt}
+                    {screeningLoading && isSelected ? t("screening.checking") : opt.label}
                   </button>
                 );
               })}

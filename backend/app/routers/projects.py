@@ -22,6 +22,7 @@ from app.schemas.project import (
     QuestionResponse,
     ScreeningQuestionCreate,
     ScreeningQuestionResponse,
+    ScreeningTranslationPatch,
 )
 from app.services.analytics import emit_event
 from app.services.demo_seeder import (
@@ -116,6 +117,12 @@ def create_project(
 
     db.commit()
     db.refresh(project)
+
+    # Auto-translate screening questions into the supported languages so the
+    # qualification step is native (background; researcher can edit later).
+    if project.screening_questions:
+        from app.services.screening_translation import schedule_screening_translation
+        schedule_screening_translation(project.id)
 
     # Fire `study_created` only on the first non-demo project for this
     # company — the activation milestone, not every project.
@@ -415,6 +422,12 @@ def update_project(
 
     db.commit()
     db.refresh(project)
+
+    # Canonical questions/options just changed → (re)generate localizations.
+    if project.screening_questions:
+        from app.services.screening_translation import schedule_screening_translation
+        schedule_screening_translation(project.id)
+
     return _project_to_response(project)
 
 
@@ -560,13 +573,82 @@ def add_screening_question(
     db.add(sq)
     db.commit()
     db.refresh(sq)
+
+    from app.services.screening_translation import schedule_screening_translation
+    schedule_screening_translation(project.id)
+
     return ScreeningQuestionResponse(
         id=sq.id,
         question=sq.question,
         options=sq.options_list,
         disqualifying_options=sq.disqualifying_options_list,
         sort_order=sq.sort_order,
+        translations=sq.translations_dict,
     )
+
+
+@router.patch(
+    "/{project_id}/screening/{screening_id}/translations",
+    response_model=ScreeningQuestionResponse,
+)
+def patch_screening_translation(
+    project_id: str,
+    screening_id: str,
+    body: ScreeningTranslationPatch,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ScreeningQuestionResponse:
+    """Researcher edit of one language's localized screening text. Options are
+    aligned by index to the canonical options; extra/short arrays are clamped."""
+    project = _get_project_or_404(project_id, company.id, db)
+    sq = (
+        db.query(ScreeningQuestion)
+        .filter(ScreeningQuestion.id == screening_id, ScreeningQuestion.project_id == project.id)
+        .first()
+    )
+    if sq is None:
+        raise HTTPException(status_code=404, detail="Screening question not found")
+
+    lang = (body.lang or "").lower()[:2]
+    if not lang:
+        raise HTTPException(status_code=400, detail="lang is required")
+    canonical = sq.options_list
+    # Clamp option labels to the canonical count; pad missing with canonical.
+    opts = [
+        (body.options[i] if i < len(body.options) and body.options[i] else canonical[i])
+        for i in range(len(canonical))
+    ]
+    d = sq.translations_dict
+    d[lang] = {"question": body.question or sq.question, "options": opts}
+    sq.translations = json.dumps(d, ensure_ascii=False)
+    db.commit()
+    db.refresh(sq)
+    return ScreeningQuestionResponse(
+        id=sq.id,
+        question=sq.question,
+        options=sq.options_list,
+        disqualifying_options=sq.disqualifying_options_list,
+        sort_order=sq.sort_order,
+        translations=sq.translations_dict,
+    )
+
+
+@router.post("/{project_id}/screening/regenerate-translations", status_code=status.HTTP_202_ACCEPTED)
+def regenerate_screening_translations(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> dict:
+    """Re-run auto-translation for all of a project's screening questions
+    (background). Used by the 'Regenerate' action in the Setup tab."""
+    project = _get_project_or_404(project_id, company.id, db)
+    # Clear existing translations so the background job regenerates fresh.
+    for sq in project.screening_questions:
+        sq.translations = None
+    db.commit()
+    from app.services.screening_translation import schedule_screening_translation
+    schedule_screening_translation(project.id)
+    return {"status": "regenerating"}
 
 
 @router.patch("/{project_id}/questions/{question_id}", response_model=QuestionResponse)
@@ -681,6 +763,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
             options=sq.options_list,
             disqualifying_options=sq.disqualifying_options_list,
             sort_order=sq.sort_order,
+            translations=sq.translations_dict,
         )
         for sq in sorted(project.screening_questions, key=lambda sq: sq.sort_order)
     ]

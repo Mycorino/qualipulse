@@ -14,10 +14,15 @@ export interface InterviewInfo {
   panel_collection_enabled?: boolean;
 }
 
+export interface ScreeningOption {
+  value: string; // canonical option — submitted back to the gate (stable identity)
+  label: string; // localized display text
+}
+
 export interface ScreeningQuestion {
   id: string;
   question: string;
-  options: string[];
+  options: ScreeningOption[];
   sort_order: number;
 }
 
@@ -141,8 +146,11 @@ export async function startInterview(
   return data;
 }
 
-export async function getScreeningQuestions(token: string): Promise<ScreeningQuestion[]> {
-  const { data } = await client.get<ScreeningQuestion[]>(`/interview/${token}/screening-questions`);
+export async function getScreeningQuestions(token: string, lang?: string): Promise<ScreeningQuestion[]> {
+  const { data } = await client.get<ScreeningQuestion[]>(
+    `/interview/${token}/screening-questions`,
+    { params: lang ? { lang } : undefined }
+  );
   return data;
 }
 
