@@ -142,6 +142,11 @@ class ScreeningQuestion(Base):
     question: Mapped[str] = mapped_column(Text, nullable=False)
     options: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     disqualifying_options: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    # Per-language localizations of `question` + `options` (options aligned by
+    # index to the canonical `options` list). The canonical fields stay the
+    # source of truth + the stable identity for the disqualification gate;
+    # this is display only. Shape: {"fr": {"question": str, "options": [str]}}.
+    translations: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     project = relationship("Project", back_populates="screening_questions")
 
@@ -152,3 +157,27 @@ class ScreeningQuestion(Base):
     @property
     def disqualifying_options_list(self) -> list[str]:
         return json.loads(self.disqualifying_options)
+
+    @property
+    def translations_dict(self) -> dict:
+        try:
+            return json.loads(self.translations) if self.translations else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def localized(self, lang: str | None) -> tuple[str, list[dict]]:
+        """Return (question, [{value, label}]) for the given language.
+
+        `value` is always the canonical option (the gate's stable identity);
+        `label` is the localized display text, falling back to the canonical
+        option when no translation exists or the arrays don't line up.
+        """
+        canonical = self.options_list
+        tr = self.translations_dict.get((lang or "").lower()[:2]) if lang else None
+        q = (tr or {}).get("question") or self.question
+        tr_opts = (tr or {}).get("options") or []
+        opts = [
+            {"value": opt, "label": tr_opts[i] if i < len(tr_opts) and tr_opts[i] else opt}
+            for i, opt in enumerate(canonical)
+        ]
+        return q, opts

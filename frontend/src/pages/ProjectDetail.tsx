@@ -53,7 +53,8 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, type PaywallDetail } from "../api/projects";
+import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, regenerateScreeningTranslations, type PaywallDetail } from "../api/projects";
+import ScreeningTranslationsEditor from "../components/ScreeningTranslationsEditor";
 import { getCreditUsage } from "../api/billing";
 import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
@@ -2109,8 +2110,26 @@ export default function ProjectDetail() {
                             </span>
                           ))}
                         </div>
+                        <ScreeningTranslationsEditor
+                          projectId={project.id}
+                          screening={sq}
+                          sourceLang={project.language || "en"}
+                          onSaved={() => loadAll()}
+                        />
                       </div>
                     ))}
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ marginTop: 8 }}
+                      onClick={async () => {
+                        try {
+                          await regenerateScreeningTranslations(project.id);
+                          toast("Regenerating translations — refresh in a few seconds", "info");
+                        } catch { toast("Failed to regenerate translations", "error"); }
+                      }}
+                    >
+                      🌐 Regenerate all translations
+                    </button>
                   </div>
                 )
               )}

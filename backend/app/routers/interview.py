@@ -331,18 +331,31 @@ def get_demo_link(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/{token}/screening-questions")
 @limiter.limit("60/minute")
-def get_screening_questions(request: Request, token: str, db: Session = Depends(get_db)):
-    """Return screening questions for this project (no auth required)."""
+def get_screening_questions(
+    request: Request, token: str, lang: str = "", db: Session = Depends(get_db)
+):
+    """Return screening questions localized to ``lang`` (no auth required).
+
+    Each option is ``{value, label}`` — ``value`` is the canonical option (the
+    disqualification gate's stable identity, which the client submits back),
+    ``label`` is the localized display text. Missing translations are generated
+    on demand and cached (hybrid fallback), falling back to canonical text.
+    """
     link = _get_active_link_or_404(token, db)
-    return [
-        {
+    project = link.project
+    if lang:
+        from app.services.screening_translation import ensure_screening_language
+        ensure_screening_language(project, lang, db)
+    out = []
+    for q in sorted(project.screening_questions, key=lambda q: q.sort_order):
+        question, options = q.localized(lang)
+        out.append({
             "id": q.id,
-            "question": q.question,
-            "options": q.options_list,
+            "question": question,
+            "options": options,
             "sort_order": q.sort_order,
-        }
-        for q in sorted(link.project.screening_questions, key=lambda q: q.sort_order)
-    ]
+        })
+    return out
 
 
 @router.post("/{token}/screen")

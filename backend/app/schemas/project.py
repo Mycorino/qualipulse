@@ -49,8 +49,18 @@ class ScreeningQuestionResponse(BaseModel):
     options: list[str]
     disqualifying_options: list[str]
     sort_order: int
+    # Per-language localizations: {"fr": {"question": str, "options": [str]}}.
+    # Auto-generated on save; researcher-editable.
+    translations: dict = {}
 
     model_config = {"from_attributes": True}
+
+
+class ScreeningTranslationPatch(BaseModel):
+    """Researcher edit of one language's localized screening text."""
+    lang: str
+    question: str
+    options: list[str] = []
 
 
 class ProjectCreate(BaseModel):
