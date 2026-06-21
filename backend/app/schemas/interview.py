@@ -37,6 +37,11 @@ class StartInterviewResponse(BaseModel):
     # icebreaker) before the first guide question. Frontend uses this to
     # soften the chrome on turn 0 — no progress count, no skip button.
     is_warmup: bool = False
+    # The authoritative language the AI interviewer + voice are actually using
+    # for this participant (participant choice, else the study default). The
+    # frontend locks its UI chrome (progress labels, completion screen) to this
+    # so the interface never drifts away from the language being spoken.
+    language: str = "en"
 
 
 class TurnResponse(BaseModel):
@@ -125,6 +130,9 @@ class ResumeSummaryResponse(BaseModel):
     last_question: str | None = None
     turn_count: int
     elapsed_minutes: float
+    # Authoritative interview language (see StartInterviewResponse.language) so a
+    # resumed session re-locks the UI to whatever language the AI is speaking.
+    language: str = "en"
 
 
 class QualityAssessment(BaseModel):
