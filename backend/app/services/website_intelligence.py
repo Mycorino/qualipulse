@@ -30,10 +30,11 @@ import httpx
 from anthropic import Anthropic
 
 from app.config import settings
+from app.services import ai_models
 
 logger = logging.getLogger(__name__)
 
-_MODEL = "claude-sonnet-4-6"
+_MODEL = ai_models.sonnet()
 _MAX_TOKENS = 500
 
 # Sentinel Claude returns when it has no useful knowledge of the URL/brand.

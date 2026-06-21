@@ -13,6 +13,7 @@ from app.models.memo import ProjectMemo
 from app.models.project import Project
 from app.services.business_context import full_context_block
 from app.services.usage_logger import log_claude_usage
+from app.services import ai_models
 
 ANALYSIS_SYSTEM_PROMPT = """\
 You are a sceptical senior qualitative researcher reviewing your own work for a hostile PM \
@@ -318,7 +319,7 @@ def run_analysis(
 
         client = get_anthropic_client()
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=ai_models.sonnet(),
             max_tokens=4096,
             # 0.3: synthesis requires judgment but not creativity. Lower
             # temperature reduces hallucinated quotes and inflated frequency
@@ -517,7 +518,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
 
         client = get_anthropic_client()
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=ai_models.sonnet(),
             max_tokens=4096,
             # 0.3: synthesis requires judgment but not creativity. Lower
             # temperature reduces hallucinated quotes and inflated frequency

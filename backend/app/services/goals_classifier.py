@@ -17,6 +17,7 @@ import logging
 from app.services._clients import get_anthropic_client
 
 from app.config import settings
+from app.services import ai_models
 
 logger = logging.getLogger("auto_interview.goals_classifier")
 
@@ -77,7 +78,7 @@ Output the keys now."""
     try:
         client = get_anthropic_client(30.0)
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=ai_models.sonnet(),
             max_tokens=64,
             temperature=0.3,
             system=system_msg,

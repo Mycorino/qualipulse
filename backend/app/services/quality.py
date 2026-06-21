@@ -8,6 +8,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.models.interview import Participant
+from app.services import ai_models
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +185,7 @@ Return ONLY a JSON object — no markdown fences, no preamble:
     client = get_anthropic_client(60.0)
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=ai_models.sonnet(),
         max_tokens=512,
         temperature=0.3,
         messages=[{"role": "user", "content": prompt}],

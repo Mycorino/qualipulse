@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.config import settings
+from app.services import ai_models
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +217,7 @@ def _maybe_call_claude_for_rewrite(prompt: str, flag_codes: list[str]) -> str | 
     try:
         client = get_anthropic_client(10.0)
         resp = client.messages.create(
-            model="claude-haiku-4-5",
+            model=ai_models.haiku(),
             max_tokens=200,
             temperature=0.2,
             system=_REWRITE_PROMPT,

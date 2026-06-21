@@ -27,6 +27,18 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
 
+    # Claude model IDs — single source of truth (see services/ai_models.py).
+    # Blank => use the pinned default in ai_models.py. Set these to swap a model
+    # in production without a code deploy (e.g. when Anthropic retires one).
+    MODEL_SONNET: str = ""
+    MODEL_OPUS: str = ""
+    MODEL_HAIKU: str = ""
+    # When true, resolve the newest available model per family from the Models
+    # API at startup (falls back to the pinned/env value on any error). Off by
+    # default: a brand-new model can change the request surface (e.g. dropped
+    # temperature/budget_tokens), so opting in is a deliberate choice.
+    MODEL_AUTO_LATEST: bool = False
+
     # Storage
     UPLOAD_DIR: str = "./uploads"
     MAX_AUDIO_SIZE_MB: int = 50

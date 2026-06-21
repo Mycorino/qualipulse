@@ -22,6 +22,7 @@ from app.services.stt import transcribe_audio
 from app.services.storage import upload_audio, download_audio
 from app.services.tts import generate_speech
 from app.services.usage_logger import log_claude_usage, log_stt_usage, log_tts_usage
+from app.services import ai_models
 
 
 class EmptyTranscriptError(Exception):
@@ -461,7 +462,7 @@ WHY: generic answer with no behaviour or example.
     for _attempt in range(_max_retries + 1):
         try:
             response = client.messages.create(
-                model="claude-sonnet-4-6",
+                model=ai_models.sonnet(),
                 max_tokens=512,
                 temperature=0.4,
                 system=effective_system_prompt,
@@ -625,7 +626,7 @@ def _get_warmup_question(
         client = get_anthropic_client(60.0)
         effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=ai_models.sonnet(),
             max_tokens=180,
             temperature=0.6,
             system=effective_system_prompt,
@@ -695,7 +696,7 @@ def _get_first_question(
     effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=ai_models.sonnet(),
         max_tokens=256,
         temperature=0.5,
         system=effective_system_prompt,

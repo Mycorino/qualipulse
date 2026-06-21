@@ -37,8 +37,9 @@ from app.models.company import Company
 from app.models.copilot import CopilotConversation, CopilotMemory
 from app.models.survey import QUESTION_TYPES, Survey
 from app.services.usage_logger import log_claude_usage
+from app.services import ai_models
 
-MODEL = "claude-opus-4-7"
+MODEL = ai_models.opus()
 MAX_AGENT_TURNS = 8
 
 
