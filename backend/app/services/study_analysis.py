@@ -47,6 +47,7 @@ from app.models.survey import Survey
 from app.services.segment_discoveries import compute_discoveries
 from app.services.stats import DEFAULT_MIN_N
 from app.services.survey_analytics import build_dashboard
+from app.services import ai_models
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +301,7 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
 
     client = get_anthropic_client()
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=ai_models.sonnet(),
         max_tokens=4096,
         temperature=0.3,
         system=SYSTEM_PROMPT,

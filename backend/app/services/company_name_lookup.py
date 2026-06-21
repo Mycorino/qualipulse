@@ -23,10 +23,11 @@ from app.services._clients import get_anthropic_client
 from app.config import settings
 from app.models.company import Company
 from app.services.website_intelligence import _PREDEFINED_INDUSTRIES
+from app.services import ai_models
 
 logger = logging.getLogger(__name__)
 
-_MODEL = "claude-haiku-4-5"
+_MODEL = ai_models.haiku()
 
 
 def _industry_list() -> str:

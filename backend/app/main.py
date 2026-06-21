@@ -59,6 +59,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:  # pragma: no cover — never block startup on billing
         logger.exception("Billing bootstrap failed; continuing with degraded billing")
 
+    # Resolve + log the Claude model ids (and warn loudly if a configured model
+    # is unavailable — catches a retirement at deploy, not via a participant 500).
+    try:
+        from app.services import ai_models
+        ai_models.log_resolved()
+        if settings.ANTHROPIC_API_KEY:
+            import anthropic
+            _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+            for _mid in {ai_models.sonnet(), ai_models.opus(), ai_models.haiku()}:
+                try:
+                    _client.models.retrieve(_mid)
+                except Exception:
+                    logger.error("CONFIGURED CLAUDE MODEL UNAVAILABLE: %s — set MODEL_* env to a valid id", _mid)
+    except Exception:  # pragma: no cover — never block startup on model checks
+        logger.exception("Model resolution/validation failed; continuing")
+
     # Panel enrichment: sync the profiling-attribute catalogue (idempotent).
     try:
         from app.database import SessionLocal

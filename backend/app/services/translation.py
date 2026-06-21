@@ -12,6 +12,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.models.interview import InterviewTurn, Participant
+from app.services import ai_models
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +129,7 @@ Return ONLY a JSON array with the same length and order. Each item:
 
     client = get_anthropic_client(180.0)
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=ai_models.sonnet(),
         max_tokens=8192,
         temperature=0.2,
         messages=[{"role": "user", "content": prompt}],

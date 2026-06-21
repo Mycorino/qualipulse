@@ -9,10 +9,11 @@ import logging
 from typing import Optional
 
 from app.config import settings
+from app.services import ai_models
 
 logger = logging.getLogger(__name__)
 
-_MODEL = "claude-sonnet-4-6"
+_MODEL = ai_models.sonnet()
 _MAX_TOKENS = 1024
 
 _LANGUAGE_NAMES = {"en": "English", "fr": "French"}

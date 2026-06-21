@@ -48,6 +48,7 @@ from app.services.website_intelligence import (
     WebsiteIntelligenceError,
     fetch_website_summary,
 )
+from app.services import ai_models
 
 logger = logging.getLogger("auto_interview.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -714,7 +715,7 @@ def get_onboarding_suggestions(
         output_lang = "French" if lang == "fr" else "English"
 
         resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=ai_models.haiku(),
             max_tokens=400,
             messages=[{
                 "role": "user",

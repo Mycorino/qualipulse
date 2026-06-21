@@ -32,13 +32,14 @@ from app.models.interview import Participant, ProjectAnalysis
 from app.models.project import Project
 from app.services.business_context import full_context_block
 from app.services.usage_logger import log_claude_usage
+from app.services import ai_models
 
 logger = logging.getLogger("auto_interview.project_state")
 
 # Claude is cheap but not free. Only call it when there's actually something
 # to summarise (at least one completed participant). The helper below handles
 # the "return early with a deterministic fallback" path too.
-_STATE_MODEL = "claude-sonnet-4-6"
+_STATE_MODEL = ai_models.sonnet()
 _STATE_MAX_TOKENS = 256
 
 
