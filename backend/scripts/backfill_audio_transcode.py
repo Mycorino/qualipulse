@@ -50,13 +50,16 @@ def _ext_from_url(url: str) -> str:
     return os.path.splitext(path)[1] or ".webm"
 
 
-def run(dry_run: bool, limit: int | None) -> int:
+def run(dry_run: bool, limit: int | None, participant_id: str | None) -> int:
     db = SessionLocal()
     converted = skipped = failed = 0
     try:
         stmt = select(InterviewTurn).where(InterviewTurn.audio_recording_url.isnot(None))
+        if participant_id:
+            stmt = stmt.where(InterviewTurn.participant_id == participant_id)
         turns = db.execute(stmt).scalars().all()
-        print(f"Scanning {len(turns)} turns with a recording URL...")
+        scope = f" for participant {participant_id}" if participant_id else ""
+        print(f"Scanning {len(turns)} turns with a recording URL{scope}...")
 
         for turn in turns:
             url = turn.audio_recording_url
@@ -112,5 +115,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Transcode legacy participant recordings to MP3.")
     ap.add_argument("--dry-run", action="store_true", help="Report only; write nothing.")
     ap.add_argument("--limit", type=int, default=None, help="Max recordings to convert this run.")
+    ap.add_argument("--participant", default=None, help="Restrict to a single participant id.")
     args = ap.parse_args()
-    sys.exit(run(dry_run=args.dry_run, limit=args.limit))
+    sys.exit(run(dry_run=args.dry_run, limit=args.limit, participant_id=args.participant))
