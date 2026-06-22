@@ -2891,7 +2891,7 @@ export default function ProjectDetail() {
                             <span className="sidebar-panel__title">{tProject("responses.qualityAssessment")}</span>
                           </div>
                           <div className="sidebar-panel__body">
-                            <p className="sidebar-panel__pending">{tProject("qualityPending")}</p>
+                            <p className="sidebar-panel__pending">{tProject("responses.qualityPending")}</p>
                           </div>
                         </div>
                       )}
