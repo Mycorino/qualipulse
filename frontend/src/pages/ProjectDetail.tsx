@@ -147,7 +147,7 @@ export default function ProjectDetail() {
   const transcriptListRef = useRef<HTMLDivElement>(null);
 
   // ── Transcript translation (reading aid) ──────────────────────────────────
-  const [transcriptViewMode, setTranscriptViewMode] = useState<"original" | "translated">("original");
+  const [transcriptViewMode, setTranscriptViewMode] = useState<"original" | "cleaned" | "translated">("original");
   const [translating, setTranslating] = useState(false);
 
   // ── V4 paywall (unlock modal triggered by 402 from gated endpoints) ──
@@ -743,6 +743,12 @@ export default function ProjectDetail() {
       const result = await getTranscript(id!, p.id);
       setSelectedParticipant(result.participant);
       setTranscript(result.turns);
+      // Default to the corrected view when the ASR sense-check produced any
+      // fixes — it's strictly more readable, and the raw STT stays one click
+      // away (and is still shown beneath each corrected turn).
+      if (result.turns.some((t) => t.cleaned_response)) {
+        setTranscriptViewMode("cleaned");
+      }
     } catch (err) {
       // V4 paywall — backend may return 402 for participants that
       // became locked between list-fetch and transcript-fetch
@@ -2623,27 +2629,47 @@ export default function ProjectDetail() {
                           </span>
                         )}
                       </div>
-                      {/* Translation toggle (reading aid) */}
-                      {project?.language && project.language !== (i18n.language || "en").slice(0, 2).toLowerCase() && (
-                        <div className="translation-toggle" role="group" aria-label={tProject("responses.translationToggleLabel")}>
-                          <button
-                            className={`translation-toggle__btn${transcriptViewMode === "original" ? " is-active" : ""}`}
-                            onClick={() => setTranscriptViewMode("original")}
-                            disabled={translating}
-                          >
-                            {tProject("responses.viewOriginal", { lang: project.language.toUpperCase() })}
-                          </button>
-                          <button
-                            className={`translation-toggle__btn${transcriptViewMode === "translated" ? " is-active" : ""}`}
-                            onClick={handleToggleTranslation}
-                            disabled={translating}
-                          >
-                            {translating
-                              ? tProject("responses.translating")
-                              : tProject("responses.viewTranslated", { lang: (i18n.language || "en").slice(0, 2).toUpperCase() })}
-                          </button>
-                        </div>
-                      )}
+                      {/* Reading-aid toggle: raw STT / corrected / translated.
+                          Shown when the sense-check produced corrections OR the
+                          researcher's language differs from the study language. */}
+                      {(() => {
+                        const hasCleaned = (transcript ?? []).some((t) => t.cleaned_response);
+                        const langDiffers = !!project?.language && project.language !== (i18n.language || "en").slice(0, 2).toLowerCase();
+                        if (!hasCleaned && !langDiffers) return null;
+                        return (
+                          <div className="translation-toggle" role="group" aria-label={tProject("responses.translationToggleLabel")}>
+                            <button
+                              className={`translation-toggle__btn${transcriptViewMode === "original" ? " is-active" : ""}`}
+                              onClick={() => setTranscriptViewMode("original")}
+                              disabled={translating}
+                            >
+                              {hasCleaned
+                                ? tProject("responses.viewRaw", { defaultValue: "Raw STT" })
+                                : tProject("responses.viewOriginal", { lang: (project?.language || "").toUpperCase() })}
+                            </button>
+                            {hasCleaned && (
+                              <button
+                                className={`translation-toggle__btn${transcriptViewMode === "cleaned" ? " is-active" : ""}`}
+                                onClick={() => setTranscriptViewMode("cleaned")}
+                                disabled={translating}
+                              >
+                                ✨ {tProject("responses.viewCorrected", { defaultValue: "Corrected" })}
+                              </button>
+                            )}
+                            {langDiffers && (
+                              <button
+                                className={`translation-toggle__btn${transcriptViewMode === "translated" ? " is-active" : ""}`}
+                                onClick={handleToggleTranslation}
+                                disabled={translating}
+                              >
+                                {translating
+                                  ? tProject("responses.translating")
+                                  : tProject("responses.viewTranslated", { lang: (i18n.language || "en").slice(0, 2).toUpperCase() })}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Two-column: transcript left, tools right */}
@@ -2695,13 +2721,29 @@ export default function ProjectDetail() {
                                 </div>
                               ) : t.response_transcript ? (
                                 <div
-                                  className={`transcript-a${transcriptViewMode === "translated" && t.translated_response ? " transcript-a--translated" : ""}`}
+                                  className={`transcript-a${(transcriptViewMode === "translated" && t.translated_response) || (transcriptViewMode === "cleaned" && t.cleaned_response) ? " transcript-a--translated" : ""}`}
                                   onMouseUp={() => transcriptViewMode === "original" && handleTranscriptMouseUp(t.id)}
                                   style={{ userSelect: "text" }}
                                 >
                                   {transcriptViewMode === "translated" && t.translated_response ? (
                                     <>
                                       <div className="transcript-a__translated">{t.translated_response}</div>
+                                      <div className="transcript-a__original" lang={project?.language || undefined}>
+                                        {t.response_transcript}
+                                      </div>
+                                    </>
+                                  ) : transcriptViewMode === "cleaned" && t.cleaned_response ? (
+                                    <>
+                                      <div className="transcript-a__translated" lang={project?.language || undefined}>
+                                        {t.cleaned_response}
+                                        <span
+                                          className="badge"
+                                          style={{ fontSize: 10, marginLeft: 8, background: "var(--info-bg)", color: "var(--info-text)" }}
+                                          title={tProject("responses.correctedHint", { defaultValue: "Auto-corrected from the raw transcript (proper nouns, terms). Raw STT shown below." })}
+                                        >
+                                          ✨ {tProject("responses.autoCorrected", { defaultValue: "Corrected" })}
+                                        </span>
+                                      </div>
                                       <div className="transcript-a__original" lang={project?.language || undefined}>
                                         {t.response_transcript}
                                       </div>
@@ -2713,10 +2755,13 @@ export default function ProjectDetail() {
                                       : renderTaggedText(t.response_transcript, t.id)}
                                   <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle", flexWrap: "wrap" }}>
                                     <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }} onClick={() => startEditTurn(t)}>{tCommon("edit")}</button>
-                                    {/* Mobile-only: tag the whole turn (text-selection popup is unreliable on touch). */}
-                                    {transcriptViewMode === "original" && t.response_transcript && (
+                                    {/* Whole-turn tag. In original view it's the mobile fallback
+                                        (text-selection popup is unreliable on touch); in corrected
+                                        view it's the only tag path, since precise selection maps to
+                                        the raw text. Tags always store against the raw transcript. */}
+                                    {(transcriptViewMode === "original" || transcriptViewMode === "cleaned") && t.response_transcript && (
                                       <button
-                                        className="btn btn-ghost btn-xs turn-tag-btn"
+                                        className={`btn btn-ghost btn-xs${transcriptViewMode === "original" ? " turn-tag-btn" : ""}`}
                                         style={{ fontSize: 10 }}
                                         onClick={(e) => {
                                           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();

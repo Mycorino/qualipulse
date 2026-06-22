@@ -160,6 +160,12 @@ class InterviewTurn(Base):
     translated_question: Mapped[str | None] = mapped_column(Text, nullable=True)
     translation_language: Mapped[str | None] = mapped_column(String(5), nullable=True)
     translation_source_language: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    # ASR sense-check cache: a Haiku pass that fixes obvious STT errors (proper
+    # nouns, domain homophones) using study context. The original
+    # response_transcript is the data and is never overwritten; this is a
+    # display + translation-source reading aid, same principle as translation.
+    cleaned_response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cleaned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

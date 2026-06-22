@@ -15,6 +15,7 @@ from app.dependencies import (
 )
 from app.models.company import Company
 from app.models.interview import InterviewTurn, Participant
+from app.services.transcript_cleanup import cleanup_participant
 from app.services.translation import translate_participant
 
 router = APIRouter(prefix="/projects", tags=["responses"])
@@ -113,5 +114,40 @@ def translate_transcript(
 
     threading.Thread(target=_run, daemon=True).start()
     return {"status": "translating", "target_language": target}
+
+
+@router.post(
+    "/{project_id}/participants/{participant_id}/clean-transcript",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def clean_transcript(
+    project_id: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Run the ASR sense-check pass for a participant. Idempotent.
+
+    Normally fires automatically when an interview completes; this endpoint lets
+    a researcher trigger it on demand (and backfills participants that completed
+    before the feature shipped). Returns 202; corrections appear on the next
+    transcript GET in `cleaned_response`.
+    """
+    _get_project_or_404(project_id, company.id, db)
+
+    participant = (
+        db.query(Participant)
+        .filter(Participant.id == participant_id, Participant.project_id == project_id)
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    def _run():
+        with session_scope() as bg_db:
+            cleanup_participant(participant_id, bg_db)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "cleaning"}
 
 

@@ -188,6 +188,8 @@ export interface TranscriptTurn {
   translated_response: string | null;
   translated_question: string | null;
   translation_language: string | null;
+  cleaned_response: string | null;
+  cleaned_at: string | null;
 }
 
 // ── Analysis types ─────────────────────────────────────────────────────────
