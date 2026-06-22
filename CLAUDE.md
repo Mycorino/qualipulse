@@ -609,6 +609,17 @@ quota exclusion).
 - `MediaRecorder.start(250)` — timeslice fires `ondataavailable` every 250ms
 - MIME type priority: `audio/webm;codecs=opus` → `audio/webm` → `audio/mp4` (Safari) → `audio/ogg`
 - File named `recording.{ext}` to help backend/FFmpeg detect format
+- **Server-side transcode for playback (`services/transcode.py`).** Participant
+  browsers record `webm/opus`, which **Safari/iOS cannot play back** — a
+  researcher reviewing on a Mac would see "Audio unavailable" even though the
+  clip is safely stored in R2. So `respond_to_question` transcodes every
+  non-playable recording to **MP3** (via `ffmpeg`, installed in the backend
+  Dockerfile) before upload — MP3 plays in every browser and Whisper still
+  transcribes it. Any transcode failure (e.g. ffmpeg missing in local dev)
+  falls back to the original bytes, so the interview never breaks.
+  Legacy webm recordings already in R2 are converted by the one-off
+  `backend/scripts/backfill_audio_transcode.py` (idempotent; `--dry-run` +
+  `--limit` flags). Tests: `backend/tests/test_transcode.py`.
 
 ### Interview Flow (Participant)
 ```

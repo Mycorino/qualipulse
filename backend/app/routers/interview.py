@@ -29,6 +29,7 @@ from app.services.interview_engine import (
     EmptyTranscriptError,
 )
 from app.services.storage import upload_audio
+from app.services.transcode import needs_transcode, transcode_to_mp3
 from app.services.verification import generate_magic_token, verify_magic_token
 
 logger = logging.getLogger("auto_interview")
@@ -662,6 +663,18 @@ async def respond_to_question(
 
     audio_data = await audio.read()
     ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
+
+    # Normalise to MP3 for cross-browser playback. Participant browsers record
+    # webm/opus (Chrome/Firefox/Android), which Safari/iOS cannot decode — so a
+    # researcher reviewing on a Mac would see "Audio unavailable". MP3 plays
+    # everywhere and Whisper transcribes it fine. On any transcode failure
+    # (e.g. ffmpeg missing in local dev) we fall back to the original bytes.
+    if needs_transcode(ext):
+        mp3_data = transcode_to_mp3(audio_data, ext)
+        if mp3_data:
+            audio_data = mp3_data
+            ext = ".mp3"
+
     audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
     audio_url = upload_audio(audio_data, audio_key)
 

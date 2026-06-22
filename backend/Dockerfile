@@ -2,11 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for psycopg2 and healthcheck
+# System deps for psycopg2, healthcheck, and audio transcoding (ffmpeg
+# converts participant webm/opus recordings to MP3 for cross-browser playback).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     gcc \
     curl \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
