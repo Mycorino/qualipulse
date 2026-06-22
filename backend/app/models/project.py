@@ -50,6 +50,10 @@ class Project(Base):
     researcher_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     researcher_logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     research_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Per-language localizations of `research_context` for participant-facing
+    # display (shown on the consent screen). Canonical text stays the source of
+    # truth. Shape: {"fr": "<text>"}.
+    research_context_translations: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Study grounding — what business decision this study will inform
     decision_to_inform: Mapped[str | None] = mapped_column(Text, nullable=True)
     # When the researcher needs the answer ("2 weeks", "end of Q2", etc.)
@@ -123,6 +127,21 @@ class Project(Base):
         if not code:
             return self.name
         return self.name_translations_dict.get(code) or self.name
+
+    @property
+    def research_context_translations_dict(self) -> dict:
+        try:
+            return json.loads(self.research_context_translations) if self.research_context_translations else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def localized_research_context(self, lang: str | None) -> str | None:
+        """Participant-facing research context in `lang`, falling back to the
+        canonical text when no translation exists."""
+        code = (lang or "").lower()[:2]
+        if not code:
+            return self.research_context
+        return self.research_context_translations_dict.get(code) or self.research_context
 
 
 class InterviewGuideQuestion(Base):

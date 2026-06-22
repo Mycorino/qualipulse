@@ -379,9 +379,11 @@ def update_project(
 ) -> ProjectResponse:
     project = _get_project_or_404(project_id, company.id, db)
 
-    # Renaming invalidates cached participant-facing name translations.
+    # Editing participant-facing free text invalidates its cached translations.
     if (project.name or "").strip() != (body.name or "").strip():
         project.name_translations = None
+    if (project.research_context or "").strip() != ((body.research_context or "").strip()):
+        project.research_context_translations = None
     project.name = body.name
     project.language = body.language
     project.interview_duration_minutes = body.interview_duration_minutes

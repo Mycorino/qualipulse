@@ -17,6 +17,10 @@ def project_with_name(db_session, registered_company):
         name="Customer Satisfaction Long Haul Flights",
         language="en",
         name_translations=json.dumps({"fr": "Satisfaction client — vols long-courriers"}),
+        research_context="We're studying how travellers choose airlines.",
+        research_context_translations=json.dumps(
+            {"fr": "Nous étudions comment les voyageurs choisissent leur compagnie."}
+        ),
     )
     db_session.add(project)
     db_session.flush()
@@ -41,7 +45,22 @@ def test_localized_name_unit():
 def test_info_returns_localized_name(client, project_with_name):
     r = client.get("/interview/name-token", params={"lang": "fr"})
     assert r.status_code == 200, r.text
-    assert r.json()["project_name"] == "Satisfaction client — vols long-courriers"
+    body = r.json()
+    assert body["project_name"] == "Satisfaction client — vols long-courriers"
+    assert body["research_context"] == "Nous étudions comment les voyageurs choisissent leur compagnie."
+
+
+def test_research_context_canonical_without_lang(client, project_with_name):
+    r = client.get("/interview/name-token")
+    assert r.status_code == 200
+    assert r.json()["research_context"] == "We're studying how travellers choose airlines."
+
+
+def test_research_context_missing_lang_falls_back(client, project_with_name):
+    # de not stored; on-demand translate fails gracefully (no key) → canonical
+    r = client.get("/interview/name-token", params={"lang": "de"})
+    assert r.status_code == 200
+    assert r.json()["research_context"] == "We're studying how travellers choose airlines."
 
 
 def test_info_canonical_name_without_lang(client, project_with_name):
