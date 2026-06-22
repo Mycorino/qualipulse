@@ -58,6 +58,28 @@ def upload_audio(data: bytes, key: str) -> str:
         return f"/audio/{key}"
 
 
+def storage_key_from_url(url: str) -> str | None:
+    """Recover the storage key from a persisted playback URL.
+
+    Inverse of `upload_audio`'s return value. Handles both the R2 form
+    (`{R2_PUBLIC_URL}/{key}`) and the local-disk form (`/audio/{key}`).
+    Returns None if the URL doesn't match a known shape.
+    """
+    if not url:
+        return None
+    if _r2_enabled():
+        base = settings.R2_PUBLIC_URL.rstrip("/") + "/"
+        if url.startswith(base):
+            return url[len(base):]
+    if url.startswith("/audio/"):
+        return url[len("/audio/"):]
+    # R2 public URL may differ from the one configured now (or disk→R2 switch):
+    # fall back to treating everything after the last "/audio/" or host as key.
+    if "/audio/" in url:
+        return url.split("/audio/", 1)[1]
+    return None
+
+
 def download_audio(key: str) -> bytes:
     """Retrieve audio bytes by the key used when uploading."""
     if _r2_enabled():
