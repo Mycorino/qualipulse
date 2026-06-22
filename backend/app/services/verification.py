@@ -42,7 +42,12 @@ def generate_magic_token(
     db.add(db_token)
     db.commit()
 
-    magic_url = f"{settings.APP_BASE_URL}/interview/verify/{token}"
+    # Carry the participant's chosen language in the link so the verify page can
+    # lock the UI before any pre-interview screen renders — critical when the
+    # link is opened in a fresh webview (e.g. the email app's in-app browser)
+    # where localStorage from the original tab isn't available.
+    safe_lang = (lang or "en").lower()[:2]
+    magic_url = f"{settings.APP_BASE_URL}/interview/verify/{token}?lang={safe_lang}"
 
     from app.services.email import send_interview_magic_link
     delivered = send_interview_magic_link(

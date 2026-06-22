@@ -2,12 +2,25 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { verifyInterviewToken } from "../api/interviews";
+import { SUPPORTED_LANGUAGES } from "../i18n";
 
 export default function InterviewVerify() {
-  const { t } = useTranslation("shell");
+  const { t, i18n } = useTranslation("shell");
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+
+  // The chosen interview language is carried in the magic-link URL. Apply it
+  // immediately — before redirecting to /i — so the pre-interview screens
+  // (email/consent/questionnaire/screening) render natively even in a fresh
+  // webview that never saw the original tab's language pick.
+  const urlLang = (new URLSearchParams(window.location.search).get("lang") || "").slice(0, 2);
+  useEffect(() => {
+    if (urlLang && (SUPPORTED_LANGUAGES as readonly string[]).includes(urlLang)) {
+      localStorage.setItem("qp_interview_lang", urlLang);
+      if (i18n.language?.slice(0, 2) !== urlLang) i18n.changeLanguage(urlLang);
+    }
+  }, [urlLang, i18n]);
 
   useEffect(() => {
     if (!token) return;
@@ -17,9 +30,10 @@ export default function InterviewVerify() {
         sessionStorage.setItem(`interview_session_${link_token}`, session_token);
         // Stash returning-participant meta so Interview.tsx can skip the
         // profiling questionnaire and restore the participant's language.
+        // The URL lang is the fallback when the panel profile has none yet.
         sessionStorage.setItem(
           `interview_profile_meta_${link_token}`,
-          JSON.stringify({ profile_complete, first_name, preferred_language })
+          JSON.stringify({ profile_complete, first_name, preferred_language: preferred_language || urlLang || null })
         );
         navigate(`/i/${link_token}`, { replace: true });
       })

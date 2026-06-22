@@ -39,6 +39,7 @@ def schedule_screening_translation(project_id: str) -> None:
         db = SessionLocal()
         try:
             translate_project_name(project_id, db)
+            translate_project_research_context(project_id, db)
             translate_project_screening(project_id, db)
         finally:
             db.close()
@@ -200,4 +201,73 @@ Title: {project.name}"""
     d = project.name_translations_dict
     d[lang] = translated
     project.name_translations = json.dumps(d, ensure_ascii=False)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Research context — participant-facing free text shown on the consent screen
+# ---------------------------------------------------------------------------
+
+def translate_project_research_context(project_id: str, db: Session, langs: list[str] | None = None) -> None:
+    """Fire-and-forget: ensure a project's research context has translations for
+    the supported languages. Never raises (safe for a background thread)."""
+    try:
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if project is None or not (project.research_context or "").strip():
+            return
+        src = (project.language or "en").lower()[:2]
+        for lang in (langs or SUPPORTED_LANGS):
+            if lang != src:
+                _ensure_research_context_lang(db, project, lang)
+    except Exception:
+        logger.exception("research-context translation failed for project %s", project_id)
+
+
+def ensure_research_context_language(project: Project, lang: str, db: Session) -> None:
+    """On-demand: make sure this project's research context is translated into
+    `lang` (no-op if already present, lang is the source, or no context)."""
+    lang = (lang or "").lower()[:2]
+    if not lang or lang not in _LANG_NAMES:
+        return
+    if lang == (project.language or "en").lower()[:2]:
+        return
+    if not (project.research_context or "").strip():
+        return
+    if lang in project.research_context_translations_dict:
+        return
+    try:
+        _ensure_research_context_lang(db, project, lang)
+    except Exception:
+        logger.exception("on-demand research-context translation failed (%s)", lang)
+
+
+def _ensure_research_context_lang(db: Session, project: Project, lang: str) -> None:
+    text = (project.research_context or "").strip()
+    if not text or lang in project.research_context_translations_dict:
+        return
+    target = _LANG_NAMES.get(lang, "English")
+    prompt = f"""Translate the following market-research context note into {target}
+for survey participants. Keep it natural and faithful — natural {target} a native
+speaker would read, preserving meaning and tone. If it's already in {target},
+return it unchanged. Return ONLY the translated text, no quotes or commentary.
+
+Text: {text}"""
+
+    client = get_anthropic_client(60.0)
+    response = client.messages.create(
+        model=ai_models.sonnet(),
+        max_tokens=1024,
+        temperature=0.2,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    log_claude_usage(
+        db, response, "research_context_translation",
+        company_id=getattr(project, "company_id", None), project_id=project.id,
+    )
+    translated = (response.content[0].text or "").strip().strip('"').strip()
+    if not translated:
+        return
+    d = project.research_context_translations_dict
+    d[lang] = translated
+    project.research_context_translations = json.dumps(d, ensure_ascii=False)
     db.commit()

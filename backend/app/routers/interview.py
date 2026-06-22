@@ -407,8 +407,12 @@ def validate_link(
     link = _get_active_link_or_404(token, db)
     project = link.project
     if lang:
-        from app.services.screening_translation import ensure_study_name_language
+        from app.services.screening_translation import (
+            ensure_study_name_language,
+            ensure_research_context_language,
+        )
         ensure_study_name_language(project, lang, db)
+        ensure_research_context_language(project, lang, db)
 
     return {
         "project_name": project.localized_name(lang) if lang else project.name,
@@ -422,7 +426,7 @@ def validate_link(
         "question_count": len([q for q in project.guide_questions if not q.deprecated_at]),
         "researcher_name": project.researcher_name,
         "researcher_logo_url": project.researcher_logo_url,
-        "research_context": project.research_context,
+        "research_context": project.localized_research_context(lang) if lang else project.research_context,
         "privacy_policy_url": project.privacy_policy_url,
         "panel_collection_enabled": getattr(project, "panel_collection_enabled", True),
     }
