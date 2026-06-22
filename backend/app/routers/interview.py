@@ -38,6 +38,26 @@ router = APIRouter(prefix="/interview", tags=["interview"])
 ALGORITHM = "HS256"
 SESSION_TOKEN_EXPIRE_HOURS = 2
 
+# Languages the participant UI + AI interviewer + TTS support.
+SUPPORTED_INTERVIEW_LANGS = {"en", "fr", "de", "es", "it", "pt"}
+
+
+def _effective_interview_language(participant: Participant) -> str:
+    """The authoritative language the AI is conducting this interview in.
+
+    Participant's explicit choice wins; otherwise the study's configured
+    language; otherwise English. Normalised to a supported 2-letter code so
+    the frontend can lock its UI chrome to exactly what the AI is speaking.
+    """
+    project = participant.project
+    candidate = (
+        getattr(participant, "preferred_language", None)
+        or getattr(project, "language", None)
+        or "en"
+    )
+    code = (candidate or "en").lower()[:2]
+    return code if code in SUPPORTED_INTERVIEW_LANGS else "en"
+
 
 class ScreenRequest(BaseModel):
     answers: dict[str, str]  # question_id → selected option
@@ -375,14 +395,23 @@ def screen_participant(request: Request, token: str, body: ScreenRequest, db: Se
 def validate_link(
     request: Request,
     token: str,
+    lang: str = "",
     db: Session = Depends(get_db),
 ):
-    """Validate an interview link and return project info. No auth required."""
+    """Validate an interview link and return project info. No auth required.
+
+    When ``lang`` is supplied the participant-facing study name is localized
+    (translated on demand + cached); the canonical ``project.name`` stays the
+    researcher's source of truth.
+    """
     link = _get_active_link_or_404(token, db)
     project = link.project
+    if lang:
+        from app.services.screening_translation import ensure_study_name_language
+        ensure_study_name_language(project, lang, db)
 
     return {
-        "project_name": project.name,
+        "project_name": project.localized_name(lang) if lang else project.name,
         # Company name powers the participant-facing identity avatar when
         # the project has no explicit researcher_name / logo. Falling back
         # to project_name produced nonsense initials (study title → "PN").
@@ -477,6 +506,7 @@ def get_resume_summary(
         last_question=last_turn.question_text if last_turn else None,
         turn_count=len(turns),
         elapsed_minutes=round(elapsed_minutes, 1),
+        language=_effective_interview_language(participant),
     )
 
 
@@ -562,9 +592,8 @@ def start_interview_session(
     # Validate the participant's chosen interview language against the
     # supported set; ignore anything else so a junk value can't reach the
     # AI prompt / TTS.
-    _SUPPORTED_LANGS = {"en", "fr", "de", "es", "it", "pt"}
     chosen_lang = (getattr(body, "preferred_language", None) or "").lower()[:2] if body else ""
-    preferred_language = chosen_lang if chosen_lang in _SUPPORTED_LANGS else None
+    preferred_language = chosen_lang if chosen_lang in SUPPORTED_INTERVIEW_LANGS else None
 
     participant = Participant(
         link_id=link.id,
@@ -589,6 +618,7 @@ def start_interview_session(
         first_question=result["question_text"],
         tts_audio_url=result["tts_audio_url"],
         is_warmup=bool(result.get("is_warmup", False)),
+        language=_effective_interview_language(participant),
     )
 
 
@@ -699,6 +729,7 @@ def get_interview_status(
         "status": participant.status,
         "turn_count": len(turns),
         "last_question": last_question,
+        "language": _effective_interview_language(participant),
         "started_at": participant.started_at.isoformat() if participant.started_at else None,
         "completed_at": participant.completed_at.isoformat() if participant.completed_at else None,
     }

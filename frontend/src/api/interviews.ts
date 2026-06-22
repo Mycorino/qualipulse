@@ -37,6 +37,8 @@ export interface StartInterviewResponse {
   tts_audio_url?: string;
   /** True when the engine is opening with a warm-up turn (PF-3). */
   is_warmup?: boolean;
+  /** Authoritative language the AI + voice are using; UI locks to this. */
+  language?: string;
 }
 
 export interface SubmitAudioResponse {
@@ -69,6 +71,8 @@ export interface ResumeSummary {
   last_question?: string;
   turn_count: number;
   elapsed_minutes: number;
+  /** Authoritative interview language; UI re-locks to this on resume. */
+  language?: string;
 }
 
 export interface PanelTag {
@@ -107,8 +111,10 @@ export interface VerifyTokenResponse {
   preferred_language?: string | null;
 }
 
-export async function getInterviewInfo(token: string): Promise<InterviewInfo> {
-  const { data } = await client.get<InterviewInfo>(`/interview/${token}`);
+export async function getInterviewInfo(token: string, lang?: string): Promise<InterviewInfo> {
+  const { data } = await client.get<InterviewInfo>(`/interview/${token}`, {
+    params: lang ? { lang } : undefined,
+  });
   return data;
 }
 

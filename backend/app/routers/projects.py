@@ -118,11 +118,11 @@ def create_project(
     db.commit()
     db.refresh(project)
 
-    # Auto-translate screening questions into the supported languages so the
-    # qualification step is native (background; researcher can edit later).
-    if project.screening_questions:
-        from app.services.screening_translation import schedule_screening_translation
-        schedule_screening_translation(project.id)
+    # Auto-translate participant-facing copy (study name + screening questions)
+    # into the supported languages so the interview is native (background;
+    # researcher can edit later).
+    from app.services.screening_translation import schedule_screening_translation
+    schedule_screening_translation(project.id)
 
     # Fire `study_created` only on the first non-demo project for this
     # company — the activation milestone, not every project.
@@ -379,6 +379,9 @@ def update_project(
 ) -> ProjectResponse:
     project = _get_project_or_404(project_id, company.id, db)
 
+    # Renaming invalidates cached participant-facing name translations.
+    if (project.name or "").strip() != (body.name or "").strip():
+        project.name_translations = None
     project.name = body.name
     project.language = body.language
     project.interview_duration_minutes = body.interview_duration_minutes
@@ -423,10 +426,9 @@ def update_project(
     db.commit()
     db.refresh(project)
 
-    # Canonical questions/options just changed → (re)generate localizations.
-    if project.screening_questions:
-        from app.services.screening_translation import schedule_screening_translation
-        schedule_screening_translation(project.id)
+    # Canonical name/questions/options just changed → (re)generate localizations.
+    from app.services.screening_translation import schedule_screening_translation
+    schedule_screening_translation(project.id)
 
     return _project_to_response(project)
 

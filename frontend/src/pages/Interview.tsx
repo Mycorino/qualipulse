@@ -27,6 +27,13 @@ import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/Par
 import PanelEnrichment from "../components/PanelEnrichment";
 import { SUPPORTED_LANGUAGES } from "../i18n";
 
+// A tiny valid silent WAV. Playing this from within a user gesture (the
+// "enable microphone" tap) "unlocks" the audio element on iOS Safari, so the
+// first question's TTS — which fires from a useEffect, not a tap — is allowed
+// to autoplay afterwards instead of being silently blocked.
+const SILENT_AUDIO =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
+
 type Phase =
   | "email_entry"
   | "email_sent"
@@ -279,7 +286,13 @@ export default function Interview() {
         });
       return;
     }
-    getInterviewInfo(token)
+    // Best-guess language we already know before the round-trip (explicit pick
+    // or browser) so the study name comes back localized on the first fetch.
+    const supported = SUPPORTED_LANGUAGES as readonly string[];
+    const manual = localStorage.getItem("qp_interview_lang") || "";
+    const browser = (i18n.language || "en").slice(0, 2);
+    const guess = supported.includes(manual) ? manual : supported.includes(browser) ? browser : "";
+    getInterviewInfo(token, guess || undefined)
       .then((data) => {
         setInfo(data);
         // Language precedence (participant choice wins, per the redesign):
@@ -287,14 +300,16 @@ export default function Interview() {
         //   2. their browser/detected language (if we support it)
         //   3. the study's configured language (if we support it)
         //   4. English
-        const supported = SUPPORTED_LANGUAGES as readonly string[];
-        const manual = localStorage.getItem("qp_interview_lang") || "";
-        const browser = (i18n.language || "en").slice(0, 2);
         let target = "en";
         if (supported.includes(manual)) target = manual;
         else if (supported.includes(browser)) target = browser;
         else if (data.language && supported.includes(data.language)) target = data.language;
         if (target !== i18n.language) i18n.changeLanguage(target);
+        // If the resolved language differs from our pre-fetch guess (e.g. it
+        // came from the study's default), refetch so the name is localized.
+        if (target !== guess && target !== "en") {
+          getInterviewInfo(token, target).then(setInfo).catch(() => {});
+        }
       })
       .catch(() => setError(t("linkInactive.title")))
       .finally(() => setInfoLoading(false));
@@ -353,42 +368,93 @@ export default function Interview() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [phase, participantId]);
 
+  // Lock both the live i18n language AND the persisted interview-language key
+  // to the backend-authoritative value so the UI never drifts from the AI, and
+  // so a mid-interview remount re-resolves to the same language.
+  const lockInterviewLanguage = useCallback(
+    (lang?: string | null) => {
+      const code = (lang || "").slice(0, 2);
+      if (!code || !(SUPPORTED_LANGUAGES as readonly string[]).includes(code)) return;
+      localStorage.setItem("qp_interview_lang", code);
+      if (i18n.language?.slice(0, 2) !== code) i18n.changeLanguage(code);
+      // Refetch study info in the locked language so participant-facing copy
+      // (the study name on the completion screen, etc.) is localized too.
+      if (token) {
+        getInterviewInfo(token, code)
+          .then((data) => setInfo(data))
+          .catch(() => { /* keep canonical name on failure */ });
+      }
+    },
+    [i18n, token]
+  );
+
   // ── TTS ────────────────────────────────────────────────────────────────
+
+  // Reuse ONE audio element for the whole interview. iOS Safari only reliably
+  // allows programmatic playback on an element it has already played once from
+  // a user gesture; creating a fresh `new Audio()` per turn re-triggers the
+  // autoplay block. `unlockAudio()` (called from the mic-enable tap) primes it.
+  const getAudioEl = useCallback(() => {
+    if (!audioRef.current) audioRef.current = new Audio();
+    return audioRef.current;
+  }, []);
+
+  const unlockAudio = useCallback(() => {
+    try {
+      const audio = getAudioEl();
+      audio.muted = true;
+      audio.src = SILENT_AUDIO;
+      const p = audio.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.muted = false;
+        }).catch(() => { audio.muted = false; });
+      }
+    } catch {
+      /* best-effort unlock — playback still has the manual Replay fallback */
+    }
+  }, [getAudioEl]);
 
   const playTTS = useCallback(
     (url: string) => {
-      if (audioRef.current) {
-        audioRef.current.onended = null;
-        audioRef.current.onerror = null;
-        audioRef.current.pause();
-      }
+      const audio = getAudioEl();
+      audio.onended = null;
+      audio.onerror = null;
+      try { audio.pause(); } catch { /* not yet playing */ }
       setTtsFailedWarning(false);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      if (!muted) {
-        setTtsPlaying(true);
-        setTtsEnded(false);
-        audio.onended = () => {
-          setTtsPlaying(false);
-          setTtsEnded(true);
-          hasEverPlayedRef.current = true;
-        };
-        audio.onerror = () => {
-          setTtsPlaying(false);
-          setTtsEnded(true);
-          // Only surface the warning once we've successfully played at least
-          // one clip — first-mount races / autoplay quirks shouldn't startle
-          // the participant with a yellow banner before the interview starts.
-          if (hasEverPlayedRef.current) setTtsFailedWarning(true);
-        };
-        audio.play().catch(() => {
+      if (muted) {
+        // Nothing to hear — unblock the record button immediately.
+        setTtsEnded(true);
+        return;
+      }
+      audio.muted = false;
+      audio.src = url;
+      setTtsPlaying(true);
+      setTtsEnded(false);
+      audio.onended = () => {
+        setTtsPlaying(false);
+        setTtsEnded(true);
+        hasEverPlayedRef.current = true;
+      };
+      audio.onerror = () => {
+        setTtsPlaying(false);
+        setTtsEnded(true);
+        // Only surface the warning once we've successfully played at least
+        // one clip — first-mount races / autoplay quirks shouldn't startle
+        // the participant with a yellow banner before the interview starts.
+        if (hasEverPlayedRef.current) setTtsFailedWarning(true);
+      };
+      audio.play()
+        .then(() => { hasEverPlayedRef.current = true; })
+        .catch(() => {
           setTtsPlaying(false);
           setTtsEnded(true);
           if (hasEverPlayedRef.current) setTtsFailedWarning(true);
         });
-      }
     },
-    [muted]
+    [muted, getAudioEl]
   );
 
   // ── Recording time limit ─────────────────────────────────────────────────
@@ -704,6 +770,10 @@ export default function Interview() {
       }
       throw err;
     }
+    // Lock the UI chrome (progress, completion screen, banners) to the language
+    // the backend is actually conducting the interview in — never let the
+    // client-side i18n state drift away from what the AI is speaking.
+    lockInterviewLanguage(res.language);
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
     setTurnCount(1);
@@ -729,6 +799,8 @@ export default function Interview() {
 
   async function handleConfirmResume() {
     if (!resumeCheck?.participant_id) return;
+    // Re-lock the UI to the language this interview was started in.
+    lockInterviewLanguage(resumeSummary?.language);
     setParticipantId(resumeCheck.participant_id);
     setCurrentQuestion(resumeCheck.last_question ?? "");
     setTurnCount(resumeCheck.turn_count ?? 1);
@@ -1051,7 +1123,7 @@ export default function Interview() {
           margin: "0 auto",
         }}>
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
-            <LanguagePicker />
+            <LanguagePicker onChange={lockInterviewLanguage} />
           </div>
           <ResearcherIdentity />
           <h1 className="interview-project-name" style={{ marginBottom: 8, textAlign: "center" }}>{info?.project_name}</h1>
@@ -1546,7 +1618,12 @@ export default function Interview() {
           </div>
           <button
             className="btn btn-primary"
-            onClick={() => setMicPermissionRequested(true)}
+            onClick={() => {
+              // Unlock audio playback inside this user gesture so the first
+              // question's TTS can autoplay on iOS Safari afterwards.
+              unlockAudio();
+              setMicPermissionRequested(true);
+            }}
           >
             {t("micPrompt.enable")} →
           </button>
