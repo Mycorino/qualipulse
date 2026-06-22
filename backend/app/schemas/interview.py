@@ -108,6 +108,8 @@ class TranscriptTurnResponse(BaseModel):
     translated_response: str | None = None
     translated_question: str | None = None
     translation_language: str | None = None
+    cleaned_response: str | None = None
+    cleaned_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

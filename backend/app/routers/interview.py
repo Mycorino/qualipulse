@@ -34,6 +34,23 @@ from app.services.verification import generate_magic_token, verify_magic_token
 
 logger = logging.getLogger("auto_interview")
 
+
+def _spawn_transcript_cleanup(participant_id: str) -> None:
+    """Fire the ASR sense-check pass in a daemon thread with its own session."""
+    import threading
+
+    from app.database import session_scope
+    from app.services.transcript_cleanup import cleanup_participant
+
+    def _run():
+        try:
+            with session_scope() as bg_db:
+                cleanup_participant(participant_id, bg_db)
+        except Exception:  # pragma: no cover — never surface to the interview
+            logger.exception("transcript cleanup thread failed for %s", participant_id)
+
+    threading.Thread(target=_run, daemon=True).start()
+
 router = APIRouter(prefix="/interview", tags=["interview"])
 
 ALGORITHM = "HS256"
@@ -687,6 +704,13 @@ async def respond_to_question(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "empty_transcript", "message": str(e)},
         )
+
+    # On completion, kick off an async ASR sense-check pass (Haiku) that fixes
+    # obvious STT errors (proper nouns, domain terms) using study context. The
+    # original transcript is preserved; this only fills cleaned_response. Daemon
+    # thread with a fresh session — never blocks or fails the interview.
+    if result["is_complete"]:
+        _spawn_transcript_cleanup(participant_id)
 
     return TurnResponse(
         question_text=result["question_text"],

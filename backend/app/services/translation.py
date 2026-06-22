@@ -79,7 +79,10 @@ def _translate_participant_inner(
         items.append({
             "id": t.id,
             "question": t.question_text or "",
-            "response": t.response_transcript or "",
+            # Translate from the ASR-cleaned text when available (proper nouns
+            # already fixed) so the reading aid inherits those corrections;
+            # fall back to the raw transcript otherwise.
+            "response": t.cleaned_response or t.response_transcript or "",
         })
 
     prompt = f"""<role>
