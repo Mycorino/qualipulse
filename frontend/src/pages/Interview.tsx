@@ -1008,13 +1008,12 @@ export default function Interview() {
   const isEmailValid = emailRegex.test(verificationEmail.trim());
 
   // Researcher identity: prefer logo, fall back to initials avatar.
-  // Initials source order: explicit researcher_name → company name →
-  // project name. Project name is last resort because a study title
-  // ("Pourquoi nos membres…") yields meaningless initials ("PN").
-  // Strip leading bracket-tags (e.g. "[Demo] How people…" → "How people…") and
-  // non-letter prefixes so initials reflect the actual name, not punctuation.
+  // Only ever derive initials from an EXPLICIT researcher_name. We must NOT
+  // fall back to the company name (that leaks the client's identity to
+  // participants) or the study title (yields meaningless initials). When the
+  // researcher hasn't set a name/logo, the avatar is simply hidden.
   function researcherInitials(): string {
-    const source = (info?.researcher_name || info?.company_name || info?.project_name || "")
+    const source = (info?.researcher_name || "")
       .replace(/^\s*\[[^\]]*\]\s*/, "")
       .replace(/^[^\p{L}]+/u, "");
     return source
