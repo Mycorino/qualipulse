@@ -76,7 +76,7 @@ function PrivacyContentEN() {
       </p>
       <ul>
         <li><strong>OpenAI</strong> (USA) — Speech-to-text transcription (Whisper) and text-to-speech audio generation. Audio data is sent for processing and is not retained by OpenAI for training purposes.</li>
-        <li><strong>Anthropic</strong> (USA) — AI-powered interview orchestration and analysis (Claude). Transcript data is sent for processing and is not used to train Anthropic's models.</li>
+        <li><strong>Anthropic</strong> (USA) — AI-powered interview orchestration and analysis. Transcript data is sent for processing and is not used to train Anthropic's models.</li>
         <li><strong>SendGrid</strong> (USA) — Transactional email delivery (verification emails, notifications).</li>
         <li><strong>Stripe</strong> (USA) — Payment processing. We do not store credit card details directly.</li>
         <li><strong>Google Cloud Platform</strong> (EU - Belgium) — Infrastructure hosting and compute.</li>
@@ -257,7 +257,7 @@ function PrivacyContentFR() {
       </p>
       <ul>
         <li><strong>OpenAI</strong> ({"\u00c9"}tats-Unis) — Transcription vocale (Whisper) et g{"\u00e9"}n{"\u00e9"}ration audio par synth{"\u00e8"}se vocale. Les donn{"\u00e9"}es audio sont envoy{"\u00e9"}es pour traitement et ne sont pas conserv{"\u00e9"}es par OpenAI {"\u00e0"} des fins d{"\u2019"}entra{"\u00ee"}nement.</li>
-        <li><strong>Anthropic</strong> ({"\u00c9"}tats-Unis) — Orchestration et analyse d{"\u2019"}entretiens par IA (Claude). Les donn{"\u00e9"}es de transcription sont envoy{"\u00e9"}es pour traitement et ne sont pas utilis{"\u00e9"}es pour entra{"\u00ee"}ner les mod{"\u00e8"}les d{"\u2019"}Anthropic.</li>
+        <li><strong>Anthropic</strong> ({"\u00c9"}tats-Unis) — Orchestration et analyse d{"\u2019"}entretiens par IA. Les donn{"\u00e9"}es de transcription sont envoy{"\u00e9"}es pour traitement et ne sont pas utilis{"\u00e9"}es pour entra{"\u00ee"}ner les mod{"\u00e8"}les d{"\u2019"}Anthropic.</li>
         <li><strong>SendGrid</strong> ({"\u00c9"}tats-Unis) — Envoi d{"\u2019"}e-mails transactionnels (v{"\u00e9"}rification, notifications).</li>
         <li><strong>Stripe</strong> ({"\u00c9"}tats-Unis) — Traitement des paiements. Nous ne stockons pas directement les donn{"\u00e9"}es de carte bancaire.</li>
         <li><strong>Google Cloud Platform</strong> (UE - Belgique) — H{"\u00e9"}bergement et calcul informatique.</li>
