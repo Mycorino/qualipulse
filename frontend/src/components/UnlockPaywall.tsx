@@ -168,6 +168,15 @@ export function UnlockModal({
 
   if (!open) return null;
 
+  // Stripe checkout requires success/cancel URLs (validated server-side
+  // against APP_BASE_URL's host) — without them the request 422s before it
+  // reaches the handler. Return the user to wherever the modal was opened.
+  const here = window.location.origin + window.location.pathname;
+  const redirectUrls = {
+    success_url: `${here}?checkout=success`,
+    cancel_url: here,
+  };
+
   const handleSubscribe = async (
     planId: string,
     interval: BillingInterval,
@@ -176,7 +185,7 @@ export function UnlockModal({
     try {
       const { data } = await client.post<{ checkout_url: string }>(
         "/billing/checkout",
-        { plan_id: planId, billing_interval: interval },
+        { plan_id: planId, billing_interval: interval, ...redirectUrls },
       );
       if (data.checkout_url) window.location.href = data.checkout_url;
     } catch {
@@ -188,7 +197,7 @@ export function UnlockModal({
     try {
       const { data } = await client.post<{ checkout_url: string }>(
         "/billing/checkout/credits",
-        { pack_id: packId },
+        { pack_id: packId, ...redirectUrls },
       );
       if (data.checkout_url) window.location.href = data.checkout_url;
     } catch {
