@@ -8,6 +8,8 @@ import { QuantiTopBar } from "../components/QuantiTopBar";
 import { AccountNudges } from "../components/AccountNudges";
 import { NewStudyModal } from "../components/NewStudyModal";
 import { NextActionChip } from "../components/NextActionChip";
+import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
+import type { CopilotTarget } from "../api/copilot";
 import {
   resolveWorkspaceNextAction,
   resolveStudySummaryAction,
@@ -101,6 +103,19 @@ function toNbaSummary(s: StudySummary): StudyNbaSummary {
     hasReport: s.has_report,
   };
 }
+
+/**
+ * Minimal Copilot target for the studies-list surface. There's no workspace
+ * chat backend — the copilot here only explains and points the user at the
+ * real "+ New study" action, so chat is disabled and every method is a stub.
+ */
+const WORKSPACE_COPILOT_TARGET: CopilotTarget = {
+  id: "workspace",
+  runTurn: async () => ({ reply: "", proposed_actions: [], memory_updated: false }),
+  loadConversation: async () => ({ thread: [], version: 0 }),
+  saveConversation: async (_thread, version) => version,
+  applyAction: async () => {},
+};
 
 /** Short, action-oriented footer status per study card → i18n key suffix. */
 const CARD_STATUS_KEY: Partial<Record<NbaActionType, string>> = {
@@ -266,6 +281,28 @@ export default function StudyList() {
       </div>
 
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
+
+      {/* Unified copilot presence. On the empty studies screen it auto-opens
+          once to explain research and point at "+ New study"; otherwise it
+          sits as the usual dock for consistency with instrument pages. */}
+      {studies !== null && (
+        <ResearchCopilotPanel
+          target={WORKSPACE_COPILOT_TARGET}
+          onApplied={() => {}}
+          mission={t("studyList.copilotMission")}
+          disableInput
+          autoOpen={studies.length === 0}
+          intro={
+            studies.length === 0
+              ? {
+                  lead: t("copilot.workspace.introLead"),
+                  ctaLabel: t("copilot.workspace.createFirst"),
+                  onCta: () => setPickerOpen(true),
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

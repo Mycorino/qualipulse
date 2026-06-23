@@ -110,6 +110,7 @@
     "loading": "Loading…",
     "emptyText": "No studies yet. Start one — survey, interviews, or both. A Study forms around your first instrument and shows up here.",
     "copilotEyebrow": "✦ Research Copilot",
+    "copilotMission": "help you start your first study",
     "dismissUpdate": "Dismiss update",
     "studyType": {
       "survey": "SURVEY STUDY",
@@ -161,6 +162,10 @@
     "dismissUpdate": "Dismiss update",
     "suggestedNextStep": "✦ Suggested next step",
     "emptyLead": "I can draft questions, fix methodology issues, and shape your study. Tell me what you want to learn.",
+    "workspace": {
+      "introLead": "Hi! Research here means talking to real people — through a survey, AI-moderated interviews, or both — to learn what they actually think before you decide. It all starts with a study. Ready to set up your first one? I'll guide you through it.",
+      "createFirst": "Create my first study"
+    },
     "thinking": "Thinking…",
     "inputPlaceholder": "Ask the copilot…",
     "send": "Send",
