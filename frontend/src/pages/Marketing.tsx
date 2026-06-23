@@ -50,6 +50,77 @@ function useInView(threshold = 0.15, initiallyVisible = false) {
   return { ref, visible };
 }
 
+/* ---- Research Copilot chat mockup (interactive demo) ---- */
+function CopilotMockup() {
+  const { t } = useTranslation("marketing");
+  // initial → user accepts → next question appears → AI is typing → AI replies
+  const [phase, setPhase] = useState<"initial" | "question" | "typing" | "done">("initial");
+  const accepted = phase !== "initial";
+
+  useEffect(() => {
+    if (phase === "question") {
+      const id = setTimeout(() => setPhase("typing"), 600);
+      return () => clearTimeout(id);
+    }
+    if (phase === "typing") {
+      const id = setTimeout(() => setPhase("done"), 1500);
+      return () => clearTimeout(id);
+    }
+  }, [phase]);
+
+  return (
+    <div className="mkt-copilot-mockup">
+      <div className="mkt-preview-card">
+        <div className="mkt-preview-header">
+          <span className="mkt-preview-dot red" />
+          <span className="mkt-preview-dot yellow" />
+          <span className="mkt-preview-dot green" />
+          <span className="mkt-preview-title">{t("copilot.previewTitle")}</span>
+          <span className="mkt-copilot-live-dot" aria-hidden="true" />
+        </div>
+        <div className="mkt-copilot-chat">
+          <div className="mkt-copilot-bubble mkt-copilot-user">
+            {t("copilot.chatUser")}
+          </div>
+          <div className="mkt-copilot-bubble mkt-copilot-ai">
+            <p>{t("copilot.chatAi")}</p>
+            <div className="mkt-copilot-proposal">
+              <div className="mkt-copilot-proposal-title">{t("copilot.proposalTitle")}</div>
+              <div className="mkt-copilot-proposal-body">{t("copilot.proposalBody")}</div>
+              <button
+                type="button"
+                className={`mkt-copilot-accept${accepted ? " accepted" : ""}`}
+                onClick={() => phase === "initial" && setPhase("question")}
+                disabled={accepted}
+              >
+                {accepted ? t("copilot.acceptedLabel") : `${t("copilot.acceptLabel")} →`}
+              </button>
+            </div>
+          </div>
+          {phase === "initial" && (
+            <div className="mkt-copilot-try-hint" aria-hidden="true">{t("copilot.tryHint")}</div>
+          )}
+          {phase !== "initial" && (
+            <div className="mkt-copilot-bubble mkt-copilot-user mkt-copilot-bubble-in">
+              {t("copilot.chatUser2")}
+            </div>
+          )}
+          {phase === "typing" && (
+            <div className="mkt-copilot-bubble mkt-copilot-typing" aria-hidden="true">
+              <span /><span /><span />
+            </div>
+          )}
+          {phase === "done" && (
+            <div className="mkt-copilot-bubble mkt-copilot-ai mkt-copilot-bubble-in">
+              <p>{t("copilot.chatAi2")}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Marketing() {
   const { t } = useTranslation("marketing");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -101,6 +172,25 @@ export default function Marketing() {
   const comparisonHeaders = t("comparison.headers", { returnObjects: true }) as string[];
   const qualityItems = t("quality.items", { returnObjects: true }) as Array<{ eyebrow: string; title: string; desc: string }>;
   const faqs = t("faq.items", { returnObjects: true }) as Array<{ question: string; answer: string }>;
+
+  const copilotIcons = [
+    // Wand + sparkle — turns goal into guide questions
+    <svg key="wand" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M3 15L12.5 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M11 3L12.2 6.8L16 8L12.2 9.2L11 13L9.8 9.2L6 8L9.8 6.8L11 3Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+    </svg>,
+    // Card + checkmark — accept in one click
+    <svg key="card" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <rect x="1.75" y="3.75" width="14.5" height="10.5" rx="2.25" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M5.5 9.5L7.5 11.5L12.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>,
+    // Stacked layers — keeps context across studies
+    <svg key="layers" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path d="M9 2L16 5.5L9 9L2 5.5L9 2Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+      <path d="M2 9L9 12.5L16 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M2 12.5L9 16L16 12.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>,
+  ];
 
   return (
     <div className="mkt">
@@ -328,39 +418,15 @@ export default function Marketing() {
             <h2 className="mkt-section-title" style={{ textAlign: "left" }}>{t("copilot.title")}</h2>
             <p className="mkt-copilot-subtitle">{t("copilot.subtitle")}</p>
             <ul className="mkt-copilot-features">
-              {(t("copilot.features", { returnObjects: true }) as Array<{ icon: string; text: string }>).map((f, i) => (
+              {(t("copilot.features", { returnObjects: true }) as Array<{ text: string }>).map((f, i) => (
                 <li key={i}>
-                  <span className="mkt-copilot-icon">{f.icon}</span>
+                  <span className="mkt-copilot-icon">{copilotIcons[i]}</span>
                   <span>{f.text}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="mkt-copilot-mockup">
-            <div className="mkt-preview-card">
-              <div className="mkt-preview-header">
-                <span className="mkt-preview-dot red" />
-                <span className="mkt-preview-dot yellow" />
-                <span className="mkt-preview-dot green" />
-                <span className="mkt-preview-title">{t("copilot.previewTitle")}</span>
-              </div>
-              <div className="mkt-copilot-chat">
-                <div className="mkt-copilot-bubble mkt-copilot-user">
-                  {t("copilot.chatUser")}
-                </div>
-                <div className="mkt-copilot-bubble mkt-copilot-ai">
-                  <p>{t("copilot.chatAi")}</p>
-                  <div className="mkt-copilot-proposal">
-                    <div className="mkt-copilot-proposal-title">{t("copilot.proposalTitle")}</div>
-                    <div className="mkt-copilot-proposal-body">{t("copilot.proposalBody")}</div>
-                    <span className="mkt-copilot-accept" aria-hidden="true">
-                      {t("copilot.acceptLabel")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <CopilotMockup />
         </div>
       </section>
 

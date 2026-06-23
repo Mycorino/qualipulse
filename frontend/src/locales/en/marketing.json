@@ -134,15 +134,19 @@
     "title": "Your always-on research partner",
     "subtitle": "The Research Copilot turns a rough question into a usable study, suggests next actions, and keeps context across your research program.",
     "features": [
-      { "icon": "🧠", "text": "Turns a research goal into objectives, screening criteria, and guide questions" },
-      { "icon": "📋", "text": "Proposes next steps as cards you can accept in one click" },
-      { "icon": "🔄", "text": "Keeps context across studies, surveys, interviews, and reports" }
+      { "text": "Turns a research goal into objectives, screening criteria, and guide questions" },
+      { "text": "Proposes next steps as cards you can accept in one click" },
+      { "text": "Keeps context across studies, surveys, interviews, and reports" }
     ],
     "chatUser": "What should I ask about onboarding friction?",
     "chatAi": "Based on your research goal, I'd suggest focusing on the first 10 minutes of the experience. Here's a proposed interview guide:",
     "proposalTitle": "Proposed: 5-question interview guide",
     "proposalBody": "Discovery → First impression → Pain points → Workarounds → Ideal experience",
-    "acceptLabel": "Accept"
+    "acceptLabel": "Accept",
+    "acceptedLabel": "Accepted ✓",
+    "chatUser2": "Great — can you add a screening question for active users?",
+    "chatAi2": "Done. I've added a screening question that filters for people who used the product in the last 30 days, and your interview link is ready to share.",
+    "tryHint": "↑ This is a live demo — try it"
   },
   "quality": {
     "badge": "Interview quality",
