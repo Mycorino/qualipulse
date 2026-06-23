@@ -107,6 +107,20 @@ interface CreditPack {
   currency: string;
 }
 
+/** Subset of GET /billing/plans we render in the credits-gate cards. */
+interface SubPlan {
+  id: string;
+  name: string;
+  monthly_price_cents: number | null;
+  annual_price_cents: number | null;
+  currency: string;
+  included_credits: number | null;
+  max_editors: number | null;
+  max_active_projects: number | null;
+}
+
+type BillingInterval = "monthly" | "annual";
+
 export function UnlockModal({
   open,
   onClose,
@@ -115,6 +129,9 @@ export function UnlockModal({
 }: UnlockModalProps) {
   const { t } = useTranslation("paywall");
   const [packs, setPacks] = useState<CreditPack[]>([]);
+  const [plans, setPlans] = useState<SubPlan[]>([]);
+  const [billingInterval, setBillingInterval] =
+    useState<BillingInterval>("annual");
   const [working, setWorking] = useState<string | null>(null);
   const creditsMode = mode === "credits";
 
@@ -126,6 +143,17 @@ export function UnlockModal({
       .get<CreditPack[]>("/billing/credit-packs")
       .then((r: { data: CreditPack[] }) => setPacks(r.data))
       .catch(() => setPacks([]));
+  }, [open, creditsMode]);
+
+  // Load the subscription plans for the credits-gate cards so the
+  // Exploration vs Team difference (credits / editors / projects) is
+  // accurate and never drifts from the catalogue.
+  useEffect(() => {
+    if (!open || !creditsMode) return;
+    client
+      .get<SubPlan[]>("/billing/plans")
+      .then((r: { data: SubPlan[] }) => setPlans(r.data))
+      .catch(() => setPlans([]));
   }, [open, creditsMode]);
 
   // Escape closes.
@@ -140,12 +168,15 @@ export function UnlockModal({
 
   if (!open) return null;
 
-  const handleSubscribe = async (planId: string) => {
+  const handleSubscribe = async (
+    planId: string,
+    interval: BillingInterval,
+  ) => {
     setWorking(`plan:${planId}`);
     try {
       const { data } = await client.post<{ checkout_url: string }>(
         "/billing/checkout",
-        { plan_id: planId, billing_interval: "monthly" },
+        { plan_id: planId, billing_interval: interval },
       );
       if (data.checkout_url) window.location.href = data.checkout_url;
     } catch {
@@ -171,6 +202,17 @@ export function UnlockModal({
   const recommendedPack =
     sortedPacks.find((p) => p.credits >= lockedCount) ||
     sortedPacks[sortedPacks.length - 1];
+
+  // Credits-gate plan cards: just the two upgrade tiers, catalogue order
+  // (Exploration before Team). Recommend the cheapest plan whose monthly
+  // credits already cover the shortfall — falling back to the largest.
+  const subPlans = plans.filter(
+    (p) => p.id === "exploration" || p.id === "team",
+  );
+  const recommendedPlanId = (
+    subPlans.find((p) => (p.included_credits ?? 0) >= lockedCount) ||
+    subPlans[subPlans.length - 1]
+  )?.id;
 
   return (
     <div
@@ -203,6 +245,94 @@ export function UnlockModal({
           {creditsMode ? t("credits_modal_body") : t("modal_body")}
         </p>
 
+        {creditsMode && subPlans.length > 0 ? (
+          <div className="unlock-modal__plans">
+            <div
+              className="unlock-modal__interval"
+              role="group"
+              aria-label={t("interval_label")}
+            >
+              {(["monthly", "annual"] as BillingInterval[]).map((iv) => (
+                <button
+                  key={iv}
+                  type="button"
+                  className={billingInterval === iv ? "is-active" : ""}
+                  aria-pressed={billingInterval === iv}
+                  onClick={() => setBillingInterval(iv)}
+                >
+                  {t(iv === "monthly" ? "interval_monthly" : "interval_annual")}
+                  {iv === "annual" && (
+                    <span className="unlock-modal__interval-save">
+                      {t("interval_save")}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="unlock-modal__plan-grid">
+              {subPlans.map((p) => {
+                const recommended = p.id === recommendedPlanId;
+                const totalCents =
+                  billingInterval === "annual"
+                    ? p.annual_price_cents
+                    : p.monthly_price_cents;
+                const perMonthCents =
+                  billingInterval === "annual" && totalCents != null
+                    ? Math.round(totalCents / 12)
+                    : totalCents;
+                return (
+                  <div
+                    key={p.id}
+                    className={`unlock-modal__plan${recommended ? " unlock-modal__plan--recommended" : ""}`}
+                  >
+                    {recommended && (
+                      <div className="unlock-modal__plan-badge">
+                        {t("recommended")}
+                      </div>
+                    )}
+                    <div className="unlock-modal__plan-name">{p.name}</div>
+                    <div className="unlock-modal__plan-price">
+                      {perMonthCents != null
+                        ? formatPrice(perMonthCents, p.currency)
+                        : "—"}
+                      <span className="unlock-modal__plan-price-unit">
+                        {t("per_month")}
+                      </span>
+                    </div>
+                    {billingInterval === "annual" && totalCents != null && (
+                      <div className="unlock-modal__plan-price-sub">
+                        {t("billed_annually", {
+                          total: formatPrice(totalCents, p.currency),
+                        })}
+                      </div>
+                    )}
+                    <ul className="unlock-modal__path-list">
+                      <li>
+                        {t("plan_credits", { count: p.included_credits ?? 0 })}
+                      </li>
+                      <li>{t("plan_editors", { count: p.max_editors ?? 1 })}</li>
+                      <li>
+                        {t("plan_projects", {
+                          count: p.max_active_projects ?? 0,
+                        })}
+                      </li>
+                    </ul>
+                    <button
+                      type="button"
+                      className={`btn ${recommended ? "btn-primary" : "btn-secondary"}`}
+                      onClick={() => handleSubscribe(p.id, billingInterval)}
+                      disabled={working !== null}
+                    >
+                      {working === `plan:${p.id}`
+                        ? t("redirecting")
+                        : t("subscribe_cta")}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
         <div
           className={`unlock-modal__paths${creditsMode ? " unlock-modal__paths--single" : ""}`}
         >
@@ -224,7 +354,7 @@ export function UnlockModal({
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => handleSubscribe("exploration")}
+              onClick={() => handleSubscribe("exploration", "monthly")}
               disabled={working !== null}
             >
               {working === "plan:exploration"
@@ -234,7 +364,7 @@ export function UnlockModal({
             <button
               type="button"
               className="btn btn-secondary unlock-modal__secondary-plan"
-              onClick={() => handleSubscribe("team")}
+              onClick={() => handleSubscribe("team", "monthly")}
               disabled={working !== null}
             >
               {working === "plan:team"
@@ -298,6 +428,7 @@ export function UnlockModal({
           </div>
           )}
         </div>
+        )}
 
         <button
           type="button"
