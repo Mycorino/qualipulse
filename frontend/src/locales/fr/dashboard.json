@@ -110,6 +110,7 @@
     "loading": "Chargement…",
     "emptyText": "Aucune étude pour l'instant. Lancez-vous — questionnaire, entretiens, ou les deux. Une étude se crée autour de votre premier instrument et apparaît ici.",
     "copilotEyebrow": "✦ Copilote de recherche",
+    "copilotMission": "lancer votre première étude",
     "dismissUpdate": "Ignorer",
     "studyType": {
       "survey": "ÉTUDE QUANTI",
@@ -161,6 +162,10 @@
     "dismissUpdate": "Ignorer",
     "suggestedNextStep": "✦ Prochaine étape suggérée",
     "emptyLead": "Je peux rédiger des questions, corriger des problèmes de méthode et structurer votre étude. Dites-moi ce que vous voulez apprendre.",
+    "workspace": {
+      "introLead": "Bonjour ! Faire de la recherche, c'est parler à de vraies personnes — via un questionnaire, des entretiens animés par l'IA, ou les deux — pour comprendre ce qu'elles pensent vraiment avant de décider. Tout commence par une étude. Prêt à créer la vôtre ? Je vous guide.",
+      "createFirst": "Créer ma première étude"
+    },
     "thinking": "Réflexion…",
     "inputPlaceholder": "Posez votre question au copilote…",
     "send": "Envoyer",

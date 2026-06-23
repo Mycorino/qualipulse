@@ -73,6 +73,9 @@ export function ResearchCopilotPanel({
   nextAction,
   nudges,
   onDismissNudge,
+  autoOpen,
+  intro,
+  disableInput,
 }: {
   target: CopilotTarget;
   onApplied: () => void;
@@ -83,6 +86,21 @@ export function ResearchCopilotPanel({
   /** Event-driven nudges — "something changed while you were away." */
   nudges?: Nudge[];
   onDismissNudge?: (id: string) => void;
+  /**
+   * Open the panel automatically the FIRST time it's seen on this surface
+   * (guarded per `target.id` via localStorage). Used to greet first-run
+   * users — e.g. the empty studies screen.
+   */
+  autoOpen?: boolean;
+  /**
+   * A deterministic intro shown in the empty thread instead of the generic
+   * lead + instrument starters. The CTA fires `onCta` directly (no chat
+   * turn) — used on surfaces with no chat backend, to explain and point the
+   * user at the real next action.
+   */
+  intro?: { lead: string; ctaLabel?: string; onCta?: () => void };
+  /** Hide the free-text input (surfaces with no chat backend). */
+  disableInput?: boolean;
 }) {
   const { t } = useTranslation("dashboard");
   const { toast } = useToast();
@@ -130,6 +148,21 @@ export function ResearchCopilotPanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target.id]);
+
+  // Auto-open the panel the first time it's seen on this surface. Guarded
+  // per target.id via localStorage so a repeat visit doesn't re-pop it.
+  useEffect(() => {
+    if (!autoOpen) return;
+    const key = `copilot_autoopen_${target.id}`;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+    } catch {
+      // localStorage unavailable (private mode) — open anyway, it's harmless.
+    }
+    setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen, target.id]);
 
   // Persist the thread after every change (turns, accepts, rejects) once
   // the initial load has settled. Serialized to avoid concurrent writes
@@ -336,7 +369,22 @@ export function ResearchCopilotPanel({
       )}
 
       <div className="copilot-thread" ref={threadRef}>
-        {thread.length === 0 && (
+        {thread.length === 0 && intro && (
+          <div className="copilot-empty">
+            <p className="copilot-empty__lead">{intro.lead}</p>
+            {intro.ctaLabel && intro.onCta && (
+              <button
+                type="button"
+                className="btn btn-primary copilot-intro-cta"
+                onClick={intro.onCta}
+              >
+                {intro.ctaLabel}
+              </button>
+            )}
+          </div>
+        )}
+
+        {thread.length === 0 && !intro && (
           <div className="copilot-empty">
             {nextAction && nextAction.kind === "do" && (() => {
               const nbaLabel = t(nextAction.labelKey, nextAction.params);
@@ -458,6 +506,7 @@ export function ResearchCopilotPanel({
         )}
       </div>
 
+      {!disableInput && (
       <div className="copilot-input">
         <textarea
           className="copilot-input__field"
@@ -482,6 +531,7 @@ export function ResearchCopilotPanel({
           {t("copilot.send")}
         </button>
       </div>
+      )}
     </aside>
   );
 }

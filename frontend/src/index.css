@@ -11710,6 +11710,12 @@ select.field-input {
 }
 .copilot-starter:hover { border-color: var(--brand-400, var(--brand-500)); }
 
+/* First-run intro CTA on surfaces with no chat backend (studies list). */
+.copilot-intro-cta {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
 .copilot-msg {
   font-size: var(--text-sm);
   line-height: 1.5;
