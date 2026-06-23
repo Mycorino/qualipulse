@@ -72,15 +72,21 @@ function buildTypingFrames(text: string): Array<{ str: string; delay: number }> 
   return frames;
 }
 
-/* ---- Research Copilot chat mockup (interactive demo) ---- */
+/* ---- Research Copilot chat mockup (interactive demo) ----
+   Mirrors the real product: the Copilot proposes next steps as cards the
+   researcher accepts in one click (propose_guide_questions →
+   propose_screening_questions). It never edits the study unilaterally. */
 function CopilotMockup() {
   const { t } = useTranslation("marketing");
-  // initial → user types follow-up → AI is typing → AI replies
-  const [phase, setPhase] = useState<"initial" | "question" | "typing" | "done">("initial");
+  // initial → (accept guide) → user types follow-up → AI thinking →
+  // AI proposes a screener → (accept screener) → confirmation
+  type Phase = "initial" | "question" | "thinking" | "screener" | "confirmed";
+  const [phase, setPhase] = useState<Phase>("initial");
   const [typed, setTyped] = useState("");
-  const accepted = phase !== "initial";
+  const guideAccepted = phase !== "initial";
+  const screenerAccepted = phase === "confirmed";
 
-  // Typewriter for the follow-up question; completion advances to AI "typing".
+  // Typewriter for the follow-up question; completion advances to AI thinking.
   useEffect(() => {
     if (phase !== "question") return;
     const frames = buildTypingFrames(t("copilot.chatUser2"));
@@ -88,7 +94,7 @@ function CopilotMockup() {
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
       if (i >= frames.length) {
-        timer = setTimeout(() => setPhase("typing"), 450);
+        timer = setTimeout(() => setPhase("thinking"), 450);
         return;
       }
       setTyped(frames[i].str);
@@ -101,8 +107,8 @@ function CopilotMockup() {
   }, [phase, t]);
 
   useEffect(() => {
-    if (phase === "typing") {
-      const id = setTimeout(() => setPhase("done"), 1500);
+    if (phase === "thinking") {
+      const id = setTimeout(() => setPhase("screener"), 1500);
       return () => clearTimeout(id);
     }
   }, [phase]);
@@ -128,11 +134,11 @@ function CopilotMockup() {
               <div className="mkt-copilot-proposal-body">{t("copilot.proposalBody")}</div>
               <button
                 type="button"
-                className={`mkt-copilot-accept${accepted ? " accepted" : ""}`}
+                className={`mkt-copilot-accept${guideAccepted ? " accepted" : ""}`}
                 onClick={() => phase === "initial" && setPhase("question")}
-                disabled={accepted}
+                disabled={guideAccepted}
               >
-                {accepted ? t("copilot.acceptedLabel") : `${t("copilot.acceptLabel")} →`}
+                {guideAccepted ? t("copilot.acceptedLabel") : `${t("copilot.acceptLabel")} →`}
               </button>
             </div>
           </div>
@@ -148,14 +154,31 @@ function CopilotMockup() {
               )}
             </div>
           )}
-          {phase === "typing" && (
+          {phase === "thinking" && (
             <div className="mkt-copilot-bubble mkt-copilot-typing" aria-hidden="true">
               <span /><span /><span />
             </div>
           )}
-          {phase === "done" && (
+          {(phase === "screener" || phase === "confirmed") && (
             <div className="mkt-copilot-bubble mkt-copilot-ai mkt-copilot-bubble-in">
               <p>{t("copilot.chatAi2")}</p>
+              <div className="mkt-copilot-proposal">
+                <div className="mkt-copilot-proposal-title">{t("copilot.screenerTitle")}</div>
+                <div className="mkt-copilot-proposal-body">{t("copilot.screenerBody")}</div>
+                <button
+                  type="button"
+                  className={`mkt-copilot-accept${screenerAccepted ? " accepted" : ""}`}
+                  onClick={() => phase === "screener" && setPhase("confirmed")}
+                  disabled={screenerAccepted}
+                >
+                  {screenerAccepted ? t("copilot.acceptedLabel") : `${t("copilot.acceptLabel")} →`}
+                </button>
+              </div>
+            </div>
+          )}
+          {phase === "confirmed" && (
+            <div className="mkt-copilot-bubble mkt-copilot-ai mkt-copilot-bubble-in">
+              <p>{t("copilot.chatConfirm")}</p>
             </div>
           )}
         </div>
