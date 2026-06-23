@@ -134,15 +134,22 @@
     "title": "Votre partenaire de recherche, toujours là",
     "subtitle": "Le Copilote de recherche transforme une question encore floue en étude exploitable, propose les prochaines actions et garde le fil de tout votre programme.",
     "features": [
-      { "icon": "🧠", "text": "Transforme un objectif en critères de sélection, objectifs et questions d'entretien" },
-      { "icon": "📋", "text": "Propose les prochaines étapes sous forme de cartes à valider en un clic" },
-      { "icon": "🔄", "text": "Garde le fil entre vos études, questionnaires, entretiens et rapports" }
+      { "text": "Transforme un objectif en critères de sélection, objectifs et questions d'entretien" },
+      { "text": "Propose les prochaines étapes sous forme de cartes à valider en un clic" },
+      { "text": "Garde le fil entre vos études, questionnaires, entretiens et rapports" }
     ],
     "chatUser": "Que devrais-je demander sur la friction à la prise en main ?",
     "chatAi": "D'après votre objectif, je vous suggère de vous concentrer sur les 10 premières minutes. Voici une proposition de guide d'entretien :",
     "proposalTitle": "Proposition : guide d'entretien en 5 questions",
     "proposalBody": "Découverte → Première impression → Points de friction → Contournements → Expérience idéale",
-    "acceptLabel": "Valider"
+    "acceptLabel": "Valider",
+    "acceptedLabel": "Validé ✓",
+    "chatUser2": "Parfait — peux-tu ajouter une question de filtrage pour les utilisateurs actifs ?",
+    "chatAi2": "Bonne idée. Voici une question de filtrage à valider de la même façon :",
+    "screenerTitle": "Proposition : question de filtrage",
+    "screenerBody": "« Avez-vous utilisé le produit ces 30 derniers jours ? »  ·  Oui  /  Non (élimine)",
+    "chatConfirm": "Ajoutée à votre filtrage. Le lien d'entretien à partager se trouve sur la page de votre étude.",
+    "tryHint": "↑ Démo interactive — essayez"
   },
   "quality": {
     "badge": "Qualité des entretiens",
