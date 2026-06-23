@@ -7,6 +7,7 @@ import type {
   CopilotTarget,
   ProposedAction,
   ProposedGuideQuestion,
+  ProposedScreeningQuestion,
   ProposedSurveyQuestion,
 } from "../api/copilot";
 import type { NextAction } from "../copilot/nextAction";
@@ -241,18 +242,55 @@ export function ResearchCopilotPanel({
     );
   };
 
-  // Accepting a staged proposal (objective / settings) should move the
-  // conversation to the next step instead of leaving it idle — the
-  // Copilot reads the updated snapshot and proposes whatever comes next.
+  // Accepting a staged proposal (objective / settings / screening) should
+  // move the conversation to the next step instead of leaving it idle —
+  // the Copilot reads the updated snapshot and proposes whatever comes next.
+  // For screening questions, wait until all pending ones in the batch are
+  // resolved before triggering continuation (avoids multiple sends per batch).
   const AUTO_CONTINUE_AFTER = new Set(["edit_objective", "edit_settings"]);
 
-  const accept = async (action: PendingAction) => {
+  // When the researcher edits a proposal before accepting, merge the draft
+  // text back into the action so applyAction sees the corrected content.
+  const applyDraftToAction = (action: PendingAction, draft: string): PendingAction => {
+    switch (action.type) {
+      case "add_guide_question":
+        return { ...action, question: { ...(action.question as ProposedGuideQuestion), main_question: draft } };
+      case "add_question":
+        return { ...action, question: { ...(action.question as ProposedSurveyQuestion), prompt: draft } };
+      case "add_screening_question":
+        return { ...action, screening: { ...(action.screening as ProposedScreeningQuestion), question: draft } };
+      case "edit_guide_question":
+        return { ...action, new_main_question: draft };
+      case "edit_question":
+        return { ...action, new_prompt: draft };
+      case "edit_objective":
+        return { ...action, new_objective: draft };
+      default:
+        return action;
+    }
+  };
+
+  const accept = async (action: PendingAction, draft?: string) => {
+    const effectiveAction = draft != null ? applyDraftToAction(action, draft) : action;
     try {
-      await target.applyAction(action);
+      await target.applyAction(effectiveAction);
       setStatus(action.id, "accepted");
       onApplied();
       if (AUTO_CONTINUE_AFTER.has(action.type)) {
         send(t("copilot.continueAfterAccept"));
+      } else if (action.type === "add_screening_question") {
+        // Continue only when this is the last pending screener in the batch.
+        const otherScreenersPending = thread
+          .flatMap((it) => (it.kind === "assistant" ? it.actions : []))
+          .some(
+            (a) =>
+              a.id !== action.id &&
+              a.type === "add_screening_question" &&
+              a.status === "pending",
+          );
+        if (!otherScreenersPending) {
+          send(t("copilot.continueAfterAccept"));
+        }
       }
     } catch {
       toast(t("copilot.applyError"), "error");
@@ -388,7 +426,7 @@ export function ResearchCopilotPanel({
                   <ProposalCard
                     key={a.id}
                     action={a}
-                    onAccept={() => accept(a)}
+                    onAccept={(draft) => accept(a, draft)}
                     onReject={() => setStatus(a.id, "rejected")}
                   />
                 ))}
@@ -486,16 +524,28 @@ export function ResearchCopilotPanel({
   );
 }
 
+// Action types where the researcher might want to tweak the text before accepting.
+const EDITABLE_PROPOSAL_TYPES = new Set([
+  "add_guide_question",
+  "add_question",
+  "add_screening_question",
+  "edit_guide_question",
+  "edit_question",
+  "edit_objective",
+]);
+
 function ProposalCard({
   action,
   onAccept,
   onReject,
 }: {
   action: PendingAction;
-  onAccept: () => void;
+  onAccept: (draft?: string) => void;
   onReject: () => void;
 }) {
   const { t } = useTranslation("dashboard");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
   let heading: string;
   let body: string | undefined;
 
@@ -557,33 +607,78 @@ function ProposalCard({
       ? (action.question as { rationale?: string }).rationale
       : action.screening?.rationale ?? action.rationale;
 
+  const isEditable = EDITABLE_PROPOSAL_TYPES.has(action.type);
+
+  const startEditing = () => {
+    setDraft(body ?? "");
+    setEditing(true);
+  };
+
   return (
     <div
       className={`copilot-proposal copilot-proposal--${action.status}`}
       data-action={action.type}
     >
       <div className="copilot-proposal__eyebrow">{heading}</div>
-      <div className="copilot-proposal__body">{body}</div>
-      {rationale && (
+      {editing ? (
+        <textarea
+          className="copilot-proposal__edit-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={3}
+          autoFocus
+        />
+      ) : (
+        <div className="copilot-proposal__body">{body}</div>
+      )}
+      {!editing && rationale && (
         <div className="copilot-proposal__rationale">{rationale}</div>
       )}
       {action.status === "pending" ? (
-        <div className="copilot-proposal__actions">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={onAccept}
-          >
-            {t("copilot.proposal.accept")}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={onReject}
-          >
-            {t("copilot.proposal.dismiss")}
-          </button>
-        </div>
+        editing ? (
+          <div className="copilot-proposal__actions">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => { onAccept(draft); setEditing(false); }}
+            >
+              {t("copilot.proposal.accept")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setEditing(false)}
+            >
+              {t("copilot.proposal.cancelEdit")}
+            </button>
+          </div>
+        ) : (
+          <div className="copilot-proposal__actions">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => onAccept()}
+            >
+              {t("copilot.proposal.accept")}
+            </button>
+            {isEditable && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={startEditing}
+              >
+                {t("copilot.proposal.edit")}
+              </button>
+            )}
+            <button
+              type="button"
+              className="copilot-proposal__dismiss-link"
+              onClick={onReject}
+            >
+              {t("copilot.proposal.dismiss")}
+            </button>
+          </div>
+        )
       ) : (
         <div className="copilot-proposal__status">
           {action.status === "accepted"

@@ -11843,10 +11843,45 @@ select.field-input {
   color: var(--text-secondary);
   line-height: 1.45;
 }
+.copilot-proposal__edit-input {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  box-sizing: border-box;
+}
+.copilot-proposal__edit-input:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 2px var(--brand-100, color-mix(in srgb, var(--brand-500) 15%, transparent));
+}
 .copilot-proposal__actions {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-3);
+}
+.copilot-proposal__dismiss-link {
+  margin-left: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary, var(--text-secondary));
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.copilot-proposal__dismiss-link:hover {
+  color: var(--text-secondary);
 }
 .copilot-proposal__status {
   margin-top: var(--space-2);

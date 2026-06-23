@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SUPPORTED_LANGUAGES } from "../i18n";
 import { patchScreeningTranslation, ScreeningQuestionResponse } from "../api/projects";
 import { useToast } from "./Toast";
@@ -35,6 +35,18 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
     screening.options.map((o, i) => tr?.options?.[i] ?? o)
   );
   const [saving, setSaving] = useState(false);
+
+  // When the screening prop updates (e.g. after the background auto-translation
+  // job completes and loadAll() refreshes the project data), sync the form
+  // fields for the currently-selected language so the translated text appears
+  // without requiring a full page reload.
+  useEffect(() => {
+    const t = screening.translations?.[lang];
+    setQuestion(t?.question ?? screening.question);
+    setOptions(screening.options.map((o, i) => t?.options?.[i] ?? o));
+    // `lang` intentionally omitted — switchLang() handles tab changes synchronously.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screening]);
 
   function switchLang(next: string) {
     setLang(next);

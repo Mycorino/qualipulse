@@ -198,6 +198,8 @@
       "removeThisQuestion": "Supprimer cette question",
       "fallbackQuestion": "question",
       "accept": "Accepter",
+      "edit": "Modifier",
+      "cancelEdit": "Annuler",
       "dismiss": "Ignorer",
       "applied": "✓ Appliqué",
       "dismissed": "Ignoré"
