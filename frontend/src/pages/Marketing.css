@@ -881,6 +881,21 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Blinking text caret while the follow-up question is being typed */
+.mkt-copilot-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  animation: mkt-caret-blink 1s step-end infinite;
+}
+@keyframes mkt-caret-blink {
+  0%, 50%  { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
 /* ---- Copilot live indicator ---- */
 .mkt-copilot-live-dot {
   width: 7px;

@@ -50,18 +50,57 @@ function useInView(threshold = 0.15, initiallyVisible = false) {
   return { ref, visible };
 }
 
+/* Build a human-feeling typing schedule: one char at a time with jittered
+   delays, plus a single double-letter typo that gets noticed and backspaced. */
+function buildTypingFrames(text: string): Array<{ str: string; delay: number }> {
+  const frames: Array<{ str: string; delay: number }> = [];
+  // Pick a typo point ~55% in that lands on a letter (not a space).
+  let typoAt = Math.floor(text.length * 0.55);
+  while (typoAt < text.length - 2 && text[typoAt] === " ") typoAt++;
+  let cur = "";
+  for (let i = 0; i < text.length; i++) {
+    cur += text[i];
+    frames.push({ str: cur, delay: 45 + Math.random() * 70 });
+    if (i === typoAt) {
+      const dup = cur + text[i]; // accidental double letter
+      frames.push({ str: dup, delay: 95 });   // typed the extra char
+      frames.push({ str: dup, delay: 320 });  // notice it
+      frames.push({ str: cur, delay: 110 });  // backspace
+      frames.push({ str: cur, delay: 200 });  // brief pause before resuming
+    }
+  }
+  return frames;
+}
+
 /* ---- Research Copilot chat mockup (interactive demo) ---- */
 function CopilotMockup() {
   const { t } = useTranslation("marketing");
-  // initial → user accepts → next question appears → AI is typing → AI replies
+  // initial → user types follow-up → AI is typing → AI replies
   const [phase, setPhase] = useState<"initial" | "question" | "typing" | "done">("initial");
+  const [typed, setTyped] = useState("");
   const accepted = phase !== "initial";
 
+  // Typewriter for the follow-up question; completion advances to AI "typing".
   useEffect(() => {
-    if (phase === "question") {
-      const id = setTimeout(() => setPhase("typing"), 600);
-      return () => clearTimeout(id);
-    }
+    if (phase !== "question") return;
+    const frames = buildTypingFrames(t("copilot.chatUser2"));
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      if (i >= frames.length) {
+        timer = setTimeout(() => setPhase("typing"), 450);
+        return;
+      }
+      setTyped(frames[i].str);
+      const d = frames[i].delay;
+      i++;
+      timer = setTimeout(tick, d);
+    };
+    timer = setTimeout(tick, 300); // beat before the user starts typing
+    return () => clearTimeout(timer);
+  }, [phase, t]);
+
+  useEffect(() => {
     if (phase === "typing") {
       const id = setTimeout(() => setPhase("done"), 1500);
       return () => clearTimeout(id);
@@ -102,7 +141,11 @@ function CopilotMockup() {
           )}
           {phase !== "initial" && (
             <div className="mkt-copilot-bubble mkt-copilot-user mkt-copilot-bubble-in">
-              {t("copilot.chatUser2")}
+              {phase === "question" ? (
+                <>{typed}<span className="mkt-copilot-caret" aria-hidden="true" /></>
+              ) : (
+                t("copilot.chatUser2")
+              )}
             </div>
           )}
           {phase === "typing" && (
