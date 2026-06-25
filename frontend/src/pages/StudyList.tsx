@@ -282,25 +282,22 @@ export default function StudyList() {
 
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
 
-      {/* Unified copilot presence. On the empty studies screen it auto-opens
-          once to explain research and point at "+ New study"; otherwise it
-          sits as the usual dock for consistency with instrument pages. */}
-      {studies !== null && (
+      {/* First-run handhold: only on the empty studies screen. The Copilot
+          auto-opens once to explain research and point at "+ New study".
+          There's no workspace chat backend, so we don't mount it once the
+          user has studies — the workspace NBA strip covers guidance there. */}
+      {studies !== null && studies.length === 0 && (
         <ResearchCopilotPanel
           target={WORKSPACE_COPILOT_TARGET}
           onApplied={() => {}}
           mission={t("studyList.copilotMission")}
           disableInput
-          autoOpen={studies.length === 0}
-          intro={
-            studies.length === 0
-              ? {
-                  lead: t("copilot.workspace.introLead"),
-                  ctaLabel: t("copilot.workspace.createFirst"),
-                  onCta: () => setPickerOpen(true),
-                }
-              : undefined
-          }
+          autoOpen
+          intro={{
+            lead: t("copilot.workspace.introLead"),
+            ctaLabel: t("copilot.workspace.createFirst"),
+            onCta: () => setPickerOpen(true),
+          }}
         />
       )}
     </div>

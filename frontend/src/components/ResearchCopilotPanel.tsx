@@ -41,6 +41,14 @@ type ThreadItem =
 const STARTER_KEYS = ["scratch", "methodology", "nextQuestion"];
 
 /**
+ * Targets we've already auto-opened during THIS page load. Survives React
+ * StrictMode's dev mount/unmount/remount (which resets component state), so
+ * the panel still opens once even though the localStorage guard is written
+ * on the first invoke. A genuine later page load starts with an empty set.
+ */
+const _autoOpenedThisLoad = new Set<string>();
+
+/**
  * Lightweight inline renderer for the copilot's replies — turns
  * `**bold**`, `*italic*`, and `` `code` `` into the matching elements.
  * Newlines/lists are preserved by `white-space: pre-wrap` on
@@ -151,8 +159,14 @@ export function ResearchCopilotPanel({
 
   // Auto-open the panel the first time it's seen on this surface. Guarded
   // per target.id via localStorage so a repeat visit doesn't re-pop it.
+  // `_autoOpenedThisLoad` lets the StrictMode dev remount re-open even though
+  // the localStorage guard was already written on the first invoke.
   useEffect(() => {
     if (!autoOpen) return;
+    if (_autoOpenedThisLoad.has(target.id)) {
+      setOpen(true);
+      return;
+    }
     const key = `copilot_autoopen_${target.id}`;
     try {
       if (localStorage.getItem(key)) return;
@@ -160,6 +174,7 @@ export function ResearchCopilotPanel({
     } catch {
       // localStorage unavailable (private mode) — open anyway, it's harmless.
     }
+    _autoOpenedThisLoad.add(target.id);
     setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpen, target.id]);
@@ -384,7 +399,7 @@ export function ResearchCopilotPanel({
           </div>
         )}
 
-        {thread.length === 0 && !intro && (
+        {thread.length === 0 && !intro && !disableInput && (
           <div className="copilot-empty">
             {nextAction && nextAction.kind === "do" && (() => {
               const nbaLabel = t(nextAction.labelKey, nextAction.params);
