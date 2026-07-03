@@ -331,6 +331,8 @@
     "createLinkCta": "Créer un lien d'entretien",
     "noFiltered": "Aucune réponse {{status}}.",
     "anonymous": "Anonyme",
+    "followUpOk": "Recontact OK",
+    "followUpOkHint": "Ce participant a accepté d'être recontacté pour de futures études.",
     "live": "En direct",
     "noSelected": "Aucune réponse sélectionnée",
     "selectPrompt": "Choisissez un participant dans la liste pour voir sa transcription",

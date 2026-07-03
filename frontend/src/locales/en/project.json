@@ -331,6 +331,8 @@
     "createLinkCta": "Create interview link",
     "noFiltered": "No {{status}} responses.",
     "anonymous": "Anonymous",
+    "followUpOk": "Follow-up OK",
+    "followUpOkHint": "This participant agreed to be contacted for future studies.",
     "live": "Live",
     "noSelected": "No response selected",
     "selectPrompt": "Choose a participant from the list to view their transcript",

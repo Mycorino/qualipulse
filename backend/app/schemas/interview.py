@@ -72,6 +72,11 @@ class ParticipantResponse(BaseModel):
     age_range: str | None = None
     profession: str | None = None
     country: str | None = None
+    email: str | None = None
+    email_verified: bool = False
+    # Denormalised recontact flag (see Participant.panel_consent):
+    # True = agreed to follow-ups, False = declined, None = unknown.
+    panel_consent: bool | None = None
     quality_score: float | None = None
     quality_label: str | None = None
     quality_summary: str | None = None

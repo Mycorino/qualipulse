@@ -150,6 +150,11 @@ def list_participants(
                 age_range=p.age_range,
                 profession=p.profession,
                 country=p.country,
+                # Contact email stays behind the paywall alongside the
+                # transcript body — a locked row shows consent status only.
+                email=None if is_locked else p.email,
+                email_verified=p.email_verified,
+                panel_consent=p.panel_consent,
                 quality_score=q_score,
                 quality_label=q_label,
                 quality_summary=p.quality_summary,
@@ -291,6 +296,8 @@ def export_transcripts_csv(
     writer.writerow([
         "participant_id",
         "display_name",
+        "email",
+        "follow_up_consent",
         "status",
         "started_at",
         "completed_at",
@@ -302,6 +309,13 @@ def export_transcripts_csv(
         "created_at",
     ])
 
+    def _consent_cell(p: Participant) -> str:
+        if p.panel_consent is True:
+            return "yes"
+        if p.panel_consent is False:
+            return "no"
+        return ""
+
     for p in participants:
         turns = sorted(p.turns, key=lambda t: t.turn_index)
         if not turns:
@@ -309,6 +323,8 @@ def export_transcripts_csv(
             writer.writerow([
                 p.id,
                 p.display_name or "",
+                p.email or "",
+                _consent_cell(p),
                 p.status,
                 _fmt_dt(p.started_at),
                 _fmt_dt(p.completed_at),
@@ -319,6 +335,8 @@ def export_transcripts_csv(
                 writer.writerow([
                     p.id,
                     p.display_name or "",
+                    p.email or "",
+                    _consent_cell(p),
                     p.status,
                     _fmt_dt(p.started_at),
                     _fmt_dt(p.completed_at),

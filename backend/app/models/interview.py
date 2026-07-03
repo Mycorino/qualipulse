@@ -49,6 +49,11 @@ class Participant(Base):
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Denormalised from PanelProfile.panel_consent (matched by email) when the
+    # interview completes or the panel profile is saved — gives researchers a
+    # per-participant "OK to recontact" flag without joining panel_profiles.
+    # None = unknown (pre-feature rows), False = declined, True = consented.
+    panel_consent: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # Participant-chosen interview language — overrides Project.language for the
     # AI interviewer + voice when set (en/fr/de/es/it/pt).
     preferred_language: Mapped[str | None] = mapped_column(String(10), nullable=True)

@@ -104,6 +104,9 @@ export default function Interview() {
   // Consent
   const [consentGiven, setConsentGiven] = useState(false);
   const [consentDeclined, setConsentDeclined] = useState(false);
+  // Two-tap decline: declining is terminal (no way back to the study), so an
+  // accidental tap shouldn't end it. First tap arms an inline confirmation.
+  const [declineConfirming, setDeclineConfirming] = useState(false);
 
   // Panel profile
   const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
@@ -141,7 +144,11 @@ export default function Interview() {
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [processing, setProcessing] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [muted, setMuted] = useState(false);
+  // Mute preference survives reloads/resume — an unexpected replay of TTS
+  // after a refresh is jarring for someone who explicitly muted it.
+  const [muted, setMuted] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("qp_interview_muted") === "1"
+  );
   const [turnCount, setTurnCount] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isFollowUp, setIsFollowUp] = useState(false);
@@ -183,6 +190,11 @@ export default function Interview() {
   const [micPermissionRequested, setMicPermissionRequested] = useState(false);
 
   const [ttsFailedWarning, setTtsFailedWarning] = useState(false);
+  // Autoplay was blocked before ANY clip has played (iOS Safari when the
+  // unlock trick didn't take). Distinct from ttsFailedWarning: instead of a
+  // scary banner we show a "Play question" button — a user gesture always
+  // satisfies the autoplay policy.
+  const [ttsBlocked, setTtsBlocked] = useState(false);
   // Has any audio successfully played in this session? Until then, an
   // onerror/play-rejection is almost always a transient autoplay-policy
   // glitch on the very first <audio> element rather than a real failure
@@ -191,7 +203,7 @@ export default function Interview() {
 
   // Audit-fix UI state
   const [whyEmailOpen, setWhyEmailOpen] = useState(false);
-  const [screeningErrorKind, setScreeningErrorKind] = useState<"network" | "server" | null>(null);
+  const [screeningErrorKind, setScreeningErrorKind] = useState<"network" | "server" | "ratelimit" | null>(null);
   const [screeningRetryCount, setScreeningRetryCount] = useState(0);
   const [transcriptDismissed, setTranscriptDismissed] = useState(false);
   const [transcriptExpanded, setTranscriptExpanded] = useState(false);
@@ -424,6 +436,7 @@ export default function Interview() {
       audio.onerror = null;
       try { audio.pause(); } catch { /* not yet playing */ }
       setTtsFailedWarning(false);
+      setTtsBlocked(false);
       if (muted) {
         // Nothing to hear — unblock the record button immediately.
         setTtsEnded(true);
@@ -452,6 +465,9 @@ export default function Interview() {
           setTtsPlaying(false);
           setTtsEnded(true);
           if (hasEverPlayedRef.current) setTtsFailedWarning(true);
+          // First clip rejected → almost certainly the autoplay policy.
+          // Offer a tap-to-play fallback so the question isn't silently lost.
+          else setTtsBlocked(true);
         });
     },
     [muted, getAudioEl]
@@ -838,11 +854,15 @@ export default function Interview() {
         // actually answered.
         const e = err as { response?: { status?: number }; message?: string };
         const isNetwork = !e?.response || e?.message === "Network Error";
-        setScreeningErrorKind(isNetwork ? "network" : "server");
+        const isRateLimited = e?.response?.status === 429;
+        const kind = isNetwork ? "network" : isRateLimited ? "ratelimit" : "server";
+        setScreeningErrorKind(kind);
         setScreeningError(
-          isNetwork
+          kind === "network"
             ? t("screening.submissionErrorNetwork")
-            : t("screening.submissionErrorServer"),
+            : kind === "ratelimit"
+              ? t("screening.rateLimited", { defaultValue: "Too many attempts in a short time. Please wait a minute before trying again." })
+              : t("screening.submissionErrorServer"),
         );
         setScreeningRetryCount((c) => c + 1);
         // Important: do NOT clear `screeningAnswers[questionId]` — keep
@@ -934,9 +954,15 @@ export default function Interview() {
       } else {
         setPendingBlob(lastBlobRef.current);
         const isNetwork = !(err as { response?: unknown })?.response;
-        setError(isNetwork
-          ? t("interview.networkError", { defaultValue: "Connection lost — please check your internet and tap Submit to retry." })
-          : t("interview.serverError", { defaultValue: "Something went wrong on our end. Please tap Submit to try again." }));
+        if (isNetwork) {
+          setError(t("interview.networkError", { defaultValue: "Connection lost — please check your internet and tap Submit to retry." }));
+        } else if (status === 429) {
+          // Rate-limited: retrying immediately just re-trips the limit —
+          // tell the participant to wait instead of showing a generic error.
+          setError(t("interview.rateLimited", { defaultValue: "Too many attempts in a short time. Please wait a minute, then tap Submit again — your answer is saved." }));
+        } else {
+          setError(t("interview.serverError", { defaultValue: "Something went wrong on our end. Please tap Submit to try again." }));
+        }
       }
     } finally {
       setProcessing(false);
@@ -984,6 +1010,7 @@ export default function Interview() {
   function toggleMute() {
     setMuted((m) => {
       const next = !m;
+      try { localStorage.setItem("qp_interview_muted", next ? "1" : "0"); } catch { /* private mode */ }
       if (next && audioRef.current) {
         // Fix 5: Fully reset audio on mute — pause, reset position,
         // clear callbacks to prevent stale state, and enable recording
@@ -1029,7 +1056,7 @@ export default function Interview() {
     if (info?.researcher_logo_url) {
       return (
         <div className="landing-researcher-logo">
-          <img src={info.researcher_logo_url} alt={info.researcher_name ?? "Researcher"} />
+          <img src={info.researcher_logo_url} alt={info.researcher_name ?? ""} />
         </div>
       );
     }
@@ -1286,17 +1313,45 @@ export default function Interview() {
           {starting && <p className="muted-text" style={{ marginTop: 12 }}>{t("consent.starting")}</p>}
           {error && <div className="error-banner" role="alert">{error}</div>}
 
+          {/* In-progress interview on this device: offer a one-tap resume so a
+              reload doesn't force re-reading the whole consent screen. Consent
+              was already given when this session originally started. */}
+          {getSavedSession() && (
+            <div className="resume-summary-panel" style={{ marginTop: 12 }}>
+              <p style={{ margin: "0 0 10px", fontSize: 14 }}>{t("consent.resumeAvailable", { defaultValue: "You have an interview in progress on this device." })}</p>
+              <button className="btn btn-secondary" style={{ minHeight: 44 }} onClick={handleResumeSession}>
+                {t("consent.resumeCta", { defaultValue: "Continue where you left off" })} →
+              </button>
+            </div>
+          )}
+
           <div className="consent-actions">
-            <button
-              className="btn btn-primary"
-              onClick={handleConsentAccept}
-              disabled={starting}
-            >
-              {t("consent.accept")}
-            </button>
-            <button className="btn btn-ghost" onClick={() => setConsentDeclined(true)} style={{ color: "var(--text-secondary)" }}>
-              {t("consent.decline")}
-            </button>
+            {declineConfirming ? (
+              <>
+                <p style={{ width: "100%", margin: "0 0 8px", fontSize: 14, color: "var(--text-secondary)" }} role="alert">
+                  {t("consent.declineConfirmText", { defaultValue: "Are you sure? Declining ends your participation — you won't be able to come back to this study." })}
+                </p>
+                <button className="btn btn-primary" onClick={() => setDeclineConfirming(false)}>
+                  {t("consent.declineConfirmNo", { defaultValue: "Keep going" })}
+                </button>
+                <button className="btn btn-ghost" onClick={() => setConsentDeclined(true)} style={{ color: "var(--text-secondary)" }}>
+                  {t("consent.declineConfirmYes", { defaultValue: "Yes, decline" })}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleConsentAccept}
+                  disabled={starting}
+                >
+                  {t("consent.accept")}
+                </button>
+                <button className="btn btn-ghost" onClick={() => setDeclineConfirming(true)} style={{ color: "var(--text-secondary)" }}>
+                  {t("consent.decline")}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1502,7 +1557,9 @@ export default function Interview() {
               <p className="screening-error-card__title">
                 {screeningErrorKind === "network"
                   ? t("screening.submissionErrorNetwork")
-                  : t("screening.submissionErrorServer")}
+                  : screeningErrorKind === "ratelimit"
+                    ? t("screening.rateLimited", { defaultValue: "Too many attempts in a short time. Please wait a minute before trying again." })
+                    : t("screening.submissionErrorServer")}
               </p>
               {screeningRetryCount >= 2 && (
                 <p className="screening-error-card__escalate">
@@ -1778,6 +1835,24 @@ export default function Interview() {
             )}
           </div>
 
+          {/* Autoplay blocked before any clip ever played (iOS Safari):
+              calm tap-to-play fallback so the question is never silently lost. */}
+          {ttsBlocked && !muted && (
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <button
+                className="btn btn-secondary"
+                style={{ minHeight: 44 }}
+                onClick={() => {
+                  const url = audioRef.current?.src;
+                  if (url) playTTS(url);
+                  else setTtsBlocked(false);
+                }}
+              >
+                🔊 {t("interview.playQuestion", { defaultValue: "Play the question" })}
+              </button>
+            </div>
+          )}
+
           {/* Fix 2: TTS audio failure warning */}
           {ttsFailedWarning && (
             <div className="error-banner" role="alert" style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -1963,6 +2038,14 @@ export default function Interview() {
                 <p className="record-label">
                   {ttsPlaying ? "⏵ " + t("interview.listeningToQuestion") : t("interview.tapToRecord")}
                 </p>
+                {!ttsPlaying && (
+                  <p className="muted-text" style={{ fontSize: 12, marginTop: 4 }}>
+                    {t("interview.maxRecordingHint", {
+                      minutes: Math.round(MAX_RECORDING_SECONDS / 60),
+                      defaultValue: "Up to {{minutes}} minutes per answer",
+                    })}
+                  </p>
+                )}
                 {ttsPlaying && (
                   <button
                     type="button"
