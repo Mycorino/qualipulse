@@ -36,7 +36,12 @@ GOAL_BUCKETS = {
 }
 
 
-def classify_goals(goals_freeform: str, timeout: float = 10.0) -> str | None:
+def classify_goals(
+    goals_freeform: str,
+    timeout: float = 10.0,
+    db=None,
+    company_id: str | None = None,
+) -> str | None:
     """Map a free-form goals string to a comma-separated list of bucket keys.
 
     Returns ``None`` if the API key is missing, the call fails, or the model
@@ -80,10 +85,16 @@ Output the keys now."""
         response = client.messages.create(
             model=ai_models.sonnet(),
             max_tokens=64,
-            temperature=0.3,
+            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
             system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )
+        if db is not None:
+            from app.services.usage_logger import log_claude_usage
+
+            log_claude_usage(
+                db, response, "goals_classification", company_id=company_id
+            )
         raw = response.content[0].text.strip()
         # Defensive: strip anything that isn't a known bucket key
         keys = [k.strip().lower() for k in raw.split(",") if k.strip()]

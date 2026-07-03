@@ -103,6 +103,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_PUBLIC: str = "60/minute"     # Interview public endpoints
     RATE_LIMIT_AUTH: str = "10/minute"       # Login/signup
     RATE_LIMIT_DEFAULT: str = "120/minute"   # Authenticated API calls
+    RATE_LIMIT_COPILOT: str = "10/minute"    # Copilot turns (each = up to 8 Opus calls)
+
+    # Per-workspace daily spend ceiling for copilot turns (USD, summed from
+    # AIUsageLog). 0 disables the gate.
+    COPILOT_DAILY_COST_LIMIT_USD: float = 25.0
 
     @property
     def allowed_origins_list(self) -> list[str]:

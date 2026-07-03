@@ -135,10 +135,30 @@
     "refineScopeHint": "Seule cette question sera réécrite. Le reste de votre guide reste intact.",
     "projectCreated": "Projet créé !",
     "sectionGeneral": "Général",
-    "carouselBrief": ["Lecture de votre brief…", "Extraction des points clés…", "Identification des angles de recherche…", "Presque terminé…"],
-    "carouselObjective": ["Analyse de votre contexte…", "Formulation de l'objectif de recherche…", "Identification des objectifs d'apprentissage…", "Finalisation de la recommandation…"],
-    "carouselScope": ["Évaluation de votre objectif…", "Recommandation du public cible…", "Estimation de la durée de session…"],
-    "carouselQuestions": ["Structuration des sections…", "Rédaction des questions adaptatives…", "Ajout des conseils de relance…", "Vérification du flux de questions…", "Peaufinage de la formulation…"],
+    "carouselBrief": [
+      "Lecture de votre brief…",
+      "Extraction des points clés…",
+      "Identification des angles de recherche…",
+      "Presque terminé…"
+    ],
+    "carouselObjective": [
+      "Analyse de votre contexte…",
+      "Formulation de l'objectif de recherche…",
+      "Identification des objectifs d'apprentissage…",
+      "Finalisation de la recommandation…"
+    ],
+    "carouselScope": [
+      "Évaluation de votre objectif…",
+      "Recommandation du public cible…",
+      "Estimation de la durée de session…"
+    ],
+    "carouselQuestions": [
+      "Structuration des sections…",
+      "Rédaction des questions adaptatives…",
+      "Ajout des conseils de relance…",
+      "Vérification du flux de questions…",
+      "Peaufinage de la formulation…"
+    ],
     "scopeSettingsLabel": "Paramètres de l'étude",
     "briefAndObjectiveTitle": "Cadrage de recherche",
     "briefAndObjectiveSubtitle": "Décrivez votre projet et définissez ce que vous voulez apprendre. L'IA vous aidera à structurer les deux."
@@ -301,7 +321,8 @@
     "noCustomPrompt": "Pas de prompt personnalisé — utilise le prompt par défaut.",
     "clickToEdit": "Cliquer pour modifier",
     "moveUp": "Monter",
-    "moveDown": "Descendre"
+    "moveDown": "Descendre",
+    "addQuestionError": "Impossible d'ajouter une question"
   },
   "responses": {
     "title": "Réponses",

@@ -544,6 +544,8 @@ def lint_survey_question(
         question_type=body.type,
         config=body.config,
         with_rewrite=body.with_rewrite,
+        db=db,
+        company_id=company.id,
     )
     return LintResponse(
         flags=[

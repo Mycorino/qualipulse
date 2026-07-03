@@ -135,10 +135,30 @@
     "refineScopeHint": "Only this question will be rewritten. The rest of your guide stays untouched.",
     "projectCreated": "Project created!",
     "sectionGeneral": "General",
-    "carouselBrief": ["Reading your brief…", "Extracting key points…", "Identifying research angles…", "Almost there…"],
-    "carouselObjective": ["Analyzing your context…", "Framing a research objective…", "Identifying learning goals…", "Polishing the recommendation…"],
-    "carouselScope": ["Evaluating your objective…", "Recommending audience fit…", "Estimating session length…"],
-    "carouselQuestions": ["Structuring interview sections…", "Writing adaptive questions…", "Adding probing tips…", "Reviewing question flow…", "Polishing wording…"],
+    "carouselBrief": [
+      "Reading your brief…",
+      "Extracting key points…",
+      "Identifying research angles…",
+      "Almost there…"
+    ],
+    "carouselObjective": [
+      "Analyzing your context…",
+      "Framing a research objective…",
+      "Identifying learning goals…",
+      "Polishing the recommendation…"
+    ],
+    "carouselScope": [
+      "Evaluating your objective…",
+      "Recommending audience fit…",
+      "Estimating session length…"
+    ],
+    "carouselQuestions": [
+      "Structuring interview sections…",
+      "Writing adaptive questions…",
+      "Adding probing tips…",
+      "Reviewing question flow…",
+      "Polishing wording…"
+    ],
     "scopeSettingsLabel": "Study settings",
     "briefAndObjectiveTitle": "Research focus",
     "briefAndObjectiveSubtitle": "Describe your project and define what you want to learn. The AI will help structure both."
@@ -301,7 +321,8 @@
     "noCustomPrompt": "No custom prompt — using default.",
     "clickToEdit": "Click to edit",
     "moveUp": "Move up",
-    "moveDown": "Move down"
+    "moveDown": "Move down",
+    "addQuestionError": "Could not add a question"
   },
   "responses": {
     "title": "Responses",

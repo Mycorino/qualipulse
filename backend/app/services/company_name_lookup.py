@@ -35,7 +35,7 @@ def _industry_list() -> str:
 
 
 def backfill_business_from_name(
-    company: Company, *, force: bool = False
+    company: Company, *, force: bool = False, db=None
 ) -> bool:
     """Populate ``business_summary`` + ``industry`` for a company whose
     only known signal is the typed name. Returns True if anything was
@@ -89,10 +89,14 @@ def backfill_business_from_name(
         resp = client.messages.create(
             model=_MODEL,
             max_tokens=300,
-            temperature=0.1,
+            **ai_models.temperature_kwargs(_MODEL, 0.1),
             system=system,
             messages=[{"role": "user", "content": user}],
         )
+        if db is not None:
+            from app.services.usage_logger import log_claude_usage
+
+            log_claude_usage(db, resp, "name_lookup", company_id=company.id)
         raw = resp.content[0].text.strip()
         if raw.startswith("```"):
             lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]

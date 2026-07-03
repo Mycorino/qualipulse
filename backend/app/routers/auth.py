@@ -627,7 +627,9 @@ def _schedule_company_name_backfill(company_id: str) -> None:
             # Domain-prefetch is higher quality (from the actual website)
             # than a Haiku guess from a typed company name.
             has_domain_summary = bool((c.business_summary or "").strip())
-            if backfill_business_from_name(c, force=not has_domain_summary):
+            if backfill_business_from_name(
+                c, force=not has_domain_summary, db=bg_db
+            ):
                 bg_db.commit()
                 logger.info(
                     "Backfilled business context for %s from typed name '%s'",
@@ -665,6 +667,7 @@ _FALLBACK_USE_CASES_FR = [
 def get_onboarding_suggestions(
     request: Request,
     company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
 ):
     """Return AI-suggested use cases and a profile summary for onboarding step 3.
 
@@ -748,6 +751,12 @@ def get_onboarding_suggestions(
             }],
         )
 
+        from app.services.usage_logger import log_claude_usage
+
+        log_claude_usage(
+            db, resp, "onboarding_suggestions", company_id=company.id
+        )
+
         import json
         raw = resp.content[0].text.strip()
         if raw.startswith("```"):
@@ -790,7 +799,9 @@ def complete_onboarding(
     if body.goals_freeform:
         try:
             from app.services.goals_classifier import classify_goals
-            company.goals_classification = classify_goals(body.goals_freeform)
+            company.goals_classification = classify_goals(
+                body.goals_freeform, db=db, company_id=company.id
+            )
         except Exception:  # pragma: no cover - defensive
             logger.exception("Failed to classify goals for %s", company.email)
 
@@ -889,6 +900,7 @@ def complete_onboarding(
                     industry=snapshot.get("industry"),
                     selected_use_cases=use_cases_list,
                     lang=snapshot.get("preferred_language") or "en",
+                    company_id=company_id,
                 )
             except Exception:  # pragma: no cover - defensive
                 logger.exception("Background welcome email failed for %s", snapshot["email"])

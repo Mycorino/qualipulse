@@ -35,7 +35,38 @@ type PendingAction = ProposedAction & {
 
 type ThreadItem =
   | { kind: "user"; text: string }
-  | { kind: "assistant"; text: string; actions: PendingAction[] };
+  | {
+      kind: "assistant";
+      text: string;
+      actions: PendingAction[];
+      /** The turn failed — text may be a partial stream. Never replayed
+       * to the model; renders an inline notice + retry. */
+      error?: boolean;
+    };
+
+/** Server JSON → ThreadItem[], defensively. A malformed persisted item
+ * (missing `actions`, unknown kind) must not crash the whole panel. */
+function sanitizeThread(raw: unknown[]): ThreadItem[] {
+  const items: ThreadItem[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const it = entry as Record<string, unknown>;
+    const text = typeof it.text === "string" ? it.text : "";
+    if (it.kind === "user") {
+      items.push({ kind: "user", text });
+    } else if (it.kind === "assistant") {
+      items.push({
+        kind: "assistant",
+        text,
+        actions: Array.isArray(it.actions)
+          ? (it.actions as PendingAction[])
+          : [],
+        error: it.error === true,
+      });
+    }
+  }
+  return items;
+}
 
 /** i18n key suffixes under dashboard:copilot.starters */
 const STARTER_KEYS = ["scratch", "methodology", "nextQuestion"];
@@ -124,26 +155,57 @@ export function ResearchCopilotPanel({
   // while busy. Falls back to a generic "Thinking…" between status events.
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const prevCount = useRef(0);
   const loaded = useRef(false);
   const versionRef = useRef(0);
   const saveInFlight = useRef(false);
+  const saveDirty = useRef(false);
+  const lastSavedJson = useRef("");
+  // Single synchronous source of truth for the thread. Every mutation goes
+  // through updateThread so async handlers (stream deltas, accepts, saves)
+  // never race a stale closure. `thread` state mirrors it for rendering.
+  const threadData = useRef<ThreadItem[]>([]);
+  // Monotonic token identifying the CURRENT turn/target. Any async handler
+  // from an older turn (a stream still running after navigating from
+  // project A to project B) sees a mismatch and no-ops instead of writing
+  // A's reply into B's conversation.
+  const turnToken = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  // True while the user is scrolled to (near) the bottom — auto-scroll
+  // only then, so reading an earlier proposal mid-stream isn't yanked.
+  const isAtBottom = useRef(true);
+
+  const updateThread = (updater: (cur: ThreadItem[]) => ThreadItem[]) => {
+    threadData.current = updater(threadData.current);
+    setThread(threadData.current);
+  };
 
   // Restore the persisted conversation for this instrument on mount, so the
   // chat resumes instead of being lost when the researcher navigates away.
   useEffect(() => {
     let cancelled = false;
     loaded.current = false;
+    turnToken.current += 1; // invalidate any in-flight turn for the old target
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false);
+    setStatusLabel(null);
+    threadData.current = [];
     setThread([]);
     prevCount.current = 0;
     versionRef.current = 0;
+    lastSavedJson.current = "";
     target
       .loadConversation()
       .then((snapshot) => {
         if (cancelled) return;
         if (Array.isArray(snapshot.thread) && snapshot.thread.length > 0) {
-          setThread(snapshot.thread as ThreadItem[]);
-          prevCount.current = snapshot.thread.length;
+          const items = sanitizeThread(snapshot.thread);
+          threadData.current = items;
+          setThread(items);
+          prevCount.current = items.length;
+          lastSavedJson.current = JSON.stringify(items);
         }
         versionRef.current = snapshot.version;
       })
@@ -153,6 +215,9 @@ export function ResearchCopilotPanel({
       });
     return () => {
       cancelled = true;
+      // Unmount / target switch: stop any live stream (releases the HTTP
+      // connection; the server stops generating).
+      abortRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target.id]);
@@ -179,92 +244,187 @@ export function ResearchCopilotPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpen, target.id]);
 
-  // Persist the thread after every change (turns, accepts, rejects) once
-  // the initial load has settled. Serialized to avoid concurrent writes
-  // racing on the version counter.
-  useEffect(() => {
+  // Persist on TURN BOUNDARIES (turn finished, accepts, rejects) — never
+  // per streamed token. A save landing while one is already in flight
+  // marks a dirty flag and re-runs when it settles, so the final state
+  // is never silently dropped.
+  const persist = () => {
     if (!loaded.current) return;
-    if (saveInFlight.current) return;
+    const items = threadData.current;
+    const json = JSON.stringify(items);
+    if (json === lastSavedJson.current) return; // e.g. hydration echo
+    if (saveInFlight.current) {
+      saveDirty.current = true;
+      return;
+    }
     saveInFlight.current = true;
     target
-      .saveConversation(thread, versionRef.current)
+      .saveConversation(items, versionRef.current)
       .then((newVersion) => {
         versionRef.current = newVersion;
+        lastSavedJson.current = json;
       })
       .catch(() => undefined)
       .finally(() => {
         saveInFlight.current = false;
+        if (saveDirty.current) {
+          saveDirty.current = false;
+          persist();
+        }
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thread, target.id]);
+  };
 
-  // Auto-scroll only when a NEW message arrives (or the copilot starts
-  // thinking) — never when an existing proposal's status changes.
   useEffect(() => {
+    if (busy) return; // mid-stream states are transient — don't persist them
+    persist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread, busy, target.id]);
+
+  // Auto-scroll on new messages / streaming — but only while the user is
+  // already at the bottom. Scrolling up to re-read is never yanked back.
+  const handleThreadScroll = () => {
+    const el = threadRef.current;
+    if (!el) return;
+    isAtBottom.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  };
+
+  useEffect(() => {
+    if (!isAtBottom.current) {
+      prevCount.current = thread.length;
+      return;
+    }
     if (thread.length > prevCount.current || busy) {
       threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight });
     }
     prevCount.current = thread.length;
   }, [thread, busy]);
 
-  const toMessages = (items: ThreadItem[]): CopilotMessage[] =>
-    items.map((it) => ({ role: it.kind, content: it.text }));
+  // Restore focus to the input when a turn ends — the browser drops focus
+  // if the field was disabled/blurred during the stream.
+  useEffect(() => {
+    if (!busy && open && !disableInput) inputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy]);
 
-  const send = async (raw: string) => {
-    const text = raw.trim();
-    if (!text || busy) return;
-    const next: ThreadItem[] = [...thread, { kind: "user", text }];
-    // Push the user turn AND an empty assistant draft. Streaming deltas
-    // fill the draft; the final `done` event finalises it with the
-    // authoritative reply + proposed actions.
-    setThread([...next, { kind: "assistant", text: "", actions: [] }]);
-    setInput("");
+  // Error bubbles (and empty drafts) are UI artifacts — never replay them
+  // to the model as real assistant turns.
+  const toMessages = (items: ThreadItem[]): CopilotMessage[] =>
+    items
+      .filter(
+        (it) =>
+          it.kind === "user" ||
+          (it.text.trim().length > 0 && !(it.kind === "assistant" && it.error)),
+      )
+      .map((it) => ({ role: it.kind, content: it.text }));
+
+  const stop = () => {
+    abortRef.current?.abort();
+  };
+
+  const runTurnWith = async (baseItems: ThreadItem[]) => {
+    const token = ++turnToken.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const fresh = () => turnToken.current === token;
+
     setStatusLabel(null);
     setBusy(true);
     try {
-      const resp = await target.runTurn(toMessages(next), {
-        onStatus: (label) => setStatusLabel(label),
-        onDelta: (chunk) =>
-          setThread((t) =>
-            t.map((it, i) =>
-              i === t.length - 1 && it.kind === "assistant"
+      const resp = await target.runTurn(toMessages(baseItems), {
+        signal: controller.signal,
+        onStatus: (label) => {
+          if (fresh()) setStatusLabel(label);
+        },
+        onDelta: (chunk) => {
+          if (!fresh()) return;
+          updateThread((items) =>
+            items.map((it, i) =>
+              i === items.length - 1 && it.kind === "assistant"
                 ? { ...it, text: it.text + chunk }
                 : it,
             ),
-          ),
+          );
+        },
       });
-      setThread((t) =>
-        t.map((it, i) =>
-          i === t.length - 1 && it.kind === "assistant"
+      if (!fresh()) return;
+      updateThread((items) =>
+        items.map((it, i) =>
+          i === items.length - 1 && it.kind === "assistant"
             ? {
                 ...it,
                 text: resp.reply,
+                error: resp.error === true,
                 actions: resp.proposed_actions.map((a, j) => ({
                   ...a,
-                  id: `${Date.now()}-${j}`,
+                  id: `${token}-${j}`,
                   status: "pending" as const,
                 })),
               }
             : it,
         ),
       );
-    } catch {
-      toast(t("copilot.unavailable"), "error");
-      const errorReply = t("copilot.errorReply");
-      setThread((items) =>
+      if (resp.error) toast(t("copilot.unavailable"), "error");
+    } catch (err) {
+      if (!fresh()) return;
+      const aborted = (err as Error | undefined)?.name === "AbortError";
+      if (!aborted) toast(t("copilot.unavailable"), "error");
+      // KEEP any streamed partial text — a reply that died at 95% is still
+      // useful. Flag the bubble so it renders the notice + retry and is
+      // excluded from future model input.
+      updateThread((items) =>
         items.map((it, i) =>
           i === items.length - 1 && it.kind === "assistant"
-            ? {
-                ...it,
-                text: errorReply,
-              }
+            ? { ...it, error: !aborted, text: it.text }
             : it,
         ),
       );
+      if (aborted) {
+        // User stop (or navigation): drop a trailing EMPTY draft entirely.
+        updateThread((items) => {
+          const last = items[items.length - 1];
+          if (last && last.kind === "assistant" && !last.text.trim() && last.actions.length === 0) {
+            return items.slice(0, -1);
+          }
+          return items;
+        });
+      }
     } finally {
-      setStatusLabel(null);
-      setBusy(false);
+      if (turnToken.current === token) {
+        abortRef.current = null;
+        setStatusLabel(null);
+        setBusy(false);
+      }
     }
+  };
+
+  const send = async (raw: string) => {
+    const text = raw.trim();
+    if (!text || busy) return;
+    // Push the user turn AND an empty assistant draft. Streaming deltas
+    // fill the draft; the final `done` event finalises it with the
+    // authoritative reply + proposed actions.
+    updateThread((cur) => [
+      ...cur,
+      { kind: "user", text },
+      { kind: "assistant", text: "", actions: [] },
+    ]);
+    const baseItems = threadData.current.slice(0, -1); // without the draft
+    setInput("");
+    await runTurnWith(baseItems);
+  };
+
+  /** Re-run the turn behind a failed assistant bubble, in place. */
+  const retryLast = async () => {
+    if (busy) return;
+    const items = threadData.current;
+    const last = items[items.length - 1];
+    if (!last || last.kind !== "assistant" || !last.error) return;
+    updateThread((cur) => [
+      ...cur.slice(0, -1),
+      { kind: "assistant", text: "", actions: [] },
+    ]);
+    await runTurnWith(threadData.current.slice(0, -1));
   };
 
   const submitFreeReply = (actionId: string) => {
@@ -275,7 +435,7 @@ export function ResearchCopilotPanel({
   };
 
   const setStatus = (actionId: string, status: PendingAction["status"]) => {
-    setThread((t) =>
+    updateThread((t) =>
       t.map((it) =>
         it.kind === "assistant"
           ? {
@@ -369,7 +529,9 @@ export function ResearchCopilotPanel({
               key={n.id}
               className={`copilot-nudge copilot-nudge--${n.tone}`}
             >
-              <span className="copilot-nudge__text">{n.text}</span>
+              <span className="copilot-nudge__text">
+                {n.textKey ? t(n.textKey, n.textParams) : n.text}
+              </span>
               <button
                 type="button"
                 className="copilot-nudge__dismiss"
@@ -383,7 +545,12 @@ export function ResearchCopilotPanel({
         </div>
       )}
 
-      <div className="copilot-thread" ref={threadRef}>
+      <div
+        className="copilot-thread"
+        ref={threadRef}
+        onScroll={handleThreadScroll}
+        role="log"
+      >
         {thread.length === 0 && intro && (
           <div className="copilot-empty">
             <p className="copilot-empty__lead">{intro.lead}</p>
@@ -444,6 +611,21 @@ export function ResearchCopilotPanel({
             <div key={idx} className="copilot-msg copilot-msg--assistant">
               {it.text && (
                 <div className="copilot-msg__text">{renderRich(it.text)}</div>
+              )}
+              {it.error && (
+                <div className="copilot-msg__error">
+                  <span>{t("copilot.errorInline")}</span>
+                  {idx === thread.length - 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={retryLast}
+                      disabled={busy}
+                    >
+                      {t("copilot.retry")}
+                    </button>
+                  )}
+                </div>
               )}
               {it.actions
                 .filter((a) => a.type !== "suggest_replies")
@@ -524,6 +706,7 @@ export function ResearchCopilotPanel({
       {!disableInput && (
       <div className="copilot-input">
         <textarea
+          ref={inputRef}
           className="copilot-input__field"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -535,16 +718,25 @@ export function ResearchCopilotPanel({
           }}
           placeholder={t("copilot.inputPlaceholder")}
           rows={2}
-          disabled={busy}
         />
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={() => send(input)}
-          disabled={busy || !input.trim()}
-        >
-          {t("copilot.send")}
-        </button>
+        {busy ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={stop}
+          >
+            {t("copilot.stop")}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => send(input)}
+            disabled={!input.trim()}
+          >
+            {t("copilot.send")}
+          </button>
+        )}
       </div>
       )}
     </aside>
@@ -612,9 +804,23 @@ function ProposalCard({
   } else if (action.type === "refine_analysis") {
     heading = t("copilot.proposal.refineAnalysis");
     body = t("copilot.proposal.refineAnalysisBody");
-  } else {
+  } else if (
+    action.type === "remove_question" ||
+    action.type === "remove_guide_question"
+  ) {
     heading = t("copilot.proposal.removeQuestion");
     body = t("copilot.proposal.removeThisQuestion");
+  } else {
+    // Forward compatibility: an action type this build doesn't know MUST
+    // NOT fall into the remove branch (a dangerous mislabel) — render a
+    // neutral card with no Accept.
+    return (
+      <div className="copilot-proposal copilot-proposal--rejected">
+        <div className="copilot-proposal__eyebrow">
+          {t("copilot.proposal.unsupported")}
+        </div>
+      </div>
+    );
   }
 
   const rationale =

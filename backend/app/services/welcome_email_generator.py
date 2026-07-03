@@ -28,6 +28,7 @@ def generate_personalized_welcome(
     industry: Optional[str] = None,
     selected_use_cases: Optional[list[str]] = None,
     language: str = "en",
+    company_id: Optional[str] = None,
 ) -> Optional[str]:
     """Generate a personalised welcome email body (HTML).
 
@@ -88,11 +89,27 @@ def generate_personalized_welcome(
         response = client.messages.create(
             model=_MODEL,
             max_tokens=_MAX_TOKENS,
-            temperature=0.7,
+            **ai_models.temperature_kwargs(_MODEL, 0.7),
             timeout=15.0,
             system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )
+
+        # Runs in a background thread with no request session — open a
+        # short-lived one purely for cost tracking (best-effort).
+        try:
+            from app.database import SessionLocal
+            from app.services.usage_logger import log_claude_usage
+
+            _db = SessionLocal()
+            try:
+                log_claude_usage(
+                    _db, response, "welcome_email", company_id=company_id
+                )
+            finally:
+                _db.close()
+        except Exception:  # noqa: BLE001 — never block the email on logging
+            pass
 
         text = ""
         for block in getattr(response, "content", []) or []:

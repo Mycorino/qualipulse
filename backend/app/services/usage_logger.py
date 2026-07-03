@@ -10,7 +10,7 @@ WHISPER_PER_SECOND = 0.0001            # $0.006 per minute = $0.0001 per second
 TTS_PER_CHARACTER = 0.000015           # $15 per 1M characters
 
 # Claude per-token (input, output) rates by model family — matched on a
-# substring of response.model. Opus 4.7 (the copilot) is $5/$25 per 1M,
+# substring of response.model. Opus (the copilot) is $5/$25 per 1M,
 # Sonnet $3/$15, Haiku $1/$5. The copilot's per-call cost was being
 # undercounted ~40% by the old flat Sonnet rate.
 _CLAUDE_RATES: list[tuple[str, float, float]] = [
@@ -88,7 +88,14 @@ def log_claude_usage(
             cost,
         )
     except Exception:
-        pass  # Never let logging break the main flow
+        # Never let logging break the main flow — but DO roll back, or a
+        # failed commit leaves the caller's shared session in
+        # PendingRollback and silently poisons every later commit in the
+        # same turn (including the remaining usage records).
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
 
 def log_tts_usage(

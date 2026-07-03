@@ -464,7 +464,7 @@ WHY: generic answer with no behaviour or example.
             response = client.messages.create(
                 model=ai_models.sonnet(),
                 max_tokens=512,
-                temperature=0.4,
+                **ai_models.temperature_kwargs(ai_models.sonnet(), 0.4),
                 system=effective_system_prompt,
                 messages=[{"role": "user", "content": user_message}],
             )
@@ -628,7 +628,7 @@ def _get_warmup_question(
         response = client.messages.create(
             model=ai_models.sonnet(),
             max_tokens=180,
-            temperature=0.6,
+            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.6),
             system=effective_system_prompt,
             messages=[
                 {
@@ -698,7 +698,7 @@ def _get_first_question(
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=256,
-        temperature=0.5,
+        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.5),
         system=effective_system_prompt,
         messages=[
             {
