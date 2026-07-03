@@ -2587,6 +2587,11 @@ export default function ProjectDetail() {
                                 {tProject(`responses.quality${p.quality_label!.charAt(0).toUpperCase() + p.quality_label!.slice(1)}`)}
                               </span>
                             )}
+                            {p.panel_consent && (
+                              <span className="status-badge" style={{ fontSize: 10, background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }} title={tProject("responses.followUpOkHint")}>
+                                ✓ {tProject("responses.followUpOk")}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2617,6 +2622,12 @@ export default function ProjectDetail() {
                             {selectedParticipant.profession && <span className="participant-card__badge">{selectedParticipant.profession}</span>}
                             {selectedParticipant.age_range && <span className="participant-card__badge">{selectedParticipant.age_range}</span>}
                             {selectedParticipant.country && <span className="participant-card__badge">{selectedParticipant.country}</span>}
+                            {selectedParticipant.email && <span className="participant-card__badge">{selectedParticipant.email}</span>}
+                            {selectedParticipant.panel_consent && (
+                              <span className="participant-card__badge" title={tProject("responses.followUpOkHint")}>
+                                ✓ {tProject("responses.followUpOk")}
+                              </span>
+                            )}
                           </div>
                           <span className="participant-card__date">{new Date(selectedParticipant.started_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
                         </div>

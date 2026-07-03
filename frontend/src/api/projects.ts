@@ -131,6 +131,11 @@ export interface ParticipantResponse {
   age_range?: string | null;
   profession?: string | null;
   country?: string | null;
+  email?: string | null;
+  email_verified?: boolean;
+  /** True = agreed to be recontacted for future studies, false = declined,
+   *  null/undefined = unknown (pre-feature participants). */
+  panel_consent?: boolean | null;
   quality_score?: number | null;
   quality_label?: string | null;
   quality_summary?: string | null;

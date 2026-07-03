@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 from jose import JWTError, jwt
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -33,6 +34,29 @@ from app.services.transcode import needs_transcode, transcode_to_mp3
 from app.services.verification import generate_magic_token, verify_magic_token
 
 logger = logging.getLogger("auto_interview")
+
+
+def _sync_panel_consent_to_participant(participant: Participant, db: Session) -> None:
+    """Copy PanelProfile.panel_consent onto the participant (matched by email).
+
+    The panel profile is saved before the Participant row exists (the
+    questionnaire runs pre-screening), so the two are only linkable by email.
+    Denormalising the flag here lets researchers filter/export "OK to
+    recontact" participants without a join. Best-effort — never raises.
+    """
+    try:
+        if not participant.email:
+            return
+        profile = (
+            db.query(PanelProfile)
+            .filter(func.lower(PanelProfile.email) == participant.email.strip().lower())
+            .first()
+        )
+        if profile is not None and participant.panel_consent != bool(profile.panel_consent):
+            participant.panel_consent = bool(profile.panel_consent)
+            db.commit()
+    except Exception:
+        logger.exception("panel-consent sync failed for participant %s", participant.id)
 
 
 def _spawn_transcript_cleanup(participant_id: str) -> None:
@@ -267,10 +291,15 @@ def save_panel_profile(
             detail="Invalid or expired session for panel profile update.",
         )
 
-    profile = db.query(PanelProfile).filter(PanelProfile.email == body.email).first()
+    email_norm = body.email.strip().lower()
+    profile = (
+        db.query(PanelProfile)
+        .filter(func.lower(PanelProfile.email) == email_norm)
+        .first()
+    )
     newly_consented = False
     if profile is None:
-        profile = PanelProfile(email=body.email)
+        profile = PanelProfile(email=email_norm)
         db.add(profile)
 
     was_consented = bool(profile.panel_consent)
@@ -314,6 +343,24 @@ def save_panel_profile(
 
     profile.last_active = datetime.utcnow()
     db.commit()
+
+    # Reflect the consent onto any participant rows this person already has on
+    # this link — covers the post-interview re-prompt, where the Participant
+    # row exists before the opt-in lands.
+    consent_val = bool(profile.panel_consent)
+    link_participants = (
+        db.query(Participant)
+        .join(InterviewLink, Participant.link_id == InterviewLink.id)
+        .filter(
+            InterviewLink.token == token,
+            func.lower(Participant.email) == email_norm,
+        )
+        .all()
+    )
+    if any(p.panel_consent != consent_val for p in link_participants):
+        for p in link_participants:
+            p.panel_consent = consent_val
+        db.commit()
 
     # On the first opt-in, email the durable "manage your panel" link so the
     # panelist can keep enriching their profile over time (more profile =
@@ -610,6 +657,9 @@ def start_interview_session(
         email_was_verified = True
     elif body and getattr(body, "email", None):
         verified_email = body.email
+    # Normalise so the same person matches across projects and against their
+    # PanelProfile row (whose lookups are also case-insensitive).
+    verified_email = verified_email.strip().lower() if verified_email else None
 
     # Validate the participant's chosen interview language against the
     # supported set; ignore anything else so a junk value can't reach the
@@ -711,6 +761,7 @@ async def respond_to_question(
     # thread with a fresh session — never blocks or fails the interview.
     if result["is_complete"]:
         _spawn_transcript_cleanup(participant_id)
+        _sync_panel_consent_to_participant(participant, db)
 
     return TurnResponse(
         question_text=result["question_text"],
@@ -740,6 +791,9 @@ async def skip_question(
         raise HTTPException(status_code=400, detail="Interview already completed")
 
     result = engine_skip_question(participant_id, db)
+
+    if result["is_complete"]:
+        _sync_panel_consent_to_participant(participant, db)
 
     return TurnResponse(
         question_text=result["question_text"],

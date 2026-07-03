@@ -14,7 +14,7 @@
     "yourEmail": "Votre adresse email",
     "sendLink": "Envoyer mon lien",
     "sendingLink": "Envoi…",
-    "emailNote": "Nous utilisons votre email pour sauvegarder votre progression et vous permettre de reprendre plus tard. Rien d'autre ne vous sera envoyé.",
+    "emailNote": "Nous utilisons votre email pour votre lien d'accès, pour sauvegarder votre progression et pour vous envoyer une courte confirmation à la fin. Jamais de marketing.",
     "sendError": "Nous n'avons pas pu envoyer votre lien. Vérifiez votre adresse email et réessayez.",
     "resendError": "Nous n'avons pas pu renvoyer le lien. Veuillez réessayer.",
     "skipEmail": "Continuer sans email →",
@@ -22,7 +22,7 @@
     "skipEmailNote": "Vous ne pourrez pas reprendre depuis un autre appareil.",
     "trustLine": "Vos réponses sont chiffrées et stockées de manière sécurisée.",
     "whyEmailToggle": "Pourquoi nous demandons votre email",
-    "whyEmailBody": "Votre email nous permet de mettre l'entretien en pause et de le reprendre depuis n'importe quel appareil. Nous ne vous ajouterons à aucune liste de diffusion."
+    "whyEmailBody": "Votre email nous permet de mettre l'entretien en pause et de le reprendre depuis n'importe quel appareil, et de vous envoyer une courte confirmation à la fin. Nous ne vous ajouterons à aucune liste de diffusion — les invitations à de futures études n'arrivent que si vous y consentez explicitement."
   },
   "emailSent": {
     "title": "Vérifiez votre boîte de réception",
@@ -58,7 +58,12 @@
     "panelJoinDesc": "Soyez invité·e à de futures études rémunérées qui correspondent à votre profil",
     "panelJoinNote": "Nous enregistrerons votre profil de manière sécurisée. Vous pouvez vous désinscrire à tout moment.",
     "byParticipating": "En participant à cette étude, vous acceptez ce qui suit :",
-    "startError": "Nous n'avons pas pu démarrer votre entretien. Veuillez réessayer."
+    "startError": "Nous n'avons pas pu démarrer votre entretien. Veuillez réessayer.",
+    "resumeAvailable": "Vous avez un entretien en cours sur cet appareil.",
+    "resumeCta": "Reprendre là où vous en étiez",
+    "declineConfirmText": "Êtes-vous sûr·e ? Refuser met fin à votre participation — vous ne pourrez pas revenir à cette étude.",
+    "declineConfirmYes": "Oui, refuser",
+    "declineConfirmNo": "Continuer"
   },
   "profile": {
     "title": "Présentez-vous",
@@ -270,6 +275,7 @@
     "submissionErrorNetwork": "Impossible de joindre notre serveur — vérifiez votre connexion et réessayez.",
     "submissionErrorServer": "Une erreur s'est produite de notre côté. Réessayez — si le problème persiste, contactez votre chercheur.",
     "submissionEscalation": "Toujours bloqué·e ? Répondez à l'email qui vous a amené·e ici.",
+    "rateLimited": "Trop de tentatives en peu de temps. Patientez une minute avant de réessayer.",
     "retry": "Réessayer",
     "disqualified": {
       "title": "Merci pour votre temps",
@@ -300,7 +306,8 @@
     "processing": {
       "transcribing": "🎙️ Transcription de votre réponse…",
       "thinking": "💭 Analyse en cours…",
-      "preparing": "🔊 Préparation de la prochaine question…"
+      "preparing": "🔊 Préparation de la prochaine question…",
+      "takingLonger": "Encore un instant — on y est presque…"
     },
     "transcript": "Nous avons entendu :",
     "transcriptDismiss": "Fermer",
@@ -318,7 +325,13 @@
     "preparingFirst": "Préparation de votre première question…",
     "uploadError": "Nous n'avons pas pu envoyer votre réponse. Appuyez sur « Réessayer » pour la renvoyer.",
     "recordingError": "Nous n'avons pas pu capturer votre enregistrement. Veuillez réessayer.",
-    "skipError": "Impossible de passer la question. Veuillez réessayer."
+    "skipError": "Impossible de passer la question. Veuillez réessayer.",
+    "serverError": "Une erreur s'est produite de notre côté. Appuyez sur Envoyer pour réessayer.",
+    "rateLimited": "Trop de tentatives en peu de temps. Patientez une minute, puis appuyez à nouveau sur Envoyer — votre réponse est sauvegardée.",
+    "emptyTranscript": "Nous n'avons rien entendu dans cet enregistrement. Vérifiez que votre micro est proche de vous, puis réenregistrez — si le problème persiste, essayez un autre appareil.",
+    "playQuestion": "Écouter la question",
+    "skipAudio": "Passer l'audio — je suis prêt·e",
+    "maxRecordingHint": "Jusqu'à {{minutes}} minutes par réponse"
   },
   "completion": {
     "title": "Merci, {{name}} !",
@@ -346,7 +359,8 @@
       "saving": "Enregistrement…",
       "dismiss": "Non merci"
     },
-    "enrichCta": "Ajouter quelques infos → débloquer plus d'études"
+    "enrichCta": "Ajouter quelques infos → débloquer plus d'études",
+    "dataRights": "Pour demander la suppression de vos données, contactez le chercheur qui vous a partagé ce lien."
   },
   "resume": {
     "title": "Content de vous revoir !",

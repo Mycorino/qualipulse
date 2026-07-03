@@ -14,7 +14,7 @@
     "yourEmail": "Your email address",
     "sendLink": "Send my link",
     "sendingLink": "Sending…",
-    "emailNote": "We use your email to save your progress so you can resume later. We won't send anything else.",
+    "emailNote": "We use your email for your access link, to save your progress, and to send a short confirmation once you finish. No marketing, ever.",
     "sendError": "We couldn't send your link. Please check your email address and try again.",
     "resendError": "We couldn't resend the link. Please try again.",
     "skipEmail": "Continue without email →",
@@ -22,7 +22,7 @@
     "skipEmailNote": "You won't be able to resume on a different device.",
     "trustLine": "Your responses are encrypted and stored securely.",
     "whyEmailToggle": "Why we ask for your email",
-    "whyEmailBody": "We use your email so you can pause and resume the interview from any device. We won't add you to any list."
+    "whyEmailBody": "We use your email so you can pause and resume the interview from any device, and to send you a short confirmation once you finish. We won't add you to any list — future-study invitations only ever happen if you explicitly opt in."
   },
   "emailSent": {
     "title": "Check your inbox",
@@ -58,7 +58,12 @@
     "panelJoinDesc": "Get invited to future paid studies that match your profile",
     "panelJoinNote": "We'll save your profile securely. You can opt out any time.",
     "byParticipating": "By taking part in this study you agree to the following:",
-    "startError": "We couldn't start your interview. Please try again."
+    "startError": "We couldn't start your interview. Please try again.",
+    "resumeAvailable": "You have an interview in progress on this device.",
+    "resumeCta": "Continue where you left off",
+    "declineConfirmText": "Are you sure? Declining ends your participation — you won't be able to come back to this study.",
+    "declineConfirmYes": "Yes, decline",
+    "declineConfirmNo": "Keep going"
   },
   "profile": {
     "title": "Tell us a bit about yourself",
@@ -270,6 +275,7 @@
     "submissionErrorNetwork": "We couldn't reach our server — please check your connection and try again.",
     "submissionErrorServer": "Something went wrong on our end. Please try again — if this keeps happening, reach out to your researcher.",
     "submissionEscalation": "Still having trouble? Reply to the email that brought you here.",
+    "rateLimited": "Too many attempts in a short time. Please wait a minute before trying again.",
     "retry": "Try again",
     "disqualified": {
       "title": "Thank you for your time",
@@ -300,7 +306,8 @@
     "processing": {
       "transcribing": "🎙️ Transcribing your answer…",
       "thinking": "💭 Thinking…",
-      "preparing": "🔊 Preparing next question…"
+      "preparing": "🔊 Preparing next question…",
+      "takingLonger": "Still working — hang tight…"
     },
     "transcript": "We heard:",
     "transcriptDismiss": "Dismiss",
@@ -318,7 +325,13 @@
     "preparingFirst": "Preparing your first question…",
     "uploadError": "Couldn't send your answer. Tap 'Try again' to resend.",
     "recordingError": "We couldn't capture your recording. Please try again.",
-    "skipError": "We couldn't skip the question. Please try again."
+    "skipError": "We couldn't skip the question. Please try again.",
+    "serverError": "Something went wrong on our end. Please tap Submit to try again.",
+    "rateLimited": "Too many attempts in a short time. Please wait a minute, then tap Submit again — your answer is saved.",
+    "emptyTranscript": "We couldn't hear anything in that recording. Make sure your microphone is close by, then record again — if this keeps happening, try a different device.",
+    "playQuestion": "Play the question",
+    "skipAudio": "Skip audio — I'm ready",
+    "maxRecordingHint": "Up to {{minutes}} minutes per answer"
   },
   "completion": {
     "title": "Thank you, {{name}}!",
@@ -346,7 +359,8 @@
       "saving": "Saving…",
       "dismiss": "No thanks"
     },
-    "enrichCta": "Add a few more details → unlock more studies"
+    "enrichCta": "Add a few more details → unlock more studies",
+    "dataRights": "To request deletion of your data, contact the researcher who shared this link."
   },
   "resume": {
     "title": "Welcome back!",
