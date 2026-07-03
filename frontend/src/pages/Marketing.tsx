@@ -662,7 +662,9 @@ export default function Marketing() {
           {MARKETING_PLANS.map((p) => {
             const features = t(`pricing.plans.${p.id}.features`, { returnObjects: true }) as string[];
             const isAnnual = billingInterval === "annual";
-            const display = isAnnual ? Math.round(p.annualEur / 12) : p.monthlyEur;
+            // floor, not round: 7990/12 would round to €666/mo — a number
+            // with the wrong connotations on a pricing page
+            const display = isAnnual ? Math.floor(p.annualEur / 12) : p.monthlyEur;
             return (
               <div key={p.id} className={`mkt-plan${p.highlight ? " mkt-plan-highlight" : ""}`}>
                 {p.highlight && <div className="mkt-plan-badge">{t("pricing.recommended")}</div>}

@@ -317,9 +317,11 @@ export function UnlockModal({
                   billingInterval === "annual"
                     ? p.annual_price_cents
                     : p.monthly_price_cents;
+                // Whole-euro floor for the "/mo" figure: 299000/12 cents
+                // would otherwise display as €249.17
                 const perMonthCents =
                   billingInterval === "annual" && totalCents != null
-                    ? Math.round(totalCents / 12)
+                    ? Math.floor(totalCents / 12 / 100) * 100
                     : totalCents;
                 return (
                   <div
