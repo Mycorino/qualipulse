@@ -38,6 +38,13 @@ const TEAM_SIZES = ["1–10", "11–50", "51–200", "201–1000", "1000+"];
 type StepId = 1 | 2 | 3;
 
 function inferStartStep(me: CompanyResponse): StepId {
+  // Fresh Google signups arrive with a placeholder company name derived from
+  // the email local-part (set by the OAuth callback). Start them on step 1 so
+  // they can correct it — the field is prefilled, so it's one click if right.
+  if (localStorage.getItem("qp_google_new_signup") === "1") {
+    localStorage.removeItem("qp_google_new_signup");
+    return 1;
+  }
   if (me.role && me.company_size) return 3;
   if (me.name) return 2;
   return 1;

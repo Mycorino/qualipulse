@@ -7,7 +7,6 @@
   "pitch_transcript": "{{count}} more transcripts are waiting — unlock them with a plan. Your first {{preview}} stay free forever.",
   "pitch_analysis": "AI analysis runs across your full study. Unlock all {{count}} transcripts with a plan to synthesize themes — your first {{preview}} stay free for tagging and memos.",
   "unlock_cta": "Unlock transcripts",
-
   "close": "Close",
   "dismiss": "Maybe later",
   "modal_eyebrow": "Unlock your full study",
@@ -16,7 +15,6 @@
   "credits_modal_eyebrow": "Field your full study",
   "credits_modal_title": "Unlock {{count}} more interviews",
   "credits_modal_body": "Your target needs more credits than your plan includes (1 credit = 1 completed interview). Subscribe to field the whole study and get fresh credits every month.",
-
   "subscription_eyebrow": "Ongoing research",
   "subscription_title": "Monthly plan",
   "subscription_body": "Best if you'll run more studies. Includes a fresh batch of credits each month, AI analysis, and unlocks everything you've collected so far.",
@@ -25,7 +23,6 @@
   "subscription_perk_3": "New credits every month",
   "subscription_cta_exploration": "Subscribe to Exploration — €89/mo",
   "subscription_cta_team": "Subscribe to Team — €299/mo",
-
   "interval_label": "Billing interval",
   "interval_monthly": "Monthly",
   "interval_annual": "Annual",
@@ -39,7 +36,6 @@
   "plan_projects_one": "{{count}} active project",
   "plan_projects_other": "{{count}} active projects",
   "subscribe_cta": "Subscribe",
-
   "pack_eyebrow": "Pay as you go",
   "pack_title": "Credit pack",
   "pack_body": "Best if this is a one-off study. Buy a pack to unlock and keep going — no subscription.",
@@ -48,6 +44,6 @@
   "pack_cta": "Buy {{credits}} credits — {{price}}",
   "other_packs": "Or another size:",
   "credits_label": "credits",
-
-  "redirecting": "Redirecting to checkout…"
+  "redirecting": "Redirecting to checkout…",
+  "checkout_error": "We couldn't open the checkout. Please try again in a moment."
 }

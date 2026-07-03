@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useHead } from "../hooks/useHead";
 import type { AnalysisReport, AttributedQuote } from "../api/projects";
 import { Skeleton } from "../components/Skeleton";
 
@@ -17,6 +18,12 @@ export default function SharedReport() {
   const [data, setData] = useState<SharedReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Token URLs are recipient-only; keep shared reports out of search.
+  useHead({
+    title: `${data?.project_name ?? t("sharedReport.researchReport")} — QualiPulse`,
+    metas: [{ name: "robots", content: "noindex" }],
+  });
 
   useEffect(() => {
     if (!token) return;

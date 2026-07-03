@@ -31,6 +31,13 @@ export default function GoogleFinish() {
       return;
     }
 
+    // Fresh Google accounts get a placeholder company name derived from the
+    // email local-part. Flag it so /welcome starts on the "Your company"
+    // step where the user can correct it (Welcome.tsx consumes this flag).
+    if (params.get("is_new") === "1") {
+      localStorage.setItem("qp_google_new_signup", "1");
+    }
+
     saveToken(access, refresh);
     setCachedOnboarded(onboarded);
     // Clear the fragment so the tokens aren't left in browser history.

@@ -16,6 +16,19 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import client from "../api/client";
+import { useToast } from "./Toast";
+
+/** Plan/interval the user picked on the marketing pricing page (stashed by
+ *  Signup.tsx). Lets checkout surfaces preselect their expressed intent
+ *  instead of defaulting everyone to Exploration/monthly. */
+function storedPlanPreference(): { plan: string | null; interval: BillingInterval | null } {
+  const plan = localStorage.getItem("qp_selected_plan");
+  const rawInterval = localStorage.getItem("qp_selected_interval");
+  return {
+    plan: plan === "exploration" || plan === "team" || plan === "agency" ? plan : null,
+    interval: rawInterval === "monthly" || rawInterval === "annual" ? rawInterval : null,
+  };
+}
 
 interface PaywallCardProps {
   /** Optional context — display the locked participant's
@@ -128,10 +141,13 @@ export function UnlockModal({
   mode = "transcripts",
 }: UnlockModalProps) {
   const { t } = useTranslation("paywall");
+  const { toast } = useToast();
   const [packs, setPacks] = useState<CreditPack[]>([]);
   const [plans, setPlans] = useState<SubPlan[]>([]);
-  const [billingInterval, setBillingInterval] =
-    useState<BillingInterval>("annual");
+  const preference = storedPlanPreference();
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>(
+    preference.interval ?? "annual",
+  );
   const [working, setWorking] = useState<string | null>(null);
   const creditsMode = mode === "credits";
 
@@ -187,8 +203,14 @@ export function UnlockModal({
         "/billing/checkout",
         { plan_id: planId, billing_interval: interval, ...redirectUrls },
       );
-      if (data.checkout_url) window.location.href = data.checkout_url;
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        toast(t("checkout_error"), "error");
+        setWorking(null);
+      }
     } catch {
+      toast(t("checkout_error"), "error");
       setWorking(null);
     }
   };
@@ -199,8 +221,14 @@ export function UnlockModal({
         "/billing/checkout/credits",
         { pack_id: packId, ...redirectUrls },
       );
-      if (data.checkout_url) window.location.href = data.checkout_url;
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        toast(t("checkout_error"), "error");
+        setWorking(null);
+      }
     } catch {
+      toast(t("checkout_error"), "error");
       setWorking(null);
     }
   };
@@ -218,10 +246,14 @@ export function UnlockModal({
   const subPlans = plans.filter(
     (p) => p.id === "exploration" || p.id === "team",
   );
-  const recommendedPlanId = (
-    subPlans.find((p) => (p.included_credits ?? 0) >= lockedCount) ||
-    subPlans[subPlans.length - 1]
-  )?.id;
+  const recommendedPlanId =
+    (preference.plan && subPlans.some((p) => p.id === preference.plan)
+      ? preference.plan
+      : undefined) ??
+    (
+      subPlans.find((p) => (p.included_credits ?? 0) >= lockedCount) ||
+      subPlans[subPlans.length - 1]
+    )?.id;
 
   return (
     <div
@@ -360,26 +392,30 @@ export function UnlockModal({
               <li>{t("subscription_perk_2")}</li>
               <li>{t("subscription_perk_3")}</li>
             </ul>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => handleSubscribe("exploration", "monthly")}
-              disabled={working !== null}
-            >
-              {working === "plan:exploration"
-                ? t("redirecting")
-                : t("subscription_cta_exploration")}
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary unlock-modal__secondary-plan"
-              onClick={() => handleSubscribe("team", "monthly")}
-              disabled={working !== null}
-            >
-              {working === "plan:team"
-                ? t("redirecting")
-                : t("subscription_cta_team")}
-            </button>
+            {/* Primary CTA follows the plan picked on the pricing page (if
+                any) instead of always pushing Exploration. Labels quote
+                monthly prices, so checkout stays monthly here — the credits
+                grid handles annual with dynamic prices. */}
+            {(preference.plan === "team"
+              ? (["team", "exploration"] as const)
+              : (["exploration", "team"] as const)
+            ).map((planId, i) => (
+              <button
+                key={planId}
+                type="button"
+                className={
+                  i === 0
+                    ? "btn btn-primary"
+                    : "btn btn-secondary unlock-modal__secondary-plan"
+                }
+                onClick={() => handleSubscribe(planId, "monthly")}
+                disabled={working !== null}
+              >
+                {working === `plan:${planId}`
+                  ? t("redirecting")
+                  : t(`subscription_cta_${planId}`)}
+              </button>
+            ))}
           </div>
 
           {!creditsMode && (
@@ -460,7 +496,7 @@ function formatDuration(seconds: number): string {
 }
 
 function formatPrice(cents: number, currency: string): string {
-  const value = (cents / 100).toFixed(0);
+  const value = cents % 100 === 0 ? (cents / 100).toFixed(0) : (cents / 100).toFixed(2);
   const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : currency;
   return `${symbol}${value}`;
 }

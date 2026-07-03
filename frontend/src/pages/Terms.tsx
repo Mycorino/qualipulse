@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useHead } from "../hooks/useHead";
 
 function TermsContentEN() {
   return (
@@ -275,6 +276,7 @@ function TermsContentFR() {
 export default function Terms() {
   const { t, i18n } = useTranslation();
   const isFR = i18n.language?.startsWith("fr");
+  useHead({ title: `${t("legal.terms.pageTitle")} — QualiPulse` });
 
   const tocItems: [string, string][] = [
     ["#section-1", t("legal.terms.toc.serviceDescription")],

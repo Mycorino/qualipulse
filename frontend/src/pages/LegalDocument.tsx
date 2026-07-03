@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useHead } from "../hooks/useHead";
 
 type Section = {
   id: string;
@@ -530,6 +531,7 @@ export default function LegalDocument() {
   const docKey = resolveDoc(pathname);
   const lang = i18n.language?.startsWith("fr") ? "fr" : "en";
   const doc: LegalDoc = docs[docKey][lang];
+  useHead({ title: `${doc.title} — QualiPulse` });
 
   return (
     <div className="legal-page">

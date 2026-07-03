@@ -1,7 +1,7 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
+import { useHead } from "../hooks/useHead";
 import { signup, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
@@ -25,6 +25,7 @@ function getPasswordStrength(pw: string, t: (key: string) => string): { label: s
 
 export default function Signup() {
   const { t, i18n } = useTranslation("auth");
+  useHead({ title: t("signup.metaTitle") });
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -56,6 +57,14 @@ export default function Signup() {
   const selectedPlan = searchParams.get("plan") ?? undefined;
   const selectedInterval = searchParams.get("interval") ?? undefined;
   const refCode = searchParams.get("ref") ?? undefined;
+
+  // Stash the pricing-page choice so later checkout surfaces (paywall,
+  // billing) can preselect it. localStorage survives the Google OAuth
+  // round-trip, which loses query params.
+  useEffect(() => {
+    if (selectedPlan) localStorage.setItem("qp_selected_plan", selectedPlan);
+    if (selectedInterval) localStorage.setItem("qp_selected_interval", selectedInterval);
+  }, [selectedPlan, selectedInterval]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -111,7 +120,7 @@ export default function Signup() {
         setError(t("signup.errors.emailExists"));
         setShowLoginHint(true);
       } else {
-        const msg = getErrorMessage(err, t("signup.createAccount"));
+        const msg = getErrorMessage(err, t("signup.errors.generic"));
         if (msg.toLowerCase().includes("already")) {
           setError(msg);
           setShowLoginHint(true);
@@ -127,9 +136,6 @@ export default function Signup() {
 
   return (
     <div className="auth-page">
-      <Helmet>
-        <title>{t("signup.metaTitle")}</title>
-      </Helmet>
       <div className="auth-card">
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           <LanguageSwitcher />
