@@ -117,6 +117,31 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
     }),
   },
   {
+    // Analysis in flight — say so instead of falling through to "done".
+    test: (s) => s.analysisStatus === "generating",
+    action: () => ({
+      id: "analysis_generating",
+      actionType: "wait",
+      labelKey: `${NS}analysisGenerating.label`,
+      reasonKey: `${NS}analysisGenerating.reason`,
+      kind: "wait",
+      weight: 50,
+    }),
+  },
+  {
+    // Analysis failed — offer the retry, don't pretend all is well.
+    test: (s) => s.analysisStatus === "failed",
+    action: (s) => ({
+      id: "retry_analysis",
+      actionType: "run_analysis",
+      labelKey: `${NS}retryAnalysis.label`,
+      reasonKey: `${NS}retryAnalysis.reason`,
+      params: { count: s.completedCount },
+      kind: "do",
+      weight: 75,
+    }),
+  },
+  {
     test: (s) => s.completedCount >= 3 && s.analysisStatus === "none",
     action: (s) => ({
       id: "run_analysis",
@@ -126,6 +151,22 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
       params: { count: s.completedCount },
       kind: "do",
       weight: 85,
+    }),
+  },
+  {
+    // 1-2 interviews in: not "all set" — analysis unlocks at 3.
+    test: (s) =>
+      s.completedCount > 0 &&
+      s.completedCount < 3 &&
+      s.analysisStatus === "none",
+    action: (s) => ({
+      id: "collect_more",
+      actionType: "wait",
+      labelKey: `${NS}collectMore.label`,
+      reasonKey: `${NS}collectMore.reason`,
+      params: { count: s.completedCount, min: 3 },
+      kind: "wait",
+      weight: 45,
     }),
   },
   {

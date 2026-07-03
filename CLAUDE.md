@@ -48,9 +48,11 @@ A SaaS platform that lets companies create AI-driven voice interviews. Researche
 **Stack:**
 - **Backend:** FastAPI (Python) + SQLAlchemy + PostgreSQL (prod) / SQLite (dev), JWT auth
 - **Frontend:** React 18 + Vite + TypeScript
-- **AI:**
-  - Interview orchestration + analysis: Claude Sonnet (`claude-sonnet-4-20250514`)
-  - Research Copilot (surface-level chat agent + onboarding): Claude **Opus 4.7** (`claude-opus-4-7`) with adaptive thinking (`thinking: {type: "adaptive"}`), `output_config: {effort: "high"}`, and prompt-cache breakpoints on system blocks
+- **AI:** all model ids resolve through `services/ai_models.py` (env-overridable pins; see that file for the source of truth)
+  - Interview orchestration + analysis + translation etc.: Claude Sonnet (`claude-sonnet-4-6`)
+  - Research Copilot (survey + interview-guide surfaces): Claude **Opus** (`claude-opus-4-8`) with adaptive thinking (`thinking: {type: "adaptive"}`), `output_config: {effort: "high"}`, and a split system prompt: stable base+methodology block behind the prompt-cache breakpoint, volatile memory+snapshot block after it, plus a cache marker on the message tail per agent-loop iteration
+  - Lightweight tasks (transcript cleanup, name lookup, question coach, onboarding suggestions): Claude Haiku (`claude-haiku-4-5`)
+  - Sampling params go through `ai_models.temperature_kwargs()` so model upgrades can't 400 on removed `temperature`
   - Anthropic SDK pinned at **`anthropic==0.102.0`** (0.43.x lacked `output_config` / adaptive thinking)
 - **STT:** OpenAI Whisper (`whisper-1`)
 - **TTS:** OpenAI TTS (`tts-1`, voice: `alloy`)
@@ -101,11 +103,10 @@ auto-interview/
 │   │   └── services/
 │   │       ├── interview_engine.py  # Core AI orchestration (Claude Sonnet)
 │   │       ├── analysis.py          # AI synthesis + refined analysis
-│   │       ├── copilot.py           # Research Copilot turn engine (Opus 4.7, SSE streaming, scoped memory, tool dispatch, proposal-turn filter)
-│   │       ├── copilot_onboarding.py # ONBOARDING_ADAPTER (save_profile, propose_research_plan, propose_study, suggest_replies, request_website, propose_participant_demo, remember) — drives /welcome Phase 2
-│   │       ├── onboarding_personalisation.py  # Haiku-cached welcome greeting + starter chips (Wave B)
+│   │       ├── copilot.py           # Research Copilot turn engine (Opus, SSE streaming, scoped memory, tool dispatch, proposal-turn filter)
+│   │       ├── copilot_interview.py # INTERVIEW_ADAPTER (guide/screener/analysis proposals) for the project surface
+│   │       ├── ai_models.py         # Single source of truth for Claude model ids (env-overridable pins + temperature_kwargs guard)
 │   │       ├── company_name_lookup.py  # Haiku-only backfill of business_summary + industry from a typed company name (for freemail signups)
-│   │       ├── demo_bundles.py      # Backend-served sample-study bundles for the /welcome sample modal (3 industry variants × 2 locales)
 │   │       ├── signup_prefetch.py   # W2.5 — background website pre-fetch keyed off the user's email domain at signup
 │   │       ├── analytics.py         # Funnel-event INFO logger (signup / onboarding_completed / study_created / link_shared / participant_completed / paid_converted)
 │   │       ├── quality.py           # Heuristic quality scoring
@@ -470,17 +471,18 @@ boot, no-ops after the first.
 The Research Copilot is an always-on agent surfaced as a dock + open panel on every authenticated page (and as the full-screen `/welcome` conversation for onboarding). It powers free-form chat, surface-aware suggestions, and structured **proposal actions** the user accepts with one click.
 
 **Adapter pattern.** Each surface defines a `CopilotAdapter` in `services/copilot.py` (or a sibling module):
-- `INTERVIEW_ADAPTER` (kind=`project`) — guides, links, analysis, refinement, sharing
-- `SURVEY_ADAPTER` (kind=`survey`) — questions, branching, publishing, reports
-- `ONBOARDING_ADAPTER` (kind=`onboarding`, instrument_scope_kind=`company`) — `services/copilot_onboarding.py`, drives `/welcome`
+- `INTERVIEW_ADAPTER` (kind=`interview`) — `services/copilot_interview.py`: guides, screeners, settings, analysis proposals
+- `SURVEY_ADAPTER` (kind=`survey`) — `services/copilot.py`: survey questions
 
 Each adapter exposes: `methodology` (system prompt fragment with rules and caps), `tools` (JSON Schema), `snapshot(instrument)` (compact state read each turn), `run_tool(name, args, ...)`, and a `stub` reply for tests. The shared `run_copilot_turn` / `run_copilot_turn_stream` in `services/copilot.py` build prompt-cache-friendly system blocks (stable methodology FIRST behind the breakpoint, volatile snapshot AFTER), call Anthropic with Opus 4.7 + adaptive thinking, dispatch tool calls, and persist conversation history.
 
-**Streaming.** All copilot endpoints return **SSE** (`text/event-stream`) with `Cache-Control: no-cache` and `X-Accel-Buffering: no`. Events: `{type: "status", label}` (tool labels via `_TOOL_LABELS`), `{type: "delta", text}` (token-by-token model output), `{type: "done", reply, proposed_actions, memory}`. The frontend `streamCopilot` in `api/copilot.ts` uses `fetch` + `ReadableStream.getReader()` (axios buffers — unsuitable for SSE) with a 60s idle timeout per chunk. **Critical:** the FastAPI generator captures `db.get_bind()` BEFORE returning, then opens a fresh `Session(bind=engine)` inside the stream body — otherwise `Depends(get_db)` closes the session before iteration begins.
+**Streaming.** All copilot endpoints return **SSE** (`text/event-stream`) with `Cache-Control: no-cache` and `X-Accel-Buffering: no`. Events: `{type: "status", label}` (tool labels via `_TOOL_LABELS`), `{type: "delta", text}` (token-by-token model output), `{type: "done", reply, proposed_actions, memory}`. The frontend `streamCopilot` in `api/copilot.ts` uses `fetch` + `ReadableStream.getReader()` (axios buffers — unsuitable for SSE) with a 90s idle timeout per chunk, an AbortController (Stop button / unmount / navigation cancel), and a one-shot 401 token refresh. **Critical:** the FastAPI generator captures `db.get_bind()` BEFORE returning, then opens a fresh `Session(bind=engine)` inside the stream body — otherwise `Depends(get_db)` closes the session before iteration begins.
 
 **Memory.** `CopilotMemory` rows are scoped at company / study / instrument tiers. The `remember` tool writes durable notes; the snapshot embeds recent memory at each turn. `CopilotConversation` persists turn history per instrument so the panel can reopen mid-thread.
 
-**Proposal-turn filter.** `_filter_proposal_turn_actions` in `services/copilot.py` runs at the end of every turn. When the turn contains a primary-proposal action (`create_research_plan` or `create_first_study`), it strips any `suggest_replies` actions whose `context` is a lightweight-signal capture (`referral_source` / `current_tool` / `research_experience`) — so the user's attention stays on the accept CTA. Belt-and-suspenders to the "PROPOSAL TURN OWNS THE SCREEN" methodology rule.
+**Proposal-turn filter.** `_filter_proposal_turn_actions` in `services/copilot.py` runs at the end of every turn. When the turn stages any real proposal card (guide question, objective, screener, settings, analysis, survey question…), it strips all `suggest_replies` chip groups so the user's attention stays on the accept CTA. Belt-and-suspenders to the "PROPOSAL TURN OWNS THE SCREEN" methodology rule.
+
+**Guardrails.** Copilot POSTs are rate-limited per account (`RATE_LIMIT_COPILOT`, keyed on the bearer token) and gated by a per-workspace daily spend ceiling (`COPILOT_DAILY_COST_LIMIT_USD`, summed from `AIUsageLog.operation == "copilot"`; 429 `copilot_daily_limit_reached` when hit). Request history is bounded (60 messages × 8k chars in the schema; the engine sends only the recent tail to the model).
 
 **Onboarding methodology hard rules** (`_ONBOARDING_METHODOLOGY` in `copilot_onboarding.py`):
 - **RULE 1: One question per turn.** Bundling questions ("1. Quel canal... 2. Quelle décision...") is forbidden.
@@ -492,8 +494,10 @@ Each adapter exposes: `methodology` (system prompt fragment with rules and caps)
 
 **Mission + NBA + Nudges.** Each surface declares a one-line **mission** shown in the panel header. A deterministic **NBA resolver** (`frontend/src/copilot/nextAction.ts` — `resolveProjectNextAction`, `resolveSurveyNextAction`, `resolveWorkspaceNextAction`, `resolveStudySummaryAction`) picks a single best next action from a priority ladder — **no LLM call**, runs on every render. Rendered as a chip in the dock or inline in empty states via `NextActionChip`. **Nudges** are localStorage-diffed events (`frontend/src/copilot/signals.ts`, key `copilot_signals_v2`): `analysis_ready`, `analysis_stale`, `data_milestone`, `quality_flag`, `study_report_ready`. 24h TTL, dismiss persists, and nudges for the current tab auto-suppress to avoid noise. New nudges are announced once via aria-live (`useNudgeAnnounce.ts`).
 
-### Onboarding Flow (hybrid: wizard → conversational → plan)
-After signup users land on `/welcome` — a **hybrid two-phase flow**: a 3-step structured wizard first, then a full-screen Research Copilot conversation that ends in a multi-step research plan. The Welcome.tsx mode-switch picks which to show based on profile state + `localStorage.qp_welcome_setup_skipped_v2`.
+### Onboarding Flow
+> **Doc status:** everything below describing a *conversational* Phase 2 (ONBOARDING_ADAPTER, `/onboarding/copilot`, canonical reply chips, research-plan proposals, milestone bar) is a **design that was never merged** — none of it exists in the codebase. What ships today: `/welcome` is the structured wizard (`Welcome.tsx`), personalised via `GET /auth/onboarding/suggestions` (Haiku) and the company-name/domain backfills described below. The historical spec is kept for reference only.
+
+After signup users land on `/welcome`.
 
 **Phase 1 — Structured wizard (`WelcomeSetup.tsx`).** 3 steps capturing the qualification data we need for personalisation:
 - Step 1: company name + role chips + team size
@@ -932,8 +936,8 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Profile save + change password in AccountSettings UI (PATCH /auth/me, POST /auth/change-password)
 - [x] Analysis-ready email (triggered after AI synthesis completes)
 - [x] Feature gates enforced on: projects, questions, links, analysis, export
-- [x] Conversational onboarding via Research Copilot (`/welcome`): canned greeting → SSE chat with `ONBOARDING_ADAPTER` → milestone bar + "What I know about you" sidebar + canonical quick-reply chips + inline website-lookup card → `propose_study` proposal → one-click accept creates real first study + objective + guide questions → memory recap screen. Replaces the legacy 4-step form. Server enforces canonical chip option sets for the four profile contexts.
-- [x] Research Copilot (always-on): dock + open panel on every authenticated page; per-surface adapters (interview/survey/onboarding); SSE streaming (status/delta/done); deterministic NBA chip; nudge tier with 5 event types and aria-live announcer; mission header per surface; scoped memory (company/study/instrument); Opus 4.7 + adaptive thinking + prompt cache
+- [x] Onboarding wizard (`/welcome`): 3-step structured wizard with Haiku-personalised use-case suggestions (`GET /auth/onboarding/suggestions`), company-name/domain business-context backfill, and demo-project seeding on completion. (A conversational copilot onboarding was specced but never merged.)
+- [x] Research Copilot (always-on): dock + open panel on every authenticated page; per-surface adapters (interview/survey); SSE streaming (status/delta/done, Stop + retry, abortable); deterministic NBA chip; localized nudge tier with 5 event types and aria-live announcer; mission header per surface; scoped memory (company/study/instrument); Opus 4.8 + adaptive thinking + split-block prompt cache
 - [x] Centralized error messages (frontend `utils/errorMessages.ts`)
 - [x] Terms of Service + Privacy Policy pages, plus launch legal pack (`LegalDocument.tsx`): DPA, subprocessors, participant interview notice, AI use policy, and data retention policy. Marketing footer links all legal docs; participant consent screen links `/participant-notice` by default.
 - [x] SendGrid email integration (domain-authenticated, branded HTML templates)
@@ -1075,7 +1079,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id` (str), `affiliate_id` (FK), `amount`, `paid_at`, `notes`
 
 ### AIUsageLog
-`id` (int), `company_id` (FK), `project_id` (FK), `participant_id` (FK), `operation` (indexed), `model`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `characters` (TTS), `audio_seconds` (STT), `cost_usd`, `created_at` (indexed). **Cost is model-aware** (Opus / Sonnet / Haiku per-token rates in `services/usage_logger.py::_CLAUDE_RATES`) and **cache-aware** (cache writes 1.25× input price, cache reads 0.10×). Each Claude call also emits an INFO log line `"claude usage op=… model=… input=… output=… cache_read=… cache_write=… cost=$…"` so cache-hit rates are visible via `gcloud logging read`.
+`id` (int), `company_id` (FK), `project_id` (FK), `participant_id` (FK), `operation` (indexed), `model`, `input_tokens`, `output_tokens`, `characters` (TTS), `audio_seconds` (STT), `cost_usd`, `created_at` (indexed). (No cache-token columns — cache reads/writes are priced into `cost_usd` and visible in log lines only.) **Cost is model-aware** (Opus / Sonnet / Haiku per-token rates in `services/usage_logger.py::_CLAUDE_RATES`) and **cache-aware** (cache writes 1.25× input price, cache reads 0.10×). Each Claude call also emits an INFO log line `"claude usage op=… model=… input=… output=… cache_read=… cache_write=… cost=$…"` so cache-hit rates are visible via `gcloud logging read`.
 
 ### EmailSendLog
 `id` (str uuid), `company_id` (FK, indexed), `event` (str, indexed — `day_1_followup` | `trial_half_over` | `trial_ending`), `sent_at`. Unique constraint on `(company_id, event)` — append-only log that makes the Wave 3B `/admin/scheduled-emails/run` runner idempotent: a duplicate cron firing in the same window trips the constraint instead of double-sending. Alembic 0032. The Wave 3A first-response email predates this table and uses `Company.first_response_email_sent_at` instead.
@@ -1203,24 +1207,15 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | GET/POST | `/projects/{id}/memos` | List/create memos |
 | PUT/DELETE | `/projects/{id}/memos/{mid}` | Update/delete memo |
 
-### Research Copilot (`/copilot` + `/onboarding/copilot`)
-All `/copilot` endpoints return **SSE** (`text/event-stream`) — events `status`, `delta`, `done`. See "Research Copilot architecture" above. Onboarding endpoints are scoped at the **company** level and drive `/welcome`.
+### Research Copilot (`/copilot`)
+All copilot POST endpoints return **SSE** (`text/event-stream`) — events `status`, `delta`, `done` (the terminal `done` may carry `error: true`). See "Research Copilot architecture" above. There is **no onboarding copilot surface** — onboarding is the `/welcome` wizard plus `GET /auth/onboarding/suggestions` (Haiku).
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/projects/{id}/copilot` | Yes | Run a Copilot turn for a project (interview adapter) — SSE stream |
-| GET | `/projects/{id}/copilot/conversation` | Yes | Recent turn history for this project |
-| POST | `/surveys/{id}/copilot` | Yes | Run a Copilot turn for a survey (survey adapter) — SSE stream |
-| GET | `/surveys/{id}/copilot/conversation` | Yes | Recent turn history for this survey |
-| POST | `/onboarding/copilot` | Yes | Run an onboarding Copilot turn — SSE stream; can emit `create_research_plan` (PREFERRED), `create_first_study` (fallback), `suggest_replies`, `request_website`, `propose_participant_demo` proposals |
-| GET | `/onboarding/copilot/conversation` | Yes | Onboarding conversation history (used by Welcome.tsx mount to hydrate the thread after refresh / nav round-trip) |
-| PUT | `/onboarding/copilot/conversation` | Yes | Persist the onboarding thread (Wave A — survives reload) |
-| GET | `/onboarding/copilot/memory` | Yes | Haiku-generated locale-correct memory recap (Welcome completion screen). 24h cached on Company. |
-| POST | `/onboarding/copilot/greeting-prep` | Yes | Generate (or fetch cached) personalised /welcome greeting via Haiku — quotes one concrete detail from `business_summary`. Returns `{greeting: str \| null}`; null means fall back to static i18n. |
-| GET | `/onboarding/copilot/starter-suggestions` | Yes | Three industry-aware research-starter chip strings tailored to captured profile (Haiku, 24h cache). |
-| GET | `/onboarding/demo-bundle?variant=<key>` | Yes | Structured demo-study bundle for the sample-study modal (synthesis / quotes / guide). Variant = `saas` (default) / `b2b_specifier` / `consumer`. Locale auto-derived from `preferred_language`. |
-| POST | `/onboarding/study` | Yes | Accept a `create_first_study` proposal — creates Project + guide questions + interview link in one transaction. |
-| POST | `/onboarding/research-plan` | Yes | Accept a `create_research_plan` proposal (Wave E) — creates `ResearchPlan` + `ResearchPlanStep` rows. Drafts the first `voice_interview` step (regardless of position) as a real Project + interview link. Non-voice steps stay `pending`. Returns `{plan_id, project_id, study_name, interview_token}`. |
+| POST | `/projects/{id}/copilot` | Yes | Run a Copilot turn for a project (interview adapter) — SSE stream. Rate-limited per account + daily spend gate. |
+| GET/PUT | `/projects/{id}/copilot/conversation` | Yes | Load / persist the panel thread (optimistic `version`) |
+| POST | `/surveys/{id}/copilot` | Yes | Run a Copilot turn for a survey (survey adapter) — SSE stream. Rate-limited per account + daily spend gate. |
+| GET/PUT | `/surveys/{id}/copilot/conversation` | Yes | Load / persist the panel thread (optimistic `version`) |
 
 > The legacy `/research/*` endpoints (parse-brief, suggest-objective, suggest-scope, suggest-questions) have been **removed**. Their flow is now driven by the Copilot via tool calls / proposal actions.
 

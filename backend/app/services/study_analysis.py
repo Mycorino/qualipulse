@@ -303,10 +303,15 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=4096,
-        temperature=0.3,
+        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
+
+    from app.services.usage_logger import log_claude_usage
+
+    log_claude_usage(db, response, "study_analysis", company_id=study.company_id)
+
     raw = response.content[0].text.strip()
     if raw.startswith("```"):
         lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]

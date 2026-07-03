@@ -10390,6 +10390,11 @@ select.field-input {
   opacity: 0.6;
   cursor: pointer;
   line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: var(--text-sm);
 }
 .copilot-nudge__dismiss:hover { opacity: 1; }
@@ -11676,6 +11681,11 @@ select.field-input {
   color: var(--text-tertiary);
   cursor: pointer;
   line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .copilot-panel__close:hover { color: var(--text-primary); }
 
@@ -11741,6 +11751,14 @@ select.field-input {
   font-style: italic;
 }
 .copilot-msg__text { white-space: pre-wrap; }
+.copilot-msg__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  margin-top: var(--space-2, 8px);
+  color: var(--warning-text, #8a5a00);
+  font-size: var(--text-sm, 0.875rem);
+}
 .copilot-msg__text code {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.92em;

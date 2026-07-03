@@ -32,7 +32,7 @@ logger = logging.getLogger("auto_interview")
 # Pinned, known-good current models (verified live). Keep these current.
 _DEFAULTS = {
     "sonnet": "claude-sonnet-4-6",
-    "opus": "claude-opus-4-7",
+    "opus": "claude-opus-4-8",  # same $5/$25 pricing + request surface as 4.7
     "haiku": "claude-haiku-4-5",
 }
 
@@ -85,6 +85,31 @@ def opus() -> str:
 def haiku() -> str:
     """Lightweight tasks — onboarding personalisation, name lookup, etc."""
     return _resolved()["haiku"]
+
+
+# Model generations that REJECT non-default sampling params — passing
+# `temperature` / `top_p` / `top_k` to these returns a 400. (Opus 4.7 removed
+# them; Opus 4.8 keeps that surface; Sonnet 5 rejects non-default values.)
+_NO_SAMPLING_MARKERS = (
+    "opus-4-7",
+    "opus-4-8",
+    "sonnet-5",
+    "fable",
+    "mythos",
+)
+
+
+def temperature_kwargs(model_id: str, temperature: float) -> dict:
+    """``{"temperature": X}`` for models that accept it, ``{}`` otherwise.
+
+    Call sites splat this (``**ai_models.temperature_kwargs(model, 0.3)``)
+    instead of passing ``temperature=`` directly, so flipping a model pin or
+    enabling ``MODEL_AUTO_LATEST`` can never 400 an existing caller.
+    """
+    lowered = (model_id or "").lower()
+    if any(marker in lowered for marker in _NO_SAMPLING_MARKERS):
+        return {}
+    return {"temperature": temperature}
 
 
 def log_resolved() -> None:

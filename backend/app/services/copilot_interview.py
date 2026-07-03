@@ -894,5 +894,9 @@ INTERVIEW_ADAPTER = CopilotAdapter(
     snapshot=_guide_snapshot,
     run_tool=_guide_run_tool,
     stub=_guide_stub,
-    default_reply="Done — review the proposed changes in your interview guide.",
+    default_reply={
+        "en": "Done — review the proposed changes in your interview guide.",
+        "fr": "Terminé — passez en revue les modifications proposées dans "
+        "votre guide d'entretien.",
+    },
 )

@@ -11,24 +11,31 @@ with its own adapter (see ``services/copilot.py`` / ``copilot_interview.py``):
 it resumes when the researcher navigates away and back.
 """
 
+import hashlib
 import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
+from slowapi.util import get_remote_address
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.limiter import limiter
+from app.logging_config import logger
 from app.models.company import Company
 from app.models.project import Project
 from app.models.survey import Survey
+from app.models.usage import AIUsageLog
 from app.schemas.copilot import (
     ConversationState,
     CopilotRequest,
     CopilotResponse,
 )
 from app.services.copilot import (
+    ERROR_REPLY,
     SURVEY_ADAPTER,
     get_conversation,
     get_memory,
@@ -37,6 +44,47 @@ from app.services.copilot import (
     save_conversation,
 )
 from app.services.copilot_interview import INTERVIEW_ADAPTER
+
+
+def _copilot_rate_key(request: Request) -> str:
+    """Rate-limit key for copilot turns: the bearer token (per account)
+    rather than the IP, so an office NAT isn't collectively throttled and
+    one account can't fan out across IPs. Falls back to IP when absent."""
+    auth = request.headers.get("authorization")
+    if auth:
+        return hashlib.sha256(auth.encode()).hexdigest()
+    return get_remote_address(request)
+
+
+def _check_copilot_budget(db: Session, company: Company) -> None:
+    """Per-workspace daily spend ceiling. One copilot turn can make up to
+    8 Opus calls — without a ceiling, the rate limit alone still permits
+    hundreds of dollars a day from a single account."""
+    limit = settings.COPILOT_DAILY_COST_LIMIT_USD
+    if limit <= 0:
+        return
+    day_start = datetime.utcnow().replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    spent = (
+        db.query(func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0))
+        .filter(
+            AIUsageLog.company_id == company.id,
+            AIUsageLog.operation == "copilot",
+            AIUsageLog.created_at >= day_start,
+        )
+        .scalar()
+        or 0.0
+    )
+    if spent >= limit:
+        logger.warning(
+            "Copilot daily budget reached (company=%s spent=$%.2f limit=$%.2f)",
+            company.id, spent, limit,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="copilot_daily_limit_reached",
+        )
 
 
 def _sse_event(event: dict) -> str:
@@ -74,23 +122,53 @@ def _stream_copilot_response(
         from app.models.project import Project as _Project
         from app.models.survey import Survey as _Survey
 
-        with _Session(engine) as gen_db:
-            comp = gen_db.query(_Company).filter(_Company.id == company_id).one()
-            if instrument_kind == "project":
-                inst = gen_db.query(_Project).filter(
-                    _Project.id == instrument_id
+        # The turn engine guarantees its own terminal `done` event, but the
+        # wrapper here can still fail (instrument deleted between the
+        # ownership check and iteration start, engine errors, serialization).
+        # Without a catch, Starlette aborts the response mid-stream and the
+        # client hangs until its idle timeout — so ALWAYS emit a terminal
+        # event. GeneratorExit (client disconnect) must propagate untouched.
+        lang = "en"
+        try:
+            with _Session(engine) as gen_db:
+                comp = gen_db.query(_Company).filter(
+                    _Company.id == company_id
                 ).one()
-            elif instrument_kind == "survey":
-                inst = gen_db.query(_Survey).filter(
-                    _Survey.id == instrument_id
-                ).one()
-            else:
-                raise ValueError(f"Unknown instrument kind: {instrument_kind}")
-            for event in run_copilot_turn_stream(
-                gen_db, comp, inst, adapter, body.messages,
-                body.active_section, body.mission,
-            ):
-                yield _sse_event(event)
+                if (comp.preferred_language or "en").startswith("fr"):
+                    lang = "fr"
+                if instrument_kind == "project":
+                    inst = gen_db.query(_Project).filter(
+                        _Project.id == instrument_id
+                    ).one()
+                elif instrument_kind == "survey":
+                    inst = gen_db.query(_Survey).filter(
+                        _Survey.id == instrument_id
+                    ).one()
+                else:
+                    raise ValueError(
+                        f"Unknown instrument kind: {instrument_kind}"
+                    )
+                for event in run_copilot_turn_stream(
+                    gen_db, comp, inst, adapter, body.messages,
+                    body.active_section, body.mission,
+                ):
+                    yield _sse_event(event)
+        except GeneratorExit:
+            raise
+        except Exception as exc:
+            logger.error(
+                "Copilot stream wrapper failed (%s %s): %s",
+                instrument_kind, instrument_id, exc,
+            )
+            yield _sse_event(
+                {
+                    "type": "done",
+                    "reply": ERROR_REPLY[lang],
+                    "proposed_actions": [],
+                    "memory_updated": False,
+                    "error": True,
+                }
+            )
 
     return StreamingResponse(
         stream(), media_type="text/event-stream", headers=_SSE_HEADERS,
@@ -129,7 +207,9 @@ def _project_or_404(db: Session, project_id: str, company: Company) -> Project:
 
 
 @router.post("/surveys/{survey_id}/copilot")
+@limiter.limit(settings.RATE_LIMIT_COPILOT, key_func=_copilot_rate_key)
 def survey_copilot(
+    request: Request,
     survey_id: str,
     body: CopilotRequest,
     db: Session = Depends(get_db),
@@ -139,6 +219,7 @@ def survey_copilot(
     See project_copilot for the event schema and the session-lifetime
     workaround for Depends(get_db) under StreamingResponse."""
     _survey_or_404(db, survey_id, company)
+    _check_copilot_budget(db, company)
     return _stream_copilot_response(
         engine=db.get_bind(),
         company_id=company.id,
@@ -182,7 +263,9 @@ def put_survey_conversation(
 
 
 @router.post("/projects/{project_id}/copilot")
+@limiter.limit(settings.RATE_LIMIT_COPILOT, key_func=_copilot_rate_key)
 def project_copilot(
+    request: Request,
     project_id: str,
     body: CopilotRequest,
     db: Session = Depends(get_db),
@@ -192,6 +275,7 @@ def project_copilot(
     progress + the reply text as SSE. The terminal `done` event carries
     the authoritative {reply, proposed_actions, memory_updated}."""
     _project_or_404(db, project_id, company)
+    _check_copilot_budget(db, company)
     return _stream_copilot_response(
         engine=db.get_bind(),
         company_id=company.id,

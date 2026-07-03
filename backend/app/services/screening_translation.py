@@ -108,7 +108,7 @@ Return ONLY a JSON array of the same length and order. Each item:
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=4096,
-        temperature=0.2,
+        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.2),
         messages=[{"role": "user", "content": prompt}],
     )
     log_claude_usage(
@@ -188,7 +188,7 @@ Title: {project.name}"""
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=200,
-        temperature=0.2,
+        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.2),
         messages=[{"role": "user", "content": prompt}],
     )
     log_claude_usage(
@@ -257,7 +257,7 @@ Text: {text}"""
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=1024,
-        temperature=0.2,
+        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.2),
         messages=[{"role": "user", "content": prompt}],
     )
     log_claude_usage(

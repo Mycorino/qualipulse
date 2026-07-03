@@ -24,7 +24,7 @@ def test_pinned_defaults(fresh_registry, monkeypatch):
     monkeypatch.setattr(settings, "MODEL_AUTO_LATEST", False)
     m = fresh_registry()
     assert m.sonnet() == "claude-sonnet-4-6"
-    assert m.opus() == "claude-opus-4-7"
+    assert m.opus() == "claude-opus-4-8"
     assert m.haiku() == "claude-haiku-4-5"
 
 

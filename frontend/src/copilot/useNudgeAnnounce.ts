@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { Nudge } from "./signals";
 
@@ -9,6 +10,7 @@ import type { Nudge } from "./signals";
  * ids already spoken.
  */
 export function useNudgeAnnounce(nudges: Nudge[] | undefined): string {
+  const { t } = useTranslation("dashboard");
   const announced = useRef<Set<string>>(new Set());
   const [message, setMessage] = useState("");
 
@@ -16,7 +18,11 @@ export function useNudgeAnnounce(nudges: Nudge[] | undefined): string {
     const fresh = (nudges ?? []).filter((n) => !announced.current.has(n.id));
     if (fresh.length === 0) return;
     fresh.forEach((n) => announced.current.add(n.id));
-    setMessage(fresh[fresh.length - 1].text);
+    const latest = fresh[fresh.length - 1];
+    setMessage(
+      latest.textKey ? t(latest.textKey, latest.textParams) : latest.text ?? "",
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nudges]);
 
   return message;

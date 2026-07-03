@@ -205,7 +205,8 @@
       "accept": "Accepter",
       "dismiss": "Ignorer",
       "applied": "✓ Appliqué",
-      "dismissed": "Ignoré"
+      "dismissed": "Ignoré",
+      "unsupported": "Cette suggestion nécessite une version plus récente de l'application."
     },
     "type": {
       "likert": "Échelle de Likert",
@@ -214,6 +215,15 @@
       "nps": "NPS",
       "open_text": "Texte libre",
       "short_text": "Texte court"
+    },
+    "stop": "Arrêter",
+    "retry": "Réessayer",
+    "errorInline": "Cette réponse ne s'est pas terminée — vous pouvez réessayer.",
+    "missions": {
+      "overview": "Faire avancer cette vague d'entretiens.",
+      "setup": "Préparer ce guide d'entretien pour la collecte.",
+      "responses": "Suivre les données et repérer tôt les problèmes de qualité.",
+      "analysis": "Transformer les transcriptions en décisions."
     }
   },
   "nba": {
@@ -305,6 +315,25 @@
     "workspaceDone": {
       "label": "Vos études avancent toutes",
       "reason": "Chaque étude a un rapport — rien ne requiert votre attention pour le moment."
+    },
+    "analysisGenerating": {
+      "label": "Analyse en cours…",
+      "reason": "La synthèse IA est en cours de génération — revenez dans une minute."
+    },
+    "retryAnalysis": {
+      "label": "Relancer l'analyse",
+      "reason": "La dernière analyse a échoué — relancez-la."
+    },
+    "collectMore": {
+      "label": "Collectez plus d'entretiens ({{count}}/{{min}})",
+      "reason": "L'analyse se débloque à {{min}} entretiens terminés."
     }
+  },
+  "nudges": {
+    "analysisReady": "Votre analyse est prête à consulter.",
+    "dataMilestone": "Vous avez {{count}} entretiens terminés — assez pour lancer l'analyse.",
+    "analysisStale": "{{count}} nouveaux entretiens depuis la dernière analyse — pensez à l'actualiser.",
+    "qualityFlag": "Un entretien de faible qualité vient d'arriver — à vérifier.",
+    "studyReportReady": "« {{name}} » — le rapport d'analyse est prêt."
   }
 }

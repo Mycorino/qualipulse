@@ -1082,6 +1082,7 @@ def send_personalized_welcome(
     industry: str | None = None,
     selected_use_cases: list[str] | None = None,
     lang: str = "en",
+    company_id: str | None = None,
 ) -> bool:
     """Send a Claude-generated personalised welcome email after onboarding.
 
@@ -1101,6 +1102,7 @@ def send_personalized_welcome(
             industry=industry,
             selected_use_cases=selected_use_cases,
             language=lang,
+            company_id=company_id,
         )
         if not body_html:
             raise ValueError("Generator returned empty body")

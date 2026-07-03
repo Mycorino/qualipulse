@@ -477,7 +477,7 @@ async def fetch_website_summary(
             msg = ai_client.messages.create(
                 model=_MODEL,
                 max_tokens=_MAX_TOKENS,
-                temperature=0.3,
+                **ai_models.temperature_kwargs(_MODEL, 0.3),
                 messages=[{
                     "role": "user",
                     "content": _build_prompt_with_content(
@@ -515,7 +515,7 @@ async def fetch_website_summary(
         search_msg = ai_client.messages.create(
             model=_MODEL,
             max_tokens=_MAX_TOKENS,
-            temperature=0.3,
+            **ai_models.temperature_kwargs(_MODEL, 0.3),
             tools=[{
                 "type": "web_search_20250305",
                 "name": "web_search",

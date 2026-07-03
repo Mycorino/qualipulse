@@ -187,7 +187,7 @@ Return ONLY a JSON object — no markdown fences, no preamble:
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=512,
-        temperature=0.3,
+        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
         messages=[{"role": "user", "content": prompt}],
     )
 

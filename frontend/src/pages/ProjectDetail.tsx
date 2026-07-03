@@ -72,12 +72,14 @@ import type { ProposedGuideQuestion } from "../api/copilot";
 
 type Tab = "overview" | "setup" | "responses" | "analysis";
 
-/** The copilot's one-line mission per tab — what it's helping with here. */
-const PROJECT_MISSIONS: Record<Tab, string> = {
-  overview: "Keep this round moving.",
-  setup: "Get this interview guide ready to collect.",
-  responses: "Watch the data land and flag quality problems early.",
-  analysis: "Turn transcripts into decisions.",
+/** The copilot's one-line mission per tab — i18n keys in the dashboard
+ * namespace, resolved at render so FR users don't get a mixed-language
+ * panel header. */
+const PROJECT_MISSION_KEYS: Record<Tab, string> = {
+  overview: "copilot.missions.overview",
+  setup: "copilot.missions.setup",
+  responses: "copilot.missions.responses",
+  analysis: "copilot.missions.analysis",
 };
 
 const PRESET_COLORS = [
@@ -92,6 +94,7 @@ export default function ProjectDetail() {
   const { t: tAnalysis, i18n } = useTranslation("analysis");
   const { t: tProject } = useTranslation("project");
   const { t: tCommon } = useTranslation("common");
+  const { t: tDashboard } = useTranslation("dashboard");
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Header / coachmarks / overflow menu ───────────────────────────────
@@ -370,6 +373,7 @@ export default function ProjectDetail() {
           analysisStatus: analysis?.status ?? "none",
           completedCount: completedParts.length,
           analysisParticipantCount: analysis?.participant_count ?? 0,
+          analysisVersion: analysis?.version ?? 0,
           lowQualityCount: completedParts.filter(
             (p) => p.quality_label === "low",
           ).length,
@@ -1503,9 +1507,9 @@ export default function ProjectDetail() {
     analysisStatus:
       (analysis?.status as ProjectNbaInput["analysisStatus"]) ?? "none",
     analysisParticipantCount: analysis?.participant_count ?? 0,
-    annotationCount: 0,
+    annotationCount: Object.keys(themeAnnotations).length,
   };
-  const projectMission = PROJECT_MISSIONS[tab];
+  const projectMission = tDashboard(PROJECT_MISSION_KEYS[tab]);
   const projectNextAction = resolveProjectNextAction(projectNbaInput);
 
   /** Add a blank guide question inline (then edit it in place). The old
@@ -1513,15 +1517,18 @@ export default function ProjectDetail() {
    *  the manual fallback. */
   const addBlankGuideQuestion = async () => {
     if (!id) return;
+    // Guide content follows the PROJECT's language (participants see it),
+    // not the researcher's UI language.
+    const guideIsFr = (project?.language ?? "en").startsWith("fr");
     try {
       await createGuideQuestion(id, {
         section_title: "Questions",
-        main_question: "New question",
+        main_question: guideIsFr ? "Nouvelle question" : "New question",
       });
       const fresh = await getProject(id);
       setProject(fresh);
     } catch {
-      toast("Could not add a question", "error");
+      toast(tProject("setup.addQuestionError"), "error");
     }
   };
   const instrumentSections = [

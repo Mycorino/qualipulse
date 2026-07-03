@@ -191,7 +191,12 @@ Rules:
 """
 
 
-def _maybe_call_claude_for_rewrite(prompt: str, flag_codes: list[str]) -> str | None:
+def _maybe_call_claude_for_rewrite(
+    prompt: str,
+    flag_codes: list[str],
+    db=None,
+    company_id: str | None = None,
+) -> str | None:
     """Ask Claude Haiku for ONE rewritten prompt.
 
     Returns None when the API key is absent (tests / dev), so the coach
@@ -219,10 +224,14 @@ def _maybe_call_claude_for_rewrite(prompt: str, flag_codes: list[str]) -> str | 
         resp = client.messages.create(
             model=ai_models.haiku(),
             max_tokens=200,
-            temperature=0.2,
+            **ai_models.temperature_kwargs(ai_models.haiku(), 0.2),
             system=_REWRITE_PROMPT,
             messages=[{"role": "user", "content": user}],
         )
+        if db is not None:
+            from app.services.usage_logger import log_claude_usage
+
+            log_claude_usage(db, resp, "question_coach", company_id=company_id)
         raw = resp.content[0].text.strip()
         if raw.startswith("```"):
             lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
@@ -246,6 +255,8 @@ def lint_question(
     question_type: str,
     config: dict[str, Any] | None = None,
     with_rewrite: bool = True,
+    db=None,
+    company_id: str | None = None,
 ) -> LintResult:
     """Lint a question prompt + config; optionally add a Claude rewrite.
 
@@ -262,7 +273,9 @@ def lint_question(
         }
     ]
     if with_rewrite and rewriteable_codes:
-        rewrite = _maybe_call_claude_for_rewrite(prompt, rewriteable_codes)
+        rewrite = _maybe_call_claude_for_rewrite(
+            prompt, rewriteable_codes, db=db, company_id=company_id
+        )
         if rewrite:
             for f in flags:
                 if f.code in rewriteable_codes:

@@ -324,7 +324,7 @@ def run_analysis(
             # 0.3: synthesis requires judgment but not creativity. Lower
             # temperature reduces hallucinated quotes and inflated frequency
             # claims — the dominant failure mode of analysis at small N.
-            temperature=0.3,
+            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
             system=ANALYSIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -523,7 +523,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
             # 0.3: synthesis requires judgment but not creativity. Lower
             # temperature reduces hallucinated quotes and inflated frequency
             # claims — the dominant failure mode of analysis at small N.
-            temperature=0.3,
+            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
             system=ANALYSIS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )

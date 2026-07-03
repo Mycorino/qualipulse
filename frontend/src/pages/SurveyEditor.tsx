@@ -217,13 +217,20 @@ export default function SurveyEditor() {
   // count and status; post-launch response/report data lives on the
   // survey dashboard (a later phase).
   const surveyMission = t("editor.mission");
-  const surveyNextAction = resolveSurveyNextAction({
-    questionCount: questions.length,
-    status: survey.status,
-    completedResponses: 0,
-    hasReport: false,
-    reportResponseCount: 0,
-  });
+  // Once the survey is live, the post-publish rungs need response counts
+  // this surface doesn't load — a chip built from zeros would show
+  // "Share the survey (0/30)" against a survey with hundreds of responses.
+  // Better no chip than a wrong one.
+  const surveyNextAction =
+    survey.status === "live" || survey.status === "closed"
+      ? undefined
+      : resolveSurveyNextAction({
+          questionCount: questions.length,
+          status: survey.status,
+          completedResponses: 0,
+          hasReport: false,
+          reportResponseCount: 0,
+        });
 
   return (
     <InstrumentShell

@@ -12,7 +12,9 @@ from pydantic import BaseModel, Field
 
 class CopilotMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str
+    # Bounded — the request body is client-controlled and goes straight
+    # into an Opus prompt; unbounded content is an open cost hole.
+    content: str = Field(..., max_length=8_000)
 
 
 class CopilotRequest(BaseModel):
@@ -23,11 +25,15 @@ class CopilotRequest(BaseModel):
     one-line job the copilot is helping with on this surface (e.g. "Turn
     transcripts into decisions"). Both are optional — they let the agent
     bias its help toward where the researcher sits.
+
+    ``messages`` is capped: the server only feeds the recent tail to the
+    model anyway (see ``copilot.MAX_MODEL_MESSAGES``), so a longer history
+    in the request is pure cost with no benefit.
     """
 
-    messages: list[CopilotMessage] = Field(..., min_length=1)
-    active_section: str | None = None
-    mission: str | None = None
+    messages: list[CopilotMessage] = Field(..., min_length=1, max_length=60)
+    active_section: str | None = Field(default=None, max_length=200)
+    mission: str | None = Field(default=None, max_length=500)
 
 
 class CopilotResponse(BaseModel):

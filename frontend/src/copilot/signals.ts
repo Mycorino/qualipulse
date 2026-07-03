@@ -28,7 +28,12 @@ export interface Nudge {
   id: string;
   event: NudgeEvent;
   scopeId: string;
-  text: string;
+  /** i18n key in the `dashboard` namespace (+ interpolation params).
+   *  Stored as a key so persisted nudges re-localize on language switch. */
+  textKey: string;
+  textParams?: Record<string, string | number>;
+  /** Legacy field — nudges persisted before the i18n refactor. */
+  text?: string;
   tone: "positive" | "neutral" | "caution";
   createdAt: number;
 }
@@ -39,6 +44,10 @@ export interface ProjectSnapshot {
   completedCount: number;
   analysisParticipantCount: number;
   lowQualityCount: number;
+  /** Version of the latest analysis — disambiguates re-runs that happen
+   *  to cover the same participant count (id-reuse would otherwise keep
+   *  a re-run permanently suppressed after one dismissal). */
+  analysisVersion?: number;
 }
 
 /** The diff-relevant slice of a study, for home-page detection. */
@@ -119,13 +128,15 @@ function makeNudge(
   event: NudgeEvent,
   scopeId: string,
   idSuffix: string | number,
-  text: string,
+  textKey: string,
+  textParams?: Record<string, string | number>,
 ): Nudge {
   return {
     id: `${scopeId}:${event}:${idSuffix}`,
     event,
     scopeId,
-    text,
+    textKey,
+    textParams,
     tone: NUDGE_TONE[event],
     createdAt: Date.now(),
   };
@@ -161,8 +172,8 @@ export function detectProjectNudges(
         makeNudge(
           "analysis_ready",
           scopeId,
-          curr.analysisParticipantCount,
-          "Your analysis is ready to review.",
+          `${curr.analysisVersion ?? 0}-${curr.analysisParticipantCount}`,
+          "nudges.analysisReady",
         ),
       );
     }
@@ -175,7 +186,8 @@ export function detectProjectNudges(
           "data_milestone",
           scopeId,
           ANALYSE_THRESHOLD,
-          `You've got ${curr.completedCount} completed interviews — enough to analyse.`,
+          "nudges.dataMilestone",
+          { count: curr.completedCount },
         ),
       );
     }
@@ -191,7 +203,8 @@ export function detectProjectNudges(
           "analysis_stale",
           scopeId,
           curr.completedCount,
-          `${currGap} new interviews since the last analysis — worth refreshing.`,
+          "nudges.analysisStale",
+          { count: currGap },
         ),
       );
     }
@@ -201,7 +214,7 @@ export function detectProjectNudges(
           "quality_flag",
           scopeId,
           curr.lowQualityCount,
-          "A low-quality interview just came in — worth a look.",
+          "nudges.qualityFlag",
         ),
       );
     }
@@ -248,7 +261,8 @@ export function detectWorkspaceNudges(studies: StudyReportInput[]): Nudge[] {
           "study_report_ready",
           s.id,
           "report",
-          `“${s.name}” — the analysis report is ready.`,
+          "nudges.studyReportReady",
+          { name: s.name },
         ),
       );
     }

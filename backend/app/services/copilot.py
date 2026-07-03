@@ -7,7 +7,8 @@ persistence, and prompt assembly stay generic.
 
 Design notes
 ------------
-- Model: ``claude-opus-4-7`` with adaptive thinking — research-grade
+- Model: the current Opus pin (see ``ai_models.opus()``) with adaptive
+  thinking — research-grade
   qualitative reasoning (reading transcripts, respecting confidence
   levels, separating observation from recommendation). Adaptive thinking
   self-moderates, so trivial guide-edit turns stay fast while results
@@ -41,6 +42,39 @@ from app.services import ai_models
 
 MODEL = ai_models.opus()
 MAX_AGENT_TURNS = 8
+
+# Server-side caps on what one HTTP turn can send to the model. The client
+# already trims its persisted thread, but the request body is client-
+# controlled — without these a caller could stream an arbitrarily long
+# history straight into Opus at full input price.
+MAX_MODEL_MESSAGES = 40
+MAX_MESSAGE_CHARS = 8_000
+
+
+def _lang(company) -> str:
+    """Two-letter UI language for user-facing canned strings."""
+    lang = getattr(company, "preferred_language", None) or "en"
+    return "fr" if lang.startswith("fr") else "en"
+
+
+# User-facing canned replies. These land in the chat thread as the
+# assistant bubble, so they must follow the researcher's UI language —
+# same rule as _TOOL_LABELS below.
+UNAVAILABLE_REPLY = {
+    "en": "The copilot is briefly unavailable — please try again in a moment.",
+    "fr": "Le copilote est momentanément indisponible — veuillez réessayer "
+    "dans un instant.",
+}
+ERROR_REPLY = {
+    "en": "Something went wrong — please try again.",
+    "fr": "Une erreur s'est produite — veuillez réessayer.",
+}
+REFUSAL_REPLY = {
+    "en": "I can't help with that request. Try rephrasing it around your "
+    "research goal.",
+    "fr": "Je ne peux pas répondre à cette demande. Essayez de la reformuler "
+    "autour de votre objectif de recherche.",
+}
 
 
 # ── Memory (scoped: company / study / instrument) ────────────────────────────
@@ -159,68 +193,102 @@ def save_conversation(
     if len(thread) > MAX_CONVERSATION_TURNS:
         thread = thread[-MAX_CONVERSATION_TURNS:]
     payload = json.dumps(thread, ensure_ascii=False)
-    row = (
+
+    # Atomic compare-and-swap: the version check happens INSIDE the UPDATE's
+    # WHERE clause, so two concurrent writers that both loaded version N
+    # can't both win — the second one matches zero rows.
+    filters = [
+        CopilotConversation.scope_kind == scope_kind,
+        CopilotConversation.scope_id == scope_id,
+    ]
+    if expected_version is not None:
+        filters.append(CopilotConversation.version == expected_version)
+    updated = (
         db.query(CopilotConversation)
+        .filter(*filters)
+        .update(
+            {
+                CopilotConversation.thread: payload,
+                CopilotConversation.version: CopilotConversation.version + 1,
+                CopilotConversation.updated_at: datetime.utcnow(),
+            },
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    if updated:
+        if expected_version is not None:
+            return expected_version + 1
+        row = (
+            db.query(CopilotConversation.version)
+            .filter(
+                CopilotConversation.scope_kind == scope_kind,
+                CopilotConversation.scope_id == scope_id,
+            )
+            .scalar()
+        )
+        return row or 1
+
+    # Zero rows matched: either the row doesn't exist yet, or the version
+    # check failed (stale write).
+    current = (
+        db.query(CopilotConversation.version)
         .filter(
             CopilotConversation.scope_kind == scope_kind,
             CopilotConversation.scope_id == scope_id,
         )
-        .first()
+        .scalar()
     )
-    if row is None:
-        row = CopilotConversation(
-            company_id=company_id,
-            scope_kind=scope_kind,
-            scope_id=scope_id,
-            thread=payload,
-            version=1,
+    if current is not None:
+        logger.warning(
+            "Stale conversation write discarded: scope=%s/%s expected_v=%s actual_v=%d",
+            scope_kind, scope_id, expected_version, current,
         )
-        db.add(row)
+        return current
+
+    # First save for this scope. Two concurrent first saves race on the
+    # unique (scope_kind, scope_id) index — the loser rolls back and
+    # reports the winner's version instead of surfacing a 500.
+    from sqlalchemy.exc import IntegrityError
+
+    row = CopilotConversation(
+        company_id=company_id,
+        scope_kind=scope_kind,
+        scope_id=scope_id,
+        thread=payload,
+        version=1,
+    )
+    db.add(row)
+    try:
         db.commit()
         return 1
-    if expected_version is not None and row.version != expected_version:
-        logger.warning(
-            "Stale conversation write discarded: scope=%s/%s expected_v=%d actual_v=%d",
-            scope_kind, scope_id, expected_version, row.version,
+    except IntegrityError:
+        db.rollback()
+        current = (
+            db.query(CopilotConversation.version)
+            .filter(
+                CopilotConversation.scope_kind == scope_kind,
+                CopilotConversation.scope_id == scope_id,
+            )
+            .scalar()
         )
-        return row.version
-    row.thread = payload
-    row.version += 1
-    row.updated_at = datetime.utcnow()
-    db.commit()
-    return row.version
+        return current or 1
 
 
 # ── Surface adapter ──────────────────────────────────────────────────────────
 
 
-# When a primary proposal (research plan or first study) is in a turn,
-# strip secondary lightweight-capture chips so the user's attention
-# stays on the accept CTA. Belt-and-suspenders to the methodology rule.
-_PRIMARY_PROPOSAL_TYPES = {"create_research_plan", "create_first_study"}
-_SIDE_CAPTURE_CONTEXTS = {
-    "referral_source",
-    "current_tool",
-    "research_experience",
-}
-
-
 def _filter_proposal_turn_actions(actions: list[dict]) -> list[dict]:
-    """If this turn contains a primary proposal card, drop any
-    lightweight-signal suggest_replies chip groups so the proposal
-    owns the screen. Pure function — easy to test."""
-    has_primary = any(
-        a.get("type") in _PRIMARY_PROPOSAL_TYPES for a in actions
-    )
-    if not has_primary:
+    """PROPOSAL TURN OWNS THE SCREEN: when a turn stages any real proposal
+    card (guide question, objective, screener, settings, analysis, survey
+    question…), drop suggest_replies chip groups so the researcher's
+    attention stays on the accept CTA. Belt-and-suspenders enforcement of
+    the methodology rule ("never attach options to the turn where you
+    propose"). Pure function — easy to test."""
+    has_proposal = any(a.get("type") != "suggest_replies" for a in actions)
+    if not has_proposal:
         return list(actions)
-    return [
-        a for a in actions
-        if not (
-            a.get("type") == "suggest_replies"
-            and a.get("context") in _SIDE_CAPTURE_CONTEXTS
-        )
-    ]
+    return [a for a in actions if a.get("type") != "suggest_replies"]
 
 
 def _suppress_opening_chips(
@@ -254,7 +322,9 @@ class CopilotAdapter:
     run_tool: Callable[..., str]
     # (instrument, history) -> {reply, proposed_actions, memory_updated}
     stub: Callable[..., dict]
-    default_reply: str
+    # Per-language fallback shown when the model emits only tool calls with
+    # no prose (a common proposal turn) — keys "en" / "fr".
+    default_reply: dict
 
 
 def remember_tool(instrument_scope: str) -> dict:
@@ -309,7 +379,14 @@ re-save what's there.
 - Every proposed item carries a one-line rationale.
 
 Be concise and warm. The chat is for clarifying intent — the instrument \
-itself is where your work lands."""
+itself is where your work lands.
+
+Language:
+- Write your chat replies in the researcher's UI language (given in the \
+context block below). Mirror the researcher if they switch languages.
+- Write all instrument content you propose — questions, answer options, \
+objectives, screeners — in the instrument's own language (also given \
+below): participants see that content, not the researcher's UI language."""
 
 
 def _memory_block(db: Session, label: str, scope_kind: str, scope_id: str) -> str:
@@ -319,13 +396,30 @@ def _memory_block(db: Session, label: str, scope_kind: str, scope_id: str) -> st
     return ""
 
 
-def _system_prompt(
+def _stable_system_text(adapter: CopilotAdapter) -> str:
+    """The cacheable prefix: base rules + surface methodology. MUST stay
+    byte-identical across requests for the same surface — prompt caching is
+    a prefix match, so anything volatile (memory, snapshot, tab, mission,
+    languages) belongs in the context block AFTER the cache breakpoint."""
+    return f"{_BASE_SYSTEM}\n\n{adapter.methodology}"
+
+
+def _context_system_text(
     db: Session, company: Company, instrument, adapter: CopilotAdapter
 ) -> str:
-    # Stack every applicable memory tier, broadest first. The onboarding
-    # surface's "instrument" is the Company itself — it has no study_id,
-    # and its instrument scope would duplicate the workspace block — so
-    # both are guarded.
+    """The volatile context: languages, memory tiers, live snapshot.
+    Changes whenever the researcher edits anything — which is exactly why
+    it must NOT sit inside the cached prefix."""
+    ui_lang = getattr(company, "preferred_language", None) or "en"
+    instrument_lang = getattr(instrument, "language", None) or ui_lang
+    parts = [
+        f"Researcher UI language: {ui_lang}. "
+        f"Instrument language: {instrument_lang}."
+    ]
+
+    # Stack every applicable memory tier, broadest first. A surface whose
+    # "instrument" is the Company itself has no study_id, and its
+    # instrument scope would duplicate the workspace block — both guarded.
     study_id = getattr(instrument, "study_id", None)
     blocks = _memory_block(
         db, "Workspace memory (applies to every study)", "company", company.id
@@ -344,11 +438,11 @@ def _system_prompt(
         )
     if not blocks:
         blocks = "\n\nYou have no saved memory yet."
+    parts.append(blocks.lstrip("\n"))
+
     snapshot = json.dumps(adapter.snapshot(instrument), ensure_ascii=False)
-    return (
-        f"{_BASE_SYSTEM}\n\n{adapter.methodology}{blocks}"
-        f"\n\nThe instrument right now:\n{snapshot}"
-    )
+    parts.append(f"The instrument right now:\n{snapshot}")
+    return "\n\n".join(parts)
 
 
 # ── Agent loop ───────────────────────────────────────────────────────────────
@@ -412,6 +506,8 @@ _TOOL_LABELS: dict[str, str] = {
     "propose_run_analysis": "Setting up the analysis",
     "propose_refine_analysis": "Setting up the refined analysis",
     # survey
+    "read_survey": "Reading your survey",
+    "propose_questions": "Drafting questions",
     "add_question": "Drafting a question",
     "edit_question": "Revising a question",
     "remove_question": "Removing a question",
@@ -441,6 +537,8 @@ _TOOL_LABELS_FR: dict[str, str] = {
     "propose_screening_questions": "Rédaction du filtre",
     "propose_run_analysis": "Préparation de l'analyse",
     "propose_refine_analysis": "Préparation de l'analyse affinée",
+    "read_survey": "Lecture de votre sondage",
+    "propose_questions": "Rédaction des questions",
     "add_question": "Rédaction d'une question",
     "edit_question": "Révision d'une question",
     "remove_question": "Suppression d'une question",
@@ -469,14 +567,21 @@ def _build_system_blocks(
     active_section: str | None,
     mission: str | None,
 ) -> list[dict]:
-    """The cached system prefix + the volatile tab/mission block."""
+    """Two system blocks: the stable, cached prefix (base + methodology)
+    and the volatile context (languages, memory, snapshot, tab, mission).
+
+    The cache breakpoint sits on block 1 ONLY. Putting memory or the
+    snapshot before the breakpoint would invalidate the whole prefix on
+    every remember/edit — prompt caching is a byte-exact prefix match.
+    """
     system = [
         {
             "type": "text",
-            "text": _system_prompt(db, company, instrument, adapter),
+            "text": _stable_system_text(adapter),
             "cache_control": {"type": "ephemeral"},
         }
     ]
+    context = _context_system_text(db, company, instrument, adapter)
     context_bits: list[str] = []
     if active_section:
         context_bits.append(
@@ -486,17 +591,53 @@ def _build_system_blocks(
     if mission:
         context_bits.append(f"Your mission here: {mission}")
     if context_bits:
-        system.append(
+        context += (
+            "\n\n"
+            + " ".join(context_bits)
+            + " Bias your help toward what is actionable from where "
+            "they sit — but still propose anything relevant if they ask."
+        )
+    system.append({"type": "text", "text": context})
+    return system
+
+
+def _messages_with_cache_marker(history: list[dict]) -> list[dict]:
+    """Shallow-copied history with a cache breakpoint on the last content
+    block of the final message.
+
+    The agent loop re-sends the whole growing history on every one of its
+    (up to MAX_AGENT_TURNS) iterations; marking the tail lets iteration N
+    read iterations 1..N-1 from cache at ~0.1x input price instead of
+    re-billing them in full. The same marker also caches the conversation
+    prefix across HTTP turns. Never mutates the caller's history (it is
+    reused for the next iteration) and never touches assistant/thinking
+    blocks — the final message here is always a user message.
+    """
+    if not history:
+        return history
+    out = list(history)
+    last = dict(out[-1])
+    content = last.get("content")
+    if isinstance(content, str):
+        if not content.strip():
+            return history  # empty text block would be rejected
+        last["content"] = [
             {
                 "type": "text",
-                "text": (
-                    " ".join(context_bits)
-                    + " Bias your help toward what is actionable from where "
-                    "they sit — but still propose anything relevant if they ask."
-                ),
+                "text": content,
+                "cache_control": {"type": "ephemeral"},
             }
-        )
-    return system
+        ]
+    elif isinstance(content, list) and content and isinstance(content[-1], dict):
+        blocks = list(content)
+        final = dict(blocks[-1])
+        final["cache_control"] = {"type": "ephemeral"}
+        blocks[-1] = final
+        last["content"] = blocks
+    else:
+        return history  # SDK objects or unknown shape — leave untouched
+    out[-1] = last
+    return out
 
 
 def run_copilot_turn_stream(
@@ -521,10 +662,18 @@ def run_copilot_turn_stream(
     returns the final dict — same contract as before for non-HTTP callers
     and existing tests that call it directly.
     """
-    history = [{"role": m.role, "content": m.content} for m in messages]
+    lang = _lang(company)
     # First turn = the opening user message is the only user turn so far.
     # Used to keep the interview opener chip-free (open context question).
+    # Computed BEFORE truncation so a capped long thread never reads as new.
     is_first_turn = sum(1 for m in messages if m.role == "user") <= 1
+    # Server-side cap on model input — the schema bounds the request too,
+    # but the model never needs more than the recent tail either way.
+    messages = messages[-MAX_MODEL_MESSAGES:]
+    history = [
+        {"role": m.role, "content": m.content[:MAX_MESSAGE_CHARS]}
+        for m in messages
+    ]
 
     if not settings.ANTHROPIC_API_KEY:
         # Stub path — no streaming, just emit the canned final.
@@ -553,7 +702,7 @@ def run_copilot_turn_stream(
                 tools=adapter.tools,
                 thinking={"type": "adaptive"},
                 output_config={"effort": "high"},
-                messages=history,
+                messages=_messages_with_cache_marker(history),
             ) as stream:
                 for text in stream.text_stream:
                     iteration_text.append(text)
@@ -574,6 +723,12 @@ def run_copilot_turn_stream(
                 )
                 break
 
+            if response.stop_reason == "refusal":
+                logger.warning("Copilot turn refused (company=%s)", company.id)
+                if not reply_parts:
+                    reply_parts.append(REFUSAL_REPLY[lang])
+                break
+
             if response.stop_reason != "tool_use":
                 break
 
@@ -591,6 +746,7 @@ def run_copilot_turn_stream(
                     ),
                 }
                 tool_input = block.input or {}
+                tool_failed = False
                 try:
                     if block.name == "remember":
                         result = _handle_remember(
@@ -605,14 +761,25 @@ def run_copilot_turn_stream(
                         "Copilot tool %s failed (company=%s): %s",
                         block.name, company.id, tool_exc,
                     )
+                    # A failed flush leaves the session in PendingRollback —
+                    # without this, every later commit in the turn (including
+                    # usage logging) would fail silently.
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
                     result = f"Tool error: {block.name} failed."
-                tool_results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result,
-                    }
-                )
+                    tool_failed = True
+                tool_result: dict = {
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                }
+                if tool_failed:
+                    # Flag it so the model treats the failure as a failure
+                    # instead of a successful observation.
+                    tool_result["is_error"] = True
+                tool_results.append(tool_result)
             history.append({"role": "user", "content": tool_results})
     except anthropic.APIError as exc:
         logger.error(
@@ -623,13 +790,10 @@ def run_copilot_turn_stream(
         )
         yield {
             "type": "done",
-            "reply": (
-                "\n\n".join(reply_parts).strip()
-                or "The copilot is briefly unavailable — please try again in a "
-                "moment."
-            ),
+            "reply": "\n\n".join(reply_parts).strip() or UNAVAILABLE_REPLY[lang],
             "proposed_actions": [],
             "memory_updated": turn.memory_updated,
+            "error": True,
         }
         return
     except Exception as exc:
@@ -639,18 +803,19 @@ def run_copilot_turn_stream(
         )
         yield {
             "type": "done",
-            "reply": (
-                "\n\n".join(reply_parts).strip()
-                or "Something went wrong — please try again."
-            ),
+            "reply": "\n\n".join(reply_parts).strip() or ERROR_REPLY[lang],
             "proposed_actions": [],
             "memory_updated": turn.memory_updated,
+            "error": True,
         }
         return
 
     yield {
         "type": "done",
-        "reply": "\n\n".join(reply_parts).strip() or adapter.default_reply,
+        "reply": (
+            "\n\n".join(reply_parts).strip()
+            or adapter.default_reply.get(lang, adapter.default_reply["en"])
+        ),
         "proposed_actions": _filter_proposal_turn_actions(
             _suppress_opening_chips(turn.actions, adapter, is_first_turn)
         ),
@@ -671,7 +836,9 @@ def run_copilot_turn(
     so non-HTTP callers (and tests calling this directly) see the same
     contract as before the streaming refactor."""
     final = {
-        "reply": adapter.default_reply,
+        "reply": adapter.default_reply.get(
+            _lang(company), adapter.default_reply["en"]
+        ),
         "proposed_actions": [],
         "memory_updated": False,
     }
@@ -922,5 +1089,9 @@ SURVEY_ADAPTER = CopilotAdapter(
     snapshot=_survey_snapshot,
     run_tool=_survey_run_tool,
     stub=_survey_stub,
-    default_reply="Done — review the proposed changes in your question list.",
+    default_reply={
+        "en": "Done — review the proposed changes in your question list.",
+        "fr": "Terminé — passez en revue les modifications proposées dans "
+        "votre liste de questions.",
+    },
 )

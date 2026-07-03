@@ -205,7 +205,8 @@
       "accept": "Accept",
       "dismiss": "Dismiss",
       "applied": "✓ Applied",
-      "dismissed": "Dismissed"
+      "dismissed": "Dismissed",
+      "unsupported": "This suggestion needs a newer version of the app."
     },
     "type": {
       "likert": "Likert scale",
@@ -214,6 +215,15 @@
       "nps": "NPS",
       "open_text": "Open text",
       "short_text": "Short text"
+    },
+    "stop": "Stop",
+    "retry": "Retry",
+    "errorInline": "This reply didn't finish — you can retry.",
+    "missions": {
+      "overview": "Keep this round moving.",
+      "setup": "Get this interview guide ready to collect.",
+      "responses": "Watch the data land and flag quality problems early.",
+      "analysis": "Turn transcripts into decisions."
     }
   },
   "nba": {
@@ -305,6 +315,25 @@
     "workspaceDone": {
       "label": "Your studies are all moving",
       "reason": "Every study has a report — nothing needs you right now."
+    },
+    "analysisGenerating": {
+      "label": "Analysis running…",
+      "reason": "The AI synthesis is being generated — check back in a minute."
+    },
+    "retryAnalysis": {
+      "label": "Retry the analysis",
+      "reason": "The last analysis run failed — run it again."
+    },
+    "collectMore": {
+      "label": "Collect more interviews ({{count}}/{{min}})",
+      "reason": "Analysis unlocks at {{min}} completed interviews."
     }
+  },
+  "nudges": {
+    "analysisReady": "Your analysis is ready to review.",
+    "dataMilestone": "You've got {{count}} completed interviews — enough to analyse.",
+    "analysisStale": "{{count}} new interviews since the last analysis — worth refreshing.",
+    "qualityFlag": "A low-quality interview just came in — worth a look.",
+    "studyReportReady": "“{{name}}” — the analysis report is ready."
   }
 }
