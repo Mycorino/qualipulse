@@ -1,5 +1,6 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { signup, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
@@ -126,6 +127,9 @@ export default function Signup() {
 
   return (
     <div className="auth-page">
+      <Helmet>
+        <title>{t("signup.metaTitle")}</title>
+      </Helmet>
       <div className="auth-card">
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           <LanguageSwitcher />
@@ -133,6 +137,7 @@ export default function Signup() {
         <Link to="/" className="auth-logo" style={{ textDecoration: "none", color: "inherit" }}>QualiPulse</Link>
         <h1 className="auth-title">{t("signup.title")}</h1>
         <p className="auth-subtitle">{t("signup.subtitle")}</p>
+        <p className="auth-offer-note">{t("signup.offerNote")}</p>
 
         {error && (
           <div className="error-banner">

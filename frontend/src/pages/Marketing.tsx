@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -188,7 +189,7 @@ function CopilotMockup() {
 }
 
 export default function Marketing() {
-  const { t } = useTranslation("marketing");
+  const { t, i18n } = useTranslation("marketing");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("annual");
   const [activePersona, setActivePersona] = useState(0);
@@ -260,6 +261,30 @@ export default function Marketing() {
 
   return (
     <div className="mkt">
+      <Helmet>
+        <title>{t("meta.title")}</title>
+        <meta name="description" content={t("meta.description")} />
+        <meta property="og:title" content={t("meta.title")} />
+        <meta property="og:description" content={t("meta.description")} />
+        <html lang={(i18n.language || "en").startsWith("fr") ? "fr" : "en"} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: "QualiPulse",
+            applicationCategory: "BusinessApplication",
+            operatingSystem: "Web",
+            description: t("meta.description"),
+            url: "https://app.qualipulse.com",
+            offers: {
+              "@type": "Offer",
+              price: "0",
+              priceCurrency: "EUR",
+              description: "3 free completed interviews, no credit card required",
+            },
+          })}
+        </script>
+      </Helmet>
       {/* ---- Nav ---- */}
       <nav className="mkt-nav">
         <span className="mkt-logo">QualiPulse</span>

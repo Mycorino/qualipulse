@@ -201,15 +201,19 @@ export default function Welcome() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ignore Enter on focused buttons (chips, CTAs) — the click already
+      // handles it, and advancing here too would double-fire the action.
+      if ((e.target as HTMLElement)?.tagName === "BUTTON") return;
       if (e.key === "Enter" && !saving) {
         if (step === 1 && step1Valid) handleStep1Next();
         else if (step === 2 && step2Valid) handleStep2Next();
+        else if (step === 3 && !suggestionsLoading) handleComplete();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, step1Valid, step2Valid, saving, companyName, roleFamily, roleKey, roleOther, teamSize]);
+  }, [step, step1Valid, step2Valid, saving, suggestionsLoading, companyName, roleFamily, roleKey, roleOther, teamSize]);
 
   if (loading || !me) {
     return (
@@ -460,7 +464,7 @@ export default function Welcome() {
                 type="button"
                 className="btn btn-primary"
                 onClick={handleComplete}
-                disabled={saving || suggestionsLoading}
+                disabled={saving}
               >
                 {saving ? t("saving") : t("step_3_cta")}
               </button>

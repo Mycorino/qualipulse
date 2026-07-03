@@ -1,5 +1,6 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
 import { login, getMe, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
@@ -73,6 +74,9 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <Helmet>
+        <title>{t("login.metaTitle")}</title>
+      </Helmet>
       <div className="auth-card">
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
           <LanguageSwitcher />

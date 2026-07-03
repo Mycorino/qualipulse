@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "QualiPulse — Entretiens utilisateurs par IA, insights prêts à décider",
+    "description": "QualiPulse mène des entretiens vocaux modérés par IA avec vos utilisateurs et en tire un mémo de recherche prêt à décider — thèmes, citations et recommandations en quelques heures, pas en quelques semaines. 3 entretiens gratuits, sans carte bancaire."
+  },
   "nav": {
     "howItWorks": "Comment ça marche",
     "features": "Fonctionnalités",
@@ -308,6 +312,14 @@
       {
         "question": "Puis-je acheter plus d'entretiens ?",
         "answer": "Oui. Vous pouvez changer de formule ou acheter des packs de crédits prépayés quand une étude a besoin de plus de réponses."
+      },
+      {
+        "question": "Quelles langues sont prises en charge ?",
+        "answer": "Les études se déroulent aujourd'hui en français ou en anglais — le modérateur IA, l'expérience participant et le mémo de recherche suivent la langue de votre étude. L'espace chercheur est disponible dans les deux langues également."
+      },
+      {
+        "question": "À qui appartiennent les données de recherche ?",
+        "answer": "À vous. Les enregistrements, transcriptions et rapports appartiennent à votre espace de travail, le stockage est chiffré, et nous n'entraînons jamais de modèles d'IA sur vos recherches. Les transcriptions s'exportent en CSV quand vous en avez besoin."
       }
     ]
   },

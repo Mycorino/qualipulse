@@ -843,6 +843,20 @@ select.field-input {
   margin-bottom: 24px;
 }
 
+/* Offer reminder on signup — keeps the landing-page promise visible at the
+   point of highest drop-off. Sits tight under the subtitle. */
+.auth-offer-note {
+  display: inline-block;
+  margin: -16px 0 24px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border: 1px solid var(--brand-100);
+  border-radius: 999px;
+}
+
 .auth-footer {
   text-align: center;
   margin-top: 20px;
