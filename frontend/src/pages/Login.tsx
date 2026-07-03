@@ -1,6 +1,7 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useHead } from "../hooks/useHead";
 import { login, getMe, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
@@ -8,6 +9,7 @@ import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function Login() {
   const { t } = useTranslation("auth");
+  useHead({ title: t("login.metaTitle") });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -65,7 +67,7 @@ export default function Login() {
         navigate("/dashboard", { replace: true });
       }
     } catch (err: unknown) {
-      setError(getErrorMessage(err, t("login.signIn")));
+      setError(getErrorMessage(err, t("login.errors.generic")));
     } finally {
       setLoading(false);
     }

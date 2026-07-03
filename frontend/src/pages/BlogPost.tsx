@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
+import { useHead } from "../hooks/useHead";
 import DOMPurify from "dompurify";
 import { getPublishedPost, type BlogPost } from "../api/blog";
 import { NewsletterCTA } from "./Blog";
@@ -23,6 +23,38 @@ export default function BlogPostPage() {
       })
       .finally(() => setLoading(false));
   }, [slug]);
+
+  const metaTitle = post ? post.meta_title || post.title : null;
+  const metaDescription = post ? post.meta_description || post.excerpt || "" : "";
+  const ogImage = post ? post.og_image_url || post.cover_image_url || "" : "";
+
+  useHead(
+    post && metaTitle
+      ? {
+          title: t("post.metaTitle", { title: metaTitle }),
+          metas: [
+            { name: "description", content: metaDescription },
+            { property: "og:title", content: metaTitle },
+            { property: "og:description", content: metaDescription },
+            { property: "og:type", content: "article" },
+            ...(ogImage ? [{ property: "og:image", content: ogImage }] : []),
+            { property: "article:published_time", content: post.published_at || "" },
+            { property: "article:author", content: post.author_name },
+            ...post.tags.map((tag) => ({ property: "article:tag", content: tag })),
+          ],
+          jsonLd: {
+            "@context": "https://schema.org",
+            "@type": "Article",
+            headline: post.title,
+            description: metaDescription,
+            image: ogImage || undefined,
+            datePublished: post.published_at,
+            author: { "@type": "Person", name: post.author_name },
+            publisher: { "@type": "Organization", name: "QualiPulse" },
+          },
+        }
+      : {},
+  );
 
   function formatDate(iso: string | null) {
     if (!iso) return "";
@@ -50,44 +82,8 @@ export default function BlogPostPage() {
     );
   }
 
-  const metaTitle = post.meta_title || post.title;
-  const metaDescription = post.meta_description || post.excerpt || "";
-  const ogImage = post.og_image_url || post.cover_image_url || "";
-
   return (
     <>
-      <Helmet>
-        <title>{t("post.metaTitle", { title: metaTitle })}</title>
-        <meta name="description" content={metaDescription} />
-        <meta property="og:title" content={metaTitle} />
-        <meta property="og:description" content={metaDescription} />
-        <meta property="og:type" content="article" />
-        {ogImage && <meta property="og:image" content={ogImage} />}
-        <meta property="article:published_time" content={post.published_at || ""} />
-        <meta property="article:author" content={post.author_name} />
-        {post.tags.map((tag) => (
-          <meta key={tag} property="article:tag" content={tag} />
-        ))}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Article",
-            headline: post.title,
-            description: metaDescription,
-            image: ogImage || undefined,
-            datePublished: post.published_at,
-            author: {
-              "@type": "Person",
-              name: post.author_name,
-            },
-            publisher: {
-              "@type": "Organization",
-              name: "QualiPulse",
-            },
-          })}
-        </script>
-      </Helmet>
-
       <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
         {/* Header */}
         <header style={{

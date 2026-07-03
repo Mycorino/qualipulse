@@ -38,6 +38,13 @@ const TEAM_SIZES = ["1–10", "11–50", "51–200", "201–1000", "1000+"];
 type StepId = 1 | 2 | 3;
 
 function inferStartStep(me: CompanyResponse): StepId {
+  // Fresh Google signups arrive with a placeholder company name derived from
+  // the email local-part (set by the OAuth callback). Start them on step 1 so
+  // they can correct it — the field is prefilled, so it's one click if right.
+  if (localStorage.getItem("qp_google_new_signup") === "1") {
+    localStorage.removeItem("qp_google_new_signup");
+    return 1;
+  }
   if (me.role && me.company_size) return 3;
   if (me.name) return 2;
   return 1;
@@ -201,15 +208,19 @@ export default function Welcome() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ignore Enter on focused buttons (chips, CTAs) — the click already
+      // handles it, and advancing here too would double-fire the action.
+      if ((e.target as HTMLElement)?.tagName === "BUTTON") return;
       if (e.key === "Enter" && !saving) {
         if (step === 1 && step1Valid) handleStep1Next();
         else if (step === 2 && step2Valid) handleStep2Next();
+        else if (step === 3 && !suggestionsLoading) handleComplete();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, step1Valid, step2Valid, saving, companyName, roleFamily, roleKey, roleOther, teamSize]);
+  }, [step, step1Valid, step2Valid, saving, suggestionsLoading, companyName, roleFamily, roleKey, roleOther, teamSize]);
 
   if (loading || !me) {
     return (
@@ -460,7 +471,7 @@ export default function Welcome() {
                 type="button"
                 className="btn btn-primary"
                 onClick={handleComplete}
-                disabled={saving || suggestionsLoading}
+                disabled={saving}
               >
                 {saving ? t("saving") : t("step_3_cta")}
               </button>

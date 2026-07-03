@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useHead } from "../hooks/useHead";
 
 function PrivacyContentEN() {
   return (
@@ -368,6 +369,7 @@ function PrivacyContentFR() {
 export default function Privacy() {
   const { t, i18n } = useTranslation();
   const isFR = i18n.language?.startsWith("fr");
+  useHead({ title: `${t("legal.privacy.pageTitle")} — QualiPulse` });
 
   const tocItems: [string, string][] = [
     ["#section-1", t("legal.privacy.toc.introduction")],

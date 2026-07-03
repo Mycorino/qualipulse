@@ -7,7 +7,6 @@
   "pitch_transcript": "{{count}} transcriptions de plus attendent — débloquez-les avec un plan. Vos {{preview}} premières restent gratuites pour toujours.",
   "pitch_analysis": "L'analyse IA s'exécute sur toute votre étude. Débloquez les {{count}} transcriptions pour synthétiser les thèmes — vos {{preview}} premières restent gratuites pour le tag et les notes.",
   "unlock_cta": "Débloquer les transcriptions",
-
   "close": "Fermer",
   "dismiss": "Plus tard",
   "modal_eyebrow": "Débloquez votre étude complète",
@@ -16,7 +15,6 @@
   "credits_modal_eyebrow": "Menez votre étude complète",
   "credits_modal_title": "Débloquez {{count}} entretiens de plus",
   "credits_modal_body": "Votre objectif demande plus de crédits que votre plan n'en inclut (1 crédit = 1 entretien complété). Abonnez-vous pour mener toute l'étude et recevoir de nouveaux crédits chaque mois.",
-
   "subscription_eyebrow": "Recherche continue",
   "subscription_title": "Plan mensuel",
   "subscription_body": "Idéal pour des études récurrentes. Inclut une nouvelle salve de crédits chaque mois, l'analyse IA, et débloque tout ce que vous avez déjà collecté.",
@@ -25,7 +23,6 @@
   "subscription_perk_3": "Nouveaux crédits chaque mois",
   "subscription_cta_exploration": "S'abonner à Exploration — 89 €/mois",
   "subscription_cta_team": "S'abonner à Team — 299 €/mois",
-
   "interval_label": "Intervalle de facturation",
   "interval_monthly": "Mensuel",
   "interval_annual": "Annuel",
@@ -39,7 +36,6 @@
   "plan_projects_one": "{{count}} projet actif",
   "plan_projects_other": "{{count}} projets actifs",
   "subscribe_cta": "S'abonner",
-
   "pack_eyebrow": "Paiement à l'usage",
   "pack_title": "Pack de crédits",
   "pack_body": "Idéal pour une étude unique. Achetez un pack pour débloquer et continuer — sans abonnement.",
@@ -48,6 +44,6 @@
   "pack_cta": "Acheter {{credits}} crédits — {{price}}",
   "other_packs": "Ou une autre taille :",
   "credits_label": "crédits",
-
-  "redirecting": "Redirection vers le paiement…"
+  "redirecting": "Redirection vers le paiement…",
+  "checkout_error": "Impossible d'ouvrir le paiement. Veuillez réessayer dans un instant."
 }

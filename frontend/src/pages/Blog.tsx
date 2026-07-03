@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
+import { useHead } from "../hooks/useHead";
 import { getPublishedPosts, type BlogPost } from "../api/blog";
 
 export default function Blog() {
   const { t } = useTranslation("blog");
+
+  useHead({
+    title: t("list.metaTitle"),
+    metas: [
+      { name: "description", content: t("list.metaDescription") },
+      { property: "og:title", content: t("list.ogTitle") },
+      { property: "og:description", content: t("list.ogDescription") },
+      { property: "og:type", content: "website" },
+    ],
+  });
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -37,14 +47,6 @@ export default function Blog() {
 
   return (
     <>
-      <Helmet>
-        <title>{t("list.metaTitle")}</title>
-        <meta name="description" content={t("list.metaDescription")} />
-        <meta property="og:title" content={t("list.ogTitle")} />
-        <meta property="og:description" content={t("list.ogDescription")} />
-        <meta property="og:type" content="website" />
-      </Helmet>
-
       <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
         {/* Header */}
         <header style={{

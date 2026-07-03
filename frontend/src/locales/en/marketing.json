@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "QualiPulse — AI-moderated user interviews, decision-ready insights",
+    "description": "QualiPulse runs AI-moderated voice interviews with your users and turns them into a decision-ready research memo — themes, quotes, and recommendations in hours, not weeks. 3 free interviews, no credit card."
+  },
   "nav": {
     "howItWorks": "How it works",
     "features": "Features",
@@ -308,6 +312,14 @@
       {
         "question": "Can I buy more interviews?",
         "answer": "Yes. You can upgrade plans or buy prepaid credit packs when a study needs more responses."
+      },
+      {
+        "question": "What languages are supported?",
+        "answer": "Studies run in English or French today — the AI moderator, the participant experience, and the research memo all follow your study's language. The researcher workspace is available in both languages too."
+      },
+      {
+        "question": "Who owns the research data?",
+        "answer": "You do. Recordings, transcripts, and reports belong to your workspace, storage is encrypted, and we never train AI models on your research. Transcripts export to CSV whenever you need them."
       }
     ]
   },

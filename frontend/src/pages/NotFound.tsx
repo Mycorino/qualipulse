@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Helmet } from "react-helmet-async";
+import { useHead } from "../hooks/useHead";
 
 /**
  * Catch-all 404 page. Mounted at <Route path="*"> in App.tsx so that unknown
@@ -19,6 +19,14 @@ import { Helmet } from "react-helmet-async";
 export default function NotFound() {
   const { t } = useTranslation();
 
+  useHead({
+    title: `${t("notFound.title")} · QualiPulse`,
+    metas: [
+      { name: "robots", content: "noindex,follow" },
+      { name: "prerender-status-code", content: "404" },
+    ],
+  });
+
   return (
     <div
       style={{
@@ -30,12 +38,6 @@ export default function NotFound() {
         padding: "24px",
       }}
     >
-      <Helmet>
-        <title>{`${t("notFound.title")} · QualiPulse`}</title>
-        <meta name="robots" content="noindex,follow" />
-        <meta name="prerender-status-code" content="404" />
-      </Helmet>
-
       <div
         style={{
           maxWidth: 480,
