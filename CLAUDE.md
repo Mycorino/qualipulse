@@ -1184,6 +1184,7 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | POST | `/projects/{id}/analysis/refine` | ai_analysis | Trigger refined analysis |
 | POST | `/projects/{id}/analysis/share` | — | Generate share token |
 | DELETE | `/projects/{id}/analysis/share` | — | Revoke share token |
+| GET | `/projects/{id}/analysis/report.html` | — | Standalone print/PDF-ready HTML findings report (`?version=` optional; EN/FR by project language; rendered by `services/report_export.py`) |
 | GET | `/reports/{share_token}` | No auth | Public shared report |
 
 ### Export & Responses (`/projects/{id}/participants`)
