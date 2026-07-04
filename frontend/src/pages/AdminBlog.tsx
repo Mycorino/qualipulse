@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
@@ -34,13 +34,31 @@ function adminClient(key: string) {
   });
 }
 
+const UPLOADABLE_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+
+async function uploadBlogImage(adminKey: string, file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await adminClient(adminKey).post<{ url: string }>("/admin/blog/upload-image", form);
+  return res.data.url;
+}
+
 // ── Toolbar ────────────────────────────────────────────────────────────────
 
-function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function Toolbar({
+  editor,
+  onUploadImage,
+  uploadingImage,
+}: {
+  editor: ReturnType<typeof useEditor>;
+  onUploadImage: (file: File) => void;
+  uploadingImage: boolean;
+}) {
   const { t } = useTranslation("blog");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   if (!editor) return null;
 
-  function addImage() {
+  function addImageUrl() {
     const url = window.prompt(t("admin.imageUrlPrompt"));
     if (url) editor!.chain().focus().setImage({ src: url }).run();
   }
@@ -69,8 +87,22 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <button type="button" onClick={() => editor!.chain().focus().toggleCodeBlock().run()} className={editor!.isActive("codeBlock") ? "is-active" : ""}>{t("admin.toolbarCode")}</button>
       <span style={{ width: 1, background: "var(--border)", margin: "0 4px" }} />
       <button type="button" onClick={addLink}>{t("admin.toolbarLink")}</button>
-      <button type="button" onClick={addImage}>{t("admin.toolbarImage")}</button>
+      <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}>
+        {uploadingImage ? t("admin.uploading") : t("admin.toolbarImage")}
+      </button>
+      <button type="button" onClick={addImageUrl}>{t("admin.toolbarImageUrl")}</button>
       <button type="button" onClick={() => editor!.chain().focus().setHorizontalRule().run()}>HR</button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={UPLOADABLE_IMAGE_TYPES.join(",")}
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onUploadImage(file);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }
@@ -116,6 +148,25 @@ function PostEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const editorRef = useRef<Editor | null>(null);
+
+  const uploadAndInsert = useCallback(
+    async (file: File) => {
+      if (!UPLOADABLE_IMAGE_TYPES.includes(file.type)) return;
+      setError("");
+      setUploadingImage(true);
+      try {
+        const url = await uploadBlogImage(adminKey, file);
+        editorRef.current?.chain().focus().setImage({ src: url }).run();
+      } catch (err: any) {
+        setError(err.response?.data?.detail || t("admin.uploadFailed"));
+      } finally {
+        setUploadingImage(false);
+      }
+    },
+    [adminKey, t]
+  );
 
   const editor = useEditor({
     extensions: [
@@ -125,7 +176,50 @@ function PostEditor({
       Placeholder.configure({ placeholder: t("admin.contentPlaceholder") }),
     ],
     content: post?.content ?? "",
+    editorProps: {
+      // Paste / drop an image file straight into the editor → upload → insert.
+      handlePaste: (_view, event) => {
+        const file = Array.from(event.clipboardData?.files ?? []).find((f) =>
+          UPLOADABLE_IMAGE_TYPES.includes(f.type)
+        );
+        if (file) {
+          uploadAndInsert(file);
+          return true;
+        }
+        return false;
+      },
+      handleDrop: (_view, event) => {
+        const file = Array.from(event.dataTransfer?.files ?? []).find((f) =>
+          UPLOADABLE_IMAGE_TYPES.includes(f.type)
+        );
+        if (file) {
+          event.preventDefault();
+          uploadAndInsert(file);
+          return true;
+        }
+        return false;
+      },
+    },
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadCover(file: File) {
+    setError("");
+    setUploadingCover(true);
+    try {
+      setCoverUrl(await uploadBlogImage(adminKey, file));
+    } catch (err: any) {
+      setError(err.response?.data?.detail || t("admin.uploadFailed"));
+    } finally {
+      setUploadingCover(false);
+    }
+  }
 
   function handleTitleChange(val: string) {
     setTitle(val);
@@ -269,7 +363,7 @@ function PostEditor({
           <div style={{ marginBottom: 12 }}>
             <label style={labelStyle}>{t("admin.fieldContent")}</label>
             <div className="tiptap-editor">
-              <Toolbar editor={editor} />
+              <Toolbar editor={editor} onUploadImage={uploadAndInsert} uploadingImage={uploadingImage} />
               <EditorContent editor={editor} />
             </div>
           </div>
@@ -284,7 +378,35 @@ function PostEditor({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
             <div>
               <label style={labelStyle}>{t("admin.fieldCoverImage")}</label>
-              <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} style={inputStyle} placeholder="https://..." />
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} style={inputStyle} placeholder="https://..." />
+                <button
+                  type="button"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={uploadingCover}
+                  style={{
+                    padding: "8px 12px",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius)",
+                    background: "var(--bg-surface)",
+                    color: "var(--text-secondary)",
+                    fontSize: 13,
+                    cursor: uploadingCover ? "default" : "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >{uploadingCover ? t("admin.uploading") : t("admin.uploadButton")}</button>
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept={UPLOADABLE_IMAGE_TYPES.join(",")}
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadCover(file);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
             </div>
             <div>
               <label style={labelStyle}>{t("admin.fieldAuthor")}</label>

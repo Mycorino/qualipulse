@@ -58,6 +58,31 @@ def upload_audio(data: bytes, key: str) -> str:
         return f"/audio/{key}"
 
 
+def upload_image(data: bytes, key: str) -> str:
+    """Store image bytes and return the URL to embed in content.
+
+    key should be a relative path like 'blog-images/{uuid}.png'.
+    R2 returns the absolute public URL; local disk returns '/api/files/{key}'
+    (the /api prefix is stripped by the Vite dev proxy and the production
+    nginx, landing on the backend /files route).
+    """
+    if _r2_enabled():
+        _r2_client().put_object(
+            Bucket=settings.R2_BUCKET,
+            Key=key,
+            Body=data,
+            ContentType=_content_type(key),
+        )
+        base = settings.R2_PUBLIC_URL.rstrip("/")
+        return f"{base}/{key}"
+    else:
+        abs_path = os.path.join(settings.UPLOAD_DIR, key)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, "wb") as f:
+            f.write(data)
+        return f"/api/files/{key}"
+
+
 def storage_key_from_url(url: str) -> str | None:
     """Recover the storage key from a persisted playback URL.
 
@@ -99,4 +124,9 @@ def _content_type(key: str) -> str:
         ".webm": "audio/webm",
         ".ogg": "audio/ogg",
         ".wav": "audio/wav",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
     }.get(ext, "application/octet-stream")
