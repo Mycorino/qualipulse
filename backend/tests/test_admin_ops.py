@@ -304,3 +304,33 @@ class TestAuditLog:
         resp = client.get("/admin/audit-log", headers=headers)
         entries = resp.json()
         assert entries[0]["admin_identity"] == "unknown"
+
+
+# ── Costs report ──────────────────────────────────────────────────────────────
+
+
+class TestCostsReport:
+
+    def test_costs_endpoint_returns_report(self, client, db_session):
+        """Regression: /admin/costs 500ed because the per-company aggregation
+        used func.case() instead of the sqlalchemy case() construct."""
+        from app.models.usage import AIUsageLog
+
+        tokens = _signup(client)
+        db_session.add(AIUsageLog(
+            company_id=tokens["company_id"],
+            operation="interview_turn",
+            model="claude-sonnet-4-6",
+            input_tokens=100,
+            output_tokens=50,
+            cost_usd=0.0123,
+            participant_id="p-1",
+        ))
+        db_session.commit()
+
+        resp = client.get("/admin/costs", headers=_admin_headers())
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["total_cost_usd"] > 0
+        assert len(body["by_company"]) == 1
+        assert body["by_company"][0]["company_id"] == tokens["company_id"]

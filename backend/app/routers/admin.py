@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import delete as sql_delete, func
+from sqlalchemy import case, delete as sql_delete, func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -739,7 +739,7 @@ def _costs_report(db: Session, company_id: str | None = None) -> dict:
                 func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0).label("total_cost"),
                 func.coalesce(
                     func.sum(
-                        func.case(
+                        case(
                             (AIUsageLog.created_at >= month_start, AIUsageLog.cost_usd),
                             else_=0.0,
                         )
@@ -748,7 +748,7 @@ def _costs_report(db: Session, company_id: str | None = None) -> dict:
                 ).label("month_cost"),
                 func.count(
                     func.distinct(
-                        func.case(
+                        case(
                             (AIUsageLog.operation.in_(interview_ops), AIUsageLog.participant_id),
                             else_=None,
                         )

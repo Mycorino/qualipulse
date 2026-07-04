@@ -62,6 +62,10 @@
     "tableDate": "Date",
     "loading": "Loading…",
     "failedLoad": "We couldn't load your affiliate data. Please refresh the page.",
-    "failedDashboard": "We couldn't load your dashboard. Please refresh the page."
+    "failedDashboard": "We couldn't load your dashboard. Please refresh the page.",
+    "payoutHistory": "Payout history",
+    "noPayouts": "No payouts yet. Once you cross the payout threshold, we'll pay you out and it will show here.",
+    "tableAmount": "Amount",
+    "tableNotes": "Notes"
   }
 }
