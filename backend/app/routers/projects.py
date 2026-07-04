@@ -97,6 +97,7 @@ def create_project(
         panel_collection_enabled=body.panel_collection_enabled,
         warmup_enabled=body.warmup_enabled,
     )
+    _apply_branding_fields(project, body, company, db)
     db.add(project)
     db.flush()
 
@@ -442,6 +443,42 @@ def update_project(
     return _project_to_response(project)
 
 
+def _apply_branding_fields(project: Project, body, company: Company, db: Session) -> None:
+    """Apply participant-facing identity/branding fields from a create or
+    settings-patch payload.
+
+    Identity fields (researcher_name / logo / privacy policy) and the
+    ``anonymous`` mode are free. Visual theming — ``branded`` mode, a brand
+    colour, or a font — requires the ``custom_branding`` entitlement
+    (legacy Lab/Enterprise tiers, credits Team/Agency/Enterprise plans).
+    """
+    from app.services.billing_service import workspace_has_feature
+
+    wants_theming = (
+        body.branding_mode == "branded"
+        or body.brand_primary_color is not None
+        or body.brand_font is not None
+    )
+    if wants_theming and not workspace_has_feature(db, company, "custom_branding"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="custom_branding_required",
+        )
+
+    if body.researcher_name is not None:
+        project.researcher_name = body.researcher_name.strip() or None
+    if body.researcher_logo_url is not None:
+        project.researcher_logo_url = body.researcher_logo_url.strip() or None
+    if body.privacy_policy_url is not None:
+        project.privacy_policy_url = body.privacy_policy_url.strip() or None
+    if body.branding_mode is not None:
+        project.branding_mode = body.branding_mode
+    if body.brand_primary_color is not None:
+        project.brand_primary_color = body.brand_primary_color
+    if body.brand_font is not None:
+        project.brand_font = body.brand_font
+
+
 @router.patch("/{project_id}/settings", response_model=ProjectResponse)
 def patch_project_settings(
     project_id: str,
@@ -473,6 +510,7 @@ def patch_project_settings(
         project.interview_duration_minutes = body.interview_duration_minutes
     if body.target_participants is not None:
         project.target_participants = body.target_participants
+    _apply_branding_fields(project, body, company, db)
     db.commit()
     db.refresh(project)
     return _project_to_response(project)
@@ -795,6 +833,12 @@ def _project_to_response(project: Project) -> ProjectResponse:
         target_customer_description=getattr(project, "target_customer_description", None),
         target_participants=getattr(project, "target_participants", None),
         is_demo=getattr(project, "is_demo", False),
+        branding_mode=getattr(project, "branding_mode", "standard") or "standard",
+        brand_primary_color=getattr(project, "brand_primary_color", None),
+        brand_font=getattr(project, "brand_font", None),
+        researcher_name=project.researcher_name,
+        researcher_logo_url=project.researcher_logo_url,
+        privacy_policy_url=project.privacy_policy_url,
         created_at=project.created_at,
         questions=questions,
         screening_questions=screening,

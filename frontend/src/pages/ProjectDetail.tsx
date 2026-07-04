@@ -56,6 +56,7 @@ import {
 } from "../api/projects";
 import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, regenerateScreeningTranslations, type PaywallDetail } from "../api/projects";
 import ScreeningTranslationsEditor from "../components/ScreeningTranslationsEditor";
+import BrandingSettings from "../components/BrandingSettings";
 import { getCreditUsage } from "../api/billing";
 import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
@@ -2103,6 +2104,10 @@ export default function ProjectDetail() {
                 </div>
               </div>
             </section>
+
+            {/* Branding & identity — participant-facing identity policy
+                (standard / branded / anonymous) + brand color & font. */}
+            <BrandingSettings project={project} onUpdated={setProject} />
 
             {/* Screening Questions */}
             <section className="detail-section">

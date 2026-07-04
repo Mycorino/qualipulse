@@ -209,6 +209,21 @@ def get_plan(db: Session, plan_id: str) -> Plan | None:
     return db.query(Plan).filter(Plan.id == plan_id).first()
 
 
+def workspace_has_feature(db: Session, company: Company, key: str) -> bool:
+    """Dual-track boolean feature check (e.g. ``custom_branding``).
+
+    Legacy plans read the tier's ``TierLimits`` flag; credits-based plans
+    read the plan entitlement map. Missing keys resolve to ``False``.
+    """
+    sub = get_current_subscription(db, company.id)
+    plan = get_plan(db, sub.plan_id) if sub else None
+    if plan is None or plan.is_legacy:
+        from app.services.feature_gates import get_effective_limits
+
+        return bool(getattr(get_effective_limits(company), key, False))
+    return bool(get_entitlements(db, company.id).get(key, False))
+
+
 def get_entitlements(db: Session, workspace_id: str) -> dict[str, Any]:
     """Return the merged entitlement map for a workspace.
 
