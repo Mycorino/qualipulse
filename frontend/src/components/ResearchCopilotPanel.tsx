@@ -827,6 +827,18 @@ function ProposalCard({
           ? t("copilot.proposal.settingsWarmupOn")
           : t("copilot.proposal.settingsWarmupOff"),
       );
+    if (s.branding_mode === "anonymous")
+      parts.push(t("copilot.proposal.settingsBrandingAnonymous", { defaultValue: "Anonymous study" }));
+    else if (s.branding_mode === "branded")
+      parts.push(t("copilot.proposal.settingsBrandingBranded", { defaultValue: "Branded interview" }));
+    else if (s.branding_mode === "standard")
+      parts.push(t("copilot.proposal.settingsBrandingStandard", { defaultValue: "Standard identity" }));
+    if (s.brand_primary_color)
+      parts.push(t("copilot.proposal.settingsBrandColor", { color: s.brand_primary_color, defaultValue: "Color {{color}}" }));
+    if (s.brand_font)
+      parts.push(t("copilot.proposal.settingsBrandFont", { font: s.brand_font, defaultValue: "Font: {{font}}" }));
+    if (s.researcher_name)
+      parts.push(t("copilot.proposal.settingsResearcherName", { name: s.researcher_name, defaultValue: "Shown as {{name}}" }));
     body = parts.join(" · ");
   } else if (action.type === "add_screening_question") {
     heading = t("copilot.proposal.addScreening");

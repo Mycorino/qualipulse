@@ -48,7 +48,34 @@ export default function BrandingSettings({
   }, []);
 
   const [saving, setSaving] = useState(false);
+  const [savingDefault, setSavingDefault] = useState(false);
   const colorDebounceRef = useRef<number | null>(null);
+
+  // Persist this study's branding as the workspace default — every NEW
+  // study starts from it, and each study's Setup tab can still override.
+  async function saveAsDefault() {
+    setSavingDefault(true);
+    try {
+      await client.put("/auth/branding-defaults", {
+        branding_mode: mode,
+        brand_primary_color: mode === "branded" ? project.brand_primary_color ?? undefined : undefined,
+        brand_font: mode === "branded" ? project.brand_font ?? undefined : undefined,
+        researcher_name: project.researcher_name ?? undefined,
+        researcher_logo_url: project.researcher_logo_url ?? undefined,
+        privacy_policy_url: project.privacy_policy_url ?? undefined,
+      });
+      toast(
+        t("setup.brandingDefaultSaved", {
+          defaultValue: "Saved — new studies will start with this branding.",
+        }),
+        "success"
+      );
+    } catch {
+      toast(t("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
+    } finally {
+      setSavingDefault(false);
+    }
+  }
 
   async function save(settings: Parameters<typeof patchProjectSettings>[1]) {
     setSaving(true);
@@ -136,6 +163,19 @@ export default function BrandingSettings({
             })}
           </p>
         </div>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={saving || savingDefault}
+          onClick={saveAsDefault}
+          title={t("setup.brandingSaveDefaultHelp", {
+            defaultValue: "New studies will start with these branding settings — each study can still change them.",
+          })}
+        >
+          {savingDefault
+            ? t("setup.brandingSavingDefault", { defaultValue: "Saving…" })
+            : t("setup.brandingSaveDefault", { defaultValue: "Save as default for new studies" })}
+        </button>
       </div>
 
       <div className="branding-mode-grid" role="radiogroup" aria-label={t("setup.brandingTitle", { defaultValue: "Branding & identity" })}>

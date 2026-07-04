@@ -283,6 +283,10 @@
   "setup": {
     "brandingTitle": "Branding & identity",
     "brandingSubtitle": "What participants see about who is running this study.",
+    "brandingSaveDefault": "Save as default for new studies",
+    "brandingSavingDefault": "Saving…",
+    "brandingSaveDefaultHelp": "New studies will start with these branding settings — each study can still change them.",
+    "brandingDefaultSaved": "Saved — new studies will start with this branding.",
     "brandingModeStandard": "Standard",
     "brandingModeStandardHelp": "Your researcher name and logo, default QualiPulse styling.",
     "brandingModeBranded": "Branded",

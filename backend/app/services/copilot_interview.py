@@ -8,6 +8,7 @@ the snapshot, tools, methodology contract, tool executor, and stub.
 from __future__ import annotations
 
 import json
+import re
 
 from sqlalchemy.orm import Session
 
@@ -46,6 +47,11 @@ def _guide_snapshot(project: Project) -> dict:
             "interview_duration_minutes": project.interview_duration_minutes,
             "target_participants": project.target_participants,
             "warmup_enabled": project.warmup_enabled,
+            # Participant-facing identity policy: standard / branded / anonymous.
+            "branding_mode": getattr(project, "branding_mode", "standard") or "standard",
+            "brand_primary_color": getattr(project, "brand_primary_color", None),
+            "brand_font": getattr(project, "brand_font", None),
+            "researcher_name": project.researcher_name,
         },
         # The screener — runs BEFORE the interview to filter who gets in.
         # `[]` means there is no screener yet.
@@ -296,6 +302,15 @@ frames as directional, not a study.
 - Only propose a setting CHANGE when it differs from the current value, \
 and always explain the trade-off in your reply before the researcher \
 accepts.
+- BRANDING lives in settings too (`branding_mode` / `brand_primary_color` / \
+`brand_font` / `researcher_name`). If the researcher wants a blind study \
+("participants shouldn't know it's us"), set `branding_mode: "anonymous"` — \
+the interview page then hides their company name, researcher name and logo. \
+If they want their brand on the interview ("use our colours", "make it \
+look like us"), set `branding_mode: "branded"` with the colour/font they \
+give you — note branded theming needs the custom-branding plan feature, so \
+if the accept fails they may need a plan upgrade. Never invent a brand \
+colour they didn't provide.
 
 SCREENING — the snapshot's `screening_questions` shows the current \
 screener (`[]` = none yet):
@@ -523,10 +538,12 @@ _INTERVIEW_TOOLS = [
         "name": "propose_settings",
         "description": (
             "Propose changing this interview round's settings — interview "
-            "length, target sample size, and/or the opening warm-up. Staged "
-            "for the researcher to accept. Only include the fields you are "
-            "actually changing, and only when they differ from the current "
-            "values in the snapshot."
+            "length, target sample size, the opening warm-up, and/or the "
+            "participant-facing branding (standard / branded / anonymous, "
+            "brand colour, font, researcher name). Staged for the researcher "
+            "to accept. Only include the fields you are actually changing, "
+            "and only when they differ from the current values in the "
+            "snapshot."
         ),
         "input_schema": {
             "type": "object",
@@ -542,6 +559,29 @@ _INTERVIEW_TOOLS = [
                 "warmup_enabled": {
                     "type": "boolean",
                     "description": "Open with a light warm-up question before the guide.",
+                },
+                "branding_mode": {
+                    "type": "string",
+                    "enum": ["standard", "branded", "anonymous"],
+                    "description": (
+                        "Participant-facing identity policy. 'anonymous' hides "
+                        "who runs the study (blind research); 'branded' themes "
+                        "the interview page with the brand colour + font "
+                        "(requires the custom-branding plan feature)."
+                    ),
+                },
+                "brand_primary_color": {
+                    "type": "string",
+                    "description": "#rrggbb accent colour for branded mode.",
+                },
+                "brand_font": {
+                    "type": "string",
+                    "enum": ["system", "humanist", "serif", "elegant"],
+                    "description": "Curated font style for branded mode.",
+                },
+                "researcher_name": {
+                    "type": "string",
+                    "description": "Researcher/team name shown to participants.",
                 },
                 "rationale": {
                     "type": "string",
@@ -751,6 +791,20 @@ def _guide_run_tool(
                 pass
         if tool_input.get("warmup_enabled") is not None:
             settings["warmup_enabled"] = bool(tool_input["warmup_enabled"])
+        # Participant-facing branding — validated here so a hallucinated
+        # value never reaches the accept flow (which PATCHes settings).
+        mode = tool_input.get("branding_mode")
+        if mode in ("standard", "branded", "anonymous"):
+            settings["branding_mode"] = mode
+        color = tool_input.get("brand_primary_color")
+        if isinstance(color, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            settings["brand_primary_color"] = color.lower()
+        font = tool_input.get("brand_font")
+        if font in ("system", "humanist", "serif", "elegant"):
+            settings["brand_font"] = font
+        researcher_name = (tool_input.get("researcher_name") or "").strip()
+        if researcher_name:
+            settings["researcher_name"] = researcher_name[:255]
         if not settings:
             return "No settings to change were provided. Not recorded."
         turn.actions.append(

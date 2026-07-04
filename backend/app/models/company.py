@@ -84,6 +84,21 @@ class Company(Base):
     # Integrations
     slack_webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Workspace-level participant-branding defaults, prefilled into every
+    # new study (each study's own Setup tab keeps the final say). JSON dict
+    # of the Project branding fields: branding_mode / brand_primary_color /
+    # brand_font / researcher_name / researcher_logo_url / privacy_policy_url.
+    branding_defaults: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    @property
+    def branding_defaults_dict(self) -> dict:
+        import json
+
+        try:
+            return json.loads(self.branding_defaults) if self.branding_defaults else {}
+        except (ValueError, TypeError):
+            return {}
+
     # Onboarding redesign — personal identity + recap
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
