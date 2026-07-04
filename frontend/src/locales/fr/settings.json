@@ -31,6 +31,7 @@
     "newPasswordPlaceholder": "Au moins 8 caractères",
     "updatePassword": "Mettre à jour le mot de passe",
     "passwordUpdated": "✓ Mot de passe mis à jour",
+    "saveError": "Impossible d'enregistrer — veuillez réessayer.",
     "passwordError": "Nous n'avons pas pu mettre à jour votre mot de passe. Vérifiez votre mot de passe actuel et réessayez.",
     "languageTitle": "Langue",
     "languageWarning": "Seuls les menus et les nouveaux contenus seront traduits. Vos études existantes, guides d'entretien et rapports d'analyse ne seront pas retraduits."
@@ -60,6 +61,9 @@
     "freeTrial": "Essai gratuit",
     "trialCreditsHint": "Vos crédits d'entretien gratuits n'expirent pas. Aucune carte de crédit requise.",
     "usageThisPeriod": "Utilisation cette période",
+    "creditsPurchased": "Paiement reçu — vos crédits apparaîtront dans un instant.",
+    "upgradeSuccess": "Votre offre a été mise à niveau. Bienvenue à bord !",
+    "checkoutError": "Impossible d'ouvrir le paiement — réessayez ou contactez le support.",
     "creditsRemaining": "Crédits restants",
     "creditsUsed": "Crédits utilisés",
     "overageCredits": "Dépassement",
@@ -160,7 +164,8 @@
       "unverified": "Non vérifié",
       "body": "Vérifiez votre e-mail pour sécuriser votre compte et débloquer vos crédits d'entretien.",
       "resend": "Renvoyer l'e-mail de vérification",
-      "resent": "E-mail de vérification envoyé — vérifiez votre boîte de réception."
+      "resent": "E-mail de vérification envoyé — vérifiez votre boîte de réception.",
+      "resendError": "Impossible d'envoyer l'e-mail — réessayez dans une minute."
     },
     "planCard": {
       "label": "Forfait et crédits",

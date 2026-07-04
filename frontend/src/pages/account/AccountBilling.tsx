@@ -1,12 +1,52 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import client from "../../api/client";
+import { useToast } from "../../components/Toast";
 import { useAccount } from "./accountContext";
 
 export default function AccountBilling() {
   const { t } = useTranslation(["settings", "common"]);
   const { billing, plans, packs } = useAccount();
+  const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
+  const [upgradingPlanId, setUpgradingPlanId] = useState<string | null>(null);
+  const [portalBusy, setPortalBusy] = useState(false);
+
+  // Returning from Stripe Checkout — confirm the outcome, then clean the URL
+  // so a refresh doesn't repeat the toast.
+  useEffect(() => {
+    if (searchParams.get("credits") === "purchased") {
+      toast(
+        t("billing.creditsPurchased", {
+          defaultValue: "Payment received — your credits will appear in a moment.",
+        }),
+        "success"
+      );
+    } else if (searchParams.get("upgraded") === "true") {
+      toast(
+        t("billing.upgradeSuccess", { defaultValue: "Your plan has been upgraded. Welcome aboard!" }),
+        "success"
+      );
+    } else {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("credits");
+    next.delete("upgraded");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function checkoutError() {
+    toast(
+      t("billing.checkoutError", {
+        defaultValue: "Could not open checkout — please try again or contact support.",
+      }),
+      "error"
+    );
+  }
 
   async function handleBuyPack(packId: string) {
     setBuyingPackId(packId);
@@ -19,11 +59,12 @@ export default function AccountBilling() {
       window.location.href = data.checkout_url;
     } catch {
       setBuyingPackId(null);
-      alert(t("common:contactSupport"));
+      checkoutError();
     }
   }
 
   async function handleUpgrade(planId: string) {
+    setUpgradingPlanId(planId);
     try {
       const { data } = await client.post("/billing/checkout", {
         plan_id: planId,
@@ -33,16 +74,19 @@ export default function AccountBilling() {
       });
       window.location.href = data.checkout_url;
     } catch {
-      alert(t("common:contactSupport"));
+      setUpgradingPlanId(null);
+      checkoutError();
     }
   }
 
   async function handleManageBilling() {
+    setPortalBusy(true);
     try {
       const { data } = await client.post("/billing/portal", { return_url: window.location.href });
       window.location.href = data.portal_url;
     } catch {
-      alert(t("common:contactSupport"));
+      setPortalBusy(false);
+      checkoutError();
     }
   }
 
@@ -205,8 +249,13 @@ export default function AccountBilling() {
               </div>
             </div>
             {billing.tier !== "starter" && billing.tier !== "free" && billing.tier !== "solo" && (
-              <button className="btn btn-ghost btn-sm" onClick={handleManageBilling} style={{ marginTop: 16 }}>
-                {t("billing.manageBilling")}
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={handleManageBilling}
+                disabled={portalBusy}
+                style={{ marginTop: 16 }}
+              >
+                {portalBusy ? t("common:loading", { defaultValue: "Loading…" }) : t("billing.manageBilling")}
               </button>
             )}
           </div>
@@ -270,8 +319,14 @@ export default function AccountBilling() {
                 ) : plan.is_custom ? (
                   <a href="mailto:hello@qualipulse.com" className="btn btn-ghost btn-sm">{t("billing.contactUs")}</a>
                 ) : (
-                  <button className="btn btn-primary btn-sm" onClick={() => handleUpgrade(plan.id)}>
-                    {t("billing.upgradeToLabel", { name: plan.name })}
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={upgradingPlanId !== null}
+                    onClick={() => handleUpgrade(plan.id)}
+                  >
+                    {upgradingPlanId === plan.id
+                      ? t("common:loading", { defaultValue: "Loading…" })
+                      : t("billing.upgradeToLabel", { name: plan.name })}
                   </button>
                 )}
               </div>

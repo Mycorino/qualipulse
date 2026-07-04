@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import client from "../../api/client";
-import { useAccount } from "./accountContext";
+import { useAccount, SLACK_INTEGRATION_ENABLED } from "./accountContext";
 
 /**
  * Account Home — status-card overview. Leads with the account state that
@@ -14,16 +14,20 @@ export default function AccountHome() {
   const { me, billing } = useAccount();
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const [resendError, setResendError] = useState(false);
 
   const verified = me?.email_verified ?? true;
 
   async function handleResend() {
     setResending(true);
+    setResendError(false);
     try {
       await client.post("/auth/resend-verification");
       setResent(true);
     } catch {
-      // best-effort; the dashboard banner remains the fallback path
+      // Rate-limited (3/min) or transient failure — tell the user instead
+      // of silently doing nothing.
+      setResendError(true);
     } finally {
       setResending(false);
     }
@@ -70,6 +74,13 @@ export default function AccountHome() {
                         "Verify your email to secure your account and unlock interview credits.",
                     })}
                   </p>
+                  {resendError && (
+                    <p className="error-text" style={{ fontSize: 13, margin: "0 0 10px" }}>
+                      {t("home.emailCard.resendError", {
+                        defaultValue: "Could not send the email — please try again in a minute.",
+                      })}
+                    </p>
+                  )}
                   <button
                     className="btn btn-primary btn-sm"
                     onClick={handleResend}
@@ -146,7 +157,8 @@ export default function AccountHome() {
           </div>
         </div>
 
-        {/* Slack integration. */}
+        {/* Slack integration — hidden while the integration is paused. */}
+        {SLACK_INTEGRATION_ENABLED && (
         <div className="account-card">
           <div className="account-card__head">
             <span className="account-card__label">
@@ -175,6 +187,7 @@ export default function AccountHome() {
             </Link>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
