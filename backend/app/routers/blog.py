@@ -1,10 +1,11 @@
 import json
 import re
+import uuid
 from datetime import datetime
 from typing import Optional
 
 import bleach
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,7 @@ from app.dependencies import get_db
 from app.limiter import limiter
 from app.models.blog import BlogPost
 from app.routers.admin import require_admin
+from app.services.storage import upload_image
 
 router = APIRouter(tags=["blog"])
 
@@ -181,6 +183,47 @@ def get_published_post(slug: str, db: Session = Depends(get_db)):
 
 
 # ── Admin endpoints ──────────────────────────────────────────────────────────
+
+# Image upload for the blog editor (TipTap content + cover images).
+# Stored in R2 in production (absolute public URL) or under UPLOAD_DIR in
+# local dev (served via /files, reachable as /api/files/* through the proxy).
+MAX_IMAGE_SIZE_MB = 8
+_IMAGE_EXTENSIONS = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+
+
+def _matches_image_magic(data: bytes, ext: str) -> bool:
+    """Cheap signature check so a mislabelled file can't be stored as an image."""
+    if ext == ".png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext == ".jpg":
+        return data.startswith(b"\xff\xd8\xff")
+    if ext == ".gif":
+        return data.startswith((b"GIF87a", b"GIF89a"))
+    if ext == ".webp":
+        return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
+@router.post("/admin/blog/upload-image", dependencies=[Depends(require_admin)], status_code=201)
+async def admin_upload_blog_image(file: UploadFile = File(...)):
+    ext = _IMAGE_EXTENSIONS.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(
+            status_code=415,
+            detail="Unsupported image type. Allowed: PNG, JPEG, WebP, GIF.",
+        )
+    data = await file.read()
+    if len(data) > MAX_IMAGE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"Image too large. Max size is {MAX_IMAGE_SIZE_MB}MB.")
+    if not _matches_image_magic(data, ext):
+        raise HTTPException(status_code=415, detail="File content does not match its image type.")
+    key = f"blog-images/{uuid.uuid4()}{ext}"
+    return {"url": upload_image(data, key)}
 
 @router.get("/admin/blog", dependencies=[Depends(require_admin)])
 def admin_list_posts(
