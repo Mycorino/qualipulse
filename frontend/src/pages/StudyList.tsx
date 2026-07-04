@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
+import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { useToast } from "../components/Toast";
 import { QuantiTopBar } from "../components/QuantiTopBar";
 import { AccountNudges } from "../components/AccountNudges";
@@ -278,6 +279,8 @@ export default function StudyList() {
             </div>
           )}
         </section>
+
+        {studies !== null && <DecisionMemoSection studies={studies} />}
       </div>
 
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}

@@ -185,8 +185,13 @@ def render_analysis_report_html(
     participants: list,
     annotations: list,
     company_name: str = "",
+    include_appendix: bool = True,
 ) -> str:
-    """Build the full standalone HTML document for one analysis version."""
+    """Build the full standalone HTML document for one analysis version.
+
+    ``include_appendix=False`` is the public-share variant: the participant
+    roster (demographics + quality labels) is stripped.
+    """
     lang = "fr" if (project.language or "en").lower().startswith("fr") else "en"
     L = _STRINGS[lang]
 
@@ -475,7 +480,7 @@ def render_analysis_report_html(
         <tbody>{roster_rows}</tbody>
       </table>
     </section>
-    """ if completed else ""
+    """ if (completed and include_appendix) else ""
 
     title = f"{project.name} — {L['doc_type']}"
 
@@ -650,6 +655,352 @@ section {{ margin-bottom: 40px; }}
 {tensions_section}
 {recos_section}
 {appendix}
+<footer class="doc-footer">
+  <span><strong>QualiPulse</strong> · {_esc(company_name)}</span>
+  <span>{L["footer"]}</span>
+</footer>
+</div>
+</body>
+</html>"""
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Decision memo — cross-study synthesis document
+# ═══════════════════════════════════════════════════════════════════════════
+
+_MEMO_STRINGS = {
+    "en": {
+        "doc_type": "Decision memo",
+        "generated": "Generated",
+        "studies": "studies",
+        "confidence": "Confidence",
+        "confidence_low": "Low", "confidence_medium": "Medium", "confidence_high": "High",
+        "decision": "Decision under consideration",
+        "verdict": "Verdict",
+        "summary": "Executive summary",
+        "findings": "Key findings across studies",
+        "findings_sub": "Every finding names the studies that support it. Strength reflects cross-study corroboration, not enthusiasm.",
+        "strength_strong": "Strong evidence",
+        "strength_moderate": "Moderate evidence",
+        "strength_weak": "Weak evidence",
+        "evidence": "Most convincing evidence",
+        "conflicts": "Where the studies disagree",
+        "conflicts_sub": "Treat these as open questions, not noise — disagreement between studies is information.",
+        "gaps": "What we still don't know",
+        "recos": "Recommendations",
+        "recos_sub": "Decision-oriented next steps. Each one states what evidence would prove it wrong.",
+        "included": "Studies included",
+        "col_study": "Study", "col_n": "Interviews", "col_conf": "Confidence",
+        "col_date": "Analysed", "col_mixed": "Mixed methods",
+        "confidence_note": "How to read this confidence level",
+        "footer": "Generated with QualiPulse — synthesised from per-study analyses with full quote traceability.",
+        "print_btn": "Print / Save as PDF",
+        "yes": "Yes", "no": "—",
+    },
+    "fr": {
+        "doc_type": "Mémo de décision",
+        "generated": "Généré le",
+        "studies": "études",
+        "confidence": "Confiance",
+        "confidence_low": "Faible", "confidence_medium": "Moyenne", "confidence_high": "Élevée",
+        "decision": "Décision à éclairer",
+        "verdict": "Verdict",
+        "summary": "Synthèse",
+        "findings": "Enseignements clés transverses",
+        "findings_sub": "Chaque enseignement nomme les études qui le soutiennent. La force reflète la corroboration entre études.",
+        "strength_strong": "Preuves solides",
+        "strength_moderate": "Preuves modérées",
+        "strength_weak": "Preuves faibles",
+        "evidence": "Preuve la plus convaincante",
+        "conflicts": "Là où les études divergent",
+        "conflicts_sub": "À traiter comme des questions ouvertes — un désaccord entre études est une information.",
+        "gaps": "Ce que nous ne savons toujours pas",
+        "recos": "Recommandations",
+        "recos_sub": "Prochaines étapes orientées décision. Chacune précise ce qui la réfuterait.",
+        "included": "Études incluses",
+        "col_study": "Étude", "col_n": "Entretiens", "col_conf": "Confiance",
+        "col_date": "Analysée le", "col_mixed": "Méthodes mixtes",
+        "confidence_note": "Comment lire ce niveau de confiance",
+        "footer": "Généré avec QualiPulse — synthétisé à partir des analyses de chaque étude, avec traçabilité complète des citations.",
+        "print_btn": "Imprimer / Enregistrer en PDF",
+        "yes": "Oui", "no": "—",
+    },
+}
+
+_STRENGTH_LEVEL = {"strong": 3, "moderate": 2, "weak": 1}
+
+_MEMO_CSS = """
+:root {
+  --brand: #4369f5; --brand-dark: #1e3fd4; --brand-soft: #f0f4ff;
+  --ink: #0d0f1a; --ink-2: #5a6076; --ink-3: #6c7386;
+  --line: #e2e4ed; --paper: #ffffff; --wash: #f5f5f7;
+  --warn-bg: #fffbeb; --warn-border: #fde68a; --warn-ink: #92400e;
+  --ok-bg: #f0fdf4; --ok-ink: #065f46;
+  --bad-bg: #fef2f2; --bad-ink: #991b1b;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink); background: var(--wash); font-size: 15px; line-height: 1.55; letter-spacing: -0.01em; }
+.sheet { max-width: 820px; margin: 0 auto; background: var(--paper); padding: 56px 64px 40px; }
+@media (max-width: 720px) { .sheet { padding: 32px 20px; } }
+.cover { border-bottom: 1px solid var(--line); padding-bottom: 28px; margin-bottom: 36px; position: relative; }
+.cover::before { content: ""; position: absolute; top: -56px; left: -64px; right: -64px; height: 6px;
+  background: linear-gradient(90deg, #9bb3ff, var(--brand), var(--brand-dark)); }
+.cover__brand { display: flex; align-items: baseline; gap: 12px; margin-bottom: 28px; }
+.cover__logo { font-weight: 700; font-size: 1.05rem; color: var(--brand); letter-spacing: -0.02em; }
+.cover__doctype { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-3); }
+.cover__title { font-size: 2.1rem; line-height: 1.15; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 18px; }
+.cover__meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 4px 10px;
+  border-radius: 999px; background: var(--wash); border: 1px solid var(--line); color: var(--ink-2); }
+.chip--strong { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chip--ghost { background: transparent; }
+.chip--conf-high { background: var(--ok-bg); color: var(--ok-ink); border-color: #bbf7d0; }
+.chip--conf-medium { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-border); }
+.chip--conf-low { background: var(--bad-bg); color: var(--bad-ink); border-color: #fecaca; }
+.eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--brand); font-weight: 700; margin-bottom: 12px; }
+section { margin-bottom: 40px; }
+.decision-q { font-size: 1.05rem; font-weight: 600; color: var(--ink-2); }
+.verdict { background: var(--brand-soft); border-left: 4px solid var(--brand);
+  padding: 24px 28px; border-radius: 0 12px 12px 0; }
+.verdict p { font-size: 1.15rem; line-height: 1.6; font-weight: 500; letter-spacing: -0.015em; }
+.summary-text { font-size: 0.98rem; color: var(--ink-2); max-width: 68ch; }
+.rationale { margin-top: 14px; font-size: 0.85rem; color: var(--ink-2); background: var(--wash);
+  border-radius: 10px; padding: 12px 16px; }
+.section-title { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.025em; margin-bottom: 6px; }
+.section-sub { font-size: 0.88rem; color: var(--ink-3); margin-bottom: 22px; max-width: 60ch; }
+.finding { border: 1px solid var(--line); border-left: 4px solid var(--brand); border-radius: 0 14px 14px 0;
+  padding: 22px 26px; margin-bottom: 18px; }
+.finding__head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.finding__num { font-size: 0.8rem; font-weight: 700; color: var(--brand); }
+.finding__title { font-size: 1.08rem; font-weight: 700; letter-spacing: -0.02em; flex: 1; }
+.strength { display: inline-flex; align-items: center; gap: 4px; }
+.sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
+.sdot--on { background: var(--brand); }
+.strength__label { font-size: 0.72rem; color: var(--ink-3); margin-left: 4px; }
+.finding__detail { font-size: 0.92rem; color: var(--ink-2); margin-bottom: 12px; }
+.finding__studies { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.finding__evidence { border-left: 3px solid var(--line); padding: 8px 0 8px 18px; margin-left: 6px; }
+.finding__evidence .lbl { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--ink-3); display: block; margin-bottom: 3px; }
+.finding__evidence p { font-size: 0.92rem; font-style: italic; }
+.conflict { border: 1px solid var(--line); border-left: 4px solid #ef4444; border-radius: 0 12px 12px 0;
+  padding: 16px 20px; margin-bottom: 14px; }
+.conflict h3 { font-size: 0.98rem; font-weight: 700; margin-bottom: 6px; }
+.conflict p { font-size: 0.88rem; color: var(--ink-2); }
+.gaps { list-style: none; }
+.gaps li { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-ink);
+  border-radius: 10px; padding: 12px 18px; margin-bottom: 10px; font-size: 0.9rem; }
+.recos { list-style: none; }
+.reco { display: flex; gap: 16px; align-items: flex-start; border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; }
+.reco__num { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; background: var(--brand);
+  color: #fff; font-weight: 700; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
+.reco p { font-size: 0.92rem; padding-top: 3px; }
+.included { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.included th, .included td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; }
+.included th { background: var(--wash); font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--ink-2); }
+.doc-footer { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 18px;
+  font-size: 0.76rem; color: var(--ink-3); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.doc-footer strong { color: var(--brand); }
+.toolbar { position: fixed; top: 18px; right: 18px; z-index: 10; }
+.toolbar button { font: inherit; font-size: 0.82rem; font-weight: 600; color: #fff; background: var(--brand);
+  border: 0; border-radius: 999px; padding: 10px 18px; cursor: pointer; box-shadow: 0 4px 16px rgba(13,15,26,0.18); }
+.toolbar button:hover { background: var(--brand-dark); }
+.avoid-break { break-inside: avoid; page-break-inside: avoid; }
+@media print {
+  body { background: #fff; }
+  .sheet { max-width: none; padding: 0; }
+  .toolbar { display: none; }
+  .cover::before { left: 0; right: 0; top: 0; }
+  .cover { padding-top: 18px; }
+  section { margin-bottom: 28px; }
+  @page { size: A4; margin: 16mm 14mm; }
+}
+"""
+
+
+def _strength_meter(strength: str, L: dict) -> str:
+    level = _STRENGTH_LEVEL.get((strength or "").lower(), 0)
+    label = L.get("strength_{}".format((strength or "").lower()), _esc(strength))
+    dots = "".join(
+        '<span class="sdot{}"></span>'.format(" sdot--on" if i < level else "")
+        for i in range(3)
+    )
+    return f'<span class="strength" title="{_esc(label)}">{dots}<span class="strength__label">{_esc(label)}</span></span>'
+
+
+def render_decision_memo_html(synthesis, studies_meta: list, company_name: str = "") -> str:
+    """Standalone print-ready HTML for one CrossStudySynthesis decision memo.
+
+    ``studies_meta`` — list of dicts: name, participant_count, confidence,
+    generated_at, has_mixed_methods (built by the router from live rows).
+    """
+    lang = "fr" if (synthesis.language or "en").lower().startswith("fr") else "en"
+    L = _MEMO_STRINGS[lang]
+
+    report = json.loads(synthesis.report) if synthesis.report else {}
+    findings = report.get("key_findings", []) or []
+    conflicts = report.get("conflicts", []) or []
+    gaps = report.get("gaps", []) or []
+    recommendations = report.get("recommendations", []) or []
+
+    conf = (report.get("confidence", "") or "").lower()
+    conf_label = L.get("confidence_{}".format(conf), _esc(report.get("confidence", "")))
+    sep = "&nbsp;:" if lang == "fr" else ":"
+
+    header = f"""
+    <header class="cover">
+      <div class="cover__brand">
+        <span class="cover__logo">QualiPulse</span>
+        <span class="cover__doctype">{L["doc_type"]}</span>
+      </div>
+      <h1 class="cover__title">{_esc(synthesis.name)}</h1>
+      <div class="cover__meta">
+        <span class="chip chip--strong">{len(studies_meta)} {L["studies"]}</span>
+        <span class="chip chip--conf-{_esc(conf)}">{L["confidence"]}{sep} {conf_label}</span>
+        <span class="chip chip--ghost">{L["generated"]} {_fmt_date(synthesis.generated_at, lang)}</span>
+      </div>
+    </header>
+    """
+
+    decision_section = f"""
+    <section class="avoid-break">
+      <h2 class="eyebrow">{L["decision"]}</h2>
+      <p class="decision-q">{_esc(report.get("decision", synthesis.decision_question or ""))}</p>
+    </section>
+    """
+
+    rationale = report.get("confidence_rationale", "")
+    verdict_section = f"""
+    <section class="avoid-break">
+      <h2 class="eyebrow">{L["verdict"]}</h2>
+      <div class="verdict"><p>{_esc(report.get("verdict", ""))}</p></div>
+      {f'<p class="rationale"><strong>{L["confidence_note"]}:</strong> {_esc(rationale)}</p>' if rationale else ""}
+    </section>
+    """
+
+    summary_section = f"""
+    <section class="avoid-break">
+      <h2 class="eyebrow">{L["summary"]}</h2>
+      <p class="summary-text">{_esc(report.get("summary", ""))}</p>
+    </section>
+    """ if report.get("summary") else ""
+
+    finding_cards = []
+    for i, f in enumerate(findings):
+        chips = "".join(
+            '<span class="chip">{}</span>'.format(_esc(s))
+            for s in (f.get("supporting_studies", []) or [])
+        )
+        evidence = f.get("evidence", "")
+        evidence_html = f"""
+          <div class="finding__evidence avoid-break">
+            <span class="lbl">{L["evidence"]}</span>
+            <p>{_esc(evidence)}</p>
+          </div>""" if evidence else ""
+        finding_cards.append(f"""
+        <article class="finding avoid-break">
+          <div class="finding__head">
+            <span class="finding__num">{i + 1:02d}</span>
+            <h3 class="finding__title">{_esc(f.get("finding", ""))}</h3>
+            {_strength_meter(f.get("strength", ""), L)}
+          </div>
+          <p class="finding__detail">{_esc(f.get("detail", ""))}</p>
+          <div class="finding__studies">{chips}</div>
+          {evidence_html}
+        </article>""")
+    findings_section = f"""
+    <section>
+      <h2 class="section-title">{L["findings"]}</h2>
+      <p class="section-sub">{L["findings_sub"]}</p>
+      {"".join(finding_cards)}
+    </section>
+    """ if findings else ""
+
+    conflict_cards = "".join(f"""
+        <article class="conflict avoid-break">
+          <h3>{_esc(c.get("topic", ""))}</h3>
+          <p>{_esc(c.get("detail", ""))}</p>
+        </article>""" for c in conflicts)
+    conflicts_section = f"""
+    <section>
+      <h2 class="section-title">{L["conflicts"]}</h2>
+      <p class="section-sub">{L["conflicts_sub"]}</p>
+      {conflict_cards}
+    </section>
+    """ if conflicts else ""
+
+    gap_items = "".join(f'<li class="avoid-break">{_esc(g)}</li>' for g in gaps)
+    gaps_section = f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["gaps"]}</h2>
+      <ul class="gaps">{gap_items}</ul>
+    </section>
+    """ if gaps else ""
+
+    reco_items = "".join(f"""
+        <li class="reco avoid-break"><span class="reco__num">{i + 1}</span><p>{_esc(r)}</p></li>"""
+        for i, r in enumerate(recommendations))
+    recos_section = f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["recos"]}</h2>
+      <p class="section-sub">{L["recos_sub"]}</p>
+      <ol class="recos">{reco_items}</ol>
+    </section>
+    """ if recommendations else ""
+
+    included_rows = ""
+    for m in studies_meta:
+        m_conf = (m.get("confidence") or "").lower()
+        m_conf_label = L.get("confidence_{}".format(m_conf), "—") if m_conf else "—"
+        included_rows += f"""
+        <tr>
+          <td>{_esc(m.get("name", ""))}</td>
+          <td>{m.get("participant_count") if m.get("participant_count") is not None else "—"}</td>
+          <td>{m_conf_label}</td>
+          <td>{_fmt_date(m.get("generated_at"), lang)}</td>
+          <td>{L["yes"] if m.get("has_mixed_methods") else L["no"]}</td>
+        </tr>"""
+    included_section = f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["included"]}</h2>
+      <table class="included">
+        <thead><tr>
+          <th>{L["col_study"]}</th><th>{L["col_n"]}</th><th>{L["col_conf"]}</th>
+          <th>{L["col_date"]}</th><th>{L["col_mixed"]}</th>
+        </tr></thead>
+        <tbody>{included_rows}</tbody>
+      </table>
+    </section>
+    """ if studies_meta else ""
+
+    title = f"{synthesis.name} — {L['doc_type']}"
+
+    return f"""<!doctype html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{_esc(title)}</title>
+<style>{_MEMO_CSS}</style>
+</head>
+<body>
+<div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>
+<div class="sheet">
+{header}
+{decision_section}
+{verdict_section}
+{summary_section}
+{findings_section}
+{conflicts_section}
+{gaps_section}
+{recos_section}
+{included_section}
 <footer class="doc-footer">
   <span><strong>QualiPulse</strong> · {_esc(company_name)}</span>
   <span>{L["footer"]}</span>

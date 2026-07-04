@@ -27,6 +27,7 @@ from app.models.billing import (
     WorkspaceSubscription,
 )
 from app.models.study import ConsentAcknowledgment, Study, StudyAnalysis, StudyParticipant
+from app.models.synthesis import CrossStudySynthesis
 from app.models.survey import (
     Survey,
     SurveyLink,
@@ -49,6 +50,7 @@ __all__ = [
     "CopilotMemory",
     "CreditBalance",
     "CreditLedger",
+    "CrossStudySynthesis",
     "InterviewGuideQuestion",
     "InterviewLink",
     "InterviewTurn",
