@@ -749,6 +749,7 @@ export default function Marketing() {
             <h4>{t("footer.companyTitle")}</h4>
             <Link to="/login">{t("footer.login")}</Link>
             <Link to="/signup">{t("footer.signup")}</Link>
+            <Link to="/participants">{t("footer.becomeParticipant")}</Link>
             <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
           </div>
           <div className="mkt-footer-col">

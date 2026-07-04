@@ -21,6 +21,7 @@ from app.models.panel import PanelAttribute, PanelAnswer, PanelProfile
 
 ALGORITHM = "HS256"
 PANEL_SESSION_DAYS = 90
+PANEL_JOIN_HOURS = 48
 SUPPORTED_LANGS = {"en", "fr", "de", "es", "it", "pt"}
 
 
@@ -50,6 +51,45 @@ def resolve_panel_email(token: str | None) -> str | None:
         return None
     email = payload.get("email")
     return email if isinstance(email, str) and email else None
+
+
+# ── Public join (double opt-in) token ────────────────────────────────────────
+
+def create_join_token(email: str, first_name: str | None, lang: str) -> str:
+    """Signed confirmation token behind the 'confirm your spot' email sent to
+    a public panel signup. Consent is only recorded when this comes back."""
+    expire = datetime.now(timezone.utc) + timedelta(hours=PANEL_JOIN_HOURS)
+    return jwt.encode(
+        {
+            "email": email,
+            "first_name": first_name or "",
+            "lang": lang,
+            "type": "panel_join",
+            "exp": expire,
+        },
+        settings.SECRET_KEY, algorithm=ALGORITHM,
+    )
+
+
+def resolve_join_token(token: str | None) -> dict | None:
+    """Return {email, first_name, lang} for a valid panel_join token."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("type") != "panel_join":
+        return None
+    email = payload.get("email")
+    if not isinstance(email, str) or not email:
+        return None
+    lang = payload.get("lang")
+    return {
+        "email": email,
+        "first_name": payload.get("first_name") or None,
+        "lang": lang if lang in SUPPORTED_LANGS else "en",
+    }
 
 
 # ── Localisation ─────────────────────────────────────────────────────────────

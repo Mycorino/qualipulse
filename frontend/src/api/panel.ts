@@ -56,3 +56,17 @@ export async function grantSensitiveConsent(
 export async function requestPanelAccess(email: string, lang?: string): Promise<void> {
   await client.post("/panel/request-access", { email, lang });
 }
+
+export async function joinPanel(params: {
+  email: string;
+  first_name?: string;
+  lang?: string;
+  consent: boolean;
+}): Promise<void> {
+  await client.post("/panel/join", params);
+}
+
+export async function confirmPanelJoin(token: string): Promise<{ token: string }> {
+  const { data } = await client.post<{ token: string }>("/panel/join/confirm", { token });
+  return data;
+}

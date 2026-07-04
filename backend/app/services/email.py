@@ -424,6 +424,22 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "foot": "Ce lien expire dans {expiry_minutes} minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.",
         },
     },
+    "panel_join": {
+        "en": {
+            "subject": "Confirm your spot on the QualiPulse panel",
+            "heading": "One click to join the panel",
+            "body": "Thanks for signing up! Confirm your email to join the QualiPulse research panel. You'll be invited to paid studies that match your profile — most are short voice interviews you can do from any device.",
+            "cta": "Confirm & join the panel →",
+            "foot": "This link expires in 48 hours. If you didn't sign up, you can safely ignore this email — nothing is stored without your confirmation.",
+        },
+        "fr": {
+            "subject": "Confirmez votre place sur le panel QualiPulse",
+            "heading": "Un clic pour rejoindre le panel",
+            "body": "Merci de votre inscription ! Confirmez votre email pour rejoindre le panel de recherche QualiPulse. Vous serez invité·e à des études rémunérées correspondant à votre profil — la plupart sont de courts entretiens vocaux, réalisables depuis n'importe quel appareil.",
+            "cta": "Confirmer et rejoindre le panel →",
+            "foot": "Ce lien expire dans 48 heures. Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email — rien n'est enregistré sans votre confirmation.",
+        },
+    },
     "panel_access": {
         "en": {
             "subject": "Get matched to more (paid) studies",
@@ -1003,6 +1019,29 @@ def send_interview_magic_link(
     return send_email(
         to=email,
         subject=_c("interview_magic", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_panel_join_confirm(email: str, token: str, lang: str = "en") -> bool:
+    """Double-opt-in confirmation for a public panel signup. Consent is only
+    recorded when the link is clicked. The token rides in the URL fragment
+    (never sent to the server in logs)."""
+    lang = _normalise_lang(lang)
+    confirm_url = f"{settings.APP_BASE_URL}/panel/confirm#token={token}"
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("panel_join", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("panel_join", lang, "body")}</p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="{confirm_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
+          {_c("panel_join", lang, "cta")}
+        </a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.8rem;margin:0;">{_c("panel_join", lang, "foot")}</p>
+    """
+    return send_email(
+        to=email,
+        subject=_c("panel_join", lang, "subject"),
         body_html=_wrap_email(content, lang),
     )
 
