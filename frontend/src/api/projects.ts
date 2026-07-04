@@ -517,6 +517,14 @@ export async function exportCSV(projectId: string): Promise<Blob> {
   return data;
 }
 
+export async function fetchAnalysisReportHtml(projectId: string, version?: number): Promise<Blob> {
+  const { data } = await client.get(`/projects/${projectId}/analysis/report.html`, {
+    params: version != null ? { version } : undefined,
+    responseType: "blob",
+  });
+  return data;
+}
+
 // ── Coding API ──────────────────────────────────────────────────────────────
 
 export async function getCodes(projectId: string): Promise<ManualCode[]> {

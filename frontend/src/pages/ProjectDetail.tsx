@@ -33,6 +33,7 @@ import {
   deleteMemo,
   getHeatmap,
   shareAnalysis,
+  fetchAnalysisReportHtml,
   getAnalysisHistory,
   getAnalysisByVersion,
   upsertThemeAnnotation,
@@ -555,6 +556,17 @@ export default function ProjectDetail() {
     a.download = `${project?.name ?? "analysis"}-report.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleExportReport() {
+    try {
+      const data = await fetchAnalysisReportHtml(id!);
+      const url = URL.createObjectURL(new Blob([data], { type: "text/html" }));
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toast(tAnalysis("exportReportError"), "error");
+    }
   }
 
   async function handleShareAnalysis() {
@@ -3100,6 +3112,9 @@ export default function ProjectDetail() {
                       </button>
                       {exportMenuOpen && (
                         <div className="overflow-menu__dropdown" role="menu">
+                          <button role="menuitem" className="overflow-menu__item" onClick={() => { setExportMenuOpen(false); handleExportReport(); }}>
+                            📄 {tAnalysis("exportReport")}
+                          </button>
                           <button role="menuitem" className="overflow-menu__item" onClick={() => { setExportMenuOpen(false); handleCopyMarkdown(); }}>
                             {exportCopied ? `✓ ${tCommon("copied")}` : tAnalysis("copyMd")}
                           </button>
@@ -3414,6 +3429,9 @@ export default function ProjectDetail() {
                               {tAnalysis("tocRecs")} <span className="analysis-toc__count">{r.recommendations.length}</span>
                             </a>
                           )}
+                          {r.themes.length > 0 && (
+                            <a className="analysis-toc__link" href="#analysis-evidence">{tAnalysis("tocEvidence")}</a>
+                          )}
                           <a className="analysis-toc__link" href="#analysis-notes">{tAnalysis("tocNotes")}</a>
                           {!isViewingPastVersion && (
                             <a className="analysis-toc__link" href="#analysis-refine">{tAnalysis("tocRefine")}</a>
@@ -3638,6 +3656,64 @@ export default function ProjectDetail() {
                         </div>
                       </div>
                     )}
+
+                    {/* Evidence map — theme × participant coverage */}
+                    {r.themes.length > 0 && (() => {
+                      const completed = participants
+                        .filter((p) => p.status === "completed")
+                        .sort((a, b) => (a.completed_at ?? a.started_at).localeCompare(b.completed_at ?? b.started_at));
+                      if (completed.length === 0) return null;
+                      const quotedNames = (t: (typeof r.themes)[number]) =>
+                        new Set(
+                          t.quotes
+                            .map((q) => (typeof q === "string" ? "" : q.participant_display_name ?? ""))
+                            .filter(Boolean)
+                        );
+                      return (
+                        <div className="analysis-block" id="analysis-evidence">
+                          <h3>{tAnalysis("evidenceMap")}</h3>
+                          <p className="muted-text" style={{ fontSize: 12, marginBottom: 8 }}>{tAnalysis("evidenceMapHint")}</p>
+                          <div style={{ overflowX: "auto" }}>
+                            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ padding: "6px 10px", textAlign: "left", background: "var(--bg-base)", borderBottom: "1px solid var(--border-default)", minWidth: 160 }}>{tAnalysis("themeHeader")}</th>
+                                  {completed.map((p, i) => (
+                                    <th key={p.id} title={p.display_name ?? ""} style={{ padding: "6px 8px", textAlign: "center", background: "var(--bg-base)", borderBottom: "1px solid var(--border-default)", whiteSpace: "nowrap" }}>
+                                      P{i + 1}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {r.themes.map((t, ti) => {
+                                  const quoted = quotedNames(t);
+                                  return (
+                                    <tr key={ti}>
+                                      <td style={{ padding: "6px 10px", borderBottom: "1px solid var(--border-subtle)", fontWeight: 500 }}>{t.title}</td>
+                                      {completed.map((p) => {
+                                        const hit = quoted.has(p.display_name ?? "");
+                                        return (
+                                          <td key={p.id} title={hit ? `${p.display_name} — ${tAnalysis("evidenceQuoted")}` : undefined} style={{ padding: "6px 8px", textAlign: "center", borderBottom: "1px solid var(--border-subtle)" }}>
+                                            <span
+                                              aria-label={hit ? tAnalysis("evidenceQuoted") : undefined}
+                                              style={{ display: "inline-block", width: hit ? 11 : 7, height: hit ? 11 : 7, borderRadius: "50%", background: hit ? "var(--brand-500)" : "var(--border-default)", opacity: hit ? 1 : 0.6 }}
+                                            />
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                          <p className="muted-text" style={{ fontSize: 11, marginTop: 6 }}>
+                            {completed.map((p, i) => `P${i + 1} ${p.display_name ?? "—"}`).join(" · ")}
+                          </p>
+                        </div>
+                      );
+                    })()}
 
                     {/* P7: Heatmap */}
                     <div className="analysis-block" id="analysis-heatmap">

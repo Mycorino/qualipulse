@@ -2,10 +2,12 @@
 
 import json
 import logging
+import re
 import threading
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,7 @@ from app.models.company import Company
 from app.models.interview import AnalysisThemeAnnotation, Participant, ProjectAnalysis
 from app.models.project import Project
 from app.services.analysis import run_analysis, run_refined_analysis
+from app.services.report_export import render_analysis_report_html
 
 logger = logging.getLogger("auto_interview.analysis")
 router = APIRouter(prefix="/projects", tags=["analysis"])
@@ -345,6 +348,52 @@ def get_heatmap(
         "segment_participants": seg_participants,
         "themes": theme_rows,
     }
+
+
+@router.get("/{project_id}/analysis/report.html", response_class=HTMLResponse)
+def export_analysis_report(
+    project_id: str,
+    version: int | None = None,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Render a ready analysis as a standalone, print-ready HTML findings report.
+
+    Declared before ``/{project_id}/analysis/{version_number}`` so the literal
+    ``report.html`` segment isn't captured by the int path param (422).
+    """
+    project = _get_project_or_404(project_id, company.id, db)
+
+    query = db.query(ProjectAnalysis).filter(
+        ProjectAnalysis.project_id == project_id,
+        ProjectAnalysis.status == "ready",
+    )
+    if version is not None:
+        query = query.filter(ProjectAnalysis.version == version)
+    analysis = query.order_by(ProjectAnalysis.version.desc()).first()
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="No ready analysis to export.")
+
+    participants = (
+        db.query(Participant)
+        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .all()
+    )
+    annotations = (
+        db.query(AnalysisThemeAnnotation)
+        .filter(AnalysisThemeAnnotation.analysis_id == analysis.id)
+        .all()
+    )
+
+    html_doc = render_analysis_report_html(
+        project, analysis, participants, annotations, company_name=company.name
+    )
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", project.name).strip("_") or "study"
+    filename = f"{slug}_findings_v{analysis.version}.html"
+    return HTMLResponse(
+        content=html_doc,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.get("/{project_id}/analysis/versions")

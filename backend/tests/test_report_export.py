@@ -1,0 +1,228 @@
+"""Tests for the HTML findings-report export (GET /projects/{id}/analysis/report.html)."""
+import json
+from datetime import datetime, timedelta
+
+import pytest
+
+from app.models.company import Company
+from app.models.interview import (
+    AnalysisThemeAnnotation,
+    InterviewLink,
+    Participant,
+    ProjectAnalysis,
+)
+from app.models.project import Project
+
+
+def _make_report(theme_title="Trust is earned at delivery", quote_text="I always check the tracking page twice a day"):
+    return {
+        "summary": "Participants trust brands that communicate proactively about delivery.",
+        "themes": [
+            {
+                "title": theme_title,
+                "summary": "P1 and P2 both described delivery updates as the moment trust forms.",
+                "quotes": [
+                    {
+                        "text": quote_text,
+                        "participant_identifier": "P1",
+                        "participant_display_name": "Alice M.",
+                        "turn_index": 3,
+                        "question_text": "How do you decide whether to reorder?",
+                    },
+                    {
+                        "text": "If the package is late and nobody tells me, I'm done.",
+                        "participant_identifier": "P2",
+                        "participant_display_name": "Ben K.",
+                        "turn_index": 5,
+                        "question_text": "Tell me about a bad experience.",
+                    },
+                ],
+                "frequency": "most",
+                "disconfirming_evidence": "P3 said she never reads delivery emails at all.",
+            }
+        ],
+        "jobs_to_be_done": [
+            {
+                "job": "When I order online, I want proactive updates, so I can stop worrying.",
+                "insight": "The anxiety is about uncertainty, not speed.",
+                "frequency": "most",
+            }
+        ],
+        "tensions": [
+            {
+                "tension": "Speed vs. certainty",
+                "detail": "P1 wants faster delivery; P2 explicitly prefers slower but predictable.",
+            }
+        ],
+        "recommendations": [
+            "Ship a proactive delay notification. Would be wrong if open rates stay under 10%.",
+        ],
+        "confidence": "medium",
+        "confidence_rationale": "N=3 with good response depth but limited diversity.",
+        "participant_count": 3,
+    }
+
+
+@pytest.fixture
+def project_with_analysis(db_session, registered_company):
+    company = (
+        db_session.query(Company)
+        .filter(Company.email == registered_company["email"])
+        .first()
+    )
+    project = Project(
+        company_id=company.id,
+        name="Customer Discovery Study",
+        language="en",
+        interview_duration_minutes=20,
+        research_objective="Understand reorder decisions",
+        decision_to_inform="Whether to build delivery notifications",
+    )
+    db_session.add(project)
+    db_session.flush()
+
+    link = InterviewLink(project_id=project.id, token="tok-report-export-test")
+    db_session.add(link)
+    db_session.flush()
+
+    base = datetime(2026, 6, 1, 10, 0, 0)
+    for i, (name, prof, country, quality) in enumerate(
+        [
+            ("Alice M.", "Product Manager", "UK", "strong"),
+            ("Ben K.", "Engineer", "Germany", "good"),
+            ("Sarah L.", "Designer", "France", "fair"),
+        ]
+    ):
+        db_session.add(
+            Participant(
+                link_id=link.id,
+                project_id=project.id,
+                display_name=name,
+                profession=prof,
+                age_range="25-34",
+                country=country,
+                status="completed",
+                started_at=base + timedelta(days=i),
+                completed_at=base + timedelta(days=i, minutes=20),
+                quality_label=quality,
+                quality_score=0.8,
+            )
+        )
+
+    analysis = ProjectAnalysis(
+        project_id=project.id,
+        version=1,
+        status="ready",
+        participant_count=3,
+        report=json.dumps(_make_report()),
+        generated_at=datetime(2026, 6, 5, 9, 0, 0),
+    )
+    db_session.add(analysis)
+    db_session.flush()
+    db_session.add(
+        AnalysisThemeAnnotation(
+            analysis_id=analysis.id,
+            theme_title="Trust is earned at delivery",
+            status="confirmed",
+            researcher_note="Matches support-ticket data.",
+        )
+    )
+    db_session.commit()
+    return project, analysis
+
+
+def test_report_export_renders_full_document(client, auth_headers, project_with_analysis):
+    project, analysis = project_with_analysis
+    resp = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("text/html")
+    assert "findings_v1.html" in resp.headers.get("content-disposition", "")
+
+    body = resp.text
+    assert "Customer Discovery Study" in body
+    assert "Trust is earned at delivery" in body
+    assert "I always check the tracking page twice a day" in body
+    assert "Alice M." in body
+    assert "Ship a proactive delay notification" in body
+    # Disconfirming evidence + annotation + JTBD + tension all present
+    assert "P3 said she never reads delivery emails" in body
+    assert "Confirmed by researcher" in body
+    assert "proactive updates" in body
+    assert "Speed vs. certainty" in body
+    # Evidence map identifiers + appendix roster
+    assert ">P1<" in body and ">P3<" in body
+    assert "Product Manager" in body
+
+
+def test_report_export_escapes_html(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    report = _make_report(
+        theme_title='<script>alert("x")</script>',
+        quote_text='He said "use <b>bold</b> claims"',
+    )
+    analysis.report = json.dumps(report)
+    db_session.commit()
+
+    resp = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers)
+    assert resp.status_code == 200
+    assert "<script>alert" not in resp.text
+    assert "&lt;script&gt;" in resp.text
+    assert "use &lt;b&gt;bold&lt;/b&gt; claims" in resp.text
+
+
+def test_report_export_404_without_ready_analysis(client, auth_headers, db_session, registered_company):
+    company = (
+        db_session.query(Company)
+        .filter(Company.email == registered_company["email"])
+        .first()
+    )
+    project = Project(company_id=company.id, name="Empty Study", interview_duration_minutes=15)
+    db_session.add(project)
+    db_session.commit()
+
+    resp = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_report_export_specific_version(client, auth_headers, db_session, project_with_analysis):
+    project, v1 = project_with_analysis
+    v2_report = _make_report(theme_title="A refined v2 theme")
+    db_session.add(
+        ProjectAnalysis(
+            project_id=project.id,
+            version=2,
+            status="ready",
+            participant_count=3,
+            report=json.dumps(v2_report),
+            version_label="researcher_refined",
+            parent_version_id=v1.id,
+            generated_at=datetime(2026, 6, 6, 9, 0, 0),
+        )
+    )
+    db_session.commit()
+
+    latest = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers)
+    assert "A refined v2 theme" in latest.text
+
+    pinned = client.get(
+        f"/projects/{project.id}/analysis/report.html?version=1", headers=auth_headers
+    )
+    assert "Trust is earned at delivery" in pinned.text
+    assert "A refined v2 theme" not in pinned.text
+
+
+def test_report_export_localised_french(client, auth_headers, db_session, project_with_analysis):
+    project, _ = project_with_analysis
+    project.language = "fr"
+    db_session.commit()
+
+    resp = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers)
+    assert resp.status_code == 200
+    assert "Rapport de résultats de recherche" in resp.text
+    assert "Recommandations" in resp.text
+
+
+def test_report_export_requires_auth(client, project_with_analysis):
+    project, _ = project_with_analysis
+    resp = client.get(f"/projects/{project.id}/analysis/report.html")
+    assert resp.status_code in (401, 403)
