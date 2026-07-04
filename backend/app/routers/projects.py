@@ -77,11 +77,18 @@ def create_project(
     except ValueError:
         raise HTTPException(status_code=404, detail="Study not found")
 
+    # Participant-facing content defaults to the researcher's own language
+    # (the copilot writes guide/screener content in project.language), but
+    # an explicit choice from the client always wins.
+    project_language = body.language or getattr(
+        company, "preferred_language", None
+    ) or "en"
+
     project = Project(
         company_id=company.id,
         study_id=study.id,
         name=body.name,
-        language=body.language,
+        language=project_language,
         interview_duration_minutes=body.interview_duration_minutes,
         system_prompt=body.system_prompt or Project.__table__.columns["system_prompt"].default.arg,
         research_objective=body.research_objective or None,
