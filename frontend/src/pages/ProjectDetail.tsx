@@ -57,6 +57,7 @@ import {
 import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, regenerateScreeningTranslations, type PaywallDetail } from "../api/projects";
 import ScreeningTranslationsEditor from "../components/ScreeningTranslationsEditor";
 import BrandingSettings from "../components/BrandingSettings";
+import DemoTour from "../components/DemoTour";
 import { getCreditUsage } from "../api/billing";
 import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
@@ -1685,10 +1686,34 @@ export default function ProjectDetail() {
         {project.is_demo && (
           <div className="demo-banner">
             <p>{tProject("detail.demoBannerText")}</p>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+              onClick={() => {
+                const sp = new URLSearchParams(searchParams);
+                sp.set("tour", "1");
+                setSearchParams(sp);
+              }}
+            >
+              {tProject("tour.replay")}
+            </button>
             <Link to="/dashboard" className="btn btn-primary btn-sm" style={{ whiteSpace: "nowrap", textDecoration: "none", flexShrink: 0 }}>
               {tProject("detail.demoBannerCta")}
             </Link>
           </div>
+        )}
+
+        {/* ── Guided tour of the demo project (onboarding hand-off or replay) ── */}
+        {project.is_demo && searchParams.get("tour") === "1" && (
+          <DemoTour
+            goToTab={(k) => applyTab(k as Tab)}
+            onExit={() => {
+              const sp = new URLSearchParams(searchParams);
+              sp.delete("tour");
+              setSearchParams(sp, { replace: true });
+            }}
+          />
         )}
 
         {/* ══ OVERVIEW ══ */}

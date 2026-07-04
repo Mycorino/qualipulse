@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
+import { listProjects } from "../api/projects";
+import { DEMO_TOUR_DONE_KEY } from "../components/DemoTour";
 import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { useToast } from "../components/Toast";
 import { QuantiTopBar } from "../components/QuantiTopBar";
@@ -129,7 +131,9 @@ const CARD_STATUS_KEY: Partial<Record<NbaActionType, string>> = {
 export default function StudyList() {
   const { t } = useTranslation("dashboard");
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // ?new=1 opens the picker directly — used by the demo tour's final CTA.
+  const [pickerOpen, setPickerOpen] = useState(() => searchParams.get("new") === "1");
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -140,6 +144,57 @@ export default function StudyList() {
       .then(setStudies)
       .catch(() => toast(t("studyList.loadError"), "error"));
   }, [toast, t]);
+
+  // Onboarding hands off here with ?tour=1. The demo project is seeded in a
+  // backend background thread right after onboarding completes, so it may
+  // not exist yet on first load — poll briefly, then drop the researcher
+  // into the flagship demo with the tour overlay armed. On timeout (seed
+  // failed or account predates demos) just stay on the dashboard.
+  useEffect(() => {
+    if (searchParams.get("tour") !== "1") return;
+    const stripParam = () => {
+      setSearchParams((sp) => {
+        const next = new URLSearchParams(sp);
+        next.delete("tour");
+        return next;
+      }, { replace: true });
+    };
+    if (localStorage.getItem(DEMO_TOUR_DONE_KEY) === "1") {
+      stripParam();
+      return;
+    }
+    let cancelled = false;
+    let attempts = 0;
+    let timer: number | undefined;
+    const tryFind = async () => {
+      attempts += 1;
+      try {
+        const projects = await listProjects();
+        const demos = projects.filter((p) => p.is_demo && !p.archived_at);
+        if (demos.length) {
+          // The seeder backdates the flagship study furthest — oldest wins.
+          const flagship = [...demos].sort((a, b) =>
+            a.created_at.localeCompare(b.created_at),
+          )[0];
+          if (!cancelled) {
+            navigate(`/projects/${flagship.id}?tab=overview&tour=1`, { replace: true });
+          }
+          return;
+        }
+      } catch {
+        // transient — keep polling
+      }
+      if (cancelled) return;
+      if (attempts < 8) timer = window.setTimeout(tryFind, 1200);
+      else stripParam();
+    };
+    tryFind();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Detect studies that gained a report since the researcher's last visit.
   useEffect(() => {

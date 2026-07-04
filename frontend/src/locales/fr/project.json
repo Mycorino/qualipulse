@@ -201,6 +201,28 @@
     "editingFieldAria": "Modification de {{field}}. Appuyez sur Entrée pour enregistrer ou Échap pour annuler.",
     "tabPanelLabel": "Panneau {{tab}}"
   },
+  "tour": {
+    "stepOf": "Étape {{current}} sur {{total}}",
+    "skip": "Passer la visite",
+    "back": "Retour",
+    "next": "Suivant",
+    "start": "Faire la visite",
+    "replay": "Revoir la visite",
+    "intro_title": "Bienvenue — voici une étude de démonstration",
+    "intro_body": "Nous avons préparé une étude d'exemple avec de vrais entretiens terminés pour vous montrer comment QualiPulse fonctionne avant de lancer la vôtre. Cette visite de 30 secondes présente les quatre parties de chaque étude.",
+    "overview_title": "Aperçu — votre étude en un coup d'œil",
+    "overview_body": "L'objectif de recherche, les statistiques de participation et le taux de complétion sont ici, avec le lien d'entretien à partager avec vos participants.",
+    "setup_title": "Configuration — ce que l'interviewer IA demande",
+    "setup_body": "Le guide d'entretien pilote la conversation : questions principales, ce que vous voulez apprendre de chacune, et questions de screening pour filtrer les participants. C'est ce que vous personnaliserez pour votre propre étude.",
+    "responses_title": "Réponses — chaque entretien, transcrit",
+    "responses_body": "La conversation complète de chaque participant est enregistrée et transcrite automatiquement. Ouvrez une transcription pour la lire tour par tour, corriger le texte et taguer les citations importantes.",
+    "analysis_title": "Analyse — des thèmes IA appuyés par des preuves",
+    "analysis_body": "Dès quelques entretiens terminés, l'IA synthétise thèmes, tensions et recommandations — chaque affirmation est appuyée par des citations verbatim traçables jusqu'à la transcription.",
+    "finale_title": "Voilà la boucle complète",
+    "finale_body": "Guide → entretiens → transcriptions → analyse. Cette démo reste dans votre espace pour l'explorer à tout moment — mais le plus rapide pour apprendre, c'est avec vos propres questions.",
+    "finale_cta_create": "Créer votre propre étude",
+    "finale_cta_explore": "Continuer à explorer la démo"
+  },
   "switcher": {
     "active": "Actif",
     "inactive": "Inactif",

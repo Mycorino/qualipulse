@@ -177,7 +177,9 @@ export default function Welcome() {
         use_case: casesArray[0] || undefined,
       });
       setCachedOnboarded(true);
-      navigate("/dashboard", { replace: true });
+      // Hand off to the demo-project tour: the dashboard waits for the
+      // background-seeded demo study, then opens it with the tour armed.
+      navigate("/dashboard?tour=1", { replace: true });
     } catch {
       toast(t("toast_save_failed"), "error");
     } finally {
