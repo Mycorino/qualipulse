@@ -200,3 +200,100 @@ class TestPublicInterviewPayload:
             "primary_color": "#00aa88",
             "font": "elegant",
         }
+
+
+class TestBrandingDefaults:
+    """Workspace-level branding defaults: PUT/GET /auth/branding-defaults
+    + inheritance into newly created projects."""
+
+    def test_get_defaults_empty(self, client, auth_headers):
+        resp = client.get("/auth/branding-defaults", headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["defaults"] == {}
+
+    def test_put_identity_defaults_free(self, client, auth_headers):
+        resp = client.put(
+            "/auth/branding-defaults",
+            json={"branding_mode": "anonymous", "researcher_name": "Acme Research"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["defaults"] == {
+            "branding_mode": "anonymous",
+            "researcher_name": "Acme Research",
+        }
+        resp = client.get("/auth/branding-defaults", headers=auth_headers)
+        assert resp.json()["defaults"]["branding_mode"] == "anonymous"
+
+    def test_put_theming_defaults_requires_entitlement(self, client, auth_headers):
+        resp = client.put(
+            "/auth/branding-defaults",
+            json={"branding_mode": "branded", "brand_primary_color": "#ff5500"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "custom_branding_required"
+
+    def test_put_theming_defaults_allowed_on_lab(self, client, auth_headers, db_session):
+        _set_tier(db_session, "lab")
+        resp = client.put(
+            "/auth/branding-defaults",
+            json={
+                "branding_mode": "branded",
+                "brand_primary_color": "#FF5500",
+                "brand_font": "serif",
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["defaults"]["brand_primary_color"] == "#ff5500"
+
+    def test_new_project_inherits_defaults(self, client, auth_headers, db_session):
+        _set_tier(db_session, "lab")
+        client.put(
+            "/auth/branding-defaults",
+            json={
+                "branding_mode": "branded",
+                "brand_primary_color": "#00aa88",
+                "brand_font": "elegant",
+                "researcher_name": "Acme Research",
+            },
+            headers=auth_headers,
+        )
+        project = _create_project(client, auth_headers)
+        assert project["branding_mode"] == "branded"
+        assert project["brand_primary_color"] == "#00aa88"
+        assert project["brand_font"] == "elegant"
+        assert project["researcher_name"] == "Acme Research"
+
+    def test_explicit_create_values_beat_defaults(self, client, auth_headers, db_session):
+        _set_tier(db_session, "lab")
+        client.put(
+            "/auth/branding-defaults",
+            json={"branding_mode": "branded", "brand_primary_color": "#00aa88"},
+            headers=auth_headers,
+        )
+        project = _create_project(client, auth_headers, branding_mode="anonymous")
+        assert project["branding_mode"] == "anonymous"
+        # Non-conflicting default fields still inherit.
+        assert project["brand_primary_color"] == "#00aa88"
+
+    def test_downgrade_falls_back_to_standard(self, client, auth_headers, db_session):
+        """Branded defaults saved on Lab must not 403 project creation
+        after a downgrade — theming is silently dropped instead."""
+        _set_tier(db_session, "lab")
+        client.put(
+            "/auth/branding-defaults",
+            json={
+                "branding_mode": "branded",
+                "brand_primary_color": "#00aa88",
+                "researcher_name": "Acme Research",
+            },
+            headers=auth_headers,
+        )
+        _set_tier(db_session, "starter")
+        project = _create_project(client, auth_headers)
+        assert project["branding_mode"] == "standard"
+        assert project["brand_primary_color"] is None
+        # Identity fields still inherit — they're free on every plan.
+        assert project["researcher_name"] == "Acme Research"

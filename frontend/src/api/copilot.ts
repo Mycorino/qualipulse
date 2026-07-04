@@ -45,6 +45,11 @@ export interface ProposedSettings {
   interview_duration_minutes?: number;
   target_participants?: number;
   warmup_enabled?: boolean;
+  /** Participant-facing identity policy + theme. */
+  branding_mode?: "standard" | "branded" | "anonymous";
+  brand_primary_color?: string;
+  brand_font?: string;
+  researcher_name?: string;
 }
 
 /**

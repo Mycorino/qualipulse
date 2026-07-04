@@ -1,3 +1,4 @@
+import json
 import logging
 import secrets
 import threading
@@ -17,6 +18,7 @@ from app.dependencies import get_current_company, get_db
 from app.limiter import limiter
 from app.models.company import Company, EmailVerificationToken, PasswordResetToken
 from app.models.affiliate import Affiliate, AffiliateReferral
+from app.schemas.project import BrandingDefaultsPayload
 from app.schemas.auth import (
     CompanyResponse,
     LoginRequest,
@@ -508,6 +510,52 @@ def update_profile(
     db.commit()
     db.refresh(company)
     return CompanyResponse.model_validate(company)
+
+
+@router.get("/branding-defaults")
+def get_branding_defaults(
+    company: Company = Depends(get_current_company),
+) -> dict:
+    """Workspace-level branding defaults prefilled into every new study."""
+    return {"defaults": company.branding_defaults_dict}
+
+
+@router.put("/branding-defaults")
+def put_branding_defaults(
+    body: BrandingDefaultsPayload,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Save the workspace branding defaults (validated like project branding).
+
+    Theming values (branded mode / colour / font) require the same
+    ``custom_branding`` entitlement as setting them on a study.
+    """
+    from app.services.billing_service import workspace_has_feature
+
+    wants_theming = (
+        body.branding_mode == "branded"
+        or body.brand_primary_color is not None
+        or body.brand_font is not None
+    )
+    if wants_theming and not workspace_has_feature(db, company, "custom_branding"):
+        raise HTTPException(status_code=403, detail="custom_branding_required")
+
+    defaults = {
+        key: value
+        for key, value in {
+            "branding_mode": body.branding_mode,
+            "brand_primary_color": body.brand_primary_color,
+            "brand_font": body.brand_font,
+            "researcher_name": (body.researcher_name or "").strip() or None,
+            "researcher_logo_url": (body.researcher_logo_url or "").strip() or None,
+            "privacy_policy_url": (body.privacy_policy_url or "").strip() or None,
+        }.items()
+        if value is not None
+    }
+    company.branding_defaults = json.dumps(defaults) if defaults else None
+    db.commit()
+    return {"defaults": defaults}
 
 
 @router.patch("/me/priority", response_model=CompanyResponse)

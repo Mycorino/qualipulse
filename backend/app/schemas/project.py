@@ -46,6 +46,11 @@ class BrandingFieldsMixin(BaseModel):
         return v
 
 
+class BrandingDefaultsPayload(BrandingFieldsMixin):
+    """Workspace-level branding defaults (PUT /auth/branding-defaults) —
+    same fields and validation as per-project branding."""
+
+
 class QuestionCreate(BaseModel):
     section_index: int
     section_title: str

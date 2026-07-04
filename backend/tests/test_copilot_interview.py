@@ -391,6 +391,60 @@ class TestResultsCopilotProposals:
             "target_participants": 12,
         }
 
+    def test_propose_settings_records_branding(self, db_session):
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, project, turn,
+            "propose_settings",
+            {
+                "branding_mode": "anonymous",
+                "researcher_name": "  Acme Research  ",
+                "rationale": "Blind study requested.",
+            },
+        )
+        assert "Recorded" in msg
+        assert turn.actions[0]["settings"] == {
+            "branding_mode": "anonymous",
+            "researcher_name": "Acme Research",
+        }
+
+    def test_propose_settings_drops_invalid_branding(self, db_session):
+        """Hallucinated colours/fonts/modes never reach the accept flow."""
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        msg = _guide_run_tool(
+            db_session, company, project, turn,
+            "propose_settings",
+            {
+                "branding_mode": "stealth",
+                "brand_primary_color": "red",
+                "brand_font": "comic-sans",
+                "rationale": "Bad values.",
+            },
+        )
+        assert "No settings" in msg
+        assert turn.actions == []
+
+    def test_propose_settings_normalises_brand_color(self, db_session):
+        company, project = self._seed(db_session)
+        turn = SimpleNamespace(actions=[])
+        _guide_run_tool(
+            db_session, company, project, turn,
+            "propose_settings",
+            {
+                "branding_mode": "branded",
+                "brand_primary_color": "#FF5500",
+                "brand_font": "serif",
+                "rationale": "Brand it.",
+            },
+        )
+        assert turn.actions[0]["settings"] == {
+            "branding_mode": "branded",
+            "brand_primary_color": "#ff5500",
+            "brand_font": "serif",
+        }
+
     def test_opening_turn_strips_chips(self):
         """The interview opener must be a chip-free open context question."""
         actions = [

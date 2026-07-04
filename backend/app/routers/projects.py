@@ -98,6 +98,7 @@ def create_project(
         warmup_enabled=body.warmup_enabled,
     )
     _apply_branding_fields(project, body, company, db)
+    _inherit_branding_defaults(project, body, company, db)
     db.add(project)
     db.flush()
 
@@ -441,6 +442,49 @@ def update_project(
     schedule_screening_translation(project.id)
 
     return _project_to_response(project)
+
+
+def _inherit_branding_defaults(project: Project, body, company: Company, db: Session) -> None:
+    """Prefill a NEW study's branding from the workspace defaults.
+
+    Field-by-field: an explicit value in the create payload always wins.
+    Downgrade-safe: if the saved defaults include theming (branded mode /
+    colour / font) but the workspace no longer has the ``custom_branding``
+    entitlement, the theming is dropped (mode falls back to standard)
+    instead of failing project creation.
+    """
+    defaults = company.branding_defaults_dict
+    if not defaults:
+        return
+
+    if body.researcher_name is None and defaults.get("researcher_name"):
+        project.researcher_name = defaults["researcher_name"]
+    if body.researcher_logo_url is None and defaults.get("researcher_logo_url"):
+        project.researcher_logo_url = defaults["researcher_logo_url"]
+    if body.privacy_policy_url is None and defaults.get("privacy_policy_url"):
+        project.privacy_policy_url = defaults["privacy_policy_url"]
+
+    wants_theming = (
+        defaults.get("branding_mode") == "branded"
+        or defaults.get("brand_primary_color")
+        or defaults.get("brand_font")
+    )
+    can_theme = True
+    if wants_theming:
+        from app.services.billing_service import workspace_has_feature
+
+        can_theme = workspace_has_feature(db, company, "custom_branding")
+
+    if body.branding_mode is None and defaults.get("branding_mode"):
+        mode = defaults["branding_mode"]
+        if mode == "branded" and not can_theme:
+            mode = "standard"
+        if mode in {"standard", "branded", "anonymous"}:
+            project.branding_mode = mode
+    if body.brand_primary_color is None and defaults.get("brand_primary_color") and can_theme:
+        project.brand_primary_color = defaults["brand_primary_color"]
+    if body.brand_font is None and defaults.get("brand_font") and can_theme:
+        project.brand_font = defaults["brand_font"]
 
 
 def _apply_branding_fields(project: Project, body, company: Company, db: Session) -> None:

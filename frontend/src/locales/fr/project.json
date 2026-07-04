@@ -261,6 +261,10 @@
   "setup": {
     "brandingTitle": "Image de marque & identité",
     "brandingSubtitle": "Ce que les participants voient sur qui mène cette étude.",
+    "brandingSaveDefault": "Définir par défaut pour les prochaines études",
+    "brandingSavingDefault": "Enregistrement…",
+    "brandingSaveDefaultHelp": "Les nouvelles études démarreront avec ces réglages — chaque étude peut toujours les modifier.",
+    "brandingDefaultSaved": "Enregistré — les nouvelles études démarreront avec cette image de marque.",
     "brandingModeStandard": "Standard",
     "brandingModeStandardHelp": "Votre nom de chercheur et votre logo, style QualiPulse par défaut.",
     "brandingModeBranded": "Aux couleurs de votre marque",
