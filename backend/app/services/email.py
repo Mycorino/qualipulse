@@ -736,6 +736,40 @@ def send_password_reset(to: str, reset_url: str, lang: str = "en") -> bool:
     )
 
 
+def send_google_link_notice(to: str, lang: str = "en") -> bool:
+    """Security notice: a Google identity was just linked to this
+    (previously password-only) account. Inline copy — this is a security
+    notice, not marketing, so it stays deliberately plain."""
+    lang = _normalise_lang(lang)
+    if lang == "fr":
+        subject = "Connexion Google ajoutée à votre compte QualiPulse"
+        heading = "Connexion Google activée"
+        body = (
+            "Un compte Google vient d'être associé à votre compte QualiPulse. "
+            "Vous pouvez désormais vous connecter avec Google en plus de votre mot de passe."
+        )
+        foot = (
+            "Si vous n'êtes pas à l'origine de cette action, réinitialisez votre "
+            "mot de passe immédiatement et contactez le support."
+        )
+    else:
+        subject = "Google Sign-In was added to your QualiPulse account"
+        heading = "Google Sign-In enabled"
+        body = (
+            "A Google account was just linked to your QualiPulse account. "
+            "You can now sign in with Google in addition to your password."
+        )
+        foot = (
+            "If this wasn't you, reset your password immediately and contact support."
+        )
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{heading}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{body}</p>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{foot}</p>
+    """
+    return send_email(to=to, subject=subject, body_html=_wrap_email(content, lang))
+
+
 def send_analysis_ready(to: str, project_name: str, project_url: str, lang: str = "en") -> bool:
     lang = _normalise_lang(lang)
     content = f"""

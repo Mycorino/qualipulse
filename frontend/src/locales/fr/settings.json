@@ -184,5 +184,33 @@
       "connectCta": "Connecter Slack →",
       "manageCta": "Gérer →"
     }
+  },
+  "security": {
+    "twoFactor": {
+      "title": "Authentification à deux facteurs",
+      "description": "Ajoutez une seconde étape à la connexion avec un code d'une application d'authentification (Google Authenticator, 1Password, Authy…). Fortement recommandé — vos données de recherche restent protégées même si votre mot de passe fuite.",
+      "enableCta": "Activer l'authentification à deux facteurs",
+      "disableCta": "Désactiver l'authentification à deux facteurs",
+      "enabledStatus": "L'authentification à deux facteurs est active",
+      "step1": "Installez une application d'authentification sur votre téléphone si vous n'en avez pas.",
+      "step2": "Ajoutez un nouveau compte dans l'application et saisissez cette clé secrète (ou ouvrez le lien ci-dessous sur votre téléphone) :",
+      "step3": "Saisissez le code à 6 chiffres affiché par l'application pour confirmer.",
+      "openInApp": "Ouvrir dans l'application d'authentification",
+      "codeLabel": "Code à 6 chiffres",
+      "currentCodeLabel": "Code de votre application (ou un code de secours)",
+      "enableConfirm": "Confirmer et activer",
+      "disableConfirm": "Désactiver la 2FA",
+      "invalidCode": "Code de vérification invalide. Veuillez réessayer.",
+      "genericError": "Une erreur est survenue. Veuillez réessayer.",
+      "backupCodesTitle": "Codes de secours",
+      "backupCodesHint": "Conservez-les en lieu sûr (gestionnaire de mots de passe). Chaque code fonctionne une seule fois si vous perdez l'accès à votre application. Ils ne seront plus affichés.",
+      "backupCodesDone": "J'ai enregistré mes codes de secours"
+    },
+    "logoutAll": {
+      "title": "Se déconnecter partout",
+      "description": "Déconnecte ce compte de tous les appareils et navigateurs, y compris celui-ci. Utilisez cette option si vous pensez qu'un appareil utilisé n'est plus sûr.",
+      "cta": "Se déconnecter de tous les appareils",
+      "confirm": "Cela vous déconnecte partout, y compris ici. Continuer ?"
+    }
   }
 }

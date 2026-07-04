@@ -30,11 +30,21 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.services.auth import (
+    check_token_version,
+    company_token_claims,
+    consume_backup_code,
+    create_2fa_pending_token,
     create_access_token,
     create_refresh_token,
+    decode_2fa_pending_token,
     decode_refresh_token,
+    generate_backup_codes,
+    generate_totp_secret,
     hash_password,
+    require_acceptable_password,
+    totp_provisioning_uri,
     verify_password,
+    verify_totp_code,
 )
 from app.services.analytics import emit_event
 from app.services.demo_seeder import seed_demo_project
@@ -52,6 +62,40 @@ from app.services import ai_models
 
 logger = logging.getLogger("auto_interview.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# ── Brute-force lockout ───────────────────────────────────────────────
+# Rate limiting throttles per-IP; this throttles per-ACCOUNT, so slow
+# credential-stuffing across many IPs still locks the target account.
+LOCKOUT_THRESHOLD = 5
+LOCKOUT_MINUTES = 15
+
+
+def _raise_if_locked(company: Company) -> None:
+    if company.locked_until and company.locked_until > datetime.utcnow():
+        remaining = int((company.locked_until - datetime.utcnow()).total_seconds() // 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"Too many failed sign-in attempts. "
+                f"Try again in {remaining} minute{'s' if remaining != 1 else ''}."
+            ),
+        )
+
+
+def _register_auth_failure(db: Session, company: Company) -> None:
+    company.failed_login_attempts = (company.failed_login_attempts or 0) + 1
+    if company.failed_login_attempts >= LOCKOUT_THRESHOLD:
+        company.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+        company.failed_login_attempts = 0
+        logger.warning("Account locked after failed attempts: %s", company.email)
+    db.commit()
+
+
+def _register_auth_success(db: Session, company: Company) -> None:
+    if company.failed_login_attempts or company.locked_until:
+        company.failed_login_attempts = 0
+        company.locked_until = None
+        db.commit()
 
 
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -96,11 +140,7 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
             detail="An account with this email already exists. Try signing in instead.",
         )
 
-    if len(body.password) < 8:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters.",
-        )
+    require_acceptable_password(body.password)
 
     # Resolve plan selection from the landing page.
     # All new accounts start on "starter" tier. The credits-based trial
@@ -195,19 +235,26 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     )
 
     return TokenResponse(
-        access_token=create_access_token({"sub": company.id}),
-        refresh_token=create_refresh_token({"sub": company.id}),
+        access_token=create_access_token(company_token_claims(company)),
+        refresh_token=create_refresh_token(company_token_claims(company)),
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 @limiter.limit("10/minute")
-def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
+    """Password step. Returns session tokens directly, or — when the account
+    has 2FA enabled — ``{"requires_2fa": true, "pending_token": ...}`` to be
+    exchanged at POST /auth/login/2fa."""
     company = db.query(Company).filter(Company.email == body.email.lower().strip()).first()
+    if company is not None:
+        _raise_if_locked(company)
     if not company or not company.password_hash or not verify_password(body.password, company.password_hash):
         # Google-only accounts (no password_hash) hit this branch — same
         # generic message as a wrong password to avoid leaking which
         # identity providers a given email is registered with.
+        if company is not None and company.password_hash:
+            _register_auth_failure(db, company)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -220,10 +267,51 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)) -
             detail=f"Account suspended: {reason}",
         )
 
+    _register_auth_success(db, company)
+
+    if company.totp_enabled:
+        return {"requires_2fa": True, "pending_token": create_2fa_pending_token(company.id)}
+
     logger.info("Login: %s", company.email)
     return TokenResponse(
-        access_token=create_access_token({"sub": company.id}),
-        refresh_token=create_refresh_token({"sub": company.id}),
+        access_token=create_access_token(company_token_claims(company)),
+        refresh_token=create_refresh_token(company_token_claims(company)),
+    )
+
+
+class TwoFactorLoginRequest(BaseModel):
+    pending_token: str
+    code: str
+
+
+@router.post("/login/2fa", response_model=TokenResponse)
+@limiter.limit("10/minute")
+def login_2fa(request: Request, body: TwoFactorLoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    """Second factor: exchange the pending token + a TOTP or backup code
+    for real session tokens."""
+    payload = decode_2fa_pending_token(body.pending_token)
+    company = db.query(Company).filter(Company.id == payload.get("sub")).first()
+    if not company or not company.totp_enabled or not company.totp_secret:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid 2FA session")
+    _raise_if_locked(company)
+
+    if not verify_totp_code(company.totp_secret, body.code):
+        remaining_codes = consume_backup_code(company.totp_backup_codes, body.code)
+        if remaining_codes is None:
+            _register_auth_failure(db, company)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid verification code",
+            )
+        company.totp_backup_codes = remaining_codes
+        logger.info("2FA backup code used: %s", company.email)
+
+    _register_auth_success(db, company)
+    db.commit()
+    logger.info("Login (2FA): %s", company.email)
+    return TokenResponse(
+        access_token=create_access_token(company_token_claims(company)),
+        refresh_token=create_refresh_token(company_token_claims(company)),
     )
 
 
@@ -237,6 +325,7 @@ def refresh_token(request: Request, body: RefreshRequest, db: Session = Depends(
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found")
+    check_token_version(payload, company)
     if company.suspended_at is not None:
         reason = company.suspension_reason or "Contact support for details."
         raise HTTPException(
@@ -244,9 +333,23 @@ def refresh_token(request: Request, body: RefreshRequest, db: Session = Depends(
             detail=f"Account suspended: {reason}",
         )
     return TokenResponse(
-        access_token=create_access_token({"sub": company.id}),
-        refresh_token=create_refresh_token({"sub": company.id}),
+        access_token=create_access_token(company_token_claims(company)),
+        refresh_token=create_refresh_token(company_token_claims(company)),
     )
+
+
+@router.post("/logout-all")
+def logout_all(
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Revoke every outstanding session for this account (including this
+    one) by bumping token_version. The caller should drop its local tokens
+    and sign in again."""
+    company.token_version = (company.token_version or 0) + 1
+    db.commit()
+    logger.info("Logout-all (token_version bump) for %s", company.email)
+    return {"message": "All sessions have been signed out."}
 
 
 # ââ Email Verification ââââââââââââââââââââââââââââââââââââââââââââââââ
@@ -353,11 +456,7 @@ def request_password_reset(request: Request, body: PasswordResetRequest, db: Ses
 
 @router.post("/password-reset/confirm")
 def confirm_password_reset(body: PasswordResetConfirm, db: Session = Depends(get_db)):
-    if len(body.new_password) < 8:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password must be at least 8 characters",
-        )
+    require_acceptable_password(body.new_password)
     token_row = db.query(PasswordResetToken).filter(
         PasswordResetToken.token == body.token,
         PasswordResetToken.used.is_(False),
@@ -368,6 +467,12 @@ def confirm_password_reset(body: PasswordResetConfirm, db: Session = Depends(get
     if not company:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found")
     company.password_hash = hash_password(body.new_password)
+    # A reset usually means the old credentials can't be trusted — revoke
+    # every outstanding session, and clear any brute-force lockout so the
+    # legitimate owner isn't left waiting out an attacker's lock.
+    company.token_version = (company.token_version or 0) + 1
+    company.failed_login_attempts = 0
+    company.locked_until = None
     token_row.used = True
     db.commit()
     logger.info("Password reset completed for %s", company.email)
@@ -938,15 +1043,115 @@ def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect",
         )
-    if len(body.new_password) < 8:
+    require_acceptable_password(body.new_password)
+    company.password_hash = hash_password(body.new_password)
+    # Revoke every other session; hand fresh tokens back so THIS session
+    # survives the token_version bump.
+    company.token_version = (company.token_version or 0) + 1
+    db.commit()
+    db.refresh(company)
+    logger.info("Password changed for %s", company.email)
+    return {
+        "message": "Password updated successfully",
+        "access_token": create_access_token(company_token_claims(company)),
+        "refresh_token": create_refresh_token(company_token_claims(company)),
+    }
+
+
+# ── Two-factor authentication (TOTP) ──────────────────────────────────
+
+
+class TwoFactorEnableRequest(BaseModel):
+    code: str
+
+
+class TwoFactorDisableRequest(BaseModel):
+    code: str
+    password: Optional[str] = None
+
+
+@router.post("/2fa/setup")
+@limiter.limit("5/minute")
+def two_factor_setup(
+    request: Request,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Start TOTP enrolment: generate a secret and return the otpauth URI.
+    2FA does not enforce until /2fa/enable confirms a valid code."""
+    if company.totp_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters",
+            detail="Two-factor authentication is already enabled.",
         )
-    company.password_hash = hash_password(body.new_password)
+    secret = generate_totp_secret()
+    company.totp_secret = secret
     db.commit()
-    logger.info("Password changed for %s", company.email)
-    return {"message": "Password updated successfully"}
+    return {
+        "secret": secret,
+        "otpauth_url": totp_provisioning_uri(secret, company.email),
+    }
+
+
+@router.post("/2fa/enable")
+@limiter.limit("10/minute")
+def two_factor_enable(
+    request: Request,
+    body: TwoFactorEnableRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Confirm enrolment with a code from the authenticator app. Returns
+    the backup codes — shown exactly once, stored only as hashes."""
+    if company.totp_enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already enabled.")
+    if not company.totp_secret:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Run setup first.")
+    if not verify_totp_code(company.totp_secret, body.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code. Check your authenticator app and try again.",
+        )
+    backup_codes, hashed_json = generate_backup_codes()
+    company.totp_enabled = True
+    company.totp_backup_codes = hashed_json
+    db.commit()
+    logger.info("2FA enabled for %s", company.email)
+    return {"message": "Two-factor authentication enabled", "backup_codes": backup_codes}
+
+
+@router.post("/2fa/disable")
+@limiter.limit("5/minute")
+def two_factor_disable(
+    request: Request,
+    body: TwoFactorDisableRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+):
+    """Turn 2FA off. Requires a currently-valid TOTP or backup code, plus
+    the account password when one exists (Google-only accounts skip it)."""
+    if not company.totp_enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA is not enabled.")
+    if company.password_hash:
+        if not body.password or not verify_password(body.password, company.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect",
+            )
+    code_ok = verify_totp_code(company.totp_secret or "", body.code)
+    if not code_ok:
+        remaining = consume_backup_code(company.totp_backup_codes, body.code)
+        if remaining is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification code",
+            )
+    company.totp_enabled = False
+    company.totp_secret = None
+    company.totp_backup_codes = None
+    db.commit()
+    logger.info("2FA disabled for %s", company.email)
+    return {"message": "Two-factor authentication disabled"}
 
 
 # ── Integrations: Slack ───────────────────────────────────────────────
@@ -1214,9 +1419,14 @@ def google_callback(
 
     # Match by google_sub first (covers users who later changed email on
     # Google), then by email (covers existing password accounts linking
-    # their Google identity for the first time).
+    # their Google identity for the first time). The email fallback is only
+    # safe when Google attests it verified the address — otherwise anyone
+    # who can create a Google account claiming a victim's email could take
+    # over the victim's workspace.
     company = db.query(Company).filter(Company.google_sub == google_sub).first()
     if company is None:
+        if not email_verified_g:
+            return _redirect_to_frontend_with_error("email_unverified")
         company = db.query(Company).filter(Company.email == email).first()
 
     is_new_account = company is None
@@ -1251,9 +1461,21 @@ def google_callback(
         # Link Google to existing account (idempotent) and trust Google's
         # verified flag to mark the email as verified if it wasn't already.
         changed = False
-        if company.google_sub != google_sub:
+        first_time_link = company.google_sub != google_sub
+        if first_time_link:
             company.google_sub = google_sub
             changed = True
+            # Security notice on first-time linking to a pre-existing
+            # password account: the legitimate owner learns immediately if
+            # someone else just attached a Google identity to their login.
+            if company.password_hash:
+                try:
+                    from app.services.email import send_google_link_notice
+                    send_google_link_notice(
+                        company.email, lang=company.preferred_language
+                    )
+                except Exception:  # pragma: no cover — never block login on email
+                    logger.exception("Google-link notice failed for %s", company.email)
         if email_verified_g and not company.email_verified:
             company.email_verified = True
             changed = True
@@ -1268,8 +1490,8 @@ def google_callback(
             db.refresh(company)
         logger.info("Google login: %s (linked=%s)", company.email, changed)
 
-    access = create_access_token({"sub": company.id})
-    refresh = create_refresh_token({"sub": company.id})
+    access = create_access_token(company_token_claims(company))
+    refresh = create_refresh_token(company_token_claims(company))
 
     # Send tokens back via URL fragment so they don't appear in server logs
     # / Referer headers. The frontend's /auth/google/finish route reads

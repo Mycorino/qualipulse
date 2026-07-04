@@ -2,7 +2,7 @@ import { useState, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useHead } from "../hooks/useHead";
-import { login, getMe, getGoogleAuthorizeUrl } from "../api/auth";
+import { login, loginWith2FA, getMe, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -15,6 +15,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // 2FA step: set after a successful password check on a 2FA-enabled account.
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState("");
   const { saveToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -52,25 +55,91 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await login(trimmedEmail, password);
-      saveToken(res.access_token, res.refresh_token);
-
-      // Check if onboarding is completed — route accordingly
-      try {
-        const me = await getMe();
-        setCachedOnboarded(!!me.onboarding_completed);
-        if (!me.onboarding_completed) {
-          navigate("/welcome", { replace: true });
-        } else {
-          navigate("/dashboard", { replace: true });
-        }
-      } catch {
-        navigate("/dashboard", { replace: true });
+      if (res.requires_2fa && res.pending_token) {
+        setPendingToken(res.pending_token);
+        return;
       }
+      await finishLogin(res.access_token!, res.refresh_token);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("login.errors.generic")));
     } finally {
       setLoading(false);
     }
+  }
+
+  async function finishLogin(accessToken: string, refreshToken?: string) {
+    saveToken(accessToken, refreshToken);
+    // Check if onboarding is completed — route accordingly
+    try {
+      const me = await getMe();
+      setCachedOnboarded(!!me.onboarding_completed);
+      if (!me.onboarding_completed) {
+        navigate("/welcome", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
+    } catch {
+      navigate("/dashboard", { replace: true });
+    }
+  }
+
+  async function handleTwoFactorSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!totpCode.trim() || !pendingToken) return;
+    setLoading(true);
+    try {
+      const res = await loginWith2FA(pendingToken, totpCode.trim());
+      await finishLogin(res.access_token, res.refresh_token);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t("login.twoFactor.invalidCode")));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (pendingToken) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <Link to="/" className="auth-logo" style={{ textDecoration: "none", color: "inherit" }}>QualiPulse</Link>
+          <h1 className="auth-title">{t("login.twoFactor.title")}</h1>
+          <p className="auth-subtitle">{t("login.twoFactor.subtitle")}</p>
+          {error && <div className="error-banner" role="alert">{error}</div>}
+          <form onSubmit={handleTwoFactorSubmit}>
+            <label className="field-label" htmlFor="login-totp">{t("login.twoFactor.codeLabel")}</label>
+            <input
+              id="login-totp"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              className="field-input"
+              value={totpCode}
+              onChange={(e) => setTotpCode(e.target.value)}
+              placeholder="123456"
+              required
+              autoFocus
+            />
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", margin: "4px 0 12px" }}>
+              {t("login.twoFactor.backupHint")}
+            </p>
+            <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+              {loading ? t("login.signingIn") : t("login.twoFactor.verify")}
+            </button>
+          </form>
+          <p className="auth-footer" style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="auth-link"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              onClick={() => { setPendingToken(null); setTotpCode(""); setError(""); }}
+            >
+              {t("login.twoFactor.backToLogin")}
+            </button>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (

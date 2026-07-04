@@ -122,6 +122,7 @@ class CompanyResponse(BaseModel):
     selected_use_cases: Optional[str] = None
     onboarding_recap: Optional[str] = None
     suspended_at: Optional[datetime] = None
+    totp_enabled: bool = False
 
     is_impersonation: bool = False
     impersonation_admin: Optional[str] = None

@@ -166,6 +166,32 @@ class Company(Base):
     suspended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     suspension_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # ── Security (Alembic 0051) ───────────────────────────────────────
+    # Monotonic session-revocation counter. Every JWT carries the value it
+    # was minted with ("tv" claim); a mismatch on decode = token revoked.
+    # Bumped on password change/reset, "log out everywhere", and admin
+    # suspension. Tokens minted before the column existed carry no claim
+    # and are treated as tv=0.
+    token_version: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    # TOTP two-factor auth. ``totp_secret`` is set at setup time but 2FA
+    # only enforces once ``totp_enabled`` flips true (after the user has
+    # proven their authenticator with a valid code). Backup codes are
+    # stored as a JSON list of SHA-256 hex digests — high-entropy codes,
+    # so a fast hash is fine (unlike passwords).
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0"
+    )
+    totp_backup_codes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Brute-force lockout: consecutive failed password / 2FA attempts.
+    # 5 failures → locked_until = now + 15 min; reset on success.
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")
 

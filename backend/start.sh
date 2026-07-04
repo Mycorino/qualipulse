@@ -72,4 +72,10 @@ print('✓ Tables created via create_all()')
   echo "✓ Alembic version stamped at head"
 fi
 
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8080}"
+# --proxy-headers makes uvicorn rewrite request.client from X-Forwarded-For,
+# so SlowAPI rate limits key on the real client IP instead of the Cloud Run /
+# nginx proxy IP (without it, every user shares one rate-limit bucket).
+# Trusting "*" is safe on Cloud Run: only Google's front end can reach the
+# container, so the header can't be spoofed by direct connections.
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8080}" \
+  --proxy-headers --forwarded-allow-ips "*"
