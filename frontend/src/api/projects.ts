@@ -78,6 +78,13 @@ export interface ProjectResponse {
   /** PF-3: when true (default), engine opens with a warm-up turn before the first guide question. */
   warmup_enabled?: boolean;
   is_demo?: boolean;
+  /** Participant-facing identity policy: standard | branded | anonymous. */
+  branding_mode?: "standard" | "branded" | "anonymous";
+  brand_primary_color?: string | null;
+  brand_font?: string | null;
+  researcher_name?: string | null;
+  researcher_logo_url?: string | null;
+  privacy_policy_url?: string | null;
   created_at: string;
   questions: QuestionResponse[];
   screening_questions: ScreeningQuestionResponse[];
@@ -357,6 +364,12 @@ export async function patchProjectSettings(
     research_context?: string;
     interview_duration_minutes?: number;
     target_participants?: number;
+    branding_mode?: "standard" | "branded" | "anonymous";
+    brand_primary_color?: string;
+    brand_font?: string;
+    researcher_name?: string;
+    researcher_logo_url?: string;
+    privacy_policy_url?: string;
   }
 ): Promise<ProjectResponse> {
   const { data } = await client.patch<ProjectResponse>(`/projects/${id}/settings`, settings);

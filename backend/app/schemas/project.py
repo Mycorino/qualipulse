@@ -1,6 +1,49 @@
+import re
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+BRANDING_MODES = {"standard", "branded", "anonymous"}
+# Curated font-stack keys — resolved to CSS stacks client-side so the
+# participant page never loads external fonts.
+BRAND_FONTS = {"system", "humanist", "serif", "elegant"}
+_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+class BrandingFieldsMixin(BaseModel):
+    """Shared validation for the participant-facing branding fields."""
+
+    branding_mode: str | None = None
+    brand_primary_color: str | None = None
+    brand_font: str | None = None
+    researcher_name: str | None = None
+    researcher_logo_url: str | None = None
+    privacy_policy_url: str | None = None
+
+    @field_validator("branding_mode")
+    @classmethod
+    def _valid_mode(cls, v: str | None) -> str | None:
+        if v is not None and v not in BRANDING_MODES:
+            raise ValueError(f"branding_mode must be one of {sorted(BRANDING_MODES)}")
+        return v
+
+    @field_validator("brand_primary_color")
+    @classmethod
+    def _valid_color(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        if not _HEX_COLOR_RE.match(v):
+            raise ValueError("brand_primary_color must be a #rrggbb hex color")
+        return v.lower()
+
+    @field_validator("brand_font")
+    @classmethod
+    def _valid_font(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        if v not in BRAND_FONTS:
+            raise ValueError(f"brand_font must be one of {sorted(BRAND_FONTS)}")
+        return v
 
 
 class QuestionCreate(BaseModel):
@@ -63,7 +106,7 @@ class ScreeningTranslationPatch(BaseModel):
     options: list[str] = []
 
 
-class ProjectCreate(BaseModel):
+class ProjectCreate(BrandingFieldsMixin):
     name: str
     # None => inherit the creating company's preferred_language (so a French
     # researcher gets French participant-facing content by default). An
@@ -86,7 +129,7 @@ class ProjectCreate(BaseModel):
     screening_questions: list[ScreeningQuestionCreate] = []
 
 
-class ProjectSettingsPatch(BaseModel):
+class ProjectSettingsPatch(BrandingFieldsMixin):
     name: str | None = None
     panel_collection_enabled: bool | None = None
     warmup_enabled: bool | None = None
@@ -153,6 +196,12 @@ class ProjectResponse(BaseModel):
     target_customer_description: str | None = None
     target_participants: int | None = None
     is_demo: bool = False
+    branding_mode: str = "standard"
+    brand_primary_color: str | None = None
+    brand_font: str | None = None
+    researcher_name: str | None = None
+    researcher_logo_url: str | None = None
+    privacy_policy_url: str | None = None
     created_at: datetime
     questions: list[QuestionResponse] = []
     screening_questions: list[ScreeningQuestionResponse] = []

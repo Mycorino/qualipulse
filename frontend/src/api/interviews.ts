@@ -1,4 +1,5 @@
 import client from "./client";
+import type { ParticipantBranding } from "../utils/branding";
 
 export interface InterviewInfo {
   project_name: string;
@@ -12,6 +13,9 @@ export interface InterviewInfo {
   research_context?: string;
   privacy_policy_url?: string;
   panel_collection_enabled?: boolean;
+  /** Identity policy + theme. In "anonymous" mode the server already
+   *  stripped company_name / researcher_name / researcher_logo_url. */
+  branding?: ParticipantBranding;
 }
 
 export interface ScreeningOption {

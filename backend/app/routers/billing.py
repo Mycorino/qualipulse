@@ -168,6 +168,11 @@ def billing_status(
             "ai_analysis": legacy_limits.ai_analysis,
             "export_csv": legacy_limits.export_csv,
             "team_members": legacy_limits.team_members,
+            # Resolved dual-track (legacy tier flag OR credits-plan
+            # entitlement) — gates the branded-theming controls in Setup.
+            "custom_branding": billing_service.workspace_has_feature(
+                db, company, "custom_branding"
+            ),
         },
         "usage": {
             "interview_count": company.interview_count,

@@ -26,6 +26,7 @@ import LanguagePicker from "../components/LanguagePicker";
 import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/ParticipantQuestionnaire";
 import PanelEnrichment from "../components/PanelEnrichment";
 import { SUPPORTED_LANGUAGES } from "../i18n";
+import { applyParticipantBranding } from "../utils/branding";
 
 // A tiny valid silent WAV. Playing this from within a user gesture (the
 // "enable microphone" tap) "unlocks" the audio element on iOS Safari, so the
@@ -333,6 +334,11 @@ export default function Interview() {
       getPanelTags().then(setPanelTags).catch(() => {});
     }
   }, [phase]);
+
+  // Branded studies re-theme the whole participant experience (accent color
+  // + font) by overriding the design-system CSS variables; cleanup restores
+  // them so the theme never leaks past this page.
+  useEffect(() => applyParticipantBranding(info?.branding), [info?.branding]);
 
   // TEMP: toggle the dev "skip to end" affordance from the URL (?devskip=1/0).
   useEffect(() => {
@@ -1268,6 +1274,9 @@ export default function Interview() {
           <ResearcherIdentity />
           {info.researcher_name && (
             <p className="consent-researcher-name">{info.researcher_name}</p>
+          )}
+          {info.branding?.mode === "anonymous" && (
+            <p className="consent-anonymous-note">{t("consent.anonymousStudy")}</p>
           )}
           <h1 className="consent-title">{t("consent.title")}</h1>
           <p className="consent-project">{info.project_name}</p>

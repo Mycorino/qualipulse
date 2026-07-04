@@ -479,21 +479,31 @@ def validate_link(
         ensure_study_name_language(project, lang, db)
         ensure_research_context_language(project, lang, db)
 
+    branding_mode = getattr(project, "branding_mode", "standard") or "standard"
+    anonymous = branding_mode == "anonymous"
+
     return {
         "project_name": project.localized_name(lang) if lang else project.name,
         # Company name powers the participant-facing identity avatar when
         # the project has no explicit researcher_name / logo. Falling back
         # to project_name produced nonsense initials (study title → "PN").
-        "company_name": project.company.name if project.company else None,
+        # Anonymous studies strip ALL identity fields server-side — the
+        # participant payload never contains who is running the research.
+        "company_name": None if anonymous else (project.company.name if project.company else None),
         "welcome_message": project.welcome_message,
         "language": project.language,
         "interview_duration_minutes": project.interview_duration_minutes,
         "question_count": len([q for q in project.guide_questions if not q.deprecated_at]),
-        "researcher_name": project.researcher_name,
-        "researcher_logo_url": project.researcher_logo_url,
+        "researcher_name": None if anonymous else project.researcher_name,
+        "researcher_logo_url": None if anonymous else project.researcher_logo_url,
         "research_context": project.localized_research_context(lang) if lang else project.research_context,
         "privacy_policy_url": project.privacy_policy_url,
         "panel_collection_enabled": getattr(project, "panel_collection_enabled", True),
+        "branding": {
+            "mode": branding_mode,
+            "primary_color": getattr(project, "brand_primary_color", None) if branding_mode == "branded" else None,
+            "font": getattr(project, "brand_font", None) if branding_mode == "branded" else None,
+        },
     }
 
 

@@ -55,6 +55,35 @@
       "cwd": "frontend"
     },
     {
+      "name": "backend-branding-preview",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DATABASE_URL=sqlite:///./preview_branding.db",
+        "SENDGRID_API_KEY=",
+        "/opt/anaconda3/bin/uvicorn",
+        "app.main:app",
+        "--port",
+        "8099"
+      ],
+      "port": 8099,
+      "cwd": "backend"
+    },
+    {
+      "name": "frontend-branding-preview",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_BACKEND_URL=http://localhost:8099",
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5199"
+      ],
+      "port": 5199,
+      "cwd": "frontend"
+    },
+    {
       "name": "backend-panel-join",
       "runtimeExecutable": "/opt/anaconda3/bin/uvicorn",
       "runtimeArgs": [

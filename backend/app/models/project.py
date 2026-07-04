@@ -70,6 +70,20 @@ class Project(Base):
     # Setup sample-size guidance, not a hard gate. Nullable = not yet decided.
     target_participants: Mapped[int | None] = mapped_column(Integer, nullable=True)
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Participant-facing identity policy for this study:
+    #   "standard"  — show researcher_name / logo when set (default, legacy behaviour)
+    #   "branded"   — additionally theme the interview page with the brand
+    #                 colour + font below (custom_branding entitlement)
+    #   "anonymous" — the public interview payload strips company name,
+    #                 researcher name and logo entirely (blind study)
+    branding_mode: Mapped[str] = mapped_column(
+        String(20), default="standard", nullable=False, server_default="standard"
+    )
+    # Hex "#rrggbb" accent used for buttons/progress on the participant page.
+    brand_primary_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    # Curated font-stack key (system / humanist / serif / elegant) — resolved
+    # to a CSS stack client-side so no external fonts are ever loaded.
+    brand_font: Mapped[str | None] = mapped_column(String(30), nullable=True)
     panel_collection_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # PF-3: when True (default), the AI moderator opens the interview with a
     # warm-up turn before the first guide question — a low-stakes invitation
