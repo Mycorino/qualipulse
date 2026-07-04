@@ -201,6 +201,28 @@
     "editingFieldAria": "Editing {{field}}. Press Enter to save or Escape to cancel.",
     "tabPanelLabel": "{{tab}} panel"
   },
+  "tour": {
+    "stepOf": "Step {{current}} of {{total}}",
+    "skip": "Skip tour",
+    "back": "Back",
+    "next": "Next",
+    "start": "Show me around",
+    "replay": "Replay tour",
+    "intro_title": "Welcome — this is a demo study",
+    "intro_body": "We set up a sample study with real completed interviews so you can see how QualiPulse works before running your own. This 30-second tour walks through the four parts of every study.",
+    "overview_title": "Overview — your study at a glance",
+    "overview_body": "The research objective, participant stats and completion rate live here, along with the interview link you share with participants.",
+    "setup_title": "Setup — what the AI interviewer asks",
+    "setup_body": "The interview guide drives the conversation: main questions, what you want to learn from each, and screening questions to filter participants. This is what you'll customise for your own study.",
+    "responses_title": "Responses — every interview, transcribed",
+    "responses_body": "Each participant's full conversation is recorded and transcribed automatically. Open a transcript to read it turn by turn, fix wording, and tag the quotes that matter.",
+    "analysis_title": "Analysis — AI themes backed by evidence",
+    "analysis_body": "Once a few interviews are in, the AI synthesises themes, tensions and recommendations — every claim backed by verbatim quotes you can trace back to a transcript.",
+    "finale_title": "That's the whole loop",
+    "finale_body": "Guide → interviews → transcripts → analysis. This demo stays in your workspace to explore anytime — but the fastest way to learn is with your own questions.",
+    "finale_cta_create": "Create your own study",
+    "finale_cta_explore": "Keep exploring the demo"
+  },
   "switcher": {
     "active": "Active",
     "inactive": "Inactive",
