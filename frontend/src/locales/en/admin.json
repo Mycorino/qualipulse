@@ -83,7 +83,10 @@
     "noProjects": "No projects",
     "loadingShort": "Loading…",
     "participants_one": "{{count}} participant",
-    "participants_other": "{{count}} participants"
+    "participants_other": "{{count}} participants",
+    "prev": "Previous",
+    "next": "Next",
+    "page": "Page {{page}}"
   },
   "affiliates": {
     "title": "Affiliate Program",
@@ -97,7 +100,32 @@
     "colCommission": "Commission %",
     "colSignups": "Signups",
     "colConversions": "Conversions",
-    "colEarned": "Earned"
+    "colEarned": "Earned",
+    "filterAll": "All",
+    "status_pending": "Pending",
+    "status_active": "Active",
+    "status_rejected": "Rejected",
+    "noneForFilter": "No affiliates match this filter.",
+    "colPending": "Pending payout",
+    "colActions": "Actions",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approved": "Affiliate approved",
+    "rejected": "Application rejected",
+    "save": "Save",
+    "editCommission": "Click to edit commission",
+    "commissionUpdated": "Commission updated",
+    "commissionInvalid": "Commission must be between 0 and 100%",
+    "recordPayout": "Record payout",
+    "nothingToPayOut": "No pending earnings to pay out",
+    "payoutRecorded": "Payout of ${{amount}} recorded",
+    "pendingBadgeTitle": "{{count}} pending application(s)",
+    "applied": "Applied",
+    "approvedOn": "Approved",
+    "website": "Website",
+    "paidOut": "Paid out",
+    "payoutHistory": "Payout history",
+    "noPayouts": "No payouts recorded yet."
   },
   "audit": {
     "allActions": "All actions",
@@ -167,9 +195,22 @@
     "impersonateFailed": "Failed to impersonate",
     "loadUsersFailed": "Failed to load users",
     "loadAffiliatesFailed": "Failed to load affiliates",
-    "loadAuditFailed": "Failed to load audit log"
+    "loadAuditFailed": "Failed to load audit log",
+    "affiliateUpdateFailed": "Failed to update affiliate",
+    "payoutFailed": "Failed to record payout"
   },
   "impersonate": {
     "loading": "Loading account view…"
+  },
+  "payoutDialog": {
+    "title": "Record payout",
+    "pendingInfo": "Pending earnings: ${{amount}}",
+    "amountLabel": "Amount (USD)",
+    "notesLabel": "Notes (optional)",
+    "notesPlaceholder": "e.g. PayPal transfer ref. 12345",
+    "errorAmount": "Enter an amount greater than zero",
+    "cancel": "Cancel",
+    "submit": "Record payout",
+    "submitting": "Recording…"
   }
 }

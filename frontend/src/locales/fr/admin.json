@@ -83,7 +83,10 @@
     "noProjects": "Aucun projet",
     "loadingShort": "Chargement…",
     "participants_one": "{{count}} participant",
-    "participants_other": "{{count}} participants"
+    "participants_other": "{{count}} participants",
+    "prev": "Précédent",
+    "next": "Suivant",
+    "page": "Page {{page}}"
   },
   "affiliates": {
     "title": "Programme d'affiliation",
@@ -97,7 +100,32 @@
     "colCommission": "Commission %",
     "colSignups": "Inscriptions",
     "colConversions": "Conversions",
-    "colEarned": "Gagné"
+    "colEarned": "Gagné",
+    "filterAll": "Tous",
+    "status_pending": "En attente",
+    "status_active": "Actif",
+    "status_rejected": "Refusé",
+    "noneForFilter": "Aucun affilié ne correspond à ce filtre.",
+    "colPending": "À verser",
+    "colActions": "Actions",
+    "approve": "Approuver",
+    "reject": "Refuser",
+    "approved": "Affilié approuvé",
+    "rejected": "Candidature refusée",
+    "save": "Enregistrer",
+    "editCommission": "Cliquer pour modifier la commission",
+    "commissionUpdated": "Commission mise à jour",
+    "commissionInvalid": "La commission doit être comprise entre 0 et 100 %",
+    "recordPayout": "Enregistrer un versement",
+    "nothingToPayOut": "Aucun gain en attente à verser",
+    "payoutRecorded": "Versement de {{amount}} $ enregistré",
+    "pendingBadgeTitle": "{{count}} candidature(s) en attente",
+    "applied": "Candidature",
+    "approvedOn": "Approuvé le",
+    "website": "Site web",
+    "paidOut": "Versé",
+    "payoutHistory": "Historique des versements",
+    "noPayouts": "Aucun versement enregistré pour le moment."
   },
   "audit": {
     "allActions": "Toutes les actions",
@@ -167,9 +195,22 @@
     "impersonateFailed": "Échec de la connexion en tant que",
     "loadUsersFailed": "Échec du chargement des utilisateurs",
     "loadAffiliatesFailed": "Échec du chargement des affiliés",
-    "loadAuditFailed": "Échec du chargement du journal d'audit"
+    "loadAuditFailed": "Échec du chargement du journal d'audit",
+    "affiliateUpdateFailed": "Échec de la mise à jour de l'affilié",
+    "payoutFailed": "Échec de l'enregistrement du versement"
   },
   "impersonate": {
     "loading": "Chargement de la vue du compte…"
+  },
+  "payoutDialog": {
+    "title": "Enregistrer un versement",
+    "pendingInfo": "Gains en attente : {{amount}} $",
+    "amountLabel": "Montant (USD)",
+    "notesLabel": "Notes (facultatif)",
+    "notesPlaceholder": "ex. virement PayPal réf. 12345",
+    "errorAmount": "Saisissez un montant supérieur à zéro",
+    "cancel": "Annuler",
+    "submit": "Enregistrer le versement",
+    "submitting": "Enregistrement…"
   }
 }

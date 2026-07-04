@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import AdminBlog from "./AdminBlog";
@@ -40,6 +40,33 @@ interface AuditEntry {
   details: Record<string, unknown> | null;
   is_impersonation: boolean;
   created_at: string;
+}
+
+interface AdminAffiliate {
+  id: string;
+  name: string;
+  email: string;
+  code: string;
+  status: string;
+  commission_pct: number;
+  total_earned: number;
+  total_paid: number;
+  pending_earnings: number;
+  payout_threshold: number;
+  signups: number;
+  conversions: number;
+  website: string | null;
+  how_they_found_us: string | null;
+  notes: string | null;
+  created_at: string;
+  approved_at: string | null;
+}
+
+interface AffiliatePayout {
+  id: string;
+  amount: number;
+  paid_at: string;
+  notes: string | null;
 }
 
 interface AdminStats {
@@ -239,9 +266,13 @@ export default function Admin() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [tierFilter, setTierFilter] = useState("");
+  const [userPage, setUserPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const USERS_PAGE_SIZE = 50;
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<AdminProject[]>([]);
@@ -286,8 +317,20 @@ export default function Admin() {
       setPanelDeleting(false);
     }
   }
-  const [affiliates, setAffiliates] = useState<any[]>([]);
+  const [affiliates, setAffiliates] = useState<AdminAffiliate[]>([]);
   const [affiliatesLoading, setAffiliatesLoading] = useState(false);
+  const [affStatusFilter, setAffStatusFilter] = useState("");
+  const [affExpandedId, setAffExpandedId] = useState<string | null>(null);
+  const [affPayouts, setAffPayouts] = useState<AffiliatePayout[]>([]);
+  const [affPayoutsLoading, setAffPayoutsLoading] = useState(false);
+  const [commissionEditId, setCommissionEditId] = useState<string | null>(null);
+  const [commissionValue, setCommissionValue] = useState("");
+
+  const [payoutDialog, setPayoutDialog] = useState<AdminAffiliate | null>(null);
+  const [payoutAmount, setPayoutAmount] = useState("");
+  const [payoutNotes, setPayoutNotes] = useState("");
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
 
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -339,7 +382,10 @@ export default function Admin() {
     setLoading(true);
     setError("");
     try {
-      const params: Record<string, string> = {};
+      const params: Record<string, string | number> = {
+        page: userPage,
+        limit: USERS_PAGE_SIZE,
+      };
       if (search) params.search = search;
       if (tierFilter) params.tier = tierFilter;
       const res = await client().get<AdminUser[]>("/admin/users", { params });
@@ -349,7 +395,16 @@ export default function Admin() {
     } finally {
       setLoading(false);
     }
-  }, [client, search, tierFilter, t]);
+  }, [client, search, tierFilter, userPage, t]);
+
+  // Debounce the search input so we don't fire a request per keystroke
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setUserPage(1);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -369,15 +424,15 @@ export default function Admin() {
     }
   }, [client]);
 
-  const loadAffiliates = useCallback(async () => {
-    setAffiliatesLoading(true);
+  const loadAffiliates = useCallback(async (silent = false) => {
+    if (!silent) setAffiliatesLoading(true);
     try {
-      const res = await client().get("/affiliates/admin/list");
+      const res = await client().get<{ affiliates: AdminAffiliate[] }>("/affiliates/admin/list");
       setAffiliates(res.data.affiliates || []);
     } catch {
-      setError(t("toasts.loadAffiliatesFailed"));
+      if (!silent) setError(t("toasts.loadAffiliatesFailed"));
     } finally {
-      setAffiliatesLoading(false);
+      if (!silent) setAffiliatesLoading(false);
     }
   }, [client, t]);
 
@@ -409,7 +464,13 @@ export default function Admin() {
       }
       loadStats();
     }
-  }, [authed, search, tierFilter, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authed, search, tierFilter, userPage, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Silent affiliate fetch on auth so the pending-application badge shows
+  // without opening the tab
+  useEffect(() => {
+    if (authed) loadAffiliates(true);
+  }, [authed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleExpand(user: AdminUser) {
     if (expandedId === user.id) {
@@ -587,6 +648,116 @@ export default function Admin() {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(""), 2500);
   }
+
+  function applyAffiliateUpdate(updated: AdminAffiliate) {
+    setAffiliates((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+  }
+
+  async function handleAffiliateStatus(aff: AdminAffiliate, newStatus: "active" | "rejected") {
+    setActionLoading(`aff-status-${aff.id}`);
+    try {
+      const res = await client().patch<{ affiliate: AdminAffiliate }>(
+        `/affiliates/admin/${aff.id}`,
+        { status: newStatus }
+      );
+      applyAffiliateUpdate(res.data.affiliate);
+      showSuccess(
+        newStatus === "active" ? t("affiliates.approved") : t("affiliates.rejected")
+      );
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setError(typeof detail === "string" ? detail : t("toasts.affiliateUpdateFailed"));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCommissionSave(aff: AdminAffiliate) {
+    const pct = parseFloat(commissionValue);
+    if (Number.isNaN(pct) || pct <= 0 || pct > 100) {
+      setError(t("affiliates.commissionInvalid"));
+      return;
+    }
+    setActionLoading(`aff-commission-${aff.id}`);
+    try {
+      const res = await client().patch<{ affiliate: AdminAffiliate }>(
+        `/affiliates/admin/${aff.id}`,
+        { commission_pct: pct }
+      );
+      applyAffiliateUpdate(res.data.affiliate);
+      setCommissionEditId(null);
+      showSuccess(t("affiliates.commissionUpdated"));
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setError(typeof detail === "string" ? detail : t("toasts.affiliateUpdateFailed"));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleAffiliateExpand(aff: AdminAffiliate) {
+    if (affExpandedId === aff.id) {
+      setAffExpandedId(null);
+      return;
+    }
+    setAffExpandedId(aff.id);
+    setAffPayouts([]);
+    setAffPayoutsLoading(true);
+    try {
+      const res = await client().get<{ payouts: AffiliatePayout[] }>(
+        `/affiliates/admin/${aff.id}/payouts`
+      );
+      setAffPayouts(res.data.payouts);
+    } catch {
+      setAffPayouts([]);
+    } finally {
+      setAffPayoutsLoading(false);
+    }
+  }
+
+  async function handleRecordPayout() {
+    if (!payoutDialog) return;
+    const amount = parseFloat(payoutAmount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      setPayoutError(t("payoutDialog.errorAmount"));
+      return;
+    }
+    setPayoutSubmitting(true);
+    setPayoutError(null);
+    try {
+      const res = await client().post<{ total_paid: number; pending_earnings: number }>(
+        `/affiliates/admin/${payoutDialog.id}/payout`,
+        { amount, notes: payoutNotes.trim() || null }
+      );
+      setAffiliates((prev) =>
+        prev.map((a) =>
+          a.id === payoutDialog.id
+            ? { ...a, total_paid: res.data.total_paid, pending_earnings: res.data.pending_earnings }
+            : a
+        )
+      );
+      showSuccess(t("affiliates.payoutRecorded", { amount: amount.toFixed(2) }));
+      setPayoutDialog(null);
+      setPayoutAmount("");
+      setPayoutNotes("");
+      if (affExpandedId === payoutDialog.id) {
+        const payoutsRes = await client()
+          .get<{ payouts: AffiliatePayout[] }>(`/affiliates/admin/${payoutDialog.id}/payouts`)
+          .catch(() => null);
+        if (payoutsRes) setAffPayouts(payoutsRes.data.payouts);
+      }
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setPayoutError(typeof detail === "string" ? detail : t("toasts.payoutFailed"));
+    } finally {
+      setPayoutSubmitting(false);
+    }
+  }
+
+  const pendingAffiliateCount = affiliates.filter((a) => a.status === "pending").length;
+  const visibleAffiliates = affStatusFilter
+    ? affiliates.filter((a) => a.status === affStatusFilter)
+    : affiliates;
 
   // ── Login gate ────────────────────────────────────────────────────────────
 
@@ -906,9 +1077,29 @@ export default function Admin() {
               cursor: "pointer",
               fontSize: 14,
               fontWeight: tab === "affiliates" ? 600 : 500,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
             {t("tabs.affiliates")}
+            {pendingAffiliateCount > 0 && (
+              <span
+                style={{
+                  background: "var(--warning-bg, #fffbeb)",
+                  color: "var(--warning-text, #92400e)",
+                  border: "1px solid var(--warning-border, #fcd34d)",
+                  borderRadius: 10,
+                  padding: "0 7px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  lineHeight: "18px",
+                }}
+                title={t("affiliates.pendingBadgeTitle", { count: pendingAffiliateCount })}
+              >
+                {pendingAffiliateCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setTab("blog")}
@@ -970,8 +1161,8 @@ export default function Admin() {
             <input
               type="search"
               placeholder={t("users.searchPlaceholder")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               style={{
                 flex: 1,
                 maxWidth: 340,
@@ -984,7 +1175,7 @@ export default function Admin() {
             />
             <select
               value={tierFilter}
-              onChange={(e) => setTierFilter(e.target.value)}
+              onChange={(e) => { setTierFilter(e.target.value); setUserPage(1); }}
               style={{
                 padding: "8px 12px",
                 borderRadius: "var(--radius-sm)",
@@ -1061,69 +1252,233 @@ export default function Admin() {
             }}
           >
             <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                 <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{t("affiliates.title")}</h2>
-                <button
-                  onClick={loadAffiliates}
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-sm)",
-                    padding: "8px 14px",
-                    fontSize: 13,
-                    cursor: "pointer",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  {t("affiliates.refresh")}
-                </button>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  {["", "pending", "active", "rejected"].map((s) => (
+                    <button
+                      key={s || "all"}
+                      onClick={() => setAffStatusFilter(s)}
+                      style={{
+                        background: affStatusFilter === s ? "var(--primary)" : "var(--bg-surface)",
+                        color: affStatusFilter === s ? "#fff" : "var(--text-secondary)",
+                        border: `1px solid ${affStatusFilter === s ? "var(--primary)" : "var(--border)"}`,
+                        borderRadius: 999,
+                        padding: "5px 12px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {s === "" ? t("affiliates.filterAll") : t(`affiliates.status_${s}`)}
+                      {s === "pending" && pendingAffiliateCount > 0 && ` (${pendingAffiliateCount})`}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => loadAffiliates()}
+                    style={{
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-sm)",
+                      padding: "6px 14px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {t("affiliates.refresh")}
+                  </button>
+                </div>
               </div>
             </div>
             {affiliatesLoading && <div style={{ padding: "24px", textAlign: "center" }}>{t("affiliates.loading")}</div>}
-            {!affiliatesLoading && affiliates.length === 0 && (
+            {!affiliatesLoading && visibleAffiliates.length === 0 && (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text-secondary)" }}>
-                {t("affiliates.none")}
+                {affStatusFilter ? t("affiliates.noneForFilter") : t("affiliates.none")}
               </div>
             )}
-            {!affiliatesLoading && affiliates.length > 0 && (
+            {!affiliatesLoading && visibleAffiliates.length > 0 && (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "var(--bg-sunken)", borderBottom: "1px solid var(--border)" }}>
                       <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colName")}</th>
-                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colEmail")}</th>
                       <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colCode")}</th>
                       <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colStatus")}</th>
                       <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colCommission")}</th>
                       <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colSignups")}</th>
                       <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colConversions")}</th>
                       <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colEarned")}</th>
+                      <th style={{ padding: "12px", textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colPending")}</th>
+                      <th style={{ padding: "12px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{t("affiliates.colActions")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {affiliates.map((aff: any) => (
-                      <tr key={aff.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                        <td style={{ padding: "12px", fontSize: 13 }}>{aff.name}</td>
-                        <td style={{ padding: "12px", fontSize: 13 }}>{aff.email}</td>
-                        <td style={{ padding: "12px", fontSize: 13, fontFamily: "monospace" }}>{aff.code}</td>
-                        <td style={{ padding: "12px", fontSize: 12 }}>
-                          <span
-                            style={{
-                              background: aff.status === "active" ? "var(--success-bg)" : aff.status === "pending" ? "var(--warning-bg)" : "var(--danger-bg)",
-                              color: aff.status === "active" ? "var(--success)" : aff.status === "pending" ? "var(--warning)" : "var(--danger)",
-                              padding: "4px 8px",
-                              borderRadius: 4,
-                              fontWeight: 600,
-                            }}
+                    {visibleAffiliates.map((aff) => (
+                      <Fragment key={aff.id}>
+                        <tr
+                          style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: affExpandedId === aff.id ? "var(--bg-overlay)" : undefined }}
+                          onClick={() => handleAffiliateExpand(aff)}
+                        >
+                          <td style={{ padding: "12px", fontSize: 13 }}>
+                            <div style={{ fontWeight: 500 }}>{aff.name}</div>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{aff.email}</div>
+                          </td>
+                          <td style={{ padding: "12px", fontSize: 13, fontFamily: "monospace" }}>{aff.code}</td>
+                          <td style={{ padding: "12px", fontSize: 12 }}>
+                            <span
+                              style={{
+                                background: aff.status === "active" ? "var(--success-bg)" : aff.status === "pending" ? "var(--warning-bg)" : "var(--danger-bg)",
+                                color: aff.status === "active" ? "var(--success)" : aff.status === "pending" ? "var(--warning)" : "var(--danger)",
+                                padding: "4px 8px",
+                                borderRadius: 4,
+                                fontWeight: 600,
+                              }}
+                            >
+                              {t(`affiliates.status_${aff.status}`, aff.status)}
+                            </span>
+                          </td>
+                          <td
+                            style={{ padding: "12px", textAlign: "right", fontSize: 13 }}
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            {aff.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: "12px", textAlign: "right", fontSize: 13 }}>{aff.commission_pct.toFixed(1)}%</td>
-                        <td style={{ padding: "12px", textAlign: "right", fontSize: 13 }}>{aff.signups}</td>
-                        <td style={{ padding: "12px", textAlign: "right", fontSize: 13 }}>{aff.conversions}</td>
-                        <td style={{ padding: "12px", textAlign: "right", fontSize: 13, fontWeight: 600 }}>${aff.total_earned.toFixed(2)}</td>
-                      </tr>
+                            {commissionEditId === aff.id ? (
+                              <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+                                <input
+                                  type="number"
+                                  value={commissionValue}
+                                  min={1}
+                                  max={100}
+                                  step={0.5}
+                                  autoFocus
+                                  onChange={(e) => setCommissionValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleCommissionSave(aff);
+                                    if (e.key === "Escape") setCommissionEditId(null);
+                                  }}
+                                  style={{ width: 64, padding: "4px 6px", fontSize: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-xs)" }}
+                                  aria-label={t("affiliates.colCommission")}
+                                />
+                                <button
+                                  disabled={actionLoading === `aff-commission-${aff.id}`}
+                                  onClick={() => handleCommissionSave(aff)}
+                                  style={{ background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-xs)", padding: "4px 8px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                                >
+                                  {actionLoading === `aff-commission-${aff.id}` ? "…" : t("affiliates.save")}
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => { setCommissionEditId(aff.id); setCommissionValue(String(aff.commission_pct)); }}
+                                title={t("affiliates.editCommission")}
+                                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--text-primary)", textDecoration: "underline dotted", padding: 0 }}
+                              >
+                                {aff.commission_pct.toFixed(1)}%
+                              </button>
+                            )}
+                          </td>
+                          <td style={{ padding: "12px", textAlign: "right", fontSize: 13 }}>{aff.signups}</td>
+                          <td style={{ padding: "12px", textAlign: "right", fontSize: 13 }}>{aff.conversions}</td>
+                          <td style={{ padding: "12px", textAlign: "right", fontSize: 13, fontWeight: 600 }}>${aff.total_earned.toFixed(2)}</td>
+                          <td style={{ padding: "12px", textAlign: "right", fontSize: 13, fontWeight: 600, color: aff.pending_earnings >= aff.payout_threshold ? "var(--warning-text, #92400e)" : undefined }}>
+                            ${aff.pending_earnings.toFixed(2)}
+                          </td>
+                          <td style={{ padding: "12px", fontSize: 12 }} onClick={(e) => e.stopPropagation()}>
+                            {aff.status === "pending" ? (
+                              <span style={{ display: "inline-flex", gap: 6 }}>
+                                <button
+                                  disabled={actionLoading === `aff-status-${aff.id}`}
+                                  onClick={() => handleAffiliateStatus(aff, "active")}
+                                  style={{ background: "var(--success)", color: "#fff", border: "none", borderRadius: "var(--radius-xs)", padding: "4px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                                >
+                                  {actionLoading === `aff-status-${aff.id}` ? "…" : t("affiliates.approve")}
+                                </button>
+                                <button
+                                  disabled={actionLoading === `aff-status-${aff.id}`}
+                                  onClick={() => handleAffiliateStatus(aff, "rejected")}
+                                  style={{ background: "none", border: "1px solid var(--danger-border)", color: "var(--danger)", borderRadius: "var(--radius-xs)", padding: "4px 10px", fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+                                >
+                                  {t("affiliates.reject")}
+                                </button>
+                              </span>
+                            ) : aff.status === "active" ? (
+                              <button
+                                disabled={aff.pending_earnings <= 0}
+                                onClick={() => {
+                                  setPayoutDialog(aff);
+                                  setPayoutAmount(aff.pending_earnings > 0 ? aff.pending_earnings.toFixed(2) : "");
+                                  setPayoutNotes("");
+                                  setPayoutError(null);
+                                }}
+                                title={aff.pending_earnings <= 0 ? t("affiliates.nothingToPayOut") : undefined}
+                                style={{
+                                  background: "none",
+                                  border: "1px solid var(--border)",
+                                  color: "var(--text-primary)",
+                                  borderRadius: "var(--radius-xs)",
+                                  padding: "4px 10px",
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  cursor: aff.pending_earnings <= 0 ? "default" : "pointer",
+                                  opacity: aff.pending_earnings <= 0 ? 0.4 : 1,
+                                }}
+                              >
+                                {t("affiliates.recordPayout")}
+                              </button>
+                            ) : (
+                              <span style={{ color: "var(--text-muted)" }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                        {affExpandedId === aff.id && (
+                          <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                            <td colSpan={9} style={{ padding: "14px 24px", background: "var(--bg-sunken)" }}>
+                              <div style={{ display: "flex", gap: 40, flexWrap: "wrap", fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+                                <span>
+                                  <strong style={{ color: "var(--text-muted)", fontWeight: 600 }}>{t("affiliates.applied")}</strong>{" "}
+                                  {new Date(aff.created_at).toLocaleDateString()}
+                                </span>
+                                {aff.approved_at && (
+                                  <span>
+                                    <strong style={{ color: "var(--text-muted)", fontWeight: 600 }}>{t("affiliates.approvedOn")}</strong>{" "}
+                                    {new Date(aff.approved_at).toLocaleDateString()}
+                                  </span>
+                                )}
+                                {aff.website && (
+                                  <span>
+                                    <strong style={{ color: "var(--text-muted)", fontWeight: 600 }}>{t("affiliates.website")}</strong>{" "}
+                                    <a href={aff.website} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>{aff.website}</a>
+                                  </span>
+                                )}
+                                <span>
+                                  <strong style={{ color: "var(--text-muted)", fontWeight: 600 }}>{t("affiliates.paidOut")}</strong>{" "}
+                                  ${aff.total_paid.toFixed(2)}
+                                </span>
+                              </div>
+                              {aff.how_they_found_us && (
+                                <p style={{ fontSize: 12, color: "var(--text-secondary)", fontStyle: "italic", margin: "0 0 12px", lineHeight: 1.5 }}>
+                                  “{aff.how_they_found_us}”
+                                </p>
+                              )}
+                              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                                {t("affiliates.payoutHistory")}
+                              </div>
+                              {affPayoutsLoading && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{t("affiliates.loading")}</div>}
+                              {!affPayoutsLoading && affPayouts.length === 0 && (
+                                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{t("affiliates.noPayouts")}</div>
+                              )}
+                              {!affPayoutsLoading &&
+                                affPayouts.map((p) => (
+                                  <div key={p.id} style={{ display: "flex", gap: 16, fontSize: 12, padding: "5px 0", borderBottom: "1px solid var(--border-subtle)" }}>
+                                    <span style={{ color: "var(--text-muted)", minWidth: 90 }}>{new Date(p.paid_at).toLocaleDateString()}</span>
+                                    <span style={{ fontWeight: 600 }}>${p.amount.toFixed(2)}</span>
+                                    {p.notes && <span style={{ color: "var(--text-secondary)" }}>{p.notes}</span>}
+                                  </div>
+                                ))}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -1497,6 +1852,45 @@ export default function Admin() {
               )}
             </div>
           ))}
+
+          {/* Users pagination */}
+          {!loading && (userPage > 1 || users.length === USERS_PAGE_SIZE) && (
+            <div style={{ display: "flex", gap: 8, padding: "12px 16px", justifyContent: "flex-end", borderTop: "1px solid var(--border)" }}>
+              <button
+                disabled={userPage <= 1}
+                onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "4px 12px",
+                  fontSize: 12,
+                  cursor: userPage <= 1 ? "default" : "pointer",
+                  opacity: userPage <= 1 ? 0.4 : 1,
+                }}
+              >
+                {t("users.prev")}
+              </button>
+              <span style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "center" }}>
+                {t("users.page", { page: userPage })}
+              </span>
+              <button
+                disabled={users.length < USERS_PAGE_SIZE}
+                onClick={() => setUserPage((p) => p + 1)}
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "4px 12px",
+                  fontSize: 12,
+                  cursor: users.length < USERS_PAGE_SIZE ? "default" : "pointer",
+                  opacity: users.length < USERS_PAGE_SIZE ? 0.4 : 1,
+                }}
+              >
+                {t("users.next")}
+              </button>
+            </div>
+          )}
         </div>
         )}
       </div>
@@ -1936,6 +2330,128 @@ export default function Admin() {
                 }}
               >
                 {creditDialogSubmitting ? t("creditsDialog.submitting") : t("creditsDialog.submit")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record payout dialog */}
+      {payoutDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+          onClick={() => !payoutSubmitting && setPayoutDialog(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: 24,
+              width: 420,
+              maxWidth: "100%",
+              boxShadow: "var(--shadow-lg)",
+            }}
+          >
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+              {t("payoutDialog.title")}
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+              {payoutDialog.name} · {payoutDialog.email}
+            </p>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12 }}>
+              {t("payoutDialog.pendingInfo", { amount: payoutDialog.pending_earnings.toFixed(2) })}
+            </p>
+            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              {t("payoutDialog.amountLabel")}
+            </label>
+            <input
+              type="number"
+              value={payoutAmount}
+              min={0.01}
+              step={0.01}
+              onChange={(e) => setPayoutAmount(e.target.value)}
+              disabled={payoutSubmitting}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                fontSize: 13,
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-xs)",
+                marginBottom: 12,
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+              }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
+              {t("payoutDialog.notesLabel")}
+            </label>
+            <textarea
+              value={payoutNotes}
+              onChange={(e) => setPayoutNotes(e.target.value)}
+              placeholder={t("payoutDialog.notesPlaceholder")}
+              disabled={payoutSubmitting}
+              rows={2}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                fontSize: 13,
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-xs)",
+                marginBottom: 12,
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                fontFamily: "inherit",
+                resize: "vertical",
+              }}
+            />
+            {payoutError && (
+              <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 12 }}>
+                {payoutError}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setPayoutDialog(null)}
+                disabled={payoutSubmitting}
+                style={{
+                  background: "none",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-primary)",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {t("payoutDialog.cancel")}
+              </button>
+              <button
+                onClick={handleRecordPayout}
+                disabled={payoutSubmitting}
+                style={{
+                  background: "var(--primary)",
+                  border: "none",
+                  color: "white",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "6px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  opacity: payoutSubmitting ? 0.6 : 1,
+                }}
+              >
+                {payoutSubmitting ? t("payoutDialog.submitting") : t("payoutDialog.submit")}
               </button>
             </div>
           </div>

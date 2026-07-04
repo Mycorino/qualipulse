@@ -30,6 +30,13 @@ interface Referral {
   converted_at: string | null;
 }
 
+interface Payout {
+  id: string;
+  amount: number;
+  paid_at: string;
+  notes: string | null;
+}
+
 // ── Apply View ─────────────────────────────────────────────────────────────
 
 function AffiliateApply() {
@@ -289,6 +296,7 @@ function AffiliateDashboard() {
   const { t, i18n } = useTranslation("affiliate");
   const [stats, setStats] = useState<AffiliateStats | null>(null);
   const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [payouts, setPayouts] = useState<Payout[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -303,12 +311,14 @@ function AffiliateDashboard() {
     setError("");
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [statsRes, referralsRes] = await Promise.all([
+      const [statsRes, referralsRes, payoutsRes] = await Promise.all([
         axios.get("/api/affiliates/me", { headers }),
         axios.get("/api/affiliates/me/referrals", { headers }),
+        axios.get("/api/affiliates/me/payouts", { headers }).catch(() => null),
       ]);
       setStats(statsRes.data);
       setReferrals(referralsRes.data.referrals);
+      setPayouts(payoutsRes?.data.payouts ?? []);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("dashboard.failedDashboard")));
     } finally {
@@ -521,6 +531,59 @@ function AffiliateDashboard() {
                       </td>
                       <td style={{ padding: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>
                         {new Date(ref.signed_up_at).toLocaleDateString(locale)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Payout History */}
+        <div
+          style={{
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-lg)",
+            overflow: "hidden",
+            marginTop: "24px",
+          }}
+        >
+          <div style={{ padding: "24px", borderBottom: "1px solid var(--border-default)" }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 600 }}>{t("dashboard.payoutHistory")}</h2>
+          </div>
+          {payouts.length === 0 ? (
+            <div style={{ padding: "24px", textAlign: "center", color: "var(--text-secondary)" }}>
+              {t("dashboard.noPayouts")}
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "var(--bg-sunken)", borderBottom: "1px solid var(--border-default)" }}>
+                    <th style={{ padding: "12px", textAlign: "left", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>
+                      {t("dashboard.tableDate")}
+                    </th>
+                    <th style={{ padding: "12px", textAlign: "right", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>
+                      {t("dashboard.tableAmount")}
+                    </th>
+                    <th style={{ padding: "12px", textAlign: "left", fontWeight: 600, fontSize: "12px", color: "var(--text-secondary)" }}>
+                      {t("dashboard.tableNotes")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payouts.map((p) => (
+                    <tr key={p.id} style={{ borderBottom: "1px solid var(--border-default)" }}>
+                      <td style={{ padding: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>
+                        {new Date(p.paid_at).toLocaleDateString(locale)}
+                      </td>
+                      <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: 600 }}>
+                        ${p.amount.toFixed(2)}
+                      </td>
+                      <td style={{ padding: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>
+                        {p.notes || "—"}
                       </td>
                     </tr>
                   ))}

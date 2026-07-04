@@ -1,15 +1,19 @@
 import hmac
+import json
 import logging
 import re
+import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.dependencies import get_current_company, get_db
 from app.limiter import limiter
+from app.models.admin_audit import AdminAuditLog
 from app.models.company import Company
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 from app.services.auth import create_access_token
@@ -71,6 +75,13 @@ class AffiliateReferralResponse(BaseModel):
     converted_at: str | None
 
 
+class AffiliatePayoutResponse(BaseModel):
+    id: str
+    amount: float
+    paid_at: str
+    notes: str | None
+
+
 class AdminAffiliateResponse(BaseModel):
     id: str
     name: str
@@ -80,20 +91,26 @@ class AdminAffiliateResponse(BaseModel):
     commission_pct: float
     total_earned: float
     total_paid: float
+    pending_earnings: float
+    payout_threshold: float
     signups: int
     conversions: int
+    website: str | None
+    how_they_found_us: str | None
+    notes: str | None
     created_at: str
+    approved_at: str | None
 
 
 class AdminAffiliateUpdate(BaseModel):
-    commission_pct: float | None = None
+    commission_pct: float | None = Field(default=None, gt=0, le=100)
     status: str | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class AdminPayoutRequest(BaseModel):
-    amount: float
-    notes: str | None = None
+    amount: float = Field(gt=0)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 # ââ Helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
@@ -111,24 +128,74 @@ def _validate_affiliate_code(code: str) -> str:
     return code
 
 
-def _get_admin_key(x_admin_key: str | None = Header(None)) -> str:
-    """Verify admin key from header (timing-safe, disabled when no key is configured)."""
+def _get_admin_identity(
+    authorization: str | None = Header(default=None),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+    x_admin_identity: str | None = Header(default=None, alias="X-Admin-Identity"),
+) -> str:
+    """Verify the admin key (timing-safe) and return the admin identity for audit logging.
+
+    Accepts both `Authorization: Bearer <key>` (what the admin panel sends,
+    same as routers/admin.py) and the legacy `X-Admin-Key` header.
+    """
     if not settings.ADMIN_SECRET_KEY:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access is disabled",
         )
-    if not x_admin_key:
+    token = x_admin_key
+    if token is None and authorization and authorization.startswith("Bearer "):
+        token = authorization[len("Bearer "):]
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing X-Admin-Key header",
+            detail="Missing admin key",
         )
-    if not hmac.compare_digest(x_admin_key, settings.ADMIN_SECRET_KEY):
+    if not hmac.compare_digest(token, settings.ADMIN_SECRET_KEY):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid admin key",
         )
-    return x_admin_key
+    return (x_admin_identity or "unknown").strip()[:100]
+
+
+def _record_affiliate_audit(
+    db: Session,
+    admin_identity: str,
+    action: str,
+    affiliate: Affiliate,
+    details: dict | None = None,
+) -> None:
+    db.add(AdminAuditLog(
+        id=str(uuid.uuid4()),
+        admin_identity=admin_identity,
+        action=action,
+        target_company_id=affiliate.company_id,
+        target_company_email=affiliate.email,
+        details=json.dumps(details) if details else None,
+    ))
+
+
+def _referral_counts(db: Session, affiliate_ids: list[str]) -> dict[str, tuple[int, int]]:
+    """Signup + conversion counts per affiliate in one grouped query.
+
+    Conversions include referrals whose commission has already been paid out
+    (status flows signed_up → converted → paid)."""
+    if not affiliate_ids:
+        return {}
+    rows = (
+        db.query(
+            AffiliateReferral.affiliate_id,
+            func.count(AffiliateReferral.id),
+            func.sum(
+                case((AffiliateReferral.status.in_(("converted", "paid")), 1), else_=0)
+            ),
+        )
+        .filter(AffiliateReferral.affiliate_id.in_(affiliate_ids))
+        .group_by(AffiliateReferral.affiliate_id)
+        .all()
+    )
+    return {aff_id: (int(total), int(converted or 0)) for aff_id, total, converted in rows}
 
 
 def _get_affiliate_from_jwt(
@@ -242,18 +309,17 @@ def affiliate_login(
 
 
 def get_current_affiliate(
-    credentials: str = Header(None),
+    authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> Affiliate:
-    """Dependency: extract affiliate from JWT."""
-    if not credentials:
+    """Dependency: extract affiliate from the Authorization: Bearer JWT."""
+    if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authorization header",
         )
-    if credentials.startswith("Bearer "):
-        credentials = credentials[7:]
-    return _get_affiliate_from_jwt(credentials, db)
+    token = authorization[7:] if authorization.startswith("Bearer ") else authorization
+    return _get_affiliate_from_jwt(token, db)
 
 
 @router.get("/me", response_model=AffiliateStatsResponse)
@@ -262,13 +328,7 @@ def get_affiliate_stats(
     db: Session = Depends(get_db),
 ) -> AffiliateStatsResponse:
     """Get affiliate stats and earnings."""
-    # Count signups and conversions
-    referrals = db.query(AffiliateReferral).filter(
-        AffiliateReferral.affiliate_id == affiliate.id
-    ).all()
-
-    signups = len(referrals)
-    conversions = len([r for r in referrals if r.status == "converted"])
+    signups, conversions = _referral_counts(db, [affiliate.id]).get(affiliate.id, (0, 0))
     pending_earnings = affiliate.total_earned - affiliate.total_paid
 
     return AffiliateStatsResponse(
@@ -330,49 +390,78 @@ def get_affiliate_referrals(
     }
 
 
+@router.get("/me/payouts")
+def get_affiliate_payouts(
+    affiliate: Affiliate = Depends(get_current_affiliate),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Get payout history for the current affiliate."""
+    payouts = (
+        db.query(AffiliatePayout)
+        .filter(AffiliatePayout.affiliate_id == affiliate.id)
+        .order_by(AffiliatePayout.paid_at.desc())
+        .all()
+    )
+    return {
+        "payouts": [
+            AffiliatePayoutResponse(
+                id=p.id,
+                amount=p.amount,
+                paid_at=p.paid_at.isoformat(),
+                notes=p.notes,
+            )
+            for p in payouts
+        ],
+        "total": len(payouts),
+    }
+
+
 # ââ Admin endpoints ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+
+def _admin_affiliate_response(aff: Affiliate, signups: int, conversions: int) -> AdminAffiliateResponse:
+    return AdminAffiliateResponse(
+        id=aff.id,
+        name=aff.name,
+        email=aff.email,
+        code=aff.code,
+        status=aff.status,
+        commission_pct=aff.commission_pct,
+        total_earned=aff.total_earned,
+        total_paid=aff.total_paid,
+        pending_earnings=aff.total_earned - aff.total_paid,
+        payout_threshold=aff.payout_threshold,
+        signups=signups,
+        conversions=conversions,
+        website=aff.website,
+        how_they_found_us=aff.how_they_found_us,
+        notes=aff.notes,
+        created_at=aff.created_at.isoformat(),
+        approved_at=aff.approved_at.isoformat() if aff.approved_at else None,
+    )
 
 
 @router.get("/admin/list")
 def list_affiliates(
-    x_admin_key: str = Depends(_get_admin_key),
+    admin_identity: str = Depends(_get_admin_identity),
     db: Session = Depends(get_db),
 ) -> dict:
     """Admin: list all affiliates with stats."""
-    affiliates = db.query(Affiliate).all()
-    result = []
-
-    for aff in affiliates:
-        referrals = db.query(AffiliateReferral).filter(
-            AffiliateReferral.affiliate_id == aff.id
-        ).all()
-        signups = len(referrals)
-        conversions = len([r for r in referrals if r.status == "converted"])
-
-        result.append(
-            AdminAffiliateResponse(
-                id=aff.id,
-                name=aff.name,
-                email=aff.email,
-                code=aff.code,
-                status=aff.status,
-                commission_pct=aff.commission_pct,
-                total_earned=aff.total_earned,
-                total_paid=aff.total_paid,
-                signups=signups,
-                conversions=conversions,
-                created_at=aff.created_at.isoformat(),
-            )
-        )
-
-    return {"affiliates": result}
+    affiliates = db.query(Affiliate).order_by(Affiliate.created_at.desc()).all()
+    counts = _referral_counts(db, [a.id for a in affiliates])
+    return {
+        "affiliates": [
+            _admin_affiliate_response(aff, *counts.get(aff.id, (0, 0)))
+            for aff in affiliates
+        ]
+    }
 
 
 @router.patch("/admin/{affiliate_id}")
 def update_affiliate(
     affiliate_id: str,
     body: AdminAffiliateUpdate,
-    x_admin_key: str = Depends(_get_admin_key),
+    admin_identity: str = Depends(_get_admin_identity),
     db: Session = Depends(get_db),
 ) -> dict:
     """Admin: approve/reject/update affiliate."""
@@ -389,11 +478,20 @@ def update_affiliate(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot change status from {affiliate.status} to {body.status}. Only pending affiliates can be approved or rejected.",
             )
+        old_status = affiliate.status
         affiliate.status = body.status
         if body.status == "active":
             affiliate.approved_at = datetime.utcnow()
+        _record_affiliate_audit(
+            db, admin_identity, "affiliate_status_change", affiliate,
+            {"from": old_status, "to": body.status},
+        )
 
-    if body.commission_pct is not None and body.commission_pct > 0:
+    if body.commission_pct is not None and body.commission_pct != affiliate.commission_pct:
+        _record_affiliate_audit(
+            db, admin_identity, "affiliate_commission_change", affiliate,
+            {"from": affiliate.commission_pct, "to": body.commission_pct},
+        )
         affiliate.commission_pct = body.commission_pct
 
     if body.notes is not None:
@@ -403,14 +501,19 @@ def update_affiliate(
     db.refresh(affiliate)
 
     logger.info("Updated affiliate %s: status=%s, commission_pct=%s", affiliate_id, body.status, body.commission_pct)
-    return {"message": "Affiliate updated", "affiliate_id": affiliate.id}
+    signups, conversions = _referral_counts(db, [affiliate.id]).get(affiliate.id, (0, 0))
+    return {
+        "message": "Affiliate updated",
+        "affiliate_id": affiliate.id,
+        "affiliate": _admin_affiliate_response(affiliate, signups, conversions),
+    }
 
 
 @router.post("/admin/{affiliate_id}/payout")
 def record_payout(
     affiliate_id: str,
     body: AdminPayoutRequest,
-    x_admin_key: str = Depends(_get_admin_key),
+    admin_identity: str = Depends(_get_admin_identity),
     db: Session = Depends(get_db),
 ) -> dict:
     """Admin: record a payout for an affiliate."""
@@ -418,15 +521,24 @@ def record_payout(
     if not affiliate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Affiliate not found")
 
+    pending = affiliate.total_earned - affiliate.total_paid
+    if body.amount > pending + 1e-9:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Payout of ${body.amount:.2f} exceeds pending earnings of ${pending:.2f}.",
+        )
+
     payout = AffiliatePayout(
         affiliate_id=affiliate.id,
         amount=body.amount,
         notes=body.notes,
     )
     db.add(payout)
-
-    # Update affiliate total_paid
     affiliate.total_paid += body.amount
+    _record_affiliate_audit(
+        db, admin_identity, "affiliate_payout", affiliate,
+        {"amount": body.amount, "notes": body.notes},
+    )
 
     db.commit()
     db.refresh(payout)
@@ -436,4 +548,37 @@ def record_payout(
         "message": "Payout recorded",
         "payout_id": payout.id,
         "amount": body.amount,
+        "total_paid": affiliate.total_paid,
+        "pending_earnings": affiliate.total_earned - affiliate.total_paid,
+    }
+
+
+@router.get("/admin/{affiliate_id}/payouts")
+def list_affiliate_payouts(
+    affiliate_id: str,
+    admin_identity: str = Depends(_get_admin_identity),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Admin: payout history for one affiliate."""
+    affiliate = db.query(Affiliate).filter(Affiliate.id == affiliate_id).first()
+    if not affiliate:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Affiliate not found")
+
+    payouts = (
+        db.query(AffiliatePayout)
+        .filter(AffiliatePayout.affiliate_id == affiliate.id)
+        .order_by(AffiliatePayout.paid_at.desc())
+        .all()
+    )
+    return {
+        "payouts": [
+            AffiliatePayoutResponse(
+                id=p.id,
+                amount=p.amount,
+                paid_at=p.paid_at.isoformat(),
+                notes=p.notes,
+            )
+            for p in payouts
+        ],
+        "total": len(payouts),
     }
