@@ -567,6 +567,16 @@ study named `[Démo] Courses alimentaires en ligne — habitudes & freins`
   substrings of real participant transcripts.
 - **Memos** — 3 project memos (general + theme-linked + tension-linked)
 - **Editing state** — one turn flagged `manually_edited=True`
+- **Second demo study + decision memo** — a leaner sibling exit-interview
+  study (EN: `[Demo] Why subscribers cancel — exit interviews`, FR:
+  `[Démo] Pourquoi ils quittent le drive — entretiens de sortie`; 3
+  participants with a strong/good/fair quality spread, 1 ready `ai_discovery`
+  analysis) plus a **ready `CrossStudySynthesis` decision memo** across both
+  studies. The memo corroborates the flagship study (pause/price/history for
+  EN; ruptures/coût de switch for FR) and carries one deliberate cross-study
+  conflict, so the full arc — interviews → per-study analysis → cross-study
+  decision memo — is demoable on first login. All memo evidence quotes are
+  verbatim substrings of the seeded transcripts (test-enforced).
 - **Demo CTA banner** — When viewing a demo project, a styled banner
   prompts users to create their first real study
 
@@ -575,9 +585,10 @@ The content lives in `backend/app/services/_demo_data_{en,fr}.py` so the
 (exposed in `ProjectResponse` API schema) and are **excluded from the tier
 project-quota count** in `routers/projects.py` so they never block a user
 from creating their first real study. Tests:
-`backend/tests/test_demo_seeder.py` (4 tests — relationship graph, quote-tag
+`backend/tests/test_demo_seeder.py` (18 tests — relationship graph, quote-tag
 offset integrity, every analysis quote appears verbatim in a real transcript,
-quota exclusion).
+quota exclusion, second-study + memo seeding, memo evidence verbatim EN/FR,
+memo export render).
 
 ### Email Verification
 - On signup: `EmailVerificationToken` created (24h expiry). Only the verification email is sent, and it greets by **first name** ("Welcome, Marie") rather than company name (falls back to company name if first name is missing).

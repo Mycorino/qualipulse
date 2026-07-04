@@ -49,6 +49,7 @@ from app.models.interview import (
 from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.models.study import Study, StudyAnalysis
+from app.models.synthesis import CrossStudySynthesis
 from app.models.survey import (
     Survey,
     SurveyLink,
@@ -56,8 +57,20 @@ from app.models.survey import (
     SurveyResponse,
     SurveyResponseAnswer,
 )
-from app.services._demo_data_en import NOTABLE_QUOTES_EN, PARTICIPANTS_EN, QUALITY_EN
-from app.services._demo_data_fr import NOTABLE_QUOTES_FR, PARTICIPANTS_FR, QUALITY_FR
+from app.services._demo_data_en import (
+    NOTABLE_QUOTES_EN,
+    PARTICIPANTS2_EN,
+    PARTICIPANTS_EN,
+    QUALITY2_EN,
+    QUALITY_EN,
+)
+from app.services._demo_data_fr import (
+    NOTABLE_QUOTES_FR,
+    PARTICIPANTS2_FR,
+    PARTICIPANTS_FR,
+    QUALITY2_FR,
+    QUALITY_FR,
+)
 from app.services.study_provisioning import create_study
 
 
@@ -1218,6 +1231,597 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         )
     )
 
+    # Cross-study synthesis showcase: a sibling exit-interview study plus a
+    # ready decision memo across both, so a new account can experience the
+    # full arc — interviews → per-study analysis → cross-study decision memo —
+    # without running a single real interview.
+    second_study = _seed_second_demo_study(db, company_id, lang, now)
+    db.add(
+        CrossStudySynthesis(
+            company_id=company_id,
+            name=DEMO_MEMO_NAME_FR if lang == "fr" else DEMO_MEMO_NAME,
+            decision_question=DEMO_MEMO_QUESTION_FR if lang == "fr" else DEMO_MEMO_QUESTION,
+            study_ids=json.dumps([demo_study.id, second_study.id]),
+            status="ready",
+            report=json.dumps(_memo_report(lang)),
+            language=lang,
+            generated_at=now - timedelta(hours=2),
+            created_at=now - timedelta(hours=2),
+        )
+    )
+
     db.commit()
     db.refresh(project)
     return project
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Demo study #2 + cross-study decision memo
+#
+# A second, leaner demo study (3 exit interviews, one ready analysis) whose
+# real purpose is to make the cross-study synthesis demoable on day one:
+# the seeded CrossStudySynthesis memo cites both studies by name, corroborates
+# them where they agree and surfaces one deliberate conflict. All memo
+# evidence quotes are verbatim substrings of the seeded transcripts — same
+# integrity bar as the per-study analyses.
+# ═══════════════════════════════════════════════════════════════════════════
+
+DEMO2_PROJECT_NAME = "[Demo] Why subscribers cancel — exit interviews"
+DEMO2_PROJECT_NAME_FR = "[Démo] Pourquoi ils quittent le drive — entretiens de sortie"
+
+DEMO2_OBJECTIVE = (
+    "Understand the precise moment subscribers decide to cancel a streaming "
+    "service, what triggered it, and what — if anything — would have kept them."
+)
+DEMO2_OBJECTIVE_FR = (
+    "Comprendre le moment précis où les clients arrêtent de commander leurs "
+    "courses en ligne, ce qui l'a déclenché, et ce qui aurait pu les retenir."
+)
+
+DEMO2_WELCOME = (
+    "Thanks for talking to us! You recently cancelled a streaming subscription — "
+    "we'd love to hear the honest story of how that happened. There are no wrong "
+    "answers; we're interested in the real moment, not the polite version."
+)
+DEMO2_WELCOME_FR = (
+    "Merci de nous accorder ce moment ! Vous avez récemment arrêté de commander "
+    "vos courses en ligne — racontez-nous honnêtement comment ça s'est passé. "
+    "Il n'y a pas de mauvaise réponse : c'est le vrai moment qui nous intéresse."
+)
+
+DEMO2_GUIDE: list[dict] = [
+    {
+        "section": "The moment of cancellation",
+        "questions": [
+            {
+                "q": "Walk me through the last streaming service you cancelled — what happened that week?",
+                "learning": "The concrete trigger event, its timing, and how long the decision had been latent.",
+            },
+            {
+                "q": "What, if anything, could the service have done to keep you?",
+                "learning": "Save-offer receptivity, pause/step-down demand, perceived silence at the exit.",
+            },
+        ],
+    },
+    {
+        "section": "Looking back",
+        "questions": [
+            {
+                "q": "How do you feel about that service now — would you ever go back?",
+                "learning": "Win-back conditions, whether history/profiles still bind them, emotional residue.",
+            },
+        ],
+    },
+]
+
+DEMO2_GUIDE_FR: list[dict] = [
+    {
+        "section": "Le moment de l'abandon",
+        "questions": [
+            {
+                "q": "Racontez-moi la dernière fois que vous avez arrêté de commander vos courses en ligne — que s'est-il passé ?",
+                "learning": "L'événement déclencheur concret, son timing, et depuis combien de temps la décision couvait.",
+            },
+            {
+                "q": "Qu'est-ce que l'enseigne aurait pu faire pour vous garder ?",
+                "learning": "Réceptivité aux offres de rétention, demande de validation des substitutions, silence perçu au départ.",
+            },
+        ],
+    },
+    {
+        "section": "Avec le recul",
+        "questions": [
+            {
+                "q": "Que faudrait-il pour que vous y retourniez ?",
+                "learning": "Conditions de retour, poids de l'historique/des listes, résidu émotionnel.",
+            },
+        ],
+    },
+]
+
+DEMO_MEMO_NAME = "[Demo] Retention vs acquisition — decision memo"
+DEMO_MEMO_NAME_FR = "[Démo] Fiabilité vs acquisition — mémo de décision"
+
+DEMO_MEMO_QUESTION = (
+    "Should next quarter's roadmap prioritise retention features (pause, "
+    "cancel-flow, win-back) or acquisition content spend?"
+)
+DEMO_MEMO_QUESTION_FR = (
+    "Faut-il investir la prochaine roadmap dans la fiabilité (stocks, "
+    "substitutions, créneaux) ou dans l'acquisition promotionnelle ?"
+)
+
+
+def _study2_report(lang: str) -> dict:
+    """Hand-authored v1 analysis for demo study #2 — quotes are verbatim
+    substrings of PARTICIPANTS2 transcripts (enforced by tests)."""
+    if lang == "fr":
+        return {
+            "summary": (
+                "Trois entretiens de sortie racontent la même mécanique : "
+                "l'abandon du drive ne vient pas d'une lassitude diffuse mais "
+                "d'un incident précis — rupture massive, substitution ratée, "
+                "hausse des frais — qui fait basculer une insatisfaction "
+                "latente. L'historique (listes, panier type) retarde le départ "
+                "de plusieurs mois, et aucune des trois n'a fait l'objet de la "
+                "moindre tentative de rétention au moment de partir."
+            ),
+            "themes": [
+                {
+                    "title": "L'abandon suit un incident précis, pas une lassitude",
+                    "summary": (
+                        "Nadia (8 produits manquants sur 30), Julien (substitution "
+                        "sur un produit de santé) et Marta (frais passés de 0 à 7 €) "
+                        "datent tous leur départ d'un événement identifiable. "
+                        "L'insatisfaction couvait, mais c'est l'incident qui décide."
+                    ),
+                    "quotes": [
+                        _build_quote("La goutte d'eau, c'est la commande où il manquait huit produits sur trente.", "Nadia K.", 1),
+                        _build_quote("Une substitution ratée sur le lait de mon fils, ça ne pardonne pas.", "Julien P.", 1),
+                        _build_quote("C'était les frais qui montaient, tout simplement.", "Marta S.", 1),
+                    ],
+                    "frequency": "3 participants sur 3",
+                    "disconfirming_evidence": "",
+                },
+                {
+                    "title": "Les listes et l'historique retardent le départ de plusieurs mois",
+                    "summary": (
+                        "Julien est resté trois mois après l'incident déclencheur, "
+                        "Nadia encaissait les déceptions — dans les deux cas parce "
+                        "que recréer listes et panier type ailleurs coûte des "
+                        "semaines. L'historique est l'actif de rétention réel, et "
+                        "il est aujourd'hui non exportable et non valorisé."
+                    ),
+                    "quotes": [
+                        _build_quote("ce qui m'a retenu si longtemps, c'est mes listes. Tout recréer ailleurs, c'est une soirée entière", "Julien P.", 1),
+                        _build_quote("je restais parce que tout était configuré, mes listes, mon panier type du mercredi, deux ans d'habitudes", "Nadia K.", 1),
+                    ],
+                    "frequency": "2 participants sur 3",
+                    "disconfirming_evidence": "Marta, petits paniers bimensuels, ne mentionne aucun attachement à un historique — le levier est absent du segment solo.",
+                },
+                {
+                    "title": "Une sortie silencieuse : personne ne tente de retenir",
+                    "summary": (
+                        "Aucun des trois départs n'a déclenché la moindre réaction "
+                        "de l'enseigne — pas d'offre, pas de mail, pas de question. "
+                        "Nadia, elle-même logisticienne, souligne qu'un client "
+                        "hebdomadaire qui s'arrête net devrait déclencher un appel."
+                    ),
+                    "quotes": [
+                        _build_quote("personne n'a cherché à me retenir. Pas un mail, rien.", "Nadia K.", 2),
+                    ],
+                    "frequency": "3 participants sur 3",
+                    "disconfirming_evidence": "",
+                },
+            ],
+            "jobs_to_be_done": [
+                {
+                    "job": "Quand une commande tourne mal, je veux être prévenue et pouvoir arbitrer avant le retrait, pour ne pas découvrir le problème avec un enfant dans le siège auto.",
+                    "insight": "Ce n'est pas l'incident qui fait partir, c'est de le subir sans préavis ni contrôle. La notification pré-retrait transforme un churn en simple déception.",
+                    "frequency": "2 participants sur 3",
+                },
+            ],
+            "tensions": [
+                {
+                    "tension": "Calcul froid vs rupture de confiance",
+                    "detail": (
+                        "Marta part sur un calcul (frais/panier) et reviendrait si "
+                        "le calcul redevient bon ; Julien part sur une rupture de "
+                        "confiance (le lait de son fils) et exige une preuve durable. "
+                        "Les deux churns demandent des réponses opposées — tarifaire "
+                        "pour l'un, produit pour l'autre."
+                    ),
+                },
+            ],
+            "recommendations": [
+                "Notifier les ruptures et substitutions AVANT le retrait avec arbitrage client ligne par ligne — le déclencheur n°1 des deux abandons famille. Serait invalidé si les clients notifiés churnaient autant que les non-notifiés.",
+                "Rendre les listes exportables/importables — l'actif qui retient est aussi la barrière au retour. Serait invalidé si les clients revenus recréent leurs listes sans friction mesurable.",
+                "Déclencher une action de rétention sur tout client hebdomadaire inactif depuis 3 semaines. Serait invalidé si le taux de réactivation des contactés n'excède pas celui des non-contactés.",
+            ],
+            "confidence": "medium",
+            "confidence_rationale": "N=3 avec des récits précis et datés, mais un seul segment solo et aucune cliente encore active pour contraster.",
+            "participant_count": 3,
+        }
+
+    return {
+        "summary": (
+            "Three exit interviews tell one mechanical story: cancellation is "
+            "not a slow drift but a dated event — a price email landing in a "
+            "dead content month, an annual budget review, a wage-driven "
+            "trade-off. Accumulated watch history postpones the decision for "
+            "months, and none of the three exits triggered any save attempt "
+            "from the service."
+        ),
+        "themes": [
+            {
+                "title": "Cancellation is a dated event, not a drift",
+                "summary": (
+                    "Daniel cancelled the night a price email landed in the week "
+                    "he'd finished his only show; Fatima the afternoon her budget "
+                    "spreadsheet made the creeping price visible; Tom while the "
+                    "kettle boiled after a two-euro increase. All three name the "
+                    "date; none describes a gradual decision."
+                ),
+                "quotes": [
+                    _build_quote("The price email landed the same week I finished the only thing I was watching. I cancelled that night.", "Daniel O.", 1),
+                    _build_quote("It was the price going up, simple as.", "Tom W.", 1),
+                ],
+                "frequency": "3 of 3 participants",
+                "disconfirming_evidence": "",
+            },
+            {
+                "title": "Watch history postpones the exit for months",
+                "summary": (
+                    "Fatima delayed a cancellation she wanted for months because "
+                    "the history 'felt like a diary'; Daniel says his tuned "
+                    "recommendations were what kept him so long. The asset that "
+                    "retains is invisible in the product and evaporates at exit."
+                ),
+                "quotes": [
+                    _build_quote("I'd been meaning to cancel for months, but my watch history felt like a diary I didn't want to throw away.", "Fatima B.", 1),
+                    _build_quote("What kept me so long was my profile honestly, the recommendations finally understood me", "Daniel O.", 1),
+                ],
+                "frequency": "2 of 3 participants",
+                "disconfirming_evidence": "Tom, watching on a shared laptop with rotating logins, attaches no value to history at all — the lever may not exist for the youngest segment.",
+            },
+            {
+                "title": "The exit is silent — nobody works the save",
+                "summary": (
+                    "None of the three cancellations triggered an offer, a pause "
+                    "proposal, or even a targeted goodbye. Daniel — a sales "
+                    "manager — was explicitly waiting for a save offer that never "
+                    "came; Fatima notes win-back marketing will now cost more "
+                    "than the discount that would have kept her."
+                ),
+                "quotes": [
+                    _build_quote("Nobody asked me to stay. Not even a we're-sorry-to-see-you-go discount.", "Daniel O.", 2),
+                    _build_quote("If they'd let me freeze it for the summer I'd still be a customer.", "Fatima B.", 2),
+                ],
+                "frequency": "3 of 3 participants",
+                "disconfirming_evidence": "",
+            },
+        ],
+        "jobs_to_be_done": [
+            {
+                "job": "When a service stops earning its fee, I want to step away without losing what I've built, so I can come back later without starting over.",
+                "insight": "All three describe the exit as a break, not an ending — but the product only offers a binary cancel that destroys the accumulated value.",
+                "frequency": "2 of 3 participants",
+            },
+        ],
+        "tensions": [
+            {
+                "tension": "No hard feelings vs point of principle",
+                "detail": (
+                    "Tom leaves and returns purely on price and shows — 'no hard "
+                    "feelings'. Daniel could afford the increase but cancelled on "
+                    "principle the night the email mistimed. Price-led churn and "
+                    "principle-led churn need different saves: a cheaper tier for "
+                    "one, better timing and acknowledgement for the other."
+                ),
+            },
+        ],
+        "recommendations": [
+            "Test a save offer at the cancel step (discount or pause) — all three exits were silent and at least two were winnable. Would be wrong if save-offer acceptance stays under 5% in an A/B test.",
+            "Introduce a pause/step-down state that preserves history and profiles. Would be wrong if paused accounts resume at no higher rate than cold win-backs.",
+            "Never send price-increase emails into a subscriber's low-watch month — sequence them after flagship releases. Would be wrong if churn shows no interaction between price emails and trailing watch time.",
+        ],
+        "confidence": "medium",
+        "confidence_rationale": "N=3 with precise, dated narratives, but all three are churned subscribers — no active-subscriber contrast group.",
+        "participant_count": 3,
+    }
+
+
+def _memo_report(lang: str) -> dict:
+    """Hand-authored cross-study decision memo. supporting_studies use the
+    exact seeded study names; evidence quotes are verbatim transcript
+    substrings from either study."""
+    if lang == "fr":
+        s1, s2 = DEMO_PROJECT_NAME_FR, DEMO2_PROJECT_NAME_FR
+        return {
+            "decision": DEMO_MEMO_QUESTION_FR,
+            "verdict": (
+                "Investir la roadmap dans la fiabilité. Les deux études convergent "
+                "sur le même mécanisme : la fidélité tient à un actif accumulé "
+                "(listes, historique, habitudes) et se rompt sur un incident "
+                "opérationnel — jamais sur une offre concurrente mieux disante. "
+                "La réserve principale : le segment des petits paniers (personnes "
+                "seules) churne sur les frais, pas sur la fiabilité, et resterait "
+                "mal servi par cet investissement."
+            ),
+            "summary": (
+                "Sept entretiens sur deux études racontent une fidélité par inertie "
+                "d'actifs : les clientes restent parce que tout est configuré, et "
+                "partent quand un incident (rupture massive, substitution ratée) "
+                "brise la confiance sans préavis ni contrôle. La validation des "
+                "substitutions apparaît dans les deux études comme la demande la "
+                "plus concrète et la moins servie du marché."
+            ),
+            "key_findings": [
+                {
+                    "finding": "L'incident opérationnel déclenche le départ ; le prix ne fait que le timer",
+                    "detail": (
+                        "L'étude de sortie date chaque abandon d'un incident précis "
+                        "(ruptures, substitution) ; l'étude d'usage montre que les "
+                        "ruptures érodent la confiance plus que les frais. Le prix "
+                        "n'apparaît comme déclencheur que sur le segment solo."
+                    ),
+                    "supporting_studies": [s1, s2],
+                    "evidence": "« La goutte d'eau, c'est la commande où il manquait huit produits sur trente. » (Entretiens de sortie — Nadia K.)",
+                    "strength": "strong",
+                },
+                {
+                    "finding": "Les listes et l'historique sont l'actif de rétention réel — et la barrière au retour",
+                    "detail": (
+                        "Les deux études indépendamment : le coût de switch invisible "
+                        "verrouille la fidélité (étude d'usage) et retarde le départ "
+                        "de plusieurs mois (étude de sortie). Le même actif, non "
+                        "exportable, empêche ensuite les churnées de revenir."
+                    ),
+                    "supporting_studies": [s1, s2],
+                    "evidence": "« ce qui m'a retenu si longtemps, c'est mes listes. Tout recréer ailleurs, c'est une soirée entière » (Entretiens de sortie — Julien P.)",
+                    "strength": "strong",
+                },
+                {
+                    "finding": "La validation des substitutions est le correctif le plus demandé des deux échantillons",
+                    "detail": (
+                        "Demande explicite et récurrente dans l'étude d'usage, cause "
+                        "racine du churn famille dans l'étude de sortie. C'est une "
+                        "fonctionnalité logicielle, pas un chantier logistique."
+                    ),
+                    "supporting_studies": [s1, s2],
+                    "evidence": "« Me laisser valider les substitutions, tout simplement. » (Entretiens de sortie — Julien P.)",
+                    "strength": "moderate",
+                },
+            ],
+            "conflicts": [
+                {
+                    "topic": "Le rôle du prix",
+                    "detail": (
+                        "L'étude d'usage conclut que la sensibilité prix dépend du "
+                        "profil (Romain compare au centime, Sophie paie la fiabilité) ; "
+                        "l'étude de sortie ne trouve le prix comme déclencheur que "
+                        "chez Marta (petits paniers). Réconciliation la plus plausible : "
+                        "le prix segmente la clientèle mais ne déclenche l'abandon que "
+                        "là où l'actif accumulé est faible."
+                    ),
+                },
+            ],
+            "gaps": [
+                "Aucune cliente encore active et satisfaite dans l'étude de sortie — le contraste churn/rétention repose sur deux échantillons différents.",
+                "Le segment personnes seules / petits paniers n'est représenté que par une participante.",
+                "L'économie du win-back (coût de reconquête vs coût de rétention) n'est chiffrée dans aucune des deux études.",
+            ],
+            "recommendations": [
+                "Livrer la validation des substitutions avant tout investissement promo — demande n°1 des deux études. Serait invalidé si l'usage de la fonctionnalité restait marginal chez les clientes à risque.",
+                "Notifier ruptures et incidents avant le retrait — transforme le déclencheur de churn en simple déception. Serait invalidé si les clientes notifiées churnaient autant.",
+                "Étudier une offre petits paniers avant de conclure que la fiabilité suffit — le segment solo churne sur les frais. Serait invalidé si le churn solo restait stable après un tarif adapté.",
+            ],
+            "confidence": "medium",
+            "confidence_rationale": "Deux études qualitatives convergentes (7 entretiens au total) à confiances élevée et moyenne, mais aucune donnée quantitative sur les volumes par segment.",
+        }
+
+    s1, s2 = DEMO_PROJECT_NAME, DEMO2_PROJECT_NAME
+    return {
+        "decision": DEMO_MEMO_QUESTION,
+        "verdict": (
+            "Prioritise retention features. Both studies independently surface "
+            "the same mechanism — subscribers are held by accumulated value "
+            "(history, profiles, tuned recommendations) and lost at a mistimed "
+            "price event — and every element of that mechanism is within product "
+            "control, unlike acquisition content whose effect ends with each "
+            "finale. Biggest caveat: the youngest, login-sharing segment attaches "
+            "no value to history, so retention features won't move that cohort."
+        ),
+        "summary": (
+            "Seven interviews across two studies converge: streaming loyalty is "
+            "rented, not owned. Subscribers rotate around shows, stay for "
+            "accumulated history, and churn decisively when a price email lands "
+            "in a low-watch month. All three exits in the cancellation study were "
+            "silent — no save offer, no pause, no goodbye — and a pause state is "
+            "the single most requested missing feature in both samples."
+        ),
+        "key_findings": [
+            {
+                "finding": "A pause state would intercept decisive cancellations",
+                "detail": (
+                    "The usage study surfaced pause as the top unmet need (named "
+                    "or implied by 3 of 4); in the exit study, two of three "
+                    "churned subscribers state unprompted that a freeze would "
+                    "have kept them. The demand exists on both sides of the "
+                    "cancel event."
+                ),
+                "supporting_studies": [s1, s2],
+                "evidence": "\"If they'd let me freeze it for the summer I'd still be a customer.\" (Exit interviews — Fatima B.)",
+                "strength": "strong",
+            },
+            {
+                "finding": "Price emails set the timing of churn, not its cause",
+                "detail": (
+                    "Both studies find price increases to be the dominant trigger "
+                    "— but only when they land in a dead content month. The cause "
+                    "is accumulated low usage; the email merely dates the decision."
+                ),
+                "supporting_studies": [s1, s2],
+                "evidence": "\"The price email landed the same week I finished the only thing I was watching. I cancelled that night.\" (Exit interviews — Daniel O.)",
+                "strength": "strong",
+            },
+            {
+                "finding": "Watch history is the invisible retention asset",
+                "detail": (
+                    "The usage study's most loyal behaviour and the exit study's "
+                    "longest-postponed cancellations share one driver: years of "
+                    "watch history and tuned recommendations that would be lost. "
+                    "The product neither surfaces this value nor preserves it at exit."
+                ),
+                "supporting_studies": [s1, s2],
+                "evidence": "\"I'd been meaning to cancel for months, but my watch history felt like a diary I didn't want to throw away.\" (Exit interviews — Fatima B.)",
+                "strength": "moderate",
+            },
+        ],
+        "conflicts": [
+            {
+                "topic": "Does the catalogue retain?",
+                "detail": (
+                    "The usage study concludes loyalty lives at the catalogue "
+                    "(exclusives, curation); yet in the exit interviews, nobody "
+                    "cites catalogue at the moment of cancelling — only price "
+                    "events and silence. Most plausible reconciliation: catalogue "
+                    "sets the level of willingness to pay, while operational "
+                    "moments (price emails, dead months) set the timing of churn. "
+                    "Both matter, but only the second is being mismanaged."
+                ),
+            },
+        ],
+        "gaps": [
+            "No never-subscribers in either sample — acquisition questions are only answered from the subscriber side.",
+            "Single-market pricing context per participant; bundle-heavy telco markets are unrepresented.",
+            "Win-back economics (cost of re-acquiring a silent churner vs cost of a save offer) are unquantified in both studies.",
+        ],
+        "recommendations": [
+            "Ship a pause state (2-3 months, history and profiles frozen) before the next price change. Would be wrong if paused accounts resume at no higher rate than cold win-backs.",
+            "Sequence price increases to land within two weeks of a flagship release, never in dead months. Would be wrong if churn cohorts show no interaction between price emails and trailing watch time.",
+            "Add a save step to the cancel flow (pause proposal or targeted offer) — every observed exit was silent. Would be wrong if save acceptance stays under 5% in an A/B test.",
+        ],
+        "confidence": "medium",
+        "confidence_rationale": "Two converging qualitative studies (7 interviews total) with high and medium individual confidence, but no quantitative sizing of the segments involved.",
+    }
+
+
+def _seed_second_demo_study(db: Session, company_id: str, lang: str, now: datetime):
+    """Seed the exit-interview sibling study (3 participants, 1 ready analysis).
+
+    Returns the created Study. Leaner than the flagship demo on purpose —
+    its job is to make the cross-study memo demoable, not to duplicate the
+    full researcher-workflow showcase.
+    """
+    if lang == "fr":
+        name = DEMO2_PROJECT_NAME_FR
+        objective = DEMO2_OBJECTIVE_FR
+        welcome = DEMO2_WELCOME_FR
+        guide = DEMO2_GUIDE_FR
+        participants_data = PARTICIPANTS2_FR
+        quality_map = QUALITY2_FR
+        quality_keys = ["nadia", "julien", "marta"]
+    else:
+        name = DEMO2_PROJECT_NAME
+        objective = DEMO2_OBJECTIVE
+        welcome = DEMO2_WELCOME
+        guide = DEMO2_GUIDE
+        participants_data = PARTICIPANTS2_EN
+        quality_map = QUALITY2_EN
+        quality_keys = ["daniel", "fatima", "tom"]
+
+    study = create_study(db, company_id, name)
+    project = Project(
+        company_id=company_id,
+        study_id=study.id,
+        name=name,
+        language=lang,
+        interview_duration_minutes=15,
+        welcome_message=welcome,
+        research_objective=objective,
+        is_demo=True,
+        created_at=now - timedelta(days=6),
+    )
+    db.add(project)
+    db.flush()
+
+    sort_order = 0
+    for section_index, section in enumerate(guide):
+        for question_index, item in enumerate(section["questions"]):
+            db.add(
+                InterviewGuideQuestion(
+                    project_id=project.id,
+                    section_index=section_index,
+                    section_title=section["section"],
+                    question_index=question_index,
+                    main_question=item["q"],
+                    interview_notes="",
+                    desired_learning=item["learning"],
+                    sort_order=sort_order,
+                )
+            )
+            sort_order += 1
+
+    link = InterviewLink(
+        project_id=project.id,
+        token=secrets.token_urlsafe(32),
+        is_active=True,
+        created_at=now - timedelta(days=6),
+    )
+    db.add(link)
+    db.flush()
+
+    for i, data in enumerate(participants_data):
+        started = now - timedelta(days=5 - i)
+        q = quality_map.get(quality_keys[i], {})
+        participant = Participant(
+            link_id=link.id,
+            project_id=project.id,
+            display_name=data["display_name"],
+            email=data["email"],
+            profession=data["profession"],
+            age_range=data["age_range"],
+            country=data["country"],
+            email_verified=True,
+            status="completed",
+            started_at=started,
+            completed_at=started + timedelta(minutes=14),
+            quality_score=q.get("quality_score", 0.75),
+            quality_label=q.get("quality_label", "good"),
+            quality_summary=q.get("quality_summary"),
+            quality_strengths=json.dumps(q["quality_strengths"]) if "quality_strengths" in q else None,
+            quality_issues=json.dumps(q["quality_issues"]) if "quality_issues" in q else None,
+            avg_response_words=q.get("avg_response_words"),
+            short_answer_pct=q.get("short_answer_pct"),
+        )
+        db.add(participant)
+        db.flush()
+        for t_idx, turn in enumerate(data["turns"]):
+            db.add(
+                InterviewTurn(
+                    participant_id=participant.id,
+                    turn_index=t_idx,
+                    question_index=max(0, int(turn.get("question_index", 1)) - 1),
+                    is_follow_up=bool(turn.get("is_follow_up", False)),
+                    follow_up_index=0,
+                    question_text=turn["question_text"],
+                    response_transcript=turn["response_transcript"],
+                    created_at=started + timedelta(minutes=t_idx * 3),
+                )
+            )
+
+    db.add(
+        ProjectAnalysis(
+            project_id=project.id,
+            version=1,
+            version_label="ai_discovery",
+            status="ready",
+            participant_count=len(participants_data),
+            report=json.dumps(_study2_report(lang)),
+            generated_at=now - timedelta(days=2),
+            created_at=now - timedelta(days=2),
+        )
+    )
+    db.flush()
+    return study
