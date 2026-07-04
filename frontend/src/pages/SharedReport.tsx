@@ -120,8 +120,16 @@ export default function SharedReport() {
         {/* Title */}
         <div className="shared-report-title-block">
           <h1 className="shared-report-title">{data.project_name ?? t("sharedReport.researchReport")}</h1>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
             <span className="badge">{t("sharedReport.interviews", { count: report.participant_count })}</span>
+            <a
+              className="btn btn-ghost btn-sm"
+              href={`/api/reports/${token}/report.html`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🖨 {t("sharedReport.printBtn")}
+            </a>
             {report.confidence && (
               <span
                 className="badge"

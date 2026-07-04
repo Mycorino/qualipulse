@@ -72,7 +72,8 @@
     "tensionsAndContradictions": "Tensions et contradictions",
     "recommendations": "Recommandations",
     "generatedBy": "Généré par",
-    "tagline": "Recherche qualitative pilotée par l'IA"
+    "tagline": "Recherche qualitative pilotée par l'IA",
+    "printBtn": "Imprimer / Enregistrer en PDF"
   },
   "regenerateConfirm": "Générer une nouvelle analyse ? La version actuelle sera conservée dans l'historique.",
   "staleWarning_one": "{{count}} nouvelle réponse depuis la dernière analyse — régénérez pour l'inclure.",

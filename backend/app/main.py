@@ -185,7 +185,7 @@ from app.routers import (
     auth, projects, links, interview, export, audio,
     analysis, responses, coding, memos, billing, admin, affiliate, blog,
     templates, team, surveys, public_surveys, studies, copilot,
-    scheduled_emails, panel,
+    scheduled_emails, panel, synthesis,
 )
 
 app.include_router(auth.router)
@@ -208,6 +208,7 @@ app.include_router(surveys.router)
 app.include_router(public_surveys.router)
 app.include_router(studies.router)
 app.include_router(copilot.router)
+app.include_router(synthesis.router)
 app.include_router(scheduled_emails.router)
 app.include_router(panel.router)
 
@@ -247,3 +248,36 @@ def get_shared_report(share_token: str, db=Depends(get_db)):
         "generated_at": analysis.generated_at.isoformat() if analysis.generated_at else None,
         "report": _json.loads(analysis.report) if analysis.report else None,
     }
+
+
+@app.get("/reports/{share_token}/report.html", tags=["public"])
+def get_shared_report_html(share_token: str, db=Depends(get_db)):
+    """Print/PDF-ready standalone HTML of a shared report — no auth required.
+
+    Public variant: the participant appendix (demographics + quality labels)
+    is stripped; quotes keep the attribution the researcher chose to share.
+    """
+    from fastapi.responses import HTMLResponse
+
+    from app.models.interview import Participant, ProjectAnalysis
+    from app.services.report_export import render_analysis_report_html
+
+    analysis = db.query(ProjectAnalysis).filter(
+        ProjectAnalysis.share_token == share_token,
+        ProjectAnalysis.status == "ready",
+    ).first()
+    if analysis is None or analysis.project is None:
+        raise HTTPException(status_code=404, detail="Report not found or link has been revoked.")
+
+    participants = (
+        db.query(Participant)
+        .filter(
+            Participant.project_id == analysis.project_id,
+            Participant.status == "completed",
+        )
+        .all()
+    )
+    html_doc = render_analysis_report_html(
+        analysis.project, analysis, participants, annotations=[], include_appendix=False
+    )
+    return HTMLResponse(content=html_doc)
