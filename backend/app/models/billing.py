@@ -219,6 +219,13 @@ class CreditLedger(Base):
     balance_after: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source: Mapped[str | None] = mapped_column(String(40), nullable=True)
     event_metadata: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    # Stripe Checkout session id for purchase grants / refund revocations —
+    # the structured idempotency key for webhook replays. Older rows only
+    # carry it inside event_metadata JSON; readers fall back to a LIKE
+    # match for those. Alembic 0050.
+    stripe_session_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
 

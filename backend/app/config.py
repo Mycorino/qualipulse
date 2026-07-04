@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     STRIPE_PRICE_PACK_25: str = ""
     STRIPE_PRICE_PACK_50: str = ""
     STRIPE_PRICE_PACK_100: str = ""
+    # Stripe Tax — enable only once tax registration is configured in the
+    # Stripe dashboard, otherwise Checkout session creation 400s. When on,
+    # Checkout computes VAT automatically and collects business VAT IDs.
+    STRIPE_AUTOMATIC_TAX: bool = False
 
     # Google OAuth (Sign in with Google). Leave blank to disable —
     # /auth/google/login returns 503 when unconfigured. The redirect URI
@@ -100,6 +104,11 @@ class Settings(BaseSettings):
     SALES_SLACK_WEBHOOK_URL: str = ""
 
     # Rate limits (requests per minute)
+    # haveibeenpwned k-anonymity check on new passwords. Always on in
+    # production; set true to also enable in dev/staging. Fail-open on
+    # network errors either way.
+    PASSWORD_BREACH_CHECK: bool = False
+
     RATE_LIMIT_PUBLIC: str = "60/minute"     # Interview public endpoints
     RATE_LIMIT_AUTH: str = "10/minute"       # Login/signup
     RATE_LIMIT_DEFAULT: str = "120/minute"   # Authenticated API calls

@@ -601,14 +601,16 @@ quota exclusion).
 - **DNS records** (Namecheap): em9375 CNAME, s1/s2._domainkey CNAME, _dmarc TXT
 
 ### Authentication & Security
-- JWT access tokens (24h expiry) + refresh tokens (30d expiry), HS256
+- JWT access tokens (24h expiry) + refresh tokens (30d expiry), HS256. Every token carries a `tv` (token_version) claim pinned to `Company.token_version` — bumping the column revokes all outstanding tokens. Bumped on password change/reset and `POST /auth/logout-all`; tokens minted pre-0051 (no claim) are treated as tv=0. Impersonation tokens are exempt.
 - Auto-refresh on 401 via Axios interceptor (`client.ts`)
-- Bcrypt password hashing (min 8 chars)
-- Rate limiting: 10/min on auth, 60/min on public, 120/min on authenticated
-- Security headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, HSTS (production)
+- Bcrypt password hashing. Password policy: ≥8 chars with at least one letter and one digit (`validate_password_strength`), enforced at signup / change / reset. Optional haveibeenpwned k-anonymity breach check (`is_password_breached`, fail-open; on in production or via `PASSWORD_BREACH_CHECK`).
+- **TOTP 2FA** (pyotp): `POST /auth/2fa/setup` (secret + otpauth URI) → `POST /auth/2fa/enable` (verify code; returns 10 single-use backup codes, stored as SHA-256 hashes) → login becomes two-step (`POST /auth/login` returns `{requires_2fa, pending_token}`, exchanged at `POST /auth/login/2fa` with a TOTP or backup code). `POST /auth/2fa/disable` needs password + valid code. `totp_enabled` exposed in `GET /auth/me`. UI: Account → Security (`AccountSecurity.tsx`) + 2FA step in `Login.tsx`. Schema: Alembic 0051.
+- **Account lockout**: 5 consecutive failed password/2FA attempts → 15-min lock (`Company.failed_login_attempts` / `locked_until`, 429 on login). Reset on success; password reset clears it.
+- Rate limiting: 10/min on auth, 60/min on public, 120/min on authenticated. **uvicorn runs with `--proxy-headers --forwarded-allow-ips "*"`** (start.sh + docker-compose) so `request.client` is the real client IP behind Cloud Run/nginx — without it all users share one rate-limit bucket.
+- Security headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, HSTS (production), CSP (deny-all on API responses in `main.py`; SPA policy in `frontend/nginx.conf.template` + mirrored in local `nginx.conf`)
 - CORS configurable via `ALLOWED_ORIGINS`
 - Audio endpoint: directory traversal protection
-- **Google Sign-In** (OAuth2 authorization-code flow): `GET /auth/google/login` returns a Google consent URL with a 15-min signed-state JWT (CSRF nonce + sanitized post-login path + UI lang); `GET /auth/google/callback` exchanges the code via `httpx`, fetches `/userinfo`, then upserts the Company (matches by `google_sub` first, then by email — so existing password accounts auto-link on first Google login). New Google signups get `email_verified=True` and the same 14-day starter trial as paid signups. Tokens are returned to the frontend via URL fragment to `/auth/google/finish`, which persists them, clears the fragment from history, and routes to `/welcome` (new) or `/dashboard` (returning). `password_hash` is now nullable for OAuth-only accounts; password login + change-password guard against null. Disabled (returns 503) when `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` are unset. Schema: Alembic 0023 adds `companies.google_sub` (unique index) and makes `password_hash` nullable.
+- **Google Sign-In** (OAuth2 authorization-code flow): `GET /auth/google/login` returns a Google consent URL with a 15-min signed-state JWT (CSRF nonce + sanitized post-login path + UI lang); `GET /auth/google/callback` exchanges the code via `httpx`, fetches `/userinfo`, then upserts the Company (matches by `google_sub` first, then by email — the email fallback only runs when Google attests `email_verified`, and first-time linking to a password account triggers a security-notice email). New Google signups get `email_verified=True` and the same 14-day starter trial as paid signups. Tokens are returned to the frontend via URL fragment to `/auth/google/finish`, which persists them, clears the fragment from history, and routes to `/welcome` (new) or `/dashboard` (returning). `password_hash` is now nullable for OAuth-only accounts; password login + change-password guard against null. Disabled (returns 503) when `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` are unset. Schema: Alembic 0023 adds `companies.google_sub` (unique index) and makes `password_hash` nullable.
 
 ### Audio Recording (Safari Compatibility)
 - `MediaRecorder.start(250)` — timeslice fires `ondataavailable` every 250ms
@@ -1122,7 +1124,12 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/auth/signup` | No | Create account, send nominative verification email, set 14-day trial (welcome-with-brief fires later on onboarding completion) |
-| POST | `/auth/login` | No | Login, get access + refresh tokens |
+| POST | `/auth/login` | No | Login (password step). 2FA accounts get `{requires_2fa, pending_token}` instead of tokens |
+| POST | `/auth/login/2fa` | No | Exchange pending token + TOTP/backup code for session tokens |
+| POST | `/auth/logout-all` | Yes | Revoke every session (token_version bump) |
+| POST | `/auth/2fa/setup` | Yes | Start TOTP enrolment (secret + otpauth URI) |
+| POST | `/auth/2fa/enable` | Yes | Confirm code, enable 2FA, return backup codes |
+| POST | `/auth/2fa/disable` | Yes | Disable 2FA (password + valid code) |
 | POST | `/auth/refresh` | No | Refresh access token |
 | GET | `/auth/google/login` | No | Returns Google OAuth authorize URL (signed state with next path + lang) |
 | GET | `/auth/google/callback` | No | Google redirect: exchange code, upsert account, bounce to `/auth/google/finish#access_token=...` |
@@ -1227,7 +1234,7 @@ All copilot POST endpoints return **SSE** (`text/event-stream`) — events `stat
 | GET | `/billing/status` | Current subscription |
 | POST | `/billing/checkout` | Create Stripe Checkout session |
 | POST | `/billing/portal` | Open Stripe Customer Portal |
-| POST | `/billing/webhook` | Stripe webhook handler |
+| POST | `/billing/webhook` | Stripe webhook handler (subscription create/update/delete, invoice payment succeeded/**failed** → past_due, checkout completed, **charge.refunded** → credit-pack clawback via `revoke_purchased_credits` (idempotent per session, ledger `revoke_purchased`), **charge.dispute.\*** → UsageEvent for admin review) |
 
 ### Affiliate (`/affiliates`)
 | Method | Path | Auth | Description |

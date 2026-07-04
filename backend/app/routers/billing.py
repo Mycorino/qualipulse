@@ -325,13 +325,16 @@ def create_checkout_session(
         import stripe  # type: ignore
         stripe.api_key = stripe_key
 
-        session = stripe.checkout.Session.create(
+        session_kwargs: dict = dict(
             customer_email=company.email,
             payment_method_types=["card"],
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=_validate_redirect_url(body.success_url, "success_url"),
             cancel_url=_validate_redirect_url(body.cancel_url, "cancel_url"),
+            # Billing address is required for B2B invoicing + VAT
+            # determination; Stripe stores it on the customer/invoice.
+            billing_address_collection="required",
             metadata={
                 "company_id": company.id,
                 "workspace_id": company.id,
@@ -339,6 +342,10 @@ def create_checkout_session(
                 "billing_interval": interval,
             },
         )
+        if settings.STRIPE_AUTOMATIC_TAX:
+            session_kwargs["automatic_tax"] = {"enabled": True}
+            session_kwargs["tax_id_collection"] = {"enabled": True}
+        session = stripe.checkout.Session.create(**session_kwargs)
         return {"checkout_url": session.url}
     except ImportError:
         raise HTTPException(status_code=503, detail="Stripe library not installed")
@@ -428,20 +435,32 @@ def create_credit_pack_checkout(
         import stripe  # type: ignore
         stripe.api_key = stripe_key
 
-        session = stripe.checkout.Session.create(
+        pack_metadata = {
+            "company_id": company.id,
+            "workspace_id": company.id,
+            "pack_id": pack.id,
+            "credits": str(pack.credits),
+        }
+        session_kwargs: dict = dict(
             customer_email=company.email,
             payment_method_types=["card"],
             mode="payment",  # one-time, not subscription
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=_validate_redirect_url(body.success_url, "success_url"),
             cancel_url=_validate_redirect_url(body.cancel_url, "cancel_url"),
-            metadata={
-                "company_id": company.id,
-                "workspace_id": company.id,
-                "pack_id": pack.id,
-                "credits": str(pack.credits),
-            },
+            billing_address_collection="required",
+            metadata=pack_metadata,
+            # Copy the workspace metadata onto the PaymentIntent (Stripe
+            # propagates it to the charge) so a later charge.refunded
+            # webhook can resolve the workspace without an API lookup.
+            payment_intent_data={"metadata": pack_metadata},
         )
+        if settings.STRIPE_AUTOMATIC_TAX:
+            session_kwargs["automatic_tax"] = {"enabled": True}
+            session_kwargs["tax_id_collection"] = {"enabled": True}
+            # tax_id_collection in payment mode requires a Customer object.
+            session_kwargs["customer_creation"] = "always"
+        session = stripe.checkout.Session.create(**session_kwargs)
         return {"checkout_url": session.url}
     except ImportError:
         raise HTTPException(status_code=503, detail="Stripe library not installed")
@@ -553,8 +572,14 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         _handle_subscription_deleted(db, event["data"]["object"])
     elif event_type == "invoice.payment_succeeded":
         _handle_invoice_payment_succeeded(db, event["data"]["object"])
+    elif event_type == "invoice.payment_failed":
+        _handle_invoice_payment_failed(db, event["data"]["object"])
     elif event_type == "checkout.session.completed":
         _handle_checkout_session_completed(db, event["data"]["object"])
+    elif event_type == "charge.refunded":
+        _handle_charge_refunded(db, event["data"]["object"])
+    elif event_type in ("charge.dispute.created", "charge.dispute.updated"):
+        _handle_charge_dispute(db, event_type, event["data"]["object"])
     return {"received": True}
 
 
@@ -754,6 +779,162 @@ def _handle_invoice_payment_succeeded(db: Session, invoice: dict) -> None:
     billing_service.grant_period_credits(
         db, sub_row, source="invoice_payment_succeeded",
         metadata={"stripe_invoice_id": invoice.get("id")},
+    )
+
+
+def _handle_invoice_payment_failed(db: Session, invoice: dict) -> None:
+    """A renewal charge failed — flip the subscription to past_due so
+    ``can_start_interview`` stops admitting new interviews. Stripe retries
+    per its dunning schedule; a later ``invoice.payment_succeeded`` (or
+    ``customer.subscription.updated``) restores the active status."""
+    stripe_sub_id = invoice.get("subscription")
+    if not stripe_sub_id:
+        return
+    from app.models.billing import WorkspaceSubscription
+    sub_row = (
+        db.query(WorkspaceSubscription)
+        .filter(WorkspaceSubscription.stripe_subscription_id == stripe_sub_id)
+        .first()
+    )
+    if sub_row is None:
+        return
+    if sub_row.status not in ("canceled", "unpaid"):
+        sub_row.status = "past_due"
+        sub_row.updated_at = datetime.utcnow()
+    company = db.query(Company).filter(Company.id == sub_row.workspace_id).first()
+    if company:
+        company.subscription_status = "past_due"
+    db.commit()
+    logger.warning(
+        "Stripe invoice payment FAILED for subscription %s (workspace %s) — marked past_due",
+        stripe_sub_id, sub_row.workspace_id,
+    )
+
+
+def _workspace_id_for_charge(db: Session, charge: dict) -> str | None:
+    """Best-effort resolution of the workspace behind a Stripe charge.
+
+    Order: charge metadata (credit-pack PaymentIntents carry it since we set
+    ``payment_intent_data.metadata`` at checkout) → the Stripe customer id
+    on any WorkspaceSubscription / Company row.
+    """
+    meta = charge.get("metadata") or {}
+    workspace_id = meta.get("workspace_id") or meta.get("company_id")
+    if workspace_id:
+        return workspace_id
+    customer_id = charge.get("customer")
+    if not customer_id:
+        return None
+    from app.models.billing import WorkspaceSubscription
+    sub_row = (
+        db.query(WorkspaceSubscription)
+        .filter(WorkspaceSubscription.stripe_customer_id == customer_id)
+        .first()
+    )
+    if sub_row is not None:
+        return sub_row.workspace_id
+    company = db.query(Company).filter(Company.stripe_customer_id == customer_id).first()
+    return company.id if company else None
+
+
+def _handle_charge_refunded(db: Session, charge: dict) -> None:
+    """Keep credit balances in sync when a payment is refunded in Stripe.
+
+    Credit-pack refunds claw the granted credits back (idempotent per
+    checkout session). Subscription-invoice refunds are recorded as a
+    UsageEvent for admin follow-up — clawing back period credits
+    automatically would strand in-flight interviews, so support decides
+    via the admin credit-adjust endpoint.
+    """
+    workspace_id = _workspace_id_for_charge(db, charge)
+    if not workspace_id:
+        logger.warning("charge.refunded %s: could not resolve workspace", charge.get("id"))
+        return
+
+    if charge.get("invoice"):
+        # Subscription payment refund — surface it, don't auto-clawback.
+        from app.models.billing import UsageEvent
+        db.add(UsageEvent(
+            workspace_id=workspace_id,
+            event_name="stripe_subscription_refund",
+            billable=False,
+            event_metadata={
+                "stripe_charge_id": charge.get("id"),
+                "stripe_invoice_id": charge.get("invoice"),
+                "amount_refunded": charge.get("amount_refunded"),
+                "currency": charge.get("currency"),
+            },
+        ))
+        db.commit()
+        logger.warning(
+            "Stripe SUBSCRIPTION refund on workspace %s (charge %s, %s %s) — "
+            "review credits via admin adjust",
+            workspace_id, charge.get("id"),
+            charge.get("amount_refunded"), charge.get("currency"),
+        )
+        return
+
+    # One-time payment (credit pack): find the checkout session and revoke.
+    session_id = (charge.get("metadata") or {}).get("checkout_session_id")
+    if not session_id:
+        payment_intent = charge.get("payment_intent")
+        if payment_intent and settings.STRIPE_SECRET_KEY:
+            try:
+                import stripe  # type: ignore
+                stripe.api_key = settings.STRIPE_SECRET_KEY
+                sessions = stripe.checkout.Session.list(payment_intent=payment_intent, limit=1)
+                if sessions.data:
+                    session_id = sessions.data[0].id
+            except Exception:  # pragma: no cover — network fallback only
+                logger.exception("charge.refunded: session lookup failed for %s", charge.get("id"))
+    if not session_id:
+        logger.warning(
+            "charge.refunded %s: no checkout session resolvable — manual review needed "
+            "(workspace %s)", charge.get("id"), workspace_id,
+        )
+        return
+
+    billing_service.revoke_purchased_credits(
+        db,
+        workspace_id,
+        stripe_session_id=session_id,
+        stripe_charge_id=charge.get("id"),
+    )
+    logger.warning(
+        "Stripe credit-pack refund processed: workspace %s session %s charge %s",
+        workspace_id, session_id, charge.get("id"),
+    )
+
+
+def _handle_charge_dispute(db: Session, event_type: str, dispute: dict) -> None:
+    """Record chargebacks so they're visible to admins — no automatic
+    punitive action (Stripe freezes the funds; support investigates)."""
+    charge = dispute.get("charge")
+    workspace_id = _workspace_id_for_charge(
+        db, {"id": charge, "metadata": dispute.get("metadata") or {},
+             "customer": dispute.get("customer")},
+    )
+    from app.models.billing import UsageEvent
+    if workspace_id:
+        db.add(UsageEvent(
+            workspace_id=workspace_id,
+            event_name="stripe_dispute",
+            billable=False,
+            event_metadata={
+                "stripe_dispute_id": dispute.get("id"),
+                "stripe_charge_id": charge,
+                "status": dispute.get("status"),
+                "reason": dispute.get("reason"),
+                "amount": dispute.get("amount"),
+                "currency": dispute.get("currency"),
+                "event_type": event_type,
+            },
+        ))
+        db.commit()
+    logger.warning(
+        "Stripe DISPUTE %s: charge=%s workspace=%s reason=%s status=%s amount=%s %s",
+        dispute.get("id"), charge, workspace_id or "?", dispute.get("reason"),
+        dispute.get("status"), dispute.get("amount"), dispute.get("currency"),
     )
 
 

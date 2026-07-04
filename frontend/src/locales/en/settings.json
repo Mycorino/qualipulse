@@ -184,5 +184,33 @@
       "connectCta": "Connect Slack →",
       "manageCta": "Manage →"
     }
+  },
+  "security": {
+    "twoFactor": {
+      "title": "Two-factor authentication",
+      "description": "Add a second step at sign-in with a code from an authenticator app (Google Authenticator, 1Password, Authy…). Strongly recommended — it protects your research data even if your password leaks.",
+      "enableCta": "Enable two-factor authentication",
+      "disableCta": "Disable two-factor authentication",
+      "enabledStatus": "Two-factor authentication is on",
+      "step1": "Install an authenticator app on your phone if you don't have one.",
+      "step2": "Add a new account in the app and enter this secret key (or open the link below on your phone):",
+      "step3": "Enter the 6-digit code the app shows to confirm.",
+      "openInApp": "Open in authenticator app",
+      "codeLabel": "6-digit code",
+      "currentCodeLabel": "Code from your authenticator app (or a backup code)",
+      "enableConfirm": "Confirm and enable",
+      "disableConfirm": "Disable 2FA",
+      "invalidCode": "Invalid verification code. Please try again.",
+      "genericError": "Something went wrong. Please try again.",
+      "backupCodesTitle": "Backup codes",
+      "backupCodesHint": "Store these somewhere safe (password manager). Each code works once if you lose access to your authenticator app. They will not be shown again.",
+      "backupCodesDone": "I saved my backup codes"
+    },
+    "logoutAll": {
+      "title": "Sign out everywhere",
+      "description": "Sign out of every device and browser where this account is logged in, including this one. Use this if you think a device you used is no longer safe.",
+      "cta": "Sign out of all devices",
+      "confirm": "This signs you out everywhere, including here. Continue?"
+    }
   }
 }

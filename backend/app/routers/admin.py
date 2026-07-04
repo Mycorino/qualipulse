@@ -575,6 +575,9 @@ def suspend_user(
 
     company.suspended_at = datetime.utcnow()
     company.suspension_reason = body.reason.strip()
+    # No token_version bump needed: get_current_company checks suspended_at
+    # on every request, so existing tokens are already blocked (and start
+    # working again on unsuspend, which a version bump would prevent).
     db.commit()
     db.refresh(company)
 

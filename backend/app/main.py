@@ -130,6 +130,13 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # The API only ever returns JSON / audio bytes — it never serves an HTML
+    # document — so a deny-everything CSP is safe and neutralises any
+    # reflected-content injection if a response is ever coerced into being
+    # rendered. (The SPA's real CSP lives in the frontend nginx config.)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    )
     if settings.is_production:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response

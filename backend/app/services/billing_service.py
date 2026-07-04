@@ -53,6 +53,7 @@ EVT_GRANT_ROLLOVER = "grant_rollover"
 EVT_CONSUME_INTERVIEW = "consume_interview"
 EVT_OVERAGE_INTERVIEW = "overage_interview"
 EVT_REFUND_INTERVIEW = "refund_interview"
+EVT_REVOKE_PURCHASED = "revoke_purchased"
 EVT_ADJUSTMENT_ADMIN = "adjustment_admin"
 EVT_EXPIRE_CREDITS = "expire_credits"
 
@@ -839,17 +840,10 @@ def grant_purchased_credits(
         return None
 
     # Idempotency: bail if a grant_purchased ledger row already exists for
-    # this Stripe session. Cheap query, exact match.
-    existing = (
-        db.query(CreditLedger)
-        .filter(
-            CreditLedger.workspace_id == workspace_id,
-            CreditLedger.event_type == EVT_GRANT_PURCHASED,
-            CreditLedger.event_metadata.like(f'%"{stripe_session_id}"%'),
-        )
-        .first()
-    )
-    if existing is not None:
+    # this Stripe session. Indexed exact match on the dedicated column;
+    # LIKE fallback covers rows written before the 0050 migration, where
+    # the session id only lives inside the metadata JSON.
+    if _find_ledger_by_session(db, workspace_id, EVT_GRANT_PURCHASED, stripe_session_id):
         return billing_get_active_balance_for_workspace(db, workspace_id)
 
     balance = get_active_balance(db, workspace_id)
@@ -872,6 +866,7 @@ def grant_purchased_credits(
             credits_delta=credits,
             balance_after=balance.available,
             source="stripe_checkout",
+            stripe_session_id=stripe_session_id,
             event_metadata={
                 "stripe_session_id": stripe_session_id,
                 "pack_id": pack_id,
@@ -880,6 +875,105 @@ def grant_purchased_credits(
     )
     db.commit()
     db.refresh(balance)
+    return balance
+
+
+def _find_ledger_by_session(
+    db: Session, workspace_id: str, event_type: str, stripe_session_id: str
+) -> CreditLedger | None:
+    """Locate a ledger row for a Stripe checkout session, column-first with a
+    JSON-LIKE fallback for pre-0050 rows."""
+    if not stripe_session_id:
+        return None
+    row = (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.workspace_id == workspace_id,
+            CreditLedger.event_type == event_type,
+            CreditLedger.stripe_session_id == stripe_session_id,
+        )
+        .first()
+    )
+    if row is not None:
+        return row
+    return (
+        db.query(CreditLedger)
+        .filter(
+            CreditLedger.workspace_id == workspace_id,
+            CreditLedger.event_type == event_type,
+            CreditLedger.event_metadata.like(f'%"{stripe_session_id}"%'),
+        )
+        .first()
+    )
+
+
+def revoke_purchased_credits(
+    db: Session,
+    workspace_id: str,
+    *,
+    stripe_session_id: str,
+    stripe_charge_id: str | None = None,
+    reason: str = "charge_refunded",
+) -> CreditBalance | None:
+    """Claw back a prepaid credit-pack grant after a Stripe refund.
+
+    Finds the original ``grant_purchased`` row for the checkout session and
+    removes the same number of credits from the balance it was granted to.
+    Idempotent per session — a second ``charge.refunded`` delivery is a
+    no-op because the ``revoke_purchased`` row already exists. The balance
+    is clamped so ``purchased_credits`` never goes negative (partial spend
+    of the pack means the workspace simply keeps what it already used —
+    the delta is recorded in the ledger for support to see).
+    """
+    grant = _find_ledger_by_session(db, workspace_id, EVT_GRANT_PURCHASED, stripe_session_id)
+    if grant is None:
+        logger.warning(
+            "revoke_purchased_credits: no grant found for session %s (workspace %s)",
+            stripe_session_id, workspace_id,
+        )
+        return None
+    if _find_ledger_by_session(db, workspace_id, EVT_REVOKE_PURCHASED, stripe_session_id):
+        return billing_get_active_balance_for_workspace(db, workspace_id)
+
+    balance = None
+    if grant.balance_id:
+        balance = db.query(CreditBalance).filter(CreditBalance.id == grant.balance_id).first()
+    if balance is None:
+        balance = get_active_balance(db, workspace_id)
+    if balance is None:
+        logger.warning(
+            "revoke_purchased_credits: no balance for workspace %s; ledger-only revoke",
+            workspace_id,
+        )
+
+    granted = max(0, grant.credits_delta or 0)
+    revoked = granted
+    if balance is not None:
+        revoked = min(granted, max(0, balance.purchased_credits or 0))
+        balance.purchased_credits = (balance.purchased_credits or 0) - revoked
+        balance.updated_at = _utcnow()
+
+    db.add(
+        CreditLedger(
+            id=str(uuid.uuid4()),
+            workspace_id=workspace_id,
+            balance_id=balance.id if balance is not None else None,
+            event_type=EVT_REVOKE_PURCHASED,
+            credits_delta=-revoked,
+            balance_after=balance.available if balance is not None else None,
+            source=reason,
+            stripe_session_id=stripe_session_id,
+            event_metadata={
+                "stripe_session_id": stripe_session_id,
+                "stripe_charge_id": stripe_charge_id,
+                "granted": granted,
+                "revoked": revoked,
+            },
+        )
+    )
+    db.commit()
+    if balance is not None:
+        db.refresh(balance)
     return balance
 
 

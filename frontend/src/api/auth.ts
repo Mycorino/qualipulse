@@ -48,6 +48,8 @@ export interface CompanyResponse {
   // the 30-day re-prompt cadence.
   current_priority?: string | null;
   current_priority_updated_at?: string | null;
+  // Whether TOTP two-factor auth is active on the account.
+  totp_enabled?: boolean;
 }
 
 export interface OnboardingProfile {
@@ -101,15 +103,60 @@ export async function signup(
   return data;
 }
 
+export interface LoginResult {
+  access_token?: string;
+  refresh_token?: string;
+  token_type?: string;
+  // Present when the account has 2FA enabled — exchange at /auth/login/2fa.
+  requires_2fa?: boolean;
+  pending_token?: string;
+}
+
 export async function login(
   email: string,
   password: string
-): Promise<TokenResponse> {
-  const { data } = await client.post<TokenResponse>("/auth/login", {
+): Promise<LoginResult> {
+  const { data } = await client.post<LoginResult>("/auth/login", {
     email,
     password,
   });
   return data;
+}
+
+export async function loginWith2FA(
+  pendingToken: string,
+  code: string
+): Promise<TokenResponse> {
+  const { data } = await client.post<TokenResponse>("/auth/login/2fa", {
+    pending_token: pendingToken,
+    code,
+  });
+  return data;
+}
+
+// ── Two-factor authentication (TOTP) ──
+
+export interface TwoFactorSetupResponse {
+  secret: string;
+  otpauth_url: string;
+}
+
+export async function setupTwoFactor(): Promise<TwoFactorSetupResponse> {
+  const { data } = await client.post<TwoFactorSetupResponse>("/auth/2fa/setup");
+  return data;
+}
+
+export async function enableTwoFactor(code: string): Promise<{ backup_codes: string[] }> {
+  const { data } = await client.post<{ backup_codes: string[] }>("/auth/2fa/enable", { code });
+  return data;
+}
+
+export async function disableTwoFactor(code: string, password?: string): Promise<void> {
+  await client.post("/auth/2fa/disable", { code, password: password || null });
+}
+
+export async function logoutAllSessions(): Promise<void> {
+  await client.post("/auth/logout-all");
 }
 
 export async function getGoogleAuthorizeUrl(

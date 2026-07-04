@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models.company import Company
-from app.services.auth import decode_access_token
+from app.services.auth import check_token_version, decode_access_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -77,6 +77,7 @@ def get_current_company(
             detail="Company not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    check_token_version(payload, company)
 
     is_impersonation = payload.get("impersonation", False)
     if is_impersonation:
@@ -141,6 +142,10 @@ def get_current_company_optional(
         return None
     company = db.query(Company).filter(Company.id == company_id).first()
     if company is None:
+        return None
+    try:
+        check_token_version(payload, company)
+    except HTTPException:
         return None
     if not payload.get("impersonation", False) and company.suspended_at is not None:
         return None
