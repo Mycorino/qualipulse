@@ -65,7 +65,10 @@ class ScreeningTranslationPatch(BaseModel):
 
 class ProjectCreate(BaseModel):
     name: str
-    language: str = "en"
+    # None => inherit the creating company's preferred_language (so a French
+    # researcher gets French participant-facing content by default). An
+    # explicit "en"/"fr" is always respected.
+    language: str | None = None
     # Sprint 15: when set, the project joins this existing Study (e.g. an
     # interview round added from inside a Study). When omitted, a Study is
     # auto-created named after the project — Decision 8, implicit creation.

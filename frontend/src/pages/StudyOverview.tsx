@@ -36,7 +36,7 @@ import { QuantiTopBar } from "../components/QuantiTopBar";
 type Tab = "overview" | "surveys" | "interviews" | "participants" | "report";
 
 export default function StudyOverview() {
-  const { t } = useTranslation(["study", "dashboard"]);
+  const { t, i18n } = useTranslation(["study", "dashboard"]);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -67,8 +67,10 @@ export default function StudyOverview() {
     if (!study) return;
     try {
       const project = await createProject({
+        // Participant-facing content follows the researcher's UI language
+        // by default — the copilot drafts the guide in project.language.
         name: t("overview.untitledInterview"),
-        language: "en",
+        language: i18n.language?.startsWith("fr") ? "fr" : "en",
         study_id: study.id,
         questions: [],
       });

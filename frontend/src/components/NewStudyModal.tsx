@@ -63,7 +63,7 @@ const ANGLES: AngleCard[] = [
 ];
 
 export function NewStudyModal({ onClose }: { onClose: () => void }) {
-  const { t } = useTranslation("dashboard");
+  const { t, i18n } = useTranslation("dashboard");
   const navigate = useNavigate();
   const { toast } = useToast();
   const [name, setName] = useState("");
@@ -79,7 +79,7 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
         // then drop into the workspace — the copilot drafts the guide.
         const project = await createProject({
           name: studyName,
-          language: "en",
+          language: i18n.language?.startsWith("fr") ? "fr" : "en",
           questions: [],
         });
         navigate(`/projects/${project.id}?tab=setup`);

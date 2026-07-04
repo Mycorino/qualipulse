@@ -449,22 +449,55 @@ export function ResearchCopilotPanel({
     );
   };
 
-  // Accepting a staged proposal (objective / settings) should move the
-  // conversation to the next step instead of leaving it idle — the
-  // Copilot reads the updated snapshot and proposes whatever comes next.
-  const AUTO_CONTINUE_AFTER = new Set(["edit_objective", "edit_settings"]);
+  // Resolving a staged proposal should move the conversation to the next
+  // step instead of leaving it idle — the Copilot reads the updated
+  // snapshot and proposes whatever comes next (objective -> screener ->
+  // guide). These proposal types advance the staged flow; the guide is
+  // the terminal stage, so it deliberately does NOT auto-continue.
+  const AUTO_CONTINUE_AFTER = new Set([
+    "edit_objective",
+    "edit_settings",
+    "add_screening_question",
+  ]);
+
+  // A screener proposal stages a BATCH of add_screening_question cards.
+  // Fire the "what's next" turn once — after the last card in the batch is
+  // resolved and at least one was accepted — never once per card. Reads
+  // the synchronous thread ref, so accepting several cards fast can't fire
+  // it twice or miss on a stale closure.
+  const maybeAutoContinue = (action: PendingAction) => {
+    if (!AUTO_CONTINUE_AFTER.has(action.type)) return;
+    const turn = threadData.current.find(
+      (it) =>
+        it.kind === "assistant" &&
+        it.actions.some((a) => a.id === action.id),
+    );
+    if (!turn || turn.kind !== "assistant") return;
+    const proposals = turn.actions.filter((a) => a.type !== "suggest_replies");
+    // Wait until every proposal card in this turn is resolved…
+    if (proposals.some((a) => a.status === "pending")) return;
+    // …and only continue if the user actually accepted something.
+    if (!proposals.some((a) => a.status === "accepted")) return;
+    send(t("copilot.continueAfterAccept"));
+  };
 
   const accept = async (action: PendingAction) => {
     try {
       await target.applyAction(action);
       setStatus(action.id, "accepted");
       onApplied();
-      if (AUTO_CONTINUE_AFTER.has(action.type)) {
-        send(t("copilot.continueAfterAccept"));
-      }
+      maybeAutoContinue(action);
     } catch {
       toast(t("copilot.applyError"), "error");
     }
+  };
+
+  const reject = (action: PendingAction) => {
+    setStatus(action.id, "rejected");
+    // Rejecting the last pending card in a batch where others were
+    // accepted still advances the flow — otherwise the conversation
+    // stalls after "accept 2, reject 1".
+    maybeAutoContinue(action);
   };
 
   if (!open) {
@@ -634,7 +667,7 @@ export function ResearchCopilotPanel({
                     key={a.id}
                     action={a}
                     onAccept={() => accept(a)}
-                    onReject={() => setStatus(a.id, "rejected")}
+                    onReject={() => reject(a)}
                   />
                 ))}
               {/* Clarifying-question chips — one click answers, or the
