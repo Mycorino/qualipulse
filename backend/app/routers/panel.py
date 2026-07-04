@@ -6,7 +6,8 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
@@ -36,6 +37,13 @@ class TokenRequest(BaseModel):
 class RequestAccessRequest(BaseModel):
     email: str
     lang: str | None = None
+
+
+class JoinRequest(BaseModel):
+    email: EmailStr
+    first_name: str | None = None
+    lang: str | None = None
+    consent: bool = False
 
 
 def _profile_or_401(db: Session, token: str | None) -> PanelProfile:
@@ -107,6 +115,78 @@ def grant_sensitive_consent(request: Request, body: TokenRequest, lang: str = "e
         "sensitive_consent": True,
         "attributes": _visible_attributes(db, lang, include_sensitive=True),
     }
+
+
+@router.post("/join")
+@limiter.limit("5/minute")
+def join_panel(request: Request, body: JoinRequest, db: Session = Depends(get_db)):
+    """Public panel signup (double opt-in). No profile is created here — we
+    email a signed confirmation link and only record consent when it comes
+    back via /join/confirm. Always 200 (no account enumeration). An
+    already-consented panelist gets their regular access link instead."""
+    if not body.consent:
+        raise HTTPException(status_code=400, detail="Consent is required to join the panel.")
+    email = body.email.strip().lower()
+    lang = (body.lang or "en")[:2]
+    first_name = (body.first_name or "").strip()[:80] or None
+
+    from app.services.email import send_panel_access_link, send_panel_join_confirm
+
+    existing = (
+        db.query(PanelProfile)
+        .filter(func.lower(PanelProfile.email) == email)
+        .first()
+    )
+    try:
+        if existing is not None and existing.panel_consent:
+            send_panel_access_link(
+                email=existing.email,
+                token=ps.create_panel_session(existing.email),
+                lang=(body.lang or existing.preferred_language or "en")[:2],
+            )
+        else:
+            send_panel_join_confirm(
+                email=email,
+                token=ps.create_join_token(email, first_name, lang),
+                lang=lang,
+            )
+    except Exception:  # pragma: no cover — never leak send failures
+        logger.exception("panel join email send failed for %s", email)
+    return {"ok": True}
+
+
+@router.post("/join/confirm")
+@limiter.limit("20/minute")
+def confirm_panel_join(request: Request, body: TokenRequest, db: Session = Depends(get_db)):
+    """Confirm a public signup: record consent, create the profile if needed,
+    and hand back a durable panel session so the portal opens immediately.
+    Idempotent — re-clicking the emailed link keeps working."""
+    payload = ps.resolve_join_token(body.token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired confirmation link.",
+        )
+    profile = (
+        db.query(PanelProfile)
+        .filter(func.lower(PanelProfile.email) == payload["email"].lower())
+        .first()
+    )
+    now = datetime.utcnow()
+    if profile is None:
+        profile = PanelProfile(email=payload["email"], created_at=now)
+        db.add(profile)
+    if not profile.panel_consent:
+        profile.panel_consent = True
+        profile.consent_at = now
+    if not profile.first_name and payload["first_name"]:
+        profile.first_name = payload["first_name"]
+    if not profile.preferred_language:
+        profile.preferred_language = payload["lang"]
+    profile.last_active = now
+    db.commit()
+    db.refresh(profile)
+    return {"token": ps.create_panel_session(profile.email)}
 
 
 @router.post("/request-access")
