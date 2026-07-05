@@ -5,7 +5,7 @@ import { useHead } from "../hooks/useHead";
 import { getPublishedPosts, type BlogPost } from "../api/blog";
 
 export default function Blog() {
-  const { t } = useTranslation("blog");
+  const { t, i18n } = useTranslation("blog");
 
   useHead({
     title: t("list.metaTitle"),
@@ -38,7 +38,7 @@ export default function Blog() {
 
   function formatDate(iso: string | null) {
     if (!iso) return "";
-    return new Date(iso).toLocaleDateString("en-US", {
+    return new Date(iso).toLocaleDateString(i18n.language, {
       year: "numeric",
       month: "long",
       day: "numeric",

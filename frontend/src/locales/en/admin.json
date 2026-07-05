@@ -38,7 +38,8 @@
     "users": "Users",
     "affiliates": "Affiliates",
     "blog": "Blog",
-    "audit": "Audit Log"
+    "audit": "Audit Log",
+    "panel": "Panel"
   },
   "users": {
     "searchPlaceholder": "Search by name or email…",
@@ -212,5 +213,12 @@
     "cancel": "Cancel",
     "submit": "Record payout",
     "submitting": "Recording…"
+  },
+  "panel": {
+    "title": "Delete a consumer / panelist account",
+    "help": "Removes their panel profile, all enrichment answers, and outstanding magic tokens. GDPR right-to-erasure — also resets re-testing with the same email (the profiling questionnaire shows again).",
+    "includeInterviews": "Also delete their interview records (across all studies)",
+    "deleting": "Deleting…",
+    "deleteCta": "Delete panelist"
   }
 }

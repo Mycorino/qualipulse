@@ -12,7 +12,7 @@ import {
 } from "../../api/team";
 
 export default function AccountWorkspace() {
-  const { t } = useTranslation(["settings", "common"]);
+  const { t, i18n } = useTranslation(["settings", "common"]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invites, setInvites] = useState<TeamInvitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,7 +178,7 @@ export default function AccountWorkspace() {
                   <div style={{ fontWeight: 600 }}>{i.email}</div>
                   <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
                     {t("team.invitedAs", { role: t(`team.roles.${i.role}`) })} ·{" "}
-                    {t("team.expiresOn", { date: new Date(i.expires_at).toLocaleDateString() })}
+                    {t("team.expiresOn", { date: new Date(i.expires_at).toLocaleDateString(i18n.language) })}
                   </div>
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => handleRevoke(i.id)}>

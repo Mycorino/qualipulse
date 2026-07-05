@@ -14,7 +14,7 @@ interface SharedReportData {
 
 export default function SharedReport() {
   const { token } = useParams<{ token: string }>();
-  const { t } = useTranslation("analysis");
+  const { t, i18n } = useTranslation("analysis");
   const [data, setData] = useState<SharedReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +110,7 @@ export default function SharedReport() {
           <div className="shared-report-meta">
             <span>{t("sharedReport.participant", { count: data.participant_count })}</span>
             {data.generated_at && (
-              <span>{t("sharedReport.generatedOn", { date: new Date(data.generated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) })}</span>
+              <span>{t("sharedReport.generatedOn", { date: new Date(data.generated_at).toLocaleDateString(i18n.language, { month: "short", day: "numeric", year: "numeric" }) })}</span>
             )}
           </div>
         </div>

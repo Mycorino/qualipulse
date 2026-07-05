@@ -17,7 +17,7 @@ import { getMe, resendVerification } from "../api/auth";
  * Dashboard so the banners look and behave identically.
  */
 export function AccountNudges() {
-  const { t } = useTranslation(["dashboard", "common"]);
+  const { t, i18n } = useTranslation(["dashboard", "common"]);
   const navigate = useNavigate();
   const [me, setMe] = useState<Awaited<ReturnType<typeof getMe>> | null>(null);
   const [trialDismissed, setTrialDismissed] = useState(false);
@@ -54,7 +54,7 @@ export function AccountNudges() {
     const dismissKey = `trial-banner-dismissed-${trialEnd.toISOString().slice(0, 10)}`;
     const wasDismissed = trialDismissed || localStorage.getItem(dismissKey) === "true";
     if (wasDismissed && !endingSoon) return null;
-    const formattedDate = trialEnd.toLocaleDateString(undefined, {
+    const formattedDate = trialEnd.toLocaleDateString(i18n.language, {
       day: "numeric",
       month: "short",
       year: "numeric",

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import i18n from "../i18n";
 
 import {
   DiscoveryConfidence,
@@ -872,5 +873,5 @@ function BreakdownRenderer({ q, minN }: { q: QuestionAnalytics; minN: number }) 
 function formatDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString(i18n.language, { month: "short", day: "numeric", year: "numeric" });
 }

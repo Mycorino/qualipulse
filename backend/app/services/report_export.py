@@ -192,7 +192,12 @@ def render_analysis_report_html(
     ``include_appendix=False`` is the public-share variant: the participant
     roster (demographics + quality labels) is stripped.
     """
-    lang = "fr" if (project.language or "en").lower().startswith("fr") else "en"
+    # The analysis body is written in the owning company's preferred_language
+    # (services/analysis.py) — the report chrome must match the body, not the
+    # interview language, or an EN researcher running a FR study gets French
+    # labels around English analysis text.
+    company_lang = getattr(getattr(project, "company", None), "preferred_language", None)
+    lang = "fr" if (company_lang or project.language or "en").lower().startswith("fr") else "en"
     L = _STRINGS[lang]
 
     report = json.loads(analysis.report) if analysis.report else {}

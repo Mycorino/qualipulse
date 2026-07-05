@@ -106,5 +106,18 @@
         "contactAndComplaints": "Contact and Complaints"
       }
     }
-  }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Unable to connect to the server. Please check your internet connection and try again.",
+    "timeout": "The request timed out. Please try again.",
+    "badRequest": "Invalid request. Please check your input and try again.",
+    "unauthorized": "Invalid credentials. Please try again.",
+    "forbidden": "You don't have permission to do this.",
+    "conflict": "This resource already exists.",
+    "validation": "Please check all fields are filled in correctly.",
+    "rateLimited": "Too many attempts. Please wait a moment and try again.",
+    "serverUnavailable": "Our servers are temporarily unavailable. Please try again in a few moments."
+  },
+  "retry": "Retry"
 }

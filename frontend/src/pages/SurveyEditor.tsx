@@ -622,8 +622,8 @@ function QuestionCoachPanel({
               className={`survey-q-editor__guardrail survey-q-editor__guardrail--${flag.tone}`}
               style={{ padding: "var(--space-3)" }}
             >
-              <div style={{ fontWeight: 600 }}>{flag.label}</div>
-              <div style={{ marginTop: 4, fontSize: "var(--text-xs)" }}>{flag.detail}</div>
+              <div style={{ fontWeight: 600 }}>{t(`editor.coach.flags.${flag.code}.label`, { defaultValue: flag.label })}</div>
+              <div style={{ marginTop: 4, fontSize: "var(--text-xs)" }}>{t(`editor.coach.flags.${flag.code}.detail`, { defaultValue: flag.detail })}</div>
               {flag.suggested_replacement && (
                 <div
                   style={{

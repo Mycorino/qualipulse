@@ -26,7 +26,7 @@ interface LanguagePickerProps {
 }
 
 export default function LanguagePicker({ onChange, className, style }: LanguagePickerProps) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation("interview");
   const current = (i18n.language || "en").slice(0, 2);
   const value = SUPPORTED_LANGUAGES.includes(current as (typeof SUPPORTED_LANGUAGES)[number])
     ? current
@@ -51,7 +51,7 @@ export default function LanguagePicker({ onChange, className, style }: LanguageP
       <select
         value={value}
         onChange={handleChange}
-        aria-label="Choose your language"
+        aria-label={t("languagePicker.ariaLabel")}
         className="language-picker__select"
       >
         {SUPPORTED_LANGUAGES.map((lng) => (

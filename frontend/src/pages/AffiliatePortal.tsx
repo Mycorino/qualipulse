@@ -121,7 +121,7 @@ function AffiliateApply() {
             className="field-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Jane Doe"
+            placeholder={t("apply.namePlaceholder")}
             required
             disabled={loading}
             aria-label={t("apply.nameLabel")}
@@ -135,7 +135,7 @@ function AffiliateApply() {
             className="field-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="jane@example.com"
+            placeholder={t("apply.emailPlaceholder")}
             required
             disabled={loading}
             aria-label={t("apply.emailLabel")}
@@ -149,7 +149,7 @@ function AffiliateApply() {
             className="field-input"
             value={code}
             onChange={(e) => setCode(e.target.value.toLowerCase())}
-            placeholder="jane-doe"
+            placeholder={t("apply.codePlaceholder")}
             required
             disabled={loading}
             aria-label={t("apply.codeLabel")}
@@ -166,7 +166,7 @@ function AffiliateApply() {
             className="field-input"
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
-            placeholder="https://yourwebsite.com"
+            placeholder={t("apply.websitePlaceholder")}
             disabled={loading}
             aria-label={t("apply.websiteLabel")}
           />
@@ -251,7 +251,7 @@ function AffiliateLogin() {
             className="field-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="jane@example.com"
+            placeholder={t("apply.emailPlaceholder")}
             required
             disabled={loading}
             aria-label={t("login.emailLabel")}
@@ -263,7 +263,7 @@ function AffiliateLogin() {
             className="field-input"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="jane-doe"
+            placeholder={t("apply.codePlaceholder")}
             required
             disabled={loading}
             aria-label={t("login.codeLabel")}

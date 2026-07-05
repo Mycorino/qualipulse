@@ -3,22 +3,40 @@
     "hero": {
       "eyebrow": "Design system · Sprint 1",
       "title": "La voix éditoriale de la recherche mixte",
-      "subtitle": "Trois primitives pour la surface quanti — une ChartCard qui impose la discipline « résultat avant graphique », une VerbatimCard qui associe les citations à un extrait audio optionnel, et une MethodologyBox qui ancre chaque rapport dans une notation d'échantillon crédible."
+      "subtitle": "Trois primitives pour la surface quanti — une ChartCard qui impose la discipline « résultat avant graphique », une VerbatimCard qui associe les citations à un extrait audio optionnel, et une MethodologyBox qui ancre chaque rapport dans une notation d'échantillon crédible."
     },
     "methodology": {
       "meta": "Obligatoire en tête de chaque rapport partagé. Variante détaillée en annexe.",
       "fields": {
-        "sampleSize": { "label": "Taille d'échantillon", "value": "n=247 répondants complets" },
-        "fieldingWindow": { "label": "Période de terrain", "value": "14 avr. – 02 mai 2026" },
-        "method": { "label": "Méthode", "value": "Mixte (questionnaire + 18 entretiens)" },
-        "segments": { "label": "Segments", "value": "Rôle · Taille d'entreprise · Région" },
-        "marginOfError": { "label": "Marge d'erreur", "value": "±5,4 pts à 95 % de confiance" },
-        "sampling": { "label": "Échantillonnage", "value": "Quota panel stratifié" }
+        "sampleSize": {
+          "label": "Taille d'échantillon",
+          "value": "n=247 répondants complets"
+        },
+        "fieldingWindow": {
+          "label": "Période de terrain",
+          "value": "14 avr. – 02 mai 2026"
+        },
+        "method": {
+          "label": "Méthode",
+          "value": "Mixte (questionnaire + 18 entretiens)"
+        },
+        "segments": {
+          "label": "Segments",
+          "value": "Rôle · Taille d'entreprise · Région"
+        },
+        "marginOfError": {
+          "label": "Marge d'erreur",
+          "value": "±5,4 pts à 95 % de confiance"
+        },
+        "sampling": {
+          "label": "Échantillonnage",
+          "value": "Quota panel stratifié"
+        }
       },
-      "note": "Pondéré pour refléter la composition PM/chercheurs du SaaS B2B par taille d'entreprise et région. Les effectifs bruts sont affichés à côté des pourcentages pondérés tout au long. Les segments sous n=30 sont rapportés en effectifs seuls."
+      "note": "Pondéré pour refléter la composition PM/chercheurs du SaaS B2B par taille d'entreprise et région. Les effectifs bruts sont affichés à côté des pourcentages pondérés tout au long du rapport. Les segments sous n=30 sont rapportés en effectifs seuls."
     },
     "chartCard": {
-      "meta": "Surtitre → résultat en serif → emplacement graphique → pied de page avec notation d'échantillon. Sous n=30, un avertissement « indicatif seulement » apparaît automatiquement.",
+      "meta": "Surtitre → résultat en serif → emplacement graphique → pied de page avec notation d'échantillon. Sous n=30, un avertissement « indicatif seulement » apparaît automatiquement.",
       "likert": {
         "eyebrow": "Likert · Q3",
         "takeaway": "Les détracteurs citent les frictions d'intégration 3× plus souvent que les promoteurs."
@@ -51,29 +69,29 @@
     },
     "verbatim": {
       "meta": "Citation mise en avant avec lecture audio optionnelle. Par défaut, attribution au segment seul (priorité à la confidentialité) — les noms n'apparaissent que si les participants ont consenti à être identifiés.",
-      "q1": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin.",
+      "q1": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin.",
       "q2": "Le format d'entretien semblait étonnamment naturel. J'ai oublié que c'était une IA dès la deuxième question.",
       "q3": "Ce que je veux, c'est moins d'outils, pas plus de fonctionnalités. Chaque nouveau tableau de bord est un onglet de plus que je n'ouvrirai jamais.",
-      "q4": "Honnêtement ? J'ai juste besoin que ce soit rapide. Tout le reste est négociable."
+      "q4": "Honnêtement ? J'ai juste besoin que ce soit rapide. Tout le reste est négociable."
     },
     "statHero": {
-      "meta": "Le motif de page pour les associations « chiffre + voix » — 60/40, chiffre à gauche, citation à droite. Un seul chiffre par bloc. La forme d'onde dans la citation est l'interaction signature.",
+      "meta": "Le motif de page pour les associations « chiffre + voix » — 60/40, chiffre à gauche, citation à droite. Un seul chiffre par bloc. La forme d'onde dans la citation est l'interaction signature.",
       "onboarding": {
         "eyebrow": "Intégration · Q2",
         "description": "des nouveaux utilisateurs abandonnent l'intégration avant d'atteindre la troisième étape.",
-        "meta": "n=247 · IC 95 % ±5,4 pts · 14 avr. – 02 mai 2026",
-        "quote": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin."
+        "meta": "n=247 · IC 95 % ±5,4 pts · 14 avr. – 02 mai 2026",
+        "quote": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin."
       },
       "recommendation": {
         "eyebrow": "Recommandation · Q7",
         "description": "Net Promoter Score sur l'ensemble des réponses complètes — les promoteurs l'emportent sur les détracteurs, mais un segment virulent se forme.",
-        "meta": "n=247 · 47 % promoteurs · 22 % détracteurs",
+        "meta": "n=247 · 47 % promoteurs · 22 % détracteurs",
         "quote": "Franchement, je le recommanderais dès demain si l'analyse prenait deux fois moins de temps. Pour l'instant c'est un 7 — ça pourrait être un 9."
       }
     },
     "audioClip": {
       "title": "AudioClip — variante forme d'onde",
-      "metaPart1": "Forme d'onde procédurale teintée avec la palette de visualisation. Les barres pleines suivent la lecture ; la forme est déterministe par",
+      "metaPart1": "Forme d'onde procédurale teintée avec la palette de visualisation. Les barres pleines suivent la lecture ; la forme est déterministe par",
       "metaPart2": ", si bien que chaque extrait paraît distinct sans décodage audio réel. Le vrai décodage Web Audio viendra plus tard.",
       "demo1": "Démo forme d'onde 1",
       "demo2": "Démo forme d'onde 2",
@@ -81,7 +99,7 @@
       "barVariant": "Variante en barres pour comparaison"
     },
     "compareChips": {
-      "meta": "Filtre de segments multi-sélection, groupé par dimension. L'état actif est rempli de la couleur de marque ; « Tous » réinitialise une dimension. Sélection :",
+      "meta": "Filtre de segments multi-sélection, groupé par dimension. L'état actif est rempli de la couleur de marque ; « Tous » réinitialise une dimension. Sélection :",
       "dimensions": {
         "role": "Rôle",
         "region": "Région",
@@ -134,67 +152,79 @@
       "verbatim": "Le produit est excellent. C'est la page tarifs qui a presque fait capoter la vente."
     },
     "questionType": {
-      "meta": "Tuile sélectionnable pour choisir un type de question. Chacune porte des badges de garde-fous méthodologiques : dès le choix, l'utilisateur voit que nous randomiserons l'ordre, équilibrerons les échelles et insérerons des contrôles d'attention. Les types v2 affichent une pastille « Bientôt disponible ».",
+      "meta": "Tuile sélectionnable pour choisir un type de question. Chacune porte des badges de garde-fous méthodologiques : dès le choix, l'utilisateur voit que nous randomiserons l'ordre, équilibrerons les échelles et insérerons des contrôles d'attention. Les types v2 affichent une pastille « Bientôt disponible ».",
       "likert": {
         "name": "Likert · 5 points",
         "description": "Mesurer l'accord sur une échelle équilibrée.",
-        "bestFor": "Idéal pour : opinions, énoncés d'accord",
-        "guardrails": { "balanced": "Auto-équilibré", "randomized": "Ordre randomisé" }
+        "bestFor": "Idéal pour : opinions, énoncés d'accord",
+        "guardrails": {
+          "balanced": "Auto-équilibré",
+          "randomized": "Ordre randomisé"
+        }
       },
       "multiChoice": {
         "name": "Choix multiple",
         "description": "Choisir une ou plusieurs options dans une liste.",
-        "bestFor": "Idéal pour : demandes de fonctionnalités, comportements",
-        "guardrails": { "randomized": "Ordre randomisé", "anchor": "Ancres prises en charge" }
+        "bestFor": "Idéal pour : demandes de fonctionnalités, comportements",
+        "guardrails": {
+          "randomized": "Ordre randomisé",
+          "anchor": "Ancres prises en charge"
+        }
       },
       "nps": {
         "name": "Net Promoter Score",
         "description": "Échelle de recommandation validée de 0 à 10.",
-        "bestFor": "Idéal pour : suivre la recommandation dans le temps",
-        "guardrails": { "standard": "Standard 0–10", "locked": "Ancres verrouillées" }
+        "bestFor": "Idéal pour : suivre la recommandation dans le temps",
+        "guardrails": {
+          "standard": "Standard 0–10",
+          "locked": "Ancres verrouillées"
+        }
       },
       "openText": {
         "name": "Texte libre",
         "description": "Réponses libres, regroupées en thèmes par l'IA.",
-        "bestFor": "Idéal pour : « une chose que nous pourrions changer »",
-        "guardrails": { "clustered": "Regroupé par IA", "maxChars": "500 caractères max." }
+        "bestFor": "Idéal pour : « une chose que nous pourrions changer »",
+        "guardrails": {
+          "clustered": "Regroupé par IA",
+          "maxChars": "500 caractères max."
+        }
       },
       "maxDiff": {
         "name": "MaxDiff",
-        "description": "Classer par contrainte les arbitrages entre attributs.",
-        "bestFor": "Idéal pour : priorisation de fonctionnalités à grande échelle"
+        "description": "Classement forcé des arbitrages entre attributs.",
+        "bestFor": "Idéal pour : priorisation de fonctionnalités à grande échelle"
       },
       "conjoint": {
         "name": "Analyse conjointe",
         "description": "Décomposer les préférences en utilités d'attributs.",
-        "bestFor": "Idéal pour : recherche tarifaire et packaging"
+        "bestFor": "Idéal pour : recherche tarifaire et packaging"
       }
     },
     "surveyEditor": {
-      "meta": "La surface d'édition de la question en cours de construction. Les configurations propres à chaque type vivent dans une coquille partagée. Des garde-fous en temps réel signalent les questions à double barillet et les formulations orientées au fil de la saisie — essayez d'écrire « Êtes-vous satisfait de la vitesse et de la fiabilité ? » ou « Adorez-vous notre produit ? » pour les voir se déclencher.",
+      "meta": "La surface d'édition de la question en cours de construction. Les configurations propres à chaque type vivent dans une coquille partagée. Des garde-fous en temps réel signalent les questions doubles et les formulations orientées au fil de la saisie — essayez d'écrire « Êtes-vous satisfait de la vitesse et de la fiabilité ? » ou « Adorez-vous notre produit ? » pour les voir se déclencher.",
       "prompts": {
-        "likert": "Êtes-vous satisfait de la vitesse et de la fiabilité du pipeline d'analyse ?",
-        "multiChoice": "Lequel des éléments suivants améliorerait le plus votre flux de travail ?",
-        "nps": "Quelle est la probabilité que vous nous recommandiez à un ami ou un collègue ?",
-        "openText": "Quelle est la seule chose que nous pourrions changer pour vous faciliter la vie ?"
+        "likert": "Êtes-vous satisfait de la vitesse et de la fiabilité du pipeline d'analyse ?",
+        "multiChoice": "Lequel des éléments suivants améliorerait le plus votre flux de travail ?",
+        "nps": "Quelle est la probabilité que vous nous recommandiez à un ami ou un collègue ?",
+        "openText": "Quelle est la seule chose que nous pourrions changer pour vous faciliter la vie ?"
       }
     },
     "screenerBridge": {
-      "meta": "Le levier — conversion questionnaire vers entretien. Les répondants filtrés du questionnaire sont invités en un clic à un entretien vocal IA de 10 minutes. Le coût en crédits est affiché d'emblée ; les crédits ne sont débités que lorsqu'un entretien aboutit réellement.",
-      "detractors": "« Détracteurs utilisant le mobile au quotidien » — Rôle : PM, Région : Amérique du Nord, NPS ≤ 6",
-      "promoters": "« Promoteurs dans des entreprises de 500+ employés » — NPS ≥ 9, Taille d'entreprise ≥ 500"
+      "meta": "Le levier — conversion questionnaire vers entretien. Les répondants filtrés du questionnaire sont invités en un clic à un entretien vocal IA de 10 minutes. Le coût en crédits est affiché d'emblée ; les crédits ne sont débités que lorsqu'un entretien aboutit réellement.",
+      "detractors": "« Détracteurs utilisant le mobile au quotidien » — Rôle : PM, Région : Amérique du Nord, NPS ≤ 6",
+      "promoters": "« Promoteurs dans des entreprises de 500+ employés » — NPS ≥ 9, Taille d'entreprise ≥ 500"
     },
     "findingCard": {
-      "meta": "Le motif de page à titre d'action façon MBB pour le rapport mixte. Titre d'action en serif (style thèse, jamais « Thème : X »), ligne de preuves, ligne d'implication « Et alors ? », pastille de confiance et note d'échantillon. Trois variantes de mise en page selon la composition.",
+      "meta": "Le motif de page « titre-action » façon MBB pour le rapport mixte. Titre d'action en serif (style thèse, jamais « Thème : X »), ligne de preuves, ligne d'implication « Et alors ? », pastille de confiance et note d'échantillon. Trois variantes de mise en page selon la composition.",
       "f03": {
         "index": "Résultat 03 sur 07",
-        "actionTitle": "Les déficits de confiance nous coûtent 30 % des nouveaux utilisateurs — à cause du paiement, pas des tarifs.",
-        "context": "Les détracteurs partis durant leur premier mois ont systématiquement pointé le tunnel de paiement comme opaque — même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc ; le paiement, non.",
+        "actionTitle": "Les déficits de confiance nous coûtent 30 % des nouveaux utilisateurs — à cause du paiement, pas des tarifs.",
+        "context": "Les détracteurs partis durant leur premier mois ont systématiquement pointé le tunnel de paiement comme opaque — même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc ; le paiement, non.",
         "evidenceEyebrow": "Likert · Q3 — Clarté du paiement",
         "evidenceTakeaway": "Les détracteurs jugent le paiement 3× plus confus que les promoteurs, et 2× plus confus que les tarifs.",
         "verbatim1": "La page tarifs avait du sens. Le paiement m'a demandé des choses auxquelles je ne m'attendais pas — c'est là que j'ai abandonné.",
         "verbatim2": "J'ai vraiment cru qu'on me facturait deux fois. Les lignes ne correspondent pas à ce qui est sur la page tarifs.",
-        "implication": "Réorganiser le paiement pour qu'il reflète la page tarifs ligne par ligne. Le texte tarifaire instaure la confiance ; le paiement défait ce travail en 30 secondes.",
+        "implication": "Réorganiser le paiement pour qu'il reflète la page tarifs ligne par ligne. Le texte tarifaire instaure la confiance ; le paiement défait ce travail en 30 secondes.",
         "sampleNote": "n=247 questionnaire · 18 entretiens de suivi · 4 segments"
       },
       "f04": {
@@ -209,7 +239,7 @@
           "recruitingPanel": "Panel de recrutement"
         },
         "verbatim": "Si vous m'enleviez l'analyse, je résilierais. Les entretiens sont sympas mais je peux en faire n'importe où.",
-        "implication": "Mettre le rapport en avant sur le site marketing, pas l'entretien. L'entretien est la tuyauterie ; le rapport est ce pour quoi on paie.",
+        "implication": "Mettre le rapport en avant sur le site marketing, pas l'entretien. L'entretien est la tuyauterie ; le rapport est ce pour quoi on paie.",
         "sampleNote": "n=89 promoteurs · 6 entretiens de renouvellement"
       },
       "f05": {
@@ -246,7 +276,7 @@
       },
       "q4": {
         "label": "Besoin faible · Solution élevée",
-        "quote": "C'est un plus, mais notre équipe utilise des docs Notion et ça couvre 80 % du besoin."
+        "quote": "C'est un plus, mais notre équipe utilise des docs Notion et ça couvre 80 % du besoin."
       }
     },
     "crossTab": {
@@ -265,9 +295,9 @@
         "aiAccuracy": "Précision de l'IA",
         "mobileParity": "Parité mobile"
       },
-      "note": "La colonne Designers affiche des effectifs car n=12 est sous le seuil d'inférence (n≥30). Les thèmes sont regroupés par IA à partir des réponses en texte libre ; les cellules montrent le % du segment ayant mentionné le thème."
+      "note": "La colonne Designers affiche des effectifs car n=12 est sous le seuil d'inférence (n≥30). Les thèmes sont regroupés par IA à partir des réponses en texte libre ; les cellules montrent le % du segment ayant mentionné le thème."
     },
-    "footer": "Sprint 1 + 2 + 3 + 4 — extension du design system pour le chantier quanti. 13 nouveaux composants : ChartCard, VerbatimCard, MethodologyBox, StatHero, CompareChips, DashboardShell, DashboardStrip, QuestionTypeCard, SurveyQuestionEditor, ScreenerBridge, FindingCard, Segment2x2, CrossTabTable, ainsi qu'une variante forme d'onde sur la primitive AudioClip existante. Sprint 5 ensuite : mise en page scrollytelling du rapport + feuille de style d'impression + PrioritizationMatrix.",
+    "footer": "Sprint 1 + 2 + 3 + 4 — extension du design system pour le chantier quanti. 13 nouveaux composants : ChartCard, VerbatimCard, MethodologyBox, StatHero, CompareChips, DashboardShell, DashboardStrip, QuestionTypeCard, SurveyQuestionEditor, ScreenerBridge, FindingCard, Segment2x2, CrossTabTable, ainsi qu'une variante forme d'onde sur la primitive AudioClip existante. Sprint 5 ensuite : mise en page scrollytelling du rapport + feuille de style d'impression + PrioritizationMatrix.",
     "charts": {
       "likert": {
         "stronglyDisagree": "Pas du tout d'accord",
@@ -275,9 +305,9 @@
         "neutral": "Neutre",
         "agree": "D'accord",
         "stronglyAgree": "Tout à fait d'accord",
-        "disagreeFooter": "{{pct}} % pas d'accord",
-        "neutralFooter": "{{pct}} % neutres",
-        "agreeFooter": "{{pct}} % d'accord"
+        "disagreeFooter": "{{pct}} % pas d'accord",
+        "neutralFooter": "{{pct}} % neutres",
+        "agreeFooter": "{{pct}} % d'accord"
       },
       "nps": {
         "scoreLabel": "Score NPS",
@@ -320,50 +350,72 @@
     },
     "methodology": {
       "fields": {
-        "sampleSize": { "label": "Taille d'échantillon", "value": "n=247 répondants complets" },
-        "fieldingWindow": { "label": "Période de terrain", "value": "14 avr. – 02 mai 2026" },
-        "method": { "label": "Méthode", "value": "Mixte (questionnaire + 18 entretiens)" },
-        "segments": { "label": "Segments", "value": "Rôle · Taille d'entreprise · Région" },
-        "marginOfError": { "label": "Marge d'erreur", "value": "±5,4 pts à 95 % de confiance" },
-        "sampling": { "label": "Échantillonnage", "value": "Quota panel stratifié" }
+        "sampleSize": {
+          "label": "Taille d'échantillon",
+          "value": "n=247 répondants complets"
+        },
+        "fieldingWindow": {
+          "label": "Période de terrain",
+          "value": "14 avr. – 02 mai 2026"
+        },
+        "method": {
+          "label": "Méthode",
+          "value": "Mixte (questionnaire + 18 entretiens)"
+        },
+        "segments": {
+          "label": "Segments",
+          "value": "Rôle · Taille d'entreprise · Région"
+        },
+        "marginOfError": {
+          "label": "Marge d'erreur",
+          "value": "±5,4 pts à 95 % de confiance"
+        },
+        "sampling": {
+          "label": "Échantillonnage",
+          "value": "Quota panel stratifié"
+        }
       },
-      "note": "Pondéré pour refléter la composition PM / chercheurs du SaaS B2B par taille d'entreprise et région. Les effectifs bruts sont affichés à côté des pourcentages pondérés tout au long. Les segments sous n=30 sont rapportés en effectifs seuls."
+      "note": "Pondéré pour refléter la composition PM / chercheurs du SaaS B2B par taille d'entreprise et région. Les effectifs bruts sont affichés à côté des pourcentages pondérés tout au long du rapport. Les segments sous n=30 sont rapportés en effectifs seuls."
     },
     "executiveSummary": {
       "headline": "Trois choses — le paiement comble le déficit de confiance, le rapport IA porte le renouvellement, les designers sont peut-être un ICP à part.",
       "subheadline": "Si nous livrons un seul changement avant la fin du trimestre, c'est le paiement. Les deux autres sont des signaux sur lesquels agir, pas des engagements.",
       "thought1": {
-        "thesis": "Les déficits de confiance coûtent 30 % des nouveaux utilisateurs — et la cause est le paiement, pas la page tarifs.",
-        "elaboration": "Les détracteurs partis ont systématiquement pointé le paiement comme opaque, même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc sur tous les segments ; le paiement, non. Réordonner les lignes pour refléter les tarifs permettrait de récupérer environ 18 à 22 % de l'attrition du premier mois.",
+        "thesis": "Les déficits de confiance coûtent 30 % des nouveaux utilisateurs — et la cause est le paiement, pas la page tarifs.",
+        "elaboration": "Les détracteurs partis ont systématiquement pointé le paiement comme opaque, même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc sur tous les segments ; le paiement, non. Réordonner les lignes pour refléter les tarifs permettrait de récupérer environ 18 à 22 % de l'attrition du premier mois.",
         "findingRef": "Résultat 03"
       },
       "thought2": {
         "thesis": "Les promoteurs renouvellent à cause du rapport de synthèse IA — pas à cause de l'outil d'entretien.",
-        "elaboration": "Quand on leur demande ce qu'ils résilieraient en dernier, les promoteurs citent le rapport 2× plus souvent que la surface d'entretien. Mettons le rapport en avant sur le site marketing ; les entretiens sont la tuyauterie, payée via l'analyse.",
+        "elaboration": "Quand on leur demande ce qu'ils résilieraient en dernier, les promoteurs citent le rapport 2× plus souvent que la surface d'entretien. Mettons le rapport en avant sur le site marketing ; les entretiens sont la tuyauterie, payée via l'analyse.",
         "findingRef": "Résultat 04"
       },
       "thought3": {
         "thesis": "Les designers sont peut-être un ICP à part — mais l'échantillon est trop mince pour s'engager.",
-        "elaboration": "Les designers (n=12) déclarent un cas d'usage principal différent (test de concept, pas recherche client). Le signal est intéressant mais pas encore exploitable ; nous recommandons un questionnaire de 30 répondants designers avant tout travail produit.",
+        "elaboration": "Les designers (n=12) déclarent un cas d'usage principal différent (test de concept, pas recherche client). Le signal est intéressant mais pas encore exploitable ; nous recommandons un questionnaire de 30 répondants designers avant tout travail produit.",
         "findingRef": "Résultat 05"
       },
-      "author": { "name": "Camille Dubois", "role": "Chercheuse senior", "date": "06 mai 2026" }
+      "author": {
+        "name": "Camille Dubois",
+        "role": "Chercheuse senior",
+        "date": "06 mai 2026"
+      }
     },
     "headlineStat": {
       "eyebrow": "Intégration · Q2",
       "description": "des nouveaux utilisateurs abandonnent le parcours d'intégration avant d'atteindre la troisième étape.",
-      "meta": "n=247 · IC 95 % ±5,4 pts",
-      "quote": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin."
+      "meta": "n=247 · IC 95 % ±5,4 pts",
+      "quote": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin."
     },
     "finding03": {
       "index": "Résultat 03 sur 07",
-      "actionTitle": "Les déficits de confiance nous coûtent 30 % des nouveaux utilisateurs — à cause du paiement, pas des tarifs.",
-      "context": "Les détracteurs partis durant leur premier mois ont systématiquement pointé le paiement comme opaque — même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc ; le paiement, non.",
+      "actionTitle": "Les déficits de confiance nous coûtent 30 % des nouveaux utilisateurs — à cause du paiement, pas des tarifs.",
+      "context": "Les détracteurs partis durant leur premier mois ont systématiquement pointé le paiement comme opaque — même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc ; le paiement, non.",
       "evidenceEyebrow": "Likert · Q3 — Clarté du paiement",
       "evidenceTakeaway": "Les détracteurs jugent le paiement 3× plus confus que les promoteurs.",
       "verbatim1": "La page tarifs avait du sens. Le paiement m'a demandé des choses auxquelles je ne m'attendais pas — c'est là que j'ai abandonné.",
       "verbatim2": "J'ai vraiment cru qu'on me facturait deux fois. Les lignes ne correspondent pas à ce qui est sur la page tarifs.",
-      "implication": "Réorganiser le paiement pour qu'il reflète la page tarifs ligne par ligne. Le texte tarifaire instaure la confiance ; le paiement défait ce travail en 30 secondes.",
+      "implication": "Réorganiser le paiement pour qu'il reflète la page tarifs ligne par ligne. Le texte tarifaire instaure la confiance ; le paiement défait ce travail en 30 secondes.",
       "sampleNote": "n=247 questionnaire · 18 entretiens de suivi · 4 segments"
     },
     "finding04": {
@@ -378,7 +430,7 @@
         "recruitingPanel": "Panel de recrutement"
       },
       "verbatim": "Si vous m'enleviez l'analyse, je résilierais. Les entretiens sont sympas mais je peux en faire n'importe où.",
-      "implication": "Mettre le rapport en avant sur le site marketing, pas l'entretien. L'entretien est la tuyauterie ; le rapport est ce pour quoi on paie.",
+      "implication": "Mettre le rapport en avant sur le site marketing, pas l'entretien. L'entretien est la tuyauterie ; le rapport est ce pour quoi on paie.",
       "sampleNote": "n=89 promoteurs · 6 entretiens de renouvellement"
     },
     "segmentMatrix": {
@@ -398,7 +450,7 @@
       },
       "q4": {
         "label": "Besoin faible · Solution élevée",
-        "quote": "C'est un plus, mais notre équipe utilise des docs Notion et ça couvre 80 % du besoin."
+        "quote": "C'est un plus, mais notre équipe utilise des docs Notion et ça couvre 80 % du besoin."
       }
     },
     "crossTab": {
@@ -421,7 +473,7 @@
     "prioritization": {
       "rec1": "Aligner les lignes du paiement sur la page tarifs",
       "rec2": "Mettre la démo du rapport IA en tête de la page d'accueil",
-      "rec3": "Ajouter un explicatif « offre équipe » en ligne dans l'inscription",
+      "rec3": "Ajouter un explicatif « offre équipe » en ligne dans l'inscription",
       "rec4": "Vague de questionnaire ciblée designers (n=30)",
       "rec5": "Reconstruire le pipeline d'export pour les chercheurs",
       "rec6": "Parité mobile pour la revue des transcriptions",
@@ -433,9 +485,9 @@
     },
     "charts": {
       "likert": {
-        "disagreeFooter": "{{pct}} % pas d'accord",
-        "neutralFooter": "{{pct}} % neutres",
-        "agreeFooter": "{{pct}} % d'accord"
+        "disagreeFooter": "{{pct}} % pas d'accord",
+        "neutralFooter": "{{pct}} % neutres",
+        "agreeFooter": "{{pct}} % d'accord"
       }
     }
   }

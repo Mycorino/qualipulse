@@ -1,16 +1,16 @@
 {
   "skip": "Passer pour le moment",
-  "verify_banner": "Pensez à vérifier votre adresse email quand vous avez un moment — regardez votre boîte de réception.",
+  "verify_banner": "Pensez à vérifier votre adresse email quand vous avez un moment — le lien vous attend dans votre boîte de réception.",
   "verify_resend": "Renvoyer",
-  "greeting": "Bonjour {{firstName}} — je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planning et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager — et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : quelle est la chose la plus importante que vous avez besoin d'apprendre sur vos utilisateurs en ce moment ?",
-  "greeting_post_wizard": "Bienvenue, {{firstName}} — c'est noté. Vous êtes {{role}}, focus sur {{useCase}}.\n\nMaintenant, rédigeons votre première étude. Quelle décision repose sur cette recherche ?",
-  "goal_suggestions_label": "Ou choisissez un point de départ :",
+  "greeting": "Bonjour {{firstName}} — je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planification et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager — et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : qu'avez-vous le plus besoin d'apprendre sur vos utilisateurs en ce moment ?",
+  "greeting_post_wizard": "Bienvenue, {{firstName}} — c'est noté. Vous êtes {{role}}, avec pour priorité {{useCase}}.\n\nMaintenant, rédigeons votre première étude. Quelle décision repose sur cette recherche ?",
+  "goal_suggestions_label": "Ou choisissez un point de départ :",
   "goal_suggestions": [
-    "Pourquoi les utilisateurs en essai partent",
+    "Pourquoi les utilisateurs en essai abandonnent",
     "Tester un nouveau parcours d'onboarding",
     "Comprendre une nouvelle audience"
   ],
-  "see_sample_link": "Ou voir d'abord à quoi ressemble une étude finie →",
+  "see_sample_link": "Ou voir d'abord à quoi ressemble une étude terminée →",
   "phase": {
     "profile": "Parlez-moi de votre travail",
     "frame": "Cadrez votre étude",
@@ -29,9 +29,9 @@
     "company": "Entreprise",
     "name": "Vous",
     "business_summary_label": "Activité",
-    "empty_hint": "Je remplirai au fur et à mesure — votre rôle, ce que vous cherchez à apprendre, sur qui."
+    "empty_hint": "Je compléterai au fil de la conversation — votre rôle, ce que vous cherchez à apprendre, et auprès de qui."
   },
-  "input_placeholder": "Dites au copilot ce que vous voulez apprendre…",
+  "input_placeholder": "Dites au Copilot ce que vous voulez apprendre…",
   "send": "Envoyer",
   "thinking_fallback": "Rédaction…",
   "setting_up": "Préparation de votre étude…",
@@ -80,13 +80,13 @@
     "cta_take_interview_hint": "90 secondes — écoutez le Copilot poser ses questions et s'adapter",
     "cta_copy_link": "Copier le lien à partager",
     "cta_open_study": "Ouvrir votre étude →",
-    "plan_hint": "Les équipes comme la vôtre commencent souvent sur <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — passez au plan quand QualiPulse aura fait ses preuves.",
+    "plan_hint": "Les équipes comme la vôtre démarrent souvent avec <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — franchissez le pas quand QualiPulse aura fait ses preuves.",
     "cta_upgrade": "Passer à {{plan}} →"
   },
   "verify_modal": {
     "eyebrow": "Un petit détail",
-    "title": "Souhaitez-vous un récapitulatif de cette conversation par email ?",
-    "body": "Nous vous enverrons aussi un email dès que votre première réponse arrivera — pour ne pas avoir à revenir vérifier. Vérifiez votre adresse et c'est fait.",
+    "title": "Souhaitez-vous un récapitulatif de cette conversation par email ?",
+    "body": "Nous vous enverrons aussi un email dès que votre première réponse arrivera — pas besoin de revenir vérifier. Confirmez votre adresse et c'est réglé.",
     "accept": "Oui, envoyer le lien de vérification",
     "dismiss": "Plus tard"
   },
@@ -110,9 +110,9 @@
           "q1_section": "CONTEXTE",
           "q1_question": "Racontez-moi ce que vous essayiez de faire la première fois que vous vous êtes connecté·e.",
           "q2_section": "MOMENT D'ABANDON",
-          "q2_question": "Y a-t-il eu un moment où vous vous êtes dit « ce n'est pas pour moi maintenant » ? Parlez-moi de ça.",
+          "q2_question": "Y a-t-il eu un moment où vous vous êtes dit « ce n'est pas pour moi maintenant » ? Parlez-moi de ça.",
           "q3_section": "CE QUI AURAIT AIDÉ",
-          "q3_question": "Si vous aviez pu sauter une étape, laquelle ?"
+          "q3_question": "Si vous aviez pu sauter une étape, laquelle ?"
         },
         "themes": [
           {
@@ -122,7 +122,7 @@
             "speaker": "Maya, PM dans une SaaS de 40 personnes"
           },
           {
-            "title": "La première étude semblait à enjeu",
+            "title": "La première étude semblait à fort enjeu",
             "finding": "Les utilisateurs en essai décrivaient la première étude comme « leur seule chance ». Ils sur-éditaient le guide et ne l'envoyaient jamais.",
             "quote": "J'ai réécrit ces cinq questions sept fois. J'étais sûr que j'allais faire perdre du temps aux participants.",
             "speaker": "Jonas, fondateur, fintech B2B"
@@ -163,11 +163,11 @@
           "name": "Pourquoi les architectes choisissent une base de spécifications plutôt qu'une autre",
           "objective": "Comprendre le moment où l'architecte choisit la base produit en laquelle il a confiance, pour savoir quels signaux de crédibilité comptent vraiment.",
           "q1_section": "CONTEXTE",
-          "q1_question": "Racontez-moi le dernier projet où vous avez dû spécifier un produit que vous ne connaissiez pas. Qu'est-ce qui a déclenché ?",
+          "q1_question": "Racontez-moi le dernier projet où vous avez dû spécifier un produit que vous ne connaissiez pas. Quel a été le déclencheur ?",
           "q2_section": "MOMENT DE DÉCISION",
-          "q2_question": "Qu'est-ce qui vous a fait préférer une source plutôt qu'une autre en comparant ? Parlez-moi d'un moment précis.",
+          "q2_question": "Qu'est-ce qui vous a fait préférer une source plutôt qu'une autre au moment de comparer ? Parlez-moi d'un moment précis.",
           "q3_section": "CE QUI CASSE LE CHOIX",
-          "q3_question": "Quand avez-vous abandonné un produit que vous auriez sinon spécifié ? Pourquoi ?"
+          "q3_question": "Quand avez-vous abandonné un produit que vous auriez sinon spécifié ? Pourquoi ?"
         },
         "themes": [
           {
@@ -178,13 +178,13 @@
           },
           {
             "title": "BIM-ready ou pas spécifié",
-            "finding": "Si l'objet BIM ne se téléchargeait pas en moins d'une minute, le produit sortait du shortlist. La notoriété de la marque ne le sauvait pas.",
+            "finding": "Si l'objet BIM ne se téléchargeait pas en moins d'une minute, le produit sortait de la shortlist. La notoriété de la marque ne le sauvait pas.",
             "quote": "Je ne vais pas le modéliser moi-même. Si leur fichier Revit n'y est pas, je prends le concurrent dont le fichier y est.",
             "speaker": "Marc, BIM coordinator, agence design-build"
           },
           {
             "title": "Le service conformité du client a un droit de veto",
-            "finding": "Les architectes pré-filtrent sur les certifications parce que le service juridique tuera la spec en fin de course si manquant. Ils contournent les produits qui semblent risqués.",
+            "finding": "Les architectes pré-filtrent sur les certifications parce que le service juridique tuera la spec en fin de course s'il en manque une. Ils contournent les produits qui semblent risqués.",
             "quote": "J'ai appris à mes dépens — choisi le meilleur produit, la conformité l'a sorti au quatrième mois. Maintenant je trie par certification d'abord.",
             "speaker": "Sophie, architecte, marchés publics"
           }
@@ -216,20 +216,20 @@
       "consumer": {
         "example": {
           "name": "Pourquoi les nouveaux acheteurs abandonnent leur panier aux frais de port",
-          "objective": "Comprendre ce qui fait basculer l'acheteur de « intéressé » à « tant pis » dans les 60 dernières secondes du checkout, pour savoir quel frein retirer en premier.",
+          "objective": "Comprendre ce qui fait basculer l'acheteur d'« intéressé » à « tant pis » dans les 60 dernières secondes du checkout, pour savoir quel frein retirer en premier.",
           "q1_section": "CONTEXTE",
-          "q1_question": "Racontez-moi la dernière fois que vous avez mis quelque chose dans un panier sans acheter. Qu'est-ce que vous cherchiez à faire ?",
+          "q1_question": "Racontez-moi la dernière fois que vous avez mis quelque chose dans un panier sans acheter. Qu'est-ce que vous cherchiez à faire ?",
           "q2_section": "LE MOMENT DE BASCULE",
-          "q2_question": "À quel moment exact vous êtes-vous dit « en fait, non » ? Décrivez-moi la scène.",
+          "q2_question": "À quel moment exact vous êtes-vous dit « en fait, non » ? Décrivez-moi la scène.",
           "q3_section": "CE QUI AURAIT MARCHÉ",
-          "q3_question": "S'ils avaient fait une chose différemment, vous auriez acheté ? Laquelle ?"
+          "q3_question": "S'ils avaient fait une chose différemment, vous auriez acheté ? Laquelle ?"
         },
         "themes": [
           {
-            "title": "La surprise sur les frais de port, pas le montant",
-            "finding": "14 sur 25 ont abandonné non pas parce que les frais étaient élevés, mais parce qu'ils n'apparaissaient qu'à l'étape finale. Même 4,99 € semblait un piège quand révélé tard.",
+            "title": "C'est la surprise des frais de port qui tue, pas leur montant",
+            "finding": "14 sur 25 ont abandonné non pas parce que les frais étaient élevés, mais parce qu'ils n'apparaissaient qu'à l'étape finale. Même 4,99 € passaient pour un piège quand ils apparaissaient si tard.",
             "quote": "C'était pas les cinq euros. C'est que j'avais passé dix minutes à choisir et ils me l'avaient caché tout du long.",
-            "speaker": "Élise, jeune active, acheteuse en ligne mensuelle"
+            "speaker": "Élise, jeune active, achats en ligne mensuels"
           },
           {
             "title": "Création de compte = fermeture d'onglet",
@@ -239,9 +239,9 @@
           },
           {
             "title": "La confiance s'effondre sans moyens de paiement familiers",
-            "finding": "Les acheteurs attendent Apple Pay / PayPal comme sortie de secours quand la marque leur est inconnue. Leur absence = perception louche, pas juste inconfort.",
+            "finding": "Les acheteurs attendent Apple Pay / PayPal comme sortie de secours quand la marque leur est inconnue. Sans eux, la marque paraît louche — ce n'est pas un simple inconfort.",
             "quote": "Je ne les connaissais pas. S'ils ne prennent pas PayPal je me dis que ma CB part on ne sait où.",
-            "speaker": "Camille, premier achat suite à pub sociale"
+            "speaker": "Camille, premier achat après une pub sur les réseaux sociaux"
           }
         ],
         "quotes": [
@@ -279,9 +279,9 @@
     "modal_title_reveal": "Et voici ce que vous verrez après leur passage",
     "modal_body": "Nous allons vous poser une question rapide — exactement comme vos participants. Environ 30 secondes.",
     "modal_body_reveal": "Les vrais entretiens passent par la transcription, le surlignage automatique et le tagging. Imaginez 30 de ces réponses analysées ensemble.",
-    "question": "Bonjour {{firstName}} — petite question : parlez-moi du meilleur onboarding que vous avez vécu récemment, et de ce qui l'a rendu marquant ?",
+    "question": "Bonjour {{firstName}} — petite question : parlez-moi du meilleur onboarding que vous avez vécu récemment. Qu'est-ce qui l'a rendu marquant ?",
     "tap_to_speak": "Touchez pour parler",
-    "tap_to_stop": "Touchez quand fini",
+    "tap_to_stop": "Touchez quand vous avez terminé",
     "start_recording": "Commencer l'enregistrement",
     "stop_recording": "Arrêter l'enregistrement",
     "requesting_mic": "Demande d'accès au micro…",
@@ -289,7 +289,7 @@
     "try_again": "Réessayer",
     "skip_to_example": "Passer — montrez-moi l'exemple",
     "reveal_cta": "Compris — rédigeons mon étude →",
-    "auto_continue": "Compris, et le plan ?",
+    "auto_continue": "Compris, et le plan ?",
     "your_answer": "Votre réponse",
     "reveal_caption": "Les vraies études font émerger des dizaines de ces moments — les codes regroupent automatiquement les passages similaires entre participants.",
     "close": "Fermer",
@@ -299,18 +299,18 @@
     "canned_highlight": "guidé pour configurer mon premier projet en moins de deux minutes",
     "canned_code": "Moment de premier succès"
   },
-  "chat_error": "Désolé — je n'ai pas pu répondre à l'instant. Merci de réessayer.",
+  "chat_error": "Désolé — je n'ai pas réussi à répondre. Merci de réessayer.",
   "toast": {
     "resend_success": "Email de vérification envoyé.",
     "resend_error": "Impossible de renvoyer pour l'instant.",
     "verify_sent": "Envoyé — vérifiez votre boîte de réception pour activer les emails récapitulatifs.",
-    "link_copied": "Lien d'entretien copié dans votre presse-papier.",
+    "link_copied": "Lien d'entretien copié dans le presse-papiers.",
     "link_copy_failed": "Copie impossible — ouvrez votre étude pour récupérer le lien.",
     "no_link": "Le lien n'a pas pu être créé — ouvrez votre étude pour en configurer un.",
     "no_link_short": "Ouvrez votre étude pour configurer un lien d'entretien.",
     "study_setup_failed": "Impossible de préparer votre étude — merci de réessayer.",
     "skip_failed": "Une erreur est survenue — merci de réessayer.",
     "website_unreadable": "Impossible de lire ce site — essayez une autre URL.",
-    "upgrade_failed": "Impossible de démarrer le paiement — vous pourrez améliorer à tout moment depuis Facturation."
+    "upgrade_failed": "Impossible de démarrer le paiement — vous pourrez passer à une formule supérieure à tout moment depuis la page Facturation."
   }
 }

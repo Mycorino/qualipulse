@@ -199,7 +199,9 @@
     "shareLater": "I'll share later",
     "goToProject": "Go to project",
     "editingFieldAria": "Editing {{field}}. Press Enter to save or Escape to cancel.",
-    "tabPanelLabel": "{{tab}} panel"
+    "tabPanelLabel": "{{tab}} panel",
+    "loadingProject": "Loading project...",
+    "projectNotFound": "Project not found."
   },
   "tour": {
     "stepOf": "Step {{current}} of {{total}}",
@@ -453,7 +455,8 @@
     "translating": "Translating…",
     "translationFailed": "We couldn't translate this transcript. Please try again.",
     "tagTurn": "Tag turn",
-    "tagWholeTurn": "Tag the whole answer (precise selection unavailable in translated view)"
+    "tagWholeTurn": "Tag the whole answer (precise selection unavailable in translated view)",
+    "memoPlaceholder": "Research note..."
   },
   "transcript": {
     "title": "Transcript",
@@ -465,7 +468,8 @@
     "participant": "Participant",
     "tagQuote": "Tag quote",
     "qualityAssessment": "Quality assessment",
-    "runAssessment": "Run AI assessment"
+    "runAssessment": "Run AI assessment",
+    "discardContinue": "Discard & continue"
   },
   "coding": {
     "title": "Codebook",
@@ -474,5 +478,87 @@
     "noTags": "Select text in the transcript to tag a quote.",
     "deleteCode": "Delete code",
     "confirmDelete": "Delete this code? All its tags across transcripts will be removed."
+  },
+  "toasts": {
+    "shareLinkCopied": "Share link copied to clipboard ✓",
+    "shareLinkFailed": "Could not generate share link — make sure analysis is ready.",
+    "annotationRemoveFailed": "Failed to remove annotation",
+    "annotationSaveFailed": "Failed to save annotation",
+    "noteSaveFailed": "Failed to save note",
+    "contextSaveFailed": "Failed to save context",
+    "versionLoadFailed": "Failed to load version",
+    "linkUpdateFailed": "Failed to update link",
+    "linkGenerateFailed": "Failed to generate link",
+    "refineStartFailed": "Failed to start refined analysis",
+    "csvExportFailed": "Failed to export CSV",
+    "projectArchived": "Project archived",
+    "projectArchiveFailed": "Failed to archive project",
+    "transcriptSaveFailed": "Failed to save transcript edit",
+    "quoteTagFailed": "Failed to tag quote",
+    "codeCreateFailed": "Failed to create code",
+    "codeRenameFailed": "Failed to rename code",
+    "notesSaveFailed": "Failed to save notes",
+    "questionSaveFailed": "Failed to save question",
+    "reorderFailed": "Failed to reorder",
+    "questionUpdateFailed": "Failed to update question",
+    "memoSaveFailed": "Failed to save memo",
+    "memoUpdateFailed": "Failed to update memo",
+    "noReadyAnalysis": "No ready analysis available — generate one first.",
+    "screeningSaveFailed": "Failed to save screening questions",
+    "roundRenameFailed": "Couldn't rename the interview round",
+    "translationsRegenerating": "Regenerating translations — refresh in a few seconds",
+    "translationsRegenerateFailed": "Failed to regenerate translations",
+    "clipboardCopyFailed": "Could not copy to clipboard"
+  },
+  "confirms": {
+    "discardTranscript": "You have unsaved transcript changes. Discard them?",
+    "archiveProject": "Archive this project? You can restore it any time from the dashboard.",
+    "deleteCode": "Delete this code? All tagged quotes will also be removed.",
+    "deprecateQuestion": "There are interviews in progress. Deprecating will skip this question for new responses. Continue?",
+    "removeTag": "Remove \"{{name}}\" tag?"
+  },
+  "guideEmpty": {
+    "writeMyself": "Write the guide myself",
+    "aiExplainer": "The AI proposes a full guide you review one question at a time — accept, edit, reorder, or delete anything. It never changes your guide without your approval."
+  },
+  "paywall": {
+    "lockedTranscripts_one": "{{count}} transcript waiting to be unlocked",
+    "lockedTranscripts_other": "{{count}} transcripts waiting to be unlocked",
+    "sub": "Your first 3 stay free forever. Unlock the rest with a plan or a credit pack.",
+    "unlockCta": "Unlock"
+  },
+  "heatmapCell": {
+    "quotes_one": "{{count}} quote — {{participants}}",
+    "quotes_other": "{{count}} quotes — {{participants}}",
+    "empty": "No quotes from this segment"
+  },
+  "share": {
+    "emailSubject": "Quick research interview — {{projectName}}",
+    "emailBody": "Hi,\n\nI'd love your input on a short research study I'm running.\nIt's a 10–20 minute voice interview you can do right from your browser, at your own pace.\n\nStart here: {{url}}\n\nThanks so much!"
+  },
+  "a11y": {
+    "removeTag": "Remove tag {{name}}",
+    "removeTagTitle": "Remove tag",
+    "roundName": "Interview round name",
+    "disqualifying": "Disqualifying",
+    "allowed": "Allowed",
+    "statusFilter": "Filter by status",
+    "close": "Close",
+    "interviewLink": "Interview link",
+    "participantRecording": "Participant recording — turn {{turn}}",
+    "annotConfirmed": "Confirmed",
+    "annotNeedsEvidence": "Needs evidence",
+    "annotDisputed": "Disputed"
+  },
+  "screeningTranslations": {
+    "saved": "Translation saved",
+    "saveFailed": "Failed to save translation",
+    "questionLabel": "Question"
+  },
+  "brandingFonts": {
+    "system": "Modern (default)",
+    "humanist": "Humanist",
+    "serif": "Classic serif",
+    "elegant": "Elegant serif"
   }
 }

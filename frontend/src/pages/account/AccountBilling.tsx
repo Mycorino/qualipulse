@@ -6,7 +6,7 @@ import { useToast } from "../../components/Toast";
 import { useAccount } from "./accountContext";
 
 export default function AccountBilling() {
-  const { t } = useTranslation(["settings", "common"]);
+  const { t, i18n } = useTranslation(["settings", "common"]);
   const { billing, plans, packs } = useAccount();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -113,7 +113,7 @@ export default function AccountBilling() {
               {billing.display?.show_trial_end && billing.plan.trial_end && (
                 <span className="muted-text" style={{ fontSize: 13 }}>
                   {t("billing.trialEndsOn", { defaultValue: "Trial ends" })}{" "}
-                  {new Date(billing.plan.trial_end).toLocaleDateString()}
+                  {new Date(billing.plan.trial_end).toLocaleDateString(i18n.language)}
                 </span>
               )}
             </div>
@@ -154,7 +154,7 @@ export default function AccountBilling() {
             {billing.credits.period_end && (
               <div className="muted-text" style={{ fontSize: 12, marginTop: 12 }}>
                 {t("billing.periodEndsOn", { defaultValue: "Period ends" })}{" "}
-                {new Date(billing.credits.period_end).toLocaleDateString()}
+                {new Date(billing.credits.period_end).toLocaleDateString(i18n.language)}
                 {billing.plan.cancel_at_period_end && (
                   <> · {t("billing.cancelAtPeriodEnd", { defaultValue: "subscription will cancel at period end" })}</>
                 )}

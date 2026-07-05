@@ -18,7 +18,11 @@
     "successTitle": "Application received",
     "successSubtitle": "Thanks! We'll review your application and get back to you within 2–3 business days.",
     "successRedirect": "Redirecting to login in a moment…",
-    "failedSubmit": "We couldn't send your application. Please try again."
+    "failedSubmit": "We couldn't send your application. Please try again.",
+    "namePlaceholder": "Jane Doe",
+    "emailPlaceholder": "jane@example.com",
+    "codePlaceholder": "jane-doe",
+    "websitePlaceholder": "https://yourwebsite.com"
   },
   "login": {
     "title": "Affiliate sign in",

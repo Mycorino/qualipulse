@@ -189,7 +189,7 @@ function CopilotMockup() {
 }
 
 export default function Marketing() {
-  const { t } = useTranslation("marketing");
+  const { t, i18n } = useTranslation("marketing");
 
   useHead({
     title: t("meta.title"),
@@ -682,7 +682,7 @@ export default function Marketing() {
                   <strong>{p.credits}</strong> {t("pricing.creditsPerMonth", { defaultValue: "interview credits / month" })}
                 </div>
                 <div className="mkt-plan-credits" style={{ marginTop: 4, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-                  <strong className="tabular">{p.surveyResponses.toLocaleString()}</strong> {t("pricing.surveyResponsesPerMonth", { defaultValue: "survey responses / month" })}
+                  <strong className="tabular">{p.surveyResponses.toLocaleString(i18n.language)}</strong> {t("pricing.surveyResponsesPerMonth", { defaultValue: "survey responses / month" })}
                 </div>
                 <div className="mkt-plan-desc">{t(`pricing.plans.${p.id}.desc`)}</div>
                 <ul className="mkt-plan-features">

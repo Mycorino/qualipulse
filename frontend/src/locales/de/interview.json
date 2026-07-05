@@ -58,7 +58,13 @@
     "panelJoinDesc": "Werden Sie zu zukünftigen bezahlten Studien eingeladen, die zu Ihrem Profil passen",
     "panelJoinNote": "Wir speichern Ihr Profil sicher. Sie können sich jederzeit wieder abmelden.",
     "byParticipating": "Mit der Teilnahme an dieser Studie stimmen Sie Folgendem zu:",
-    "startError": "Wir konnten Ihr Interview nicht starten. Bitte versuchen Sie es erneut."
+    "startError": "Wir konnten Ihr Interview nicht starten. Bitte versuchen Sie es erneut.",
+    "anonymousStudy": "Diese Studie wird anonym durchgeführt — die dahinterstehende Organisation hat sich entschieden, ihre Identität nicht offenzulegen.",
+    "declineConfirmNo": "Weitermachen",
+    "declineConfirmText": "Sind Sie sicher? Wenn Sie ablehnen, endet Ihre Teilnahme — Sie können nicht zu dieser Studie zurückkehren.",
+    "declineConfirmYes": "Ja, ablehnen",
+    "resumeAvailable": "Sie haben auf diesem Gerät ein laufendes Interview.",
+    "resumeCta": "Dort weitermachen, wo Sie aufgehört haben"
   },
   "profile": {
     "title": "Erzählen Sie uns ein wenig über sich",
@@ -280,7 +286,8 @@
       "futureStudies": "Erzählen Sie mir von zukünftigen Studien",
       "futureStudiesNote": "Antworten Sie auf die E-Mail, die Sie hierher gebracht hat, und wir behalten Sie im Hinterkopf.",
       "contactMistake": "Glauben Sie, das ist ein Fehler? Antworten Sie auf die E-Mail, die Sie hierher gebracht hat."
-    }
+    },
+    "rateLimited": "Zu viele Versuche in kurzer Zeit. Bitte warten Sie eine Minute, bevor Sie es erneut versuchen."
   },
   "interview": {
     "progressLabel": "F{{current}} von {{total}}",
@@ -300,7 +307,8 @@
     "processing": {
       "transcribing": "🎙️ Ihre Antwort wird transkribiert…",
       "thinking": "💭 Denkt nach…",
-      "preparing": "🔊 Nächste Frage wird vorbereitet…"
+      "preparing": "🔊 Nächste Frage wird vorbereitet…",
+      "takingLonger": "Dauert noch einen Moment — gleich geschafft…"
     },
     "transcript": "Wir haben gehört:",
     "transcriptDismiss": "Schließen",
@@ -318,7 +326,13 @@
     "preparingFirst": "Ihre erste Frage wird vorbereitet…",
     "uploadError": "Ihre Antwort konnte nicht gesendet werden. Tippen Sie auf „Erneut versuchen\", um sie noch einmal zu senden.",
     "recordingError": "Wir konnten Ihre Aufnahme nicht erfassen. Bitte versuchen Sie es erneut.",
-    "skipError": "Wir konnten die Frage nicht überspringen. Bitte versuchen Sie es erneut."
+    "skipError": "Wir konnten die Frage nicht überspringen. Bitte versuchen Sie es erneut.",
+    "emptyTranscript": "Wir konnten in dieser Aufnahme nichts hören. Stellen Sie sicher, dass Ihr Mikrofon in der Nähe ist, und nehmen Sie erneut auf — falls das Problem bestehen bleibt, versuchen Sie es mit einem anderen Gerät.",
+    "maxRecordingHint": "Bis zu {{minutes}} Minuten pro Antwort",
+    "playQuestion": "Frage anhören",
+    "rateLimited": "Zu viele Versuche in kurzer Zeit. Bitte warten Sie eine Minute und tippen Sie dann erneut auf Absenden — Ihre Antwort ist gespeichert.",
+    "serverError": "Bei uns ist etwas schiefgelaufen. Bitte tippen Sie auf Absenden, um es erneut zu versuchen.",
+    "skipAudio": "Audio überspringen — ich bin bereit"
   },
   "completion": {
     "title": "Vielen Dank, {{name}}!",
@@ -346,7 +360,8 @@
       "saving": "Wird gespeichert…",
       "dismiss": "Nein danke"
     },
-    "enrichCta": "Ein paar Angaben mehr → mehr Studien freischalten"
+    "enrichCta": "Ein paar Angaben mehr → mehr Studien freischalten",
+    "dataRights": "Um die Löschung Ihrer Daten zu beantragen, wenden Sie sich an die Person, die diesen Link mit Ihnen geteilt hat."
   },
   "resume": {
     "title": "Willkommen zurück!",
@@ -371,5 +386,14 @@
     "title": "Diese Studie nimmt derzeit keine Antworten an",
     "body": "Diese Studie nimmt momentan keine neuen Antworten an. Bitte wenden Sie sich an die Person, die Ihnen diesen Link geschickt hat.",
     "close": "Sie können diese Seite bedenkenlos schließen."
+  },
+  "micError": {
+    "MIC_GENERIC": "Auf das Mikrofon konnte nicht zugegriffen werden. Bitte versuchen Sie es erneut.",
+    "MIC_NOT_FOUND": "Kein Mikrofon gefunden. Bitte schließen Sie eines an und versuchen Sie es erneut.",
+    "MIC_IN_USE": "Das Mikrofon wird von einer anderen Anwendung verwendet. Bitte schließen Sie andere Apps und versuchen Sie es erneut.",
+    "MIC_CONSTRAINTS": "Dieses Mikrofon ist nicht kompatibel. Bitte versuchen Sie es mit einem anderen Gerät."
+  },
+  "languagePicker": {
+    "ariaLabel": "Wählen Sie Ihre Sprache"
   }
 }

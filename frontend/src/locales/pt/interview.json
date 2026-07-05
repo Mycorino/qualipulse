@@ -58,7 +58,13 @@
     "panelJoinDesc": "Seja convidado(a) para estudos pagos futuros que correspondam ao seu perfil",
     "panelJoinNote": "Guardaremos o seu perfil em segurança. Pode cancelar a qualquer momento.",
     "byParticipating": "Ao participar neste estudo, concorda com o seguinte:",
-    "startError": "Não conseguimos iniciar a sua entrevista. Tente novamente, por favor."
+    "startError": "Não conseguimos iniciar a sua entrevista. Tente novamente, por favor.",
+    "anonymousStudy": "Este estudo é conduzido de forma anónima — a organização responsável optou por não revelar a sua identidade.",
+    "declineConfirmNo": "Continuar",
+    "declineConfirmText": "Tem a certeza? Ao recusar, a sua participação termina — não poderá voltar a este estudo.",
+    "declineConfirmYes": "Sim, recusar",
+    "resumeAvailable": "Tem uma entrevista em curso neste dispositivo.",
+    "resumeCta": "Continuar onde ficou"
   },
   "profile": {
     "title": "Conte-nos um pouco sobre si",
@@ -280,7 +286,8 @@
       "futureStudies": "Avise-me sobre estudos futuros",
       "futureStudiesNote": "Responda ao email que o(a) trouxe até aqui e teremos isso em conta.",
       "contactMistake": "Acha que isto é um engano? Responda ao email que o(a) trouxe até aqui."
-    }
+    },
+    "rateLimited": "Demasiadas tentativas em pouco tempo. Aguarde um minuto antes de tentar novamente."
   },
   "interview": {
     "progressLabel": "P{{current}} de {{total}}",
@@ -300,7 +307,8 @@
     "processing": {
       "transcribing": "🎙️ A transcrever a sua resposta…",
       "thinking": "💭 A pensar…",
-      "preparing": "🔊 A preparar a próxima pergunta…"
+      "preparing": "🔊 A preparar a próxima pergunta…",
+      "takingLonger": "Só mais um momento — está quase…"
     },
     "transcript": "Ouvimos:",
     "transcriptDismiss": "Fechar",
@@ -318,7 +326,13 @@
     "preparingFirst": "A preparar a sua primeira pergunta…",
     "uploadError": "Não conseguimos enviar a sua resposta. Toque em 'Tentar novamente' para reenviar.",
     "recordingError": "Não conseguimos captar a sua gravação. Tente novamente, por favor.",
-    "skipError": "Não conseguimos ignorar a pergunta. Tente novamente, por favor."
+    "skipError": "Não conseguimos ignorar a pergunta. Tente novamente, por favor.",
+    "emptyTranscript": "Não conseguimos ouvir nada nessa gravação. Verifique se o microfone está perto de si e grave novamente — se o problema persistir, experimente outro dispositivo.",
+    "maxRecordingHint": "Até {{minutes}} minutos por resposta",
+    "playQuestion": "Ouvir a pergunta",
+    "rateLimited": "Demasiadas tentativas em pouco tempo. Aguarde um minuto e toque novamente em Enviar — a sua resposta está guardada.",
+    "serverError": "Algo correu mal do nosso lado. Toque em Enviar para tentar novamente.",
+    "skipAudio": "Saltar o áudio — estou pronto"
   },
   "completion": {
     "title": "Obrigado, {{name}}!",
@@ -346,7 +360,8 @@
       "saving": "A guardar…",
       "dismiss": "Não, obrigado"
     },
-    "enrichCta": "Adicione mais alguns dados → desbloqueie mais estudos"
+    "enrichCta": "Adicione mais alguns dados → desbloqueie mais estudos",
+    "dataRights": "Para pedir a eliminação dos seus dados, contacte a pessoa que partilhou este link consigo."
   },
   "resume": {
     "title": "Bem-vindo(a) de volta!",
@@ -371,5 +386,14 @@
     "title": "Este estudo não está a aceitar respostas neste momento",
     "body": "Este estudo não está a aceitar novas respostas de momento. Por favor, contacte o investigador que lhe enviou este link.",
     "close": "Pode fechar esta página em segurança."
+  },
+  "micError": {
+    "MIC_GENERIC": "Não foi possível aceder ao microfone. Tente novamente.",
+    "MIC_NOT_FOUND": "Nenhum microfone detetado. Ligue um microfone e tente novamente.",
+    "MIC_IN_USE": "O microfone está a ser utilizado por outra aplicação. Feche as outras aplicações e tente novamente.",
+    "MIC_CONSTRAINTS": "Este microfone não é compatível. Experimente outro dispositivo."
+  },
+  "languagePicker": {
+    "ariaLabel": "Escolha o seu idioma"
   }
 }

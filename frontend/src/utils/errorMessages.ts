@@ -1,11 +1,15 @@
 import { AxiosError } from "axios";
+import i18n from "../i18n";
 
 /**
  * Extract a user-friendly error message from an API error.
  * Handles: network errors, rate limits, validation, server errors, and known API detail strings.
+ * All generic copy resolves through i18n (common:errors.*) so it follows the UI language;
+ * backend `detail` strings still pass through verbatim (API contract).
  */
-export function getErrorMessage(err: unknown, fallback = "Something went wrong"): string {
-  if (!err) return fallback;
+export function getErrorMessage(err: unknown, fallback?: string): string {
+  const genericFallback = fallback ?? i18n.t("common:errors.generic");
+  if (!err) return genericFallback;
 
   const axiosErr = err as AxiosError<{
     detail?: string | { msg: string }[] | { code?: string; message?: string };
@@ -13,12 +17,12 @@ export function getErrorMessage(err: unknown, fallback = "Something went wrong")
 
   // Network error — no response at all
   if (axiosErr.code === "ERR_NETWORK" || !axiosErr.response) {
-    return "Unable to connect to the server. Please check your internet connection and try again.";
+    return i18n.t("common:errors.network");
   }
 
   // Request timed out
   if (axiosErr.code === "ECONNABORTED") {
-    return "The request timed out. Please try again.";
+    return i18n.t("common:errors.timeout");
   }
 
   const status = axiosErr.response?.status;
@@ -26,7 +30,7 @@ export function getErrorMessage(err: unknown, fallback = "Something went wrong")
 
   // Pydantic validation errors come as an array
   if (Array.isArray(detail)) {
-    return detail.map((d) => d.msg).join(". ") || fallback;
+    return detail.map((d) => d.msg).join(". ") || genericFallback;
   }
 
   // Known API detail string
@@ -43,22 +47,22 @@ export function getErrorMessage(err: unknown, fallback = "Something went wrong")
   // HTTP status-based fallbacks
   switch (status) {
     case 400:
-      return "Invalid request. Please check your input and try again.";
+      return i18n.t("common:errors.badRequest");
     case 401:
-      return "Invalid credentials. Please try again.";
+      return i18n.t("common:errors.unauthorized");
     case 403:
-      return "You don't have permission to do this.";
+      return i18n.t("common:errors.forbidden");
     case 409:
-      return "This resource already exists.";
+      return i18n.t("common:errors.conflict");
     case 422:
-      return "Please check all fields are filled in correctly.";
+      return i18n.t("common:errors.validation");
     case 429:
-      return "Too many attempts. Please wait a moment and try again.";
+      return i18n.t("common:errors.rateLimited");
     case 500:
     case 502:
     case 503:
-      return "Our servers are temporarily unavailable. Please try again in a few moments.";
+      return i18n.t("common:errors.serverUnavailable");
     default:
-      return fallback;
+      return genericFallback;
   }
 }

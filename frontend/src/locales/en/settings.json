@@ -217,5 +217,7 @@
       "cta": "Sign out of all devices",
       "confirm": "This signs you out everywhere, including here. Continue?"
     }
-  }
+  },
+  "loadErrorTitle": "Unable to load account settings",
+  "loadErrorMessage": "Something went wrong while loading your account data. Please try again."
 }

@@ -264,7 +264,7 @@ export default function Signup() {
             className="field-input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
+            placeholder={t("signup.emailPlaceholder")}
             required
             autoComplete="email"
           />

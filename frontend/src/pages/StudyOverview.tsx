@@ -415,7 +415,7 @@ function ReportTab({
   studyId: string;
   progress: StudyDetail["progress"];
 }) {
-  const { t } = useTranslation("study");
+  const { t, i18n } = useTranslation("study");
   const { toast } = useToast();
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState<StudyAnalysis | null>(null);
@@ -568,7 +568,7 @@ function ReportTab({
           </div>
           <span className="tabular" style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
             {analysis.generated_at
-              ? t("overview.report.generatedAt", { date: new Date(analysis.generated_at).toLocaleString() })
+              ? t("overview.report.generatedAt", { date: new Date(analysis.generated_at).toLocaleString(i18n.language) })
               : t("overview.report.generatedAtUnknown")}
           </span>
         </div>

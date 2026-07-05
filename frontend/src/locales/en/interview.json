@@ -386,5 +386,14 @@
     "title": "This study isn't taking responses right now",
     "body": "This study isn't accepting new responses at the moment. Please reach out to the researcher who shared this link.",
     "close": "You can safely close this page."
+  },
+  "micError": {
+    "MIC_GENERIC": "Could not access the microphone. Please try again.",
+    "MIC_NOT_FOUND": "No microphone found. Please connect a microphone and try again.",
+    "MIC_IN_USE": "The microphone is being used by another application. Please close other apps and try again.",
+    "MIC_CONSTRAINTS": "This microphone isn't compatible. Please try a different device."
+  },
+  "languagePicker": {
+    "ariaLabel": "Choose your language"
   }
 }
