@@ -40,9 +40,9 @@
     "currentPlan": "Plan actuel",
     "upgradePlan": "Changer de plan",
     "packsTitle": "Acheter des crédits supplémentaires",
-    "packsSubtitle": "Recharges ponctuelles. Les crédits achetés se reportent jusqu'à utilisation.",
+    "packsSubtitle": "Recharges ponctuelles. Les crédits achetés restent valables jusqu'à leur utilisation.",
     "creditsLabel": "crédits",
-    "perCreditPrice": "{{price}} € par crédit",
+    "perCreditPrice": "{{price}} € par crédit",
     "buyPack": "Acheter le pack",
     "packUnavailable": "Indisponible",
     "manageBilling": "Gérer la facturation →",
@@ -56,13 +56,13 @@
       "csvExport": "Export CSV",
       "teamMembers": "Membres de l'équipe",
       "included": "✓ Inclus",
-      "upgrade": "— Mettez à niveau pour débloquer"
+      "upgrade": "— Passez à une offre supérieure pour débloquer"
     },
     "freeTrial": "Essai gratuit",
-    "trialCreditsHint": "Vos crédits d'entretien gratuits n'expirent pas. Aucune carte de crédit requise.",
+    "trialCreditsHint": "Vos crédits d'entretien gratuits n'expirent pas. Aucune carte bancaire requise.",
     "usageThisPeriod": "Utilisation cette période",
     "creditsPurchased": "Paiement reçu — vos crédits apparaîtront dans un instant.",
-    "upgradeSuccess": "Votre offre a été mise à niveau. Bienvenue à bord !",
+    "upgradeSuccess": "Vous êtes passé·e à l'offre supérieure. Bienvenue à bord !",
     "checkoutError": "Impossible d'ouvrir le paiement — réessayez ou contactez le support.",
     "creditsRemaining": "Crédits restants",
     "creditsUsed": "Crédits utilisés",
@@ -81,10 +81,10 @@
       "csvExport": "Export CSV",
       "customBranding": "Personnalisation de marque",
       "teamWorkspace": "Espace d'équipe",
-      "overage": "Dépassement : {{price}} €/crédit"
+      "overage": "Dépassement : {{price}} €/crédit"
     },
     "packName": "Pack de {{count}} crédits",
-    "priceMonthly": "{{price}} €/mois"
+    "priceMonthly": "{{price}} €/mois"
   },
   "language": {
     "title": "Langue",
@@ -104,7 +104,7 @@
     "membersTitle": "Membres de l'espace",
     "pendingTitle": "Invitations en attente",
     "remove": "Retirer",
-    "removeConfirm": "Retirer ce membre ? Il perdra l'accès à tous les projets de cet espace.",
+    "removeConfirm": "Retirer ce membre ? Il perdra l'accès à tous les projets de cet espace.",
     "revoke": "Révoquer",
     "invitedAs": "Invité(e) en tant que {{role}}",
     "expiresOn": "expire le {{date}}",
@@ -172,7 +172,7 @@
       "creditsRemaining": "crédits restants",
       "creditsUsed": "{{used}} sur {{total}} utilisés",
       "noExpiry": "sans expiration",
-      "upgradeCta": "Voir les forfaits et améliorer →",
+      "upgradeCta": "Voir les forfaits supérieurs →",
       "manageCta": "Gérer la facturation →"
     },
     "workspaceCard": {
@@ -198,7 +198,7 @@
       "disableCta": "Désactiver l'authentification à deux facteurs",
       "enabledStatus": "L'authentification à deux facteurs est active",
       "step1": "Installez une application d'authentification sur votre téléphone si vous n'en avez pas.",
-      "step2": "Ajoutez un nouveau compte dans l'application et saisissez cette clé secrète (ou ouvrez le lien ci-dessous sur votre téléphone) :",
+      "step2": "Ajoutez un nouveau compte dans l'application et saisissez cette clé secrète (ou ouvrez le lien ci-dessous sur votre téléphone) :",
       "step3": "Saisissez le code à 6 chiffres affiché par l'application pour confirmer.",
       "openInApp": "Ouvrir dans l'application d'authentification",
       "codeLabel": "Code à 6 chiffres",
@@ -213,9 +213,11 @@
     },
     "logoutAll": {
       "title": "Se déconnecter partout",
-      "description": "Déconnecte ce compte de tous les appareils et navigateurs, y compris celui-ci. Utilisez cette option si vous pensez qu'un appareil utilisé n'est plus sûr.",
+      "description": "Déconnecte ce compte de tous les appareils et navigateurs, y compris celui-ci. Utilisez cette option si vous pensez qu'un appareil que vous avez utilisé n'est plus sûr.",
       "cta": "Se déconnecter de tous les appareils",
-      "confirm": "Cela vous déconnecte partout, y compris ici. Continuer ?"
+      "confirm": "Cela vous déconnecte partout, y compris ici. Continuer ?"
     }
-  }
+  },
+  "loadErrorTitle": "Impossible de charger les paramètres du compte",
+  "loadErrorMessage": "Une erreur s'est produite lors du chargement de vos données. Veuillez réessayer."
 }

@@ -752,12 +752,19 @@ def invite_segment_to_interview(
         tokens.append(token)
 
         interview_url = f"{base_url.rstrip('/')}/i/{token}"
+        # Invite in the language the interview will be conducted in —
+        # this email is participant-facing, not researcher-facing.
+        invite_lang = (target_project.language or "en").lower()
+        sender_fallback = (
+            "Votre équipe de recherche" if invite_lang.startswith("fr") else "Your researcher"
+        )
         try:
             ok = send_interview_invite(
                 to=participant.email_normalized,  # type: ignore[arg-type]
                 project_name=target_project.name,
                 interview_url=interview_url,
-                sender_name=company.name or "Your researcher",
+                sender_name=company.name or sender_fallback,
+                lang=invite_lang,
             )
             if ok:
                 invited += 1

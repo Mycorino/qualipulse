@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "../i18n";
 import { patchScreeningTranslation, ScreeningQuestionResponse } from "../api/projects";
 import { useToast } from "./Toast";
@@ -23,6 +24,7 @@ interface Props {
 
 export default function ScreeningTranslationsEditor({ projectId, screening, sourceLang, onSaved }: Props) {
   const { toast } = useToast();
+  const { t } = useTranslation("project");
   const [open, setOpen] = useState(false);
   const langs = useMemo(
     () => SUPPORTED_LANGUAGES.filter((l) => l !== sourceLang.slice(0, 2)),
@@ -47,10 +49,10 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
     setSaving(true);
     try {
       await patchScreeningTranslation(projectId, screening.id, { lang, question, options });
-      toast("Translation saved", "success");
+      toast(t("screeningTranslations.saved"), "success");
       onSaved();
     } catch {
-      toast("Failed to save translation", "error");
+      toast(t("screeningTranslations.saveFailed"), "error");
     } finally {
       setSaving(false);
     }
@@ -75,7 +77,7 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
               </button>
             ))}
           </div>
-          <label className="field-label">Question</label>
+          <label className="field-label">{t("screeningTranslations.questionLabel")}</label>
           <input className="field-input" value={question} onChange={(e) => setQuestion(e.target.value)} />
           <label className="field-label" style={{ marginTop: 8 }}>Options</label>
           {screening.options.map((canonical, i) => (

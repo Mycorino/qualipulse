@@ -188,6 +188,8 @@ Rules:
 - Stay under 30 words.
 - Plain language. No academic jargon. No "Please rate…" preamble.
 - Never propose multiple alternatives. One rewrite only.
+- Write the rewrite in the SAME LANGUAGE as the original question (a French
+  question gets a French rewrite, etc.). Never translate the question.
 """
 
 

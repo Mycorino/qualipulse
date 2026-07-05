@@ -51,20 +51,30 @@ def _post(webhook_url: str, payload: dict[str, Any]) -> bool:
         return False
 
 
-def send_test_message(webhook_url: str) -> bool:
+def _is_fr(lang: str | None) -> bool:
+    return bool(lang) and lang.lower().startswith("fr")
+
+
+def send_test_message(webhook_url: str, *, lang: str | None = None) -> bool:
     """Post a test confirmation message. Used by Account Settings → Test button."""
+    if _is_fr(lang):
+        text = ":white_check_mark: QualiPulse est connecté à ce canal Slack."
+        block_text = (
+            ":white_check_mark: *QualiPulse est connecté !*\n"
+            "Vous recevrez une notification ici dès qu'une analyse IA sera terminée."
+        )
+    else:
+        text = ":white_check_mark: QualiPulse is connected to this Slack channel."
+        block_text = (
+            ":white_check_mark: *QualiPulse is connected!*\n"
+            "You'll get a notification here whenever an AI analysis finishes."
+        )
     payload = {
-        "text": ":white_check_mark: QualiPulse is connected to this Slack channel.",
+        "text": text,
         "blocks": [
             {
                 "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": (
-                        ":white_check_mark: *QualiPulse is connected!*\n"
-                        "You'll get a notification here whenever an AI analysis finishes."
-                    ),
-                },
+                "text": {"type": "mrkdwn", "text": block_text},
             },
         ],
     }
@@ -78,27 +88,41 @@ def send_analysis_ready(
     project_url: str,
     participant_count: int,
     top_themes: list[str] | None = None,
+    lang: str | None = None,
 ) -> bool:
     """Notify a channel that an AI analysis has just finished for a project."""
     themes = top_themes or []
     theme_lines = "\n".join(f"• {t}" for t in themes[:5]) if themes else ""
 
-    text = (
-        f":sparkles: Analysis ready for *{project_name}* "
-        f"({participant_count} participant{'s' if participant_count != 1 else ''})"
-    )
+    if _is_fr(lang):
+        text = (
+            f":sparkles: Analyse prête pour *{project_name}* "
+            f"({participant_count} participant{'s' if participant_count != 1 else ''})"
+        )
+        summary = (
+            f":sparkles: *Analyse IA prête*\n"
+            f"*Étude :* {project_name}\n"
+            f"*Participants :* {participant_count}"
+        )
+        themes_title = "*Thèmes principaux*"
+        button_label = "Ouvrir dans QualiPulse"
+    else:
+        text = (
+            f":sparkles: Analysis ready for *{project_name}* "
+            f"({participant_count} participant{'s' if participant_count != 1 else ''})"
+        )
+        summary = (
+            f":sparkles: *AI analysis ready*\n"
+            f"*Project:* {project_name}\n"
+            f"*Participants:* {participant_count}"
+        )
+        themes_title = "*Top themes*"
+        button_label = "Open in QualiPulse"
 
     blocks: list[dict[str, Any]] = [
         {
             "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": (
-                    f":sparkles: *AI analysis ready*\n"
-                    f"*Project:* {project_name}\n"
-                    f"*Participants:* {participant_count}"
-                ),
-            },
+            "text": {"type": "mrkdwn", "text": summary},
         },
     ]
 
@@ -106,7 +130,7 @@ def send_analysis_ready(
         blocks.append(
             {
                 "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*Top themes*\n{theme_lines}"},
+                "text": {"type": "mrkdwn", "text": f"{themes_title}\n{theme_lines}"},
             }
         )
 
@@ -116,7 +140,7 @@ def send_analysis_ready(
             "elements": [
                 {
                     "type": "button",
-                    "text": {"type": "plain_text", "text": "Open in QualiPulse"},
+                    "text": {"type": "plain_text", "text": button_label},
                     "url": project_url,
                     "style": "primary",
                 }
@@ -133,27 +157,36 @@ def send_interview_completed(
     project_name: str,
     participant_name: str,
     project_url: str,
+    lang: str | None = None,
 ) -> bool:
     """Notify when a participant finishes an interview. Kept for future use."""
-    text = f":speech_balloon: New interview completed for *{project_name}* by {participant_name}"
+    if _is_fr(lang):
+        text = f":speech_balloon: Nouvel entretien terminé pour *{project_name}* par {participant_name}"
+        summary = (
+            f":speech_balloon: *Nouvelle réponse*\n"
+            f"*Étude :* {project_name}\n"
+            f"*Participant :* {participant_name}"
+        )
+        button_label = "Voir la transcription"
+    else:
+        text = f":speech_balloon: New interview completed for *{project_name}* by {participant_name}"
+        summary = (
+            f":speech_balloon: *New response*\n"
+            f"*Project:* {project_name}\n"
+            f"*Participant:* {participant_name}"
+        )
+        button_label = "View transcript"
     blocks = [
         {
             "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": (
-                    f":speech_balloon: *New response*\n"
-                    f"*Project:* {project_name}\n"
-                    f"*Participant:* {participant_name}"
-                ),
-            },
+            "text": {"type": "mrkdwn", "text": summary},
         },
         {
             "type": "actions",
             "elements": [
                 {
                     "type": "button",
-                    "text": {"type": "plain_text", "text": "View transcript"},
+                    "text": {"type": "plain_text", "text": button_label},
                     "url": project_url,
                 }
             ],

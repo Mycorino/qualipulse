@@ -58,7 +58,13 @@
     "panelJoinDesc": "Recibe invitaciones a futuros estudios remunerados que encajen con tu perfil",
     "panelJoinNote": "Guardaremos tu perfil de forma segura. Puedes darte de baja cuando quieras.",
     "byParticipating": "Al participar en este estudio aceptas lo siguiente:",
-    "startError": "No pudimos empezar tu entrevista. Inténtalo de nuevo."
+    "startError": "No pudimos empezar tu entrevista. Inténtalo de nuevo.",
+    "anonymousStudy": "Este estudio se realiza de forma anónima — la organización responsable ha decidido no revelar su identidad.",
+    "declineConfirmNo": "Continuar",
+    "declineConfirmText": "¿Está seguro? Si rechaza, su participación termina — no podrá volver a este estudio.",
+    "declineConfirmYes": "Sí, rechazar",
+    "resumeAvailable": "Tiene una entrevista en curso en este dispositivo.",
+    "resumeCta": "Continuar donde lo dejó"
   },
   "profile": {
     "title": "Cuéntanos un poco sobre ti",
@@ -280,7 +286,8 @@
       "futureStudies": "Cuéntame sobre futuros estudios",
       "futureStudiesNote": "Responde al correo que te trajo hasta aquí y te tendremos en cuenta.",
       "contactMistake": "¿Crees que esto es un error? Responde al correo que te trajo hasta aquí."
-    }
+    },
+    "rateLimited": "Demasiados intentos en poco tiempo. Espere un minuto antes de volver a intentarlo."
   },
   "interview": {
     "progressLabel": "P{{current}} de {{total}}",
@@ -300,7 +307,8 @@
     "processing": {
       "transcribing": "🎙️ Transcribiendo tu respuesta…",
       "thinking": "💭 Pensando…",
-      "preparing": "🔊 Preparando la siguiente pregunta…"
+      "preparing": "🔊 Preparando la siguiente pregunta…",
+      "takingLonger": "Un momento más — ya casi está…"
     },
     "transcript": "Esto es lo que oímos:",
     "transcriptDismiss": "Descartar",
@@ -318,7 +326,13 @@
     "preparingFirst": "Preparando tu primera pregunta…",
     "uploadError": "No pudimos enviar tu respuesta. Toca 'Intentar de nuevo' para reenviar.",
     "recordingError": "No pudimos capturar tu grabación. Inténtalo de nuevo.",
-    "skipError": "No pudimos omitir la pregunta. Inténtalo de nuevo."
+    "skipError": "No pudimos omitir la pregunta. Inténtalo de nuevo.",
+    "emptyTranscript": "No pudimos oír nada en esa grabación. Asegúrese de que el micrófono esté cerca y grabe de nuevo — si el problema persiste, pruebe con otro dispositivo.",
+    "maxRecordingHint": "Hasta {{minutes}} minutos por respuesta",
+    "playQuestion": "Escuchar la pregunta",
+    "rateLimited": "Demasiados intentos en poco tiempo. Espere un minuto y pulse Enviar de nuevo — su respuesta está guardada.",
+    "serverError": "Algo ha fallado por nuestra parte. Pulse Enviar para intentarlo de nuevo.",
+    "skipAudio": "Omitir el audio — estoy listo"
   },
   "completion": {
     "title": "¡Gracias, {{name}}!",
@@ -346,7 +360,8 @@
       "saving": "Guardando…",
       "dismiss": "No, gracias"
     },
-    "enrichCta": "Añade unos datos más → desbloquea más estudios"
+    "enrichCta": "Añade unos datos más → desbloquea más estudios",
+    "dataRights": "Para solicitar la eliminación de sus datos, contacte con la persona que compartió este enlace con usted."
   },
   "resume": {
     "title": "¡Bienvenido de nuevo!",
@@ -371,5 +386,14 @@
     "title": "Este estudio no acepta respuestas en este momento",
     "body": "Este estudio no está aceptando nuevas respuestas por ahora. Ponte en contacto con la persona que te compartió este enlace.",
     "close": "Puedes cerrar esta página con tranquilidad."
+  },
+  "micError": {
+    "MIC_GENERIC": "No se pudo acceder al micrófono. Inténtelo de nuevo.",
+    "MIC_NOT_FOUND": "No se ha detectado ningún micrófono. Conecte uno e inténtelo de nuevo.",
+    "MIC_IN_USE": "Otra aplicación está usando el micrófono. Cierre las demás aplicaciones e inténtelo de nuevo.",
+    "MIC_CONSTRAINTS": "Este micrófono no es compatible. Pruebe con otro dispositivo."
+  },
+  "languagePicker": {
+    "ariaLabel": "Elija su idioma"
   }
 }

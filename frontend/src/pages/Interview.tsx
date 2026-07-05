@@ -786,7 +786,9 @@ export default function Interview() {
       const e = err as { response?: { status?: number; data?: { detail?: { code?: string; message?: string } } } };
       const detail = e?.response?.data?.detail;
       if (e?.response?.status === 403 && detail?.code === "study_unavailable") {
-        setStudyUnavailableMsg(detail.message || t("studyUnavailable.body"));
+        // Always use the localized copy — the backend `message` is a fixed
+        // English sentence and would leak English into non-EN interviews.
+        setStudyUnavailableMsg(t("studyUnavailable.body"));
         setPhase("study_unavailable");
         return;
       }
@@ -1926,7 +1928,11 @@ export default function Interview() {
               </button>
             </div>
           ) : recError ? (
-            <div className="error-banner" role="alert">{recError}</div>
+            <div className="error-banner" role="alert">
+              {["MIC_GENERIC", "MIC_NOT_FOUND", "MIC_IN_USE", "MIC_CONSTRAINTS"].includes(recError)
+                ? t(`micError.${recError}`)
+                : recError}
+            </div>
           ) : null}
 
           {coachingHint && !coachingHintDismissed && (

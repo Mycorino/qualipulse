@@ -73,19 +73,21 @@ export function useAudioRecorder() {
       recorder.start(250); // timeslice: fire ondataavailable every 250ms
       setIsRecording(true);
     } catch (err: unknown) {
-      let message = "Could not access microphone. Please try again.";
+      // Stable sentinel codes — the consumer maps them to localized copy
+      // (participants can be in any of the 6 interview languages).
+      let code = "MIC_GENERIC";
       if (err instanceof Error) {
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-          message = "PERMISSION_DENIED";
+          code = "PERMISSION_DENIED";
         } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-          message = "No microphone found. Please connect a microphone and try again.";
+          code = "MIC_NOT_FOUND";
         } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
-          message = "Microphone is in use by another application. Please close other apps and try again.";
+          code = "MIC_IN_USE";
         } else if (err.name === "OverconstrainedError") {
-          message = "Microphone does not meet the required constraints. Please try a different device.";
+          code = "MIC_CONSTRAINTS";
         }
       }
-      setError(message);
+      setError(code);
     }
   }, []);
 

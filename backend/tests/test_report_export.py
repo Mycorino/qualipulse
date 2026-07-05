@@ -70,6 +70,10 @@ def project_with_analysis(db_session, registered_company):
         .filter(Company.email == registered_company["email"])
         .first()
     )
+    # Report chrome follows the researcher's preferred_language (it must match
+    # the analysis body, which is generated in that language) — pin it to EN so
+    # the English assertions below hold regardless of the signup default.
+    company.preferred_language = "en"
     project = Project(
         company_id=company.id,
         name="Customer Discovery Study",
@@ -213,6 +217,9 @@ def test_report_export_specific_version(client, auth_headers, db_session, projec
 
 def test_report_export_localised_french(client, auth_headers, db_session, project_with_analysis):
     project, _ = project_with_analysis
+    # Chrome language = the researcher's preferred_language (matches the
+    # analysis body), not the interview language.
+    project.company.preferred_language = "fr"
     project.language = "fr"
     db_session.commit()
 

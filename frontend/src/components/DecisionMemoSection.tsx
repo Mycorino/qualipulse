@@ -23,7 +23,7 @@ import { useToast } from "./Toast";
 const POLL_MS = 5000;
 
 export function DecisionMemoSection({ studies }: { studies: StudySummary[] }) {
-  const { t } = useTranslation("dashboard");
+  const { t, i18n } = useTranslation("dashboard");
   const { toast } = useToast();
   const [memos, setMemos] = useState<SynthesisSummary[] | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -143,7 +143,7 @@ export function DecisionMemoSection({ studies }: { studies: StudySummary[] }) {
                 <div style={{ fontWeight: 600 }}>{m.name}</div>
                 <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
                   {t("decisionMemos.studyCount", { count: m.study_count })}
-                  {m.generated_at ? ` · ${new Date(m.generated_at).toLocaleDateString()}` : ""}
+                  {m.generated_at ? ` · ${new Date(m.generated_at).toLocaleDateString(i18n.language)}` : ""}
                 </div>
               </div>
               {m.status === "generating" && (

@@ -132,7 +132,7 @@ function PostEditor({
   onSaved: () => void;
   onCancel: () => void;
 }) {
-  const { t } = useTranslation("blog");
+  const { t, i18n } = useTranslation("blog");
   const [title, setTitle] = useState(post?.title ?? "");
   const [subtitle, setSubtitle] = useState(post?.subtitle ?? "");
   const [slug, setSlug] = useState(post?.slug ?? "");
@@ -466,7 +466,7 @@ function PostEditor({
             <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.2, marginBottom: 8 }}>{title || t("admin.untitled")}</h1>
             {subtitle && <p style={{ fontSize: 18, color: "var(--text-secondary)", marginBottom: 12 }}>{subtitle}</p>}
             <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--border-subtle)" }}>
-              {authorName} &middot; {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              {authorName} &middot; {new Date().toLocaleDateString(i18n.language, { month: "long", day: "numeric", year: "numeric" })}
             </div>
             <div
               className="blog-content"

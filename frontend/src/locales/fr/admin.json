@@ -38,7 +38,8 @@
     "users": "Utilisateurs",
     "affiliates": "Affiliés",
     "blog": "Blog",
-    "audit": "Journal d'audit"
+    "audit": "Journal d'audit",
+    "panel": "Panel"
   },
   "users": {
     "searchPlaceholder": "Rechercher par nom ou e-mail…",
@@ -71,9 +72,9 @@
     "delete": "Supprimer",
     "aiSpendTotal": "au total",
     "aiSpendThisMonth": "ce mois-ci",
-    "aiSpendLabel": "Dépenses IA :",
+    "aiSpendLabel": "Dépenses IA :",
     "adjustCredits": "Ajuster les crédits",
-    "loginAs": "Se connecter en tant que",
+    "loginAs": "Se connecter à sa place",
     "unsuspend": "Réactiver",
     "suspend": "Suspendre",
     "suspendedBadge": "Suspendu",
@@ -115,12 +116,12 @@
     "save": "Enregistrer",
     "editCommission": "Cliquer pour modifier la commission",
     "commissionUpdated": "Commission mise à jour",
-    "commissionInvalid": "La commission doit être comprise entre 0 et 100 %",
+    "commissionInvalid": "La commission doit être comprise entre 0 et 100 %",
     "recordPayout": "Enregistrer un versement",
     "nothingToPayOut": "Aucun gain en attente à verser",
     "payoutRecorded": "Versement de {{amount}} $ enregistré",
     "pendingBadgeTitle": "{{count}} candidature(s) en attente",
-    "applied": "Candidature",
+    "applied": "Candidature le",
     "approvedOn": "Approuvé le",
     "website": "Site web",
     "paidOut": "Versé",
@@ -135,7 +136,7 @@
     "actionUserDelete": "Suppression d'utilisateur",
     "actionSuspend": "Suspension",
     "actionUnsuspend": "Réactivation",
-    "actionImpersonation": "Connexion en tant que",
+    "actionImpersonation": "Connexion à la place de l'utilisateur",
     "searchPlaceholder": "Rechercher par e-mail…",
     "search": "Rechercher",
     "colWhen": "Quand",
@@ -151,7 +152,7 @@
   },
   "suspendDialog": {
     "title": "Suspendre le compte",
-    "warning": "Cela bloquera la connexion et tout accès à l'API. L'utilisateur verra « Compte suspendu » avec le motif ci-dessous.",
+    "warning": "Cela bloquera la connexion et tout accès à l'API. L'utilisateur verra « Compte suspendu » avec le motif ci-dessous.",
     "reasonLabel": "Motif (visible par l'utilisateur)",
     "reasonPlaceholder": "ex. Violation des conditions d'utilisation",
     "cancel": "Annuler",
@@ -171,7 +172,7 @@
     "submitting": "Application…"
   },
   "deleteDialog": {
-    "message": "Supprimer le compte de « {{name}} » ({{email}}) ? Cela supprime définitivement toutes ses données et est irréversible.",
+    "message": "Supprimer le compte de « {{name}} » ({{email}}) ? Toutes ses données seront définitivement supprimées. Cette action est irréversible.",
     "cancel": "Annuler",
     "confirm": "Supprimer"
   },
@@ -191,8 +192,8 @@
     "suspendFailed": "Échec de la suspension",
     "accountUnsuspended": "Compte réactivé",
     "unsuspendFailed": "Échec de la réactivation",
-    "impersonationOpened": "Onglet de connexion en tant que ouvert",
-    "impersonateFailed": "Échec de la connexion en tant que",
+    "impersonationOpened": "Onglet ouvert — vous êtes connecté à la place de l'utilisateur",
+    "impersonateFailed": "Échec de la connexion à la place de l'utilisateur",
     "loadUsersFailed": "Échec du chargement des utilisateurs",
     "loadAffiliatesFailed": "Échec du chargement des affiliés",
     "loadAuditFailed": "Échec du chargement du journal d'audit",
@@ -204,7 +205,7 @@
   },
   "payoutDialog": {
     "title": "Enregistrer un versement",
-    "pendingInfo": "Gains en attente : {{amount}} $",
+    "pendingInfo": "Gains en attente : {{amount}} $",
     "amountLabel": "Montant (USD)",
     "notesLabel": "Notes (facultatif)",
     "notesPlaceholder": "ex. virement PayPal réf. 12345",
@@ -212,5 +213,12 @@
     "cancel": "Annuler",
     "submit": "Enregistrer le versement",
     "submitting": "Enregistrement…"
+  },
+  "panel": {
+    "title": "Supprimer un compte consommateur / panéliste",
+    "help": "Supprime son profil de panéliste, toutes ses réponses d'enrichissement et les liens magiques en cours. Droit à l'effacement RGPD — permet aussi de retester avec le même email (le questionnaire de profil s'affiche à nouveau).",
+    "includeInterviews": "Supprimer aussi ses entretiens (toutes études confondues)",
+    "deleting": "Suppression…",
+    "deleteCta": "Supprimer le panéliste"
   }
 }

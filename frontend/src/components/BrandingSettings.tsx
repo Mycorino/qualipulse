@@ -295,7 +295,7 @@ export default function BrandingSettings({
                   >
                     {Object.keys(BRAND_FONT_STACKS).map((key) => (
                       <option key={key} value={key}>
-                        {BRAND_FONT_LABELS[key] ?? key}
+                        {t(`brandingFonts.${key}`, { defaultValue: BRAND_FONT_LABELS[key] ?? key })}
                       </option>
                     ))}
                   </select>

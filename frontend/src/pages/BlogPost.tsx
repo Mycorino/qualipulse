@@ -7,7 +7,7 @@ import { getPublishedPost, type BlogPost } from "../api/blog";
 import { NewsletterCTA } from "./Blog";
 
 export default function BlogPostPage() {
-  const { t } = useTranslation("blog");
+  const { t, i18n } = useTranslation("blog");
   const { slug } = useParams<{ slug: string }>();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,7 +58,7 @@ export default function BlogPostPage() {
 
   function formatDate(iso: string | null) {
     if (!iso) return "";
-    return new Date(iso).toLocaleDateString("en-US", {
+    return new Date(iso).toLocaleDateString(i18n.language, {
       year: "numeric",
       month: "long",
       day: "numeric",

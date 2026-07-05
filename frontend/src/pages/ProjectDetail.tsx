@@ -576,9 +576,9 @@ export default function ProjectDetail() {
       const res = await shareAnalysis(id!);
       const url = `${window.location.origin}/reports/${res.share_token}`;
       await navigator.clipboard.writeText(url);
-      toast("Share link copied to clipboard ✓", "success");
+      toast(tProject("toasts.shareLinkCopied"), "success");
     } catch {
-      toast("Could not generate share link — make sure analysis is ready.", "error");
+      toast(tProject("toasts.shareLinkFailed"), "error");
     }
   }
 
@@ -615,7 +615,7 @@ export default function ProjectDetail() {
           return next;
         });
       } catch {
-        toast("Failed to remove annotation", "error");
+        toast(tProject("toasts.annotationRemoveFailed"), "error");
       }
       return;
     }
@@ -628,7 +628,7 @@ export default function ProjectDetail() {
       });
       setThemeAnnotations((prev) => ({ ...prev, [themeTitle]: saved }));
     } catch {
-      toast("Failed to save annotation", "error");
+      toast(tProject("toasts.annotationSaveFailed"), "error");
     }
   }
 
@@ -645,7 +645,7 @@ export default function ProjectDetail() {
       });
       setThemeAnnotations((prev) => ({ ...prev, [themeTitle]: saved }));
     } catch {
-      toast("Failed to save note", "error");
+      toast(tProject("toasts.noteSaveFailed"), "error");
     }
   }
 
@@ -661,7 +661,7 @@ export default function ProjectDetail() {
         setTimeout(() => setContextSaving(false), 2000);
       } catch {
         setContextSaving(false);
-        toast("Failed to save context", "error");
+        toast(tProject("toasts.contextSaveFailed"), "error");
       }
     }, 1500);
   }
@@ -676,7 +676,7 @@ export default function ProjectDetail() {
       // Refresh versions list
       getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {});
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to start refined analysis";
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? tProject("toasts.refineStartFailed");
       toast(msg, "error");
     } finally {
       setRefining(false);
@@ -694,7 +694,7 @@ export default function ProjectDetail() {
       setActiveVersionReport(report);
       setActiveVersionNumber(versionNumber);
     } catch {
-      toast("Failed to load version", "error");
+      toast(tProject("toasts.versionLoadFailed"), "error");
     }
   }
 
@@ -713,7 +713,7 @@ export default function ProjectDetail() {
     } catch (err) {
       // Surfaces the backend message (e.g. "verify your email to create
       // interview links") instead of a generic failure.
-      toast(getErrorMessage(err, "Failed to generate link"), "error");
+      toast(getErrorMessage(err, tProject("toasts.linkGenerateFailed")), "error");
     }
   }
 
@@ -722,7 +722,7 @@ export default function ProjectDetail() {
       const updated = await toggleLink(linkId);
       setLinks((prev) => prev.map((l) => (l.id === linkId ? updated : l)));
     } catch {
-      toast("Failed to update link", "error");
+      toast(tProject("toasts.linkUpdateFailed"), "error");
     }
   }
 
@@ -748,7 +748,7 @@ export default function ProjectDetail() {
       return;
     }
     if (editingTurnId && editingText !== editingOriginalText) {
-      if (!confirm("You have unsaved transcript changes. Discard them?")) return;
+      if (!confirm(tProject("confirms.discardTranscript"))) return;
     }
     setSelectedParticipant(p);
     setTranscript(null);
@@ -843,18 +843,18 @@ export default function ProjectDetail() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast("Failed to export CSV", "error");
+      toast(tProject("toasts.csvExportFailed"), "error");
     }
   }
 
   async function handleArchive() {
-    if (!confirm("Archive this project? You can restore it any time from the dashboard.")) return;
+    if (!confirm(tProject("confirms.archiveProject"))) return;
     try {
       await archiveProject(id!);
-      toast("Project archived", "success");
+      toast(tProject("toasts.projectArchived"), "success");
       navigate("/dashboard");
     } catch {
-      toast("Failed to archive project", "error");
+      toast(tProject("toasts.projectArchiveFailed"), "error");
     }
   }
 
@@ -883,7 +883,7 @@ export default function ProjectDetail() {
       );
       setEditingTurnId(null);
     } catch {
-      toast("Failed to save transcript edit", "error");
+      toast(tProject("toasts.transcriptSaveFailed"), "error");
     } finally {
       setSavingTurnId(null);
     }
@@ -927,7 +927,7 @@ export default function ProjectDetail() {
       setTags((prev) => [...prev, tag]);
       setCodes((prev) => prev.map((c) => c.id === code.id ? { ...c, tag_count: c.tag_count + 1 } : c));
     } catch {
-      toast("Failed to tag quote", "error");
+      toast(tProject("toasts.quoteTagFailed"), "error");
     } finally {
       setSelectionInfo(null);
       window.getSelection()?.removeAllRanges();
@@ -945,7 +945,7 @@ export default function ProjectDetail() {
       setNewCodeColor(PRESET_COLORS[0]);
       setShowNewCode(false);
     } catch {
-      toast("Failed to create code", "error");
+      toast(tProject("toasts.codeCreateFailed"), "error");
     } finally {
       setCreatingCode(false);
     }
@@ -961,7 +961,7 @@ export default function ProjectDetail() {
   }
 
   async function handleDeleteCode(codeId: string) {
-    if (!confirm("Delete this code? All tagged quotes will also be removed.")) return;
+    if (!confirm(tProject("confirms.deleteCode"))) return;
     await deleteCode(id!, codeId);
     setCodes((prev) => prev.filter((c) => c.id !== codeId));
     setTags((prev) => prev.filter((t) => t.manual_code_id !== codeId));
@@ -976,7 +976,7 @@ export default function ProjectDetail() {
       setTags((prev) => prev.map((t) => (t.manual_code_id === codeId ? { ...t, code_name: updated.name } : t)));
       setRenamingCodeId(null);
     } catch {
-      toast("Failed to rename code", "error");
+      toast(tProject("toasts.codeRenameFailed"), "error");
     }
   }
 
@@ -990,7 +990,7 @@ export default function ProjectDetail() {
       );
       setEditingInterviewNotes(null);
     } catch {
-      toast("Failed to save notes", "error");
+      toast(tProject("toasts.notesSaveFailed"), "error");
     }
   }
 
@@ -1004,7 +1004,7 @@ export default function ProjectDetail() {
       );
       setEditingQuestionId(null);
     } catch {
-      toast("Failed to save question", "error");
+      toast(tProject("toasts.questionSaveFailed"), "error");
     } finally {
       setSavingQuestionId(null);
     }
@@ -1036,7 +1036,7 @@ export default function ProjectDetail() {
         } : prev
       );
     } catch {
-      toast("Failed to reorder", "error");
+      toast(tProject("toasts.reorderFailed"), "error");
     }
   }
 
@@ -1048,14 +1048,14 @@ export default function ProjectDetail() {
       );
       setEditingNoteId(null);
     } catch {
-      toast("Failed to save note", "error");
+      toast(tProject("toasts.noteSaveFailed"), "error");
     }
   }
 
   async function toggleDeprecateQuestion(questionId: string, currentDeprecatedAt: string | null | undefined) {
     const inProgress = participants.some((p) => p.status === "in_progress");
     if (!currentDeprecatedAt && inProgress) {
-      if (!confirm("There are interviews in progress. Deprecating will skip this question for new responses. Continue?")) return;
+      if (!confirm(tProject("confirms.deprecateQuestion"))) return;
     }
     const newDeprecatedAt = currentDeprecatedAt ? null : new Date().toISOString();
     try {
@@ -1064,7 +1064,7 @@ export default function ProjectDetail() {
         prev ? { ...prev, questions: prev.questions.map((q) => q.id === questionId ? { ...q, deprecated_at: updated.deprecated_at } : q) } : prev
       );
     } catch {
-      toast("Failed to update question", "error");
+      toast(tProject("toasts.questionUpdateFailed"), "error");
     }
   }
 
@@ -1074,14 +1074,15 @@ export default function ProjectDetail() {
     const now = new Date();
     const date = new Date(dateStr);
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    if (seconds < 60) return "just now";
+    const rtf = new Intl.RelativeTimeFormat(i18n.language, { numeric: "auto" });
+    if (seconds < 60) return rtf.format(0, "second");
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 60) return rtf.format(-minutes, "minute");
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return rtf.format(-hours, "hour");
     const days = Math.floor(hours / 24);
-    if (days < 30) return `${days}d ago`;
-    return date.toLocaleDateString();
+    if (days < 30) return rtf.format(-days, "day");
+    return date.toLocaleDateString(i18n.language);
   }
 
   async function handleAddMemo(type: string, linkedKey: string | null) {
@@ -1092,7 +1093,7 @@ export default function ProjectDetail() {
       setNewMemoContent("");
       setAddingMemoKey(null);
     } catch {
-      toast("Failed to save memo", "error");
+      toast(tProject("toasts.memoSaveFailed"), "error");
     }
   }
 
@@ -1102,7 +1103,7 @@ export default function ProjectDetail() {
       setMemos((prev) => prev.map((m) => m.id === memoId ? updated : m));
       setEditingMemoId(null);
     } catch {
-      toast("Failed to update memo", "error");
+      toast(tProject("toasts.memoUpdateFailed"), "error");
     }
   }
 
@@ -1127,7 +1128,7 @@ export default function ProjectDetail() {
       setHeatmapExpanded(true);
       localStorage.setItem("qp_heatmap_open", "true");
     } catch {
-      toast("No ready analysis available — generate one first.", "error");
+      toast(tProject("toasts.noReadyAnalysis"), "error");
     } finally {
       setHeatmapLoading(false);
     }
@@ -1307,9 +1308,9 @@ export default function ProjectDetail() {
           {text.slice(tag.start_index, tag.end_index)}
           <button
             className="tag-pill-remove tag-inline-remove"
-            onClick={(e) => { e.stopPropagation(); if (confirm(`Remove "${tag.code_name}" tag?`)) handleDeleteTag(tag.id); }}
-            aria-label={`Remove tag ${tag.code_name}`}
-            title="Remove tag"
+            onClick={(e) => { e.stopPropagation(); if (confirm(tProject("confirms.removeTag", { name: tag.code_name }))) handleDeleteTag(tag.id); }}
+            aria-label={tProject("a11y.removeTag", { name: tag.code_name })}
+            title={tProject("a11y.removeTagTitle")}
           >×</button>
         </span>
       );
@@ -1382,7 +1383,7 @@ export default function ProjectDetail() {
         ))}
         {isAdding && (
           <div style={{ marginTop: 4 }}>
-            <textarea className="field-input" value={newMemoContent} onChange={(e) => setNewMemoContent(e.target.value)} placeholder="Research note..." rows={3} style={{ width: "100%", marginBottom: 6 }} autoFocus />
+            <textarea className="field-input" value={newMemoContent} onChange={(e) => setNewMemoContent(e.target.value)} placeholder={tProject("responses.memoPlaceholder")} rows={3} style={{ width: "100%", marginBottom: 6 }} autoFocus />
             <div style={{ display: "flex", gap: 6 }}>
               <button className="btn btn-primary btn-xs" onClick={() => handleAddMemo(type, linkedKey)}>Save</button>
               <button className="btn btn-ghost btn-xs" onClick={() => { setAddingMemoKey(null); setNewMemoContent(""); }}>Cancel</button>
@@ -1395,8 +1396,8 @@ export default function ProjectDetail() {
 
   // ── Early returns ──────────────────────────────────────────────────────────
 
-  if (loading) return <div className="page-center"><p className="muted-text">Loading project...</p></div>;
-  if (!project) return <div className="page-center"><p>Project not found.</p></div>;
+  if (loading) return <div className="page-center"><p className="muted-text">{tProject("detail.loadingProject")}</p></div>;
+  if (!project) return <div className="page-center"><p>{tProject("detail.projectNotFound")}</p></div>;
 
   const completedCount = participants.filter((p) => p.status === "completed").length;
   const filterOptions = getFilterOptions();
@@ -1464,7 +1465,7 @@ export default function ProjectDetail() {
       setProject(updated);
       setEditingScreening(false);
       setExpandedSQ(null);
-    } catch { toast("Failed to save screening questions", "error"); }
+    } catch { toast(tProject("toasts.screeningSaveFailed"), "error"); }
     finally { setScreeningSaving(false); }
   }
 
@@ -1604,10 +1605,10 @@ export default function ProjectDetail() {
           onBlur={() => {
             if (!id || !project.name.trim()) return;
             patchProjectSettings(id, { name: project.name.trim() }).catch(() =>
-              toast("Couldn't rename the interview round", "error"),
+              toast(tProject("toasts.roundRenameFailed"), "error"),
             );
           }}
-          aria-label="Interview round name"
+          aria-label={tProject("a11y.roundName")}
           title={project.name}
         />
       }
@@ -1676,7 +1677,7 @@ export default function ProjectDetail() {
                 {tCommon("cancel")}
               </button>
               <button className="btn btn-primary btn-sm" onClick={confirmDiscardUnsaved}>
-                {tCommon("continue") || "Discard & continue"}
+                {tProject("transcript.discardContinue")}
               </button>
             </div>
           </div>
@@ -2179,8 +2180,8 @@ export default function ProjectDetail() {
                       onClick={async () => {
                         try {
                           await regenerateScreeningTranslations(project.id);
-                          toast("Regenerating translations — refresh in a few seconds", "info");
-                        } catch { toast("Failed to regenerate translations", "error"); }
+                          toast(tProject("toasts.translationsRegenerating"), "info");
+                        } catch { toast(tProject("toasts.translationsRegenerateFailed"), "error"); }
                       }}
                     >
                       🌐 Regenerate all translations
@@ -2215,7 +2216,7 @@ export default function ProjectDetail() {
                               <button
                                 className={`screening-disq-toggle${sq.disqualifying_options.includes(opt) ? " screening-disq-toggle--active" : ""}`}
                                 onClick={() => opt.trim() && sqToggleDisq(sqIdx, opt)}
-                                title={sq.disqualifying_options.includes(opt) ? "Disqualifying" : "Allowed"}
+                                title={sq.disqualifying_options.includes(opt) ? tProject("a11y.disqualifying") : tProject("a11y.allowed")}
                               >
                                 {sq.disqualifying_options.includes(opt) ? "✕" : "✓"}
                               </button>
@@ -2272,13 +2273,11 @@ export default function ProjectDetail() {
                       onClick={addBlankGuideQuestion}
                       style={{ marginTop: 2 }}
                     >
-                      Write the guide myself
+                      {tProject("guideEmpty.writeMyself")}
                     </button>
                   </div>
                   <p style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 10 }}>
-                    The AI proposes a full guide you review one question at a
-                    time — accept, edit, reorder, or delete anything. It never
-                    changes your guide without your approval.
+{tProject("guideEmpty.aiExplainer")}
                   </p>
                 </div>
               ) : (
@@ -2498,7 +2497,7 @@ export default function ProjectDetail() {
             if (hours < 24) return `${hours}h ago`;
             const days = Math.floor(hours / 24);
             if (days < 7) return `${days}d ago`;
-            return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            return new Date(iso).toLocaleDateString(i18n.language, { month: "short", day: "numeric" });
           }
 
           function avatarInitial(name: string | null | undefined) {
@@ -2518,7 +2517,7 @@ export default function ProjectDetail() {
                 </div>
 
                 {/* Status filter pills */}
-                <div role="group" aria-label="Filter by status" style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                <div role="group" aria-label={tProject("a11y.statusFilter")} style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
                   {(["all", "completed", "in_progress"] as const).map(f => {
                     const label = f === "all" ? tProject("responses.allFilter") : f === "completed" ? tProject("responses.doneFilter") : tProject("responses.inProgressFilter");
                     const count = f === "all" ? participants.length : f === "completed" ? completedCount : inProgressCount;
@@ -2549,10 +2548,10 @@ export default function ProjectDetail() {
                       <div className="paywall-banner__icon" aria-hidden>🔒</div>
                       <div className="paywall-banner__body">
                         <div className="paywall-banner__title">
-                          {lockedCount} {lockedCount === 1 ? "transcript" : "transcripts"} waiting to be unlocked
+                          {tProject("paywall.lockedTranscripts", { count: lockedCount })}
                         </div>
                         <div className="paywall-banner__sub">
-                          Your first 3 stay free forever. Unlock the rest with a plan or a credit pack.
+                          {tProject("paywall.sub")}
                         </div>
                       </div>
                       <button
@@ -2560,7 +2559,7 @@ export default function ProjectDetail() {
                         className="btn btn-primary btn-sm"
                         onClick={() => setUnlockState({ open: true, lockedCount })}
                       >
-                        Unlock
+                        {tProject("paywall.unlockCta")}
                       </button>
                     </div>
                   );
@@ -2678,7 +2677,7 @@ export default function ProjectDetail() {
                               </span>
                             )}
                           </div>
-                          <span className="participant-card__date">{new Date(selectedParticipant.started_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
+                          <span className="participant-card__date">{new Date(selectedParticipant.started_at).toLocaleDateString(i18n.language, { day: "numeric", month: "short", year: "numeric" })}</span>
                         </div>
                         {selectedParticipant.quality_label && (
                           <span className={`quality-badge quality-badge--${selectedParticipant.quality_label} quality-badge--lg participant-card__quality`}>
@@ -2873,7 +2872,7 @@ export default function ProjectDetail() {
                                         recordingAudioRefs.current[t.id] = el;
                                       }}
                                       src={t.audio_recording_url}
-                                      label={`Participant recording — turn ${t.turn_index}`}
+                                      label={tProject("a11y.participantRecording", { turn: t.turn_index })}
                                       onTimeUpdate={(e) => {
                                         const segs = t.response_segments;
                                         if (!segs || segs.length === 0) return;
@@ -3488,17 +3487,17 @@ export default function ProjectDetail() {
                                     <>
                                       <button
                                         className={`annotation-pill${ann?.status === "confirmed" ? " annotation-pill--confirmed" : ""}`}
-                                        aria-label="Confirmed"
+                                        aria-label={tProject("a11y.annotConfirmed")}
                                         onClick={() => handleAnnotationClick(t.title, "confirmed")}
                                       >✓ {tAnalysis("annotationConfirm")}</button>
                                       <button
                                         className={`annotation-pill${ann?.status === "needs_evidence" ? " annotation-pill--needs_evidence" : ""}`}
-                                        aria-label="Needs evidence"
+                                        aria-label={tProject("a11y.annotNeedsEvidence")}
                                         onClick={() => handleAnnotationClick(t.title, "needs_evidence")}
                                       >? {tAnalysis("annotationEvidence")}</button>
                                       <button
                                         className={`annotation-pill${ann?.status === "disputed" ? " annotation-pill--disputed" : ""}`}
-                                        aria-label="Disputed"
+                                        aria-label={tProject("a11y.annotDisputed")}
                                         onClick={() => handleAnnotationClick(t.title, "disputed")}
                                       >✕ {tAnalysis("annotationDispute")}</button>
                                     </>
@@ -3779,7 +3778,7 @@ export default function ProjectDetail() {
                                       const segParticipants = heatmap.segment_participants[seg] ?? [];
                                       return (
                                         <td key={seg} style={{ padding: "6px 8px", textAlign: "center", borderBottom: "1px solid var(--border-subtle)", background: heatmapColor(count), cursor: count > 0 ? "help" : "default" }}
-                                          title={count > 0 ? `${count} quote(s) — ${segParticipants.join(", ")}` : "No quotes from this segment"}
+                                          title={count > 0 ? tProject("heatmapCell.quotes", { count, participants: segParticipants.join(", ") }) : tProject("heatmapCell.empty")}
                                         >
                                           {count > 0 ? count : ""}
                                         </td>
@@ -3822,14 +3821,12 @@ export default function ProjectDetail() {
             setWelcomeCopied(true);
             setTimeout(() => setWelcomeCopied(false), 2000);
           } catch {
-            toast("Could not copy to clipboard", "error");
+            toast(tProject("toasts.clipboardCopyFailed"), "error");
           }
         };
-        const subject = encodeURIComponent(`Quick research interview — ${project?.name ?? ""}`);
+        const subject = encodeURIComponent(tProject("share.emailSubject", { projectName: project?.name ?? "" }));
         const bodyText = encodeURIComponent(
-          `Hi,\n\nI'd love your input on a short research study I'm running.\n` +
-            `It's a 10–20 minute voice interview you can do right from your browser, at your own pace.\n\n` +
-            `Start here: ${shareUrl}\n\nThanks so much!`
+          tProject("share.emailBody", { url: shareUrl })
         );
         const mailtoLink = `mailto:?subject=${subject}&body=${bodyText}`;
         return (
@@ -3841,7 +3838,7 @@ export default function ProjectDetail() {
             onClick={closeWelcome}
           >
             <div className="modal-content welcome-modal" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close" onClick={closeWelcome} aria-label="Close">×</button>
+              <button className="modal-close" onClick={closeWelcome} aria-label={tProject("a11y.close")}>×</button>
               <div className="welcome-modal-icon" aria-hidden="true">🎉</div>
               <h2 id="welcome-modal-title" className="welcome-modal-title">
                 {tProject("detail.welcomeModalTitle")}
@@ -3859,7 +3856,7 @@ export default function ProjectDetail() {
                       value={shareUrl}
                       onFocus={(e) => e.currentTarget.select()}
                       className="field-input welcome-modal-link-input"
-                      aria-label="Interview link"
+                      aria-label={tProject("a11y.interviewLink")}
                     />
                     <button
                       className="btn btn-primary"

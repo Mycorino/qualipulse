@@ -62,7 +62,33 @@
       "advisory": "Advisory only — apply at your discretion",
       "scanning": "Looking for double-barreled phrasing, leading wording, and bias patterns…",
       "suggestedReplacement": "Suggested replacement",
-      "applyRewrite": "Apply this rewrite"
+      "applyRewrite": "Apply this rewrite",
+      "flags": {
+        "double_barreled": {
+          "label": "Possible double-barreled question",
+          "detail": "This question may be asking about two things at once. Split it into two separate questions so you know which factor matters to respondents."
+        },
+        "leading_wording": {
+          "label": "Leading wording detected",
+          "detail": "Loaded adjectives nudge respondents toward a specific answer. Try a neutral framing that doesn't telegraph the desired response."
+        },
+        "agree_disagree_bias": {
+          "label": "Acquiescence-bias phrasing",
+          "detail": "Phrases like \"Don't you agree…\" prime agreement. Reword as a neutral question that asks the respondent for their actual view."
+        },
+        "vague_intensifier": {
+          "label": "Vague intensifier",
+          "detail": "Words like \"very\" or \"really\" mean different things to different respondents. A more specific anchor (frequency, time, money) makes answers comparable across people."
+        },
+        "too_short": {
+          "label": "Prompt is very short",
+          "detail": "Questions under 4 words often miss context. Add the specific behaviour, timeframe, or scope you're asking about."
+        },
+        "unbalanced_scale": {
+          "label": "Likert scale is unbalanced",
+          "detail": "This scale length is unusual. 5- and 7-point scales are the validated defaults — unbalanced or non-standard scales bias responses."
+        }
+      }
     },
     "config": {
       "scale": "Scale",

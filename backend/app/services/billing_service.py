@@ -500,9 +500,19 @@ def _maybe_send_usage_warning(db: Session, workspace_id: str, balance: CreditBal
     if company is None or not company.email:
         return
     lang = (company.preferred_language or "en")[:2].lower()
-    period_end_str = (
-        balance.period_end.strftime("%d %b %Y") if balance.period_end else ""
-    )
+    if balance.period_end and lang == "fr":
+        _months_fr = [
+            "janv.", "févr.", "mars", "avr.", "mai", "juin",
+            "juil.", "août", "sept.", "oct.", "nov.", "déc.",
+        ]
+        period_end_str = (
+            f"{balance.period_end.day} {_months_fr[balance.period_end.month - 1]} "
+            f"{balance.period_end.year}"
+        )
+    elif balance.period_end:
+        period_end_str = balance.period_end.strftime("%d %b %Y")
+    else:
+        period_end_str = ""
     billing_url = f"{settings.APP_BASE_URL.rstrip('/')}/account?tab=billing"
 
     try:

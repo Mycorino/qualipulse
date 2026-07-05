@@ -53,9 +53,9 @@
     "report": {
       "loading": "Chargement…",
       "generateHeadline": "Générer le rapport de thèmes quantifiés",
-      "generateBody": "Combine les agrégats du questionnaire avec les transcriptions d'entretiens en thèmes qui associent ce que les gens ont dit à la fréquence à laquelle ils l'ont dit. Chaque thème porte une prochaine étape recommandée et une pastille de confiance — le même contrat méthodologique utilisé partout ailleurs dans l'espace de travail.",
-      "lowResponseWarning_one": "⚠ Vous avez {{count}} réponse au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
-      "lowResponseWarning_other": "⚠ Vous avez {{count}} réponses au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
+      "generateBody": "Combine les agrégats du questionnaire avec les transcriptions d'entretiens en thèmes qui associent ce que les gens ont dit à la fréquence à laquelle ils l'ont dit. Chaque thème s'accompagne d'une prochaine étape recommandée et d'une pastille de confiance — le même contrat méthodologique utilisé partout ailleurs dans l'espace de travail.",
+      "lowResponseWarning_one": "⚠ Vous avez {{count}} réponse au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
+      "lowResponseWarning_other": "⚠ Vous avez {{count}} réponses au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
       "generating": "Génération… (≈10 s)",
       "generate": "Générer le rapport",
       "versionEyebrow": "Thèmes quantifiés · v{{version}}",
@@ -68,7 +68,7 @@
       "validateThemesTitle": "Lancer un micro-questionnaire de validation à partir de ces thèmes",
       "regenerate": "Régénérer",
       "regenerating": "Régénération…",
-      "lastGenerationFailed": "⚠ La dernière génération a échoué : {{error}}",
+      "lastGenerationFailed": "⚠ La dernière génération a échoué : {{error}}",
       "unknownError": "erreur inconnue",
       "executiveSummary": "Résumé",
       "themes_one": "{{count}} thème",
@@ -102,15 +102,15 @@
       "surveySignal": "Signal du questionnaire",
       "n": "n={{count}}",
       "interviewEvidence": "Preuve d'entretien · {{xOfY}}",
-      "overIndex": " · sur-indice {{value}}×",
+      "overIndex": " · surreprésentation {{value}}×",
       "segmentLabel": " · {{label}}"
     },
     "themeValidation": {
       "awaiting": "En attente des réponses de validation pour ce thème.",
       "title": "Validation des thèmes · n={{count}}",
-      "agreedCounts": "{{agreed}} répondants sur {{total}} sont d'accord (en dessous de n=30 ; décomptes uniquement)",
-      "agreedPct": "sont d'accord que ce thème résonne",
-      "ci": " · IC à 95 % {{low}}–{{high}} %"
+      "agreedCounts": "{{agreed}} répondants sur {{total}} sont d'accord (en dessous de n=30 ; décomptes uniquement)",
+      "agreedPct": "se reconnaissent dans ce thème",
+      "ci": " · IC à 95 % {{low}}–{{high}} %"
     },
     "recommendedAction": {
       "eyebrow": "Prochaine étape recommandée",
@@ -135,7 +135,7 @@
       "live": "En ligne",
       "drafts": "Brouillons",
       "surveyResponses": "Réponses au questionnaire",
-      "inferenceGrade": "Niveau d'inférence",
+      "inferenceGrade": "Seuil d'inférence atteint",
       "buildingSample": "Constitution de l'échantillon",
       "interviews": "Entretiens",
       "projects_one": "{{count}} projet",
@@ -143,11 +143,11 @@
     }
   },
   "chartCard": {
-    "completion": "{{count}} % de complétion",
-    "ci": "IC à 95 % ±{{value}} pp",
+    "completion": "{{count}} % de complétion",
+    "ci": "IC à 95 % ±{{value}} pp",
     "n": "n={{count}}",
     "smallNWarning": "⚠ Indicatif uniquement (n<{{minN}})",
-    "smallNTitle": "Échantillon trop petit pour l'inférence ; à considérer comme indicatif"
+    "smallNTitle": "Échantillon trop petit pour l'inférence ; à considérer comme indicatif"
   },
   "executiveSummary": {
     "eyebrow": "Résumé",
@@ -165,7 +165,7 @@
     "ariaLabel": "Tableau croisé",
     "themeHeader": "Thème",
     "columnN": "n={{count}}",
-    "smallNTitle": "Segment trop petit pour l'inférence (n={{columnN}} < {{minN}}). Affichage du décompte à la place.",
+    "smallNTitle": "Segment trop petit pour l'inférence (n={{columnN}} < {{minN}}). Seul le décompte est affiché.",
     "empty": "—"
   },
   "prioritization": {

@@ -30,7 +30,7 @@
   "download": "Télécharger",
   "upload": "Importer",
   "copy": "Copier",
-  "copied": "Copié !",
+  "copied": "Copié !",
   "share": "Partager",
   "restore": "Restaurer",
   "restoring": "Restauration…",
@@ -58,7 +58,7 @@
   "verifyEmailDesc": "Consultez votre boîte mail pour trouver le lien de vérification.",
   "resendEmail": "Renvoyer l'email",
   "resending": "Envoi en cours…",
-  "emailSent": "Email envoyé ! Consultez votre boîte mail.",
+  "emailSent": "Email envoyé ! Consultez votre boîte mail.",
   "learnMore": "En savoir plus",
   "contactSupport": "Contacter le support",
   "notFound": {
@@ -68,43 +68,56 @@
     "ctaBlog": "Lire le blog"
   },
   "legal": {
-    "backToHome": "Retour \u00e0 l\u2019accueil",
+    "backToHome": "Retour à l’accueil",
     "contents": "Sommaire",
-    "lastUpdated": "Derni\u00e8re mise \u00e0 jour\u00a0: avril 2026",
+    "lastUpdated": "Dernière mise à jour : avril 2026",
     "terms": {
-      "pageTitle": "Conditions g\u00e9n\u00e9rales d\u2019utilisation",
+      "pageTitle": "Conditions générales d’utilisation",
       "toc": {
         "serviceDescription": "Description du service",
         "accounts": "Comptes",
         "acceptableUse": "Utilisation acceptable",
-        "intellectualProperty": "Propri\u00e9t\u00e9 intellectuelle",
-        "dataAndPrivacy": "Donn\u00e9es et confidentialit\u00e9",
+        "intellectualProperty": "Propriété intellectuelle",
+        "dataAndPrivacy": "Données et confidentialité",
         "paymentTerms": "Conditions de paiement",
-        "serviceAvailability": "Disponibilit\u00e9 du service",
-        "limitationOfLiability": "Limitation de responsabilit\u00e9",
-        "termination": "R\u00e9siliation",
+        "serviceAvailability": "Disponibilité du service",
+        "limitationOfLiability": "Limitation de responsabilité",
+        "termination": "Résiliation",
         "changesToTerms": "Modification des conditions",
         "governingLaw": "Droit applicable",
         "contact": "Contact"
       }
     },
     "privacy": {
-      "pageTitle": "Politique de confidentialit\u00e9",
+      "pageTitle": "Politique de confidentialité",
       "toc": {
         "introduction": "Introduction",
         "dataController": "Responsable du traitement",
-        "dataWeCollect": "Donn\u00e9es que nous collectons",
-        "howWeUseYourData": "Utilisation de vos donn\u00e9es",
+        "dataWeCollect": "Données que nous collectons",
+        "howWeUseYourData": "Utilisation de vos données",
         "legalBasis": "Base juridique du traitement",
         "thirdPartyProcessors": "Sous-traitants tiers",
-        "dataStorageAndSecurity": "Stockage et s\u00e9curit\u00e9 des donn\u00e9es",
-        "dataRetention": "Conservation des donn\u00e9es",
+        "dataStorageAndSecurity": "Stockage et sécurité des données",
+        "dataRetention": "Conservation des données",
         "yourRights": "Vos droits",
         "cookies": "Cookies",
         "childrensPrivacy": "Protection des mineurs",
         "changesToPolicy": "Modifications de cette politique",
-        "contactAndComplaints": "Contact et r\u00e9clamations"
+        "contactAndComplaints": "Contact et réclamations"
       }
     }
-  }
+  },
+  "errors": {
+    "generic": "Une erreur s'est produite. Veuillez réessayer.",
+    "network": "Impossible de joindre le serveur. Vérifiez votre connexion internet et réessayez.",
+    "timeout": "La requête a expiré. Veuillez réessayer.",
+    "badRequest": "Requête invalide. Vérifiez votre saisie et réessayez.",
+    "unauthorized": "Identifiants incorrects. Veuillez réessayer.",
+    "forbidden": "Vous n'avez pas les droits nécessaires pour cette action.",
+    "conflict": "Cette ressource existe déjà.",
+    "validation": "Vérifiez que tous les champs sont correctement remplis.",
+    "rateLimited": "Trop de tentatives. Patientez un instant avant de réessayer.",
+    "serverUnavailable": "Nos serveurs sont momentanément indisponibles. Réessayez dans quelques instants."
+  },
+  "retry": "Réessayer"
 }

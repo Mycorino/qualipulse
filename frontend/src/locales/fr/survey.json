@@ -9,7 +9,7 @@
     "addQuestionFailed": "Impossible d'ajouter la question",
     "saveFailed": "Échec de l'enregistrement — votre modification n'a pas été conservée",
     "removeQuestionFailed": "Impossible de supprimer la question",
-    "reorderFailed": "Le réordonnancement n'a pas été enregistré",
+    "reorderFailed": "Le nouvel ordre n'a pas été enregistré",
     "surveyLive": "Le questionnaire est en ligne",
     "surveyClosed": "Questionnaire clôturé",
     "statusChangeFailed": "Échec du changement de statut",
@@ -17,7 +17,7 @@
     "createLinkFailed": "Impossible de créer le lien",
     "saveFailedShort": "Échec de l'enregistrement",
     "linkCopied": "Lien copié",
-    "mission": "Préparez ce questionnaire à la publication.",
+    "mission": "Préparez ce questionnaire pour la publication.",
     "crumbStudies": "Études",
     "eyebrow": "Questionnaire",
     "surveyNameAria": "Nom du questionnaire",
@@ -60,9 +60,35 @@
       "title": "Coach de question",
       "checking": "Analyse en cours…",
       "advisory": "À titre indicatif uniquement — appliquez à votre discrétion",
-      "scanning": "Recherche de formulations à double sens, de tournures orientées et de biais…",
+      "scanning": "Recherche de questions doubles, de tournures orientées et de biais…",
       "suggestedReplacement": "Remplacement suggéré",
-      "applyRewrite": "Appliquer cette reformulation"
+      "applyRewrite": "Appliquer cette reformulation",
+      "flags": {
+        "double_barreled": {
+          "label": "Question possiblement double",
+          "detail": "Cette question porte peut-être sur deux sujets à la fois. Scindez-la en deux questions distinctes pour savoir quel facteur compte pour les répondants."
+        },
+        "leading_wording": {
+          "label": "Formulation orientée détectée",
+          "detail": "Les adjectifs connotés poussent les répondants vers une réponse. Préférez une formulation neutre qui ne suggère pas la réponse attendue."
+        },
+        "agree_disagree_bias": {
+          "label": "Formulation induisant l'acquiescement",
+          "detail": "Les tournures du type « N'êtes-vous pas d'accord… » incitent à approuver. Reformulez en question neutre qui demande l'avis réel du répondant."
+        },
+        "vague_intensifier": {
+          "label": "Intensificateur vague",
+          "detail": "Des mots comme « très » ou « vraiment » n'ont pas le même sens pour tout le monde. Un repère plus précis (fréquence, durée, montant) rend les réponses comparables."
+        },
+        "too_short": {
+          "label": "Intitulé très court",
+          "detail": "Les questions de moins de 4 mots manquent souvent de contexte. Précisez le comportement, la période ou le périmètre concerné."
+        },
+        "unbalanced_scale": {
+          "label": "Échelle de Likert déséquilibrée",
+          "detail": "Cette longueur d'échelle est inhabituelle. Les échelles à 5 ou 7 points sont les standards validés — une échelle non standard biaise les réponses."
+        }
+      }
     },
     "config": {
       "scale": "Échelle",
@@ -76,9 +102,9 @@
       "responseSettings": "Paramètres de réponse",
       "maxLength": "Longueur maximale",
       "characters": "caractères",
-      "aiClusterLabel": "Recommandé : regrouper les réponses libres par IA (premier passage gratuit)",
+      "aiClusterLabel": "Recommandé : regrouper les réponses libres par IA (premier passage gratuit)",
       "npsStandard": "Standard 0 à 10",
-      "npsNote": "Le NPS utilise l'échelle validée de 0 à 10 avec les catégories fixes Détracteurs / Passifs / Promoteurs. Le libellé des ancrages est verrouillé : 0 = « Pas du tout probable », 10 = « Extrêmement probable »."
+      "npsNote": "Le NPS utilise l'échelle validée de 0 à 10 avec les catégories fixes Détracteurs / Passifs / Promoteurs. Le libellé des ancrages est verrouillé : 0 = « Pas du tout probable », 10 = « Extrêmement probable »."
     }
   },
   "list": {
@@ -108,7 +134,7 @@
   },
   "dashboard": {
     "loadFailed": "Impossible de charger le tableau de bord",
-    "savedSegmentsInfo": "Les segments enregistrés arrivent au Sprint 10 — pour l'instant, cliquez sur « Inviter à un entretien IA ».",
+    "savedSegmentsInfo": "Les segments enregistrés arrivent au Sprint 10 — pour l'instant, cliquez sur « Inviter à un entretien IA ».",
     "invitesFailed": "Échec de l'envoi des invitations",
     "invitesSent_one": "{{count}} invitation envoyée",
     "invitesSent_other": "{{count}} invitations envoyées",
@@ -124,15 +150,15 @@
     "completionRate": "Taux de complétion",
     "belowThreshold": "Inférieur à n={{count}}",
     "status": "Statut",
-    "noteBelowThreshold": "Nombre total de réponses inférieur au seuil n={{count}} requis pour l'inférence. Les pourcentages sont masqués ; les effectifs sont affichés à la place.",
-    "noteWilsonPrefix": "Intervalles de confiance de Wilson à 95 % sur chaque proportion. Les sous-segments inférieurs à n=",
+    "noteBelowThreshold": "Nombre total de réponses inférieur au seuil n={{count}} requis pour l'inférence. Les pourcentages sont masqués ; les effectifs sont affichés à la place.",
+    "noteWilsonPrefix": "Intervalles de confiance de Wilson à 95 % sur chaque proportion. Les sous-segments inférieurs à n=",
     "noteWilsonSuffix": " sont présentés uniquement en effectifs.",
     "allCompletedRespondents": "Tous les répondants ayant terminé",
     "filterAnd": " ET ",
     "questionFallback": "Question",
     "respondents": "Répondants",
     "completed": "Terminés",
-    "completionPercent": "{{percent}} % de complétion",
+    "completionPercent": "{{percent}} % de complétion",
     "tooSmall": "n trop petit pour le calcul",
     "questions": "Questions",
     "noQuestionsEditor": "Aucune question pour l'instant. Ajoutez-en dans l'éditeur.",
@@ -151,7 +177,7 @@
       "strong": "Preuve solide"
     },
     "basedOnQuestion": "D'après la Q",
-    "choice": "choix :",
+    "choice": "choix :",
     "interviewSegment": "Interroger ce segment →",
     "reviewModal": {
       "ariaLabel": "Vérifier et confirmer les invitations aux entretiens",
@@ -179,7 +205,7 @@
     },
     "noResponsesYet": "Aucune réponse pour l'instant.",
     "npsScore": "Score NPS",
-    "mean": "Moyenne : {{value}}",
+    "mean": "Moyenne : {{value}}",
     "textResponsesSummary": "Affichage de {{shown}} réponses textuelles sur {{total}}. Les thèmes regroupés par IA arrivent au Sprint 13."
   },
   "preview": {
@@ -209,14 +235,14 @@
       "open_text": "Texte libre"
     },
     "placeholders": {
-      "likert": "Dans quelle mesure êtes-vous d'accord avec l'affirmation suivante : …",
+      "likert": "Dans quelle mesure êtes-vous d'accord avec l'affirmation suivante : …",
       "multi_choice": "Laquelle des propositions suivantes décrit le mieux …",
-      "nps": "Quelle est la probabilité que vous nous recommandiez à un ami ou un collègue ?",
-      "open_text": "Quelle est la seule chose que nous pourrions changer pour améliorer cela ?"
+      "nps": "Quelle est la probabilité que vous nous recommandiez à un ami ou un collègue ?",
+      "open_text": "Quelle est la seule chose que nous pourrions changer pour améliorer cela ?"
     },
     "guardrails": {
-      "doubleBarreledLabel": "Question possiblement à double sens",
-      "doubleBarreledDetail": "Scinder « rapidité et fiabilité » en deux questions produit généralement des données plus propres.",
+      "doubleBarreledLabel": "Question possiblement double (deux questions en une)",
+      "doubleBarreledDetail": "Scinder « rapidité et fiabilité » en deux questions produit généralement des données plus propres.",
       "leadingLabel": "Formulation orientée détectée",
       "leadingDetail": "Les adjectifs chargés biaisent les réponses. Essayez une formulation neutre.",
       "shortLabel": "L'énoncé semble court",
@@ -253,7 +279,7 @@
     "nps": {
       "scale": "Échelle",
       "standard": "Standard 0 à 10",
-      "note": "Le NPS utilise l'échelle validée de 0 à 10 avec les catégories fixes Détracteurs (0–6) / Passifs (7–8) / Promoteurs (9–10). Le libellé des ancrages est verrouillé : 0 = « Pas du tout probable », 10 = « Extrêmement probable »."
+      "note": "Le NPS utilise l'échelle validée de 0 à 10 avec les catégories fixes Détracteurs (0–6) / Passifs (7–8) / Promoteurs (9–10). Le libellé des ancrages est verrouillé : 0 = « Pas du tout probable », 10 = « Extrêmement probable »."
     },
     "openText": {
       "responseSettings": "Paramètres de réponse",
@@ -277,7 +303,7 @@
   "quotaBanner": {
     "capReached": "Plafond de réponses au questionnaire atteint",
     "nearingCap": "Vous approchez de votre plafond de réponses au questionnaire",
-    "detailWithCap": "{{used}} réponses sur {{cap}} utilisées sur cette période ({{pct}} %).",
+    "detailWithCap": "{{used}} réponses sur {{cap}} utilisées sur cette période ({{pct}} %).",
     "detailWithCapNoPct": "{{used}} réponses sur {{cap}} utilisées sur cette période.",
     "detailNoCap": "{{used}} réponses sur cette période.",
     "pausedSuffix": "Les nouvelles soumissions au questionnaire seront suspendues jusqu'à la réinitialisation de votre forfait, ou passez à un forfait supérieur pour continuer à collecter.",

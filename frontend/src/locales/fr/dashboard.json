@@ -4,15 +4,15 @@
   "hubHeader": {
     "aria": "Aperçu de l'espace de travail",
     "eyebrow": "Votre espace de recherche",
-    "welcomeBack": "Bon retour",
-    "welcomeBackName": "Bon retour, {{name}}",
-    "firstStudy": "Prêt à lancer votre première étude ?",
+    "welcomeBack": "Ravi de vous revoir",
+    "welcomeBackName": "Ravi de vous revoir, {{name}}",
+    "firstStudy": "Prêt à lancer votre première étude ?",
     "firstStudySubtitle": "Configurez un entretien piloté par l'IA en quelques minutes — partagez un lien, écoutez ce que vos participants ont à dire.",
-    "contextLine": "{{projects}} projet · {{completed}} entretien complété",
-    "contextLine_other": "{{projects}} projets · {{completed}} entretiens complétés",
+    "contextLine": "{{projects}} projet · {{completed}} entretien terminé",
+    "contextLine_other": "{{projects}} projets · {{completed}} entretiens terminés",
     "pillProjects": "projet",
     "pillProjects_other": "projets",
-    "pillCompleted": "complétés",
+    "pillCompleted": "terminés",
     "pillInProgress": "en cours",
     "pillAnalysesReady": "à lire",
     "pillAnalysesReady_other": "à lire"
@@ -20,7 +20,7 @@
   "loadError": "Nous n'avons pas pu charger vos projets. Veuillez rafraîchir la page.",
   "projectCount": "{{count}} sur {{max}} projets",
   "handoffHint": {
-    "title": "Étape suivante : invitez votre premier participant.",
+    "title": "Étape suivante : invitez votre premier participant.",
     "desc": "Partagez le lien d'entretien de votre étude pour commencer à collecter des réponses.",
     "cta": "Ouvrir mon étude"
   },
@@ -38,7 +38,7 @@
     "upgradeCtaShort": "Passer à l'offre payante"
   },
   "creditsBanner": {
-    "warningTitle": "{{percent}} % de vos crédits utilisés",
+    "warningTitle": "{{percent}} % de vos crédits utilisés",
     "warningDesc": "{{used}} crédits sur {{total}} utilisés ce mois-ci. Rechargez pour éviter toute interruption.",
     "criticalTitle": "Vous n'avez plus de crédits",
     "criticalDesc": "Les nouveaux entretiens seront bloqués jusqu'à l'achat d'un pack ou le début de la prochaine période.",
@@ -46,7 +46,7 @@
     "dismissAria": "Fermer la bannière de crédits"
   },
   "gettingStarted": {
-    "welcome": "Bienvenue, {{name}} ! Configurons votre première étude.",
+    "welcome": "Bienvenue, {{name}} ! Configurons votre première étude.",
     "subtitle": "Trois étapes pour lancer votre premier entretien piloté par l'IA.",
     "step1Title": "Créer un projet",
     "step1Desc": "Décrivez vos objectifs de recherche et laissez l'IA rédiger votre guide d'entretien.",
@@ -61,13 +61,13 @@
   "projectCard": {
     "questions": "{{count}} questions",
     "questions_one": "{{count}} question",
-    "completed": "{{count}} complété(s)",
+    "completed": "{{count}} terminé(s)",
     "inProgress": "{{count}} en cours",
     "noResponses": "Aucune réponse pour l'instant",
     "analysisReady": "Analyse disponible",
     "analysing": "Analyse en cours…",
-    "nudgeAnalyse": "✦ Prêt à analyser — vous avez {{count}} entretiens complétés",
-    "nudgeAnalyse_one": "✦ Prêt à analyser — vous avez {{count}} entretien complété",
+    "nudgeAnalyse": "✦ Prêt à analyser — vous avez {{count}} entretiens terminés",
+    "nudgeAnalyse_one": "✦ Prêt à analyser — vous avez {{count}} entretien terminé",
     "nudgeStale": "⏸ Aucune nouvelle réponse depuis {{count}} jours",
     "nudgeStale_one": "⏸ Aucune nouvelle réponse depuis {{count}} jour",
     "lastActivity": "Dernière réponse le {{date}}",
@@ -88,11 +88,11 @@
     "name": "Nom A–Z"
   },
   "insights": {
-    "priorityTitle": "Sur quoi vous concentrez-vous en ce moment ?",
+    "priorityTitle": "Sur quoi vous concentrez-vous en ce moment ?",
     "priorityUpdatedAgo": "Actualisé il y a {{count}} jour",
     "priorityUpdatedAgo_other": "Actualisé il y a {{count}} jours",
     "priorityPlaceholder": "ex. Comprendre pourquoi les power users arrêtent de monter en gamme après 6 mois",
-    "priorityHint": "Une phrase courte pour qu'on vous suggère la recherche qui fait bouger l'aiguille.",
+    "priorityHint": "Une phrase courte pour que nous puissions vous suggérer les recherches à plus fort impact.",
     "prioritySave": "Enregistrer",
     "priorityEdit": "Mettre à jour",
     "recsTitlePersonalised": "Études qui correspondent à vos enjeux",
@@ -105,7 +105,7 @@
     "loadError": "Impossible de charger vos études. Actualisez la page.",
     "eyebrow": "Espace de recherche",
     "title": "Vos études",
-    "subtitle": "Une étude, c'est un projet de recherche : un questionnaire, une série d'entretiens, ou les deux — chaque carte indique les méthodes utilisées. Quanti, quali, hybride : tout au même endroit.",
+    "subtitle": "Une étude, c'est un projet de recherche : un questionnaire, une série d'entretiens, ou les deux — chaque carte indique les méthodes utilisées. Quanti, quali, hybride : tout au même endroit.",
     "newStudy": "+ Nouvelle étude",
     "loading": "Chargement…",
     "emptyText": "Aucune étude pour l'instant. Lancez-vous — questionnaire, entretiens, ou les deux. Une étude se crée autour de votre premier instrument et apparaît ici.",
@@ -134,7 +134,7 @@
     "aria": "Lancer une nouvelle étude",
     "close": "Fermer",
     "eyebrow": "Nouvelle étude",
-    "title": "Que voulez-vous apprendre ?",
+    "title": "Que voulez-vous apprendre ?",
     "sub": "Nommez votre étude, puis choisissez par où commencer. Vous pourrez toujours ajouter l'autre méthode plus tard — ce choix décide seulement de ce que vous construisez en premier.",
     "nameLabel": "Nom de l'étude",
     "namePlaceholder": "ex. Pourquoi les nouveaux utilisateurs décrochent",
@@ -147,7 +147,7 @@
       "interviewTitle": "Échanger en profondeur",
       "interviewBlurb": "Creuser. Des entretiens vocaux animés par l'IA qui s'adaptent à chaque participant.",
       "bothTitle": "Les deux — voir large, puis creuser",
-      "bothBlurb": "D'abord un questionnaire, puis des entretiens avec les segments les plus intéressants. La boucle mixte complète."
+      "bothBlurb": "D'abord un questionnaire, puis des entretiens avec les segments les plus intéressants. La boucle méthodes mixtes complète."
     }
   },
   "copilot": {
@@ -157,13 +157,13 @@
     "open": "Ouvrir le copilote de recherche",
     "ariaPanel": "Copilote de recherche",
     "title": "✦ Copilote de recherche",
-    "missionPrefix": "Pour vous aider à : {{mission}}",
+    "missionPrefix": "Pour vous aider à : {{mission}}",
     "close": "Fermer",
     "dismissUpdate": "Ignorer",
     "suggestedNextStep": "✦ Prochaine étape suggérée",
     "emptyLead": "Je peux rédiger des questions, corriger des problèmes de méthode et structurer votre étude. Dites-moi ce que vous voulez apprendre.",
     "workspace": {
-      "introLead": "Bonjour ! Faire de la recherche, c'est parler à de vraies personnes — via un questionnaire, des entretiens animés par l'IA, ou les deux — pour comprendre ce qu'elles pensent vraiment avant de décider. Tout commence par une étude. Prêt à créer la vôtre ? Je vous guide.",
+      "introLead": "Bonjour ! Faire de la recherche, c'est parler à de vraies personnes — via un questionnaire, des entretiens animés par l'IA, ou les deux — pour comprendre ce qu'elles pensent vraiment avant de décider. Tout commence par une étude. Prêt à créer la vôtre ? Je vous guide.",
       "createFirst": "Créer ma première étude"
     },
     "thinking": "Réflexion…",
@@ -177,7 +177,7 @@
     "unavailable": "Le copilote est indisponible pour le moment",
     "errorReply": "Désolé — je n'ai pas pu répondre. Réessayez.",
     "applyError": "Impossible d'appliquer cette modification",
-    "helpMePrefix": "Aidez-moi : {{label}}",
+    "helpMePrefix": "Aidez-moi : {{label}}",
     "starters": {
       "scratch": "Aidez-moi à partir de zéro",
       "methodology": "Vérifiez la méthode de cette étude",
@@ -198,7 +198,7 @@
       "settingsBrandingBranded": "Entretien aux couleurs de la marque",
       "settingsBrandingStandard": "Identité standard",
       "settingsBrandColor": "Couleur {{color}}",
-      "settingsBrandFont": "Police : {{font}}",
+      "settingsBrandFont": "Police : {{font}}",
       "settingsResearcherName": "Affiché comme {{name}}",
       "addScreening": "Ajouter — Question de sélection",
       "runAnalysis": "Lancer l'analyse IA",
@@ -303,19 +303,19 @@
       "reason": "Une étude, c'est un projet de recherche — un questionnaire, une série d'entretiens, ou les deux."
     },
     "studyDone": {
-      "label": "« {{name}} » est en bonne voie",
+      "label": "« {{name}} » est en bonne voie",
       "reason": "Cette étude a un rapport — rien ne requiert votre attention pour le moment."
     },
     "setUpStudy": {
-      "label": "Configurer « {{name}} »",
+      "label": "Configurer « {{name}} »",
       "reason": "Cette étude n'a encore ni questionnaire ni série d'entretiens."
     },
     "analyzeStudy": {
-      "label": "Analyser « {{name}} »",
+      "label": "Analyser « {{name}} »",
       "reason": "Assez de données sont là — synthétisez-les en résultats."
     },
     "collectStudy": {
-      "label": "« {{name}} » collecte des réponses",
+      "label": "« {{name}} » collecte des réponses",
       "reason": "Les réponses arrivent encore — partagez les liens pour atteindre un échantillon."
     },
     "workspaceDone": {
@@ -331,7 +331,7 @@
       "reason": "La dernière analyse a échoué — relancez-la."
     },
     "collectMore": {
-      "label": "Collectez plus d'entretiens ({{count}}/{{min}})",
+      "label": "Collecter plus d'entretiens ({{count}}/{{min}})",
       "reason": "L'analyse se débloque à {{min}} entretiens terminés."
     }
   },
@@ -340,18 +340,18 @@
     "dataMilestone": "Vous avez {{count}} entretiens terminés — assez pour lancer l'analyse.",
     "analysisStale": "{{count}} nouveaux entretiens depuis la dernière analyse — pensez à l'actualiser.",
     "qualityFlag": "Un entretien de faible qualité vient d'arriver — à vérifier.",
-    "studyReportReady": "« {{name}} » — le rapport d'analyse est prêt."
+    "studyReportReady": "« {{name}} » — le rapport d'analyse est prêt."
   },
   "decisionMemos": {
     "eyebrow": "Synthèse transverse",
     "title": "Mémos de décision",
     "sub": "Un mémo exécutif synthétisé à partir de plusieurs études terminées — verdict, preuves convergentes, divergences et zones d'ombre.",
     "newMemo": "+ Nouveau mémo de décision",
-    "empty": "Aucun mémo pour l'instant. Choisissez au moins deux études analysées pour obtenir une synthèse prête à décider.",
+    "empty": "Aucun mémo pour l'instant. Choisissez au moins deux études analysées pour obtenir une synthèse prête pour la décision.",
     "loadError": "Impossible de charger vos mémos de décision.",
     "createdToast": "Génération du mémo lancée — il apparaîtra ci-dessous une fois prêt.",
     "createError": "Impossible de lancer le mémo. Réessayez.",
-    "notReadyError": "Ces études doivent d'abord avoir une analyse prête : {{studies}}",
+    "notReadyError": "Ces études doivent d'abord avoir une analyse prête : {{studies}}",
     "openError": "Impossible d'ouvrir le mémo.",
     "deleteError": "Impossible de supprimer le mémo.",
     "statusGenerating": "Génération…",
@@ -366,7 +366,7 @@
     "modalSub": "Choisissez au moins deux études avec une analyse prête. Le mémo synthétise leurs rapports finaux — jamais les transcriptions brutes.",
     "studiesLabel": "Études à inclure",
     "questionLabel": "Décision à éclairer (optionnel)",
-    "questionPlaceholder": "ex. Prioriser la rétention ou l'acquisition au S2 ?",
+    "questionPlaceholder": "ex. Prioriser la rétention ou l'acquisition au S2 ?",
     "nameLabel": "Nom du mémo (optionnel)",
     "namePlaceholder": "ex. Rétention vs acquisition — S2",
     "studyCount": "{{count}} études"

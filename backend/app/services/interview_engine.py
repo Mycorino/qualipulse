@@ -96,6 +96,122 @@ CLOSING_MESSAGES: dict[str, str] = {
 }
 
 
+# Participant thank-you email, in every supported interview language.
+# Keyed off the participant's effective language (their own choice first,
+# then the project language) — same rule the spoken interview follows.
+COMPLETION_EMAILS: dict[str, dict[str, str]] = {
+    "en": {
+        "subject": "Thank you for your interview — {project_name}",
+        "body": (
+            "<p>Hi{greeting},</p>"
+            "<p>Thank you for taking part in the <strong>{project_name}</strong> interview. "
+            "Your responses have been recorded and will help shape the research.</p>"
+            "<p>You can close this email — no further action is needed.</p>"
+        ),
+    },
+    "fr": {
+        "subject": "Merci pour votre entretien — {project_name}",
+        "body": (
+            "<p>Bonjour{greeting},</p>"
+            "<p>Merci d'avoir participé à l'entretien <strong>{project_name}</strong>. "
+            "Vos réponses ont bien été enregistrées et contribueront à la recherche.</p>"
+            "<p>Vous pouvez fermer cet e-mail — aucune action n'est requise de votre part.</p>"
+        ),
+    },
+    "es": {
+        "subject": "Gracias por su entrevista — {project_name}",
+        "body": (
+            "<p>Hola{greeting},</p>"
+            "<p>Gracias por participar en la entrevista <strong>{project_name}</strong>. "
+            "Sus respuestas han quedado registradas y contribuirán a la investigación.</p>"
+            "<p>Puede cerrar este correo — no se requiere ninguna otra acción.</p>"
+        ),
+    },
+    "de": {
+        "subject": "Vielen Dank für Ihr Interview — {project_name}",
+        "body": (
+            "<p>Hallo{greeting},</p>"
+            "<p>vielen Dank für Ihre Teilnahme am Interview <strong>{project_name}</strong>. "
+            "Ihre Antworten wurden gespeichert und fließen in die Forschung ein.</p>"
+            "<p>Sie können diese E-Mail schließen — es ist nichts weiter zu tun.</p>"
+        ),
+    },
+    "it": {
+        "subject": "Grazie per la sua intervista — {project_name}",
+        "body": (
+            "<p>Salve{greeting},</p>"
+            "<p>grazie per aver partecipato all'intervista <strong>{project_name}</strong>. "
+            "Le sue risposte sono state registrate e contribuiranno alla ricerca.</p>"
+            "<p>Può chiudere questa email — non è richiesta alcuna ulteriore azione.</p>"
+        ),
+    },
+    "pt": {
+        "subject": "Obrigado pela sua entrevista — {project_name}",
+        "body": (
+            "<p>Olá{greeting},</p>"
+            "<p>obrigado por participar na entrevista <strong>{project_name}</strong>. "
+            "As suas respostas foram registadas e vão contribuir para a investigação.</p>"
+            "<p>Pode fechar este email — não é necessária mais nenhuma ação.</p>"
+        ),
+    },
+    "nl": {
+        "subject": "Bedankt voor uw interview — {project_name}",
+        "body": (
+            "<p>Hallo{greeting},</p>"
+            "<p>Bedankt voor uw deelname aan het interview <strong>{project_name}</strong>. "
+            "Uw antwoorden zijn opgeslagen en dragen bij aan het onderzoek.</p>"
+            "<p>U kunt deze e-mail sluiten — er is verder niets nodig.</p>"
+        ),
+    },
+    "ja": {
+        "subject": "インタビューへのご協力ありがとうございました — {project_name}",
+        "body": (
+            "<p>こんにちは{greeting}。</p>"
+            "<p><strong>{project_name}</strong>のインタビューにご協力いただき、誠にありがとうございました。"
+            "ご回答は記録され、調査に活用されます。</p>"
+            "<p>このメールへの返信は不要です。</p>"
+        ),
+    },
+    "ko": {
+        "subject": "인터뷰에 참여해 주셔서 감사합니다 — {project_name}",
+        "body": (
+            "<p>안녕하세요{greeting},</p>"
+            "<p><strong>{project_name}</strong> 인터뷰에 참여해 주셔서 감사합니다. "
+            "답변이 잘 기록되었으며 연구에 소중히 활용될 예정입니다.</p>"
+            "<p>이 메일은 확인만 하시면 됩니다 — 추가 조치는 필요하지 않습니다.</p>"
+        ),
+    },
+    "zh": {
+        "subject": "感谢您参与访谈 — {project_name}",
+        "body": (
+            "<p>您好{greeting}，</p>"
+            "<p>感谢您参与<strong>{project_name}</strong>访谈。"
+            "您的回答已成功记录，将为这项研究提供帮助。</p>"
+            "<p>您可以直接关闭这封邮件，无需任何后续操作。</p>"
+        ),
+    },
+}
+
+
+FALLBACK_FOLLOW_UPS: dict[str, str] = {
+    "en": "Could you tell me more about that?",
+    "fr": "Pouvez-vous m'en dire un peu plus ?",
+    "es": "¿Podría contarme un poco más sobre eso?",
+    "de": "Können Sie mir dazu etwas mehr erzählen?",
+    "it": "Può dirmi qualcosa di più al riguardo?",
+    "pt": "Pode contar-me um pouco mais sobre isso?",
+    "nl": "Kunt u daar iets meer over vertellen?",
+    "ja": "その点について、もう少し詳しく教えていただけますか？",
+    "ko": "그 부분에 대해 조금 더 자세히 말씀해 주시겠어요?",
+    "zh": "您能再多说一点吗？",
+}
+
+
+def _fallback_follow_up(language_code: str | None) -> str:
+    code = (language_code or "en").lower()
+    return FALLBACK_FOLLOW_UPS.get(code, FALLBACK_FOLLOW_UPS.get(code[:2], FALLBACK_FOLLOW_UPS["en"]))
+
+
 def _closing_message(language_code: str | None) -> str:
     code = (language_code or "en").lower()
     return CLOSING_MESSAGES.get(code, CLOSING_MESSAGES["en"])
@@ -503,13 +619,13 @@ WHY: generic answer with no behaviour or example.
             or "```" in cleaned
             or "\n" in cleaned
         ):
-            cleaned = "Could you tell me more about that?"
+            cleaned = _fallback_follow_up(language)
         result = {"action": "follow_up", "question": cleaned}
 
     if "action" not in result:
         result["action"] = "follow_up"
     if "question" not in result:
-        result["question"] = "Could you tell me more about that?"
+        result["question"] = _fallback_follow_up(language)
 
     return result
 
@@ -577,8 +693,11 @@ def _coaching_hint_for(state: dict, language: str) -> str | None:
     hints = {
         "en": "Researchers learn most from specific moments. If a story or example comes to mind, take your time to share it.",
         "fr": "Les chercheurs apprennent surtout des moments concrets. Si un exemple ou une anecdote vous vient, n'hésitez pas à prendre le temps de la raconter.",
-        "es": "Los investigadores aprenden más de momentos específicos. Si te viene a la mente un ejemplo, tómate tu tiempo para contarlo.",
-        "de": "Forscher lernen am meisten aus konkreten Momenten. Wenn dir eine Geschichte oder ein Beispiel einfällt, nimm dir Zeit, sie zu teilen.",
+        "es": "Los investigadores aprenden más de momentos específicos. Si le viene a la mente un ejemplo, tómese su tiempo para contarlo.",
+        "de": "Forscher lernen am meisten aus konkreten Momenten. Wenn Ihnen eine Geschichte oder ein Beispiel einfällt, nehmen Sie sich Zeit, es zu erzählen.",
+        "it": "I ricercatori imparano soprattutto dai momenti concreti. Se le viene in mente un esempio o un aneddoto, si prenda pure il tempo di raccontarlo.",
+        "pt": "Os investigadores aprendem sobretudo com momentos concretos. Se lhe ocorrer um exemplo ou uma história, tome o seu tempo para a contar.",
+        "nl": "Onderzoekers leren het meest van concrete momenten. Als u een voorbeeld of verhaal te binnen schiet, neem gerust de tijd om het te delen.",
     }
     return hints.get(lang, hints["en"])
 
@@ -1050,9 +1169,10 @@ def process_interview_turn(
                     if project
                     else settings.APP_BASE_URL
                 )
+                _lang_fri = (company_for_email.preferred_language or "en")
                 send_first_response_in(
                     to=company_for_email.email,
-                    project_name=(project.name if project else "your study"),
+                    project_name=(project.name if project else ("votre étude" if _lang_fri.startswith("fr") else "your study")),
                     project_url=project_url,
                     lang=(company_for_email.preferred_language or "en"),
                 )
@@ -1109,9 +1229,10 @@ def process_interview_turn(
                         if project
                         else settings.APP_BASE_URL
                     )
+                    _lang_fpf = (cefe.preferred_language or "en")
                     send_free_preview_full(
                         to=cefe.email,
-                        project_name=(project.name if project else "your study"),
+                        project_name=(project.name if project else ("votre étude" if _lang_fpf.startswith("fr") else "your study")),
                         project_url=project_url,
                         lang=(cefe.preferred_language or "en"),
                     )
@@ -1127,23 +1248,20 @@ def process_interview_turn(
             from app.services.email import send_email
             if participant.email:
                 project_name = participant.project.name
-                lang = (participant.project.language or "en").lower()[:2]
+                # Same language rule as the spoken interview: the
+                # participant's own choice overrides the study default.
+                lang = (
+                    getattr(participant, "preferred_language", None)
+                    or participant.project.language
+                    or "en"
+                ).lower()[:2]
                 greeting = f" {participant.display_name}" if participant.display_name else ""
-                if lang == "fr":
-                    subject = f"Merci pour votre entretien — {project_name}"
-                    body_html = f"""
-                    <p>Bonjour{greeting},</p>
-                    <p>Merci d'avoir complété l'entretien <strong>{project_name}</strong>. Vos réponses ont bien ét�� enregistrées et contribueront à enrichir la recherche.</p>
-                    <p>Vous pouvez fermer cet e-mail — aucune action supplémentaire n'est requise.</p>
-                    """
-                else:
-                    subject = f"Thank you for your interview — {project_name}"
-                    body_html = f"""
-                    <p>Hi{greeting},</p>
-                    <p>Thank you for completing the <strong>{project_name}</strong> interview. Your responses have been recorded and will help shape the research.</p>
-                    <p>You can close this email — no further action is needed.</p>
-                    """
-                send_email(to=participant.email, subject=subject, body_html=body_html)
+                copy = COMPLETION_EMAILS.get(lang, COMPLETION_EMAILS["en"])
+                send_email(
+                    to=participant.email,
+                    subject=copy["subject"].format(project_name=project_name),
+                    body_html=copy["body"].format(project_name=project_name, greeting=greeting),
+                )
         except Exception:
             pass  # Never fail the interview flow due to email errors
 

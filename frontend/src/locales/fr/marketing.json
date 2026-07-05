@@ -15,7 +15,7 @@
   "hero": {
     "badge": "La recherche utilisateur, sans la corvée",
     "title": "Arrêtez de deviner\nce que veulent vos utilisateurs.",
-    "subtitle": "Chaque décision produit est un pari sur ce que veulent les gens — et se tromper de produit est l'erreur la plus coûteuse qui soit. QualiPulse interroge vos utilisateurs à votre place et en tire des réponses claires : les thèmes principaux, les citations qui les appuient, et quoi faire ensuite — en quelques heures, pas en quelques semaines.",
+    "subtitle": "Chaque décision produit est un pari sur ce que veulent les gens — et se tromper de produit est l'erreur la plus coûteuse qui soit. QualiPulse interroge vos utilisateurs à votre place et en tire des réponses claires : les thèmes principaux, les citations qui les appuient, et quoi faire ensuite — en quelques heures, pas en quelques semaines.",
     "cta": "Commencer — 3 entretiens inclus",
     "secondaryCta": "Voir comment ça marche",
     "note": "3 entretiens gratuits · Sans carte bancaire · Seuls les entretiens terminés sont décomptés",
@@ -24,26 +24,52 @@
     "reportMeta": "12 entretiens · prêt à partager",
     "reportSummary": "Le principal frein à l'adoption n'est pas l'envie d'essayer le produit, mais la confiance dans la première prise en main. Les participants veulent percevoir la valeur avant d'investir du temps.",
     "reportMetrics": [
-      { "value": "12", "label": "entretiens" },
-      { "value": "2", "label": "tensions claires" },
-      { "value": "5", "label": "citations exploitables" }
+      {
+        "value": "12",
+        "label": "entretiens"
+      },
+      {
+        "value": "2",
+        "label": "tensions claires"
+      },
+      {
+        "value": "5",
+        "label": "citations exploitables"
+      }
     ],
-    "reportActions": ["Partager", "Marquer les citations", "Planifier la suite"],
+    "reportActions": [
+      "Partager",
+      "Marquer les citations",
+      "Planifier la suite"
+    ],
     "interviewInProgress": "Entretien en cours",
     "recordingStatus": "Enregistrement · 0:42",
-    "interviewQuestion": "Pouvez-vous me raconter la dernière fois que vous avez dû prendre en main un nouvel outil au travail ?",
+    "interviewQuestion": "Pouvez-vous me raconter la dernière fois que vous avez dû prendre en main un nouvel outil au travail ?",
     "emergingThemes": "Thèmes émergents",
-    "themeTags": ["Friction à la prise en main", "Mise en confiance", "Valeur immédiate"]
+    "themeTags": [
+      "Friction à la prise en main",
+      "Mise en confiance",
+      "Valeur immédiate"
+    ]
   },
   "trustBar": {
     "stats": [
-      { "number": "3", "label": "entretiens terminés offerts pour démarrer" },
-      { "number": "15 min", "label": "durée d'entretien par défaut" },
-      { "number": "Sans appli", "label": "les participants répondent depuis leur navigateur" }
+      {
+        "number": "3",
+        "label": "entretiens terminés offerts pour démarrer"
+      },
+      {
+        "number": "15 min",
+        "label": "durée d'entretien par défaut"
+      },
+      {
+        "number": "Sans appli",
+        "label": "les participants répondent depuis leur navigateur"
+      }
     ]
   },
   "painPoints": {
-    "title": "Ça vous parle ?",
+    "title": "Ça vous parle ?",
     "subtitle": "La plupart des équipes savent que la recherche qualitative est essentielle. Le problème, c'est tout ce qu'il y a autour.",
     "items": [
       {
@@ -111,7 +137,7 @@
   },
   "credibility": {
     "badge": "Nouveau — accès anticipé",
-    "title": "Pas encore de logos à afficher. Alors jugez-nous sur le travail.",
+    "title": "Pas encore de logos à afficher. Alors jugez-nous sur pièces.",
     "subtitle": "QualiPulse est récent. Plutôt qu'un mur de logos clients, nous préférons vous montrer exactement ce que vous obtenez — sans le moindre risque.",
     "items": [
       {
@@ -138,20 +164,26 @@
     "title": "Votre partenaire de recherche, toujours là",
     "subtitle": "Le Copilote de recherche transforme une question encore floue en étude exploitable, propose les prochaines actions et garde le fil de tout votre programme.",
     "features": [
-      { "text": "Transforme un objectif en critères de sélection, objectifs et questions d'entretien" },
-      { "text": "Propose les prochaines étapes sous forme de cartes à valider en un clic" },
-      { "text": "Garde le fil entre vos études, questionnaires, entretiens et rapports" }
+      {
+        "text": "Transforme un objectif en critères de sélection, objectifs et questions d'entretien"
+      },
+      {
+        "text": "Propose les prochaines étapes sous forme de cartes à valider en un clic"
+      },
+      {
+        "text": "Garde le fil entre vos études, questionnaires, entretiens et rapports"
+      }
     ],
-    "chatUser": "Que devrais-je demander sur la friction à la prise en main ?",
-    "chatAi": "D'après votre objectif, je vous suggère de vous concentrer sur les 10 premières minutes. Voici une proposition de guide d'entretien :",
-    "proposalTitle": "Proposition : guide d'entretien en 5 questions",
+    "chatUser": "Que devrais-je demander sur la friction à la prise en main ?",
+    "chatAi": "D'après votre objectif, je vous suggère de vous concentrer sur les 10 premières minutes. Voici une proposition de guide d'entretien :",
+    "proposalTitle": "Proposition : guide d'entretien en 5 questions",
     "proposalBody": "Découverte → Première impression → Points de friction → Contournements → Expérience idéale",
     "acceptLabel": "Valider",
     "acceptedLabel": "Validé ✓",
-    "chatUser2": "Parfait — peux-tu ajouter une question de filtrage pour les utilisateurs actifs ?",
-    "chatAi2": "Bonne idée. Voici une question de filtrage à valider de la même façon :",
-    "screenerTitle": "Proposition : question de filtrage",
-    "screenerBody": "« Avez-vous utilisé le produit ces 30 derniers jours ? »  ·  Oui  /  Non (élimine)",
+    "chatUser2": "Parfait — pouvez-vous ajouter une question de filtrage pour les utilisateurs actifs ?",
+    "chatAi2": "Bonne idée. Voici une question de filtrage à valider de la même façon :",
+    "screenerTitle": "Proposition : question de filtrage",
+    "screenerBody": "« Avez-vous utilisé le produit ces 30 derniers jours ? »  ·  Oui  /  Non (élimine)",
     "chatConfirm": "Ajoutée à votre filtrage. Le lien d'entretien à partager se trouve sur la page de votre étude.",
     "tryHint": "↑ Démo interactive — essayez"
   },
@@ -183,15 +215,15 @@
     "projectName": "Étude sur la prise en main d'un SaaS",
     "meta": "12 participants · Généré en quelques minutes",
     "summaryTitle": "Synthèse",
-    "summaryText": "Les participants signalent de façon récurrente que la complexité de la configuration initiale est le principal frein à l'adoption. La plupart apprécient une prise en main guidée, mais trouvent les approches actuelles trop génériques. Trois thèmes ressortent : les attentes de valeur rapide, le rôle de la preuve sociale dans la confiance, et la difficulté à découvrir les fonctionnalités.",
+    "summaryText": "Les participants signalent de façon récurrente que la complexité de la configuration initiale est le principal frein à l'adoption. La plupart apprécient une prise en main guidée, mais trouvent les approches actuelles trop génériques. Trois thèmes ressortent : les attentes de valeur rapide, le rôle de la preuve sociale dans la confiance, et la difficulté à découvrir les fonctionnalités.",
     "keyThemesTitle": "Thèmes clés",
     "theme1Title": "Anxiété sur le délai avant la valeur",
     "theme1Count": "Cité par 9 participants sur 12",
-    "theme1Quote": "« Je dois percevoir la valeur dans les 10 premières minutes, sinon je décroche. Je n'ai pas le temps de regarder des tutoriels. »",
+    "theme1Quote": "« Je dois percevoir la valeur dans les 10 premières minutes, sinon je décroche. Je n'ai pas le temps de regarder des tutoriels. »",
     "theme1Attr": "— Product Manager, startup en Série A",
     "theme2Title": "Difficulté à découvrir les fonctionnalités",
     "theme2Count": "Cité par 7 participants sur 12",
-    "theme2Quote": "« Je n'ai découvert la fonction d'export qu'au bout de trois mois. Je le faisais à la main depuis le début. »",
+    "theme2Quote": "« Je n'ai découvert la fonction d'export qu'au bout de trois mois. Je le faisais à la main depuis le début. »",
     "theme2Attr": "— Designer UX, Fintech",
     "recsTitle": "Recommandations",
     "rec1": "Mettre en place une prise en main guidée par tâches qui apporte de la valeur dès la première session",
@@ -222,36 +254,68 @@
   "comparison": {
     "title": "QualiPulse face à la méthode artisanale",
     "subtitle": "À quoi ressemble la recherche qualitative avec et sans QualiPulse.",
-    "headers": ["", "QualiPulse", "À la main"],
+    "headers": [
+      "",
+      "QualiPulse",
+      "À la main"
+    ],
     "rows": [
-      { "feature": "Planification nécessaire", "quali": "Non — asynchrone, à tout moment", "other": "Oui — agendas à coordonner" },
-      { "feature": "Modération IA", "quali": "Intégrée, relances adaptatives", "other": "Manuelle ou inexistante" },
-      { "feature": "Mémo de recherche", "quali": "Quelques minutes après les réponses", "other": "Synthèse à la main" },
-      { "feature": "Plans de recherche en plusieurs étapes", "quali": "Oui — entretiens + questionnaires", "other": "Souvent bricolé à la main" },
-      { "feature": "Copilote de recherche", "quali": "Un partenaire IA toujours disponible", "other": "Indisponible" },
-      { "feature": "Appareils compatibles", "quali": "Tout navigateur, sans appli", "other": "Une appli souvent requise" }
+      {
+        "feature": "Planification nécessaire",
+        "quali": "Non — asynchrone, à tout moment",
+        "other": "Oui — agendas à coordonner"
+      },
+      {
+        "feature": "Modération IA",
+        "quali": "Intégrée, relances adaptatives",
+        "other": "Manuelle ou inexistante"
+      },
+      {
+        "feature": "Mémo de recherche",
+        "quali": "Quelques minutes après les réponses",
+        "other": "Synthèse à la main"
+      },
+      {
+        "feature": "Plans de recherche en plusieurs étapes",
+        "quali": "Oui — entretiens + questionnaires",
+        "other": "Souvent bricolé à la main"
+      },
+      {
+        "feature": "Copilote de recherche",
+        "quali": "Un partenaire IA toujours disponible",
+        "other": "Indisponible"
+      },
+      {
+        "feature": "Appareils compatibles",
+        "quali": "Tout navigateur, sans appli",
+        "other": "Une appli souvent requise"
+      }
     ]
   },
   "trust": {
     "eyebrow": "Pourquoi nous avons créé QualiPulse",
-    "quote": "« Nous avons créé QualiPulse parce que nous en avions assez de passer 80 % de notre temps de recherche sur la logistique et 20 % à réfléchir. Nous voulions inverser ce rapport. »",
+    "quote": "« Nous avons créé QualiPulse parce que nous en avions assez de passer 80 % de notre temps de recherche sur la logistique et 20 % à réfléchir. Nous voulions inverser ce rapport. »",
     "name": "Corino Fontana",
     "role": "Fondateur, QualiPulse",
-    "badges": ["Conçu pour le RGPD", "Stockage chiffré", "Hébergement en Europe possible"]
+    "badges": [
+      "Conçu pour le RGPD",
+      "Stockage chiffré",
+      "Hébergement en Europe possible"
+    ]
   },
   "pricing": {
     "title": "Des tarifs simples et transparents",
     "subtitle": "Démarrez avec 3 entretiens offerts. Passez à la vitesse supérieure quand vous en avez besoin.",
     "recommended": "Recommandé",
-    "enterprise": "Vous pilotez un grand programme de recherche ?",
+    "enterprise": "Vous pilotez un grand programme de recherche ?",
     "enterpriseCta": "Parlons-en (offre Enterprise)",
     "perMonth": "/mois",
     "perYear": "/an",
     "billingToggleLabel": "Périodicité de facturation",
     "billingMonthly": "Mensuel",
     "billingAnnual": "Annuel",
-    "billingAnnualSave": "Économisez 17 %",
-    "billedAnnuallyAs": "Facturé {{amount}} € par an",
+    "billingAnnualSave": "Économisez 17 %",
+    "billedAnnuallyAs": "Facturé {{amount}} € par an",
     "creditsPerMonth": "entretiens IA terminés / mois",
     "surveyResponsesPerMonth": "réponses au questionnaire / mois",
     "creditDefinition": "1 crédit = 1 entretien participant terminé, jusqu'à 15 minutes. Les participants écartés ou ayant abandonné ne consomment pas de crédit.",
@@ -269,7 +333,7 @@
         "cta": "Commencer gratuitement"
       },
       "team": {
-        "name": "Équipe",
+        "name": "Team",
         "desc": "Pour les équipes de recherche qui mènent plusieurs études en parallèle",
         "features": [
           "Seuls les entretiens terminés sont décomptés",
@@ -281,7 +345,7 @@
         "cta": "Commencer gratuitement"
       },
       "agency": {
-        "name": "Agence",
+        "name": "Agency",
         "desc": "Pour les agences qui mènent des études pour plusieurs clients",
         "features": [
           "Seuls les entretiens terminés sont décomptés",
@@ -306,7 +370,7 @@
         "answer": "Seuls les entretiens terminés consomment un crédit. Les participants écartés, ceux qui abandonnent ou les entretiens en échec technique n'en consomment aucun."
       },
       {
-        "question": "Qu'ont à installer les participants ?",
+        "question": "Que doivent installer les participants ?",
         "answer": "Rien. Ils ouvrent un lien et réalisent un entretien vocal depuis leur navigateur, sur ordinateur ou mobile."
       },
       {
@@ -353,6 +417,6 @@
     "becomeParticipant": "Devenir participant·e",
     "contact": "Contact",
     "copy": "© 2026 QualiPulse · Conforme au RGPD",
-    "interviewLink": "Vous avez un lien d'entretien ?"
+    "interviewLink": "Vous avez un lien d'entretien ?"
   }
 }
