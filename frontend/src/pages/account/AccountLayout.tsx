@@ -9,6 +9,7 @@ import {
   Plan,
   CreditPack,
   AccountOutletContext,
+  SLACK_INTEGRATION_ENABLED,
 } from "./accountContext";
 
 /**
@@ -37,16 +38,20 @@ export default function AccountLayout() {
       client.get("/billing/credit-packs").then((r) => r.data).catch(() => []),
     ])
       .then(([meData, billingData, plansData, packsData]) => {
-        if (meData) {
-          setMe(meData);
-          // Sync UI language with the user's stored preference.
-          if (
-            meData.preferred_language &&
-            meData.preferred_language !== i18n.language?.slice(0, 2)
-          ) {
-            i18n.changeLanguage(meData.preferred_language);
-            localStorage.setItem("qp_language", meData.preferred_language);
-          }
+        // /auth/me is essential — without it every section renders empty.
+        // Billing endpoints are optional (legacy accounts may lack data).
+        if (!meData) {
+          setLoadError(true);
+          return;
+        }
+        setMe(meData);
+        // Sync UI language with the user's stored preference.
+        if (
+          meData.preferred_language &&
+          meData.preferred_language !== i18n.language?.slice(0, 2)
+        ) {
+          i18n.changeLanguage(meData.preferred_language);
+          localStorage.setItem("qp_language", meData.preferred_language);
         }
         setBilling(billingData);
         setPlans(plansData);
@@ -125,7 +130,9 @@ export default function AccountLayout() {
     { to: "/account/profile", label: t("nav.profile", { defaultValue: "Profile" }) },
     { to: "/account/security", label: t("nav.security", { defaultValue: "Security" }) },
     { to: "/account/workspace", label: t("nav.workspace", { defaultValue: "Workspace" }) },
-    { to: "/account/integrations", label: t("nav.integrations", { defaultValue: "Integrations" }) },
+    ...(SLACK_INTEGRATION_ENABLED
+      ? [{ to: "/account/integrations", label: t("nav.integrations", { defaultValue: "Integrations" }) }]
+      : []),
     { to: "/account/billing", label: t("nav.billing", { defaultValue: "Billing" }) },
   ];
 

@@ -1,6 +1,11 @@
 import { useOutletContext } from "react-router-dom";
 import type { CompanyResponse } from "../../api/auth";
 
+// Slack notifications are paused while the integration is under review.
+// Flip to true to restore the Integrations tab, the home card and the
+// /account/integrations route — backend endpoints are untouched.
+export const SLACK_INTEGRATION_ENABLED = false;
+
 // ── Shared billing types (consumed by AccountHome + AccountBilling) ──────────
 
 export interface BillingStatus {

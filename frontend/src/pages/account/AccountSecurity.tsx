@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import client from "../../api/client";
 import {
-  getMe,
   setupTwoFactor,
   enableTwoFactor,
   disableTwoFactor,
@@ -10,18 +9,20 @@ import {
 } from "../../api/auth";
 import { useAuth } from "../../hooks/useAuth";
 import { getErrorMessage } from "../../utils/errorMessages";
+import { useAccount } from "./accountContext";
 
 export default function AccountSecurity() {
   const { t } = useTranslation(["settings", "common"]);
   const { saveToken, logout } = useAuth();
+  const { me } = useAccount();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  // ── 2FA state ──
-  const [totpEnabled, setTotpEnabled] = useState<boolean | null>(null);
+  // ── 2FA state ── seeded from the layout's /auth/me fetch (no extra call)
+  const [totpEnabled, setTotpEnabled] = useState<boolean>(Boolean(me?.totp_enabled));
   const [setupData, setSetupData] = useState<{ secret: string; otpauth_url: string } | null>(null);
   const [enableCode, setEnableCode] = useState("");
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
@@ -32,12 +33,6 @@ export default function AccountSecurity() {
   const [twoFaBusy, setTwoFaBusy] = useState(false);
 
   const [logoutAllBusy, setLogoutAllBusy] = useState(false);
-
-  useEffect(() => {
-    getMe()
-      .then((me) => setTotpEnabled(!!me.totp_enabled))
-      .catch(() => setTotpEnabled(false));
-  }, []);
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -185,7 +180,7 @@ export default function AccountSecurity() {
           </div>
         )}
 
-        {totpEnabled === null ? null : totpEnabled ? (
+        {totpEnabled ? (
           <>
             <p style={{ color: "var(--success)", fontSize: 14 }}>
               ✓ {t("security.twoFactor.enabledStatus")}

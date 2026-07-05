@@ -31,6 +31,7 @@
     "newPasswordPlaceholder": "At least 8 characters",
     "updatePassword": "Update password",
     "passwordUpdated": "✓ Password updated",
+    "saveError": "Could not save — please try again.",
     "passwordError": "We couldn't update your password. Check your current password and try again.",
     "languageTitle": "Language",
     "languageWarning": "Changing language updates menus and new content only. Existing studies, interview guides, and analysis reports will not be retranslated."
@@ -60,6 +61,9 @@
     "freeTrial": "Free trial",
     "trialCreditsHint": "Your free interview credits don't expire. No credit card required.",
     "usageThisPeriod": "Usage this period",
+    "creditsPurchased": "Payment received — your credits will appear in a moment.",
+    "upgradeSuccess": "Your plan has been upgraded. Welcome aboard!",
+    "checkoutError": "Could not open checkout — please try again or contact support.",
     "creditsRemaining": "Credits remaining",
     "creditsUsed": "Credits used",
     "overageCredits": "Overage",
@@ -160,7 +164,8 @@
       "unverified": "Not verified",
       "body": "Verify your email to secure your account and unlock interview credits.",
       "resend": "Resend verification email",
-      "resent": "Verification email sent — check your inbox."
+      "resent": "Verification email sent — check your inbox.",
+      "resendError": "Could not send the email — please try again in a minute."
     },
     "planCard": {
       "label": "Plan & credits",

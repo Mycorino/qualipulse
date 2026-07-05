@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { updateSlackWebhook, testSlackWebhook } from "../../api/auth";
-import { useAccount } from "./accountContext";
+import { useAccount, SLACK_INTEGRATION_ENABLED } from "./accountContext";
 
 export default function AccountIntegrations() {
   const { t } = useTranslation(["settings", "common"]);
@@ -47,6 +48,11 @@ export default function AccountIntegrations() {
     } finally {
       setTesting(false);
     }
+  }
+
+  // Slack is paused — keep deep links working by bouncing to Account home.
+  if (!SLACK_INTEGRATION_ENABLED) {
+    return <Navigate to="/account" replace />;
   }
 
   return (
