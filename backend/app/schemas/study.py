@@ -80,6 +80,9 @@ class StudySummary(BaseModel):
     completed_response_count: int = 0
     completed_interview_count: int = 0
     has_report: bool = False
+    # Eligible for a cross-study decision memo (any ready analysis —
+    # qualitative ProjectAnalysis or mixed-methods StudyAnalysis).
+    has_ready_analysis: bool = False
 
 
 class StudyDetail(BaseModel):

@@ -16,7 +16,11 @@ from app.models.company import Company
 from app.models.study import Study
 from app.models.synthesis import CrossStudySynthesis
 from app.services.report_export import render_decision_memo_html
-from app.services.study_synthesis import gather_study_evidence, run_cross_synthesis
+from app.services.study_synthesis import (
+    gather_study_evidence,
+    latest_evidence_at,
+    run_cross_synthesis,
+)
 
 logger = logging.getLogger("auto_interview.synthesis")
 router = APIRouter(prefix="/synthesis", tags=["synthesis"])
@@ -109,20 +113,31 @@ def list_syntheses(
             study_ids = json.loads(r.study_ids)
         except Exception:
             study_ids = []
-        names = [
-            s.name
-            for s in db.query(Study).filter(Study.id.in_(study_ids)).all()
-        ] if study_ids else []
+        studies = (
+            db.query(Study).filter(Study.id.in_(study_ids)).all()
+            if study_ids
+            else []
+        )
+        # Stale = an included study has analysis evidence newer than the memo.
+        # Powers the workspace NBA "refresh your memo" rung + memo_stale nudge.
+        stale = False
+        if r.status == "ready" and r.generated_at:
+            for s in studies:
+                newest = latest_evidence_at(s, db)
+                if newest and newest > r.generated_at:
+                    stale = True
+                    break
         out.append({
             "id": r.id,
             "name": r.name,
             "status": r.status,
             "study_count": len(study_ids),
-            "study_names": names,
+            "study_names": [s.name for s in studies],
             "decision_question": r.decision_question,
             "generated_at": r.generated_at.isoformat() if r.generated_at else None,
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "error": r.error,
+            "stale": stale,
         })
     return out
 

@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
-from app.models.interview import InterviewLink, Participant
+from app.models.interview import InterviewLink, Participant, ProjectAnalysis
 from app.models.project import Project
 from app.models.study import Study, StudyAnalysis, StudyParticipant
 from app.models.survey import Survey, SurveyQuestion, SurveyResponse
@@ -187,6 +187,19 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         .first()
         is not None
     )
+    # Memo eligibility: a study can join a cross-study decision memo when it
+    # has ANY ready analysis — qualitative (ProjectAnalysis) or mixed-methods
+    # (StudyAnalysis). Mirrors gather_study_evidence in study_synthesis.py.
+    has_ready_analysis = has_report or (
+        db.query(ProjectAnalysis.id)
+        .join(Project, ProjectAnalysis.project_id == Project.id)
+        .filter(
+            Project.study_id == study.id,
+            ProjectAnalysis.status == "ready",
+        )
+        .first()
+        is not None
+    )
     return StudySummary(
         id=study.id,
         name=study.name,
@@ -198,6 +211,7 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         completed_response_count=completed_responses,
         completed_interview_count=completed_interviews,
         has_report=has_report,
+        has_ready_analysis=has_ready_analysis,
     )
 
 

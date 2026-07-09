@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { StudySummary } from "../api/studies";
@@ -7,7 +7,6 @@ import {
   createSynthesis,
   deleteSynthesis,
   fetchSynthesisMemoHtml,
-  listSyntheses,
 } from "../api/synthesis";
 import { useToast } from "./Toast";
 
@@ -18,30 +17,37 @@ import { useToast } from "./Toast";
  * (each needs a ready analysis — the server validates and names offenders),
  * optionally states the decision to inform, and gets a print-ready decision
  * memo synthesised across those studies' final analyses.
+ *
+ * The memo list is owned by StudyList (it also feeds the workspace NBA and
+ * memo nudges); this section drives create/open/delete and asks the parent
+ * to refresh via `onRefresh`. `openSignal` increments when the workspace
+ * NBA chip wants the create modal opened.
  */
 
 const POLL_MS = 5000;
 
-export function DecisionMemoSection({ studies }: { studies: StudySummary[] }) {
+interface DecisionMemoSectionProps {
+  studies: StudySummary[];
+  memos: SynthesisSummary[] | null;
+  onRefresh: () => void;
+  openSignal?: number;
+}
+
+export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: DecisionMemoSectionProps) {
   const { t, i18n } = useTranslation("dashboard");
   const { toast } = useToast();
-  const [memos, setMemos] = useState<SynthesisSummary[] | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [name, setName] = useState("");
   const [question, setQuestion] = useState("");
   const [creating, setCreating] = useState(false);
   const pollRef = useRef<number | null>(null);
+  const refresh = onRefresh;
 
-  const refresh = useCallback(() => {
-    listSyntheses()
-      .then(setMemos)
-      .catch(() => toast(t("decisionMemos.loadError"), "error"));
-  }, [toast, t]);
-
+  // The workspace NBA chip routes here: each increment opens the modal.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (openSignal && openSignal > 0) setModalOpen(true);
+  }, [openSignal]);
 
   // Poll while any memo is generating; stop as soon as none are.
   useEffect(() => {
@@ -102,7 +108,7 @@ export function DecisionMemoSection({ studies }: { studies: StudySummary[] }) {
   async function handleDelete(id: string) {
     try {
       await deleteSynthesis(id);
-      setMemos((ms) => (ms ?? []).filter((m) => m.id !== id));
+      refresh();
     } catch {
       toast(t("decisionMemos.deleteError"), "error");
     }
@@ -112,7 +118,7 @@ export function DecisionMemoSection({ studies }: { studies: StudySummary[] }) {
   if (studies.length < 2) return null;
 
   return (
-    <section className="quanti-showcase__section">
+    <section className="quanti-showcase__section" id="decision-memos">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
         <div>
           <div className="quanti-showcase__eyebrow">{t("decisionMemos.eyebrow")}</div>
@@ -152,6 +158,15 @@ export function DecisionMemoSection({ studies }: { studies: StudySummary[] }) {
               {m.status === "failed" && (
                 <span className="badge" style={{ background: "var(--danger-bg)", color: "var(--danger-text)" }} title={m.error ?? undefined}>
                   {t("decisionMemos.statusFailed")}
+                </span>
+              )}
+              {m.status === "ready" && m.stale && (
+                <span
+                  className="badge"
+                  style={{ background: "var(--warning-bg)", color: "var(--warning-text)" }}
+                  title={t("decisionMemos.staleHint")}
+                >
+                  {t("decisionMemos.statusStale")}
                 </span>
               )}
               {m.status === "ready" && (

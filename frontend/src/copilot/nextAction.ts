@@ -37,6 +37,8 @@ export type NbaActionType =
   | "set_up_study"
   | "analyze_study"
   | "collect_study"
+  | "generate_memo"
+  | "refresh_memo"
   // shared terminal states
   | "wait"
   | "done";
@@ -413,8 +415,19 @@ function studyCandidate(s: StudyNbaSummary): NextAction | null {
  * The single study across the workspace that most needs attention — the
  * highest-weight candidate. Drives the home-page copilot suggestion.
  */
+/** The workspace-level cross-study synthesis signal (decision memos). */
+export interface WorkspaceMemoSignal {
+  /** Studies with at least one ready analysis — memo-eligible. */
+  eligibleStudyCount: number;
+  /** Ready decision memos in the workspace. */
+  readyMemoCount: number;
+  /** Ready memos where an included study has newer analysis evidence. */
+  staleMemoCount: number;
+}
+
 export function resolveWorkspaceNextAction(
   studies: StudyNbaSummary[],
+  memoSignal?: WorkspaceMemoSignal,
 ): NextAction {
   if (studies.length === 0) {
     return {
@@ -433,6 +446,39 @@ export function resolveWorkspaceNextAction(
       best = candidate;
     }
   }
+  // Actionable per-study work always outranks synthesis suggestions.
+  if (best && best.kind === "do") return best;
+
+  // Cross-study rungs: exactly the moment the per-study ladders go quiet
+  // ("all set") is when the highest-value next step is synthesis.
+  if (memoSignal) {
+    if (memoSignal.staleMemoCount > 0) {
+      return {
+        id: "refresh_memo",
+        actionType: "refresh_memo",
+        labelKey: `${NS}refreshMemo.label`,
+        reasonKey: `${NS}refreshMemo.reason`,
+        params: { count: memoSignal.staleMemoCount },
+        kind: "do",
+        weight: 40,
+      };
+    }
+    if (
+      memoSignal.readyMemoCount === 0 &&
+      memoSignal.eligibleStudyCount >= 2
+    ) {
+      return {
+        id: "generate_memo",
+        actionType: "generate_memo",
+        labelKey: `${NS}generateMemo.label`,
+        reasonKey: `${NS}generateMemo.reason`,
+        params: { count: memoSignal.eligibleStudyCount },
+        kind: "do",
+        weight: 35,
+      };
+    }
+  }
+
   return (
     best ?? {
       id: "workspace_done",

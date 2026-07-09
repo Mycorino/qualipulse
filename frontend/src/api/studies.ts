@@ -47,6 +47,8 @@ export interface StudySummary {
   completed_response_count: number;
   completed_interview_count: number;
   has_report: boolean;
+  /** Eligible for a cross-study decision memo (any ready analysis). */
+  has_ready_analysis: boolean;
 }
 
 export interface StudyDetail {

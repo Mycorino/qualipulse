@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
+import { SynthesisSummary, listSyntheses } from "../api/synthesis";
 import { listProjects } from "../api/projects";
 import { DEMO_TOUR_DONE_KEY } from "../components/DemoTour";
 import { DecisionMemoSection } from "../components/DecisionMemoSection";
@@ -135,6 +136,10 @@ export default function StudyList() {
   // ?new=1 opens the picker directly — used by the demo tour's final CTA.
   const [pickerOpen, setPickerOpen] = useState(() => searchParams.get("new") === "1");
   const [nudges, setNudges] = useState<Nudge[]>([]);
+  // Decision memos live here (not in DecisionMemoSection) because they also
+  // feed the workspace NBA rungs + memo nudges.
+  const [memos, setMemos] = useState<SynthesisSummary[] | null>(null);
+  const [memoOpenSignal, setMemoOpenSignal] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
   const announce = useNudgeAnnounce(nudges);
@@ -144,6 +149,16 @@ export default function StudyList() {
       .then(setStudies)
       .catch(() => toast(t("studyList.loadError"), "error"));
   }, [toast, t]);
+
+  const refreshMemos = useCallback(() => {
+    listSyntheses()
+      .then(setMemos)
+      .catch(() => toast(t("decisionMemos.loadError"), "error"));
+  }, [toast, t]);
+
+  useEffect(() => {
+    refreshMemos();
+  }, [refreshMemos]);
 
   // Onboarding hands off here with ?tour=1. The demo project is seeded in a
   // backend background thread right after onboarding completes, so it may
@@ -196,20 +211,30 @@ export default function StudyList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Detect studies that gained a report since the researcher's last visit.
+  // Detect studies that gained a report, memos that finished generating,
+  // and memos that went stale since the researcher's last visit.
   useEffect(() => {
     if (!studies) return;
     setNudges(
       detectWorkspaceNudges(
         studies.map((s) => ({ id: s.id, name: s.name, hasReport: s.has_report })),
+        (memos ?? []).map((m) => ({
+          id: m.id,
+          name: m.name,
+          status: m.status,
+          stale: m.stale ?? false,
+        })),
       ),
     );
-  }, [studies]);
+  }, [studies, memos]);
 
   // The copilot's portfolio-triage suggestion — which study needs you.
   const runWorkspaceAction = (a: NextAction) => {
     if (a.actionType === "start_study") setPickerOpen(true);
-    else if (a.targetId) navigate(`/studies/${a.targetId}`);
+    else if (a.actionType === "generate_memo" || a.actionType === "refresh_memo") {
+      setMemoOpenSignal((n) => n + 1);
+      document.getElementById("decision-memos")?.scrollIntoView({ behavior: "smooth" });
+    } else if (a.targetId) navigate(`/studies/${a.targetId}`);
   };
 
   return (
@@ -237,7 +262,12 @@ export default function StudyList() {
         </div>
 
         {studies && studies.length > 0 && (() => {
-          const nba = resolveWorkspaceNextAction(studies.map(toNbaSummary));
+          const readyMemos = (memos ?? []).filter((m) => m.status === "ready");
+          const nba = resolveWorkspaceNextAction(studies.map(toNbaSummary), {
+            eligibleStudyCount: studies.filter((s) => s.has_ready_analysis).length,
+            readyMemoCount: readyMemos.length,
+            staleMemoCount: readyMemos.filter((m) => m.stale).length,
+          });
           // When nothing needs the researcher (no actionable NBA, no fresh
           // nudges) the strip is purely reassurance — demote it to a quiet
           // inline line so it doesn't out-shout the actual studies below.
@@ -335,7 +365,14 @@ export default function StudyList() {
           )}
         </section>
 
-        {studies !== null && <DecisionMemoSection studies={studies} />}
+        {studies !== null && (
+          <DecisionMemoSection
+            studies={studies}
+            memos={memos}
+            onRefresh={refreshMemos}
+            openSignal={memoOpenSignal}
+          />
+        )}
       </div>
 
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
