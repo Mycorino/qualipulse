@@ -13,7 +13,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import SessionLocal
-from app.dependencies import get_current_company, get_db
+from app.dependencies import (
+    get_accessible_project_or_404 as _get_project_or_404,
+    get_current_company,
+    get_db,
+)
 from app.models.company import Company
 from app.models.interview import AnalysisThemeAnnotation, Participant, ProjectAnalysis
 from app.models.project import Project
@@ -779,17 +783,6 @@ def trigger_refined_analysis(
     watchdog.start()
 
     return {"status": "generating", "message": "Refined analysis started", "version": next_version}
-
-
-def _get_project_or_404(project_id: str, company_id: str, db: Session) -> Project:
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id, Project.company_id == company_id)
-        .first()
-    )
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return project
 
 
 # ── Shareable report endpoints ────────────────────────────────────────────────

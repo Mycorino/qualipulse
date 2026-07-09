@@ -1,7 +1,10 @@
 """AI-powered synthesis of all completed interview transcripts for a project."""
 
 import json
+import logging
 from datetime import datetime
+
+logger = logging.getLogger("auto_interview.analysis")
 
 from app.services._clients import get_anthropic_client
 from sqlalchemy.orm import Session
@@ -87,6 +90,70 @@ def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict
         blocks.append("\n".join(lines))
 
     return "\n\n".join(blocks), participant_map
+
+
+def _normalize_for_match(text: str) -> str:
+    """Lenient normalisation for verbatim-quote matching.
+
+    Lowercase, straighten curly quotes/dashes, and collapse whitespace so that
+    trivial punctuation/spacing differences between the model's quote and the
+    stored transcript don't read as fabrication — while a genuinely invented
+    sentence still fails the substring test.
+    """
+    if not text:
+        return ""
+    text = text.lower()
+    for a, b in (("’", "'"), ("‘", "'"), ("“", '"'),
+                 ("”", '"'), ("–", "-"), ("—", "-"), ("…", "...")):
+        text = text.replace(a, b)
+    return " ".join(text.split())
+
+
+def _verify_report_quotes(report: dict, participants: list[Participant]) -> tuple[int, int]:
+    """Flag every analysis quote as verified against the real transcripts.
+
+    Mutates the report in place, setting ``verified: bool`` on each quote. A
+    quote is verified when its text is a substring of the named participant's
+    transcript (falling back to *any* participant's transcript when the
+    identifier is missing or mismatched). This turns the product's "full quote
+    traceability" claim from a prompt request into an enforced mechanism —
+    hallucinated evidence is marked so the UI can flag or drop it.
+
+    Returns ``(verified_count, total_count)``.
+    """
+    # identifier "P{i}" → normalized concatenated participant responses
+    by_identifier: dict[str, str] = {}
+    all_text_parts: list[str] = []
+    for i, p in enumerate(participants, 1):
+        joined = " ".join(
+            t.response_transcript for t in p.turns if t.response_transcript
+        )
+        norm = _normalize_for_match(joined)
+        by_identifier[f"P{i}"] = norm
+        all_text_parts.append(norm)
+    all_text = " ".join(all_text_parts)
+
+    verified = 0
+    total = 0
+    themes = report.get("themes") if isinstance(report, dict) else None
+    for theme in themes or []:
+        if not isinstance(theme, dict):
+            continue
+        for quote in theme.get("quotes") or []:
+            if not isinstance(quote, dict):
+                continue
+            total += 1
+            needle = _normalize_for_match(quote.get("text") or "")
+            if not needle:
+                quote["verified"] = False
+                continue
+            ident = quote.get("participant_identifier")
+            haystack = by_identifier.get(ident, "") if ident else ""
+            ok = (needle in haystack) or (needle in all_text)
+            quote["verified"] = ok
+            if ok:
+                verified += 1
+    return verified, total
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -320,7 +387,11 @@ def run_analysis(
         client = get_anthropic_client()
         response = client.messages.create(
             model=ai_models.sonnet(),
-            max_tokens=4096,
+            # 8192: a full report (6-8 themes × attributed quotes + JTBDs +
+            # tensions + recommendations) can exceed 4096 output tokens, which
+            # truncated the JSON mid-object and marked the analysis "failed" with
+            # a cryptic parse error — worst on the data-richest studies.
+            max_tokens=8192,
             # 0.3: synthesis requires judgment but not creativity. Lower
             # temperature reduces hallucinated quotes and inflated frequency
             # claims — the dominant failure mode of analysis at small N.
@@ -331,16 +402,29 @@ def run_analysis(
 
         log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
 
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            raise ValueError(
+                "Analysis output was truncated (hit max_tokens). Try filtering to "
+                "a segment or fewer participants."
+            )
+
         raw = response.content[0].text.strip()
         # Strip markdown fences if present
         if raw.startswith("```"):
             lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
             raw = "\n".join(lines).strip()
 
-        # Validate JSON
-        json.loads(raw)
+        # Parse, then verify every quote against the real transcripts so
+        # hallucinated evidence is flagged (verified=false) rather than trusted.
+        report_obj = json.loads(raw)
+        v_count, v_total = _verify_report_quotes(report_obj, completed)
+        if v_total:
+            logger.info(
+                "analysis quote verification: %d/%d verbatim (project=%s)",
+                v_count, v_total, project_id,
+            )
 
-        analysis.report = raw
+        analysis.report = json.dumps(report_obj)
         analysis.status = "ready"
         analysis.generated_at = datetime.utcnow()
 
@@ -519,7 +603,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         client = get_anthropic_client()
         response = client.messages.create(
             model=ai_models.sonnet(),
-            max_tokens=4096,
+            max_tokens=8192,  # avoid truncating data-rich reports (see run_analysis)
             # 0.3: synthesis requires judgment but not creativity. Lower
             # temperature reduces hallucinated quotes and inflated frequency
             # claims — the dominant failure mode of analysis at small N.
@@ -530,14 +614,26 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
 
         log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
 
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            raise ValueError(
+                "Refined analysis output was truncated (hit max_tokens). Try "
+                "filtering to a segment or fewer participants."
+            )
+
         raw = response.content[0].text.strip()
         if raw.startswith("```"):
             lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
             raw = "\n".join(lines).strip()
 
-        json.loads(raw)
+        report_obj = json.loads(raw)
+        v_count, v_total = _verify_report_quotes(report_obj, all_completed)
+        if v_total:
+            logger.info(
+                "refined analysis quote verification: %d/%d verbatim (project=%s)",
+                v_count, v_total, project_id,
+            )
 
-        new_analysis.report = raw
+        new_analysis.report = json.dumps(report_obj)
         new_analysis.status = "ready"
         new_analysis.participant_count = len(all_completed)
         new_analysis.generated_at = datetime.utcnow()

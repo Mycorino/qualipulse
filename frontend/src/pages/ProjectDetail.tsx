@@ -127,6 +127,7 @@ export default function ProjectDetail() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
+  const analysisPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Copilot nudges — "something changed while you were away."
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [tab, setTabRaw] = useState<Tab>(() => {
@@ -276,6 +277,17 @@ export default function ProjectDetail() {
   const [heatmapLoading, setHeatmapLoading] = useState(false);
 
   // Quality assessment is now auto-run on interview completion and stored in participant fields
+
+  // Stop analysis polling if the user navigates away mid-generation, so the
+  // interval doesn't keep fetching + setState on an unmounted component.
+  useEffect(() => {
+    return () => {
+      if (analysisPollRef.current) {
+        clearInterval(analysisPollRef.current);
+        analysisPollRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!exportMenuOpen && !headerMenuOpen) return;
@@ -453,10 +465,18 @@ export default function ProjectDetail() {
     if (analysisPolling) return;
     setAnalysisPolling(true);
     const iv = setInterval(async () => {
-      const ana = await getAnalysis(id!);
+      let ana;
+      try {
+        ana = await getAnalysis(id!);
+      } catch {
+        // Transient fetch failure — keep polling; don't leave an unhandled
+        // rejection or kill the poll on one blip.
+        return;
+      }
       setAnalysis(ana);
       if (ana.status !== "generating") {
         clearInterval(iv);
+        analysisPollRef.current = null;
         setAnalysisPolling(false);
         // Refresh version history now that a new version is ready
         getAnalysisHistory(id!).then(setAnalysisVersions).catch(() => {});
@@ -474,6 +494,7 @@ export default function ProjectDetail() {
         }
       }
     }, 3000);
+    analysisPollRef.current = iv;
   }
 
   async function handleTriggerAnalysis() {
@@ -904,7 +925,26 @@ export default function ProjectDetail() {
     if (!anchorEl) { setSelectionInfo(null); return; }
 
     const fullText = anchorEl.textContent ?? "";
-    const start = fullText.indexOf(text);
+
+    // Use the actual selection Range to find the true offset — indexOf would
+    // always tag the FIRST occurrence, mis-tagging a phrase that repeats in the
+    // turn. Measure the text from the start of the turn up to the selection
+    // start, then add any leading whitespace trimmed off `text`.
+    let start = -1;
+    try {
+      const preRange = document.createRange();
+      preRange.selectNodeContents(anchorEl);
+      preRange.setEnd(range.startContainer, range.startOffset);
+      const rawSel = sel.toString();
+      const leadingWs = rawSel.length - rawSel.trimStart().length;
+      const candidate = preRange.toString().length + leadingWs;
+      if (fullText.slice(candidate, candidate + text.length) === text) {
+        start = candidate;
+      }
+    } catch {
+      /* fall back to indexOf below */
+    }
+    if (start === -1) start = fullText.indexOf(text);
     if (start === -1) { setSelectionInfo(null); return; }
 
     // Viewport-safe x position: clamp so popup (180px wide) stays on screen

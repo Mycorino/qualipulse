@@ -67,6 +67,7 @@ _STRINGS = {
         "annot_disputed": "Disputed by researcher",
         "annot_needs_evidence": "Flagged: needs more evidence",
         "quote_prompt": "In response to",
+        "quote_unverified": "⚠ Not found verbatim in the transcript — verify before citing.",
         "evidence_map": "Evidence map",
         "evidence_map_sub": "Which participants support each theme. A filled dot means the participant is quoted in that theme.",
         "theme_col": "Theme",
@@ -126,6 +127,7 @@ _STRINGS = {
         "annot_disputed": "Contesté par le chercheur",
         "annot_needs_evidence": "Signalé : preuves insuffisantes",
         "quote_prompt": "En réponse à",
+        "quote_unverified": "⚠ Introuvable telle quelle dans le verbatim — à vérifier avant citation.",
         "evidence_map": "Carte des preuves",
         "evidence_map_sub": "Quels participants soutiennent chaque thème. Un point plein signifie que le participant est cité dans ce thème.",
         "theme_col": "Thème",
@@ -328,11 +330,20 @@ def render_analysis_report_html(
                 text, who, ident, prompt = str(q), "", "", ""
             attribution = " · ".join(x for x in [_esc(ident), _esc(who)] if x)
             prompt_html = f'<div class="quote__prompt">{L["quote_prompt"]}: “{_esc(prompt)}”</div>' if prompt else ""
+            # Only flag when verification explicitly failed. Absent `verified`
+            # (legacy reports / fixtures generated before quote-checking) shows
+            # no marker so we never imply a clean quote is suspect.
+            unverified_html = (
+                f'<div class="quote__unverified">{L["quote_unverified"]}</div>'
+                if isinstance(q, dict) and q.get("verified") is False
+                else ""
+            )
             quotes_html += f"""
             <blockquote class="quote avoid-break">
               <p>“{_esc(text)}”</p>
               <footer>— {attribution or L["anonymous"]}</footer>
               {prompt_html}
+              {unverified_html}
             </blockquote>"""
 
         disconfirm = theme.get("disconfirming_evidence", "")
@@ -577,6 +588,7 @@ section {{ margin-bottom: 40px; }}
 .quote p {{ font-size: 0.95rem; font-style: italic; color: var(--ink); }}
 .quote footer {{ font-size: 0.78rem; color: var(--ink-3); margin-top: 6px; font-weight: 600; }}
 .quote__prompt {{ font-size: 0.74rem; color: var(--ink-3); margin-top: 3px; }}
+.quote__unverified {{ font-size: 0.72rem; color: #b45309; margin-top: 4px; font-weight: 600; }}
 
 .callout {{ border-radius: 10px; padding: 14px 18px; margin-top: 14px; font-size: 0.88rem; }}
 .callout__title {{ font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }}
