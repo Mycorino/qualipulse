@@ -240,3 +240,60 @@ def test_shared_report_public_print_html(client, db_session, two_ready_studies):
     assert "Appendix — participants" not in resp.text
 
     assert client.get("/reports/bad-token/report.html").status_code == 404
+
+
+def test_memo_stale_flag_tracks_newer_analysis(client, auth_headers, db_session, two_ready_studies, monkeypatch):
+    """A ready memo goes stale when an included study gains a newer analysis."""
+    from datetime import timedelta
+
+    monkeypatch.setattr("app.routers.synthesis._spawn_synthesis_thread", lambda _id: None)
+    monkeypatch.setattr(
+        "app.services.study_synthesis._call_claude",
+        lambda prompt, db, company_id: json.dumps(_MEMO_JSON),
+    )
+    resp = client.post(
+        "/synthesis/",
+        json={"study_ids": [s.id for s in two_ready_studies]},
+        headers=auth_headers,
+    )
+    synth_id = resp.json()["id"]
+    run_cross_synthesis(synth_id, db_session)
+
+    listing = client.get("/synthesis/", headers=auth_headers).json()
+    assert listing[0]["id"] == synth_id
+    assert listing[0]["stale"] is False
+
+    # Study 1 gains a v2 analysis generated AFTER the memo.
+    memo = db_session.query(CrossStudySynthesis).filter_by(id=synth_id).one()
+    project = two_ready_studies[0].projects[0]
+    db_session.add(
+        ProjectAnalysis(
+            project_id=project.id,
+            version=2,
+            status="ready",
+            participant_count=5,
+            report=json.dumps(_mini_report(theme="Newer theme")),
+            generated_at=memo.generated_at + timedelta(minutes=5),
+        )
+    )
+    db_session.commit()
+
+    listing = client.get("/synthesis/", headers=auth_headers).json()
+    assert listing[0]["stale"] is True
+
+
+def test_study_summary_exposes_has_ready_analysis(client, auth_headers, db_session, two_ready_studies, registered_company):
+    """StudySummary.has_ready_analysis marks memo-eligible studies for the NBA."""
+    company = (
+        db_session.query(Company)
+        .filter(Company.email == registered_company["email"])
+        .first()
+    )
+    bare = Study(company_id=company.id, name="No analysis yet")
+    db_session.add(bare)
+    db_session.commit()
+
+    listing = {s["name"]: s for s in client.get("/studies/", headers=auth_headers).json()}
+    assert listing["Streaming choices"]["has_ready_analysis"] is True
+    assert listing["Churn triggers"]["has_ready_analysis"] is True
+    assert listing["No analysis yet"]["has_ready_analysis"] is False

@@ -333,6 +333,14 @@
     "collectMore": {
       "label": "Collect more interviews ({{count}}/{{min}})",
       "reason": "Analysis unlocks at {{min}} completed interviews."
+    },
+    "generateMemo": {
+      "label": "Generate a decision memo",
+      "reason": "{{count}} studies are analysed — synthesise them into one executive verdict."
+    },
+    "refreshMemo": {
+      "label": "Refresh your decision memo",
+      "reason": "A study in the memo has newer analysis — the memo no longer reflects it."
     }
   },
   "nudges": {
@@ -340,7 +348,9 @@
     "dataMilestone": "You've got {{count}} completed interviews — enough to analyse.",
     "analysisStale": "{{count}} new interviews since the last analysis — worth refreshing.",
     "qualityFlag": "A low-quality interview just came in — worth a look.",
-    "studyReportReady": "“{{name}}” — the analysis report is ready."
+    "studyReportReady": "“{{name}}” — the analysis report is ready.",
+    "memoReady": "“{{name}}” — your decision memo is ready.",
+    "memoStale": "“{{name}}” — a study in this memo has newer analysis. Worth regenerating."
   },
   "decisionMemos": {
     "eyebrow": "Cross-study synthesis",
@@ -369,6 +379,8 @@
     "questionPlaceholder": "e.g. Should we prioritise retention features over acquisition in H2?",
     "nameLabel": "Memo name (optional)",
     "namePlaceholder": "e.g. Retention vs acquisition — H2",
-    "studyCount": "{{count}} studies"
+    "studyCount": "{{count}} studies",
+    "statusStale": "Out of date",
+    "staleHint": "A study in this memo has a newer analysis than the memo. Generate a new memo to include it."
   }
 }

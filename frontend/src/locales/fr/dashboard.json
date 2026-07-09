@@ -333,6 +333,14 @@
     "collectMore": {
       "label": "Collecter plus d'entretiens ({{count}}/{{min}})",
       "reason": "L'analyse se débloque à {{min}} entretiens terminés."
+    },
+    "generateMemo": {
+      "label": "Générer un mémo de décision",
+      "reason": "{{count}} études sont analysées — synthétisez-les en un verdict exécutif."
+    },
+    "refreshMemo": {
+      "label": "Actualiser votre mémo de décision",
+      "reason": "Une étude du mémo a une analyse plus récente — le mémo ne la reflète plus."
     }
   },
   "nudges": {
@@ -340,7 +348,9 @@
     "dataMilestone": "Vous avez {{count}} entretiens terminés — assez pour lancer l'analyse.",
     "analysisStale": "{{count}} nouveaux entretiens depuis la dernière analyse — pensez à l'actualiser.",
     "qualityFlag": "Un entretien de faible qualité vient d'arriver — à vérifier.",
-    "studyReportReady": "« {{name}} » — le rapport d'analyse est prêt."
+    "studyReportReady": "« {{name}} » — le rapport d'analyse est prêt.",
+    "memoReady": "« {{name}} » — votre mémo de décision est prêt.",
+    "memoStale": "« {{name}} » — une étude de ce mémo a une analyse plus récente. Pensez à le régénérer."
   },
   "decisionMemos": {
     "eyebrow": "Synthèse transverse",
@@ -369,6 +379,8 @@
     "questionPlaceholder": "ex. Prioriser la rétention ou l'acquisition au S2 ?",
     "nameLabel": "Nom du mémo (optionnel)",
     "namePlaceholder": "ex. Rétention vs acquisition — S2",
-    "studyCount": "{{count}} études"
+    "studyCount": "{{count}} études",
+    "statusStale": "Obsolète",
+    "staleHint": "Une étude de ce mémo a une analyse plus récente que le mémo. Générez un nouveau mémo pour l'inclure."
   }
 }

@@ -116,6 +116,23 @@ def gather_study_evidence(study: Study, db: Session) -> dict | None:
     return {"study": study, "project_analysis": qual, "study_analysis": mixed}
 
 
+def latest_evidence_at(study: Study, db: Session) -> datetime | None:
+    """Most recent ``generated_at`` across the study's ready analyses.
+
+    Drives memo staleness: a decision memo generated before this timestamp
+    no longer reflects the study's current findings.
+    """
+    evidence = gather_study_evidence(study, db)
+    if evidence is None:
+        return None
+    times = [
+        a.generated_at
+        for a in (evidence["project_analysis"], evidence["study_analysis"])
+        if a is not None and a.generated_at is not None
+    ]
+    return max(times) if times else None
+
+
 def _study_block(evidence: dict) -> str:
     """Serialise one study's evidence into a prompt block."""
     study: Study = evidence["study"]

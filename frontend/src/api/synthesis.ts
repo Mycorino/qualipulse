@@ -12,6 +12,8 @@ export interface SynthesisSummary {
   generated_at: string | null;
   created_at: string | null;
   error: string | null;
+  /** A ready memo whose included studies have newer analysis evidence. */
+  stale?: boolean;
 }
 
 export interface SynthesisDetail {

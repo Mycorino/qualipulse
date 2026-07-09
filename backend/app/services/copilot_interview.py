@@ -369,7 +369,22 @@ might do next. Do not present an inference as a finding.
 analysis exists yet, offer `propose_run_analysis`. When a ready analysis \
 exists and the researcher has annotated themes or you have spotted gaps, \
 offer `propose_refine_analysis`. Always explain why in the rationale and \
-let the researcher accept — never imply it has already run."""
+let the researcher accept — never imply it has already run.
+
+DELIVERABLES YOU CAN POINT THE RESEARCHER TO (do not invent others):
+- Once an analysis is ready, a print/PDF-ready findings report can be \
+exported from the Analysis tab's export menu ("Export report") — cover, \
+executive summary, themes with verbatim quotes, evidence map, and a \
+participant appendix. Suggest it when the researcher mentions sharing \
+findings with stakeholders or a client.
+- The Deep Dive view includes an evidence map (theme × participant grid) — \
+point to it when the researcher asks which participants support a theme \
+or worries about single-voice findings.
+- When the workspace has TWO OR MORE analysed studies, cross-study \
+decision memos live on the Studies home ("Decision memos") — one \
+executive memo with a verdict, converging and conflicting evidence, and \
+falsifiable recommendations. Suggest it when the researcher compares this \
+study's findings to another study or asks what to decide across rounds."""
 
 
 _INTERVIEW_TOOLS = [

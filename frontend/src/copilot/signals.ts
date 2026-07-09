@@ -20,7 +20,9 @@ export type NudgeEvent =
   | "analysis_stale"
   | "data_milestone"
   | "quality_flag"
-  | "study_report_ready";
+  | "study_report_ready"
+  | "memo_ready"
+  | "memo_stale";
 
 export interface Nudge {
   /** Stable id — encodes the event + triggering value, so the same
@@ -55,9 +57,16 @@ export interface StudySnapshot {
   hasReport: boolean;
 }
 
+/** The diff-relevant slice of a decision memo, for home-page detection. */
+export interface MemoSnapshot {
+  status: string; // "generating" | "ready" | "failed"
+  stale: boolean;
+}
+
 interface SignalStore {
   lastSeen: Record<string, ProjectSnapshot>;
   studyLastSeen: Record<string, StudySnapshot>;
+  memoLastSeen: Record<string, MemoSnapshot>;
   nudges: Nudge[]; // active, undismissed — persisted so a reload can't drop one
   dismissed: string[];
 }
@@ -75,12 +84,15 @@ const NUDGE_TONE: Record<NudgeEvent, Nudge["tone"]> = {
   analysis_stale: "neutral",
   quality_flag: "caution",
   study_report_ready: "positive",
+  memo_ready: "positive",
+  memo_stale: "neutral",
 };
 
 function loadStore(): SignalStore {
   let store: SignalStore = {
     lastSeen: {},
     studyLastSeen: {},
+    memoLastSeen: {},
     nudges: [],
     dismissed: [],
   };
@@ -91,6 +103,7 @@ function loadStore(): SignalStore {
       store = {
         lastSeen: parsed.lastSeen ?? {},
         studyLastSeen: parsed.studyLastSeen ?? {},
+        memoLastSeen: parsed.memoLastSeen ?? {},
         nudges: parsed.nudges ?? [],
         dismissed: parsed.dismissed ?? [],
       };
@@ -243,14 +256,27 @@ export interface StudyReportInput {
   hasReport: boolean;
 }
 
+/** A decision memo seen on the home page, for memo_ready / memo_stale. */
+export interface MemoInput {
+  id: string;
+  name: string;
+  status: string; // "generating" | "ready" | "failed"
+  stale: boolean;
+}
+
 /**
- * Diff the studies list against the stored baseline and emit a nudge for
- * any study that gained a report since last seen. Returns all active
- * workspace nudges (study-scoped).
+ * Diff the studies list (and, when provided, the decision-memo list)
+ * against the stored baseline and emit a nudge for any study that gained
+ * a report, any memo that finished generating, and any memo that went
+ * stale since last seen. Returns all active workspace nudges.
  */
-export function detectWorkspaceNudges(studies: StudyReportInput[]): Nudge[] {
+export function detectWorkspaceNudges(
+  studies: StudyReportInput[],
+  memos: MemoInput[] = [],
+): Nudge[] {
   const store = loadStore();
-  const ids = new Set(studies.map((s) => s.id));
+  const studyIds = new Set(studies.map((s) => s.id));
+  const memoIds = new Set(memos.map((m) => m.id));
 
   for (const s of studies) {
     const prev = store.studyLastSeen[s.id];
@@ -269,9 +295,35 @@ export function detectWorkspaceNudges(studies: StudyReportInput[]): Nudge[] {
     store.studyLastSeen[s.id] = { hasReport: s.hasReport };
   }
 
+  for (const m of memos) {
+    const prev = store.memoLastSeen[m.id];
+    if (prev) {
+      if (prev.status !== "ready" && m.status === "ready") {
+        addNudge(
+          store,
+          makeNudge("memo_ready", m.id, "ready", "nudges.memoReady", {
+            name: m.name,
+          }),
+        );
+      }
+      if (m.status === "ready" && !prev.stale && m.stale) {
+        addNudge(
+          store,
+          makeNudge("memo_stale", m.id, "stale", "nudges.memoStale", {
+            name: m.name,
+          }),
+        );
+      }
+    }
+    store.memoLastSeen[m.id] = { status: m.status, stale: m.stale };
+  }
+
   saveStore(store);
   return store.nudges.filter(
-    (n) => n.event === "study_report_ready" && ids.has(n.scopeId),
+    (n) =>
+      (n.event === "study_report_ready" && studyIds.has(n.scopeId)) ||
+      ((n.event === "memo_ready" || n.event === "memo_stale") &&
+        memoIds.has(n.scopeId)),
   );
 }
 
