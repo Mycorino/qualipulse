@@ -61,6 +61,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: i18n parity check
+        run: node scripts/check-i18n.mjs
+
       - name: Build
         run: npm run build
 

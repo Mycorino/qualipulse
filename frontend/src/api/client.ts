@@ -13,6 +13,31 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+// Coalesce concurrent 401s into a single refresh. Without this, N parallel
+// requests that all 401 fire N independent /auth/refresh calls, each racing to
+// write a new refresh_token to localStorage — last write wins and the others'
+// rotated tokens are lost, which can log the user out. All callers now await
+// the same in-flight promise instead.
+let refreshPromise: Promise<string> | null = null;
+
+function refreshAccessToken(storedRefreshToken: string): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post("/api/auth/refresh", { refresh_token: storedRefreshToken })
+      .then(({ data }) => {
+        localStorage.setItem("token", data.access_token);
+        if (data.refresh_token) {
+          localStorage.setItem("refresh_token", data.refresh_token);
+        }
+        return data.access_token as string;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
 client.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -39,14 +64,8 @@ client.interceptors.response.use(
 
       if (storedRefreshToken) {
         try {
-          const { data } = await axios.post("/api/auth/refresh", {
-            refresh_token: storedRefreshToken,
-          });
-          localStorage.setItem("token", data.access_token);
-          if (data.refresh_token) {
-            localStorage.setItem("refresh_token", data.refresh_token);
-          }
-          originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
+          const accessToken = await refreshAccessToken(storedRefreshToken);
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return client(originalRequest);
         } catch {
           // Refresh failed — fall through to logout

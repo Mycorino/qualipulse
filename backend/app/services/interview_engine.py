@@ -95,6 +95,11 @@ CLOSING_MESSAGES: dict[str, str] = {
     "zh": "我们的访谈到此结束。非常感谢您抽出宝贵时间并认真回答，这对我们非常有帮助！",
 }
 
+# Hard ceiling on consecutive follow-ups per guide question. The AI prompt
+# advises moving on after ~2 follow-ups without new information; this is the
+# server-enforced backstop so one topic can never eat the whole interview.
+MAX_FOLLOWUPS_PER_QUESTION = 3
+
 
 # Participant thank-you email, in every supported interview language.
 # Keyed off the participant's effective language (their own choice first,
@@ -437,8 +442,13 @@ def decide_next_action(
     """
     client = get_anthropic_client(60.0)
 
-    # Compute how much of the allotted time has been used and questions answered
-    time_used_pct = (elapsed_minutes / total_minutes * 100) if total_minutes > 0 else 100
+    # Compute how much of the allotted time has been used and questions answered.
+    # When the configured duration is missing/zero/negative we can't reliably
+    # reason about pacing — treat time as "unknown" (0% used) rather than 100%,
+    # so a misconfigured project can never trivially satisfy the close gate and
+    # end interviews after a single exchange (see close gate below).
+    pacing_known = total_minutes > 0
+    time_used_pct = (elapsed_minutes / total_minutes * 100) if pacing_known else 0.0
     questions_answered = current_question_index + 1  # 1-based count of questions reached
     remaining_minutes = max(0.0, total_minutes - elapsed_minutes)
 
@@ -479,8 +489,13 @@ def decide_next_action(
         )
 
     # ── Close gate ─────────────────────────────────────────────────────────
-    can_close = all_questions_done or time_used_pct >= 95.0
-    can_close = can_close and (time_used_pct >= 80.0)
+    if pacing_known:
+        can_close = all_questions_done or time_used_pct >= 95.0
+        can_close = can_close and (time_used_pct >= 80.0)
+    else:
+        # Duration misconfigured — the only trustworthy close signal left is
+        # "every guide question has been covered".
+        can_close = all_questions_done
 
     if can_close:
         close_instruction = '3. "close" — the interview is complete (all questions covered and/or time is up); wrap up warmly'
@@ -585,7 +600,15 @@ WHY: generic answer with no behaviour or example.
                 messages=[{"role": "user", "content": user_message}],
             )
             break
-        except (anthropic.APIStatusError, httpx.TimeoutException) as exc:
+        except (
+            anthropic.APIStatusError,
+            # APITimeoutError / APIConnectionError are the SDK's wrappers for the
+            # most common transient failure (a mid-interview timeout). They are
+            # NOT APIStatusError subclasses, so the original tuple never retried
+            # them — a single slow call raised a hard error to the participant.
+            anthropic.APIConnectionError,
+            httpx.TimeoutException,
+        ) as exc:
             if _attempt < _max_retries:
                 _time.sleep(1.5 ** _attempt)
                 continue
@@ -938,11 +961,28 @@ def process_interview_turn(
             "No speech detected in the recording. Please try again in a quieter environment."
         )
 
-    # 1b. Whisper hallucination guard — common phantom phrases on silent audio
+    # 1b. Whisper hallucination guard — common phantom phrases on silent audio.
+    # Whisper is trained on captioned video and hallucinates outro/subtitle
+    # boilerplate on near-silence. Cover every language the interview engine
+    # supports (see LANGUAGE_NAMES) so a silent clip in de/es/it/pt isn't
+    # treated as a real answer and fed to Claude.
     _HALLUCINATION_PHRASES = (
+        # English
         "thank you for watching", "thanks for watching", "please subscribe",
-        "like and subscribe", "see you in the next", "merci d'avoir regardé",
-        "sous-titres réalisés", "sous-titrage",
+        "like and subscribe", "see you in the next",
+        # French
+        "merci d'avoir regardé", "sous-titres réalisés", "sous-titrage",
+        # German
+        "untertitel der amara", "untertitelung des zdf", "vielen dank fürs zuschauen",
+        # Spanish
+        "gracias por ver el vídeo", "gracias por ver el video", "subtítulos realizados por",
+        # Italian
+        "sottotitoli e revisione a cura di", "sottotitoli creati dalla comunità",
+        "grazie per aver guardato",
+        # Portuguese
+        "obrigado por assistir", "legendas pela comunidade",
+        # Cross-language subtitle-community watermark
+        "amara.org",
     )
     _lower_transcript = transcript.strip().lower()
     if any(p in _lower_transcript for p in _HALLUCINATION_PHRASES):
@@ -988,8 +1028,12 @@ def process_interview_turn(
             language_override=context.get("language"),
         )
         first_tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-        first_tts_url = upload_audio(generate_speech(first_q_text), first_tts_key)
-        log_tts_usage(db, first_q_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
+        try:
+            first_tts_url = upload_audio(generate_speech(first_q_text), first_tts_key)
+            log_tts_usage(db, first_q_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
+        except Exception:
+            logger.exception("Warm-up handoff TTS failed for participant %s; continuing text-only", participant_id)
+            first_tts_url = None
         next_turn_idx = (turns[-1].turn_index + 1) if turns else 0
         new_turn = InterviewTurn(
             participant_id=participant_id,
@@ -1063,14 +1107,33 @@ def process_interview_turn(
             if (cur_q - expected_q) < -1.5:
                 decision["action"] = "next_question"
 
+    # Server-side follow-up depth cap: never let one topic consume the whole
+    # interview. The prompt advises Claude to move on after ~2 follow-ups without
+    # new information, but that's advisory — enforce a hard ceiling so a model
+    # that ignores the guidance can't loop indefinitely on a single question.
+    if decision["action"] == "follow_up":
+        cur_q = context["current_question_index"]
+        existing_followups = sum(
+            1 for t in turns if t.question_index == cur_q and t.is_follow_up
+        )
+        has_next_question = cur_q < (context["total_questions"] - 1)
+        if existing_followups >= MAX_FOLLOWUPS_PER_QUESTION and has_next_question:
+            decision["action"] = "next_question"
+
     action = decision["action"]
     question_text = decision["question"]
     is_complete = action == "close"
 
-    # 5. Generate TTS for the next question / closing and upload
+    # 5. Generate TTS for the next question / closing and upload. A TTS/storage
+    # outage must not kill an in-flight interview — the client tolerates a null
+    # audio URL and degrades to text-only, matching start_interview's fallback.
     tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-    tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
-    log_tts_usage(db, question_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
+    try:
+        tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
+        log_tts_usage(db, question_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
+    except Exception:
+        logger.exception("TTS generation failed for participant %s; continuing text-only", participant_id)
+        tts_audio_url = None
 
     # 6. Determine the new turn metadata
     next_turn_index = (turns[-1].turn_index + 1) if turns else 0
@@ -1326,13 +1389,22 @@ def skip_question(participant_id: str, db) -> dict:
         last.response_transcript = "[Skipped]"
         db.commit()
 
-    # Decide next action — force next_question
+    # Decide next action — force next_question.
+    #
+    # The engine tracks a GLOBAL question ordinal on each turn (0,1,2,… bumped
+    # by next_question), but a guide question's own `question_index` restarts at
+    # 0 for every section. So we must flatten the guide into global order
+    # (section_index, question_index) and index into it positionally — comparing
+    # the per-section index against the global counter would end the interview
+    # early on any multi-section guide (and storing the per-section index on the
+    # new turn would corrupt the counter for the next respond).
     current_q_index = context["current_question_index"]
-    guide_questions = sorted(
+    ordered_questions = sorted(
         [q for q in project.guide_questions if not q.deprecated_at],
-        key=lambda q: q.question_index,
+        key=lambda q: (q.section_index, q.question_index),
     )
-    next_questions = [q for q in guide_questions if q.question_index > current_q_index]
+    next_pos = current_q_index + 1
+    next_questions = ordered_questions[next_pos:]
 
     if not next_questions:
         # No more questions — close
@@ -1341,13 +1413,38 @@ def skip_question(participant_id: str, db) -> dict:
         try:
             audio_data = generate_speech(closing_text)
             key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-            upload_audio_file(audio_data, key)
-            tts_url = f"/audio/{key}"
+            # Use the URL upload returns — it's the R2 public URL in prod and
+            # only "/audio/{key}" on local disk. Hardcoding the local shape
+            # produced a broken (404) audio link on R2.
+            tts_url = upload_audio_file(audio_data, key)
         except Exception:
             pass
         participant.status = "completed"
         participant.completed_at = datetime.utcnow()
         db.commit()
+
+        # Consume one credit — a completion reached by skipping the final
+        # question is still a completed interview. Mirrors the main respond
+        # flow: no-op for legacy plans, idempotent per participant. Without
+        # this, an interview finished via "skip" was billed as free.
+        try:
+            from app.services.billing_service import consume_interview_credit
+            consume_interview_credit(
+                db,
+                workspace_id=participant.project.company_id,
+                participant_id=participant.id,
+                project_id=participant.project_id,
+                metadata={
+                    "duration_seconds": int((participant.completed_at - participant.started_at).total_seconds()) if participant.started_at else None,
+                    "language": participant.project.language if participant.project else None,
+                    "completed_via": "skip",
+                },
+            )
+        except Exception:  # pragma: no cover — never fail an interview on billing
+            logger.exception(
+                "Credit consumption failed for participant %s (skip path); interview still completed",
+                participant.id,
+            )
 
         # Auto-run AI quality assessment in background thread
         try:
@@ -1381,7 +1478,9 @@ def skip_question(participant_id: str, db) -> dict:
     new_turn = InterviewTurn(
         participant_id=participant_id,
         turn_index=len(turns),
-        question_index=next_q.question_index,
+        # Global ordinal (position in the flattened guide), NOT the per-section
+        # question_index — this is what get_interview_context reads back.
+        question_index=next_pos,
         is_follow_up=False,
         follow_up_index=0,
         question_text=question_text,
@@ -1393,10 +1492,12 @@ def skip_question(participant_id: str, db) -> dict:
     try:
         audio_data = generate_speech(question_text)
         key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-        upload_audio_file(audio_data, key)
-        new_turn.tts_audio_url = key
+        # upload_audio returns the playback URL (R2 public URL in prod,
+        # "/audio/{key}" on disk). Persist and return that same URL so the
+        # skip path matches the main respond flow instead of a broken key.
+        tts_url = upload_audio_file(audio_data, key)
+        new_turn.tts_audio_url = tts_url
         db.commit()
-        tts_url = f"/audio/{key}"
     except Exception:
         pass
 

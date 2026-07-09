@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -21,13 +21,22 @@ export function useToast() {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const nextId = useRef(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const toast = useCallback((message: string, type: ToastType = "info") => {
     const id = ++nextId.current;
     setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
+    const handle = setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
+    timers.current.push(handle);
+  }, []);
+
+  // Clear any pending auto-dismiss timers on unmount so they don't fire a
+  // setState on an unmounted provider (React warning + wasted work).
+  useEffect(() => {
+    const pending = timers.current;
+    return () => pending.forEach(clearTimeout);
   }, []);
 
   return (

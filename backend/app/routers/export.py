@@ -322,8 +322,8 @@ def export_transcripts_csv(
             # Write a row for the participant even with no turns
             writer.writerow([
                 p.id,
-                p.display_name or "",
-                p.email or "",
+                _csv_safe(p.display_name or ""),
+                _csv_safe(p.email or ""),
                 _consent_cell(p),
                 p.status,
                 _fmt_dt(p.started_at),
@@ -334,8 +334,8 @@ def export_transcripts_csv(
             for t in turns:
                 writer.writerow([
                     p.id,
-                    p.display_name or "",
-                    p.email or "",
+                    _csv_safe(p.display_name or ""),
+                    _csv_safe(p.email or ""),
                     _consent_cell(p),
                     p.status,
                     _fmt_dt(p.started_at),
@@ -343,8 +343,8 @@ def export_transcripts_csv(
                     t.turn_index,
                     t.question_index if t.question_index is not None else "",
                     t.is_follow_up,
-                    t.question_text,
-                    t.response_transcript or "",
+                    _csv_safe(t.question_text),
+                    _csv_safe(t.response_transcript or ""),
                     _fmt_dt(t.created_at),
                 ])
 
@@ -359,7 +359,7 @@ def export_transcripts_csv(
 
 
 @router.post("/{project_id}/participants/{participant_id}/quality")
-async def ai_quality_assessment(
+def ai_quality_assessment(
     project_id: str,
     participant_id: str,
     db: Session = Depends(get_db),
@@ -419,3 +419,18 @@ async def ai_quality_assessment(
 
 def _fmt_dt(dt: datetime | None) -> str:
     return dt.isoformat() if dt else ""
+
+
+def _csv_safe(value) -> str:
+    """Neutralise CSV formula injection in participant/researcher free text.
+
+    A cell whose value starts with =, +, -, @ (or a leading tab/CR) is executed
+    as a formula by Excel/Sheets/LibreOffice on open. A malicious participant
+    could set their display name to `=HYPERLINK(...)` and have it fire in a
+    researcher's spreadsheet. Prefix any such cell with a single quote — the
+    OWASP-recommended mitigation — so it's rendered as literal text.
+    """
+    text = "" if value is None else str(value)
+    if text and text[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
