@@ -4,6 +4,7 @@ import { useTranslation, Trans } from "react-i18next";
 import { useHead } from "../hooks/useHead";
 import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { captureRefFromUrl } from "../utils/referral";
 
 // Credits-based plan catalogue (PR 3). Prices match the plans seeded in the
 // backend ``billing_plans.py``; keep in sync if either side changes.
@@ -255,6 +256,12 @@ export default function Marketing() {
   const diffAnim = useInView();
   const pricingAnim = useInView(0.12, initialHash === "#pricing");
   const faqAnim = useInView(0.12, initialHash === "#faq");
+
+  useEffect(() => {
+    // Affiliate links land here as /?ref=code — persist it so the eventual
+    // signup (several clicks away) can still attribute the referral.
+    captureRefFromUrl();
+  }, []);
 
   useEffect(() => {
     if (!initialHash) return;

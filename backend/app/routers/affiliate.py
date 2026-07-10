@@ -3,9 +3,10 @@ import json
 import logging
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
+from jose import JWTError, jwt as jose_jwt
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
@@ -42,7 +43,10 @@ class AffiliateApplyRequest(BaseModel):
 
 class AffiliateLoginRequest(BaseModel):
     email: EmailStr
-    code: str
+
+
+class AffiliateMagicVerifyRequest(BaseModel):
+    token: str
 
 
 class TokenResponse(BaseModel):
@@ -151,7 +155,9 @@ def _get_admin_identity(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing admin key",
         )
-    if not hmac.compare_digest(token, settings.ADMIN_SECRET_KEY):
+    # Compare bytes, not str — compare_digest raises TypeError (→ 500) on
+    # non-ASCII str input, and a crafted header shouldn't crash the guard.
+    if not hmac.compare_digest(token.encode("utf-8"), settings.ADMIN_SECRET_KEY.encode("utf-8")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid admin key",
@@ -221,6 +227,13 @@ def _get_affiliate_from_jwt(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Affiliate not found",
         )
+    # Re-check status on every request so suspending an affiliate takes
+    # effect immediately — not when their 24h token happens to expire.
+    if affiliate.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This affiliate account is not active. Contact support.",
+        )
     return affiliate
 
 
@@ -274,29 +287,88 @@ def apply_for_affiliate(
     }
 
 
-@router.post("/login", response_model=TokenResponse)
-@limiter.limit("10/minute")
+_MAGIC_LINK_EXPIRY_MINUTES = 15
+
+
+def _create_magic_token(affiliate_id: str) -> str:
+    return jose_jwt.encode(
+        {
+            "sub": f"affiliate-magic:{affiliate_id}",
+            "type": "affiliate_magic",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=_MAGIC_LINK_EXPIRY_MINUTES),
+        },
+        settings.SECRET_KEY,
+        algorithm="HS256",
+    )
+
+
+@router.post("/login")
+@limiter.limit("5/minute")
 def affiliate_login(
     request: Request,
     body: AffiliateLoginRequest,
     db: Session = Depends(get_db),
-) -> TokenResponse:
-    """Affiliate login: email + code."""
-    affiliate = db.query(Affiliate).filter(
-        Affiliate.email == body.email.lower(),
-        Affiliate.code == _validate_affiliate_code(body.code),
-    ).first()
+) -> dict:
+    """Request a passwordless sign-in link for the affiliate portal.
 
-    if not affiliate:
+    The referral code is broadcast publicly in every referral link, so it
+    can't be a credential — email possession is. Always returns the same
+    200 response so the endpoint can't be used to enumerate affiliates.
+    """
+    affiliate = db.query(Affiliate).filter(Affiliate.email == body.email.lower()).first()
+
+    if affiliate and affiliate.status == "active":
+        magic_url = (
+            f"{settings.APP_BASE_URL}/affiliate/login"
+            f"#magic={_create_magic_token(affiliate.id)}"
+        )
+        accept_lang = (request.headers.get("accept-language") or "").lower()
+        lang = "fr" if accept_lang.startswith("fr") else "en"
+        try:
+            from app.services.email import send_affiliate_magic_link
+            send_affiliate_magic_link(
+                affiliate.email, magic_url,
+                expiry_minutes=_MAGIC_LINK_EXPIRY_MINUTES, lang=lang,
+            )
+            logger.info("Affiliate magic link sent: %s", affiliate.email)
+        except Exception:
+            logger.exception("Failed to send affiliate magic link to %s", affiliate.email)
+
+    return {
+        "message": "If an active affiliate account exists for this email, a sign-in link is on its way.",
+    }
+
+
+@router.post("/login/verify", response_model=TokenResponse)
+@limiter.limit("10/minute")
+def affiliate_login_verify(
+    request: Request,
+    body: AffiliateMagicVerifyRequest,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Exchange a magic-link token for an affiliate session token."""
+    try:
+        payload = jose_jwt.decode(body.token, settings.SECRET_KEY, algorithms=["HS256"])
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or affiliate code.",
+            detail="This sign-in link is invalid or has expired. Request a new one.",
         )
 
-    if affiliate.status != "active":
+    sub = payload.get("sub") or ""
+    if payload.get("type") != "affiliate_magic" or not sub.startswith("affiliate-magic:"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This sign-in link is invalid or has expired. Request a new one.",
+        )
+
+    affiliate = db.query(Affiliate).filter(
+        Affiliate.id == sub[len("affiliate-magic:"):]
+    ).first()
+    if not affiliate or affiliate.status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Your affiliate account is {affiliate.status}. Contact support.",
+            detail="This affiliate account is not active. Contact support.",
         )
 
     logger.info("Affiliate login: %s", affiliate.email)
@@ -363,26 +435,25 @@ def get_affiliate_referrals(
     db: Session = Depends(get_db),
 ) -> dict:
     """Get list of referred companies."""
-    referrals = (
-        db.query(AffiliateReferral)
+    rows = (
+        db.query(AffiliateReferral, Company.email)
+        .outerjoin(Company, Company.id == AffiliateReferral.referred_company_id)
         .filter(AffiliateReferral.affiliate_id == affiliate.id)
         .order_by(AffiliateReferral.signed_up_at.desc())
         .all()
     )
 
-    referral_list = []
-    for ref in referrals:
-        company = db.query(Company).filter(Company.id == ref.referred_company_id).first()
-        referral_list.append(
-            AffiliateReferralResponse(
-                id=ref.id,
-                referred_company_email=company.email if company else "unknown",
-                status=ref.status,
-                commission_amount=ref.commission_amount,
-                signed_up_at=ref.signed_up_at.isoformat(),
-                converted_at=ref.converted_at.isoformat() if ref.converted_at else None,
-            )
+    referral_list = [
+        AffiliateReferralResponse(
+            id=ref.id,
+            referred_company_email=email or "unknown",
+            status=ref.status,
+            commission_amount=ref.commission_amount,
+            signed_up_at=ref.signed_up_at.isoformat(),
+            converted_at=ref.converted_at.isoformat() if ref.converted_at else None,
         )
+        for ref, email in rows
+    ]
 
     return {
         "referrals": referral_list,
@@ -473,14 +544,22 @@ def update_affiliate(
         )
 
     if body.status is not None:
-        if affiliate.status != "pending" or body.status not in ("active", "rejected"):
+        # pending → approve/reject; active ⇄ suspended (a fraudulent affiliate
+        # must be stoppable — suspension halts new attribution AND portal
+        # access immediately via the per-request status check).
+        allowed = {
+            "pending": ("active", "rejected"),
+            "active": ("suspended",),
+            "suspended": ("active",),
+        }
+        if body.status not in allowed.get(affiliate.status, ()):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot change status from {affiliate.status} to {body.status}. Only pending affiliates can be approved or rejected.",
+                detail=f"Cannot change status from {affiliate.status} to {body.status}.",
             )
         old_status = affiliate.status
         affiliate.status = body.status
-        if body.status == "active":
+        if body.status == "active" and affiliate.approved_at is None:
             affiliate.approved_at = datetime.utcnow()
         _record_affiliate_audit(
             db, admin_identity, "affiliate_status_change", affiliate,
@@ -535,6 +614,16 @@ def record_payout(
     )
     db.add(payout)
     affiliate.total_paid += body.amount
+    # Mark converted referrals as paid so the per-referral status actually
+    # reaches its documented terminal state (signed_up → converted → paid).
+    (
+        db.query(AffiliateReferral)
+        .filter(
+            AffiliateReferral.affiliate_id == affiliate.id,
+            AffiliateReferral.status == "converted",
+        )
+        .update({AffiliateReferral.status: "paid"}, synchronize_session=False)
+    )
     _record_affiliate_audit(
         db, admin_identity, "affiliate_payout", affiliate,
         {"amount": body.amount, "notes": body.notes},

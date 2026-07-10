@@ -87,7 +87,9 @@
     "participants_other": "{{count}} participants",
     "prev": "Précédent",
     "next": "Suivant",
-    "page": "Page {{page}}"
+    "page": "Page {{page}}",
+    "tierFree": "Gratuit",
+    "tierStarter": "Starter"
   },
   "affiliates": {
     "title": "Programme d'affiliation",
@@ -169,7 +171,8 @@
     "errorReasonRequired": "Le motif est obligatoire",
     "cancel": "Annuler",
     "submit": "Appliquer",
-    "submitting": "Application…"
+    "submitting": "Application…",
+    "nowAvailable": "{{count}} crédits désormais disponibles"
   },
   "deleteDialog": {
     "message": "Supprimer le compte de « {{name}} » ({{email}}) ? Toutes ses données seront définitivement supprimées. Cette action est irréversible.",

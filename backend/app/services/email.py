@@ -424,6 +424,22 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "foot": "Ce lien expire dans {expiry_minutes} minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.",
         },
     },
+    "affiliate_magic": {
+        "en": {
+            "subject": "Your QualiPulse affiliate sign-in link",
+            "heading": "Sign in to your affiliate dashboard",
+            "body": "Click the button below to open your QualiPulse affiliate dashboard. No password needed — this link signs you in directly.",
+            "cta": "Open my dashboard →",
+            "foot": "This link expires in {expiry_minutes} minutes and can only be used with your email address. If you didn't request it, you can safely ignore this email.",
+        },
+        "fr": {
+            "subject": "Votre lien de connexion affilié QualiPulse",
+            "heading": "Connectez-vous à votre tableau de bord affilié",
+            "body": "Cliquez sur le bouton ci-dessous pour ouvrir votre tableau de bord affilié QualiPulse. Pas de mot de passe — ce lien vous connecte directement.",
+            "cta": "Ouvrir mon tableau de bord →",
+            "foot": "Ce lien expire dans {expiry_minutes} minutes et ne fonctionne qu'avec votre adresse email. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.",
+        },
+    },
     "panel_join": {
         "en": {
             "subject": "Confirm your spot on the QualiPulse panel",
@@ -1053,6 +1069,35 @@ def send_interview_magic_link(
     return send_email(
         to=email,
         subject=_c("interview_magic", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_affiliate_magic_link(
+    email: str,
+    magic_url: str,
+    expiry_minutes: int = 15,
+    lang: str = "en",
+) -> bool:
+    """Passwordless sign-in link for the affiliate portal. The referral code
+    is public (it's in every referral link), so it must never double as a
+    credential — email possession is the credential instead."""
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("affiliate_magic", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("affiliate_magic", lang, "body")}</p>
+      <div style="text-align:center;margin:32px 0;">
+        <a href="{magic_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
+          {_c("affiliate_magic", lang, "cta")}
+        </a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.8rem;margin:0;">
+        {_c("affiliate_magic", lang, "foot", expiry_minutes=expiry_minutes)}
+      </p>
+    """
+    return send_email(
+        to=email,
+        subject=_c("affiliate_magic", lang, "subject"),
         body_html=_wrap_email(content, lang),
     )
 

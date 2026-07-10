@@ -33,18 +33,6 @@ export const getPublishedPosts = (page = 1, tag?: string) =>
 export const getPublishedPost = (slug: string) =>
   client.get<BlogPost>(`/blog/posts/${slug}`);
 
-// Admin
-export const adminListPosts = (page = 1, status?: string) =>
-  client.get<BlogListResponse>("/admin/blog", { params: { page, status } });
-
-export const adminGetPost = (id: string) =>
-  client.get<BlogPost>(`/admin/blog/${id}`);
-
-export const adminCreatePost = (data: Partial<BlogPost>) =>
-  client.post<BlogPost>("/admin/blog", data);
-
-export const adminUpdatePost = (id: string, data: Partial<BlogPost>) =>
-  client.put<BlogPost>(`/admin/blog/${id}`, data);
-
-export const adminDeletePost = (id: string) =>
-  client.delete(`/admin/blog/${id}`);
+// NOTE: no admin helpers here on purpose. /admin/blog/* needs the admin
+// Bearer key, not the researcher JWT this shared client injects —
+// AdminBlog.tsx builds its own client with the right credentials.

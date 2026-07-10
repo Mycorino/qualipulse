@@ -346,6 +346,18 @@ def create_checkout_session(
                 "plan_id": plan_id,
                 "billing_interval": interval,
             },
+            # Stripe does NOT propagate session metadata to the Subscription
+            # object, and customer.subscription.* handlers resolve the
+            # workspace from sub.metadata — without this the webhook no-ops
+            # (credits never provision, affiliate conversions never fire).
+            subscription_data={
+                "metadata": {
+                    "company_id": company.id,
+                    "workspace_id": company.id,
+                    "plan_id": plan_id,
+                    "billing_interval": interval,
+                },
+            },
         )
         if settings.STRIPE_AUTOMATIC_TAX:
             session_kwargs["automatic_tax"] = {"enabled": True}
@@ -679,8 +691,7 @@ def _handle_subscription_event(db: Session, event_type: str, sub: dict) -> None:
         if sub.get("customer"):
             company.stripe_customer_id = sub["customer"]
         db.commit()
-        if event_type == "customer.subscription.created":
-            _track_affiliate_conversion(db, workspace_id, sub)
+        _track_affiliate_conversion(db, workspace_id, sub)
         return
 
     # Credit-based plan path.
@@ -719,8 +730,8 @@ def _handle_subscription_event(db: Session, event_type: str, sub: dict) -> None:
         company.has_ever_paid = True
     db.commit()
 
+    _track_affiliate_conversion(db, workspace_id, sub)
     if event_type == "customer.subscription.created":
-        _track_affiliate_conversion(db, workspace_id, sub)
         try:
             from app.services.analytics import emit_event
             emit_event(
@@ -944,13 +955,22 @@ def _handle_charge_dispute(db: Session, event_type: str, dispute: dict) -> None:
 
 
 def _track_affiliate_conversion(db: Session, workspace_id: str, sub: dict) -> None:
-    """Replicate the prior affiliate-conversion side effect."""
+    """Convert a referral (once) when its subscription reaches a paid state.
+
+    Idempotent: Stripe delivers webhooks at-least-once, and this also fires
+    on ``customer.subscription.updated`` so a subscription that starts
+    ``incomplete`` (SCA / card failure) still converts when it activates.
+    Only a ``signed_up`` referral can convert — a retry or later update can
+    never re-credit the commission.
+    """
+    if sub.get("status") not in ("active", "trialing"):
+        return
     referral = (
         db.query(AffiliateReferral)
         .filter(AffiliateReferral.referred_company_id == workspace_id)
         .first()
     )
-    if not referral:
+    if not referral or referral.status != "signed_up":
         return
     referral.status = "converted"
     referral.converted_at = datetime.utcnow()
