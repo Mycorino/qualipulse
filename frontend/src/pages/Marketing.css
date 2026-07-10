@@ -1,5 +1,5 @@
 /* ============================================
-   Marketing / Landing page — Evidence-first redesign
+   Marketing / Landing page: Evidence-first redesign
    Ink hero + live interview sim, brand-blue accents,
    serif display / mono transcript vernacular.
    ============================================ */
@@ -35,7 +35,7 @@
   line-height: 1.6;
 }
 
-/* Smooth anchor scrolling while the marketing page is mounted — an instant
+/* Smooth anchor scrolling while the marketing page is mounted. An instant
    jump would land on a section whose reveal transition hasn't started yet
    (a blank flash). Scrolling through the content lets reveals fire naturally. */
 html:has(.mkt) {
@@ -716,7 +716,7 @@ html:has(.mkt) {
   align-items: baseline;
 }
 .mkt-plan-features li::before {
-  content: "—";
+  content: "•";
   color: var(--mk-brand);
   flex-shrink: 0;
 }

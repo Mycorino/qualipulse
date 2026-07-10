@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "QualiPulse — AI voice interviews, decision-ready insights",
-    "description": "QualiPulse runs AI-moderated voice interviews with your users and turns them into a decision-ready research memo — themes, verbatim quotes and recommendations in hours, not weeks. 3 free interviews, no credit card."
+    "title": "QualiPulse · AI voice interviews, decision-ready insights",
+    "description": "QualiPulse runs AI-moderated voice interviews with your users and turns them into a decision-ready research memo. Themes, verbatim quotes and recommendations in hours, not weeks. 3 free interviews, no credit card."
   },
   "nav": {
     "howItWorks": "How it works",
@@ -14,9 +14,9 @@
   },
   "hero": {
     "eyebrow": "AI-moderated voice interviews",
-    "title": "The customer interviews you keep postponing — done by Friday.",
-    "sub": "QualiPulse interviews your users by voice, in their browser — asking <b>adaptive follow-ups</b> like a trained researcher. You get transcripts, themes, and a <b>decision memo where every claim traces back to a verbatim quote</b>. No scheduling. No moderating. No transcription weekend.",
-    "cta": "Start free — 3 interviews on us",
+    "title": "The customer interviews you keep postponing. Done by Friday.",
+    "sub": "QualiPulse interviews your users by voice, right in their browser, asking <b>adaptive follow-ups</b> like a trained researcher. You get transcripts, themes, and a <b>decision memo where every claim traces back to a verbatim quote</b>. No scheduling. No moderating. No transcription weekend.",
+    "cta": "Start free with 3 interviews",
     "secondaryCta": "See the evidence trail",
     "facts": [
       "No credit card",
@@ -26,14 +26,14 @@
     ]
   },
   "live": {
-    "study": "Exit interviews — Q3 churn",
+    "study": "Exit interviews · Q3 churn",
     "participantName": "Sarah L.",
     "aiLabel": "Interviewer · AI",
     "participantLabel": "Sarah · Participant",
     "followUpBadge": "Adaptive follow-up",
     "q1": "You mentioned you almost cancelled back in March. Walk me through what happened that week.",
-    "a1": "Honestly? The price went up and I looked at my statement and thought — do I even use this anymore…",
-    "q2": "You said “do I even use this” — what would using it look like on a good week?",
+    "a1": "Honestly? The price went up, I looked at my statement, and I thought: do I even use this anymore…",
+    "q2": "You said “do I even use this.” What would using it look like on a good week?",
     "a2": "Good question. Probably the Monday planning thing. When I skip that, the whole subscription feels pointless."
   },
   "strip": {
@@ -62,17 +62,17 @@
         "desc": "Findings that arrive after the roadmap is locked don’t change anything. They become a slide nobody reopens."
       }
     ],
-    "kicker": "So teams decide on gut feel, a survey with 4% completion, and the loudest customer in the Slack channel — and call it “being scrappy.”"
+    "kicker": "So teams decide on gut feel, a survey with 4% completion, and the loudest customer in the Slack channel, then call it “being scrappy.”"
   },
   "how": {
     "eyebrow": "The fix",
     "title": "Brief it tonight. Read the memo by Friday.",
-    "subtitle": "QualiPulse collapses the whole pipeline — recruiting logistics, moderating, transcription, synthesis — into three steps.",
+    "subtitle": "QualiPulse collapses the whole pipeline into three steps: recruiting logistics, moderating, transcription, and synthesis.",
     "steps": [
       {
         "num": "Step 1",
         "title": "Describe the decision",
-        "desc": "Tell the research copilot what you need to decide. It drafts an interview guide with sections, screening questions and follow-up intents — you edit anything."
+        "desc": "Tell the research copilot what you need to decide. It drafts an interview guide with sections, screening questions and follow-up intents. You edit anything."
       },
       {
         "num": "Step 2",
@@ -82,7 +82,7 @@
       {
         "num": "Step 3",
         "title": "Read the decision memo",
-        "desc": "Themes, tensions, jobs-to-be-done and recommendations — each backed by verbatim quotes you can walk back to the exact second."
+        "desc": "Themes, tensions, jobs-to-be-done and recommendations, each backed by verbatim quotes you can walk back to the exact second."
       }
     ],
     "guideLines": [
@@ -100,21 +100,21 @@
   "evidence": {
     "eyebrow": "Why you can trust it",
     "title": "Every claim is walk-back-able.",
-    "subtitle": "AI summaries are only useful if you can check them. Click a finding — QualiPulse shows you the verbatim quote, the participant, and the timestamp it came from. Try it:",
-    "memoHead": "Decision memo — Why subscribers cancel",
-    "transcriptHead": "Transcript — verbatim source",
+    "subtitle": "AI summaries are only useful if you can check them. Click a finding, and QualiPulse shows you the verbatim quote, the participant, and the timestamp it came from. Try it:",
+    "memoHead": "Decision memo · Why subscribers cancel",
+    "transcriptHead": "Transcript · verbatim source",
     "claims": [
       {
         "title": "Cancellation is a billing-moment event",
         "time": "09:14",
-        "sub": "9 of 12 participants located the decision at a statement, renewal email, or price change — not at a moment of product frustration.",
+        "sub": "9 of 12 participants located the decision at a statement, renewal email, or price change, not at a moment of product frustration.",
         "meta": "MARCUS T. · CANCELLED MAY",
         "quote": "“I wasn’t even annoyed at the product. <m>The renewal email landed and I just thought, that’s €29 I didn’t decide to spend.</m> That was the whole thing.”"
       },
       {
         "title": "“Pause” is the unbuilt feature they wanted",
         "time": "14:02",
-        "sub": "Participants didn’t want to leave — they wanted to stop paying during low-usage months without losing history.",
+        "sub": "Participants didn’t want to leave. They wanted to stop paying during low-usage months without losing history.",
         "meta": "PRIYA R. · CANCELLED MARCH",
         "quote": "“<m>If I could have frozen it for the summer I’d still be a customer.</m> Instead the options were pay or delete, so… I deleted.”"
       },
@@ -134,11 +134,11 @@
     "items": [
       {
         "title": "Adaptive follow-ups",
-        "desc": "The AI decides after every answer: probe deeper, move on, or wrap up — pacing itself against your time budget, like a moderator watching the clock."
+        "desc": "The AI decides after every answer: probe deeper, move on, or wrap up. It paces itself against your time budget, like a moderator watching the clock."
       },
       {
         "title": "People say more than they type",
-        "desc": "A spoken answer runs 4–6× longer than a text-box answer, with the hedges and half-thoughts where the real insight hides."
+        "desc": "A spoken answer runs four to six times longer than a text-box answer, with the hedges and half-thoughts where the real insight hides."
       },
       {
         "title": "Screening built in",
@@ -150,11 +150,11 @@
       },
       {
         "title": "Your codebook, your calls",
-        "desc": "Tag quotes, write memos, dispute themes. Refined analyses incorporate your annotations — iterative, not one-shot."
+        "desc": "Tag quotes, write memos, dispute themes. Refined analyses fold in your annotations. Iterative, not one-shot."
       },
       {
         "title": "Cross-study decision memos",
-        "desc": "Synthesise up to 8 studies into one executive memo — with conflicts surfaced, not smoothed over."
+        "desc": "Synthesise up to 8 studies into one executive memo, with conflicts surfaced, not smoothed over."
       }
     ]
   },
@@ -172,12 +172,12 @@
     "creditsPerMonth": "interviews / month",
     "surveyResponsesPerMonth": "survey responses / month",
     "creditNote": "Need more in a busy month? Prepaid credit packs (25 / 50 / 100) never expire.",
-    "enterprise": "Running a large research program? Custom volume, SSO and DPA reviews —",
-    "enterpriseCta": "talk to us about Enterprise",
+    "enterprise": "Running a large research program with custom volume, SSO and DPA reviews?",
+    "enterpriseCta": "Talk to us about Enterprise",
     "trial": {
       "name": "Trial",
       "desc": "Prove it works on a question you actually have.",
-      "credits": "3 interviews included — never expire",
+      "credits": "3 interviews included, never expire",
       "features": [
         "1 editor · 1 active study",
         "Full AI analysis & decision memo",
@@ -227,27 +227,27 @@
     "items": [
       {
         "question": "What exactly costs a credit?",
-        "answer": "Only a completed interview of up to 15 minutes. Participants who are screened out, abandon halfway, or hit a technical failure never consume a credit — that risk is ours, not yours."
+        "answer": "Only a completed interview of up to 15 minutes. Participants who are screened out, abandon halfway, or hit a technical failure never consume a credit. That risk is ours, not yours."
       },
       {
         "question": "Do participants need to install anything?",
-        "answer": "No. They open your link in any browser — phone or laptop — pass a 10-second mic check, and talk. Consent, screening and resume-where-you-left-off are all built into the flow."
+        "answer": "No. They open your link in any browser (phone or laptop), pass a 10-second mic check, and talk. Consent, screening and resume-where-you-left-off are all built into the flow."
       },
       {
         "question": "Do I need to recruit participants?",
-        "answer": "QualiPulse gives you shareable links for your own participants — customers, users, a mailing list, an in-product prompt. You stay in control of who you interview."
+        "answer": "QualiPulse gives you shareable links for your own participants: customers, users, a mailing list, an in-product prompt. You stay in control of who you interview."
       },
       {
         "question": "Is an AI interviewer as good as a human moderator?",
-        "answer": "For discovery and evaluative research, it’s remarkably close — it never leads the witness, never gets tired on interview #9, and asks follow-ups grounded in what the participant just said. For deeply sensitive topics, we’d still recommend a human. The honest pitch: an AI-moderated interview beats the survey you were going to send instead."
+        "answer": "For discovery and evaluative research, it’s remarkably close. It never leads the witness, never gets tired on interview #9, and asks follow-ups grounded in what the participant just said. For deeply sensitive topics, we’d still recommend a human. The honest pitch: an AI-moderated interview beats the survey you were going to send instead."
       },
       {
         "question": "How do I know the analysis isn’t hallucinated?",
-        "answer": "Every theme, tension and recommendation carries verbatim quotes that link to the exact transcript turn — click through and read the source. You can mark themes confirmed, disputed or needs-evidence, and the refined analysis has to answer to your annotations."
+        "answer": "Every theme, tension and recommendation carries verbatim quotes that link to the exact transcript turn. Click through and read the source. You can mark themes confirmed, disputed or needs-evidence, and the refined analysis has to answer to your annotations."
       },
       {
         "question": "What languages are supported?",
-        "answer": "Studies run in English or French today — the AI moderator, the participant experience, and the research memo all follow your study’s language. Transcripts can be machine-translated as a reading aid; the original stays the untouched source of truth."
+        "answer": "Studies run in English or French today. The AI moderator, the participant experience, and the research memo all follow your study’s language. Transcripts can be machine-translated as a reading aid; the original stays the untouched source of truth."
       },
       {
         "question": "Who owns the research data?",

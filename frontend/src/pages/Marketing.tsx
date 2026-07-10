@@ -6,7 +6,7 @@ import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
 // Credits-based plan catalogue (PR 3). Prices match the plans seeded in the
-// backend ``billing_plans.py`` — keep in sync if either side changes.
+// backend ``billing_plans.py``; keep in sync if either side changes.
 const MARKETING_PLANS = [
   {
     id: "exploration",
@@ -537,7 +537,7 @@ export default function Marketing() {
             {MARKETING_PLANS.map((p) => {
               const features = t(`pricing.plans.${p.id}.features`, { returnObjects: true }) as string[];
               const isAnnual = billingInterval === "annual";
-              // floor, not round: 7990/12 would round to €666/mo — a number
+              // floor, not round: 7990/12 would round to €666/mo, a number
               // with the wrong connotations on a pricing page
               const display = isAnnual ? Math.floor(p.annualEur / 12) : p.monthlyEur;
               return (
