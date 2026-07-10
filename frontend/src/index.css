@@ -13513,15 +13513,17 @@ select.field-input {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px 8px;
+  /* FR labels ("Essai gratuit" + "Passer à un plan") outgrow the rail —
+     wrap as whole labels, never mid-word. */
+  flex-wrap: wrap;
   margin-bottom: 7px;
 }
 .hub-rail__plan-name {
   color: #fff;
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 .hub-rail__plan-cta {
   font-size: var(--text-xs);

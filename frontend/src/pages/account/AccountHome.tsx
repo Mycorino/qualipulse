@@ -129,7 +129,12 @@ export default function AccountHome() {
             <p className="account-card__value">{planName}</p>
           )}
           <div className="account-card__foot">
-            <Link className="btn btn-ghost btn-sm" to="/account/billing">
+            {/* Trial accounts get a real CTA — upgrading is the one action
+                this card exists for; paid accounts just manage billing. */}
+            <Link
+              className={`btn ${isTrial ? "btn-primary" : "btn-ghost"} btn-sm`}
+              to="/account/billing"
+            >
               {isTrial
                 ? t("home.planCard.upgradeCta", { defaultValue: "View plans & upgrade →" })
                 : t("home.planCard.manageCta", { defaultValue: "Manage billing →" })}
@@ -147,7 +152,10 @@ export default function AccountHome() {
           <p className="account-card__value">
             <strong style={{ fontSize: 28 }}>{seatLimit === -1 ? "∞" : seatLimit}</strong>{" "}
             <span className="muted-text" style={{ fontSize: 14 }}>
-              {t("home.workspaceCard.seats", { defaultValue: "team seats" })}
+              {t("home.workspaceCard.seats", {
+                defaultValue: "team seats",
+                count: seatLimit === -1 ? 2 : seatLimit,
+              })}
             </span>
           </p>
           <div className="account-card__foot">

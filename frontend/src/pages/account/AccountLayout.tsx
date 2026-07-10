@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import client from "../../api/client";
 import type { CompanyResponse } from "../../api/auth";
@@ -156,7 +156,18 @@ export default function AccountLayout() {
             <h1 className="account-identity__name">{me?.name || t("title")}</h1>
             <p className="account-identity__email">{me?.email}</p>
           </div>
-          {billing && <span className={badgeClass}>{badgeText}</span>}
+          {billing && (
+            <Link
+              className={badgeClass}
+              to="/account/billing"
+              style={{ textDecoration: "none" }}
+              aria-label={t("hubHeader.planBadgeAria", {
+                defaultValue: "Current plan — open billing",
+              })}
+            >
+              {badgeText}
+            </Link>
+          )}
           <span style={{ marginLeft: "auto" }}>
             <LanguageSwitcher variant="light" />
           </span>
