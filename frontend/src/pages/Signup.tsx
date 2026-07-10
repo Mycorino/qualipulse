@@ -5,6 +5,7 @@ import { useHead } from "../hooks/useHead";
 import { signup, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
+import { checkoutUrlForSelectedPlan } from "../utils/planCheckout";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
@@ -112,6 +113,16 @@ export default function Signup() {
       });
       saveToken(res.access_token, res.refresh_token);
       setCachedOnboarded(false);
+      // Paid intent is charged upfront: "Choose Exploration/Team/Agency" on
+      // the pricing page routes through Stripe Checkout now, not the trial.
+      // Soft-fails to the normal flow (null) when billing isn't configured
+      // or the session can't be created; cancelling checkout also lands on
+      // /welcome, where onboarding bootstraps the free trial as usual.
+      const checkoutUrl = await checkoutUrlForSelectedPlan();
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return;
+      }
       toast(t("signup.accountCreated"), "success");
       navigate("/welcome", { replace: true });
     } catch (err: unknown) {
