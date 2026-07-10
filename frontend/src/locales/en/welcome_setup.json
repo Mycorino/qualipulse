@@ -1,22 +1,18 @@
 {
   "header_skip": "Skip setup",
   "progress_aria": "Setup progress",
-
   "step_1_label": "Company",
   "step_2_label": "About you",
   "step_3_label": "Goals",
-
   "step_1_title": "Let's start with your company",
   "step_1_sub": "We'll use this to personalise your experience.",
   "step_1_cta": "Continue",
   "step_1_language_label": "Language",
-
   "field_company": "Company name",
   "field_company_placeholder": "Acme Inc.",
   "field_role_family": "Your field",
   "field_role": "Your role",
   "field_team_size": "Team size",
-
   "roleFamilies": {
     "product": "Product",
     "design": "Design & UX",
@@ -65,13 +61,10 @@
     "agency_lead": "Agency / Studio",
     "independent": "Independent"
   },
-
   "step_2_title": "Tell us about yourself",
   "step_2_sub": "This helps us tailor recommendations to your work.",
   "step_2_cta": "Continue",
-
   "role_other_placeholder": "Describe your role…",
-
   "step_3_title": "What do you want to do with QualiPulse?",
   "step_3_sub": "Pick what fits — you can always change these later.",
   "step_3_cta": "Get started →",
@@ -79,11 +72,17 @@
   "step_3_use_cases_label": "Suggested for you",
   "step_3_use_cases_hint": "Pick all that apply",
   "step_3_summary_label": "Here's what we know",
-
   "back": "Back",
   "saving": "Saving…",
-
   "toast_save_failed": "Couldn't save that — try again?",
   "toast_resend_ok": "Sent — check your inbox.",
-  "toast_resend_failed": "Couldn't resend just now — try again in a moment."
+  "toast_resend_failed": "Couldn't resend just now — try again in a moment.",
+  "progress_step": "Step {{step}} / 3",
+  "handoff_kicker": "Workspace ready",
+  "handoff_title": "Your workspace is set up.",
+  "handoff_sub": "We placed a worked example inside — two demo studies with real transcripts and a cross-study decision memo — so you can see the full arc before running your own.",
+  "handoff_note": "The example takes a few seconds to finish preparing — it may still be settling when you arrive.",
+  "handoff_memo_kicker": "Decision memo",
+  "handoff_memo_title": "A worked example, ready to open",
+  "handoff_cta": "Open your workspace →"
 }

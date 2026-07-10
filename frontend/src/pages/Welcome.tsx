@@ -62,6 +62,10 @@ export default function Welcome() {
 
   const [step, setStep] = useState<StepId>(1);
   const [saving, setSaving] = useState(false);
+  // Airlock finale: after completion we show a workspace-handoff screen
+  // instead of navigating cold — it previews the seeded example and
+  // absorbs the few seconds the backend needs to finish seeding it.
+  const [done, setDone] = useState(false);
 
   // Step 1
   const [companyName, setCompanyName] = useState("");
@@ -177,14 +181,18 @@ export default function Welcome() {
         use_case: casesArray[0] || undefined,
       });
       setCachedOnboarded(true);
-      // Hand off to the demo-project tour: the dashboard waits for the
-      // background-seeded demo study, then opens it with the tour armed.
-      navigate("/dashboard?tour=1", { replace: true });
+      setDone(true);
     } catch {
       toast(t("toast_save_failed"), "error");
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleEnterWorkspace() {
+    // Hand off to the demo-project tour: the dashboard waits for the
+    // background-seeded demo study, then opens it with the tour armed.
+    navigate("/dashboard?tour=1", { replace: true });
   }
 
   function handleSkip() {
@@ -214,7 +222,8 @@ export default function Welcome() {
       // handles it, and advancing here too would double-fire the action.
       if ((e.target as HTMLElement)?.tagName === "BUTTON") return;
       if (e.key === "Enter" && !saving) {
-        if (step === 1 && step1Valid) handleStep1Next();
+        if (done) handleEnterWorkspace();
+        else if (step === 1 && step1Valid) handleStep1Next();
         else if (step === 2 && step2Valid) handleStep2Next();
         else if (step === 3 && !suggestionsLoading) handleComplete();
       }
@@ -222,13 +231,18 @@ export default function Welcome() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, step1Valid, step2Valid, saving, suggestionsLoading, companyName, roleFamily, roleKey, roleOther, teamSize]);
+  }, [step, step1Valid, step2Valid, saving, suggestionsLoading, done, companyName, roleFamily, roleKey, roleOther, teamSize]);
 
   if (loading || !me) {
     return (
       <div className="welcome-setup">
         <header className="welcome-setup__bar">
-          <span className="welcome-setup__brand">QualiPulse</span>
+          <span className="welcome-setup__brand">
+            <span className="welcome-setup__mark" aria-hidden="true">
+              <span />
+            </span>
+            QualiPulse
+          </span>
         </header>
         <div className="welcome-setup__main" style={{ alignItems: "center", justifyContent: "center" }}>
           <div className="spinner" />
@@ -240,42 +254,83 @@ export default function Welcome() {
   return (
     <div className="welcome-setup">
       <header className="welcome-setup__bar">
-        <span className="welcome-setup__brand">QualiPulse</span>
-        <button
-          type="button"
-          className="welcome-setup__skip"
-          onClick={handleSkip}
-          disabled={saving}
-        >
-          {t("header_skip")}
-        </button>
+        <span className="welcome-setup__brand">
+          <span className="welcome-setup__mark" aria-hidden="true">
+            <span />
+          </span>
+          QualiPulse
+        </span>
+        {!done && (
+          <button
+            type="button"
+            className="welcome-setup__skip"
+            onClick={handleSkip}
+            disabled={saving}
+          >
+            {t("header_skip")}
+          </button>
+        )}
       </header>
 
       <div className="welcome-setup__main">
-        <ol className="welcome-setup__progress" aria-label={t("progress_aria")}>
-          {[1, 2, 3].map((n) => (
-            <li
-              key={n}
-              className={`welcome-setup__progress-step ${
-                n === step
-                  ? "welcome-setup__progress-step--active"
-                  : n < step
-                    ? "welcome-setup__progress-step--done"
-                    : ""
-              }`}
+        {!done && (
+          <div className="welcome-setup__progress" aria-label={t("progress_aria")}>
+            <div className="welcome-setup__progress-row">
+              <span className="welcome-setup__progress-count">
+                {t("progress_step", { step })}
+              </span>
+              <span className="welcome-setup__progress-name">{t(`step_${step}_label`)}</span>
+            </div>
+            <div
+              className="welcome-setup__progress-track"
+              role="progressbar"
+              aria-valuenow={step}
+              aria-valuemin={1}
+              aria-valuemax={3}
+              aria-label={t("progress_aria")}
             >
-              <span className="welcome-setup__progress-dot" aria-hidden="true">
-                {n < step ? "✓" : n}
-              </span>
-              <span className="welcome-setup__progress-label">
-                {t(`step_${n}_label`)}
-              </span>
-            </li>
-          ))}
-        </ol>
+              <i style={{ width: `${(step / 3) * 100}%` }} />
+            </div>
+          </div>
+        )}
+
+        {/* ── Finale: workspace handoff ── */}
+        {done && (
+          <section className="welcome-setup__card welcome-handoff">
+            <div className="welcome-setup__eyebrow">{t("handoff_kicker")}</div>
+            <h1 className="welcome-setup__title">{t("handoff_title")}</h1>
+            <p className="welcome-setup__sub">{t("handoff_sub")}</p>
+
+            <div className="welcome-handoff__preview" aria-hidden="true">
+              <div className="welcome-handoff__rail">
+                <span />
+              </div>
+              <div className="welcome-handoff__rows">
+                <span className="welcome-handoff__row">
+                  <i style={{ width: "58%" }} />
+                </span>
+                <span className="welcome-handoff__row">
+                  <i style={{ width: "42%" }} />
+                </span>
+                <div className="welcome-handoff__memo">
+                  <span>{t("handoff_memo_kicker")}</span>
+                  {t("handoff_memo_title")}
+                </div>
+              </div>
+            </div>
+
+            <p className="welcome-handoff__note">{t("handoff_note")}</p>
+
+            <div className="welcome-setup__actions">
+              <button type="button" className="btn btn-primary" onClick={handleEnterWorkspace}>
+                {t("handoff_cta")}
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* ── Step 1: Company name + language ── */}
-        {step === 1 && (
+        {!done && step === 1 && (
           <section className="welcome-setup__card">
             <h1 className="welcome-setup__title">{t("step_1_title")}</h1>
             <p className="welcome-setup__sub">{t("step_1_sub")}</p>
@@ -311,7 +366,7 @@ export default function Welcome() {
         )}
 
         {/* ── Step 2: Role + Company size ── */}
-        {step === 2 && (
+        {!done && step === 2 && (
           <section className="welcome-setup__card">
             <h1 className="welcome-setup__title">{t("step_2_title")}</h1>
             <p className="welcome-setup__sub">{t("step_2_sub")}</p>
@@ -413,7 +468,7 @@ export default function Welcome() {
         )}
 
         {/* ── Step 3: AI-suggested use cases + profile summary ── */}
-        {step === 3 && (
+        {!done && step === 3 && (
           <section className="welcome-setup__card">
             <h1 className="welcome-setup__title">{t("step_3_title")}</h1>
             <p className="welcome-setup__sub">{t("step_3_sub")}</p>
@@ -451,10 +506,10 @@ export default function Welcome() {
 
                 {suggestions?.profile_summary && (
                   <div className="welcome-setup__summary-card">
-                    <span className="welcome-setup__field-label">{t("step_3_summary_label")}</span>
-                    <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: "4px 0 0", lineHeight: 1.5 }}>
-                      {suggestions.profile_summary}
-                    </p>
+                    <span className="welcome-setup__summary-kicker">
+                      {t("step_3_summary_label")}
+                    </span>
+                    <p>{suggestions.profile_summary}</p>
                   </div>
                 )}
               </>
