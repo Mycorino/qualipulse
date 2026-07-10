@@ -1,339 +1,269 @@
 {
   "meta": {
-    "title": "QualiPulse — AI-moderated user interviews, decision-ready insights",
-    "description": "QualiPulse runs AI-moderated voice interviews with your users and turns them into a decision-ready research memo — themes, quotes, and recommendations in hours, not weeks. 3 free interviews, no credit card."
+    "title": "QualiPulse — AI voice interviews, decision-ready insights",
+    "description": "QualiPulse runs AI-moderated voice interviews with your users and turns them into a decision-ready research memo — themes, verbatim quotes and recommendations in hours, not weeks. 3 free interviews, no credit card."
   },
   "nav": {
     "howItWorks": "How it works",
-    "features": "Features",
-    "whoItsFor": "Who it's for",
+    "evidence": "Evidence",
     "pricing": "Pricing",
+    "faq": "FAQ",
     "login": "Log in",
     "startTrial": "Start free",
     "toggleMenu": "Toggle menu"
   },
   "hero": {
-    "badge": "User research, without the busywork",
-    "title": "Stop guessing\nwhat your users want.",
-    "subtitle": "Every product decision is a bet on what people want — and building the wrong thing is the most expensive mistake there is. QualiPulse interviews your users for you and turns it into clear answers: the top themes, the quotes that back them, and what to do next — in hours, not weeks.",
-    "cta": "Start free — 3 interviews included",
-    "secondaryCta": "See how it works",
-    "note": "3 free interviews · No credit card required · Completed interviews only",
-    "previewLabel": "Example research memo preview",
-    "reportKicker": "AI research memo",
-    "reportMeta": "12 interviews · ready to share",
-    "reportSummary": "The primary adoption barrier is not willingness to try the product — it is confidence in the first setup session. Participants need proof of value before they invest time in configuration.",
-    "reportMetrics": [
-      { "value": "12", "label": "interviews" },
-      { "value": "2", "label": "sharp tensions" },
-      { "value": "5", "label": "citable quotes" }
-    ],
-    "reportActions": ["Share report", "Tag quotes", "Plan follow-up"],
-    "interviewInProgress": "Interview in progress",
-    "recordingStatus": "Recording · 0:42",
-    "interviewQuestion": "Can you walk me through the last time you had to onboard a new tool at work?",
-    "emergingThemes": "Emerging themes",
-    "themeTags": ["Onboarding friction", "Trust building", "Time to value"]
-  },
-  "trustBar": {
-    "stats": [
-      { "number": "3", "label": "free completed interviews to start" },
-      { "number": "15 min", "label": "default interview length" },
-      { "number": "No app", "label": "participants answer in browser" }
+    "eyebrow": "AI-moderated voice interviews",
+    "title": "The customer interviews you keep postponing — done by Friday.",
+    "sub": "QualiPulse interviews your users by voice, in their browser — asking <b>adaptive follow-ups</b> like a trained researcher. You get transcripts, themes, and a <b>decision memo where every claim traces back to a verbatim quote</b>. No scheduling. No moderating. No transcription weekend.",
+    "cta": "Start free — 3 interviews on us",
+    "secondaryCta": "See the evidence trail",
+    "facts": [
+      "No credit card",
+      "Participants need only a link",
+      "English & French",
+      "GDPR, EU-hosted"
     ]
   },
-  "painPoints": {
-    "title": "Sound familiar?",
-    "subtitle": "Most teams know qualitative research is essential. The problem is everything around it.",
-    "items": [
+  "live": {
+    "study": "Exit interviews — Q3 churn",
+    "participantName": "Sarah L.",
+    "aiLabel": "Interviewer · AI",
+    "participantLabel": "Sarah · Participant",
+    "followUpBadge": "Adaptive follow-up",
+    "q1": "You mentioned you almost cancelled back in March. Walk me through what happened that week.",
+    "a1": "Honestly? The price went up and I looked at my statement and thought — do I even use this anymore…",
+    "q2": "You said “do I even use this” — what would using it look like on a good week?",
+    "a2": "Good question. Probably the Monday planning thing. When I skip that, the whole subscription feels pointless."
+  },
+  "strip": {
+    "audience": "Built for <b>product teams</b>, <b>UX researchers</b> & <b>agencies</b>",
+    "credit": "1 credit = 1 completed interview",
+    "speed": "Brief to first response: <b>same day</b>"
+  },
+  "problem": {
+    "eyebrow": "The problem",
+    "title": "Nobody skips research because they don’t care. They skip it because it’s slow.",
+    "subtitle": "By the time a classic interview study is scheduled, moderated, transcribed and synthesised, the decision it was meant to inform has already shipped.",
+    "cards": [
       {
-        "title": "Scheduling is the bottleneck",
-        "desc": "You have a research question. You don't have 2 weeks to coordinate calendars with 15 participants across time zones."
+        "figure": "3 wks",
+        "title": "Calendar tetris",
+        "desc": "Recruiting, timezone juggling, no-shows, reschedules. Eight interviews means three weeks of logistics before you’ve learned a single thing."
       },
       {
-        "title": "Synthesis eats your time",
-        "desc": "You're spending more hours tagging and re-reading transcripts than actually thinking about what the data means."
+        "figure": "6 hrs",
+        "title": "Per interview, all-in",
+        "desc": "Moderate it, transcribe it, code it, synthesise it. Multiply by every participant. That cost is exactly why “let’s just A/B it” wins the meeting."
       },
       {
-        "title": "Stakeholders won't wait",
-        "desc": "Product decisions are moving forward before your research is ready. Speed matters, but depth shouldn't be sacrificed."
-      },
-      {
-        "title": "No dedicated researcher on the team",
-        "desc": "You know you should talk to users. You just don't have the bandwidth to recruit, schedule, moderate, transcribe, and synthesise."
+        "figure": "Too late",
+        "title": "Insight after the decision",
+        "desc": "Findings that arrive after the roadmap is locked don’t change anything. They become a slide nobody reopens."
       }
-    ]
+    ],
+    "kicker": "So teams decide on gut feel, a survey with 4% completion, and the loudest customer in the Slack channel — and call it “being scrappy.”"
   },
-  "preview": {
-    "interviewInProgress": "Interview in progress",
-    "recording": "Recording",
-    "emergingThemes": "Emerging themes"
-  },
-  "howItWorks": {
-    "title": "How it works",
-    "subtitle": "Three steps from research question to stakeholder-ready memo.",
+  "how": {
+    "eyebrow": "The fix",
+    "title": "Brief it tonight. Read the memo by Friday.",
+    "subtitle": "QualiPulse collapses the whole pipeline — recruiting logistics, moderating, transcription, synthesis — into three steps.",
     "steps": [
       {
-        "title": "Describe your research goal",
-        "desc": "Chat with the Research Copilot or paste your brief. The AI drafts your interview guide — objectives, screening criteria, and questions. You review and refine. Five minutes, not five hours."
+        "num": "Step 1",
+        "title": "Describe the decision",
+        "desc": "Tell the research copilot what you need to decide. It drafts an interview guide with sections, screening questions and follow-up intents — you edit anything."
       },
       {
-        "title": "Participants interview on their own time",
-        "desc": "Share one link. Participants complete a voice interview in their browser — any device, any timezone. The AI asks follow-ups like a trained interviewer. No scheduling, no no-shows."
+        "num": "Step 2",
+        "title": "Share one link",
+        "desc": "Participants open it in any browser and just talk. The AI listens, probes the interesting bits, and keeps to your time budget. No app, no booking, no moderator."
       },
       {
-        "title": "Read the memo — transcripts one click away",
-        "desc": "Trigger an AI synthesis. Get structured themes with supporting quotes, tensions, and recommendations — every claim linked to the transcript behind it. Chain multiple studies into a multi-step research plan."
+        "num": "Step 3",
+        "title": "Read the decision memo",
+        "desc": "Themes, tensions, jobs-to-be-done and recommendations — each backed by verbatim quotes you can walk back to the exact second."
       }
-    ]
-  },
-  "mixedMethods": {
-    "badge": "Quant + qual",
-    "title": "Size the problem. Then understand it.",
-    "subtitle": "Surveys tell you what's happening and how big it is. Interviews tell you why. QualiPulse runs both in one study — so every finding is deep enough to act on and backed by enough scale to defend.",
-    "items": [
-      {
-        "eyebrow": "Survey",
-        "title": "See where it hurts",
-        "desc": "Reach a sample fast with structured questions. Find the patterns, size the problem, and spot the segments worth a closer look."
-      },
-      {
-        "eyebrow": "Interview",
-        "title": "Understand why",
-        "desc": "Turn your most interesting respondents into AI voice interviews. Get the story, the motivation, and the moment things break."
-      },
-      {
-        "eyebrow": "Together",
-        "title": "A finding you can defend",
-        "desc": "The number and the story in one report — depth a stakeholder believes, scale a stakeholder can't argue with."
-      }
-    ]
-  },
-  "credibility": {
-    "badge": "New — early access",
-    "title": "No logos to show off yet. So judge us on the work.",
-    "subtitle": "QualiPulse is new. Instead of a wall of customer logos, we'd rather you see exactly what you get — and risk nothing to find out.",
-    "items": [
-      {
-        "title": "See a real memo before you sign up",
-        "desc": "The sample above is the actual output format. What you see is what you'll ship to stakeholders."
-      },
-      {
-        "title": "3 interviews free, no card",
-        "desc": "Run a real study end to end before you pay anything. Only completed interviews ever count."
-      },
-      {
-        "title": "You stay in control",
-        "desc": "Review and edit every guide and every memo. Each insight links back to the verbatim transcript — nothing is a black box."
-      },
-      {
-        "title": "Your data stays yours",
-        "desc": "Encrypted storage, GDPR-conscious workflows, EU-hosting ready. We never train models on your research."
-      }
-    ]
-  },
-  "copilot": {
-    "badge": "Research Copilot",
-    "previewTitle": "Research Copilot",
-    "title": "Your always-on research partner",
-    "subtitle": "The Research Copilot turns a rough question into a usable study, suggests next actions, and keeps context across your research program.",
-    "features": [
-      { "text": "Turns a research goal into objectives, screening criteria, and guide questions" },
-      { "text": "Proposes next steps as cards you can accept in one click" },
-      { "text": "Keeps context across studies, surveys, interviews, and reports" }
     ],
-    "chatUser": "What should I ask about onboarding friction?",
-    "chatAi": "Based on your research goal, I'd suggest focusing on the first 10 minutes of the experience. Here's a proposed interview guide:",
-    "proposalTitle": "Proposed: 5-question interview guide",
-    "proposalBody": "Discovery → First impression → Pain points → Workarounds → Ideal experience",
-    "acceptLabel": "Accept",
-    "acceptedLabel": "Accepted ✓",
-    "chatUser2": "Great — can you add a screening question for active users?",
-    "chatAi2": "Good call. Here's a screening question you can accept the same way:",
-    "screenerTitle": "Proposed: screening question",
-    "screenerBody": "“Have you used the product in the last 30 days?”  ·  Yes  /  No (screens out)",
-    "chatConfirm": "Added to your screener. The shareable interview link lives on your study page.",
-    "tryHint": "↑ This is a live demo — try it"
+    "guideLines": [
+      "When did you first consider cancelling?",
+      "What almost kept you?",
+      "Walk me through your last billing moment…"
+    ],
+    "copied": "Copied ✓",
+    "memoVerdict": "Verdict: fix pause-billing before touching pricing.",
+    "confHigh": "HIGH",
+    "confMed": "MED",
+    "memoRow1": "Cancellation is triggered by billing moments, not features",
+    "memoRow2": "“Pause” is the unmet ask in 7 of 12 interviews"
   },
-  "quality": {
-    "badge": "Interview quality",
-    "title": "Built to feel natural, and stay auditable",
-    "subtitle": "AI moderation is only useful if participants can answer comfortably and researchers can trace every insight back to the source.",
+  "evidence": {
+    "eyebrow": "Why you can trust it",
+    "title": "Every claim is walk-back-able.",
+    "subtitle": "AI summaries are only useful if you can check them. Click a finding — QualiPulse shows you the verbatim quote, the participant, and the timestamp it came from. Try it:",
+    "memoHead": "Decision memo — Why subscribers cancel",
+    "transcriptHead": "Transcript — verbatim source",
+    "claims": [
+      {
+        "title": "Cancellation is a billing-moment event",
+        "time": "09:14",
+        "sub": "9 of 12 participants located the decision at a statement, renewal email, or price change — not at a moment of product frustration.",
+        "meta": "MARCUS T. · CANCELLED MAY",
+        "quote": "“I wasn’t even annoyed at the product. <m>The renewal email landed and I just thought, that’s €29 I didn’t decide to spend.</m> That was the whole thing.”"
+      },
+      {
+        "title": "“Pause” is the unbuilt feature they wanted",
+        "time": "14:02",
+        "sub": "Participants didn’t want to leave — they wanted to stop paying during low-usage months without losing history.",
+        "meta": "PRIYA R. · CANCELLED MARCH",
+        "quote": "“<m>If I could have frozen it for the summer I’d still be a customer.</m> Instead the options were pay or delete, so… I deleted.”"
+      },
+      {
+        "title": "Losing history is the real switching cost",
+        "time": "21:47",
+        "sub": "Fear of losing past work kept several participants subscribed months after they stopped using the product weekly.",
+        "meta": "JEN H. · STILL SUBSCRIBED",
+        "quote": "“Honestly the only reason I’m still paying is <m>three years of notes are in there and I don’t trust the export</m>. That’s not loyalty, that’s hostage-keeping.”"
+      }
+    ],
+    "note": "This traceability runs through the whole product: tag quotes into your own codebook, annotate themes as <b>confirmed</b> or <b>disputed</b>, and re-run the analysis with your notes folded in. The AI drafts; <b>you stay the researcher</b>."
+  },
+  "diff": {
+    "eyebrow": "Not a survey. Not a chatbot.",
+    "title": "What a real interview has that a form never will.",
     "items": [
       {
-        "eyebrow": "Adaptive follow-ups",
-        "title": "The guide flexes when an answer matters",
-        "desc": "QualiPulse follows your interview guide, then asks contextual probes when participants mention a pain point, workaround, decision moment, or contradiction."
+        "title": "Adaptive follow-ups",
+        "desc": "The AI decides after every answer: probe deeper, move on, or wrap up — pacing itself against your time budget, like a moderator watching the clock."
       },
       {
-        "eyebrow": "Participant experience",
-        "title": "A voice interview in the browser",
-        "desc": "Participants open one link, answer on desktop or mobile, and complete the interview in their own time. No app install, no calendar coordination."
+        "title": "People say more than they type",
+        "desc": "A spoken answer runs 4–6× longer than a text-box answer, with the hedges and half-thoughts where the real insight hides."
       },
       {
-        "eyebrow": "Traceability",
-        "title": "Every theme stays connected to evidence",
-        "desc": "Research memos include supporting quotes and participant context, with transcripts available for review, tagging, export, and stakeholder follow-up."
+        "title": "Screening built in",
+        "desc": "Disqualifying questions run before the interview starts, so you never pay for a participant who wasn’t your audience."
+      },
+      {
+        "title": "Quality scoring per interview",
+        "desc": "Each transcript gets an AI quality assessment, so thin or off-topic sessions are flagged before they pollute your synthesis."
+      },
+      {
+        "title": "Your codebook, your calls",
+        "desc": "Tag quotes, write memos, dispute themes. Refined analyses incorporate your annotations — iterative, not one-shot."
+      },
+      {
+        "title": "Cross-study decision memos",
+        "desc": "Synthesise up to 8 studies into one executive memo — with conflicts surfaced, not smoothed over."
       }
     ]
-  },
-  "output": {
-    "title": "From 12 interviews to this — automatically",
-    "subtitle": "This is what your AI-generated research memo looks like. Themes, quotes, tensions, and recommendations — ready to share.",
-    "projectName": "SaaS Onboarding Experience Study",
-    "meta": "12 participants · Generated in minutes",
-    "summaryTitle": "Summary",
-    "summaryText": "Participants consistently reported that initial setup complexity is the primary barrier to adoption. Most valued a guided onboarding experience but found current implementations overly generic. Three key themes emerged around time-to-value expectations, the role of social proof in building confidence, and frustrations with feature discovery.",
-    "keyThemesTitle": "Key Themes",
-    "theme1Title": "Time-to-value anxiety",
-    "theme1Count": "Mentioned by 9 of 12 participants",
-    "theme1Quote": "\"I need to see value in the first 10 minutes or I'm gone. I don't have time to watch tutorials.\"",
-    "theme1Attr": "— Product Manager, Series A startup",
-    "theme2Title": "Feature discovery friction",
-    "theme2Count": "Mentioned by 7 of 12 participants",
-    "theme2Quote": "\"I only found out about the export feature after three months. I'd been doing it manually.\"",
-    "theme2Attr": "— UX Designer, Fintech",
-    "recsTitle": "Recommendations",
-    "rec1": "Implement a task-based onboarding flow that delivers value within the first session",
-    "rec2": "Add contextual feature hints triggered by user behaviour patterns",
-    "rec3": "Create role-specific setup paths (researcher vs. PM vs. designer)"
-  },
-  "whoItsFor": {
-    "title": "Built for people who need insights, not busywork",
-    "subtitle": "Whether you run research full-time or fit it in between product decisions.",
-    "items": [
-      {
-        "title": "UX Researchers",
-        "desc": "Run more studies in less time. Offload the logistics, keep the analytical rigor. AI handles moderation and initial synthesis — you steer the interpretation.",
-        "examples": "Discovery research, evaluative studies, continuous research programs"
-      },
-      {
-        "title": "Product Managers",
-        "desc": "Get user insights without waiting for the research team's backlog. Set up a study in minutes, send the link to beta users, get a synthesis you can act on.",
-        "examples": "Feature validation, churn investigation, onboarding feedback"
-      },
-      {
-        "title": "Consultants & Agencies",
-        "desc": "Run qualitative research for clients at scale. Custom branding, shareable reports, multiple projects running in parallel.",
-        "examples": "Client research engagements, market research, stakeholder interviews"
-      }
-    ]
-  },
-  "comparison": {
-    "title": "QualiPulse vs. doing it the hard way",
-    "subtitle": "What qualitative research looks like with and without QualiPulse.",
-    "headers": ["", "QualiPulse", "The DIY way"],
-    "rows": [
-      { "feature": "Scheduling required", "quali": "No — async, anytime", "other": "Yes — calendar coordination" },
-      { "feature": "AI moderation", "quali": "Built-in, adaptive follow-ups", "other": "Manual or none" },
-      { "feature": "Research memo", "quali": "Minutes after responses are in", "other": "Manual synthesis work" },
-      { "feature": "Multi-step research plans", "quali": "Yes — interviews + surveys", "other": "Usually stitched together manually" },
-      { "feature": "Research Copilot", "quali": "Always-on AI partner", "other": "Not available" },
-      { "feature": "Device requirements", "quali": "Any browser, no app", "other": "Often requires app install" }
-    ]
-  },
-  "trust": {
-    "eyebrow": "Why we built QualiPulse",
-    "quote": "\"We built QualiPulse because we were tired of spending 80% of our research time on logistics and 20% on thinking. We wanted to flip that ratio.\"",
-    "name": "Corino Fontana",
-    "role": "Founder, QualiPulse",
-    "badges": ["GDPR-conscious workflows", "Encrypted storage", "EU-hosting ready"]
   },
   "pricing": {
-    "title": "Simple, transparent pricing",
-    "subtitle": "Start with 3 free interviews. Upgrade when you need more.",
-    "recommended": "Recommended",
-    "enterprise": "Running a large research program?",
-    "enterpriseCta": "Talk to us about Enterprise",
-    "perMonth": "/mo",
-    "perYear": "/yr",
+    "eyebrow": "Pricing",
+    "title": "Pay per completed interview. Nothing else.",
+    "subtitle": "1 credit = 1 completed interview (up to 15 minutes). Screened-out, abandoned or failed sessions never cost a credit.",
     "billingToggleLabel": "Billing interval",
     "billingMonthly": "Monthly",
     "billingAnnual": "Annual",
-    "billingAnnualSave": "Save 17%",
+    "billingAnnualSave": "−17%",
+    "recommended": "Most teams pick this",
+    "perMonth": " /mo",
     "billedAnnuallyAs": "Billed €{{amount}} per year",
-    "creditsPerMonth": "completed AI interviews / month",
+    "creditsPerMonth": "interviews / month",
     "surveyResponsesPerMonth": "survey responses / month",
-    "creditDefinition": "1 credit = 1 completed participant interview, up to 15 minutes. Screened-out or abandoned participants do not consume credits.",
+    "creditNote": "Need more in a busy month? Prepaid credit packs (25 / 50 / 100) never expire.",
+    "enterprise": "Running a large research program? Custom volume, SSO and DPA reviews —",
+    "enterpriseCta": "talk to us about Enterprise",
+    "trial": {
+      "name": "Trial",
+      "desc": "Prove it works on a question you actually have.",
+      "credits": "3 interviews included — never expire",
+      "features": [
+        "1 editor · 1 active study",
+        "Full AI analysis & decision memo",
+        "No credit card required"
+      ],
+      "cta": "Start free"
+    },
     "plans": {
       "exploration": {
         "name": "Exploration",
-        "desc": "For solo researchers running a few studies a month",
+        "desc": "Solo founders & PMs running a study a month.",
         "features": [
-          "Only completed interviews count",
-          "Up to 3 active projects",
-          "AI interview guide & analysis",
-          "CSV & PDF export",
-          "Public report sharing"
+          "1 editor · 3 active studies",
+          "Unused purchased credits roll over",
+          "CSV & PDF export, shared reports",
+          "Extra interviews €7 each"
         ],
-        "cta": "Start free"
+        "cta": "Choose Exploration"
       },
       "team": {
         "name": "Team",
-        "desc": "For research teams running studies in parallel",
+        "desc": "Product squads making research a habit, not an event.",
         "features": [
-          "Only completed interviews count",
-          "Up to 20 active projects",
           "3 editors + unlimited viewers",
+          "Up to 20 active studies",
           "Team workspace & permissions",
-          "Everything in Exploration"
+          "Extra interviews €6 each"
         ],
-        "cta": "Start free"
+        "cta": "Choose Team"
       },
       "agency": {
         "name": "Agency",
-        "desc": "For agencies running research for multiple clients",
+        "desc": "Consultancies running research for clients.",
         "features": [
-          "Only completed interviews count",
-          "Unlimited projects",
           "8 editors + unlimited viewers",
+          "Unlimited studies",
           "Client workspaces & custom branding",
-          "API access"
+          "Extra interviews €5 each"
         ],
-        "cta": "Start free"
+        "cta": "Choose Agency"
       }
     }
   },
   "faq": {
-    "title": "Questions teams ask before starting",
+    "eyebrow": "Questions",
+    "title": "The things people ask before their first study.",
     "items": [
       {
+        "question": "What exactly costs a credit?",
+        "answer": "Only a completed interview of up to 15 minutes. Participants who are screened out, abandon halfway, or hit a technical failure never consume a credit — that risk is ours, not yours."
+      },
+      {
+        "question": "Do participants need to install anything?",
+        "answer": "No. They open your link in any browser — phone or laptop — pass a 10-second mic check, and talk. Consent, screening and resume-where-you-left-off are all built into the flow."
+      },
+      {
         "question": "Do I need to recruit participants?",
-        "answer": "QualiPulse gives you shareable links for your own participants. Panel recruitment is separate, so you stay in control of who you interview."
+        "answer": "QualiPulse gives you shareable links for your own participants — customers, users, a mailing list, an in-product prompt. You stay in control of who you interview."
       },
       {
-        "question": "What counts as a credit?",
-        "answer": "Only completed participant interviews consume credits. Screened-out, abandoned, and technically failed interviews do not."
+        "question": "Is an AI interviewer as good as a human moderator?",
+        "answer": "For discovery and evaluative research, it’s remarkably close — it never leads the witness, never gets tired on interview #9, and asks follow-ups grounded in what the participant just said. For deeply sensitive topics, we’d still recommend a human. The honest pitch: an AI-moderated interview beats the survey you were going to send instead."
       },
       {
-        "question": "What do participants install?",
-        "answer": "Nothing. They open a link and complete a voice interview in the browser on desktop or mobile."
-      },
-      {
-        "question": "Can I buy more interviews?",
-        "answer": "Yes. You can upgrade plans or buy prepaid credit packs when a study needs more responses."
+        "question": "How do I know the analysis isn’t hallucinated?",
+        "answer": "Every theme, tension and recommendation carries verbatim quotes that link to the exact transcript turn — click through and read the source. You can mark themes confirmed, disputed or needs-evidence, and the refined analysis has to answer to your annotations."
       },
       {
         "question": "What languages are supported?",
-        "answer": "Studies run in English or French today — the AI moderator, the participant experience, and the research memo all follow your study's language. The researcher workspace is available in both languages too."
+        "answer": "Studies run in English or French today — the AI moderator, the participant experience, and the research memo all follow your study’s language. Transcripts can be machine-translated as a reading aid; the original stays the untouched source of truth."
       },
       {
         "question": "Who owns the research data?",
-        "answer": "You do. Recordings, transcripts, and reports belong to your workspace, storage is encrypted, and we never train AI models on your research. Transcripts export to CSV whenever you need them."
+        "answer": "You do. Recordings, transcripts and reports belong to your workspace, databases live in the EU, audio is encrypted at rest, and we never train AI models on your research. GDPR-aligned processing with a signed DPA, subprocessor list and participant notice available."
       }
     ]
   },
-  "midCta": {
-    "text": "Start free — 3 interviews included",
-    "text2": "Run your first study free — your memo's waiting"
-  },
   "finalCta": {
-    "title": "Your next research study could be done by Friday",
-    "subtitle": "Set up a study in 5 minutes. Get your first insights in hours.",
-    "cta": "Start free — 3 interviews on us"
+    "eyebrow": "3 free interviews · no card",
+    "title": "Your next roadmap decision deserves better than a hunch.",
+    "subtitle": "Brief a study in ten minutes tonight. Send one link tomorrow. Read what your customers actually said by Friday.",
+    "cta": "Start your free study",
+    "secondaryCta": "See the evidence trail"
   },
   "footer": {
-    "tagline": "AI-powered qualitative research, on autopilot.",
+    "tagline": "AI voice interviews for decisions, not decks.",
     "productTitle": "Product",
     "companyTitle": "Company",
     "legalTitle": "Legal",
