@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "QualiPulse — Entretiens utilisateurs par IA, insights prêts à décider",
-    "description": "QualiPulse mène des entretiens vocaux modérés par IA avec vos utilisateurs et en tire un mémo de recherche prêt à décider — thèmes, citations verbatim et recommandations en quelques heures, pas en quelques semaines. 3 entretiens gratuits, sans carte bancaire."
+    "title": "QualiPulse · Entretiens utilisateurs par IA, insights prêts à décider",
+    "description": "QualiPulse mène des entretiens vocaux modérés par IA avec vos utilisateurs et en tire un mémo de recherche prêt à décider : thèmes, citations verbatim et recommandations en quelques heures, pas en quelques semaines. 3 entretiens gratuits, sans carte bancaire."
   },
   "nav": {
     "howItWorks": "Comment ça marche",
@@ -14,9 +14,9 @@
   },
   "hero": {
     "eyebrow": "Entretiens vocaux modérés par IA",
-    "title": "Les entretiens utilisateurs que vous repoussez depuis des semaines — terminés vendredi.",
-    "sub": "QualiPulse interroge vos utilisateurs à la voix, dans leur navigateur — avec de vraies <b>relances adaptatives</b>, comme un chercheur expérimenté. Vous recevez transcriptions, thèmes et un <b>mémo de décision où chaque affirmation renvoie à une citation verbatim</b>. Sans planification. Sans animation. Sans week-end de retranscription.",
-    "cta": "Commencer — 3 entretiens offerts",
+    "title": "Les entretiens utilisateurs que vous repoussez depuis des semaines. Terminés vendredi.",
+    "sub": "QualiPulse interroge vos utilisateurs à la voix, directement dans leur navigateur, avec de vraies <b>relances adaptatives</b>, comme un chercheur expérimenté. Vous recevez transcriptions, thèmes et un <b>mémo de décision où chaque affirmation renvoie à une citation verbatim</b>. Sans planification. Sans animation. Sans week-end de retranscription.",
+    "cta": "Commencer avec 3 entretiens offerts",
     "secondaryCta": "Voir la traçabilité des preuves",
     "facts": [
       "Sans carte bancaire",
@@ -26,14 +26,14 @@
     ]
   },
   "live": {
-    "study": "Entretiens de départ — churn T3",
+    "study": "Entretiens de départ · churn T3",
     "participantName": "Sarah L.",
     "aiLabel": "Intervieweur · IA",
     "participantLabel": "Sarah · Participante",
     "followUpBadge": "Relance adaptative",
     "q1": "Vous disiez avoir failli résilier en mars. Racontez-moi cette semaine-là.",
-    "a1": "Franchement ? Le prix a augmenté, j'ai vu le prélèvement et je me suis dit — est-ce que je m'en sers encore…",
-    "q2": "Vous venez de dire « est-ce que je m'en sers encore » — à quoi ressemblerait une bonne semaine d'utilisation ?",
+    "a1": "Franchement ? Le prix a augmenté, j'ai regardé mon relevé et je me suis dit : est-ce que je m'en sers encore…",
+    "q2": "Vous venez de dire « est-ce que je m'en sers encore ». À quoi ressemblerait une bonne semaine d'utilisation ?",
     "a2": "Bonne question. Sûrement la planification du lundi. Quand je la saute, l'abonnement perd tout son sens."
   },
   "strip": {
@@ -62,17 +62,17 @@
         "desc": "Des conclusions qui arrivent une fois la roadmap gelée ne changent rien. Elles deviennent une slide que personne ne rouvre."
       }
     ],
-    "kicker": "Alors on décide à l'instinct, avec un sondage à 4 % de complétion et le client le plus bruyant du Slack — et on appelle ça « être pragmatique »."
+    "kicker": "Alors on décide à l'instinct, avec un sondage à 4 % de complétion et le client le plus bruyant du Slack, puis on appelle ça « être pragmatique »."
   },
   "how": {
     "eyebrow": "La solution",
     "title": "Briefez ce soir. Lisez le mémo vendredi.",
-    "subtitle": "QualiPulse compresse toute la chaîne — logistique de recrutement, animation, retranscription, synthèse — en trois étapes.",
+    "subtitle": "QualiPulse compresse toute la chaîne en trois étapes : logistique de recrutement, animation, retranscription et synthèse.",
     "steps": [
       {
         "num": "Étape 1",
         "title": "Décrivez la décision",
-        "desc": "Expliquez au Copilote de recherche ce que vous devez trancher. Il rédige le guide d'entretien — sections, questions de sélection, intentions de relance. Vous modifiez ce que vous voulez."
+        "desc": "Expliquez au Copilote de recherche ce que vous devez trancher. Il rédige le guide d'entretien : sections, questions de sélection, intentions de relance. Vous ajustez ce que vous voulez."
       },
       {
         "num": "Étape 2",
@@ -82,7 +82,7 @@
       {
         "num": "Étape 3",
         "title": "Lisez le mémo de décision",
-        "desc": "Thèmes, tensions, jobs-to-be-done et recommandations — chacun appuyé par des citations verbatim que vous pouvez remonter à la seconde près."
+        "desc": "Thèmes, tensions, jobs-to-be-done et recommandations, chacun appuyé par des citations verbatim que vous pouvez remonter à la seconde près."
       }
     ],
     "guideLines": [
@@ -100,21 +100,21 @@
   "evidence": {
     "eyebrow": "Pourquoi lui faire confiance",
     "title": "Chaque affirmation est vérifiable.",
-    "subtitle": "Un résumé d'IA n'a de valeur que si vous pouvez le contrôler. Cliquez sur un constat — QualiPulse affiche la citation verbatim, le participant et l'horodatage d'origine. Essayez :",
-    "memoHead": "Mémo de décision — Pourquoi les abonnés résilient",
-    "transcriptHead": "Transcription — source verbatim",
+    "subtitle": "Un résumé d'IA n'a de valeur que si vous pouvez le contrôler. Cliquez sur un constat, et QualiPulse affiche la citation verbatim, le participant et l'horodatage d'origine. Essayez :",
+    "memoHead": "Mémo de décision · Pourquoi les abonnés résilient",
+    "transcriptHead": "Transcription · source verbatim",
     "claims": [
       {
         "title": "La résiliation est un événement de facturation",
         "time": "09:14",
-        "sub": "9 participants sur 12 situent la décision au moment d'un relevé, d'un e-mail de renouvellement ou d'une hausse de prix — pas lors d'une frustration produit.",
+        "sub": "9 participants sur 12 situent la décision au moment d'un relevé, d'un e-mail de renouvellement ou d'une hausse de prix, pas lors d'une frustration produit.",
         "meta": "MARCUS T. · RÉSILIÉ EN MAI",
         "quote": "« Je n'étais même pas fâché contre le produit. <m>L'e-mail de renouvellement est arrivé et je me suis dit : voilà 29 € que je n'ai pas décidé de dépenser.</m> C'était juste ça. »"
       },
       {
         "title": "« Pause » est la fonctionnalité manquante",
         "time": "14:02",
-        "sub": "Les participants ne voulaient pas partir — ils voulaient arrêter de payer pendant les mois creux, sans perdre leur historique.",
+        "sub": "Les participants ne voulaient pas partir. Ils voulaient arrêter de payer pendant les mois creux, sans perdre leur historique.",
         "meta": "PRIYA R. · RÉSILIÉ EN MARS",
         "quote": "« <m>Si j'avais pu le geler pour l'été, je serais encore cliente.</m> Au lieu de ça, c'était payer ou supprimer, alors… j'ai supprimé. »"
       },
@@ -130,15 +130,15 @@
   },
   "diff": {
     "eyebrow": "Ni un sondage. Ni un chatbot.",
-    "title": "Ce qu'un vrai entretien apporte — et qu'un formulaire n'aura jamais.",
+    "title": "Ce qu'un vrai entretien apporte, et qu'un formulaire n'aura jamais.",
     "items": [
       {
         "title": "Relances adaptatives",
-        "desc": "Après chaque réponse, l'IA décide : creuser, passer à la suite ou conclure — en tenant votre budget temps, comme un modérateur qui surveille l'horloge."
+        "desc": "Après chaque réponse, l'IA décide : creuser, passer à la suite ou conclure, tout en tenant votre budget temps, comme un modérateur qui surveille l'horloge."
       },
       {
         "title": "À l'oral, on en dit plus qu'à l'écrit",
-        "desc": "Une réponse parlée est 4 à 6 fois plus longue qu'une réponse tapée, avec les hésitations et les demi-pensées où se cache le vrai insight."
+        "desc": "Une réponse parlée est quatre à six fois plus longue qu'une réponse tapée, avec les hésitations et les demi-pensées où se cache le vrai insight."
       },
       {
         "title": "Sélection intégrée",
@@ -150,11 +150,11 @@
       },
       {
         "title": "Votre grille de codes, vos arbitrages",
-        "desc": "Taguez des citations, rédigez des mémos, contestez des thèmes. Les analyses affinées intègrent vos annotations — itératif, pas one-shot."
+        "desc": "Taguez des citations, rédigez des mémos, contestez des thèmes. Les analyses affinées intègrent vos annotations. Itératif, jamais figé."
       },
       {
         "title": "Mémos de décision multi-études",
-        "desc": "Synthétisez jusqu'à 8 études en un seul mémo exécutif — avec les contradictions mises en avant, pas lissées."
+        "desc": "Synthétisez jusqu'à 8 études en un seul mémo exécutif, avec les contradictions mises en avant, pas lissées."
       }
     ]
   },
@@ -172,12 +172,12 @@
     "creditsPerMonth": "entretiens / mois",
     "surveyResponsesPerMonth": "réponses de sondage / mois",
     "creditNote": "Un mois chargé ? Les packs de crédits prépayés (25 / 50 / 100) n'expirent jamais.",
-    "enterprise": "Un programme de recherche à grande échelle ? Volume sur mesure, SSO et revue de DPA —",
-    "enterpriseCta": "parlons Enterprise",
+    "enterprise": "Un programme de recherche à grande échelle, avec volume sur mesure, SSO et revue de DPA ?",
+    "enterpriseCta": "Parlons-en",
     "trial": {
       "name": "Essai",
       "desc": "Prouvez que ça marche sur une vraie question.",
-      "credits": "3 entretiens inclus — sans expiration",
+      "credits": "3 entretiens inclus, sans expiration",
       "features": [
         "1 éditeur · 1 étude active",
         "Analyse IA et mémo de décision complets",
@@ -227,15 +227,15 @@
     "items": [
       {
         "question": "Qu'est-ce qui coûte un crédit, exactement ?",
-        "answer": "Uniquement un entretien terminé de 15 minutes maximum. Les participants écartés à la sélection, qui abandonnent en cours de route ou qui rencontrent un problème technique ne consomment jamais de crédit — ce risque est pour nous, pas pour vous."
+        "answer": "Uniquement un entretien terminé de 15 minutes maximum. Les participants écartés à la sélection, qui abandonnent en cours de route ou qui rencontrent un problème technique ne consomment jamais de crédit. Ce risque est pour nous, pas pour vous."
       },
       {
         "question": "Les participants doivent-ils installer quelque chose ?",
-        "answer": "Non. Ils ouvrent votre lien dans n'importe quel navigateur — téléphone ou ordinateur — passent un test micro de 10 secondes et parlent. Consentement, sélection et reprise d'entretien sont intégrés au parcours."
+        "answer": "Non. Ils ouvrent votre lien dans n'importe quel navigateur (téléphone ou ordinateur), passent un test micro de 10 secondes et parlent. Consentement, sélection et reprise d'entretien sont intégrés au parcours."
       },
       {
         "question": "Dois-je recruter les participants ?",
-        "answer": "QualiPulse vous donne des liens à partager avec vos propres participants — clients, utilisateurs, liste d'e-mails, message dans le produit. Vous gardez la main sur qui vous interrogez."
+        "answer": "QualiPulse vous donne des liens à partager avec vos propres participants : clients, utilisateurs, liste d'e-mails, message dans le produit. Vous gardez la main sur qui vous interrogez."
       },
       {
         "question": "Un intervieweur IA vaut-il un modérateur humain ?",
@@ -243,11 +243,11 @@
       },
       {
         "question": "Comment savoir que l'analyse n'est pas hallucinée ?",
-        "answer": "Chaque thème, tension et recommandation s'appuie sur des citations verbatim reliées au tour de parole exact — cliquez et lisez la source. Vous pouvez marquer les thèmes confirmés, contestés ou à étayer, et l'analyse affinée doit répondre à vos annotations."
+        "answer": "Chaque thème, tension et recommandation s'appuie sur des citations verbatim reliées au tour de parole exact. Cliquez et lisez la source. Vous pouvez marquer les thèmes confirmés, contestés ou à étayer, et l'analyse affinée doit répondre à vos annotations."
       },
       {
         "question": "Quelles langues sont prises en charge ?",
-        "answer": "Les études se déroulent aujourd'hui en français ou en anglais — le modérateur IA, l'expérience participant et le mémo de recherche suivent la langue de votre étude. Les transcriptions peuvent être traduites automatiquement comme aide à la lecture ; l'original reste la source de vérité, intouchée."
+        "answer": "Les études se déroulent aujourd'hui en français ou en anglais. Le modérateur IA, l'expérience participant et le mémo de recherche suivent la langue de votre étude. Les transcriptions peuvent être traduites automatiquement comme aide à la lecture ; l'original reste la source de vérité, intouchée."
       },
       {
         "question": "À qui appartiennent les données de recherche ?",
