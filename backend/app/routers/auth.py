@@ -837,8 +837,9 @@ def get_onboarding_suggestions(
     industry = (company.industry or "").strip()
     summary = (company.business_summary or "").strip()
     name = (company.name or "").strip()
+    goals = (company.goals_freeform or "").strip()
 
-    if not role and not has_context:
+    if not role and not has_context and not goals:
         return {
             "use_cases": fallback_cases,
             "profile_summary": None,
@@ -865,6 +866,10 @@ def get_onboarding_suggestions(
             context_parts.append(f"Industry: {industry}")
         if summary:
             context_parts.append(f"About the company: {summary}")
+        if goals:
+            context_parts.append(
+                f"In their own words, what they're working on / want to learn: {goals}"
+            )
 
         context_block = "\n".join(context_parts)
 
@@ -891,12 +896,16 @@ def get_onboarding_suggestions(
                     f"prioritisation; Research/Insights -> needs, segments, market; Marketing "
                     f"-> positioning, messaging, channels; Design -> usability, comprehension; "
                     f"Sales/CS -> objections, churn, satisfaction; Data -> behaviour patterns, "
-                    f"drivers. Keep them general enough to fit many studies. Do NOT use commas "
-                    f"inside a suggestion. When writing in French, follow French typography "
-                    f"(a space before ? ! : ;).\n"
+                    f"drivers. Keep them general enough to fit many studies. EXCEPTION: if "
+                    f"the profile includes an 'In their own words' line, anchor at least 2 of "
+                    f"the themes directly on what the user said they want to learn — those "
+                    f"may be as specific as the user's own goal (still 6 words max, still no "
+                    f"company or product names). Do NOT use commas inside a suggestion. When "
+                    f"writing in French, follow French typography (a space before ? ! : ;).\n"
                     f"2. Write a warm 1-2 sentence summary addressed DIRECTLY to the user in "
                     f"the second person (\"You…\" / \"Vous…\"), confirming what you understand "
-                    f"about their role and their company. Never describe them in the third "
+                    f"about their role, their company, and — when they shared it — what "
+                    f"they're working on in their own words. Never describe them in the third "
                     f"person (never \"This person\" / \"Cette personne\").\n\n"
                     f"Output ONLY valid JSON in {output_lang}:\n"
                     f'{{"use_cases": ["...", "..."], "profile_summary": "..."}}'

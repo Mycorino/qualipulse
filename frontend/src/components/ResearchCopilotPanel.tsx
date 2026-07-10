@@ -72,14 +72,6 @@ function sanitizeThread(raw: unknown[]): ThreadItem[] {
 const STARTER_KEYS = ["scratch", "methodology", "nextQuestion"];
 
 /**
- * Targets we've already auto-opened during THIS page load. Survives React
- * StrictMode's dev mount/unmount/remount (which resets component state), so
- * the panel still opens once even though the localStorage guard is written
- * on the first invoke. A genuine later page load starts with an empty set.
- */
-const _autoOpenedThisLoad = new Set<string>();
-
-/**
  * Lightweight inline renderer for the copilot's replies — turns
  * `**bold**`, `*italic*`, and `` `code` `` into the matching elements.
  * Newlines/lists are preserved by `white-space: pre-wrap` on
@@ -112,7 +104,6 @@ export function ResearchCopilotPanel({
   nextAction,
   nudges,
   onDismissNudge,
-  autoOpen,
   intro,
   disableInput,
 }: {
@@ -125,12 +116,6 @@ export function ResearchCopilotPanel({
   /** Event-driven nudges — "something changed while you were away." */
   nudges?: Nudge[];
   onDismissNudge?: (id: string) => void;
-  /**
-   * Open the panel automatically the FIRST time it's seen on this surface
-   * (guarded per `target.id` via localStorage). Used to greet first-run
-   * users — e.g. the empty studies screen.
-   */
-  autoOpen?: boolean;
   /**
    * A deterministic intro shown in the empty thread instead of the generic
    * lead + instrument starters. The CTA fires `onCta` directly (no chat
@@ -221,28 +206,6 @@ export function ResearchCopilotPanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target.id]);
-
-  // Auto-open the panel the first time it's seen on this surface. Guarded
-  // per target.id via localStorage so a repeat visit doesn't re-pop it.
-  // `_autoOpenedThisLoad` lets the StrictMode dev remount re-open even though
-  // the localStorage guard was already written on the first invoke.
-  useEffect(() => {
-    if (!autoOpen) return;
-    if (_autoOpenedThisLoad.has(target.id)) {
-      setOpen(true);
-      return;
-    }
-    const key = `copilot_autoopen_${target.id}`;
-    try {
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, "1");
-    } catch {
-      // localStorage unavailable (private mode) — open anyway, it's harmless.
-    }
-    _autoOpenedThisLoad.add(target.id);
-    setOpen(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoOpen, target.id]);
 
   // Persist on TURN BOUNDARIES (turn finished, accepts, rejects) — never
   // per streamed token. A save landing while one is already in flight

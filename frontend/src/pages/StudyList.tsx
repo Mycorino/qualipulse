@@ -757,16 +757,18 @@ export default function StudyList() {
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
 
       {/* First-run handhold: only on the empty studies screen. The Copilot
-          auto-opens once to explain research and point at "+ New study".
+          dock explains research and points at "+ New study" when opened —
+          it never auto-opens (the demo tour owns the first-run experience).
+          While the ?tour=1 onboarding handoff is polling for the seeded demo
+          the list is momentarily empty; don't mount at all during that window.
           There's no workspace chat backend, so we don't mount it once the
           user has studies — the workspace NBA strip covers guidance there. */}
-      {studies !== null && studies.length === 0 && (
+      {studies !== null && studies.length === 0 && searchParams.get("tour") !== "1" && (
         <ResearchCopilotPanel
           target={WORKSPACE_COPILOT_TARGET}
           onApplied={() => {}}
           mission={t("studyList.copilotMission")}
           disableInput
-          autoOpen
           intro={{
             lead: t("copilot.workspace.introLead"),
             ctaLabel: t("copilot.workspace.createFirst"),

@@ -33,6 +33,10 @@ const ROLE_FAMILIES: { key: string; roles: string[] }[] = [
   { key: "other", roles: [] },
 ];
 const ALL_ROLE_KEYS = ROLE_FAMILIES.flatMap((f) => f.roles);
+// Sentinel role chip appended to every family's role list — reveals the same
+// free-text input as the "other" family, for people whose field matches a
+// family but whose exact role isn't listed.
+const ROLE_OTHER = "__other";
 const TEAM_SIZES = ["1–10", "11–50", "51–200", "201–1000", "1000+"];
 
 type StepId = 1 | 2 | 3;
@@ -78,6 +82,13 @@ export default function Welcome() {
   const [suggestions, setSuggestions] = useState<OnboardingSuggestions | null>(null);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [selectedUseCases, setSelectedUseCases] = useState<Set<string>>(new Set());
+  // Free-form goals — the wizard captures almost nothing personal, so this
+  // is the one place users can say what they're actually working on. Saved
+  // to Company.goals_freeform and fed back into the Haiku suggestions.
+  const [goals, setGoals] = useState("");
+  // What goals_freeform the current `suggestions` were generated from —
+  // gates the "Refine" button so it only lights up on real changes.
+  const [goalsUsed, setGoalsUsed] = useState("");
 
   useEffect(() => {
     getMe()
@@ -96,6 +107,8 @@ export default function Welcome() {
           }
         }
         setTeamSize(data.company_size || "");
+        setGoals(data.goals_freeform || "");
+        setGoalsUsed(data.goals_freeform || "");
         const rawUc = data.selected_use_cases as unknown;
         if (rawUc && typeof rawUc === "string") {
           setSelectedUseCases(new Set(rawUc.split(",").map((s: string) => s.trim()).filter(Boolean)));
@@ -112,7 +125,7 @@ export default function Welcome() {
   }, []);
 
   const roleResolved =
-    roleFamily === "other"
+    roleFamily === "other" || roleKey === ROLE_OTHER
       ? roleOther.trim()
       : roleKey
         ? enT(`roles.${roleKey}`)
@@ -172,6 +185,24 @@ export default function Welcome() {
     }
   }
 
+  // Persist the goals and regenerate the themes from them. Separate from
+  // handleComplete so users see sharper suggestions before committing.
+  async function handleRefineSuggestions() {
+    const trimmed = goals.trim();
+    setSaving(true);
+    try {
+      const next = await saveOnboardingProfile({ goals_freeform: trimmed });
+      setMe(next);
+      setGoalsUsed(trimmed);
+    } catch {
+      toast(t("toast_save_failed"), "error");
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
+    fetchSuggestions();
+  }
+
   async function handleComplete() {
     setSaving(true);
     try {
@@ -179,6 +210,7 @@ export default function Welcome() {
       await completeOnboarding({
         selected_use_cases: casesArray.length ? casesArray.join(",") : undefined,
         use_case: casesArray[0] || undefined,
+        goals_freeform: goals.trim() || undefined,
       });
       setCachedOnboarded(true);
       setDone(true);
@@ -220,7 +252,9 @@ export default function Welcome() {
     const handler = (e: KeyboardEvent) => {
       // Ignore Enter on focused buttons (chips, CTAs) — the click already
       // handles it, and advancing here too would double-fire the action.
-      if ((e.target as HTMLElement)?.tagName === "BUTTON") return;
+      // Ignore textareas too: Enter there is a newline, not "continue".
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "BUTTON" || tag === "TEXTAREA") return;
       if (e.key === "Enter" && !saving) {
         if (done) handleEnterWorkspace();
         else if (step === 1 && step1Valid) handleStep1Next();
@@ -394,7 +428,7 @@ export default function Welcome() {
               <div className="welcome-setup__field">
                 <span className="welcome-setup__field-label">{t("field_role")}</span>
                 <div className="welcome-setup__chips" role="radiogroup">
-                  {(ROLE_FAMILIES.find((f) => f.key === roleFamily)?.roles ?? []).map((rk) => (
+                  {[...(ROLE_FAMILIES.find((f) => f.key === roleFamily)?.roles ?? []), ROLE_OTHER].map((rk) => (
                     <button
                       key={rk}
                       type="button"
@@ -404,10 +438,22 @@ export default function Welcome() {
                       onClick={() => setRoleKey(rk)}
                       disabled={saving}
                     >
-                      {t(`roles.${rk}`)}
+                      {rk === ROLE_OTHER ? t("role_other_chip") : t(`roles.${rk}`)}
                     </button>
                   ))}
                 </div>
+                {roleKey === ROLE_OTHER && (
+                  <input
+                    type="text"
+                    className="welcome-setup__other-input"
+                    value={roleOther}
+                    onChange={(e) => setRoleOther(e.target.value)}
+                    placeholder={t("role_other_placeholder")}
+                    aria-label={t("role_other_placeholder")}
+                    autoFocus
+                    disabled={saving}
+                  />
+                )}
               </div>
             )}
 
@@ -512,6 +558,35 @@ export default function Welcome() {
                     <p>{suggestions.profile_summary}</p>
                   </div>
                 )}
+
+                {/* Free-form context: the wizard chips capture very little,
+                    so let users say what they're actually working on — it
+                    persists to goals_freeform and sharpens the themes. */}
+                <div className="welcome-setup__field">
+                  <span className="welcome-setup__field-label">{t("step_3_goals_label")}</span>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>
+                    {t("step_3_goals_hint")}
+                  </p>
+                  <textarea
+                    className="welcome-setup__other-input"
+                    style={{ resize: "vertical" }}
+                    rows={3}
+                    value={goals}
+                    onChange={(e) => setGoals(e.target.value)}
+                    placeholder={t("step_3_goals_placeholder")}
+                    disabled={saving}
+                  />
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={handleRefineSuggestions}
+                      disabled={saving || !goals.trim() || goals.trim() === goalsUsed}
+                    >
+                      {t("step_3_goals_cta")}
+                    </button>
+                  </div>
+                </div>
               </>
             )}
 
