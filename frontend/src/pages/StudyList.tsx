@@ -739,29 +739,10 @@ export default function StudyList() {
                   <h3>{t("hub.memoCard.generatingTitle")}</h3>
                   <p>{t("hub.memoCard.generatingText")}</p>
                 </div>
-              ) : memoEligibleCount >= 2 ? (
-                <div className="hub-panel hub-panel--memo-cta">
-                  <h3>{t("hub.memoCard.kicker")}</h3>
-                  <p>{t("hub.memoCard.ctaText")}</p>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => {
-                      setMemoOpenSignal((n) => n + 1);
-                      scrollToMemos();
-                    }}
-                  >
-                    {t("hub.memoCard.ctaBtn")}
-                  </button>
-                </div>
-              ) : studies!.length >= 2 ? (
-                // ≥2 studies but not enough ready analyses — creating a memo
-                // would 400, so explain the prerequisite instead of a CTA.
-                <div className="hub-panel hub-panel--memo-cta">
-                  <h3>{t("hub.memoCard.kicker")}</h3>
-                  <p>{t("hub.memoCard.needAnalysisText", { count: memoEligibleCount })}</p>
-                </div>
               ) : null}
+              {/* No memo yet → nothing here. The Decision-memos section below
+                  owns creation and its empty state; a second pitch in the
+                  sidecar was the same message twice on one screen. */}
             </aside>
           )}
         </div>
