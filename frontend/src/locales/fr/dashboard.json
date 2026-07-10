@@ -381,7 +381,10 @@
     "namePlaceholder": "ex. Rétention vs acquisition — S2",
     "studyCount": "{{count}} études",
     "statusStale": "Obsolète",
-    "staleHint": "Une étude de ce mémo a une analyse plus récente que le mémo. Générez un nouveau mémo pour l'inclure."
+    "staleHint": "Une étude de ce mémo a une analyse plus récente que le mémo. Générez un nouveau mémo pour l'inclure.",
+    "emptyNeedAnalysis": "Un mémo de décision nécessite au moins deux études avec une analyse prête. Lancez d'abord l'analyse de vos études.",
+    "ineligibleNote_one": "{{count}} étude sans analyse prête ne peut pas encore être incluse.",
+    "ineligibleNote_other": "{{count}} études sans analyse prête ne peuvent pas encore être incluses."
   },
   "hub": {
     "nav": {
@@ -434,7 +437,8 @@
       "interviews_one": "{{count}} entretien",
       "interviews_other": "{{count}} entretiens",
       "responses_one": "{{count}} réponse",
-      "responses_other": "{{count}} réponses"
+      "responses_other": "{{count}} réponses",
+      "waiting": "Aucune réponse pour l'instant"
     },
     "noMatch": {
       "title": "Aucune étude ne correspond",
@@ -460,8 +464,11 @@
       "all": "Tous les mémos",
       "generatingTitle": "Synthèse du mémo en cours…",
       "generatingText": "Claude lit les analyses finales de vos études. Cela prend généralement moins d'une minute.",
-      "ctaText": "Au moins deux études ont des données. Synthétisez-les en un mémo prêt pour la décision.",
-      "ctaBtn": "Créer un mémo"
+      "ctaText": "Au moins deux études ont une analyse prête. Synthétisez-les en un mémo prêt pour la décision.",
+      "ctaBtn": "Créer un mémo",
+      "needAnalysisText_zero": "Lancez l'analyse d'au moins deux études pour débloquer un mémo de décision transverse.",
+      "needAnalysisText_one": "Une étude a une analyse prête. Analysez-en une deuxième pour débloquer un mémo de décision transverse.",
+      "needAnalysisText_other": "Analysez au moins deux études pour débloquer un mémo de décision transverse."
     },
     "palette": {
       "aria": "Palette de commandes",
@@ -479,6 +486,13 @@
       "navigate": "naviguer",
       "select": "ouvrir",
       "close": "fermer"
+    },
+    "demoBadge": "Démo",
+    "plan": {
+      "freeTrial": "Essai gratuit",
+      "upgrade": "Passer à un plan",
+      "manage": "Gérer",
+      "manageAria": "Plan et facturation — ouvrir les paramètres du compte"
     }
   }
 }

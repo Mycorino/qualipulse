@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import client from "../api/client";
 import { patchProjectSettings, ProjectResponse } from "../api/projects";
@@ -30,7 +31,8 @@ export default function BrandingSettings({
   const mode: BrandingMode = project.branding_mode ?? "standard";
 
   // Entitlement for the "branded" tier of the feature (legacy Lab/Enterprise,
-  // credits Team/Agency/Enterprise). Fetched once, lazily.
+  // credits Agency/Enterprise — see custom_branding in billing_plans.py).
+  // Fetched once, lazily.
   const [canBrand, setCanBrand] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -47,8 +49,12 @@ export default function BrandingSettings({
     };
   }, []);
 
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [savingDefault, setSavingDefault] = useState(false);
+  // Locked "branded" card clicked — show the inline upgrade panel instead of
+  // punishing the click with an error toast.
+  const [showUpsell, setShowUpsell] = useState(false);
   const colorDebounceRef = useRef<number | null>(null);
 
   // Persist this study's branding as the workspace default — every NEW
@@ -84,14 +90,17 @@ export default function BrandingSettings({
       toast(t("setup.brandingSaved", { defaultValue: "Saved" }), "success");
     } catch (err: any) {
       const code = err?.response?.data?.detail;
-      toast(
-        code === "custom_branding_required"
-          ? t("setup.brandingUpgrade", {
-              defaultValue: "Custom branding is available on the Team plan and above.",
-            })
-          : t("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }),
-        "error"
-      );
+      if (code === "custom_branding_required") {
+        setShowUpsell(true);
+        toast(
+          t("setup.brandingUpgrade", {
+            defaultValue: "Custom branding is part of the Agency plan.",
+          }),
+          "info"
+        );
+      } else {
+        toast(t("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
+      }
     } finally {
       setSaving(false);
     }
@@ -100,12 +109,7 @@ export default function BrandingSettings({
   function pickMode(next: BrandingMode) {
     if (next === mode) return;
     if (next === "branded" && canBrand === false) {
-      toast(
-        t("setup.brandingUpgrade", {
-          defaultValue: "Custom branding is available on the Team plan and above.",
-        }),
-        "error"
-      );
+      setShowUpsell(true);
       return;
     }
     // First switch to branded: seed a colour so the preview shows something.
@@ -192,7 +196,11 @@ export default function BrandingSettings({
             <span className="branding-mode-card__label">
               {opt.label}
               {opt.locked && (
-                <span className="branding-mode-card__lock" title={t("setup.brandingUpgrade", { defaultValue: "Custom branding is available on the Team plan and above." })}>
+                <span
+                  className="branding-mode-card__lock"
+                  aria-hidden="true"
+                  title={t("setup.brandingUpgrade", { defaultValue: "Custom branding is part of the Agency plan." })}
+                >
                   {" "}🔒
                 </span>
               )}
@@ -201,6 +209,33 @@ export default function BrandingSettings({
           </button>
         ))}
       </div>
+
+      {showUpsell && canBrand === false && (
+        <div className="branding-upsell" role="note">
+          <p className="branding-upsell__text">
+            {t("setup.brandingUpgradeBody", {
+              defaultValue:
+                "Theme the whole interview with your logo, color and font — included in the Agency plan.",
+            })}
+          </p>
+          <div className="branding-upsell__actions">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => navigate("/account/billing")}
+            >
+              {t("setup.brandingUpgradeCta", { defaultValue: "View plans" })}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowUpsell(false)}
+            >
+              {t("setup.brandingUpgradeDismiss", { defaultValue: "Not now" })}
+            </button>
+          </div>
+        </div>
+      )}
 
       {mode === "anonymous" ? (
         <p className="field-hint" style={{ fontSize: 13, marginTop: 12 }}>

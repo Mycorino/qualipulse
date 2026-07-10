@@ -111,7 +111,11 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
     }
   }
 
-  const eligible = studies.filter((s) => s.project_count > 0 || s.survey_count > 0);
+  // Mirror the server rule (each study needs a ready analysis) so the modal
+  // can't stage a selection that POST /synthesis/ would reject with 400.
+  const eligible = studies.filter((s) => s.has_ready_analysis);
+  const ineligibleCount = studies.length - eligible.length;
+  const canCreate = eligible.length >= 2;
   if (studies.length < 2) return null;
 
   return (
@@ -122,13 +126,20 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
           <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, margin: 0 }}>{t("decisionMemos.title")}</h2>
           <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)", margin: "4px 0 0" }}>{t("decisionMemos.sub")}</p>
         </div>
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
-          {t("decisionMemos.newMemo")}
-        </button>
+        {/* Creation entry point only once memos exist — on the empty state
+            the sidecar memo card (or the NBA chip) is the single CTA, so the
+            same action isn't offered three times on one screen. */}
+        {memos !== null && memos.length > 0 && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
+            {t("decisionMemos.newMemo")}
+          </button>
+        )}
       </div>
 
       {memos !== null && memos.length === 0 && (
-        <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)" }}>{t("decisionMemos.empty")}</p>
+        <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)" }}>
+          {canCreate ? t("decisionMemos.empty") : t("decisionMemos.emptyNeedAnalysis")}
+        </p>
       )}
 
       {memos !== null && memos.length > 0 && (
@@ -168,7 +179,8 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
               )}
               {m.status === "ready" && (
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleOpen(m.id)}>
-                  📄 {t("decisionMemos.open")}
+                  <span aria-hidden="true">📄 </span>
+                  {t("decisionMemos.open")}
                 </button>
               )}
               <button
@@ -226,7 +238,17 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
                   <span>{s.name}</span>
                 </label>
               ))}
+              {eligible.length === 0 && (
+                <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)", margin: "4px 6px" }}>
+                  {t("decisionMemos.emptyNeedAnalysis")}
+                </p>
+              )}
             </div>
+            {ineligibleCount > 0 && (
+              <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)", margin: "var(--space-2) 0 0" }}>
+                {t("decisionMemos.ineligibleNote", { count: ineligibleCount })}
+              </p>
+            )}
 
             <label style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 600, margin: "var(--space-4) 0 var(--space-1)" }}>
               {t("decisionMemos.questionLabel")}

@@ -2330,6 +2330,31 @@ select.field-input {
   font-size: 12px;
   color: var(--text-secondary);
 }
+/* Inline upgrade panel shown when the locked "Branded" mode is clicked —
+   an invitation with a path to the plan, not an error. */
+.branding-upsell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--brand-200);
+  border-radius: 10px;
+  background: var(--brand-50, #eef2ff);
+}
+.branding-upsell__text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  flex: 1 1 260px;
+}
+.branding-upsell__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .branding-color-input {
   width: 56px;
   height: 40px;
@@ -13467,10 +13492,45 @@ select.field-input {
 }
 
 .hub-rail__credits {
+  /* Rendered as a <button> — the whole block links to plan & billing. */
+  appearance: none;
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--surface-emphasis-border);
   border-radius: var(--radius-md);
   padding: 10px 11px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.hub-rail__credits:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.hub-rail__plan-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.hub-rail__plan-name {
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.hub-rail__plan-cta {
+  font-size: var(--text-xs);
+  color: var(--brand-200);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+.hub-rail__credits:hover .hub-rail__plan-cta {
+  text-decoration: underline;
 }
 .hub-rail__credits-row {
   display: flex;
@@ -13775,6 +13835,22 @@ select.field-input {
   font-weight: var(--weight-normal);
   color: var(--text-tertiary);
   margin-top: 2px;
+}
+/* Seeded showcase studies — visible in lists, excluded from totals. */
+.hub-demo-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-muted, #f1f5f9);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: 2px;
 }
 .hub-table__evidence {
   font-family: var(--font-mono);

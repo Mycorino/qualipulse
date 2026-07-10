@@ -305,7 +305,7 @@
     "brandingPreview": "Participant preview",
     "brandingPreviewCta": "I agree — start",
     "brandingSaved": "Saved",
-    "brandingUpgrade": "Custom branding is available on the Team plan and above.",
+    "brandingUpgrade": "Custom branding is part of the Agency plan.",
     "conversationStyleTitle": "Conversation style",
     "conversationStyleSubtitle": "How the AI moderator opens and paces the interview.",
     "warmupLabel": "Open with a warm-up question",
@@ -369,7 +369,10 @@
     "clickToEdit": "Click to edit",
     "moveUp": "Move up",
     "moveDown": "Move down",
-    "addQuestionError": "Could not add a question"
+    "addQuestionError": "Could not add a question",
+    "brandingUpgradeBody": "Theme the whole interview with your logo, color and font — included in the Agency plan.",
+    "brandingUpgradeCta": "View plans",
+    "brandingUpgradeDismiss": "Not now"
   },
   "responses": {
     "title": "Responses",
