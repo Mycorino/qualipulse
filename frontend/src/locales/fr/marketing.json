@@ -21,7 +21,7 @@
     "facts": [
       "Sans carte bancaire",
       "Un simple lien pour les participants",
-      "Français & anglais",
+      "Français, anglais & plus à venir",
       "RGPD, hébergé en UE"
     ]
   },
@@ -37,7 +37,7 @@
     "a2": "Bonne question. Sûrement la planification du lundi. Quand je la saute, l'abonnement perd tout son sens."
   },
   "strip": {
-    "audience": "Conçu pour les <b>équipes produit</b>, les <b>chercheurs UX</b> & les <b>agences</b>",
+    "audience": "Conçu pour les <b>équipes produit</b>, les <b>chercheurs UX</b>, les <b>agences</b> et tous ceux qui écoutent la voix du client",
     "credit": "1 crédit = 1 entretien terminé",
     "speed": "Du lancement à la première réponse : <b>le jour même</b>"
   },
@@ -244,6 +244,10 @@
       {
         "question": "Un intervieweur IA vaut-il un modérateur humain ?",
         "answer": "Pour la recherche exploratoire et évaluative, il s'en approche vraiment : il n'oriente jamais le témoin, ne fatigue pas au 9e entretien et relance à partir de ce que le participant vient de dire. Pour les sujets très sensibles, un humain reste préférable. L'idée honnête : un entretien mené par l'IA vaut mieux que le sondage que vous alliez envoyer à la place."
+      },
+      {
+        "question": "Quelles langues sont prises en charge ?",
+        "answer": "Vos entretiens se déroulent dans la langue de votre étude : le français et l'anglais sont disponibles aujourd'hui, et nous en ajoutons d'autres régulièrement. L'espace chercheur est proposé en français et en anglais, et chaque transcription peut être traduite automatiquement comme aide à la lecture, l'original restant toujours la source de vérité."
       },
       {
         "question": "Les données sont-elles hébergées en Europe ?",

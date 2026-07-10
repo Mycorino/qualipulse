@@ -303,11 +303,17 @@ html:has(.mkt) {
 .mkt-wave-row { padding: 18px 18px 6px; }
 .mkt-wave-row canvas { display: block; width: 100%; height: 56px; }
 .mkt-live-transcript { padding: 8px 18px 20px; min-height: 274px; }
-.mkt-live-line { margin-top: 16px; display: none; }
-.mkt-live-line.on { display: block; animation: mkt-rise 0.35s ease both; }
-@keyframes mkt-rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+/* Lines stay in the layout from first paint (reserving their full height) and
+   only fade + rise into view. Using display:none→block instead would grow the
+   card as each line appears and shove the whole page down on mobile. */
+.mkt-live-line { margin-top: 16px; opacity: 0; transform: translateY(6px); }
+.mkt-live-line.on {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mkt-live-line { transition: none; }
 }
 .mkt-live-speaker {
   font-family: var(--mk-mono);
