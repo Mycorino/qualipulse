@@ -14021,6 +14021,12 @@ select.field-input {
   font-size: 10px;
   color: var(--text-tertiary);
 }
+.hub-stats__note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
 
 /* Decision-memo highlight — the marketing hero's dark memo card, in-app. */
 .hub-memo {
