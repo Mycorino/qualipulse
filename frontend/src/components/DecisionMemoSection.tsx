@@ -137,9 +137,16 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
       </div>
 
       {memos !== null && memos.length === 0 && (
-        <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)" }}>
-          {canCreate ? t("decisionMemos.empty") : t("decisionMemos.emptyNeedAnalysis")}
-        </p>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "var(--space-3)" }}>
+          <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)", margin: 0 }}>
+            {canCreate ? t("decisionMemos.empty") : t("decisionMemos.emptyNeedAnalysis")}
+          </p>
+          {canCreate && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
+              {t("decisionMemos.newMemo")}
+            </button>
+          )}
+        </div>
       )}
 
       {memos !== null && memos.length > 0 && (
