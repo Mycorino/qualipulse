@@ -285,6 +285,9 @@ section { margin-top: 44px; margin-bottom: 0; }
   cursor: pointer; box-shadow: 0 4px 16px rgba(23,32,27,0.18); }
 .toolbar button:hover { background: #16452f; }
 .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+@media (max-width: 600px) {
+  .toolbar { position: static; display: flex; justify-content: flex-end; padding: 16px 20px 0; }
+}
 @media print {
   body { background: #fff; font-size: 12.5px; }
   .sheet { max-width: none; padding: 0; }
@@ -1302,6 +1305,9 @@ blockquote footer { font-size: 12px; color: var(--ink-2); }
   cursor: pointer; box-shadow: 0 4px 16px rgba(23,32,27,0.18); }
 .toolbar button:hover { background: #16452f; }
 .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+@media (max-width: 600px) {
+  .toolbar { position: static; display: flex; justify-content: flex-end; padding: 16px 20px 0; }
+}
 svg text { font-family: var(--sans); }
 @media print {
   body { background: #fff; font-size: 12.5px; }

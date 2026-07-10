@@ -680,6 +680,14 @@ def _quanti_report(lang: str) -> dict:
                 "Les ruptures de stock sont la friction qui fait basculer "
                 "cette note."
             ),
+            "verdict": (
+                "Investir d'abord sur l'expérience de rupture de stock "
+                "(validation des substitutions à l'avance) plutôt que sur le "
+                "prix : c'est la friction la plus citée chez les détractrices "
+                "et le seul levier corroboré par les deux méthodes. Réserve : "
+                "le coût de switch n'est pas encore chiffré — le sondage de "
+                "suivi doit précéder tout investissement lourd."
+            ),
             "themes": [
                 {
                     "title": "Les clientes occasionnelles recommandent beaucoup moins leur enseigne",
@@ -700,6 +708,12 @@ def _quanti_report(lang: str) -> dict:
                         "anchor_quote": notable[1]["text"],
                         "segments_mentioned": [],
                     },
+                    "counter_evidence": (
+                        "Une participante sur quatre (profil petits paniers) "
+                        "se dit indifférente aux ruptures et ne regarde que "
+                        "le total — un segment purement prix existe, mais "
+                        "reste minoritaire dans les deux sources."
+                    ),
                     "recommendation": {
                         "kind": "product",
                         "action": (
@@ -711,6 +725,11 @@ def _quanti_report(lang: str) -> dict:
                             "La rupture de stock est la friction la plus "
                             "citée en entretien et le meilleur candidat pour "
                             "remonter la note des clientes occasionnelles."
+                        ),
+                        "success_test": (
+                            "La note de recommandation des clientes "
+                            "occasionnelles dépasse 6/10 à la vague "
+                            "suivante, à tarification constante."
                         ),
                     },
                     "confidence": "supported",
@@ -734,6 +753,11 @@ def _quanti_report(lang: str) -> dict:
                         "anchor_quote": notable[0]["text"],
                         "segments_mentioned": [],
                     },
+                    "counter_evidence": (
+                        "En entretien, une participante attribue sa fidélité "
+                        "au prix seul — si ce profil pèse lourd dans la base, "
+                        "le coût de switch protège moins qu'il n'y paraît."
+                    ),
                     "recommendation": {
                         "kind": "next_research",
                         "action": (
@@ -744,9 +768,20 @@ def _quanti_report(lang: str) -> dict:
                             "Quatre entretiens suggèrent l'effet mais ne "
                             "permettent pas de le dimensionner."
                         ),
+                        "success_test": (
+                            "Le sondage de suivi produit un seuil chiffré "
+                            "d'écart de prix toléré, avec n≥30 par segment."
+                        ),
                     },
                     "confidence": "directional",
                 },
+            ],
+            "gaps": [
+                "Le poids économique du coût de switch est décrit par les "
+                "participantes mais jamais chiffré.",
+                "L'échantillon ne contient que des clientes actives — les "
+                "défections réelles ne sont connues que par ouï-dire "
+                "(biais de survivance).",
             ],
             "methodology_note": (
                 "Sondage : 44 réponses complètes, recueillies sur 7 jours. "
@@ -772,6 +807,14 @@ def _quanti_report(lang: str) -> dict:
             "rotate-in-rotate-out behaviour. The clearest product opening is "
             "a pause state between subscribed and cancelled."
         ),
+        "verdict": (
+            "Build the pause state before touching catalogue spend: it is "
+            "the only intervention corroborated by both methods, and it "
+            "converts decisive light-streamer churn into dormancy. Caveat: "
+            "which exclusives actually drive heavy-streamer renewal is not "
+            "yet sized — run the follow-up survey before committing "
+            "catalogue budget."
+        ),
         "themes": [
             {
                 "title": "Light streamers are far less likely to recommend their main service",
@@ -792,6 +835,11 @@ def _quanti_report(lang: str) -> dict:
                     "anchor_quote": notable[0]["text"],
                     "segments_mentioned": [],
                 },
+                "counter_evidence": (
+                    "One interviewee in four keeps a single year-round "
+                    "subscription and never rotates — a loyal-by-inertia "
+                    "profile a pause state would not move."
+                ),
                 "recommendation": {
                     "kind": "product",
                     "action": (
@@ -802,6 +850,11 @@ def _quanti_report(lang: str) -> dict:
                         "Light streamers churn decisively because the only "
                         "exit is a full cancel; a dormant tier converts a "
                         "lost subscriber into a paused one."
+                    ),
+                    "success_test": (
+                        "Light streamers offered a pause option show a "
+                        "measurably lower full-cancel rate over the next "
+                        "quarter."
                     ),
                 },
                 "confidence": "supported",
@@ -825,6 +878,11 @@ def _quanti_report(lang: str) -> dict:
                     "anchor_quote": notable[2]["text"],
                     "segments_mentioned": [],
                 },
+                "counter_evidence": (
+                    "The survey cannot separate exclusive-title pull from "
+                    "sheer catalogue size; one heavy streamer credits a "
+                    "price bundle, not exclusives, for staying."
+                ),
                 "recommendation": {
                     "kind": "next_research",
                     "action": (
@@ -837,9 +895,21 @@ def _quanti_report(lang: str) -> dict:
                         "but can't size which ones — a targeted survey "
                         "closes the gap."
                     ),
+                    "success_test": (
+                        "The follow-up survey names specific titles that a "
+                        "measurable share of heavy streamers cite as "
+                        "renewal-critical (n≥30)."
+                    ),
                 },
                 "confidence": "directional",
             },
+        ],
+        "gaps": [
+            "Which exclusive titles drive renewal is suggested by the "
+            "interviews but not sized.",
+            "The sample contains only current subscribers — churned users' "
+            "cancellation triggers are known only second-hand "
+            "(survivorship bias).",
         ],
         "methodology_note": (
             "Survey: 44 completed responses, fielded over 7 days. "

@@ -348,6 +348,15 @@ class TestDemoStudyIsHybrid:
         assert report.generated_with_survey_count == 1
         assert report.generated_with_interview_count == 4
 
+        # The demo must showcase the full rigor furniture — verdict, gaps,
+        # per-theme counter-evidence, falsifiable success tests — so first
+        # impressions match what real generations produce.
+        assert report.verdict
+        assert report.gaps
+        for theme in report.themes:
+            assert theme.counter_evidence
+            assert theme.recommendation.success_test
+
     def _assert_anchor_quotes_verbatim(self, db_session, company):
         project = seed_demo_project(db_session, company.id)
         all_transcripts = "\n".join(

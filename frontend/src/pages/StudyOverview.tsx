@@ -20,6 +20,7 @@ import { createProject } from "../api/projects";
 import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
+import { openHtmlDocument } from "../utils/openHtmlDocument";
 
 /**
  * StudyOverview — `/studies/:id`.
@@ -475,10 +476,10 @@ function ReportTab({
     if (!analysis) return;
     setExporting(true);
     try {
-      const data = await fetchStudyReportHtml(studyId, analysis.id);
-      const url = URL.createObjectURL(new Blob([data], { type: "text/html" }));
-      window.open(url, "_blank", "noopener");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await openHtmlDocument(
+        () => fetchStudyReportHtml(studyId, analysis.id),
+        `study-report-v${analysis.version}.html`,
+      );
     } catch {
       toast(t("overview.toast.exportReportFailed"), "error");
     } finally {

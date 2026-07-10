@@ -1,4 +1,5 @@
 import client from "./client";
+import { openHtmlDocument } from "../utils/openHtmlDocument";
 
 // ── Cross-study synthesis (decision memos) ──────────────────────────────────
 
@@ -59,12 +60,9 @@ export async function fetchSynthesisMemoHtml(id: string): Promise<Blob> {
 
 /**
  * Fetch a ready memo's print-ready HTML and open it in a new tab.
- * Throws on fetch failure so callers can toast. The object URL is
- * revoked after a minute — long enough for the tab to load.
+ * Throws on fetch failure so callers can toast. Mobile-safe: the tab is
+ * claimed synchronously before the fetch (see utils/openHtmlDocument).
  */
 export async function openSynthesisMemoInNewTab(id: string): Promise<void> {
-  const data = await fetchSynthesisMemoHtml(id);
-  const url = URL.createObjectURL(new Blob([data], { type: "text/html" }));
-  window.open(url, "_blank", "noopener");
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  await openHtmlDocument(() => fetchSynthesisMemoHtml(id), `decision-memo-${id.slice(0, 8)}.html`);
 }
