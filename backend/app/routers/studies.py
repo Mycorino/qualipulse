@@ -200,6 +200,18 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         .first()
         is not None
     )
+    # Same rule as StudyDetail.is_demo: a study is demo when it holds a
+    # seeded showcase project.
+    is_demo = (
+        db.query(Project.id)
+        .filter(
+            Project.study_id == study.id,
+            Project.archived_at.is_(None),
+            Project.is_demo.is_(True),
+        )
+        .first()
+        is not None
+    )
     return StudySummary(
         id=study.id,
         name=study.name,
@@ -212,6 +224,7 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         completed_interview_count=completed_interviews,
         has_report=has_report,
         has_ready_analysis=has_ready_analysis,
+        is_demo=is_demo,
     )
 
 

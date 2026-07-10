@@ -381,7 +381,10 @@
     "namePlaceholder": "e.g. Retention vs acquisition — H2",
     "studyCount": "{{count}} studies",
     "statusStale": "Out of date",
-    "staleHint": "A study in this memo has a newer analysis than the memo. Generate a new memo to include it."
+    "staleHint": "A study in this memo has a newer analysis than the memo. Generate a new memo to include it.",
+    "emptyNeedAnalysis": "A decision memo needs at least two studies with a ready analysis. Run the analysis on your studies first.",
+    "ineligibleNote_one": "{{count}} study without a ready analysis can't be included yet.",
+    "ineligibleNote_other": "{{count}} studies without a ready analysis can't be included yet."
   },
   "hub": {
     "nav": {
@@ -434,7 +437,8 @@
       "interviews_one": "{{count}} interview",
       "interviews_other": "{{count}} interviews",
       "responses_one": "{{count}} response",
-      "responses_other": "{{count}} responses"
+      "responses_other": "{{count}} responses",
+      "waiting": "No responses yet"
     },
     "noMatch": {
       "title": "No studies match",
@@ -460,8 +464,11 @@
       "all": "All memos",
       "generatingTitle": "Synthesising your memo…",
       "generatingText": "Claude is reading your studies' final analyses. This usually takes under a minute.",
-      "ctaText": "Two or more studies have evidence. Synthesise them into one decision-ready memo.",
-      "ctaBtn": "Create a memo"
+      "ctaText": "Two or more studies have a ready analysis. Synthesise them into one decision-ready memo.",
+      "ctaBtn": "Create a memo",
+      "needAnalysisText_zero": "Run the analysis on at least two studies to unlock a cross-study decision memo.",
+      "needAnalysisText_one": "One study has a ready analysis. Analyse a second one to unlock a cross-study decision memo.",
+      "needAnalysisText_other": "Analyse at least two studies to unlock a cross-study decision memo."
     },
     "palette": {
       "aria": "Command palette",
@@ -479,6 +486,13 @@
       "navigate": "navigate",
       "select": "select",
       "close": "close"
+    },
+    "demoBadge": "Demo",
+    "plan": {
+      "freeTrial": "Free trial",
+      "upgrade": "Upgrade",
+      "manage": "Manage",
+      "manageAria": "Plan and billing — open account settings"
     }
   }
 }

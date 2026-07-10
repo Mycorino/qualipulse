@@ -335,12 +335,29 @@ export default function StudyList() {
     });
   }, [rows, filter, query]);
 
+  // Workspace-level evidence totals exclude demo studies — the seeded
+  // showcase interviews/responses are a guided tour, not the researcher's
+  // own progress. Demo rows stay visible in the list, badged as demo.
   const totals = useMemo(
     () => ({
-      interviews: rows.reduce((n, r) => n + r.study.completed_interview_count, 0),
-      responses: rows.reduce((n, r) => n + r.study.completed_response_count, 0),
+      interviews: rows.reduce(
+        (n, r) => n + (r.study.is_demo ? 0 : r.study.completed_interview_count),
+        0,
+      ),
+      responses: rows.reduce(
+        (n, r) => n + (r.study.is_demo ? 0 : r.study.completed_response_count),
+        0,
+      ),
     }),
     [rows],
+  );
+
+  // Studies that can join a cross-study decision memo (server requires a
+  // ready analysis per study) — gates the sidecar CTA so it never leads to
+  // a request the backend would reject.
+  const memoEligibleCount = useMemo(
+    () => (studies ?? []).filter((s) => s.has_ready_analysis).length,
+    [studies],
   );
 
   const readyMemos = useMemo(
@@ -361,7 +378,7 @@ export default function StudyList() {
     }
   };
 
-  const evidenceLabel = (s: StudySummary) => {
+  const evidenceLabel = (s: StudySummary, status: StudyStatus) => {
     const parts: string[] = [];
     if (s.completed_interview_count > 0) {
       parts.push(t("hub.evidence.interviews", { count: s.completed_interview_count }));
@@ -369,7 +386,10 @@ export default function StudyList() {
     if (s.completed_response_count > 0) {
       parts.push(t("hub.evidence.responses", { count: s.completed_response_count }));
     }
-    return parts.length ? parts.join(" · ") : "—";
+    if (parts.length) return parts.join(" · ");
+    // "Collecting" + a bare dash reads as contradictory — say what's
+    // actually happening: the links are live, nothing has come in yet.
+    return status === "collecting" ? t("hub.evidence.waiting") : "—";
   };
 
   const openStudy = (id: string) => navigate(`/studies/${id}`);
@@ -397,6 +417,7 @@ export default function StudyList() {
             >
               <td className="hub-table__name">
                 {s.name}
+                {s.is_demo && <span className="hub-demo-badge">{t("hub.demoBadge")}</span>}
                 <span className="hub-table__meta">
                   <MixGlyph mix={mix} /> {t(`studyList.studyType.${mix}`).toLowerCase()}
                 </span>
@@ -407,7 +428,7 @@ export default function StudyList() {
                   {t(`hub.status.${status}`)}
                 </span>
               </td>
-              <td className="hub-table__evidence">{evidenceLabel(s)}</td>
+              <td className="hub-table__evidence">{evidenceLabel(s, status)}</td>
               <td className="hub-table__next-col">
                 <span className={`hub-next-chip${action.kind === "do" ? " hub-next-chip--do" : ""}`}>
                   {action.kind === "do" ? "✦ " : ""}
@@ -439,7 +460,10 @@ export default function StudyList() {
               <MixGlyph mix={mix} />
               <span>{t(`studyList.studyType.${mix}`)}</span>
             </div>
-            <div className="chart-card__takeaway">{s.name}</div>
+            <div className="chart-card__takeaway">
+              {s.name}
+              {s.is_demo && <span className="hub-demo-badge">{t("hub.demoBadge")}</span>}
+            </div>
             <div className="chart-card__footer tabular">
               <span>{t("studyList.surveyCount", { count: s.survey_count })}</span>
               <span className="chart-card__footer-divider">·</span>
@@ -514,7 +538,7 @@ export default function StudyList() {
 
         {hasStudies && (() => {
           const nba = resolveWorkspaceNextAction(studies!.map(toNbaSummary), {
-            eligibleStudyCount: studies!.filter((s) => s.has_ready_analysis).length,
+            eligibleStudyCount: memoEligibleCount,
             readyMemoCount: readyMemos.length,
             staleMemoCount: readyMemos.filter((m) => m.stale).length,
           });
@@ -715,7 +739,7 @@ export default function StudyList() {
                   <h3>{t("hub.memoCard.generatingTitle")}</h3>
                   <p>{t("hub.memoCard.generatingText")}</p>
                 </div>
-              ) : studies!.length >= 2 ? (
+              ) : memoEligibleCount >= 2 ? (
                 <div className="hub-panel hub-panel--memo-cta">
                   <h3>{t("hub.memoCard.kicker")}</h3>
                   <p>{t("hub.memoCard.ctaText")}</p>
@@ -729,6 +753,13 @@ export default function StudyList() {
                   >
                     {t("hub.memoCard.ctaBtn")}
                   </button>
+                </div>
+              ) : studies!.length >= 2 ? (
+                // ≥2 studies but not enough ready analyses — creating a memo
+                // would 400, so explain the prerequisite instead of a CTA.
+                <div className="hub-panel hub-panel--memo-cta">
+                  <h3>{t("hub.memoCard.kicker")}</h3>
+                  <p>{t("hub.memoCard.needAnalysisText", { count: memoEligibleCount })}</p>
                 </div>
               ) : null}
             </aside>

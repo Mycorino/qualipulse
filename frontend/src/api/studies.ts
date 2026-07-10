@@ -49,6 +49,8 @@ export interface StudySummary {
   has_report: boolean;
   /** Eligible for a cross-study decision memo (any ready analysis). */
   has_ready_analysis: boolean;
+  /** Seeded showcase study — badged in lists, excluded from workspace totals. */
+  is_demo: boolean;
 }
 
 export interface StudyDetail {

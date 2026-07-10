@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { getMe, type CompanyResponse } from "../api/auth";
-import { getCreditUsage, type CreditUsage } from "../api/billing";
+import { getCreditUsage, getPlanDisplay, type CreditUsage, type PlanDisplay } from "../api/billing";
 import { listStudies, type StudySummary } from "../api/studies";
 import { useAuth } from "../hooks/useAuth";
 import { AccountMenu } from "./HeaderControls";
@@ -76,6 +76,7 @@ export function HubShell({
   const { t } = useTranslation("dashboard");
   const [me, setMe] = useState<CompanyResponse | null>(null);
   const [credits, setCredits] = useState<CreditUsage | null>(null);
+  const [plan, setPlan] = useState<PlanDisplay | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Palette data when the host page doesn't hold the studies list itself.
   const [fetchedStudies, setFetchedStudies] = useState<StudySummary[] | null>(null);
@@ -83,6 +84,7 @@ export function HubShell({
   useEffect(() => {
     getMe().then(setMe).catch(() => setMe(null));
     getCreditUsage().then(setCredits).catch(() => setCredits(null));
+    getPlanDisplay().then(setPlan).catch(() => setPlan(null));
   }, []);
 
   const paletteStudies = studies !== undefined ? studies : fetchedStudies;
@@ -166,25 +168,44 @@ export function HubShell({
         </nav>
 
         <div className="hub-rail__foot">
-          {credits && creditTotal > 0 && (
-            <div className="hub-rail__credits">
-              <div className="hub-rail__credits-row">
-                <strong>
-                  {credits.available_credits} / {creditTotal}
-                </strong>
-                <span>{t("hub.credits.left")}</span>
-              </div>
-              <div
-                className="hub-rail__meter"
-                role="img"
-                aria-label={t("hub.credits.meterAria", {
-                  available: credits.available_credits,
-                  total: creditTotal,
-                })}
-              >
-                <i style={{ width: `${creditPct}%` }} />
-              </div>
-            </div>
+          {(plan || (credits && creditTotal > 0)) && (
+            <button
+              type="button"
+              className="hub-rail__credits"
+              onClick={() => navigate("/account/billing")}
+              aria-label={t("hub.plan.manageAria")}
+            >
+              {plan && (
+                <div className="hub-rail__plan-row">
+                  <span className="hub-rail__plan-name">
+                    {plan.is_trial ? t("hub.plan.freeTrial") : plan.plan_name}
+                  </span>
+                  <span className="hub-rail__plan-cta">
+                    {plan.is_trial ? t("hub.plan.upgrade") : t("hub.plan.manage")}
+                  </span>
+                </div>
+              )}
+              {credits && creditTotal > 0 && (
+                <>
+                  <div className="hub-rail__credits-row">
+                    <strong>
+                      {credits.available_credits} / {creditTotal}
+                    </strong>
+                    <span>{t("hub.credits.left")}</span>
+                  </div>
+                  <div
+                    className="hub-rail__meter"
+                    role="img"
+                    aria-label={t("hub.credits.meterAria", {
+                      available: credits.available_credits,
+                      total: creditTotal,
+                    })}
+                  >
+                    <i style={{ width: `${creditPct}%` }} />
+                  </div>
+                </>
+              )}
+            </button>
           )}
           <div className="hub-rail__user">
             <div className="hub-rail__user-id">

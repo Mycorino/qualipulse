@@ -83,6 +83,10 @@ class StudySummary(BaseModel):
     # Eligible for a cross-study decision memo (any ready analysis —
     # qualitative ProjectAnalysis or mixed-methods StudyAnalysis).
     has_ready_analysis: bool = False
+    # True when this Study holds seeded showcase content. The list UI badges
+    # demo rows and keeps demo evidence out of workspace-level totals so the
+    # researcher's own progress isn't inflated by tour data.
+    is_demo: bool = False
 
 
 class StudyDetail(BaseModel):

@@ -305,7 +305,7 @@
     "brandingPreview": "Aperçu participant",
     "brandingPreviewCta": "J'accepte — commencer",
     "brandingSaved": "Enregistré",
-    "brandingUpgrade": "La personnalisation de marque est disponible à partir du plan Team.",
+    "brandingUpgrade": "La personnalisation de marque fait partie du plan Agency.",
     "conversationStyleTitle": "Style de conversation",
     "conversationStyleSubtitle": "Comment le modérateur IA démarre et rythme l'entretien.",
     "warmupLabel": "Ouvrir avec une question d'échauffement",
@@ -369,7 +369,10 @@
     "clickToEdit": "Cliquer pour modifier",
     "moveUp": "Monter",
     "moveDown": "Descendre",
-    "addQuestionError": "Impossible d'ajouter une question"
+    "addQuestionError": "Impossible d'ajouter une question",
+    "brandingUpgradeBody": "Habillez tout l'entretien avec votre logo, votre couleur et votre police — inclus dans le plan Agency.",
+    "brandingUpgradeCta": "Voir les plans",
+    "brandingUpgradeDismiss": "Plus tard"
   },
   "responses": {
     "title": "Réponses",

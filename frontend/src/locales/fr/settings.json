@@ -177,8 +177,9 @@
     },
     "workspaceCard": {
       "label": "Espace de travail",
-      "seats": "sièges d'équipe",
-      "cta": "Gérer les membres →"
+      "cta": "Gérer les membres →",
+      "seats_one": "siège d'équipe",
+      "seats_other": "sièges d'équipe"
     },
     "slackCard": {
       "label": "Notifications Slack",

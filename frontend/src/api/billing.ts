@@ -26,3 +26,24 @@ export async function getCreditUsage(): Promise<CreditUsage | null> {
     return null;
   }
 }
+
+/** Canonical plan-display block emitted by GET /billing/status. */
+export interface PlanDisplay {
+  plan_name: string;
+  is_trial: boolean;
+  status: string;
+}
+
+/**
+ * Current plan for lightweight chrome (hub rail). Returns `null` when the
+ * account has no credit-native display block (legacy plans) — callers hide
+ * the plan line rather than guessing.
+ */
+export async function getPlanDisplay(): Promise<PlanDisplay | null> {
+  try {
+    const { data } = await client.get<{ display?: PlanDisplay }>("/billing/status");
+    return data?.display ?? null;
+  } catch {
+    return null;
+  }
+}
