@@ -4525,7 +4525,10 @@ select.field-input {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 4px 0 20px;
+  /* Match .hub-canvas's top rhythm — without this the avatar sits 4px
+     from the viewport edge (the account page's .dashboard-page wrapper
+     has no desktop padding of its own). */
+  padding: var(--space-6) 0 20px;
 }
 .account-identity__avatar {
   flex: none;
