@@ -81,7 +81,9 @@
       "methodologyStats_responses": "{{count}} responses",
       "methodologyStats_interview_one": "{{count}} interview",
       "methodologyStats_interview_other": "{{count}} interviews",
-      "metaSeparator": " · "
+      "metaSeparator": " · ",
+      "verdict": "Verdict",
+      "gaps": "What we don't know yet"
     },
     "validationBanner": {
       "title": "Theme validation · {{status}}",
@@ -105,7 +107,9 @@
       "n": "n={{count}}",
       "interviewEvidence": "Interview evidence · {{xOfY}}",
       "overIndex": " · over-index {{value}}×",
-      "segmentLabel": " · {{label}}"
+      "segmentLabel": " · {{label}}",
+      "counterEvidence": "What would weaken this",
+      "successTest": "Success test:"
     },
     "themeValidation": {
       "awaiting": "Awaiting validation responses for this theme.",

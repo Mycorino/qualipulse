@@ -183,3 +183,35 @@ def test_study_report_suppresses_percentages_below_threshold(client, auth_header
     )
     assert resp.status_code == 200
     assert "Sub-threshold group (n&lt;30)" in resp.text or "Sub-threshold group (n<30)" in resp.text
+
+
+def test_study_report_renders_verdict_gaps_and_success_test(client, auth_headers, db_session):
+    """The stub report carries verdict + gaps + success_test; the document
+    must render all three rigor blocks."""
+
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+    _set_language(db_session, "en")
+    resp = client.get(
+        f"/studies/{study_id}/analyses/{analysis['id']}/report.html",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.text
+    assert "Stub verdict" in body
+    assert "What we don&#x27;t know yet" in body or "What we don't know yet" in body
+    assert "Success test" in body
+
+
+def test_study_analysis_inputs_include_study_context(client, auth_headers, db_session):
+    """The generation snapshot must carry the study context (name at minimum)
+    so the model can anchor its verdict to the research question."""
+
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+    row = (
+        db_session.query(StudyAnalysis)
+        .filter(StudyAnalysis.id == analysis["id"])
+        .first()
+    )
+    snapshot = json.loads(row.inputs_snapshot)
+    assert "study_context" in snapshot
+    assert snapshot["study_context"]["study_name"]

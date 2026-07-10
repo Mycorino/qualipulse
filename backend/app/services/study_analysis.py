@@ -77,10 +77,25 @@ Iron rules:
 4. Themes that contradict the data MUST NOT be reported.
 5. Recommendations must be specific and actionable. "Improve onboarding"
    is bad. "Move the team-size selector before the payment step" is good.
-6. Return STRICT JSON. No prose around it. No markdown code fences.
+6. The verdict answers the study's research objective / decision when one
+   is provided in <study_context>: a direct recommendation plus the
+   strongest reason and the biggest caveat. Without a stated decision,
+   the verdict is the single most consequential takeaway. Never restate
+   the executive summary.
+7. Report counter-evidence honestly. When the data contains a divergent
+   voice or a signal that cuts against a theme, name it in that theme's
+   counter_evidence. A theme with no counter-evidence checked is weaker,
+   not stronger. Use null only when you genuinely looked and found none.
+8. Every recommendation carries a success_test: the observable outcome
+   that would confirm it worked (or prove it wrong) — a metric, a
+   threshold, or a falsifying observation. Never vague ("users happier").
+9. List what the data CANNOT answer in gaps — unmeasured effects, missing
+   segments, survivorship bias. An empty gaps list is almost always wrong.
+10. Return STRICT JSON. No prose around it. No markdown code fences.
 
 You are writing for product managers and founders who will use this to
 make decisions. They will see your output rendered as cards. Be concise.
+Write in the language of the study context and survey content.
 """
 
 SCHEMA_BLOCK = """\
@@ -88,6 +103,7 @@ Return a single JSON object matching this exact schema:
 
 {
   "executive_summary": "<one paragraph summarising the most important finding>",
+  "verdict": "<the decision-oriented bottom line: recommendation + strongest reason + biggest caveat. Answers the study's stated decision when one exists>",
   "themes": [
     {
       "title": "<imperative or thesis-form sentence>",
@@ -104,14 +120,17 @@ Return a single JSON object matching this exact schema:
         "anchor_quote": "<verbatim from a transcript>",
         "segments_mentioned": ["<segment label>", ...]
       },
+      "counter_evidence": "<the divergent voice or signal that cuts against this theme, or null when none exists in the data>",
       "recommendation": {
         "kind": "product" | "marketing" | "next_research",
         "action": "<specific next move>",
-        "rationale": "<one line of why>"
+        "rationale": "<one line of why>",
+        "success_test": "<the observable outcome that would confirm this worked or prove it wrong>"
       },
       "confidence": "directional" | "supported" | "strong"
     }
   ],
+  "gaps": ["<what this data cannot answer — unmeasured effect, missing segment, bias>", ...],
   "methodology_note": "<one paragraph on how the data was sourced + caveats>"
 }
 
@@ -186,6 +205,19 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
         .filter(Project.study_id == study.id, Project.archived_at.is_(None))
         .all()
     )
+
+    # Study context — without it the model can't write a verdict: it needs
+    # to know what question the research set out to answer and what decision
+    # hangs on it. Objective/decision live on the sibling interview Project
+    # (the Study row itself only has a name).
+    study_context: dict = {"study_name": study.name}
+    for p in projects:
+        if p.research_objective and "research_objective" not in study_context:
+            study_context["research_objective"] = p.research_objective
+        if getattr(p, "decision_to_inform", None) and "decision_to_inform" not in study_context:
+            study_context["decision_to_inform"] = p.decision_to_inform
+        if getattr(p, "target_customer_description", None) and "target_audience" not in study_context:
+            study_context["target_audience"] = p.target_customer_description
 
     survey_inputs = []
     for s in surveys:
@@ -275,6 +307,7 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
 
     inputs_snapshot = {
         "study_id": study.id,
+        "study_context": study_context,
         "surveys": survey_inputs,
         "interview_count": len(transcripts),
         "interviews": transcripts,
@@ -286,12 +319,13 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
     # plumbing (storage, polling, UI rendering) can be exercised without
     # an AI dependency. Real production always has the key set.
     if not settings.ANTHROPIC_API_KEY:
-        stub = _stub_report(survey_inputs, transcripts)
+        stub = _stub_report(survey_inputs, transcripts, study_context)
         return json.dumps(stub), snapshot_json
 
     # Real call.
     user_prompt = (
         f"{SCHEMA_BLOCK}\n\n"
+        f"<study_context>\n{json.dumps(study_context)}\n</study_context>\n\n"
         f"<inputs>\n{snapshot_json}\n</inputs>\n\n"
         "Generate the report now. Return ONLY the JSON object, nothing else."
     )
@@ -325,7 +359,11 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
     return raw, snapshot_json
 
 
-def _stub_report(survey_inputs: list[dict], transcripts: list[dict]) -> dict:
+def _stub_report(
+    survey_inputs: list[dict],
+    transcripts: list[dict],
+    study_context: dict | None = None,
+) -> dict:
     """Deterministic offline stub so the UI + tests work without an API key.
 
     Builds 2-3 themes directly from the survey discoveries the service
@@ -356,10 +394,12 @@ def _stub_report(survey_inputs: list[dict], transcripts: list[dict]) -> dict:
                         if transcripts
                         else None
                     ),
+                    "counter_evidence": None,
                     "recommendation": {
                         "kind": "next_research",
                         "action": "Invite this segment to follow-up interviews to understand the cause.",
                         "rationale": "We see a clear quantitative gap; we need qualitative context to act on it.",
+                        "success_test": "The follow-up interviews surface a mechanism that explains the gap.",
                     },
                     "confidence": d["confidence"],
                 }
@@ -374,10 +414,12 @@ def _stub_report(survey_inputs: list[dict], transcripts: list[dict]) -> dict:
                 "title": "Insufficient data to surface themes",
                 "survey_signal": None,
                 "interview_evidence": None,
+                "counter_evidence": None,
                 "recommendation": {
                     "kind": "next_research",
                     "action": "Collect more survey responses or interviews before regenerating.",
                     "rationale": "Themes require at least one survey question or interview to anchor.",
+                    "success_test": "A regenerated report surfaces at least one data-anchored theme.",
                 },
                 "confidence": "directional",
             }
@@ -390,7 +432,16 @@ def _stub_report(survey_inputs: list[dict], transcripts: list[dict]) -> dict:
             if not os.environ.get("ANTHROPIC_API_KEY")
             else "Stub fallback engaged — Claude returned no themes."
         ),
+        "verdict": (
+            "Stub verdict — the largest quantitative gap sits with "
+            f"“{themes[0]['title']}”; validate it qualitatively before acting."
+            if themes and themes[0].get("survey_signal")
+            else None
+        ),
         "themes": themes,
+        "gaps": [
+            "Stub mode: no AI synthesis ran, so unmeasured effects and missing segments were not assessed."
+        ],
         "methodology_note": (
             f"Generated from {sum(s['survey']['n_completed'] for s in survey_inputs)} survey "
             f"responses and {len(transcripts)} interviews. "

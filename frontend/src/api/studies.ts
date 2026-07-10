@@ -99,19 +99,27 @@ export interface ThemeRecommendation {
   kind: RecommendationKind;
   action: string;
   rationale: string | null;
+  /** Falsifiable outcome that would confirm the action worked. Absent on older reports. */
+  success_test?: string | null;
 }
 
 export interface QuantifiedTheme {
   title: string;
   survey_signal: SurveySignal | null;
   interview_evidence: InterviewEvidence | null;
+  /** Divergent voice or signal that cuts against the theme. Absent on older reports. */
+  counter_evidence?: string | null;
   recommendation: ThemeRecommendation;
   confidence: Confidence;
 }
 
 export interface QuantifiedThemeReport {
   executive_summary: string;
+  /** Decision-oriented bottom line. Absent on older reports. */
+  verdict?: string | null;
   themes: QuantifiedTheme[];
+  /** What the data cannot answer. Absent on older reports. */
+  gaps?: string[];
   methodology_note: string;
   generated_with_survey_count: number;
   generated_with_response_count: number;
