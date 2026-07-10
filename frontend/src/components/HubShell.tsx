@@ -134,7 +134,7 @@ export function HubShell({
             <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
             <path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          {t("hub.nav.search")}
+          <span className="hub-rail__search-label">{t("hub.nav.search")}</span>
           <kbd>⌘K</kbd>
         </button>
 

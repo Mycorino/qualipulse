@@ -1161,58 +1161,15 @@ function ThemeValidationPanel({
 function RecommendedActionCard({ text, onClick }: { text: string; onClick: () => void }) {
   const { t } = useTranslation("study");
   return (
-    <div
-      style={{
-        background: "var(--brand-gradient-soft)",
-        border: "1.5px solid var(--brand-300)",
-        borderRadius: "var(--radius-lg)",
-        padding: "var(--space-5) var(--space-6)",
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-4)",
-        boxShadow: "var(--shadow-xs)",
-      }}
-    >
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 40,
-          height: 40,
-          borderRadius: "var(--radius-md)",
-          background: "var(--brand-500)",
-          color: "#fff",
-          flex: "0 0 auto",
-        }}
-        aria-hidden="true"
-      >
+    <div className="reco-card">
+      <div className="reco-card__icon" aria-hidden="true">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M13 2 L3 14 L12 14 L11 22 L21 10 L12 10 Z" />
         </svg>
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: "var(--text-eyebrow)",
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--brand-700)",
-          }}
-        >
-          {t("overview.recommendedAction.eyebrow")}
-        </div>
-        <p
-          style={{
-            fontSize: "var(--text-md)",
-            color: "var(--text-primary)",
-            margin: "var(--space-1) 0 0",
-            lineHeight: 1.4,
-          }}
-        >
-          {text}
-        </p>
+      <div className="reco-card__body">
+        <div className="reco-card__eyebrow">{t("overview.recommendedAction.eyebrow")}</div>
+        <p className="reco-card__text">{text}</p>
       </div>
       <button type="button" className="btn btn-primary" onClick={onClick}>
         {t("overview.recommendedAction.takeAction")}
