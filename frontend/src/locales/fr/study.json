@@ -15,7 +15,8 @@
       "validationGenerateFailed": "Impossible de générer le questionnaire de validation",
       "generationFailed": "Échec de la génération",
       "reportGenerated": "Rapport généré",
-      "reportGenerateFailed": "Impossible de générer le rapport"
+      "reportGenerateFailed": "Impossible de générer le rapport",
+      "exportReportFailed": "Impossible d'exporter le rapport"
     },
     "untitledSurvey": "Questionnaire sans titre",
     "untitledInterview": "Série d'entretiens sans titre",
@@ -61,8 +62,9 @@
       "versionEyebrow": "Thèmes quantifiés · v{{version}}",
       "generatedAt": "Généré le {{date}}",
       "generatedAtUnknown": "Généré le —",
-      "exportPdf": "Exporter en PDF",
-      "exportPdfTitle": "Imprimer ou enregistrer le rapport en PDF",
+      "exportPdf": "Exporter le rapport (PDF)",
+      "exportPdfTitle": "Ouvrir le rapport de recherche prêt à imprimer",
+      "exportPdfLoading": "Préparation…",
       "validateThemes": "Valider ces thèmes →",
       "validateGenerating": "Génération…",
       "validateThemesTitle": "Lancer un micro-questionnaire de validation à partir de ces thèmes",

@@ -18,14 +18,21 @@ Future sprint hooks (intentionally deferred):
 """
 
 import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_company, get_db
 from app.models.company import Company
-from app.models.interview import InterviewLink, Participant, ProjectAnalysis
+from app.models.interview import (
+    InterviewLink,
+    InterviewTurn,
+    Participant,
+    ProjectAnalysis,
+)
 from app.models.project import Project
 from app.models.study import Study, StudyAnalysis, StudyParticipant
 from app.models.survey import Survey, SurveyQuestion, SurveyResponse
@@ -42,7 +49,9 @@ from app.schemas.study import (
     ThemeValidationSnapshotSchema,
     ValidationSummarySchema,
 )
+from app.services.report_export import render_study_report_html
 from app.services.study_analysis import trigger_study_analysis
+from app.services.survey_analytics import build_dashboard
 from app.services.validation_surveys import (
     compute_validation_summary,
     generate_validation_survey,
@@ -494,6 +503,109 @@ def get_analysis(
     if not a:
         raise HTTPException(status_code=404, detail="Analysis not found")
     return _analysis_to_detail(a)
+
+
+@router.get(
+    "/{study_id}/analyses/{analysis_id}/report.html",
+    response_class=HTMLResponse,
+)
+def export_study_report(
+    study_id: str,
+    analysis_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Render a ready Quantified Themes analysis as a standalone,
+    print-ready HTML research report.
+
+    ``analysis_id`` accepts the literal ``latest`` to export the most
+    recent ready analysis. Charts are drawn server-side from the same
+    survey aggregates the generation pipeline used, so the document
+    always matches the study's actual data.
+    """
+
+    study = _get_study_or_404(db, study_id, company)
+    if analysis_id == "latest":
+        analysis = (
+            db.query(StudyAnalysis)
+            .filter(
+                StudyAnalysis.study_id == study.id,
+                StudyAnalysis.status == "ready",
+            )
+            .order_by(StudyAnalysis.generated_at.desc())
+            .first()
+        )
+    else:
+        analysis = (
+            db.query(StudyAnalysis)
+            .filter(
+                StudyAnalysis.id == analysis_id,
+                StudyAnalysis.study_id == study.id,
+                StudyAnalysis.status == "ready",
+            )
+            .first()
+        )
+    if analysis is None or not analysis.report:
+        raise HTTPException(status_code=404, detail="No ready analysis to export.")
+
+    # Source surveys only — validation micro-surveys are folded into the
+    # per-theme agreement rows, charting their raw questions would duplicate.
+    surveys = (
+        db.query(Survey)
+        .filter(
+            Survey.study_id == study.id,
+            Survey.archived_at.is_(None),
+            Survey.source_analysis_id.is_(None),
+        )
+        .order_by(Survey.created_at)
+        .all()
+    )
+    dashboards = [build_dashboard(db, s) for s in surveys]
+    validation = compute_validation_summary(db, analysis)
+
+    project_ids = [
+        p.id
+        for p in db.query(Project)
+        .filter(Project.study_id == study.id, Project.archived_at.is_(None))
+        .all()
+    ]
+    participants = []
+    turn_counts: dict[str, int] = {}
+    if project_ids:
+        participants = (
+            db.query(Participant)
+            .filter(
+                Participant.project_id.in_(project_ids),
+                Participant.status == "completed",
+            )
+            .order_by(Participant.completed_at)
+            .limit(50)
+            .all()
+        )
+        if participants:
+            rows = (
+                db.query(InterviewTurn.participant_id, func.count(InterviewTurn.id))
+                .filter(InterviewTurn.participant_id.in_([p.id for p in participants]))
+                .group_by(InterviewTurn.participant_id)
+                .all()
+            )
+            turn_counts = dict(rows)
+
+    html_doc = render_study_report_html(
+        study,
+        analysis,
+        dashboards,
+        validation,
+        participants,
+        turn_counts,
+        company_name=company.name,
+    )
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", study.name).strip("_") or "study"
+    filename = f"{slug}_report_v{analysis.version}.html"
+    return HTMLResponse(
+        content=html_doc,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 # ── Sprint 14: Validation surveys (closing the loop) ─────────────────

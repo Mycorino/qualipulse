@@ -15,7 +15,8 @@
       "validationGenerateFailed": "Could not generate validation survey",
       "generationFailed": "Generation failed",
       "reportGenerated": "Report generated",
-      "reportGenerateFailed": "Could not generate report"
+      "reportGenerateFailed": "Could not generate report",
+      "exportReportFailed": "Could not export the report"
     },
     "untitledSurvey": "Untitled survey",
     "untitledInterview": "Untitled interview round",
@@ -61,8 +62,9 @@
       "versionEyebrow": "Quantified Themes · v{{version}}",
       "generatedAt": "Generated {{date}}",
       "generatedAtUnknown": "Generated —",
-      "exportPdf": "Export PDF",
-      "exportPdfTitle": "Print or save the report as a PDF",
+      "exportPdf": "Export report (PDF)",
+      "exportPdfTitle": "Open the print-ready research report",
+      "exportPdfLoading": "Preparing…",
       "validateThemes": "Validate these themes →",
       "validateGenerating": "Generating…",
       "validateThemesTitle": "Spawn a validation micro-survey from these themes",
