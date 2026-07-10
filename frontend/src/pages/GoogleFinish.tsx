@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
+import { checkoutUrlForSelectedPlan } from "../utils/planCheckout";
 
 // Reads tokens that the backend bounced back via URL fragment (so they
 // don't appear in server logs / Referer headers), persists them, then
@@ -34,7 +35,8 @@ export default function GoogleFinish() {
     // Fresh Google accounts get a placeholder company name derived from the
     // email local-part. Flag it so /welcome starts on the "Your company"
     // step where the user can correct it (Welcome.tsx consumes this flag).
-    if (params.get("is_new") === "1") {
+    const isNew = params.get("is_new") === "1";
+    if (isNew) {
       localStorage.setItem("qp_google_new_signup", "1");
     }
 
@@ -42,6 +44,22 @@ export default function GoogleFinish() {
     setCachedOnboarded(onboarded);
     // Clear the fragment so the tokens aren't left in browser history.
     window.history.replaceState(null, "", window.location.pathname);
+
+    // Brand-new Google signups who picked a paid plan on the pricing page
+    // (stashed by Signup.tsx before the OAuth round-trip) get charged
+    // upfront via Stripe Checkout, same as password signups. Only for
+    // is_new — a returning user signing in must never be bounced to
+    // checkout by a stale localStorage stash. Soft-fails to /welcome.
+    if (isNew) {
+      checkoutUrlForSelectedPlan().then((checkoutUrl) => {
+        if (checkoutUrl) {
+          window.location.href = checkoutUrl;
+        } else {
+          navigate("/welcome", { replace: true });
+        }
+      });
+      return;
+    }
     navigate(onboarded ? next : "/welcome", { replace: true });
   }, [navigate, saveToken]);
 

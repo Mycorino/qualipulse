@@ -838,3 +838,57 @@ class TestRolloverPolicy:
             .all()
         )
         assert len(rollover_events) == 1
+
+
+class TestCheckoutSessionAttribution:
+    """POST /billing/checkout must stamp attribution metadata on BOTH the
+    Checkout Session and (via subscription_data) the subscription Stripe
+    creates from it. Stripe does not copy session metadata onto the
+    subscription, and _handle_subscription_event attributes
+    customer.subscription.* events from the SUBSCRIPTION's metadata — so
+    without subscription_data the payment never registers on the workspace.
+    """
+
+    def test_checkout_session_carries_subscription_metadata(
+        self, client, auth_headers, monkeypatch
+    ):
+        import sys
+        import types
+
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "STRIPE_SECRET_KEY", "sk_test_x")
+        monkeypatch.setattr(settings, "STRIPE_PRICE_TEAM_MONTHLY", "price_team_m")
+
+        captured: dict = {}
+
+        class _Session:
+            @staticmethod
+            def create(**kwargs):
+                captured.update(kwargs)
+                return types.SimpleNamespace(url="https://checkout.stripe.test/cs_123")
+
+        fake_stripe = types.ModuleType("stripe")
+        fake_stripe.checkout = types.SimpleNamespace(Session=_Session)  # type: ignore[attr-defined]
+        fake_stripe.api_key = None  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "stripe", fake_stripe)
+
+        resp = client.post(
+            "/billing/checkout",
+            headers=auth_headers,
+            json={
+                "plan_id": "team",
+                "billing_interval": "monthly",
+                "success_url": "http://localhost:5173/welcome?checkout=success",
+                "cancel_url": "http://localhost:5173/welcome",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["checkout_url"] == "https://checkout.stripe.test/cs_123"
+
+        assert captured["mode"] == "subscription"
+        assert captured["metadata"]["plan_id"] == "team"
+        assert captured["metadata"]["workspace_id"]
+        # The critical part: the subscription itself carries the same
+        # attribution, so the webhook can resolve the workspace.
+        assert captured["subscription_data"]["metadata"] == captured["metadata"]

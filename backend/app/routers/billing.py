@@ -326,26 +326,39 @@ def create_checkout_session(
             detail=f"No Stripe price configured for plan_id={plan_id} interval={interval}",
         )
 
+    # Validate BEFORE the try: these raise 400s that the blanket
+    # `except Exception` below would otherwise remap to a misleading 500.
+    success_url = _validate_redirect_url(body.success_url, "success_url")
+    cancel_url = _validate_redirect_url(body.cancel_url, "cancel_url")
+
     try:
         import stripe  # type: ignore
         stripe.api_key = stripe_key
 
+        # The webhook attributes `customer.subscription.*` events via the
+        # SUBSCRIPTION's metadata — and Stripe does NOT copy Checkout Session
+        # metadata onto the subscription it creates. Without
+        # `subscription_data.metadata` the created subscription arrives with
+        # empty metadata and _handle_subscription_event drops it, so the
+        # payment never registers on the workspace.
+        attribution = {
+            "company_id": company.id,
+            "workspace_id": company.id,
+            "plan_id": plan_id,
+            "billing_interval": interval,
+        }
         session_kwargs: dict = dict(
             customer_email=company.email,
             payment_method_types=["card"],
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=_validate_redirect_url(body.success_url, "success_url"),
-            cancel_url=_validate_redirect_url(body.cancel_url, "cancel_url"),
+            success_url=success_url,
+            cancel_url=cancel_url,
             # Billing address is required for B2B invoicing + VAT
             # determination; Stripe stores it on the customer/invoice.
             billing_address_collection="required",
-            metadata={
-                "company_id": company.id,
-                "workspace_id": company.id,
-                "plan_id": plan_id,
-                "billing_interval": interval,
-            },
+            metadata=attribution,
+            subscription_data={"metadata": attribution},
         )
         if settings.STRIPE_AUTOMATIC_TAX:
             session_kwargs["automatic_tax"] = {"enabled": True}
@@ -436,6 +449,11 @@ def create_credit_pack_checkout(
             detail=f"No Stripe price configured for {pack.id}",
         )
 
+    # Validate BEFORE the try — same reason as the subscription checkout:
+    # these 400s must not be remapped to 500 by the blanket except below.
+    success_url = _validate_redirect_url(body.success_url, "success_url")
+    cancel_url = _validate_redirect_url(body.cancel_url, "cancel_url")
+
     try:
         import stripe  # type: ignore
         stripe.api_key = stripe_key
@@ -451,8 +469,8 @@ def create_credit_pack_checkout(
             payment_method_types=["card"],
             mode="payment",  # one-time, not subscription
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=_validate_redirect_url(body.success_url, "success_url"),
-            cancel_url=_validate_redirect_url(body.cancel_url, "cancel_url"),
+            success_url=success_url,
+            cancel_url=cancel_url,
             billing_address_collection="required",
             metadata=pack_metadata,
             # Copy the workspace metadata onto the PaymentIntent (Stripe
