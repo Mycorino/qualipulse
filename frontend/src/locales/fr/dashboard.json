@@ -382,5 +382,102 @@
     "studyCount": "{{count}} études",
     "statusStale": "Obsolète",
     "staleHint": "Une étude de ce mémo a une analyse plus récente que le mémo. Générez un nouveau mémo pour l'inclure."
+  },
+  "hub": {
+    "nav": {
+      "aria": "Navigation du hub",
+      "homeAria": "Aller à vos études",
+      "search": "Rechercher…",
+      "studies": "Études",
+      "memos": "Mémos de décision",
+      "account": "Compte"
+    },
+    "credits": {
+      "left": "crédits restants",
+      "meterAria": "{{available}} crédits restants sur {{total}} cette période"
+    },
+    "subline": {
+      "collecting_one": "{{count}} étude en collecte",
+      "collecting_other": "{{count}} études en collecte",
+      "interviews_one": "{{count}} entretien terminé",
+      "interviews_other": "{{count}} entretiens terminés",
+      "responses_one": "{{count}} réponse au sondage",
+      "responses_other": "{{count}} réponses aux sondages",
+      "quiet": "Tout est calme — vos études sont prêtes."
+    },
+    "filters": {
+      "all": "Toutes",
+      "attention": "À traiter",
+      "collecting": "En collecte",
+      "complete": "Terminées"
+    },
+    "searchPlaceholder": "Filtrer les études…",
+    "view": {
+      "aria": "Disposition de la liste",
+      "table": "Vue tableau",
+      "cards": "Vue cartes"
+    },
+    "table": {
+      "study": "Étude",
+      "status": "Statut",
+      "evidence": "Données",
+      "next": "Prochaine étape"
+    },
+    "status": {
+      "draft": "Brouillon",
+      "collecting": "En collecte",
+      "ready": "Prête à analyser",
+      "complete": "Terminée"
+    },
+    "evidence": {
+      "interviews_one": "{{count}} entretien",
+      "interviews_other": "{{count}} entretiens",
+      "responses_one": "{{count}} réponse",
+      "responses_other": "{{count}} réponses"
+    },
+    "noMatch": {
+      "title": "Aucune étude ne correspond",
+      "sub": "Essayez un autre filtre ou terme de recherche.",
+      "cta": "Réinitialiser les filtres"
+    },
+    "stats": {
+      "title": "Espace de travail",
+      "studies_one": "étude",
+      "studies_other": "études",
+      "interviews_one": "entretien",
+      "interviews_other": "entretiens",
+      "responses_one": "réponse au sondage",
+      "responses_other": "réponses aux sondages",
+      "memos_one": "mémo de décision",
+      "memos_other": "mémos de décision"
+    },
+    "memoCard": {
+      "kicker": "Mémo de décision",
+      "studies_one": "{{count}} étude",
+      "studies_other": "{{count}} études",
+      "open": "Ouvrir le mémo",
+      "all": "Tous les mémos",
+      "generatingTitle": "Synthèse du mémo en cours…",
+      "generatingText": "Claude lit les analyses finales de vos études. Cela prend généralement moins d'une minute.",
+      "ctaText": "Au moins deux études ont des données. Synthétisez-les en un mémo prêt pour la décision.",
+      "ctaBtn": "Créer un mémo"
+    },
+    "palette": {
+      "aria": "Palette de commandes",
+      "placeholder": "Rechercher une étude, lancer une commande…",
+      "noResults": "Aucun résultat",
+      "group": {
+        "studies": "Études",
+        "actions": "Actions"
+      },
+      "newStudy": "Nouvelle étude",
+      "memos": "Voir les mémos de décision",
+      "account": "Paramètres du compte",
+      "hintReport": "rapport prêt",
+      "hintCounts": "{{interviews}} entr. · {{responses}} rép.",
+      "navigate": "naviguer",
+      "select": "ouvrir",
+      "close": "fermer"
+    }
   }
 }
