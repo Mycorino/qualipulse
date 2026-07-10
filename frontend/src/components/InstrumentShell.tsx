@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { QuantiTopBar } from "./QuantiTopBar";
+import { HubShell } from "./HubShell";
 import type { Crumb } from "./QuantiTopBar";
 import { InstrumentSubNav } from "./InstrumentSubNav";
 import type { InstrumentSection } from "./InstrumentSubNav";
@@ -28,8 +28,8 @@ interface InstrumentShellProps {
  * InstrumentShell — the single shared frame for every instrument page.
  *
  * Both a survey and an interview round render through this shell, so they
- * look and behave identically: one QuantiTopBar breadcrumb (the only
- * "where am I"), one header (name · status · actions), one local
+ * look and behave identically: the HubShell rail + one breadcrumb row (the
+ * only "where am I"), one header (name · status · actions), one local
  * segmented sub-nav. No instrument page supplies its own breadcrumb or
  * tab bar — that nested chrome is exactly what the navigation critique
  * flagged as confusing.
@@ -53,38 +53,38 @@ export function InstrumentShell({
   children,
 }: InstrumentShellProps) {
   return (
-    <div className="instrument-shell">
-      <QuantiTopBar crumbs={crumbs} />
-
-      <header className="instrument-header">
-        <div className="instrument-header__main">
-          <div className="instrument-header__eyebrow">{eyebrow}</div>
-          <div className="instrument-header__titlerow">
-            <h1 className="instrument-header__title">{title}</h1>
-            {status && (
-              <span
-                className={`instrument-header__status instrument-header__status--${
-                  status.tone ?? "neutral"
-                }`}
-              >
-                {status.label}
-              </span>
-            )}
+    <HubShell active="studies" crumbs={crumbs}>
+      <div className="instrument-shell">
+        <header className="instrument-header">
+          <div className="instrument-header__main">
+            <div className="instrument-header__eyebrow">{eyebrow}</div>
+            <div className="instrument-header__titlerow">
+              <h1 className="instrument-header__title">{title}</h1>
+              {status && (
+                <span
+                  className={`instrument-header__status instrument-header__status--${
+                    status.tone ?? "neutral"
+                  }`}
+                >
+                  {status.label}
+                </span>
+              )}
+            </div>
           </div>
+          {actions && <div className="instrument-header__actions">{actions}</div>}
+        </header>
+
+        <div className="instrument-shell__subnav-row">
+          <InstrumentSubNav
+            sections={sections}
+            active={activeSection}
+            onChange={onSectionChange}
+            ariaLabel={subNavLabel}
+          />
         </div>
-        {actions && <div className="instrument-header__actions">{actions}</div>}
-      </header>
 
-      <div className="instrument-shell__subnav-row">
-        <InstrumentSubNav
-          sections={sections}
-          active={activeSection}
-          onChange={onSectionChange}
-          ariaLabel={subNavLabel}
-        />
+        {children}
       </div>
-
-      {children}
-    </div>
+    </HubShell>
   );
 }

@@ -18,7 +18,7 @@ import { createSurvey } from "../api/surveys";
 import { createProject } from "../api/projects";
 import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
-import { QuantiTopBar } from "../components/QuantiTopBar";
+import { HubShell } from "../components/HubShell";
 
 /**
  * StudyOverview — `/studies/:id`.
@@ -97,28 +97,33 @@ export default function StudyOverview() {
 
   if (error) {
     return (
-      <div className="quanti-showcase">
-        <p className="quanti-showcase__section-meta">{error}</p>
-      </div>
+      <HubShell active="studies">
+        <div className="quanti-showcase">
+          <p className="quanti-showcase__section-meta">{error}</p>
+        </div>
+      </HubShell>
     );
   }
 
   if (!study) {
     return (
-      <div className="quanti-showcase">
-        <p className="quanti-showcase__section-meta">{t("overview.loading")}</p>
-      </div>
+      <HubShell active="studies">
+        <div className="quanti-showcase">
+          <p className="quanti-showcase__section-meta">{t("overview.loading")}</p>
+        </div>
+      </HubShell>
     );
   }
 
   return (
+    <HubShell
+      active="studies"
+      crumbs={[
+        { label: t("overview.studiesCrumb"), to: "/studies" },
+        { label: study.name },
+      ]}
+    >
     <div style={{ background: "var(--bg-base)", minHeight: "100vh" }}>
-      <QuantiTopBar
-        crumbs={[
-          { label: t("overview.studiesCrumb"), to: "/studies" },
-          { label: study.name },
-        ]}
-      />
       <header
         style={{
           padding: "var(--space-4) var(--space-6)",
@@ -222,6 +227,7 @@ export default function StudyOverview() {
         {tab === "report" && <ReportTab studyId={study.id} progress={study.progress} />}
       </main>
     </div>
+    </HubShell>
   );
 }
 

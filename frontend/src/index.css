@@ -14133,3 +14133,46 @@ select.field-input {
     transform: none;
   }
 }
+
+/* Breadcrumb row for inner pages rendered through HubShell. */
+.hub-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: var(--space-4) clamp(20px, 4vw, 48px) 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+.hub-crumbs__wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.hub-crumbs__sep {
+  padding: 0 5px;
+  color: var(--border-strong);
+}
+.hub-crumbs__item {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+.hub-crumbs__item[aria-current="page"] {
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+.hub-crumbs__item--link {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  padding: 2px 0;
+}
+.hub-crumbs__item--link:hover {
+  color: var(--brand-600);
+}

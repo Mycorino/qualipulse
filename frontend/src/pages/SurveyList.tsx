@@ -12,7 +12,7 @@ import {
 } from "../api/surveys";
 import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
-import { QuantiTopBar } from "../components/QuantiTopBar";
+import { HubShell } from "../components/HubShell";
 
 /**
  * SurveyList — minimal listing + create flow for the quanti track.
@@ -67,8 +67,10 @@ export default function SurveyList() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
-    <QuantiTopBar crumbs={[{ label: t("list.crumbStudies"), to: "/studies" }, { label: t("list.crumbSurveys") }]} />
+    <HubShell
+      active="studies"
+      crumbs={[{ label: t("list.crumbStudies"), to: "/studies" }, { label: t("list.crumbSurveys") }]}
+    >
     <div className="quanti-showcase" style={{ padding: "var(--space-10) var(--report-canvas-pad-x)" }}>
       <SurveyQuotaBanner />
       <header
@@ -174,6 +176,6 @@ export default function SurveyList() {
         )}
       </section>
     </div>
-    </div>
+    </HubShell>
   );
 }

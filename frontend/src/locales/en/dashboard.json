@@ -390,7 +390,8 @@
       "search": "Search…",
       "studies": "Studies",
       "memos": "Decision memos",
-      "account": "Account"
+      "account": "Account",
+      "breadcrumbAria": "Breadcrumb"
     },
     "credits": {
       "left": "credits left",

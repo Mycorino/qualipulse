@@ -1,30 +1,37 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { getMe, type CompanyResponse } from "../api/auth";
 import { getCreditUsage, type CreditUsage } from "../api/billing";
+import { listStudies, type StudySummary } from "../api/studies";
 import { useAuth } from "../hooks/useAuth";
 import { AccountMenu } from "./HeaderControls";
-import { personInitials } from "./QuantiTopBar";
+import { personInitials, type Crumb } from "./QuantiTopBar";
+import { CommandPalette } from "./CommandPalette";
 
 /**
  * HubShell — the research-hub app frame: dark navy left rail + content
- * canvas. Phase 1 of the hub redesign wraps only the Studies home;
- * other authenticated pages keep QuantiTopBar until they migrate.
+ * canvas. Every authenticated page renders through it (phase 2); the
+ * rail inherits the marketing page's emphasis surface so the app reads
+ * as the same product the landing page sells.
  *
- * The rail inherits the marketing page's emphasis surface
- * (`--surface-emphasis`) so the app reads as the same product the
- * landing page sells. Nav stays honest: only destinations that exist
- * (Studies, Decision memos, Account).
+ * The shell owns the ⌘K command palette, so any page gets the
+ * quick-switcher for free. Pages that already hold the studies list
+ * (StudyList) pass it in via `studies`; everywhere else the palette
+ * lazily fetches on first open. Palette actions route through URL
+ * affordances StudyList already honours (`/studies?new=1`,
+ * `/studies#decision-memos`) so behaviour is identical from any page.
  */
 
 interface HubShellProps {
-  /** Opens the command palette (rail search button). */
-  onSearch?: () => void;
-  /** Scrolls to / reveals the decision-memo section. */
-  onMemos?: () => void;
-  /** Memo count badge for the rail item; omit to hide. */
+  /** Which rail destination the current page belongs to. */
+  active?: "studies" | "account";
+  /** Optional breadcrumb row rendered at the top of the content area. */
+  crumbs?: Crumb[];
+  /** Preloaded studies (skips the palette's lazy fetch). */
+  studies?: StudySummary[] | null;
+  /** Ready-memo count badge for the rail item; omit to hide. */
   memoCount?: number;
   studyCount?: number;
   children: ReactNode;
@@ -56,17 +63,40 @@ function AccountGlyph() {
   );
 }
 
-export function HubShell({ onSearch, onMemos, memoCount, studyCount, children }: HubShellProps) {
+export function HubShell({
+  active = "studies",
+  crumbs,
+  studies,
+  memoCount,
+  studyCount,
+  children,
+}: HubShellProps) {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { t } = useTranslation("dashboard");
   const [me, setMe] = useState<CompanyResponse | null>(null);
   const [credits, setCredits] = useState<CreditUsage | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Palette data when the host page doesn't hold the studies list itself.
+  const [fetchedStudies, setFetchedStudies] = useState<StudySummary[] | null>(null);
 
   useEffect(() => {
     getMe().then(setMe).catch(() => setMe(null));
     getCreditUsage().then(setCredits).catch(() => setCredits(null));
   }, []);
+
+  const paletteStudies = studies !== undefined ? studies : fetchedStudies;
+
+  const openPalette = useCallback(() => {
+    setPaletteOpen(true);
+    if (studies === undefined && fetchedStudies === null) {
+      listStudies().then(setFetchedStudies).catch(() => setFetchedStudies([]));
+    }
+  }, [studies, fetchedStudies]);
+
+  const goMemos = useCallback(() => {
+    navigate("/studies#decision-memos");
+  }, [navigate]);
 
   const initial = me ? personInitials(me) : "?";
   const first = me?.first_name?.trim() || "";
@@ -97,33 +127,39 @@ export function HubShell({ onSearch, onMemos, memoCount, studyCount, children }:
           QualiPulse
         </button>
 
-        {onSearch && (
-          <button type="button" className="hub-rail__search" onClick={onSearch}>
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            {t("hub.nav.search")}
-            <kbd>⌘K</kbd>
-          </button>
-        )}
+        <button type="button" className="hub-rail__search" onClick={openPalette}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          {t("hub.nav.search")}
+          <kbd>⌘K</kbd>
+        </button>
 
         <nav className="hub-rail__nav" aria-label={t("hub.nav.aria")}>
-          <button type="button" className="hub-rail__item hub-rail__item--active" aria-current="page">
+          <button
+            type="button"
+            className={`hub-rail__item${active === "studies" ? " hub-rail__item--active" : ""}`}
+            aria-current={active === "studies" ? "page" : undefined}
+            onClick={() => navigate("/studies")}
+          >
             <StudiesGlyph />
             {t("hub.nav.studies")}
             {typeof studyCount === "number" && <span className="hub-rail__count">{studyCount}</span>}
           </button>
-          {onMemos && (
-            <button type="button" className="hub-rail__item" onClick={onMemos}>
-              <MemoGlyph />
-              {t("hub.nav.memos")}
-              {typeof memoCount === "number" && memoCount > 0 && (
-                <span className="hub-rail__count">{memoCount}</span>
-              )}
-            </button>
-          )}
-          <button type="button" className="hub-rail__item" onClick={() => navigate("/account")}>
+          <button type="button" className="hub-rail__item" onClick={goMemos}>
+            <MemoGlyph />
+            {t("hub.nav.memos")}
+            {typeof memoCount === "number" && memoCount > 0 && (
+              <span className="hub-rail__count">{memoCount}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            className={`hub-rail__item${active === "account" ? " hub-rail__item--active" : ""}`}
+            aria-current={active === "account" ? "page" : undefined}
+            onClick={() => navigate("/account")}
+          >
             <AccountGlyph />
             {t("hub.nav.account")}
           </button>
@@ -162,7 +198,50 @@ export function HubShell({ onSearch, onMemos, memoCount, studyCount, children }:
         </div>
       </aside>
 
-      <main className="hub-shell__main">{children}</main>
+      <main className="hub-shell__main">
+        {crumbs && crumbs.length > 0 && (
+          <nav className="hub-crumbs" aria-label={t("hub.nav.breadcrumbAria")}>
+            {crumbs.map((crumb, i) => {
+              const isLast = i === crumbs.length - 1;
+              return (
+                <span key={`${crumb.label}-${i}`} className="hub-crumbs__wrap">
+                  {i > 0 && (
+                    <span className="hub-crumbs__sep" aria-hidden="true">
+                      /
+                    </span>
+                  )}
+                  {crumb.to && !isLast ? (
+                    <button
+                      type="button"
+                      className="hub-crumbs__item hub-crumbs__item--link"
+                      onClick={() => navigate(crumb.to!)}
+                    >
+                      {crumb.label}
+                    </button>
+                  ) : (
+                    <span
+                      className="hub-crumbs__item"
+                      aria-current={isLast ? "page" : undefined}
+                    >
+                      {crumb.label}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </nav>
+        )}
+        {children}
+      </main>
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpen={openPalette}
+        onClose={() => setPaletteOpen(false)}
+        studies={paletteStudies}
+        onNewStudy={() => navigate("/studies?new=1")}
+        onMemos={goMemos}
+      />
     </div>
   );
 }

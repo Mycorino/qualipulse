@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
 import { SynthesisSummary, listSyntheses, openSynthesisMemoInNewTab } from "../api/synthesis";
@@ -9,7 +9,6 @@ import { DEMO_TOUR_DONE_KEY } from "../components/DemoTour";
 import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
-import { CommandPalette } from "../components/CommandPalette";
 import { AccountNudges } from "../components/AccountNudges";
 import { NewStudyModal } from "../components/NewStudyModal";
 import { NextActionChip } from "../components/NextActionChip";
@@ -169,10 +168,37 @@ export default function StudyList() {
   const [view, setView] = useState<HubView>(() =>
     localStorage.getItem(HUB_VIEW_KEY) === "cards" ? "cards" : "table",
   );
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const announce = useNudgeAnnounce(nudges);
+
+  // The shell's palette routes "New study" here as /studies?new=1 — react
+  // to the param appearing while mounted, then strip it so refresh/back
+  // doesn't reopen the picker.
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setPickerOpen(true);
+      setSearchParams(
+        (sp) => {
+          const next = new URLSearchParams(sp);
+          next.delete("new");
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [searchParams, setSearchParams]);
+
+  // The rail's "Decision memos" item lands on /studies#decision-memos from
+  // any page — scroll once the section has data to render.
+  useEffect(() => {
+    if (location.hash !== "#decision-memos" || studies === null) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("decision-memos")?.scrollIntoView({ behavior: "smooth" });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [location.hash, studies]);
 
   useEffect(() => {
     listStudies()
@@ -447,8 +473,8 @@ export default function StudyList() {
 
   return (
     <HubShell
-      onSearch={() => setPaletteOpen(true)}
-      onMemos={hasStudies && studies!.length >= 2 ? scrollToMemos : undefined}
+      active="studies"
+      studies={studies}
       memoCount={readyMemos.length}
       studyCount={studies?.length}
     >
@@ -709,15 +735,6 @@ export default function StudyList() {
           )}
         </div>
       </div>
-
-      <CommandPalette
-        open={paletteOpen}
-        onOpen={() => setPaletteOpen(true)}
-        onClose={() => setPaletteOpen(false)}
-        studies={studies}
-        onNewStudy={() => setPickerOpen(true)}
-        onMemos={hasStudies && studies!.length >= 2 ? scrollToMemos : undefined}
-      />
 
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
 
