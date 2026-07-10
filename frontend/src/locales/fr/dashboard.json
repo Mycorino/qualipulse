@@ -454,7 +454,8 @@
       "responses_one": "réponse au sondage",
       "responses_other": "réponses aux sondages",
       "memos_one": "mémo de décision",
-      "memos_other": "mémos de décision"
+      "memos_other": "mémos de décision",
+      "excludesDemo": "Hors étude de démonstration."
     },
     "memoCard": {
       "kicker": "Mémo de décision",

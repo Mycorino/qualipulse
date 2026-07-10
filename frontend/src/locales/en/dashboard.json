@@ -454,7 +454,8 @@
       "responses_one": "survey response",
       "responses_other": "survey responses",
       "memos_one": "decision memo",
-      "memos_other": "decision memos"
+      "memos_other": "decision memos",
+      "excludesDemo": "Excludes the demo study."
     },
     "memoCard": {
       "kicker": "Decision memo",

@@ -335,11 +335,16 @@ export default function StudyList() {
     });
   }, [rows, filter, query]);
 
-  // Workspace-level evidence totals exclude demo studies — the seeded
-  // showcase interviews/responses are a guided tour, not the researcher's
-  // own progress. Demo rows stay visible in the list, badged as demo.
+  // Workspace-level totals describe the researcher's OWN work, so they
+  // exclude the seeded showcase study entirely — study count and evidence
+  // alike. Counting the demo's études but not its interviews/responses
+  // (as it did before) reads as broken: "3 studies, 0 data" sitting above
+  // a visibly-completed demo showing 4 interviews / 44 responses. Demo rows
+  // stay visible in the list, badged, and still counted by the nav tabs.
+  const hasDemo = useMemo(() => (studies ?? []).some((s) => s.is_demo), [studies]);
   const totals = useMemo(
     () => ({
+      studies: rows.reduce((n, r) => n + (r.study.is_demo ? 0 : 1), 0),
       interviews: rows.reduce(
         (n, r) => n + (r.study.is_demo ? 0 : r.study.completed_interview_count),
         0,
@@ -694,8 +699,8 @@ export default function StudyList() {
                 <h3>{t("hub.stats.title")}</h3>
                 <div className="hub-stats">
                   <div>
-                    <strong>{studies!.length}</strong>
-                    <span>{t("hub.stats.studies", { count: studies!.length })}</span>
+                    <strong>{totals.studies}</strong>
+                    <span>{t("hub.stats.studies", { count: totals.studies })}</span>
                   </div>
                   <div>
                     <strong>{totals.interviews}</strong>
@@ -710,6 +715,7 @@ export default function StudyList() {
                     <span>{t("hub.stats.memos", { count: readyMemos.length })}</span>
                   </div>
                 </div>
+                {hasDemo && <p className="hub-stats__note">{t("hub.stats.excludesDemo")}</p>}
               </div>
 
               {highlightMemo ? (
