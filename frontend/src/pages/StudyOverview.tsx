@@ -675,6 +675,41 @@ function ReportTab({
             >
               {analysis.report.executive_summary}
             </p>
+            {analysis.report.verdict && (
+              <div
+                style={{
+                  marginTop: "var(--space-4)",
+                  background: "var(--brand-50)",
+                  borderLeft: "3px solid var(--brand-600)",
+                  padding: "var(--space-3) var(--space-4)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "var(--text-eyebrow)",
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--brand-700)",
+                    marginBottom: "var(--space-1)",
+                  }}
+                >
+                  {t("overview.report.verdict")}
+                </div>
+                <p
+                  style={{
+                    fontFamily: "var(--font-serif)",
+                    fontSize: "var(--text-md)",
+                    fontWeight: 500,
+                    lineHeight: 1.5,
+                    margin: 0,
+                    maxWidth: "62ch",
+                  }}
+                >
+                  {analysis.report.verdict}
+                </p>
+              </div>
+            )}
           </section>
 
           {/* Themes */}
@@ -698,6 +733,38 @@ function ReportTab({
               />
             ))}
           </section>
+
+          {/* Gaps — what the data cannot answer */}
+          {(analysis.report.gaps ?? []).length > 0 && (
+            <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+              <div
+                style={{
+                  fontSize: "var(--text-eyebrow)",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--text-tertiary)",
+                }}
+              >
+                {t("overview.report.gaps")}
+              </div>
+              {(analysis.report.gaps ?? []).map((gap, i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: "var(--warning-bg, var(--bg-sunken))",
+                    borderLeft: "3px solid var(--warning-text)",
+                    padding: "var(--space-3) var(--space-4)",
+                    fontSize: "var(--text-sm)",
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {gap}
+                </div>
+              ))}
+            </section>
+          )}
 
           {/* Methodology */}
           <section
@@ -925,6 +992,32 @@ function ThemeCard({
         )}
       </div>
 
+      {theme.counter_evidence && (
+        <div
+          style={{
+            background: "var(--warning-bg)",
+            borderLeft: "3px solid var(--warning-text)",
+            padding: "var(--space-3) var(--space-4)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "var(--text-eyebrow)",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--warning-text)",
+              marginBottom: "var(--space-1)",
+            }}
+          >
+            {t("overview.theme.counterEvidence")}
+          </div>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", margin: 0, lineHeight: 1.5 }}>
+            {theme.counter_evidence}
+          </p>
+        </div>
+      )}
+
       {validation && <ThemeValidationPanel validation={validation} />}
 
       {/* Recommendation footer */}
@@ -968,6 +1061,19 @@ function ThemeCard({
             }}
           >
             {theme.recommendation.rationale}
+          </p>
+        )}
+        {theme.recommendation.success_test && (
+          <p
+            style={{
+              fontSize: "var(--text-sm)",
+              color: "var(--text-secondary)",
+              marginTop: "var(--space-2)",
+              lineHeight: 1.5,
+            }}
+          >
+            <strong style={{ color: "var(--text-primary)" }}>{t("overview.theme.successTest")}</strong>{" "}
+            {theme.recommendation.success_test}
           </p>
         )}
       </footer>

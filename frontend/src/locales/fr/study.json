@@ -81,7 +81,9 @@
       "methodologyStats_responses": "{{count}} réponses",
       "methodologyStats_interview_one": "{{count}} entretien",
       "methodologyStats_interview_other": "{{count}} entretiens",
-      "metaSeparator": " · "
+      "metaSeparator": " · ",
+      "verdict": "Verdict",
+      "gaps": "Ce que nous ne savons pas encore"
     },
     "validationBanner": {
       "title": "Validation des thèmes · {{status}}",
@@ -105,7 +107,9 @@
       "n": "n={{count}}",
       "interviewEvidence": "Preuve d'entretien · {{xOfY}}",
       "overIndex": " · surreprésentation {{value}}×",
-      "segmentLabel": " · {{label}}"
+      "segmentLabel": " · {{label}}",
+      "counterEvidence": "Ce qui affaiblirait cette conclusion",
+      "successTest": "Test de réussite :"
     },
     "themeValidation": {
       "awaiting": "En attente des réponses de validation pour ce thème.",

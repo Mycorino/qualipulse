@@ -1054,8 +1054,11 @@ _STUDY_STRINGS = {
         "sec_essentials": "The essentials",
         "sec_evidence": "The evidence at a glance",
         "sec_theme": "Theme {i} · What the evidence says",
+        "sec_gaps": "What we don't know yet",
         "sec_methodology": "Methodology, limits & evidence index",
         "verdict_label": "Verdict",
+        "counter_label": "What would weaken this",
+        "success_label": "Success test",
         "stat_responses": "Completed survey responses",
         "stat_interviews": "Completed interviews",
         "stat_themes": "Quantified themes",
@@ -1115,8 +1118,11 @@ _STUDY_STRINGS = {
         "sec_essentials": "L'essentiel",
         "sec_evidence": "La preuve en un coup d'œil",
         "sec_theme": "Thème {i} · Ce que dit la preuve",
+        "sec_gaps": "Ce que nous ne savons pas encore",
         "sec_methodology": "Méthodologie, limites & index des preuves",
         "verdict_label": "Verdict",
+        "counter_label": "Ce qui affaiblirait cette conclusion",
+        "success_label": "Test de réussite",
         "stat_responses": "Réponses complètes au sondage",
         "stat_interviews": "Entretiens terminés",
         "stat_themes": "Thèmes quantifiés",
@@ -1261,6 +1267,15 @@ blockquote footer { font-size: 12px; color: var(--ink-2); }
   text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 4px; }
 .so-what p { font-size: 13.5px; margin: 0; }
 .so-what .rationale-line { color: var(--ink-2); font-size: 12.5px; margin-top: 4px; }
+.verdict-box { margin-top: 22px; }
+.counter-box { background: var(--copper-tint, #f7eee5); border-left: 3px solid var(--copper);
+  padding: 12px 16px; margin-bottom: 14px; max-width: 660px; }
+.counter-box .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--copper); display: block; margin-bottom: 4px; }
+.counter-box p { font-size: 13px; margin: 0; }
+.gaps { list-style: none; margin: 0; padding: 0; }
+.gaps li { border-left: 3px solid var(--amber); background: var(--amber-tint);
+  padding: 10px 16px; margin-bottom: 10px; font-size: 13.5px; max-width: 680px; }
 
 .method-note { font-size: 13.5px; max-width: 74ch; margin-bottom: 8px; }
 .contract { background: #f4f6f4; padding: 16px 20px; font-size: 13px; margin-top: 18px; max-width: 680px; }
@@ -1518,11 +1533,18 @@ def render_study_report_html(
         </div>"""
         for i, t in enumerate(themes)
     )
+    verdict_html = ""
+    if report.get("verdict"):
+        verdict_html = (
+            f'<div class="so-what verdict-box"><span class="lbl">{L["verdict_label"]}</span>'
+            f'<p><strong>{_esc(report["verdict"])}</strong></p></div>'
+        )
     essentials = f"""
     <section class="avoid-break">
       <div class="sec-head"><span class="sec-num num">1</span><span class="sec-title">{L["sec_essentials"]}</span></div>
       <p class="verdict">{_esc(report.get("executive_summary", ""))}</p>
       <div class="findings">{findings}</div>
+      {verdict_html}
     </section>
     """
 
@@ -1634,6 +1656,13 @@ def render_study_report_html(
                 f'<blockquote><p>«&nbsp;{_esc(ev["anchor_quote"])}&nbsp;»</p>{seg_line}</blockquote></div>'
             )
 
+        counter_html = ""
+        if theme.get("counter_evidence"):
+            counter_html = (
+                f'<div class="counter-box"><span class="lbl">{L["counter_label"]}</span>'
+                f'<p>{_esc(theme["counter_evidence"])}</p></div>'
+            )
+
         validation_html = ""
         if validation is not None:
             validation_html = _theme_validation_row(validation.per_theme.get(i), L)
@@ -1646,9 +1675,16 @@ def render_study_report_html(
                 if reco.get("rationale")
                 else ""
             )
+            success = (
+                f'<p class="rationale-line"><strong>{L["success_label"]}&nbsp;:</strong> {_esc(reco["success_test"])}</p>'
+                if reco.get("success_test") and lang == "fr"
+                else f'<p class="rationale-line"><strong>{L["success_label"]}:</strong> {_esc(reco["success_test"])}</p>'
+                if reco.get("success_test")
+                else ""
+            )
             reco_html = (
                 f'<div class="so-what"><span class="lbl">{kind_label}</span>'
-                f'<p><strong>{_esc(reco["action"])}</strong></p>{rationale}</div>'
+                f'<p><strong>{_esc(reco["action"])}</strong></p>{rationale}{success}</div>'
             )
 
         theme_sections.append(f"""
@@ -1657,10 +1693,25 @@ def render_study_report_html(
           <h2 class="theme-title">{_esc(theme.get("title", ""))}{_study_confidence_chip(theme.get("confidence", ""), L)}</h2>
           {_confidence_why(theme, L)}
           <div class="evidence-grid">{"".join(cols)}</div>
+          {counter_html}
           {validation_html}
           {reco_html}
         </section>
         """)
+
+    # ── gaps: what the data cannot answer ─────────────────────────────────
+    gaps = report.get("gaps") or []
+    next_sec = len(themes) + 3
+    gaps_section = ""
+    if gaps:
+        gap_items = "".join(f'<li class="avoid-break">{_esc(g)}</li>' for g in gaps)
+        gaps_section = f"""
+    <section class="avoid-break">
+      <div class="sec-head"><span class="sec-num num">{next_sec}</span><span class="sec-title">{L["sec_gaps"]}</span></div>
+      <ul class="gaps">{gap_items}</ul>
+    </section>
+    """
+        next_sec += 1
 
     # ── methodology + evidence index ──────────────────────────────────────
     contract_items = "".join(f"<li>{item}</li>" for item in L["contract_items"])
@@ -1695,7 +1746,7 @@ def render_study_report_html(
     methodology_note = report.get("methodology_note") or ""
     methodology = f"""
     <section>
-      <div class="sec-head"><span class="sec-num num">{len(themes) + 3}</span><span class="sec-title">{L["sec_methodology"]}</span></div>
+      <div class="sec-head"><span class="sec-num num">{next_sec}</span><span class="sec-title">{L["sec_methodology"]}</span></div>
       <p class="method-note">{_esc(methodology_note)}</p>
       <div class="contract avoid-break"><h4>{L["contract_title"]}</h4><ul>{contract_items}</ul></div>
       <div class="idx">{surveys_table}{interviews_table}</div>
@@ -1719,6 +1770,7 @@ def render_study_report_html(
 {essentials}
 {evidence}
 {"".join(theme_sections)}
+{gaps_section}
 {methodology}
 <footer class="doc-footer">
   <span><strong>QualiPulse</strong> · {_esc(company_name)}</span>

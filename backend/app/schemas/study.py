@@ -153,6 +153,9 @@ class ThemeRecommendation(BaseModel):
     kind: RecommendationKind
     action: str
     rationale: str | None = None
+    # Falsifiable outcome that would confirm the action worked (or prove it
+    # wrong). Optional so reports generated before this field keep validating.
+    success_test: str | None = None
 
 
 class QuantifiedTheme(BaseModel):
@@ -166,6 +169,9 @@ class QuantifiedTheme(BaseModel):
     title: str
     survey_signal: SurveySignal | None = None
     interview_evidence: InterviewEvidence | None = None
+    # Divergent voice or signal that cuts against the theme — honesty rule
+    # inherited from the qualitative analysis's disconfirming_evidence.
+    counter_evidence: str | None = None
     recommendation: ThemeRecommendation
     confidence: Confidence
 
@@ -174,7 +180,12 @@ class QuantifiedThemeReport(BaseModel):
     """The full report payload stored in `study_analyses.report`."""
 
     executive_summary: str
+    # Decision-oriented bottom line — answers the study's stated decision
+    # when one exists. Optional: pre-existing reports don't carry it.
+    verdict: str | None = None
     themes: list[QuantifiedTheme]
+    # What the data cannot answer (unmeasured effects, missing segments).
+    gaps: list[str] = Field(default_factory=list)
     methodology_note: str
     generated_with_survey_count: int = 0
     generated_with_response_count: int = 0
