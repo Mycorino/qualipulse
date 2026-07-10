@@ -144,6 +144,13 @@ export async function listAnalyses(studyId: string): Promise<StudyAnalysis[]> {
   return resp.data;
 }
 
+export async function fetchStudyReportHtml(studyId: string, analysisId: string): Promise<Blob> {
+  const { data } = await client.get(`/studies/${studyId}/analyses/${analysisId}/report.html`, {
+    responseType: "blob",
+  });
+  return data;
+}
+
 /* ── Sprint 14: Validation surveys ────────────────────────────── */
 
 export interface GeneratedValidationSurvey {

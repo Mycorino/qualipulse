@@ -9,6 +9,7 @@ import {
   ThemeValidationSnapshot,
   ValidationSummary,
   createValidationSurvey,
+  fetchStudyReportHtml,
   getLatestAnalysis,
   getStudy,
   getValidationSummary,
@@ -430,6 +431,7 @@ function ReportTab({
   // Sprint 14: per-analysis validation summary
   const [validation, setValidation] = useState<ValidationSummary | null>(null);
   const [spawningValidation, setSpawningValidation] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -464,6 +466,23 @@ function ReportTab({
       toast(detail, "error");
     } finally {
       setSpawningValidation(false);
+    }
+  };
+
+  // Server-rendered document export: the backend draws charts from the same
+  // aggregates the analysis used — no more printing the SPA with its chrome.
+  const onExportReport = async () => {
+    if (!analysis) return;
+    setExporting(true);
+    try {
+      const data = await fetchStudyReportHtml(studyId, analysis.id);
+      const url = URL.createObjectURL(new Blob([data], { type: "text/html" }));
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toast(t("overview.toast.exportReportFailed"), "error");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -583,10 +602,11 @@ function ReportTab({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => window.print()}
+              onClick={onExportReport}
+              disabled={exporting}
               title={t("overview.report.exportPdfTitle")}
             >
-              {t("overview.report.exportPdf")}
+              {exporting ? t("overview.report.exportPdfLoading") : t("overview.report.exportPdf")}
             </button>
           )}
           {!validation && analysis.status === "ready" && (
