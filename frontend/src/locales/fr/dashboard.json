@@ -390,7 +390,8 @@
       "search": "Rechercher…",
       "studies": "Études",
       "memos": "Mémos de décision",
-      "account": "Compte"
+      "account": "Compte",
+      "breadcrumbAria": "Fil d'Ariane"
     },
     "credits": {
       "left": "crédits restants",

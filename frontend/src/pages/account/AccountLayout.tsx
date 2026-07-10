@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import client from "../../api/client";
 import type { CompanyResponse } from "../../api/auth";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
+import { HubShell } from "../../components/HubShell";
 import {
   BillingStatus,
   Plan,
@@ -22,7 +23,6 @@ import {
  */
 export default function AccountLayout() {
   const { t, i18n } = useTranslation(["settings", "common"]);
-  const navigate = useNavigate();
   const [me, setMe] = useState<CompanyResponse | null>(null);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -71,14 +71,17 @@ export default function AccountLayout() {
 
   if (loading) {
     return (
-      <div className="dashboard-page">
-        <p className="muted-text">{t("common:loading")}</p>
-      </div>
+      <HubShell active="account">
+        <div className="dashboard-page">
+          <p className="muted-text">{t("common:loading")}</p>
+        </div>
+      </HubShell>
     );
   }
 
   if (loadError) {
     return (
+      <HubShell active="account">
       <div className="dashboard-page">
         <div style={{ maxWidth: 480, margin: "var(--space-16) auto", textAlign: "center" }}>
           <h2 style={{ marginBottom: "var(--space-4)" }}>
@@ -95,6 +98,7 @@ export default function AccountLayout() {
           </button>
         </div>
       </div>
+      </HubShell>
     );
   }
 
@@ -139,23 +143,13 @@ export default function AccountLayout() {
   const ctx: AccountOutletContext = { me, setMe, billing, plans, packs, reload: load };
 
   return (
+    <HubShell active="account">
     <div className="dashboard-page">
       <div style={{ maxWidth: "960px", margin: "0 auto" }}>
-        <div
-          className="dashboard-header"
-          style={{ background: "transparent", borderBottom: "none", padding: "16px 0", height: "auto" }}
-        >
-          <h2 className="logo" style={{ margin: 0 }}>QualiPulse</h2>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <LanguageSwitcher variant="light" />
-            <button className="btn btn-ghost" onClick={() => navigate("/dashboard")}>
-              ← {t("common:dashboard")}
-            </button>
-          </div>
-        </div>
-
-        {/* Compact identity row — replaces the oversized hub band. Detailed
-            account state now lives in the Account Home status cards. */}
+        {/* Compact identity row — the HubShell rail carries the wordmark,
+            nav and account menu; this row keeps who-am-I + plan badge and
+            the language toggle. Detailed account state lives in the
+            Account Home status cards. */}
         <section className="account-identity" aria-label={t("hubHeader.aria", "Account overview")}>
           <div className="account-identity__avatar" aria-hidden="true">{initials}</div>
           <div className="account-identity__text">
@@ -163,6 +157,9 @@ export default function AccountLayout() {
             <p className="account-identity__email">{me?.email}</p>
           </div>
           {billing && <span className={badgeClass}>{badgeText}</span>}
+          <span style={{ marginLeft: "auto" }}>
+            <LanguageSwitcher variant="light" />
+          </span>
         </section>
 
         <nav className="settings-tabs" aria-label={t("nav.aria", { defaultValue: "Account sections" })}>
@@ -181,5 +178,6 @@ export default function AccountLayout() {
         <Outlet context={ctx} />
       </div>
     </div>
+    </HubShell>
   );
 }
