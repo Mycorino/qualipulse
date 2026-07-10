@@ -56,3 +56,15 @@ export async function fetchSynthesisMemoHtml(id: string): Promise<Blob> {
   });
   return data;
 }
+
+/**
+ * Fetch a ready memo's print-ready HTML and open it in a new tab.
+ * Throws on fetch failure so callers can toast. The object URL is
+ * revoked after a minute — long enough for the tab to load.
+ */
+export async function openSynthesisMemoInNewTab(id: string): Promise<void> {
+  const data = await fetchSynthesisMemoHtml(id);
+  const url = URL.createObjectURL(new Blob([data], { type: "text/html" }));
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

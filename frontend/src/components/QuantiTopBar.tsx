@@ -12,7 +12,7 @@ import { AccountMenu } from "./HeaderControls";
  * falls back to a single name initial, then the email local-part, and
  * only uses the company name as a last resort.
  */
-function personInitials(me: CompanyResponse): string {
+export function personInitials(me: CompanyResponse): string {
   const first = me.first_name?.trim() || "";
   const last = me.last_name?.trim() || "";
   if (first && last) return (first[0] + last[0]).toUpperCase();

@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { StudySummary, listStudies } from "../api/studies";
-import { SynthesisSummary, listSyntheses } from "../api/synthesis";
+import { SynthesisSummary, listSyntheses, openSynthesisMemoInNewTab } from "../api/synthesis";
 import { listProjects } from "../api/projects";
 import { DEMO_TOUR_DONE_KEY } from "../components/DemoTour";
 import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { useToast } from "../components/Toast";
-import { QuantiTopBar } from "../components/QuantiTopBar";
+import { HubShell } from "../components/HubShell";
+import { CommandPalette } from "../components/CommandPalette";
 import { AccountNudges } from "../components/AccountNudges";
 import { NewStudyModal } from "../components/NewStudyModal";
 import { NextActionChip } from "../components/NextActionChip";
@@ -27,15 +28,15 @@ import { useNudgeAnnounce } from "../copilot/useNudgeAnnounce";
 /**
  * StudyList — `/studies`, and the post-login home.
  *
- * Sprint 17: this page replaced the old project-grid dashboard. One
- * list of all research efforts, each card tagged with its instrument
- * mix (survey-only / interview-only / hybrid) so the angle is
- * glanceable. A legacy interview project surfaces here as an
- * interview-only Study card — no migration the user notices.
+ * Hub redesign (this file): the flat card grid became a real workspace —
+ * navy rail (HubShell), quiet header, one next-best-action strip, a
+ * filterable/searchable studies list with a table ↔ card toggle, and a
+ * sidecar carrying workspace stats plus the latest decision memo. The
+ * visual language extends the marketing page: navy emphasis surfaces,
+ * the brand-strip accent, mono meta text.
  *
- * Studies are auto-created on first survey/project creation (Decision 8),
- * so there's no "create Study" CTA — the angle picker (Sprint 18) will
- * be the deliberate "+ New study" entry point.
+ * Studies are auto-created on first survey/project creation (Decision 8);
+ * "+ New study" opens the angle picker.
  */
 
 type InstrumentMix = "survey" | "interview" | "hybrid" | "empty";
@@ -129,6 +130,29 @@ const CARD_STATUS_KEY: Partial<Record<NbaActionType, string>> = {
   done: "reportReady",
 };
 
+/** Lifecycle pill per study, derived from the same deterministic resolver
+ *  that powers the NBA — one source of truth for "what state is this in". */
+type StudyStatus = "draft" | "collecting" | "ready" | "complete";
+
+const STATUS_BY_ACTION: Partial<Record<NbaActionType, StudyStatus>> = {
+  set_up_study: "draft",
+  collect_study: "collecting",
+  analyze_study: "ready",
+  done: "complete",
+};
+
+type StatusFilter = "all" | "attention" | "collecting" | "complete";
+type HubView = "table" | "cards";
+
+const HUB_VIEW_KEY = "hub_view_v1";
+
+interface StudyRow {
+  study: StudySummary;
+  mix: InstrumentMix;
+  action: NextAction;
+  status: StudyStatus;
+}
+
 export default function StudyList() {
   const { t } = useTranslation("dashboard");
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
@@ -140,6 +164,12 @@ export default function StudyList() {
   // feed the workspace NBA rungs + memo nudges.
   const [memos, setMemos] = useState<SynthesisSummary[] | null>(null);
   const [memoOpenSignal, setMemoOpenSignal] = useState(0);
+  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState<HubView>(() =>
+    localStorage.getItem(HUB_VIEW_KEY) === "cards" ? "cards" : "table",
+  );
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const announce = useNudgeAnnounce(nudges);
@@ -228,29 +258,224 @@ export default function StudyList() {
     );
   }, [studies, memos]);
 
+  const setViewPersisted = (v: HubView) => {
+    setView(v);
+    localStorage.setItem(HUB_VIEW_KEY, v);
+  };
+
+  const scrollToMemos = useCallback(() => {
+    document.getElementById("decision-memos")?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
   // The copilot's portfolio-triage suggestion — which study needs you.
   const runWorkspaceAction = (a: NextAction) => {
     if (a.actionType === "start_study") setPickerOpen(true);
     else if (a.actionType === "generate_memo" || a.actionType === "refresh_memo") {
       setMemoOpenSignal((n) => n + 1);
-      document.getElementById("decision-memos")?.scrollIntoView({ behavior: "smooth" });
+      scrollToMemos();
     } else if (a.targetId) navigate(`/studies/${a.targetId}`);
   };
 
+  const rows = useMemo<StudyRow[]>(() => {
+    return (studies ?? []).map((s) => {
+      const action = resolveStudySummaryAction(toNbaSummary(s));
+      return {
+        study: s,
+        mix: instrumentMix(s),
+        action,
+        status: STATUS_BY_ACTION[action.actionType] ?? "collecting",
+      };
+    });
+  }, [studies]);
+
+  const counts = useMemo(
+    () => ({
+      all: rows.length,
+      attention: rows.filter((r) => r.action.kind === "do").length,
+      collecting: rows.filter((r) => r.status === "collecting").length,
+      complete: rows.filter((r) => r.status === "complete").length,
+    }),
+    [rows],
+  );
+
+  const visibleRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (filter === "attention" && r.action.kind !== "do") return false;
+      if (filter === "collecting" && r.status !== "collecting") return false;
+      if (filter === "complete" && r.status !== "complete") return false;
+      if (q && !r.study.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [rows, filter, query]);
+
+  const totals = useMemo(
+    () => ({
+      interviews: rows.reduce((n, r) => n + r.study.completed_interview_count, 0),
+      responses: rows.reduce((n, r) => n + r.study.completed_response_count, 0),
+    }),
+    [rows],
+  );
+
+  const readyMemos = useMemo(
+    () =>
+      (memos ?? [])
+        .filter((m) => m.status === "ready")
+        .sort((a, b) => (b.generated_at ?? "").localeCompare(a.generated_at ?? "")),
+    [memos],
+  );
+  const generatingMemo = (memos ?? []).some((m) => m.status === "generating");
+  const highlightMemo = readyMemos[0] ?? null;
+
+  const openMemo = async (id: string) => {
+    try {
+      await openSynthesisMemoInNewTab(id);
+    } catch {
+      toast(t("decisionMemos.openError"), "error");
+    }
+  };
+
+  const evidenceLabel = (s: StudySummary) => {
+    const parts: string[] = [];
+    if (s.completed_interview_count > 0) {
+      parts.push(t("hub.evidence.interviews", { count: s.completed_interview_count }));
+    }
+    if (s.completed_response_count > 0) {
+      parts.push(t("hub.evidence.responses", { count: s.completed_response_count }));
+    }
+    return parts.length ? parts.join(" · ") : "—";
+  };
+
+  const openStudy = (id: string) => navigate(`/studies/${id}`);
+
+  const renderTable = () => (
+    <div className="hub-table-wrap">
+      <table className="hub-table">
+        <thead>
+          <tr>
+            <th>{t("hub.table.study")}</th>
+            <th>{t("hub.table.status")}</th>
+            <th>{t("hub.table.evidence")}</th>
+            <th className="hub-table__next-col">{t("hub.table.next")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRows.map(({ study: s, mix, action, status }) => (
+            <tr
+              key={s.id}
+              tabIndex={0}
+              onClick={() => openStudy(s.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") openStudy(s.id);
+              }}
+            >
+              <td className="hub-table__name">
+                {s.name}
+                <span className="hub-table__meta">
+                  <MixGlyph mix={mix} /> {t(`studyList.studyType.${mix}`).toLowerCase()}
+                </span>
+              </td>
+              <td>
+                <span className={`hub-status hub-status--${status}`}>
+                  {status === "collecting" && <i aria-hidden="true" />}
+                  {t(`hub.status.${status}`)}
+                </span>
+              </td>
+              <td className="hub-table__evidence">{evidenceLabel(s)}</td>
+              <td className="hub-table__next-col">
+                <span className={`hub-next-chip${action.kind === "do" ? " hub-next-chip--do" : ""}`}>
+                  {action.kind === "do" ? "✦ " : ""}
+                  {t(`studyList.status.${CARD_STATUS_KEY[action.actionType] ?? "inProgress"}`)}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const renderCards = () => (
+    <div className="quanti-showcase__grid-2">
+      {visibleRows.map(({ study: s, mix, action }) => {
+        const needsAttention = action.kind === "do";
+        return (
+          <a
+            key={s.id}
+            href={`/studies/${s.id}`}
+            className={`chart-card${needsAttention ? " chart-card--needs-attention" : ""}`}
+            style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+          >
+            <div
+              className="chart-card__eyebrow"
+              style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+            >
+              <MixGlyph mix={mix} />
+              <span>{t(`studyList.studyType.${mix}`)}</span>
+            </div>
+            <div className="chart-card__takeaway">{s.name}</div>
+            <div className="chart-card__footer tabular">
+              <span>{t("studyList.surveyCount", { count: s.survey_count })}</span>
+              <span className="chart-card__footer-divider">·</span>
+              <span>{t("studyList.interviewCount", { count: s.project_count })}</span>
+              <span className="chart-card__footer-divider">·</span>
+              <span className={needsAttention ? "study-card__status--attention" : undefined}>
+                {needsAttention ? "✦ " : ""}
+                {t(`studyList.status.${CARD_STATUS_KEY[action.actionType] ?? "inProgress"}`)}
+              </span>
+            </div>
+          </a>
+        );
+      })}
+    </div>
+  );
+
+  const renderSkeleton = () => (
+    <div className="hub-table-wrap" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="hub-skel-row">
+          <span className="hub-skel" style={{ width: "36%", height: 12 }} />
+          <span className="hub-skel" style={{ width: 72, height: 18, borderRadius: 999 }} />
+          <span className="hub-skel" style={{ width: 110, height: 10 }} />
+          <span className="hub-skel" style={{ width: 90, height: 10 }} />
+        </div>
+      ))}
+    </div>
+  );
+
+  const hasStudies = studies !== null && studies.length > 0;
+
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-base)" }}>
-      <QuantiTopBar crumbs={[{ label: t("studyList.crumb") }]} />
-      <div
-        className="quanti-showcase quanti-showcase--list"
-        style={{ padding: "var(--space-8) var(--report-canvas-pad-x)" }}
-      >
+    <HubShell
+      onSearch={() => setPaletteOpen(true)}
+      onMemos={hasStudies && studies!.length >= 2 ? scrollToMemos : undefined}
+      memoCount={readyMemos.length}
+      studyCount={studies?.length}
+    >
+      <div className="hub-canvas">
         <AccountNudges />
 
-        <header className="quanti-showcase__hero quanti-showcase__hero--bar">
-          <div className="quanti-showcase__hero-text">
-            <div className="quanti-showcase__eyebrow">{t("studyList.eyebrow")}</div>
-            <h1 className="quanti-showcase__title">{t("studyList.title")}</h1>
-            <p className="quanti-showcase__subtitle">{t("studyList.subtitle")}</p>
+        <header className="hub-head">
+          <div className="hub-head__text">
+            <div className="hub-head__eyebrow">{t("studyList.eyebrow")}</div>
+            <h1 className="hub-head__title">{t("studyList.title")}</h1>
+            <p className="hub-head__sub">
+              {hasStudies
+                ? [
+                    counts.collecting > 0
+                      ? t("hub.subline.collecting", { count: counts.collecting })
+                      : null,
+                    totals.interviews > 0
+                      ? t("hub.subline.interviews", { count: totals.interviews })
+                      : null,
+                    totals.responses > 0
+                      ? t("hub.subline.responses", { count: totals.responses })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || t("hub.subline.quiet")
+                : t("studyList.subtitle")}
+            </p>
           </div>
           <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
             {t("studyList.newStudy")}
@@ -261,10 +486,9 @@ export default function StudyList() {
           {announce}
         </div>
 
-        {studies && studies.length > 0 && (() => {
-          const readyMemos = (memos ?? []).filter((m) => m.status === "ready");
-          const nba = resolveWorkspaceNextAction(studies.map(toNbaSummary), {
-            eligibleStudyCount: studies.filter((s) => s.has_ready_analysis).length,
+        {hasStudies && (() => {
+          const nba = resolveWorkspaceNextAction(studies!.map(toNbaSummary), {
+            eligibleStudyCount: studies!.filter((s) => s.has_ready_analysis).length,
             readyMemoCount: readyMemos.length,
             staleMemoCount: readyMemos.filter((m) => m.stale).length,
           });
@@ -273,13 +497,10 @@ export default function StudyList() {
           // inline line so it doesn't out-shout the actual studies below.
           const quiet = nba.kind === "done" && nudges.length === 0;
           return (
-            <div className={`workspace-nba${quiet ? " workspace-nba--quiet" : ""}`}>
+            <div className={`workspace-nba hub-nba${quiet ? " workspace-nba--quiet" : ""}`}>
               <span className="workspace-nba__eyebrow">{t("studyList.copilotEyebrow")}</span>
               {nudges.map((n) => (
-                <div
-                  key={n.id}
-                  className={`copilot-nudge copilot-nudge--${n.tone}`}
-                >
+                <div key={n.id} className={`copilot-nudge copilot-nudge--${n.tone}`}>
                   <span className="copilot-nudge__text">{n.text}</span>
                   <button
                     type="button"
@@ -303,77 +524,200 @@ export default function StudyList() {
           );
         })()}
 
-        <section className="quanti-showcase__section">
-          {studies === null ? (
-            <p className="quanti-showcase__section-meta">{t("studyList.loading")}</p>
-          ) : studies.length === 0 ? (
-            <div
-              style={{
-                background: "var(--bg-surface)",
-                border: "1px dashed var(--border-default)",
-                borderRadius: "var(--radius-md)",
-                padding: "var(--space-8)",
-                textAlign: "center",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "var(--space-4)",
-              }}
-            >
-              <p style={{ color: "var(--text-secondary)", maxWidth: 520, margin: 0, lineHeight: 1.5 }}>
-                {t("studyList.emptyText")}
-              </p>
-              <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
-                {t("studyList.newStudy")}
-              </button>
-            </div>
-          ) : (
-            <div className="quanti-showcase__grid-2">
-              {studies.map((s) => {
-                const mix = instrumentMix(s);
-                const action = resolveStudySummaryAction(toNbaSummary(s));
-                const needsAttention = action.kind === "do";
-                return (
-                  <a
-                    key={s.id}
-                    href={`/studies/${s.id}`}
-                    className={`chart-card${needsAttention ? " chart-card--needs-attention" : ""}`}
-                    style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
+        <div className={`hub-grid${hasStudies ? "" : " hub-grid--single"}`}>
+          <div className="hub-main">
+            {hasStudies && (
+              <div className="hub-toolbar">
+                {(["all", "attention", "collecting", "complete"] as StatusFilter[]).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    className={`hub-fpill${filter === f ? " hub-fpill--active" : ""}`}
+                    aria-pressed={filter === f}
+                    onClick={() => setFilter(f)}
                   >
-                    <div
-                      className="chart-card__eyebrow"
-                      style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+                    {t(`hub.filters.${f}`)} <span className="hub-fpill__n">{counts[f]}</span>
+                  </button>
+                ))}
+                <div className="hub-toolbar__right">
+                  <div className="hub-search">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={t("hub.searchPlaceholder")}
+                      aria-label={t("hub.searchPlaceholder")}
+                    />
+                  </div>
+                  <div className="hub-viewtoggle" role="group" aria-label={t("hub.view.aria")}>
+                    <button
+                      type="button"
+                      className={view === "table" ? "hub-viewtoggle--active" : undefined}
+                      aria-label={t("hub.view.table")}
+                      aria-pressed={view === "table"}
+                      onClick={() => setViewPersisted("table")}
                     >
-                      <MixGlyph mix={mix} />
-                      <span>{t(`studyList.studyType.${mix}`)}</span>
-                    </div>
-                    <div className="chart-card__takeaway">{s.name}</div>
-                    <div className="chart-card__footer tabular">
-                      <span>{t("studyList.surveyCount", { count: s.survey_count })}</span>
-                      <span className="chart-card__footer-divider">·</span>
-                      <span>{t("studyList.interviewCount", { count: s.project_count })}</span>
-                      <span className="chart-card__footer-divider">·</span>
-                      <span className={needsAttention ? "study-card__status--attention" : undefined}>
-                        {needsAttention ? "✦ " : ""}
-                        {t(`studyList.status.${CARD_STATUS_KEY[action.actionType] ?? "inProgress"}`)}
-                      </span>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
-          )}
-        </section>
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className={view === "cards" ? "hub-viewtoggle--active" : undefined}
+                      aria-label={t("hub.view.cards")}
+                      aria-pressed={view === "cards"}
+                      onClick={() => setViewPersisted("cards")}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <rect x="2.5" y="2.5" width="4.6" height="4.6" rx="1.2" stroke="currentColor" strokeWidth="1.3" />
+                        <rect x="8.9" y="2.5" width="4.6" height="4.6" rx="1.2" stroke="currentColor" strokeWidth="1.3" />
+                        <rect x="2.5" y="8.9" width="4.6" height="4.6" rx="1.2" stroke="currentColor" strokeWidth="1.3" />
+                        <rect x="8.9" y="8.9" width="4.6" height="4.6" rx="1.2" stroke="currentColor" strokeWidth="1.3" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
-        {studies !== null && (
-          <DecisionMemoSection
-            studies={studies}
-            memos={memos}
-            onRefresh={refreshMemos}
-            openSignal={memoOpenSignal}
-          />
-        )}
+            {studies === null ? (
+              renderSkeleton()
+            ) : studies.length === 0 ? (
+              <div
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px dashed var(--border-default)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "var(--space-8)",
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "var(--space-4)",
+                }}
+              >
+                <p style={{ color: "var(--text-secondary)", maxWidth: 520, margin: 0, lineHeight: 1.5 }}>
+                  {t("studyList.emptyText")}
+                </p>
+                <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
+                  {t("studyList.newStudy")}
+                </button>
+              </div>
+            ) : visibleRows.length === 0 ? (
+              <div className="hub-nomatch">
+                <h3>{t("hub.noMatch.title")}</h3>
+                <p>{t("hub.noMatch.sub")}</p>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setFilter("all");
+                    setQuery("");
+                  }}
+                >
+                  {t("hub.noMatch.cta")}
+                </button>
+              </div>
+            ) : view === "table" ? (
+              renderTable()
+            ) : (
+              renderCards()
+            )}
+
+            {studies !== null && (
+              <DecisionMemoSection
+                studies={studies}
+                memos={memos}
+                onRefresh={refreshMemos}
+                openSignal={memoOpenSignal}
+              />
+            )}
+          </div>
+
+          {hasStudies && (
+            <aside className="hub-sidecar">
+              <div className="hub-panel">
+                <h3>{t("hub.stats.title")}</h3>
+                <div className="hub-stats">
+                  <div>
+                    <strong>{studies!.length}</strong>
+                    <span>{t("hub.stats.studies", { count: studies!.length })}</span>
+                  </div>
+                  <div>
+                    <strong>{totals.interviews}</strong>
+                    <span>{t("hub.stats.interviews", { count: totals.interviews })}</span>
+                  </div>
+                  <div>
+                    <strong>{totals.responses}</strong>
+                    <span>{t("hub.stats.responses", { count: totals.responses })}</span>
+                  </div>
+                  <div>
+                    <strong>{readyMemos.length}</strong>
+                    <span>{t("hub.stats.memos", { count: readyMemos.length })}</span>
+                  </div>
+                </div>
+              </div>
+
+              {highlightMemo ? (
+                <div className="hub-memo">
+                  <div className="hub-memo__kicker">
+                    {t("hub.memoCard.kicker")} · {t("hub.memoCard.studies", { count: highlightMemo.study_count })}
+                  </div>
+                  <h3>{highlightMemo.name}</h3>
+                  {highlightMemo.decision_question && <p>{highlightMemo.decision_question}</p>}
+                  {highlightMemo.stale && (
+                    <span className="hub-memo__stale" title={t("decisionMemos.staleHint")}>
+                      {t("decisionMemos.statusStale")}
+                    </span>
+                  )}
+                  <div className="hub-memo__actions">
+                    <button type="button" className="hub-memo__cta" onClick={() => openMemo(highlightMemo.id)}>
+                      {t("hub.memoCard.open")} →
+                    </button>
+                    <button type="button" className="hub-memo__all" onClick={scrollToMemos}>
+                      {t("hub.memoCard.all")}
+                    </button>
+                  </div>
+                </div>
+              ) : generatingMemo ? (
+                <div className="hub-memo">
+                  <div className="hub-memo__kicker">{t("hub.memoCard.kicker")}</div>
+                  <h3>{t("hub.memoCard.generatingTitle")}</h3>
+                  <p>{t("hub.memoCard.generatingText")}</p>
+                </div>
+              ) : studies!.length >= 2 ? (
+                <div className="hub-panel hub-panel--memo-cta">
+                  <h3>{t("hub.memoCard.kicker")}</h3>
+                  <p>{t("hub.memoCard.ctaText")}</p>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      setMemoOpenSignal((n) => n + 1);
+                      scrollToMemos();
+                    }}
+                  >
+                    {t("hub.memoCard.ctaBtn")}
+                  </button>
+                </div>
+              ) : null}
+            </aside>
+          )}
+        </div>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpen={() => setPaletteOpen(true)}
+        onClose={() => setPaletteOpen(false)}
+        studies={studies}
+        onNewStudy={() => setPickerOpen(true)}
+        onMemos={hasStudies && studies!.length >= 2 ? scrollToMemos : undefined}
+      />
 
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
 
@@ -395,6 +739,6 @@ export default function StudyList() {
           }}
         />
       )}
-    </div>
+    </HubShell>
   );
 }

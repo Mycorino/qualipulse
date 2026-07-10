@@ -382,5 +382,102 @@
     "studyCount": "{{count}} studies",
     "statusStale": "Out of date",
     "staleHint": "A study in this memo has a newer analysis than the memo. Generate a new memo to include it."
+  },
+  "hub": {
+    "nav": {
+      "aria": "Hub navigation",
+      "homeAria": "Go to your studies",
+      "search": "Search…",
+      "studies": "Studies",
+      "memos": "Decision memos",
+      "account": "Account"
+    },
+    "credits": {
+      "left": "credits left",
+      "meterAria": "{{available}} of {{total}} credits left this period"
+    },
+    "subline": {
+      "collecting_one": "{{count}} study collecting",
+      "collecting_other": "{{count}} studies collecting",
+      "interviews_one": "{{count}} completed interview",
+      "interviews_other": "{{count}} completed interviews",
+      "responses_one": "{{count}} survey response",
+      "responses_other": "{{count}} survey responses",
+      "quiet": "All quiet — your studies are set up and waiting."
+    },
+    "filters": {
+      "all": "All",
+      "attention": "Needs attention",
+      "collecting": "Collecting",
+      "complete": "Complete"
+    },
+    "searchPlaceholder": "Filter studies…",
+    "view": {
+      "aria": "List layout",
+      "table": "Table view",
+      "cards": "Card view"
+    },
+    "table": {
+      "study": "Study",
+      "status": "Status",
+      "evidence": "Evidence",
+      "next": "Next step"
+    },
+    "status": {
+      "draft": "Draft",
+      "collecting": "Collecting",
+      "ready": "Ready to analyse",
+      "complete": "Complete"
+    },
+    "evidence": {
+      "interviews_one": "{{count}} interview",
+      "interviews_other": "{{count}} interviews",
+      "responses_one": "{{count}} response",
+      "responses_other": "{{count}} responses"
+    },
+    "noMatch": {
+      "title": "No studies match",
+      "sub": "Try a different filter or search term.",
+      "cta": "Clear filters"
+    },
+    "stats": {
+      "title": "Workspace",
+      "studies_one": "study",
+      "studies_other": "studies",
+      "interviews_one": "interview",
+      "interviews_other": "interviews",
+      "responses_one": "survey response",
+      "responses_other": "survey responses",
+      "memos_one": "decision memo",
+      "memos_other": "decision memos"
+    },
+    "memoCard": {
+      "kicker": "Decision memo",
+      "studies_one": "{{count}} study",
+      "studies_other": "{{count}} studies",
+      "open": "Open memo",
+      "all": "All memos",
+      "generatingTitle": "Synthesising your memo…",
+      "generatingText": "Claude is reading your studies' final analyses. This usually takes under a minute.",
+      "ctaText": "Two or more studies have evidence. Synthesise them into one decision-ready memo.",
+      "ctaBtn": "Create a memo"
+    },
+    "palette": {
+      "aria": "Command palette",
+      "placeholder": "Search studies, run a command…",
+      "noResults": "No matches",
+      "group": {
+        "studies": "Studies",
+        "actions": "Actions"
+      },
+      "newStudy": "New study",
+      "memos": "Go to decision memos",
+      "account": "Account settings",
+      "hintReport": "report ready",
+      "hintCounts": "{{interviews}} int · {{responses}} resp",
+      "navigate": "navigate",
+      "select": "select",
+      "close": "close"
+    }
   }
 }

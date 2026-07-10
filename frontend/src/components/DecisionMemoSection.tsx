@@ -6,7 +6,7 @@ import {
   SynthesisSummary,
   createSynthesis,
   deleteSynthesis,
-  fetchSynthesisMemoHtml,
+  openSynthesisMemoInNewTab,
 } from "../api/synthesis";
 import { useToast } from "./Toast";
 
@@ -96,10 +96,7 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
 
   async function handleOpen(id: string) {
     try {
-      const data = await fetchSynthesisMemoHtml(id);
-      const url = URL.createObjectURL(new Blob([data], { type: "text/html" }));
-      window.open(url, "_blank", "noopener");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await openSynthesisMemoInNewTab(id);
     } catch {
       toast(t("decisionMemos.openError"), "error");
     }
