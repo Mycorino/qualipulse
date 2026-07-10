@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom"
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { getErrorMessage } from "../utils/errorMessages";
+import { openHtmlDocument } from "../utils/openHtmlDocument";
 import { SkeletonTable } from "../components/Skeleton";
 import { AudioClip } from "../components/AudioClip";
 import { InstrumentShell } from "../components/InstrumentShell";
@@ -583,10 +584,7 @@ export default function ProjectDetail() {
 
   async function handleExportReport() {
     try {
-      const data = await fetchAnalysisReportHtml(id!);
-      const url = URL.createObjectURL(new Blob([data], { type: "text/html" }));
-      window.open(url, "_blank", "noopener");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await openHtmlDocument(() => fetchAnalysisReportHtml(id!), "findings-report.html");
     } catch {
       toast(tAnalysis("exportReportError"), "error");
     }
