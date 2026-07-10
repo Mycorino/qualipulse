@@ -100,6 +100,30 @@ def _register_auth_success(db: Session, company: Company) -> None:
         db.commit()
 
 
+def _track_affiliate_signup(db: Session, company: Company, ref_code: str | None) -> None:
+    """Attribute a new signup to an active affiliate, if a valid code came along.
+
+    Guards: normalises the code (URLs arrive with stray whitespace/case) and
+    refuses self-referrals — an affiliate signing up through their own link
+    must not earn commission on their own subscription.
+    """
+    code = (ref_code or "").strip().lower()
+    if not code:
+        return
+    affiliate = db.query(Affiliate).filter(Affiliate.code == code).first()
+    if not affiliate or affiliate.status != "active":
+        return
+    if affiliate.email.lower() == company.email.lower():
+        logger.info("Self-referral ignored: %s", affiliate.code)
+        return
+    db.add(AffiliateReferral(
+        affiliate_id=affiliate.id,
+        referred_company_id=company.id,
+    ))
+    db.commit()
+    logger.info("Affiliate referral tracked: %s -> %s", affiliate.code, company.email)
+
+
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("10/minute")
 def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
@@ -191,25 +215,7 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
         # but the import itself shouldn't be allowed to break signup.
         logger.exception("signup prefetch failed to schedule")
 
-    # Check for affiliate referral code (from query params or body)
-    ref_code = None
-    if hasattr(body, "ref_code") and body.ref_code:
-        ref_code = body.ref_code
-    else:
-        # Try to get from query params
-        ref_code = request.query_params.get("ref") if hasattr(request, "query_params") else None
-
-    if ref_code:
-        affiliate = db.query(Affiliate).filter(Affiliate.code == ref_code.lower()).first()
-        if affiliate and affiliate.status == "active":
-            # Create affiliate referral
-            referral = AffiliateReferral(
-                affiliate_id=affiliate.id,
-                referred_company_id=company.id,
-            )
-            db.add(referral)
-            db.commit()
-            logger.info("Affiliate referral tracked: %s -> %s", affiliate.code, company.email)
+    _track_affiliate_signup(db, company, getattr(body, "ref_code", None))
 
     # Create email verification token
     verification_token = EmailVerificationToken(
@@ -1360,6 +1366,7 @@ def google_login(
     request: Request,
     next: str = "/dashboard",
     lang: str = "",
+    ref: str = "",
 ):
     """Return the Google authorization URL the frontend should redirect to."""
     if not _google_configured():
@@ -1372,8 +1379,11 @@ def google_login(
     # off-site through the state parameter.
     safe_next = next if next.startswith("/") and not next.startswith("//") else "/dashboard"
     safe_lang = lang.strip().lower()[:2] if lang else ""
+    # Carry the affiliate referral code through the OAuth round-trip — the
+    # signed state is the only thing that survives the Google redirect.
+    safe_ref = ref.strip().lower()[:50] if ref else ""
 
-    state = _encode_oauth_state({"next": safe_next, "lang": safe_lang})
+    state = _encode_oauth_state({"next": safe_next, "lang": safe_lang, "ref": safe_ref})
 
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -1505,6 +1515,7 @@ def google_callback(
         db.commit()
         db.refresh(company)
         logger.info("New Google signup: %s", company.email)
+        _track_affiliate_signup(db, company, state_payload.get("ref"))
     else:
         # Link Google to existing account (idempotent) and trust Google's
         # verified flag to mark the email as verified if it wasn't already.

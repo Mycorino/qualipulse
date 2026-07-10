@@ -5,6 +5,7 @@ import { useHead } from "../hooks/useHead";
 import { signup, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
+import { captureRefFromUrl, clearStoredRefCode, getStoredRefCode } from "../utils/referral";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
@@ -42,7 +43,9 @@ export default function Signup() {
     setError("");
     setGoogleLoading(true);
     try {
-      const url = await getGoogleAuthorizeUrl("/welcome", i18n.language);
+      // The OAuth round-trip loses query params and localStorage isn't
+      // readable server-side, so the referral code rides in the signed state.
+      const url = await getGoogleAuthorizeUrl("/welcome", i18n.language, getStoredRefCode() ?? "");
       window.location.href = url;
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("login.googleError")));
@@ -56,14 +59,16 @@ export default function Signup() {
   // Plan chosen on landing page (?plan=exploration|team|agency, ?interval=monthly|annual)
   const selectedPlan = searchParams.get("plan") ?? undefined;
   const selectedInterval = searchParams.get("interval") ?? undefined;
-  const refCode = searchParams.get("ref") ?? undefined;
 
   // Stash the pricing-page choice so later checkout surfaces (paywall,
   // billing) can preselect it. localStorage survives the Google OAuth
-  // round-trip, which loses query params.
+  // round-trip, which loses query params. Same for the affiliate referral
+  // code — it usually lands on the marketing page, not here, so signup
+  // reads the persisted copy rather than its own URL.
   useEffect(() => {
     if (selectedPlan) localStorage.setItem("qp_selected_plan", selectedPlan);
     if (selectedInterval) localStorage.setItem("qp_selected_interval", selectedInterval);
+    captureRefFromUrl();
   }, [selectedPlan, selectedInterval]);
 
   async function handleSubmit(e: FormEvent) {
@@ -105,11 +110,12 @@ export default function Signup() {
       const uiLang = (i18n.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en";
       const res = await signup(trimmedCompany, trimmedEmail, password, {
         plan: selectedPlan,
-        refCode,
+        refCode: getStoredRefCode(),
         preferredLanguage: uiLang,
         firstName: trimmedFirst,
         lastName: trimmedLast,
       });
+      clearStoredRefCode();
       saveToken(res.access_token, res.refresh_token);
       setCachedOnboarded(false);
       toast(t("signup.accountCreated"), "success");

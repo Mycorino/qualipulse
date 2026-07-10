@@ -1,7 +1,7 @@
 {
   "apply": {
     "title": "Become a QualiPulse affiliate",
-    "subtitle": "Earn up to 20% recurring commission on referrals",
+    "subtitle": "Earn up to 20% commission on your referrals' first payment",
     "nameLabel": "Your name",
     "required": "*",
     "emailLabel": "Email",
@@ -26,14 +26,16 @@
   },
   "login": {
     "title": "Affiliate sign in",
-    "subtitle": "Access your affiliate dashboard",
+    "subtitle": "Enter your email and we'll send you a sign-in link — no password needed",
     "emailLabel": "Email",
-    "codeLabel": "Affiliate code",
-    "signIn": "Sign in",
-    "signingIn": "Signing in…",
+    "sendLink": "Email me a sign-in link",
+    "sendingLink": "Sending…",
+    "linkSent": "Check your inbox — if an active affiliate account exists for this email, a sign-in link is on its way.",
+    "verifying": "Signing you in…",
+    "failedLogin": "Could not send the sign-in link. Please try again.",
+    "magicFailed": "This sign-in link is invalid or has expired. Request a new one below.",
     "noAccount": "Don't have an account?",
-    "applyHere": "Apply here",
-    "failedLogin": "Invalid email or affiliate code."
+    "applyHere": "Apply here"
   },
   "dashboard": {
     "title": "Affiliate dashboard",

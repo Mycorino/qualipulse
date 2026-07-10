@@ -48,7 +48,9 @@ def require_admin(
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin key required")
     token = authorization[len("Bearer "):]
-    if not hmac.compare_digest(token, settings.ADMIN_SECRET_KEY):
+    # Compare bytes, not str — compare_digest raises TypeError (→ 500) on
+    # non-ASCII str input, and a crafted header shouldn't crash the guard.
+    if not hmac.compare_digest(token.encode("utf-8"), settings.ADMIN_SECRET_KEY.encode("utf-8")):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin key")
     return (x_admin_identity or "unknown").strip()[:100]
 
@@ -147,22 +149,39 @@ class AuditLogEntry(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
-    project_count = db.query(func.count(Project.id)).filter(
-        Project.company_id == company.id
-    ).scalar() or 0
-
-    completed_count = (
-        db.query(func.count(Participant.id))
-        .join(Project, Participant.project_id == Project.id)
-        .filter(Project.company_id == company.id, Participant.status == "completed")
-        .scalar() or 0
+def _batch_user_stats(db: Session, company_ids: list[str]) -> dict[str, tuple[int, int, Optional[datetime]]]:
+    """(project_count, completed_interviews, last_project_at) per company —
+    two grouped queries total, however many rows the page holds."""
+    if not company_ids:
+        return {}
+    stats: dict[str, tuple[int, int, Optional[datetime]]] = {}
+    project_rows = (
+        db.query(Project.company_id, func.count(Project.id), func.max(Project.created_at))
+        .filter(Project.company_id.in_(company_ids))
+        .group_by(Project.company_id)
+        .all()
     )
+    completed_rows = dict(
+        db.query(Project.company_id, func.count(Participant.id))
+        .join(Participant, Participant.project_id == Project.id)
+        .filter(Project.company_id.in_(company_ids), Participant.status == "completed")
+        .group_by(Project.company_id)
+        .all()
+    )
+    for company_id, project_count, last_project_at in project_rows:
+        stats[company_id] = (
+            int(project_count or 0),
+            int(completed_rows.get(company_id, 0)),
+            last_project_at,
+        )
+    return stats
 
-    last_project_at = db.query(func.max(Project.created_at)).filter(
-        Project.company_id == company.id
-    ).scalar()
 
+def _user_summary_from_stats(
+    company: Company,
+    stats: dict[str, tuple[int, int, Optional[datetime]]],
+) -> AdminUserSummary:
+    project_count, completed_count, last_project_at = stats.get(company.id, (0, 0, None))
     return AdminUserSummary(
         id=company.id,
         name=company.name,
@@ -180,6 +199,10 @@ def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
         suspended_at=company.suspended_at,
         suspension_reason=company.suspension_reason,
     )
+
+
+def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
+    return _user_summary_from_stats(company, _batch_user_stats(db, [company.id]))
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -206,7 +229,8 @@ def list_users(
     q = q.order_by(Company.created_at.desc())
     offset = (page - 1) * limit
     companies = q.offset(offset).limit(limit).all()
-    return [_build_user_summary(c, db) for c in companies]
+    stats = _batch_user_stats(db, [c.id for c in companies])
+    return [_user_summary_from_stats(c, stats) for c in companies]
 
 
 @router.get("/users/{company_id}", response_model=AdminUserDetail)
@@ -263,7 +287,9 @@ def update_tier(
 
     old_tier = company.subscription_tier
     company.subscription_tier = body.tier
-    company.subscription_status = "active"
+    # Deliberately leave subscription_status alone — forcing "active" here
+    # used to mask real Stripe states (past_due / canceled) until the next
+    # webhook overwrote it again.
     db.commit()
     db.refresh(company)
 
@@ -350,7 +376,25 @@ def adjust_credits(
     if body.credits_delta > 0:
         balance.purchased_credits = (balance.purchased_credits or 0) + body.credits_delta
     else:
-        balance.used_credits = (balance.used_credits or 0) + abs(body.credits_delta)
+        # Clawback: shrink the grant buckets (purchased → rollover → included)
+        # rather than inflating used_credits. Inflated usage gets attributed
+        # to buckets at period rollover, which would let clawed-back purchased
+        # credits resurrect in the next period's rollover grant.
+        remaining = abs(body.credits_delta)
+        for bucket in ("purchased_credits", "rollover_credits", "included_credits"):
+            take = min(getattr(balance, bucket) or 0, remaining)
+            setattr(balance, bucket, (getattr(balance, bucket) or 0) - take)
+            remaining -= take
+            if remaining == 0:
+                break
+        if remaining:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot remove {abs(body.credits_delta)} credits; only "
+                    f"{abs(body.credits_delta) - remaining} granted credits remain this period."
+                ),
+            )
     balance.updated_at = datetime.utcnow()
 
     db.add(
@@ -413,6 +457,19 @@ def delete_user(
         company.id, email_snapshot, name_snapshot, admin_id,
         datetime.utcnow().isoformat(),
     )
+
+    # Research plans have no ondelete on their FKs (company_id, step→project_id),
+    # so Postgres would refuse the company/project deletes below if any rows
+    # exist. Steps go first (they reference both plans and projects).
+    from app.models.research_plan import ResearchPlan, ResearchPlanStep
+
+    plan_ids = [
+        row[0]
+        for row in db.query(ResearchPlan.id).filter(ResearchPlan.company_id == company_id).all()
+    ]
+    if plan_ids:
+        db.execute(sql_delete(ResearchPlanStep).where(ResearchPlanStep.plan_id.in_(plan_ids)))
+        db.execute(sql_delete(ResearchPlan).where(ResearchPlan.id.in_(plan_ids)))
 
     project_ids = [
         row[0]
@@ -680,10 +737,6 @@ def get_audit_log(
 def _costs_report(db: Session, company_id: str | None = None) -> dict:
     now = datetime.utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    base_q = db.query(AIUsageLog)
-    if company_id is not None:
-        base_q = base_q.filter(AIUsageLog.company_id == company_id)
 
     total_cost = db.query(func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0))
     if company_id is not None:

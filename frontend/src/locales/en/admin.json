@@ -87,7 +87,9 @@
     "participants_other": "{{count}} participants",
     "prev": "Previous",
     "next": "Next",
-    "page": "Page {{page}}"
+    "page": "Page {{page}}",
+    "tierFree": "Free",
+    "tierStarter": "Starter"
   },
   "affiliates": {
     "title": "Affiliate Program",
@@ -169,7 +171,8 @@
     "errorReasonRequired": "Reason is required",
     "cancel": "Cancel",
     "submit": "Apply",
-    "submitting": "Applying…"
+    "submitting": "Applying…",
+    "nowAvailable": "{{count}} credits now available"
   },
   "deleteDialog": {
     "message": "Delete account for \"{{name}}\" ({{email}})? This permanently removes all their data and cannot be undone.",

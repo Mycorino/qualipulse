@@ -436,11 +436,11 @@ export default function Admin() {
     }
   }, [client, t]);
 
-  const loadAuditLog = useCallback(async (page = 1) => {
+  const loadAuditLog = useCallback(async (page = 1, action = auditAction) => {
     setAuditLoading(true);
     try {
       const params: Record<string, string | number> = { page, limit: 50 };
-      if (auditAction) params.action = auditAction;
+      if (action) params.action = action;
       if (auditSearch) params.search = auditSearch;
       const res = await client().get<AuditEntry[]>("/admin/audit-log", { params });
       setAuditLog(res.data);
@@ -456,15 +456,23 @@ export default function Admin() {
     if (authed) {
       if (tab === "users") {
         loadUsers();
-        loadCosts();
       } else if (tab === "affiliates") {
         loadAffiliates();
       } else if (tab === "audit") {
         loadAuditLog(1);
       }
-      loadStats();
     }
   }, [authed, search, tierFilter, userPage, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stats + cost report aggregate the whole AIUsageLog table — load them once
+  // per session, not on every search keystroke / page / tab flip. Mutations
+  // that change them (deletion, tier change) refresh explicitly.
+  useEffect(() => {
+    if (authed) {
+      loadStats();
+      loadCosts();
+    }
+  }, [authed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Silent affiliate fetch on auth so the pending-application badge shows
   // without opening the tab
@@ -541,14 +549,18 @@ export default function Admin() {
     setCreditDialogSubmitting(true);
     setCreditDialogError(null);
     try {
-      await client().post(`/admin/workspaces/${creditDialog.id}/credits/adjust`, {
-        credits_delta: delta,
-        reason: creditReason.trim(),
-      });
+      const res = await client().post<{ balance?: { available_credits?: number } }>(
+        `/admin/workspaces/${creditDialog.id}/credits/adjust`,
+        {
+          credits_delta: delta,
+          reason: creditReason.trim(),
+        }
+      );
+      const available = res.data?.balance?.available_credits;
       showSuccess(
         t(delta > 0 ? "toasts.creditsGranted" : "toasts.creditsClawedBack", {
           count: Math.abs(delta),
-        })
+        }) + (typeof available === "number" ? ` (${t("creditsDialog.nowAvailable", { count: available })})` : "")
       );
       setCreditDialog(null);
       setCreditDelta("");
@@ -567,7 +579,7 @@ export default function Admin() {
     try {
       await client().delete(`/admin/users/${user.id}`);
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
-      await loadStats();
+      await Promise.all([loadStats(), loadCosts()]);
       showSuccess(t("toasts.userDeleted"));
     } catch {
       setError(t("toasts.userDeleteFailed"));
@@ -1187,6 +1199,8 @@ export default function Admin() {
               }}
             >
               <option value="">{t("users.allTiers")}</option>
+              <option value="free">{t("users.tierFree", "Free")}</option>
+              <option value="starter">{t("users.tierStarter", "Starter")}</option>
               <option value="solo">{t("users.tierSolo")}</option>
               <option value="team">{t("users.tierTeam")}</option>
               <option value="lab">{t("users.tierLab")}</option>
@@ -1611,6 +1625,8 @@ export default function Admin() {
                       outline: "none",
                     }}
                   >
+                    <option value="free">{t("users.tierFree", "Free")}</option>
+                    <option value="starter">{t("users.tierStarter", "Starter")}</option>
                     <option value="solo">{t("users.tierSolo")}</option>
                     <option value="team">{t("users.tierTeam")}</option>
                     <option value="lab">{t("users.tierLab")}</option>
@@ -1893,7 +1909,6 @@ export default function Admin() {
           )}
         </div>
         )}
-      </div>
 
         {/* Blog management tab */}
         {tab === "blog" && <AdminBlog adminKey={adminKey} />}
@@ -1904,7 +1919,7 @@ export default function Admin() {
             <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
               <select
                 value={auditAction}
-                onChange={(e) => { setAuditAction(e.target.value); loadAuditLog(1); }}
+                onChange={(e) => { setAuditAction(e.target.value); loadAuditLog(1, e.target.value); }}
                 style={{
                   padding: "8px 12px",
                   borderRadius: "var(--radius-sm)",
@@ -1917,8 +1932,8 @@ export default function Admin() {
               >
                 <option value="">{t("audit.allActions")}</option>
                 <option value="tier_change">{t("audit.actionTierChange")}</option>
-                <option value="trial_update">{t("audit.actionTrialUpdate")}</option>
-                <option value="credit_adjustment">{t("audit.actionCreditAdjustment")}</option>
+                <option value="trial_change">{t("audit.actionTrialUpdate")}</option>
+                <option value="credit_adjust">{t("audit.actionCreditAdjustment")}</option>
                 <option value="user_delete">{t("audit.actionUserDelete")}</option>
                 <option value="suspend">{t("audit.actionSuspend")}</option>
                 <option value="unsuspend">{t("audit.actionUnsuspend")}</option>
@@ -2121,6 +2136,7 @@ export default function Admin() {
             )}
           </div>
         )}
+      </div>
 
       {/* Suspend dialog */}
       {suspendDialog && (

@@ -2,8 +2,24 @@ import { useState, useEffect, FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
-import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
+
+// The affiliate session deliberately lives in its own storage key. Routing it
+// through useAuth's saveToken clobbered the researcher session (and the
+// researcher refresh-token interceptor clobbered the affiliate token back).
+const AFFILIATE_TOKEN_KEY = "qp_affiliate_token";
+
+function getAffiliateToken(): string | null {
+  return sessionStorage.getItem(AFFILIATE_TOKEN_KEY);
+}
+
+function saveAffiliateToken(token: string): void {
+  sessionStorage.setItem(AFFILIATE_TOKEN_KEY, token);
+}
+
+function clearAffiliateToken(): void {
+  sessionStorage.removeItem(AFFILIATE_TOKEN_KEY);
+}
 
 interface AffiliateStats {
   id: string;
@@ -210,11 +226,39 @@ function AffiliateApply() {
 function AffiliateLogin() {
   const { t } = useTranslation("affiliate");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [linkSent, setLinkSent] = useState(false);
   const [error, setError] = useState("");
-  const { saveToken } = useAuth();
   const navigate = useNavigate();
+
+  // Magic links land back here as /affiliate/login#magic=<token> (fragment,
+  // so the token never reaches server logs). Exchange it for a session. The
+  // hashchange listener covers clicking the email link while this page is
+  // already open — a hash-only navigation doesn't remount the component.
+  useEffect(() => {
+    function consumeMagicHash() {
+      const match = window.location.hash.match(/magic=([^&]+)/);
+      if (!match) return;
+      // Clear the token from the URL before the async call — it must not
+      // survive in history even if verification fails.
+      window.history.replaceState(null, "", window.location.pathname);
+      setVerifying(true);
+      axios
+        .post("/api/affiliates/login/verify", { token: match[1] })
+        .then((res) => {
+          saveAffiliateToken(res.data.access_token);
+          navigate("/affiliate/dashboard");
+        })
+        .catch(() => {
+          setError(t("login.magicFailed"));
+          setVerifying(false);
+        });
+    }
+    consumeMagicHash();
+    window.addEventListener("hashchange", consumeMagicHash);
+    return () => window.removeEventListener("hashchange", consumeMagicHash);
+  }, [navigate, t]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -222,18 +266,25 @@ function AffiliateLogin() {
     setLoading(true);
 
     try {
-      const res = await axios.post("/api/affiliates/login", {
+      await axios.post("/api/affiliates/login", {
         email: email.toLowerCase().trim(),
-        code: code.toLowerCase().trim(),
       });
-
-      saveToken(res.data.access_token, undefined);
-      navigate("/affiliate/dashboard");
+      setLinkSent(true);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("login.failedLogin")));
     } finally {
       setLoading(false);
     }
+  }
+
+  if (verifying) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <p>{t("login.verifying")}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -244,40 +295,35 @@ function AffiliateLogin() {
 
         {error && <div className="error-banner">{error}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <label className="field-label">{t("login.emailLabel")}</label>
-          <input
-            type="email"
-            className="field-input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={t("apply.emailPlaceholder")}
-            required
-            disabled={loading}
-            aria-label={t("login.emailLabel")}
-          />
+        {linkSent ? (
+          <div style={{ textAlign: "center", padding: "16px 0" }}>
+            <div style={{ fontSize: "40px", marginBottom: "12px" }}>📬</div>
+            <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>{t("login.linkSent")}</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <label className="field-label">{t("login.emailLabel")}</label>
+            <input
+              type="email"
+              className="field-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t("apply.emailPlaceholder")}
+              required
+              disabled={loading}
+              aria-label={t("login.emailLabel")}
+            />
 
-          <label className="field-label">{t("login.codeLabel")}</label>
-          <input
-            type="text"
-            className="field-input"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder={t("apply.codePlaceholder")}
-            required
-            disabled={loading}
-            aria-label={t("login.codeLabel")}
-          />
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: "100%", marginTop: "16px" }}
-            disabled={loading}
-          >
-            {loading ? t("login.signingIn") : t("login.signIn")}
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: "100%", marginTop: "16px" }}
+              disabled={loading}
+            >
+              {loading ? t("login.sendingLink") : t("login.sendLink")}
+            </button>
+          </form>
+        )}
 
         <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "16px", textAlign: "center" }}>
           {t("login.noAccount")}{" "}
@@ -300,17 +346,22 @@ function AffiliateDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const { token } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (!getAffiliateToken()) {
+      navigate("/affiliate/login", { replace: true });
+      return;
+    }
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchData() {
     setLoading(true);
     setError("");
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = { Authorization: `Bearer ${getAffiliateToken()}` };
       const [statsRes, referralsRes, payoutsRes] = await Promise.all([
         axios.get("/api/affiliates/me", { headers }),
         axios.get("/api/affiliates/me/referrals", { headers }),
@@ -320,6 +371,13 @@ function AffiliateDashboard() {
       setReferrals(referralsRes.data.referrals);
       setPayouts(payoutsRes?.data.payouts ?? []);
     } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) {
+        // Session expired (24h token, no refresh) — back to the login form.
+        clearAffiliateToken();
+        navigate("/affiliate/login", { replace: true });
+        return;
+      }
       setError(getErrorMessage(err, t("dashboard.failedDashboard")));
     } finally {
       setLoading(false);
