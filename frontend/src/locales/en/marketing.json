@@ -21,7 +21,7 @@
     "facts": [
       "No credit card",
       "Participants need only a link",
-      "English & French",
+      "English, French & more coming",
       "GDPR, EU-hosted"
     ]
   },
@@ -37,7 +37,7 @@
     "a2": "Good question. Probably the Monday planning thing. When I skip that, the whole subscription feels pointless."
   },
   "strip": {
-    "audience": "Built for <b>product teams</b>, <b>UX researchers</b> & <b>agencies</b>",
+    "audience": "Built for <b>product teams</b>, <b>UX researchers</b>, <b>agencies</b> and anyone who listens to the voice of the customer",
     "credit": "1 credit = 1 completed interview",
     "speed": "Brief to first response: <b>same day</b>"
   },
@@ -247,7 +247,7 @@
       },
       {
         "question": "What languages are supported?",
-        "answer": "Studies run in English or French today. The AI moderator, the participant experience, and the research memo all follow your study’s language. Transcripts can be machine-translated as a reading aid; the original stays the untouched source of truth."
+        "answer": "Interviews run in the language of your study. English and French are live today and we’re adding more all the time. The researcher workspace is available in English and French, and any transcript can be machine-translated as a reading aid, with the original always kept as the source of truth."
       },
       {
         "question": "Who owns the research data?",
