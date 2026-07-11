@@ -653,16 +653,12 @@ select.field-input {
   border-left: 4px solid var(--theme-accent, var(--brand-300));
   transition: border-color 0.2s;
 }
-.analysis-theme:nth-child(1)  { --theme-accent: #6366f1; }
-.analysis-theme:nth-child(2)  { --theme-accent: #0ea5e9; }
-.analysis-theme:nth-child(3)  { --theme-accent: #10b981; }
-.analysis-theme:nth-child(4)  { --theme-accent: #f59e0b; }
-.analysis-theme:nth-child(5)  { --theme-accent: #ec4899; }
-.analysis-theme:nth-child(6)  { --theme-accent: #8b5cf6; }
-.analysis-theme:nth-child(7)  { --theme-accent: #14b8a6; }
-.analysis-theme:nth-child(8)  { --theme-accent: #f97316; }
-.analysis-theme:nth-child(9)  { --theme-accent: #06b6d4; }
-.analysis-theme:nth-child(10) { --theme-accent: #a855f7; }
+/* Single-accent theme borders, keyed to the report family colour (the
+   analysis panel scopes --brand to forest green). A subtle two-tone
+   alternation keeps adjacent cards distinguishable without the old
+   rainbow, which clashed with the one-accent look of the PDF export. */
+.analysis-theme:nth-child(odd)  { --theme-accent: var(--brand-600); }
+.analysis-theme:nth-child(even) { --theme-accent: var(--brand-400); }
 .analysis-theme-header {
   display: flex;
   align-items: center;
@@ -4668,6 +4664,104 @@ select.field-input {
   gap: 6px;
   flex: 1;
 }
+
+/* ── Conversion-first billing (AccountBilling) ─────────────────────────────── */
+.billing-chooser__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+/* Monthly / annual pill toggle */
+.billing-toggle {
+  display: inline-flex;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  flex-shrink: 0;
+}
+.billing-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  transition: background 0.15s, color 0.15s;
+}
+.billing-toggle button.active {
+  background: var(--surface, #fff);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+}
+.billing-toggle__save {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--success-text, #067647);
+  background: var(--success-bg, #ecfdf3);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* Plan grid: recommended card gets a raised, emphasised treatment */
+.billing-plans-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.plan-card { position: relative; }
+.plan-card--recommended {
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 1px var(--brand-500), 0 8px 24px rgba(79, 70, 229, 0.12);
+}
+.plan-flag {
+  position: absolute;
+  top: -10px;
+  left: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--brand-500);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.plan-flag--current { background: var(--text-tertiary); }
+.plan-price__unit { font-size: 14px; font-weight: 600; color: var(--text-tertiary); }
+.plan-price__sub { font-size: 12px; color: var(--text-tertiary); margin: 2px 0 0; }
+
+.billing-reassurance {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: center;
+  margin: 20px 0 0;
+}
+
+/* Demoted credit packs (collapsed <details> in conversion mode) */
+.billing-packs > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.billing-packs > summary::-webkit-details-marker { display: none; }
+.billing-packs > summary::after {
+  content: "＋";
+  position: absolute;
+  right: 24px;
+  color: var(--text-tertiary);
+  font-size: 16px;
+}
+.billing-packs[open] > summary::after { content: "−"; }
+.billing-packs { position: relative; }
 
 /* ── Mic Test ───────────────────────────────────────────────────────────── */
 .mic-test-card { max-width: 480px; text-align: center; }

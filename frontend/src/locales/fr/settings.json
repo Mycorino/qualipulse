@@ -84,7 +84,21 @@
       "overage": "Dépassement : {{price}} €/crédit"
     },
     "packName": "Pack de {{count}} crédits",
-    "priceMonthly": "{{price}} €/mois"
+    "priceMonthly": "{{price}} €/mois",
+    "chooseTitle": "Choisissez votre formule",
+    "changeTitle": "Changer de formule",
+    "chooseSubtitle": "1 crédit = 1 entretien réalisé. Les crédits inclus sont renouvelés à chaque période ; le dépassement est facturé au crédit.",
+    "billingToggleLabel": "Période de facturation",
+    "billingMonthly": "Mensuel",
+    "billingAnnual": "Annuel",
+    "billingAnnualSave": "−17 %",
+    "recommended": "Le choix des équipes",
+    "choosePlan": "Choisir {{name}}",
+    "perMonthUnit": " /mois",
+    "billedAnnually": "{{price}} € facturés par an",
+    "billedMonthly": "facturé au mois",
+    "reassurance": "Résiliable à tout moment · Les crédits achetés et reportés n'expirent jamais · Paiement sécurisé via Stripe",
+    "packsSecondaryTitle": "Vous préférez payer à l'usage ?"
   },
   "language": {
     "title": "Langue",
