@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import client from "../api/client";
-import { patchProjectSettings, ProjectResponse } from "../api/projects";
+import { patchProjectSettings, uploadProjectLogo, ProjectResponse } from "../api/projects";
 import { useToast } from "./Toast";
 import { BRAND_FONT_LABELS, BRAND_FONT_STACKS, shadeColor } from "../utils/branding";
 
@@ -52,6 +52,8 @@ export default function BrandingSettings({
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [savingDefault, setSavingDefault] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
   // Locked "branded" card clicked — show the inline upgrade panel instead of
   // punishing the click with an error toast.
   const [showUpsell, setShowUpsell] = useState(false);
@@ -80,6 +82,29 @@ export default function BrandingSettings({
       toast(t("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
     } finally {
       setSavingDefault(false);
+    }
+  }
+
+  async function onLogoFile(file: File) {
+    setUploadingLogo(true);
+    try {
+      onUpdated(await uploadProjectLogo(project.id, file));
+      toast(t("setup.brandingSaved", { defaultValue: "Saved" }), "success");
+    } catch (err: any) {
+      const status = err?.response?.status;
+      toast(
+        status === 413
+          ? t("setup.brandingLogoTooLarge", { defaultValue: "Image too large. Max size is 8MB." })
+          : status === 415
+          ? t("setup.brandingLogoBadType", {
+              defaultValue: "Unsupported image type. Use PNG, JPEG, WebP or GIF.",
+            })
+          : t("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }),
+        "error"
+      );
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
     }
   }
 
@@ -264,22 +289,62 @@ export default function BrandingSettings({
               }}
             />
 
-            <label className="field-label" htmlFor="branding-logo-url" style={{ marginTop: 12 }}>
-              {t("setup.brandingLogoUrl", { defaultValue: "Logo URL" })}
+            <label className="field-label" style={{ marginTop: 12 }}>
+              {t("setup.brandingLogo", { defaultValue: "Logo" })}
             </label>
             <input
-              id="branding-logo-url"
-              key={`lu-${project.researcher_logo_url ?? ""}`}
-              className="field-input"
-              type="url"
-              maxLength={500}
-              placeholder="https://…/logo.png"
-              defaultValue={project.researcher_logo_url ?? ""}
-              onBlur={(e) => {
-                const v = e.target.value.trim();
-                if (v !== (project.researcher_logo_url ?? "")) void save({ researcher_logo_url: v });
+              ref={logoInputRef}
+              id="branding-logo-file"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void onLogoFile(file);
               }}
             />
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              {project.researcher_logo_url && (
+                <img
+                  src={project.researcher_logo_url}
+                  alt=""
+                  style={{
+                    maxHeight: 40,
+                    maxWidth: 120,
+                    objectFit: "contain",
+                    borderRadius: 6,
+                    border: "1px solid var(--border)",
+                    padding: 4,
+                    background: "var(--surface)",
+                  }}
+                />
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={uploadingLogo || saving}
+                onClick={() => logoInputRef.current?.click()}
+              >
+                {uploadingLogo
+                  ? t("setup.brandingLogoUploading", { defaultValue: "Uploading…" })
+                  : project.researcher_logo_url
+                  ? t("setup.brandingLogoReplace", { defaultValue: "Replace logo" })
+                  : t("setup.brandingLogoUpload", { defaultValue: "Upload logo" })}
+              </button>
+              {project.researcher_logo_url && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm btn-danger-text"
+                  disabled={uploadingLogo || saving}
+                  onClick={() => void save({ researcher_logo_url: "" })}
+                >
+                  {t("setup.brandingLogoRemove", { defaultValue: "Remove" })}
+                </button>
+              )}
+            </div>
+            <p className="field-hint" style={{ fontSize: 12, marginTop: 6 }}>
+              {t("setup.brandingLogoHint", { defaultValue: "PNG, JPEG, WebP or GIF · max 8MB" })}
+            </p>
 
             <label className="field-label" htmlFor="branding-privacy-url" style={{ marginTop: 12 }}>
               {t("setup.brandingPrivacyUrl", { defaultValue: "Privacy policy URL (optional)" })}

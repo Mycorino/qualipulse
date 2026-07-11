@@ -376,6 +376,15 @@ export async function patchProjectSettings(
   return data;
 }
 
+export async function uploadProjectLogo(id: string, file: File): Promise<ProjectResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await client.post<ProjectResponse>(`/projects/${id}/branding/logo`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
 export async function importProjectCSV(name: string, language: string, csvFile: File): Promise<ProjectResponse> {
   const form = new FormData();
   form.append("name", name);
