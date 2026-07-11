@@ -11,6 +11,7 @@ import {
   SegmentOperator,
   SegmentPreview,
   SurveyDashboard,
+  fetchSurveyReportHtml,
   getDashboard,
   getDiscoveries,
   getSurvey,
@@ -18,6 +19,7 @@ import {
   previewSegment,
 } from "../api/surveys";
 import { getStudy } from "../api/studies";
+import { openHtmlDocument } from "../utils/openHtmlDocument";
 import { ChartCard } from "../components/ChartCard";
 import { DashboardShell, DashboardStrip } from "../components/DashboardShell";
 import { MethodologyBox, SmallNWarning } from "../components/MethodologyBox";
@@ -58,6 +60,7 @@ export default function SurveyDashboardPage() {
   const [inviting, setInviting] = useState(false);
   // ── Sprint 10: discoveries ─────────────────────────────────────
   const [discoveries, setDiscoveries] = useState<SegmentDiscovery[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -101,6 +104,23 @@ export default function SurveyDashboardPage() {
     if (!data || filters.length === 0) return t("dashboard.allCompletedRespondents");
     return filters.map((f) => describeFilter(f, data.questions, t)).join(t("dashboard.filterAnd"));
   }, [filters, data, t]);
+
+  // Server-rendered document export: the backend draws charts from the same
+  // aggregates the dashboard uses — a print-ready report, not the SPA chrome.
+  const onExportReport = async () => {
+    if (!id) return;
+    setExporting(true);
+    try {
+      await openHtmlDocument(
+        () => fetchSurveyReportHtml(id),
+        `survey-results-${id.slice(0, 8)}.html`,
+      );
+    } catch {
+      toast(t("dashboard.exportReportFailed"), "error");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const onConfirmInvite = async () => {
     if (!id) return;
@@ -154,6 +174,17 @@ export default function SurveyDashboardPage() {
       activeSection="results"
       onSectionChange={(k) => navigate(surveySectionPath(k, data.survey_id))}
       subNavLabel={t("dashboard.sectionsNavLabel")}
+      actions={
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={onExportReport}
+          disabled={exporting || data.questions.length === 0}
+          title={t("dashboard.exportPdfTitle")}
+        >
+          {exporting ? t("dashboard.exportPdfLoading") : t("dashboard.exportPdf")}
+        </button>
+      }
     >
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "var(--space-6) var(--space-5)" }}>
         <MethodologyBox
