@@ -793,6 +793,22 @@ function EmbeddedStudyReport({
     if (body) setHeight(Math.max(600, body.scrollHeight + 32));
   };
 
+  // If the frame's document is unreachable after load, the browser blocked
+  // it (a CSP without `frame-src blob:`, an aggressive extension, …). Rather
+  // than leave a mystery-blank box, fall back to the "open the PDF" message —
+  // the export button above still works.
+  const handleLoad = () => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc || !doc.body) {
+      setFailed(true);
+      return;
+    }
+    measure();
+    // Re-measure after fonts/SVGs settle the layout.
+    window.setTimeout(measure, 300);
+    window.setTimeout(measure, 1200);
+  };
+
   if (failed) {
     return <p className="quanti-showcase__section-meta">{t("overview.report.embedFailed")}</p>;
   }
@@ -804,12 +820,7 @@ function EmbeddedStudyReport({
       ref={iframeRef}
       src={url}
       title={t("overview.report.embedTitle")}
-      onLoad={() => {
-        measure();
-        // Re-measure after fonts/SVGs settle the layout.
-        window.setTimeout(measure, 300);
-        window.setTimeout(measure, 1200);
-      }}
+      onLoad={handleLoad}
       style={{
         width: "100%",
         height,
