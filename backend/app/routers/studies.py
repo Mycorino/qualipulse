@@ -40,6 +40,7 @@ from app.schemas.study import (
     GeneratedValidationSurvey,
     ProjectMini,
     QuantifiedThemeReport,
+    SoleInstrument,
     StudyAnalysisDetail,
     StudyAnalysisSummary,
     StudyDetail,
@@ -223,6 +224,31 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         .first()
         is not None
     )
+    # Single-instrument studies expose their one instrument so the list
+    # can open it directly instead of forcing the workspace hop.
+    sole_instrument: SoleInstrument | None = None
+    if survey_count + project_count == 1:
+        if survey_count == 1:
+            sole_survey = (
+                db.query(Survey)
+                .filter(Survey.study_id == study.id, Survey.archived_at.is_(None))
+                .first()
+            )
+            if sole_survey:
+                sole_instrument = SoleInstrument(
+                    kind="survey",
+                    id=sole_survey.id,
+                    survey_status=sole_survey.status,
+                )
+        else:
+            sole_project = (
+                db.query(Project)
+                .filter(Project.study_id == study.id, Project.archived_at.is_(None))
+                .first()
+            )
+            if sole_project:
+                sole_instrument = SoleInstrument(kind="interview", id=sole_project.id)
+
     return StudySummary(
         id=study.id,
         name=study.name,
@@ -236,6 +262,7 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         has_report=has_report,
         has_ready_analysis=has_ready_analysis,
         is_demo=is_demo,
+        sole_instrument=sole_instrument,
     )
 
 
@@ -300,6 +327,15 @@ def _project_mini(db: Session, project: Project) -> ProjectMini:
         .scalar()
         or 0
     )
+    has_ready_analysis = (
+        db.query(ProjectAnalysis.id)
+        .filter(
+            ProjectAnalysis.project_id == project.id,
+            ProjectAnalysis.status == "ready",
+        )
+        .first()
+        is not None
+    )
     return ProjectMini(
         id=project.id,
         name=project.name,
@@ -307,6 +343,7 @@ def _project_mini(db: Session, project: Project) -> ProjectMini:
         interview_link_count=link_count,
         completed_participant_count=completed,
         in_progress_participant_count=in_progress,
+        has_ready_analysis=has_ready_analysis,
     )
 
 

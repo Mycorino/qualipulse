@@ -2,10 +2,25 @@
   "overview": {
     "tabs": {
       "overview": "Aperçu",
-      "surveys": "Questionnaires",
-      "interviews": "Entretiens",
+      "instruments": "Instruments",
       "participants": "Participants",
-      "report": "Rapport"
+      "report": "Rapports"
+    },
+    "instruments": {
+      "empty": "Aucun instrument pour l'instant. Commencez par un questionnaire de sélection pour qualifier les répondants, ou passez directement à une série d'entretiens.",
+      "surveyEyebrow": "Questionnaire · {{role}} · {{status}}",
+      "interviewEyebrow": "Entretiens · {{language}}"
+    },
+    "reportsIndex": {
+      "title": "Tous les rapports de cette étude",
+      "scopeStudy": "Cette étude",
+      "scopeRound": "Série d'entretiens",
+      "scopeCross": "Multi-études",
+      "studyReportLabel": "Rapport d'étude méthodes mixtes (cette page)",
+      "ready": "Prêt",
+      "notGenerated": "Pas encore généré",
+      "noAnalysisYet": "Pas encore d'analyse",
+      "memosLabel": "Mémos de décision — synthèse de 2 études analysées ou plus (accueil Études)"
     },
     "toast": {
       "surveyCreateFailed": "Impossible de créer le questionnaire",

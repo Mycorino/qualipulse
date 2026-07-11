@@ -75,6 +75,37 @@ def test_study_summary_carries_card_signals(client, auth_headers):
     assert card["has_report"] is False
 
 
+def test_single_instrument_study_exposes_sole_instrument(client, auth_headers):
+    """The Studies list opens single-instrument studies directly on their
+    one instrument — the summary must say which instrument that is."""
+
+    survey, _q, _link = _make_live_survey(client, auth_headers, name="Solo survey")
+
+    studies = client.get("/studies/", headers=auth_headers).json()
+    card = next(s for s in studies if s["id"] == survey["study_id"])
+    assert card["sole_instrument"] == {
+        "kind": "survey",
+        "id": survey["id"],
+        "survey_status": "live",
+    }
+
+    # Adding a second instrument clears the shortcut — the workspace is
+    # the right landing page for a multi-instrument study.
+    client.post(
+        "/projects/",
+        headers=auth_headers,
+        json={
+            "name": "Round 1",
+            "language": "en",
+            "study_id": survey["study_id"],
+            "questions": [],
+        },
+    )
+    studies = client.get("/studies/", headers=auth_headers).json()
+    card = next(s for s in studies if s["id"] == survey["study_id"])
+    assert card["sole_instrument"] is None
+
+
 def test_study_detail_returns_surveys_and_progress(client, auth_headers):
     survey = client.post(
         "/surveys/", headers=auth_headers, json={"name": "With detail"}

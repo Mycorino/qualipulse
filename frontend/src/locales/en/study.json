@@ -2,10 +2,25 @@
   "overview": {
     "tabs": {
       "overview": "Overview",
-      "surveys": "Surveys",
-      "interviews": "Interviews",
+      "instruments": "Instruments",
       "participants": "Participants",
-      "report": "Report"
+      "report": "Reports"
+    },
+    "instruments": {
+      "empty": "No instruments yet. Start with a screener survey to qualify respondents, or go straight to an interview round.",
+      "surveyEyebrow": "Survey · {{role}} · {{status}}",
+      "interviewEyebrow": "Interviews · {{language}}"
+    },
+    "reportsIndex": {
+      "title": "All reports for this study",
+      "scopeStudy": "This study",
+      "scopeRound": "Interview round",
+      "scopeCross": "Cross-study",
+      "studyReportLabel": "Mixed-methods study report (this page)",
+      "ready": "Ready",
+      "notGenerated": "Not generated yet",
+      "noAnalysisYet": "No analysis yet",
+      "memosLabel": "Decision memos — synthesize 2+ analysed studies (Studies home)"
     },
     "toast": {
       "surveyCreateFailed": "Could not create the survey",
