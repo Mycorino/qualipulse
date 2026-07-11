@@ -4,6 +4,8 @@
   "iterationCoachmarkDesc": "Étiquetez les thèmes comme confirmés, contestés ou nécessitant plus de preuves — puis cliquez sur Affiner pour la v2.",
   "iterationCoachmarkDismiss": "Masquer l'astuce",
   "exportMenuLabel": "Plus d'options d'export",
+  "scopeNote": "Porte uniquement sur cette série d'entretiens.",
+  "scopeStudyReportLink": "Pour toute l'étude (questionnaires + entretiens), voir le rapport de l'étude →",
   "noAnalysis": "Aucune analyse pour l'instant. Lancez une analyse IA pour obtenir des thèmes, des jobs-to-be-done, des tensions et des recommandations.",
   "runAnalysis": "Lancer l'analyse IA",
   "running": "Génération de l'analyse…",

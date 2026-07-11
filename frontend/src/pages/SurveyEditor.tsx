@@ -24,7 +24,7 @@ import { useToast } from "../components/Toast";
 import { InstrumentShell } from "../components/InstrumentShell";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
 import {
-  SURVEY_SECTIONS,
+  surveySections,
   surveySectionPath,
   surveyStatusPill,
 } from "../components/surveyShellNav";
@@ -254,13 +254,13 @@ export default function SurveyEditor() {
           aria-label={t("editor.surveyNameAria")}
         />
       }
-      status={surveyStatusPill(survey.status)}
+      status={surveyStatusPill(survey.status, t)}
       actions={
         <button type="button" className="btn btn-primary" onClick={onTogglePublish}>
           {survey.status === "live" ? t("editor.closeSurvey") : t("editor.publish")}
         </button>
       }
-      sections={SURVEY_SECTIONS}
+      sections={surveySections(t)}
       activeSection="build"
       onSectionChange={(k) => navigate(surveySectionPath(k, survey.id))}
       subNavLabel={t("editor.sectionsNavLabel")}

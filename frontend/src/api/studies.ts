@@ -62,7 +62,11 @@ export interface StudyDetail {
   projects: ProjectMini[];
   progress: StudyProgress;
   is_demo: boolean;
+  /** English fallback text — prefer `recommended_action_key` for display. */
   recommended_action: string | null;
+  /** i18n key stem for the recommended action (see study.json → overview.recommendedAction.actions). */
+  recommended_action_key: string | null;
+  recommended_action_params: Record<string, number> | null;
 }
 
 export async function listStudies(): Promise<StudySummary[]> {

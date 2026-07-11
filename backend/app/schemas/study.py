@@ -105,7 +105,12 @@ class StudyDetail(BaseModel):
     is_demo: bool = False
     # Researcher-facing recommended next action ("Invite N detractors to interview" etc).
     # Computed server-side based on progress flags; Sprint 10 widens the cases.
+    # `recommended_action` is the English fallback text; the frontend prefers
+    # `recommended_action_key` (+ params) so the prompt renders in the UI
+    # language instead of hardcoded English.
     recommended_action: str | None = None
+    recommended_action_key: str | None = None
+    recommended_action_params: dict[str, int] | None = None
 
 
 # ── Sprint 11: Quantified Themes report ───────────────────────────────

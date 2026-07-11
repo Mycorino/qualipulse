@@ -106,6 +106,7 @@ def test_recommended_action_progression(client, auth_headers, db_session):
     client.delete(f"/surveys/{survey['id']}", headers=auth_headers)
     detail = client.get(f"/studies/{study_id}", headers=auth_headers).json()
     assert "Create a screener survey" in detail["recommended_action"]
+    assert detail["recommended_action_key"] == "create_survey"
 
     # Step 2: draft survey exists → publish prompt
     s2 = client.post(
@@ -116,6 +117,7 @@ def test_recommended_action_progression(client, auth_headers, db_session):
     study_id = s2["study_id"]
     detail = client.get(f"/studies/{study_id}", headers=auth_headers).json()
     assert "Publish your survey" in detail["recommended_action"]
+    assert detail["recommended_action_key"] == "publish_survey"
 
     # Step 3: published, 0 responses → share link prompt
     q = client.post(
@@ -129,6 +131,7 @@ def test_recommended_action_progression(client, auth_headers, db_session):
     client.patch(f"/surveys/{s2['id']}", headers=auth_headers, json={"status": "live"})
     detail = client.get(f"/studies/{study_id}", headers=auth_headers).json()
     assert "Share your survey link" in detail["recommended_action"]
+    assert detail["recommended_action_key"] == "share_survey_link"
 
     # Step 4: partial responses (below n=30) → keep collecting prompt
     for i in range(5):
@@ -143,6 +146,8 @@ def test_recommended_action_progression(client, auth_headers, db_session):
         )
     detail = client.get(f"/studies/{study_id}", headers=auth_headers).json()
     assert "more responses" in detail["recommended_action"]
+    assert detail["recommended_action_key"] == "collect_more_responses"
+    assert detail["recommended_action_params"] == {"count": 25}
 
 
 def test_study_detail_404_for_other_workspace(client, auth_headers):

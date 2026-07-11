@@ -53,6 +53,7 @@
     },
     "report": {
       "loading": "Loading…",
+      "scopeNote": "Covers the whole study — survey numbers and interview evidence in one report. Each interview round also has its own analysis in its Analysis tab.",
       "generateHeadline": "Generate the Quantified Themes report",
       "generateBody": "Combines survey aggregates with interview transcripts into themes that pair what people said with how often they said it. Each theme carries a recommended next step and a confidence pill — the same methodology contract used everywhere else in the workspace.",
       "lowResponseWarning_one": "⚠ You have {{count}} survey response. Themes below n=30 will be marked \"directional\" — collect more responses for stronger evidence.",
@@ -120,7 +121,19 @@
     },
     "recommendedAction": {
       "eyebrow": "Recommended next step",
-      "takeAction": "Take action →"
+      "takeAction": "Take action →",
+      "actions": {
+        "create_survey": "Create a screener survey to start collecting responses.",
+        "publish_survey": "Publish your survey to start collecting responses.",
+        "share_survey_link": "Share your survey link to collect the first responses.",
+        "collect_more_responses_one": "Keep collecting — {{count}} more response until inference-grade thresholds.",
+        "collect_more_responses_other": "Keep collecting — {{count}} more responses until inference-grade thresholds.",
+        "open_dashboard_invite": "Open the survey results to filter respondents and invite them to AI interviews.",
+        "invite_interviews": "Invite high-signal respondents to AI interviews from the survey results.",
+        "collect_more_interviews_one": "Conduct {{count}} more interview before generating the study report.",
+        "collect_more_interviews_other": "Conduct {{count}} more interviews before generating the study report.",
+        "generate_report": "Generate the study report to combine survey numbers and interview evidence."
+      }
     },
     "checklist": {
       "title": "Study progress",

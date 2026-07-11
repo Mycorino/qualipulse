@@ -12,7 +12,7 @@ import {
 import { getStudy } from "../api/studies";
 import { InstrumentShell } from "../components/InstrumentShell";
 import {
-  SURVEY_SECTIONS,
+  surveySections,
   surveySectionPath,
   surveyStatusPill,
 } from "../components/surveyShellNav";
@@ -60,8 +60,8 @@ export default function SurveyPreview() {
       ]}
       eyebrow={t("preview.eyebrow")}
       title={survey.name}
-      status={surveyStatusPill(survey.status)}
-      sections={SURVEY_SECTIONS}
+      status={surveyStatusPill(survey.status, t)}
+      sections={surveySections(t)}
       activeSection="preview"
       onSectionChange={(k) => navigate(surveySectionPath(k, survey.id))}
       subNavLabel={t("preview.sectionsNavLabel")}
