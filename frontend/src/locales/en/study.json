@@ -15,11 +15,14 @@
       "title": "All reports for this study",
       "scopeStudy": "This study",
       "scopeRound": "Interview round",
+      "scopeSurvey": "Survey results",
       "scopeCross": "Cross-study",
       "studyReportLabel": "Mixed-methods study report (this page)",
       "ready": "Ready",
       "notGenerated": "Not generated yet",
       "noAnalysisYet": "No analysis yet",
+      "surveyResponses_one": "{{count}} response",
+      "surveyResponses_other": "{{count}} responses",
       "memosLabel": "Decision memos — synthesize 2+ analysed studies (Studies home)"
     },
     "toast": {

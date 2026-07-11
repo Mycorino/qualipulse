@@ -28,6 +28,74 @@ from app.models.survey import (
 )
 from app.services.stats import DEFAULT_MIN_N, completion_rate, wilson_proportion
 
+# Deterministic per-question takeaway lines (the editorial anchor above each
+# chart, both in the dashboard UI and in the exported reports). Built only
+# from values the stats layer released — a suppressed percentage can never
+# leak into a takeaway.
+_TAKEAWAYS = {
+    "en": {
+        "mc_pct": "“{label}” leads — {pct}% of {n} respondents ({count} answers).",
+        "mc_count": "“{label}” leads with {count} of {n} answers.",
+        "likert_mean": "Average rating {mean} on a 1–{scale} scale (n={n}).",
+        "likert_mode": "Most common rating: {bucket} of {scale} ({count} of {n} answers).",
+        "nps": "NPS {score} — {p} promoters vs {d} detractors out of {n} respondents.",
+    },
+    "fr": {
+        "mc_pct": "« {label} » arrive en tête — {pct} % des {n} répondants ({count} réponses).",
+        "mc_count": "« {label} » arrive en tête avec {count} réponses sur {n}.",
+        "likert_mean": "Note moyenne de {mean} sur une échelle de 1 à {scale} (n={n}).",
+        "likert_mode": "Note la plus fréquente : {bucket} sur {scale} ({count} réponses sur {n}).",
+        "nps": "NPS {score} — {p} promoteurs contre {d} détracteurs sur {n} répondants.",
+    },
+}
+
+
+def _takeaway_for(qa: "QuestionAnalytics", lang: str) -> str | None:
+    """One-sentence deterministic takeaway for a question, or None."""
+    T = _TAKEAWAYS["fr" if (lang or "en").lower().startswith("fr") else "en"]
+    n = qa.n_answered
+    if n == 0:
+        return None
+
+    if qa.type in ("mc_single", "mc_multi"):
+        choices = (qa.breakdown or {}).get("choices") or []
+        if not choices:
+            return None
+        top = choices[0]  # already sorted by count desc
+        if not top.get("count"):
+            return None
+        if top.get("percentage") is not None:
+            return T["mc_pct"].format(
+                label=top.get("label", ""), pct=round(top["percentage"]),
+                n=n, count=top["count"],
+            )
+        return T["mc_count"].format(label=top.get("label", ""), count=top["count"], n=n)
+
+    if qa.type == "nps":
+        b = qa.breakdown or {}
+        if b.get("nps_score") is not None:
+            return T["nps"].format(
+                score=f"{b['nps_score']:+d}", p=b.get("promoters", 0),
+                d=b.get("detractors", 0), n=n,
+            )
+        return None
+
+    if qa.type == "likert":
+        hist = (qa.breakdown or {}).get("histogram") or []
+        if not hist:
+            return None
+        scale = max((h.get("bucket") or 0) for h in hist)
+        if qa.mean is not None:
+            return T["likert_mean"].format(mean=f"{qa.mean:.1f}", scale=scale, n=n)
+        top = max(hist, key=lambda h: h.get("count") or 0)
+        if not top.get("count"):
+            return None
+        return T["likert_mode"].format(
+            bucket=top.get("bucket"), scale=scale, count=top["count"], n=n
+        )
+
+    return None
+
 
 @dataclass
 class QuestionAnalytics:
@@ -66,8 +134,17 @@ class SurveyDashboardPayload:
     questions: list[QuestionAnalytics]
 
 
-def build_dashboard(db: Session, survey: Survey, *, min_n: int = DEFAULT_MIN_N) -> SurveyDashboardPayload:
-    """Build the dashboard payload for a survey."""
+def build_dashboard(
+    db: Session,
+    survey: Survey,
+    *,
+    min_n: int = DEFAULT_MIN_N,
+    lang: str = "en",
+) -> SurveyDashboardPayload:
+    """Build the dashboard payload for a survey.
+
+    ``lang`` localises the deterministic per-question takeaway lines (en/fr).
+    """
 
     # All responses for the survey — partial + completed.
     all_responses = (
@@ -96,7 +173,9 @@ def build_dashboard(db: Session, survey: Survey, *, min_n: int = DEFAULT_MIN_N) 
             .filter(SurveyResponseAnswer.question_id == q.id)
             .all()
         )
-        qa.append(_analytics_for_question(q, answers, min_n=min_n))
+        analytics = _analytics_for_question(q, answers, min_n=min_n)
+        analytics.takeaway = _takeaway_for(analytics, lang)
+        qa.append(analytics)
 
     return SurveyDashboardPayload(
         survey_id=survey.id,

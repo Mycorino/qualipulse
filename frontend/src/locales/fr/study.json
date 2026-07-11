@@ -15,11 +15,14 @@
       "title": "Tous les rapports de cette étude",
       "scopeStudy": "Cette étude",
       "scopeRound": "Série d'entretiens",
+      "scopeSurvey": "Résultats questionnaire",
       "scopeCross": "Multi-études",
       "studyReportLabel": "Rapport d'étude méthodes mixtes (cette page)",
       "ready": "Prêt",
       "notGenerated": "Pas encore généré",
       "noAnalysisYet": "Pas encore d'analyse",
+      "surveyResponses_one": "{{count}} réponse",
+      "surveyResponses_other": "{{count}} réponses",
       "memosLabel": "Mémos de décision — synthèse de 2 études analysées ou plus (accueil Études)"
     },
     "toast": {
