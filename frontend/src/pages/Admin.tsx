@@ -29,6 +29,10 @@ interface AdminUser {
   projects?: AdminProject[];
   suspended_at?: string | null;
   suspension_reason?: string | null;
+  plan_id?: string | null;
+  plan_name?: string | null;
+  plan_is_legacy?: boolean | null;
+  credits_available?: number | null;
 }
 
 interface AuditEntry {
@@ -503,6 +507,24 @@ export default function Admin() {
       showSuccess(t("toasts.tierUpdated"));
     } catch {
       setError(t("toasts.tierUpdateFailed"));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handlePlanChange(user: AdminUser, planId: string) {
+    setActionLoading(`plan-${user.id}`);
+    try {
+      const { data } = await client().patch<AdminUser>(
+        `/admin/users/${user.id}/plan`,
+        { plan_id: planId }
+      );
+      // The endpoint returns the fully re-resolved summary — use it so the
+      // real plan name, credits, and synced tier all refresh together.
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...data } : u)));
+      showSuccess(t("toasts.planUpdated"));
+    } catch {
+      setError(t("toasts.planUpdateFailed"));
     } finally {
       setActionLoading(null);
     }
@@ -1565,9 +1587,22 @@ export default function Admin() {
                   {user.email}
                 </div>
 
-                {/* Tier */}
-                <div>
-                  <TierBadge tier={user.subscription_tier} />
+                {/* Plan / Tier */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  {user.plan_id && !user.plan_is_legacy ? (
+                    <>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
+                        {user.plan_name}
+                      </span>
+                      {user.credits_available != null && (
+                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          {t("users.creditsLabel", { count: user.credits_available })}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <TierBadge tier={user.subscription_tier} />
+                  )}
                 </div>
 
                 {/* Trial */}
@@ -1600,6 +1635,7 @@ export default function Admin() {
                   <select
                     value={user.subscription_tier}
                     disabled={actionLoading === `tier-${user.id}`}
+                    title={t("users.tierSelectTitle")}
                     onChange={(e) => handleTierChange(user, e.target.value)}
                     style={{
                       fontSize: 12,
@@ -1615,6 +1651,34 @@ export default function Admin() {
                     <option value="team">{t("users.tierTeam")}</option>
                     <option value="lab">{t("users.tierLab")}</option>
                     <option value="enterprise">{t("users.tierEnterprise")}</option>
+                  </select>
+
+                  {/* Plan selector (credits-based — the real subscription) */}
+                  <select
+                    value={user.plan_is_legacy ? "" : user.plan_id ?? ""}
+                    disabled={actionLoading === `plan-${user.id}`}
+                    onChange={(e) => {
+                      if (e.target.value) handlePlanChange(user, e.target.value);
+                    }}
+                    title={t("users.planSelectTitle")}
+                    style={{
+                      fontSize: 12,
+                      padding: "4px 6px",
+                      borderRadius: "var(--radius-xs)",
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-surface)",
+                      cursor: "pointer",
+                      outline: "none",
+                    }}
+                  >
+                    <option value="" disabled>
+                      {t("users.planOption")}
+                    </option>
+                    <option value="trial">{t("users.planTrial")}</option>
+                    <option value="exploration">{t("users.planExploration")}</option>
+                    <option value="team">{t("users.planTeam")}</option>
+                    <option value="agency">{t("users.planAgency")}</option>
+                    <option value="enterprise">{t("users.planEnterprise")}</option>
                   </select>
 
                   {/* Trial selector */}

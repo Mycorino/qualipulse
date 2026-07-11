@@ -892,3 +892,71 @@ class TestCheckoutSessionAttribution:
         # The critical part: the subscription itself carries the same
         # attribution, so the webhook can resolve the workspace.
         assert captured["subscription_data"]["metadata"] == captured["metadata"]
+
+
+class TestAdminSetPlan:
+    """Admin-driven plan switch (billing_service.admin_set_plan)."""
+
+    def test_switch_backfilled_legacy_account_to_credits_plan(self, db_session):
+        from app.services.billing_service import admin_set_plan
+
+        ensure_plans_seeded(db_session)
+        company = _make_company(db_session, tier="starter")
+        backfill_legacy_subscriptions(db_session)  # → legacy_starter sub
+        assert get_current_subscription(db_session, company.id).plan_id == "legacy_starter"
+
+        sub = admin_set_plan(db_session, company, "team")
+
+        assert sub.plan_id == "team"
+        assert sub.status == "active"
+        # Real subscription reflects the new plan.
+        assert get_current_subscription(db_session, company.id).plan_id == "team"
+        # Legacy tier synced so feature_gates stay coherent.
+        db_session.refresh(company)
+        assert company.subscription_tier == "lab"
+        # Credits granted for the new period.
+        bal = get_active_balance(db_session, company.id)
+        assert bal is not None
+        assert bal.included_credits == 50
+        assert bal.available == 50
+
+    def test_switch_to_trial_grants_three_credits(self, db_session):
+        from app.services.billing_service import admin_set_plan
+
+        ensure_plans_seeded(db_session)
+        company = _make_company(db_session, tier="team")
+        sub = admin_set_plan(db_session, company, "trial")
+
+        assert sub.plan_id == "trial"
+        assert sub.status == "trialing"
+        assert sub.trial_end is None  # trial is not time-based
+        bal = get_active_balance(db_session, company.id)
+        assert bal.available == 3
+
+    def test_switch_reflects_in_can_start_interview(self, db_session):
+        from app.services.billing_service import admin_set_plan
+
+        ensure_plans_seeded(db_session)
+        company = _make_company(db_session, tier="starter")
+        admin_set_plan(db_session, company, "exploration")
+
+        decision = can_start_interview(db_session, company.id)
+        assert decision.allowed is True
+        assert decision.plan_id == "exploration"
+        assert decision.is_legacy is False
+
+    def test_rejects_legacy_plan_id(self, db_session):
+        from app.services.billing_service import admin_set_plan
+
+        ensure_plans_seeded(db_session)
+        company = _make_company(db_session)
+        with pytest.raises(ValueError):
+            admin_set_plan(db_session, company, "legacy_team")
+
+    def test_rejects_unknown_plan_id(self, db_session):
+        from app.services.billing_service import admin_set_plan
+
+        ensure_plans_seeded(db_session)
+        company = _make_company(db_session)
+        with pytest.raises(ValueError):
+            admin_set_plan(db_session, company, "nope")

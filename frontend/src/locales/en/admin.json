@@ -87,7 +87,16 @@
     "participants_other": "{{count}} participants",
     "prev": "Previous",
     "next": "Next",
-    "page": "Page {{page}}"
+    "page": "Page {{page}}",
+    "creditsLabel": "{{count}} credits",
+    "planSelectTitle": "Set the credits-based plan (the real subscription)",
+    "tierSelectTitle": "Legacy tier — only affects project/question caps",
+    "planOption": "Change plan…",
+    "planTrial": "Trial (free)",
+    "planExploration": "Exploration",
+    "planTeam": "Team",
+    "planAgency": "Agency",
+    "planEnterprise": "Enterprise"
   },
   "affiliates": {
     "title": "Affiliate Program",
@@ -198,7 +207,9 @@
     "loadAffiliatesFailed": "Failed to load affiliates",
     "loadAuditFailed": "Failed to load audit log",
     "affiliateUpdateFailed": "Failed to update affiliate",
-    "payoutFailed": "Failed to record payout"
+    "payoutFailed": "Failed to record payout",
+    "planUpdated": "Plan updated",
+    "planUpdateFailed": "Failed to update plan"
   },
   "impersonate": {
     "loading": "Loading account view…"

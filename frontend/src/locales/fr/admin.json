@@ -87,7 +87,16 @@
     "participants_other": "{{count}} participants",
     "prev": "Précédent",
     "next": "Suivant",
-    "page": "Page {{page}}"
+    "page": "Page {{page}}",
+    "creditsLabel": "{{count}} crédits",
+    "planSelectTitle": "Définir le plan à crédits (l’abonnement réel)",
+    "tierSelectTitle": "Palier legacy — n’affecte que les quotas projets/questions",
+    "planOption": "Changer de plan…",
+    "planTrial": "Essai (gratuit)",
+    "planExploration": "Exploration",
+    "planTeam": "Team",
+    "planAgency": "Agency",
+    "planEnterprise": "Enterprise"
   },
   "affiliates": {
     "title": "Programme d'affiliation",
@@ -198,7 +207,9 @@
     "loadAffiliatesFailed": "Échec du chargement des affiliés",
     "loadAuditFailed": "Échec du chargement du journal d'audit",
     "affiliateUpdateFailed": "Échec de la mise à jour de l'affilié",
-    "payoutFailed": "Échec de l'enregistrement du versement"
+    "payoutFailed": "Échec de l'enregistrement du versement",
+    "planUpdated": "Plan mis à jour",
+    "planUpdateFailed": "Échec de la mise à jour du plan"
   },
   "impersonate": {
     "loading": "Chargement de la vue du compte…"

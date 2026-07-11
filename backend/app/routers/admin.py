@@ -101,6 +101,13 @@ class AdminUserSummary(BaseModel):
     business_summary: Optional[str] = None
     suspended_at: Optional[datetime] = None
     suspension_reason: Optional[str] = None
+    # Real credits-based plan (WorkspaceSubscription) — the source of truth
+    # for what the customer actually sees + is gated on. May differ from the
+    # legacy subscription_tier for accounts on the credits track.
+    plan_id: Optional[str] = None
+    plan_name: Optional[str] = None
+    plan_is_legacy: Optional[bool] = None
+    credits_available: Optional[int] = None
 
 
 class AdminUserDetail(AdminUserSummary):
@@ -109,6 +116,11 @@ class AdminUserDetail(AdminUserSummary):
 
 class TierUpdate(BaseModel):
     tier: str  # "solo" | "team" | "lab" | "enterprise"
+
+
+class PlanUpdate(BaseModel):
+    plan_id: str  # credits plan: "trial" | "exploration" | "team" | "agency" | "enterprise"
+    billing_interval: str = "monthly"  # "monthly" | "annual"
 
 
 class TrialUpdate(BaseModel):
@@ -163,6 +175,17 @@ def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
         Project.company_id == company.id
     ).scalar()
 
+    # Resolve the real credits-based plan (WorkspaceSubscription) — this is
+    # what the customer's account page shows and what the interview/branding
+    # gates use, so admins need to see it, not just the legacy tier.
+    sub = billing_service.get_current_subscription(db, company.id)
+    plan = billing_service.get_plan(db, sub.plan_id) if sub else None
+    credits_available = None
+    if plan is not None and not plan.is_legacy:
+        balance = billing_service.get_active_balance(db, company.id)
+        if balance is not None:
+            credits_available = balance.available
+
     return AdminUserSummary(
         id=company.id,
         name=company.name,
@@ -179,6 +202,10 @@ def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
         business_summary=company.business_summary,
         suspended_at=company.suspended_at,
         suspension_reason=company.suspension_reason,
+        plan_id=plan.id if plan else None,
+        plan_name=plan.public_name if plan else None,
+        plan_is_legacy=plan.is_legacy if plan else None,
+        credits_available=credits_available,
     )
 
 
@@ -269,6 +296,54 @@ def update_tier(
 
     _record_audit(db, admin_id, "tier_change", company.id, company.email,
                   {"old_tier": old_tier, "new_tier": body.tier})
+
+    return _build_user_summary(company, db)
+
+
+@router.patch("/users/{company_id}/plan", response_model=AdminUserSummary)
+@limiter.limit("30/minute")
+def update_plan(
+    request: Request,
+    company_id: str,
+    body: PlanUpdate,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin),
+) -> AdminUserSummary:
+    """Switch a workspace onto a credits-based plan (no Stripe).
+
+    Unlike the legacy tier dropdown, this moves the real
+    ``WorkspaceSubscription`` — which is what the customer's account page
+    shows and what the interview / branding gates read — and grants the
+    plan's included credits. Also syncs the legacy tier so project /
+    question caps stay coherent.
+    """
+    if body.billing_interval not in {"monthly", "annual"}:
+        raise HTTPException(status_code=422, detail="billing_interval must be 'monthly' or 'annual'")
+
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if company is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    old_plan = billing_service.get_current_subscription(db, company.id)
+    old_plan_id = old_plan.plan_id if old_plan else None
+
+    try:
+        sub = billing_service.admin_set_plan(
+            db, company, body.plan_id, billing_interval=body.billing_interval
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    db.refresh(company)
+
+    _record_audit(db, admin_id, "plan_change", company.id, company.email,
+                  {"old_plan": old_plan_id, "new_plan": sub.plan_id,
+                   "billing_interval": body.billing_interval})
+
+    logger.info(
+        "ADMIN_PLAN_CHANGE: workspace=%s old=%s new=%s interval=%s",
+        company.id, old_plan_id, sub.plan_id, body.billing_interval,
+    )
 
     return _build_user_summary(company, db)
 
