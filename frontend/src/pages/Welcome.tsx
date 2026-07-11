@@ -78,7 +78,10 @@ export default function Welcome() {
   const [roleKey, setRoleKey] = useState("");
   const [roleOther, setRoleOther] = useState("");
   const [teamSize, setTeamSize] = useState("");
-  // Step 3
+  // Step 3 — split into two phases so the user's own words drive the AI:
+  //   'ask'    → free-text goal first (fed to the model)
+  //   'themes' → the generated theme chips to confirm/expand
+  const [phase3, setPhase3] = useState<"ask" | "themes">("ask");
   const [suggestions, setSuggestions] = useState<OnboardingSuggestions | null>(null);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [selectedUseCases, setSelectedUseCases] = useState<Set<string>>(new Set());
@@ -117,7 +120,19 @@ export default function Welcome() {
         }
         const startStep = inferStartStep(data);
         setStep(startStep);
-        if (startStep === 3) fetchSuggestions();
+        // A returning user who already told us their goal (or picked themes
+        // before) skips straight to the themes phase; everyone else starts on
+        // the ask phase so their own words drive the first generation.
+        if (startStep === 3) {
+          const hadGoals = !!(data.goals_freeform || "").trim();
+          const hadCases =
+            (typeof rawUc === "string" && rawUc.trim().length > 0) ||
+            (Array.isArray(rawUc) && rawUc.length > 0);
+          if (hadGoals || hadCases) {
+            setPhase3("themes");
+            fetchSuggestions();
+          }
+        }
       })
       .catch(() => navigate("/login", { replace: true }))
       .finally(() => setLoading(false));
@@ -176,8 +191,10 @@ export default function Welcome() {
         company_size: teamSize,
       });
       setMe(next);
+      // Land on the ask phase — suggestions are NOT fetched yet, so the
+      // user's own words (entered next) become the primary input to the model.
+      setPhase3("ask");
       setStep(3);
-      fetchSuggestions();
     } catch {
       toast(t("toast_save_failed"), "error");
     } finally {
@@ -185,22 +202,32 @@ export default function Welcome() {
     }
   }
 
-  // Persist the goals and regenerate the themes from them. Separate from
-  // handleComplete so users see sharper suggestions before committing.
-  async function handleRefineSuggestions() {
+  // Ask phase → themes phase. Persist the free-text goal (when provided or
+  // changed) FIRST, then generate the themes so the model is anchored on the
+  // user's own words. An empty goal is fine — it just generates from role.
+  async function handleGenerateThemes() {
     const trimmed = goals.trim();
     setSaving(true);
     try {
-      const next = await saveOnboardingProfile({ goals_freeform: trimmed });
-      setMe(next);
-      setGoalsUsed(trimmed);
+      if (trimmed && trimmed !== goalsUsed) {
+        const next = await saveOnboardingProfile({ goals_freeform: trimmed });
+        setMe(next);
+        setGoalsUsed(trimmed);
+      }
     } catch {
       toast(t("toast_save_failed"), "error");
       setSaving(false);
       return;
     }
     setSaving(false);
+    setPhase3("themes");
     fetchSuggestions();
+  }
+
+  // Themes phase → back to ask phase, so the user can edit their words and
+  // regenerate. The textarea is prefilled from `goals`.
+  function handleBackToAsk() {
+    setPhase3("ask");
   }
 
   async function handleComplete() {
@@ -259,13 +286,14 @@ export default function Welcome() {
         if (done) handleEnterWorkspace();
         else if (step === 1 && step1Valid) handleStep1Next();
         else if (step === 2 && step2Valid) handleStep2Next();
-        else if (step === 3 && !suggestionsLoading) handleComplete();
+        else if (step === 3 && phase3 === "ask") handleGenerateThemes();
+        else if (step === 3 && phase3 === "themes" && !suggestionsLoading) handleComplete();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, step1Valid, step2Valid, saving, suggestionsLoading, done, companyName, roleFamily, roleKey, roleOther, teamSize]);
+  }, [step, phase3, step1Valid, step2Valid, saving, suggestionsLoading, done, companyName, roleFamily, roleKey, roleOther, teamSize, goals, goalsUsed]);
 
   if (loading || !me) {
     return (
@@ -513,8 +541,53 @@ export default function Welcome() {
           </section>
         )}
 
-        {/* ── Step 3: AI-suggested use cases + profile summary ── */}
-        {!done && step === 3 && (
+        {/* ── Step 3a: Ask — the user's own words, fed to the model first ── */}
+        {!done && step === 3 && phase3 === "ask" && (
+          <section className="welcome-setup__card">
+            <h1 className="welcome-setup__title">{t("step_3_title")}</h1>
+            <p className="welcome-setup__sub">{t("step_3_ask_sub")}</p>
+
+            <div className="welcome-setup__field">
+              <span className="welcome-setup__field-label">{t("step_3_ask_label")}</span>
+              <textarea
+                className="welcome-setup__other-input"
+                style={{ resize: "vertical" }}
+                rows={4}
+                value={goals}
+                onChange={(e) => setGoals(e.target.value)}
+                placeholder={t("step_3_goals_placeholder")}
+                autoFocus
+                disabled={saving}
+              />
+            </div>
+
+            <div className="welcome-setup__actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setStep(2)}
+                disabled={saving}
+              >
+                {t("back")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleGenerateThemes}
+                disabled={saving}
+              >
+                {saving
+                  ? t("saving")
+                  : goals.trim()
+                    ? t("step_3_ask_cta")
+                    : t("step_3_ask_cta_empty")}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* ── Step 3b: Themes — confirm/expand the AI's proposal ── */}
+        {!done && step === 3 && phase3 === "themes" && (
           <section className="welcome-setup__card">
             <h1 className="welcome-setup__title">{t("step_3_title")}</h1>
             <p className="welcome-setup__sub">{t("step_3_sub")}</p>
@@ -559,34 +632,16 @@ export default function Welcome() {
                   </div>
                 )}
 
-                {/* Free-form context: the wizard chips capture very little,
-                    so let users say what they're actually working on — it
-                    persists to goals_freeform and sharpens the themes. */}
-                <div className="welcome-setup__field">
-                  <span className="welcome-setup__field-label">{t("step_3_goals_label")}</span>
-                  <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>
-                    {t("step_3_goals_hint")}
-                  </p>
-                  <textarea
-                    className="welcome-setup__other-input"
-                    style={{ resize: "vertical" }}
-                    rows={3}
-                    value={goals}
-                    onChange={(e) => setGoals(e.target.value)}
-                    placeholder={t("step_3_goals_placeholder")}
-                    disabled={saving}
-                  />
-                  <div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={handleRefineSuggestions}
-                      disabled={saving || !goals.trim() || goals.trim() === goalsUsed}
-                    >
-                      {t("step_3_goals_cta")}
-                    </button>
+                {/* Read-only recap of the words that drove these themes, with
+                    a one-click way back to the ask phase to edit + regenerate. */}
+                {goalsUsed.trim() && (
+                  <div className="welcome-setup__field">
+                    <span className="welcome-setup__field-label">{t("step_3_your_goal_label")}</span>
+                    <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: "0 0 6px", fontStyle: "italic" }}>
+                      “{goalsUsed}”
+                    </p>
                   </div>
-                </div>
+                )}
               </>
             )}
 
@@ -594,7 +649,7 @@ export default function Welcome() {
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => setStep(2)}
+                onClick={handleBackToAsk}
                 disabled={saving}
               >
                 {t("back")}
@@ -603,7 +658,7 @@ export default function Welcome() {
                 type="button"
                 className="btn btn-primary"
                 onClick={handleComplete}
-                disabled={saving}
+                disabled={saving || suggestionsLoading}
               >
                 {saving ? t("saving") : t("step_3_cta")}
               </button>
