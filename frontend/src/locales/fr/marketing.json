@@ -21,7 +21,7 @@
     "facts": [
       "Sans carte bancaire",
       "Un simple lien pour les participants",
-      "Français, anglais & plus à venir",
+      "Entretiens en 6 langues, d'autres à venir",
       "RGPD, hébergé en UE"
     ]
   },
@@ -247,7 +247,7 @@
       },
       {
         "question": "Quelles langues sont prises en charge ?",
-        "answer": "Vos entretiens se déroulent dans la langue de votre étude : le français et l'anglais sont disponibles aujourd'hui, et nous en ajoutons d'autres régulièrement. L'espace chercheur est proposé en français et en anglais, et chaque transcription peut être traduite automatiquement comme aide à la lecture, l'original restant toujours la source de vérité."
+        "answer": "Vos entretiens se déroulent dans la langue de votre étude : français, anglais, allemand, espagnol, portugais et italien sont disponibles aujourd'hui, et nous en ajoutons régulièrement. L'espace chercheur est proposé en français et en anglais, et chaque transcription peut être traduite automatiquement comme aide à la lecture, l'original restant toujours la source de vérité."
       },
       {
         "question": "Les données sont-elles hébergées en Europe ?",
