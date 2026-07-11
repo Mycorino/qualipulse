@@ -134,7 +134,7 @@
   },
   "dashboard": {
     "loadFailed": "Impossible de charger le tableau de bord",
-    "exportPdf": "Exporter les résultats (PDF)",
+    "exportPdf": "Ouvrir le rapport complet (PDF)",
     "exportPdfTitle": "Ouvrir le rapport de résultats prêt à imprimer",
     "exportPdfLoading": "Préparation…",
     "exportReportFailed": "Impossible d'exporter le rapport",
