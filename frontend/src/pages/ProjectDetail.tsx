@@ -3167,6 +3167,11 @@ export default function ProjectDetail() {
                 <h2>{tAnalysis("aiAnalysis")}</h2>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   {analysis.report && (
+                    <button className="btn btn-secondary btn-sm" onClick={handleExportReport} title={tAnalysis("exportReport")}>
+                      {tAnalysis("exportPdfBtn")}
+                    </button>
+                  )}
+                  {analysis.report && (
                     <div className="overflow-menu" ref={exportMenuRef}>
                       <button
                         className="overflow-menu__trigger"
@@ -3179,9 +3184,6 @@ export default function ProjectDetail() {
                       </button>
                       {exportMenuOpen && (
                         <div className="overflow-menu__dropdown" role="menu">
-                          <button role="menuitem" className="overflow-menu__item" onClick={() => { setExportMenuOpen(false); handleExportReport(); }}>
-                            📄 {tAnalysis("exportReport")}
-                          </button>
                           <button role="menuitem" className="overflow-menu__item" onClick={() => { setExportMenuOpen(false); handleCopyMarkdown(); }}>
                             {exportCopied ? `✓ ${tCommon("copied")}` : tAnalysis("copyMd")}
                           </button>

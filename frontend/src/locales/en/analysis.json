@@ -181,5 +181,6 @@
       "tension_note": "Tension note",
       "jtbd_note": "JTBD note"
     }
-  }
+  },
+  "exportPdfBtn": "Export report (PDF)"
 }
