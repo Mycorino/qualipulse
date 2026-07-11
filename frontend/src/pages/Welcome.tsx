@@ -130,7 +130,8 @@ export default function Welcome() {
             (Array.isArray(rawUc) && rawUc.length > 0);
           if (hadGoals || hadCases) {
             setPhase3("themes");
-            fetchSuggestions();
+            // Sonnet only pays off when there's a goal to anchor on.
+            fetchSuggestions(hadGoals ? "sonnet" : "haiku");
           }
         }
       })
@@ -148,10 +149,12 @@ export default function Welcome() {
   const step1Valid = !!companyName.trim();
   const step2Valid = !!roleResolved && !!teamSize;
 
-  async function fetchSuggestions() {
+  // `model` routes to the fast (haiku) or high-quality (sonnet) tier —
+  // the caller picks based on whether the user gave a free-text goal.
+  async function fetchSuggestions(model?: "haiku" | "sonnet") {
     setSuggestionsLoading(true);
     try {
-      const data = await getOnboardingSuggestions();
+      const data = await getOnboardingSuggestions(model);
       setSuggestions(data);
     } catch {
       setSuggestions({
@@ -221,7 +224,10 @@ export default function Welcome() {
     }
     setSaving(false);
     setPhase3("themes");
-    fetchSuggestions();
+    // Route by input richness: a typed goal → Sonnet (its anchoring on the
+    // user's words is exactly the win); skipped → Haiku (fast, and role-only
+    // themes don't need Sonnet's reasoning).
+    fetchSuggestions(trimmed ? "sonnet" : "haiku");
   }
 
   // Themes phase → back to ask phase, so the user can edit their words and

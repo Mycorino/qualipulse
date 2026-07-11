@@ -252,7 +252,16 @@ export interface OnboardingSuggestions {
   business_summary: string | null;
 }
 
-export async function getOnboardingSuggestions(): Promise<OnboardingSuggestions> {
-  const { data } = await client.get<OnboardingSuggestions>("/auth/onboarding/suggestions");
+// `model` routes the backend to the fast (haiku) or high-quality (sonnet)
+// tier. The wizard sends "haiku" when the user skipped the free-text goal
+// (role-only themes don't need Sonnet) and "sonnet" when they typed a goal
+// (where Sonnet's anchoring on their words pays off). Omit to default sonnet.
+export async function getOnboardingSuggestions(
+  model?: "haiku" | "sonnet",
+): Promise<OnboardingSuggestions> {
+  const { data } = await client.get<OnboardingSuggestions>(
+    "/auth/onboarding/suggestions",
+    model ? { params: { model } } : undefined,
+  );
   return data;
 }

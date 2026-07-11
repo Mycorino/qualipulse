@@ -819,14 +819,21 @@ _FALLBACK_USE_CASES_FR = [
 @limiter.limit("10/minute")
 def get_onboarding_suggestions(
     request: Request,
+    model: str = "sonnet",
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
 ):
     """Return AI-suggested use cases and a profile summary for onboarding step 3.
 
     Reads the current Company state (role, company_size, business_summary,
-    industry) and calls Haiku to generate personalised suggestions.
+    industry) and calls Claude to generate personalised suggestions.
     Degrades gracefully when data is sparse or the API is unavailable.
+
+    ``model`` selects the tier: ``sonnet`` (default) for goal-driven
+    generation where the extra reasoning anchors themes on the user's own
+    words, or ``haiku`` for the fast role-only path (the wizard sends this
+    when the user skipped the free-text goal). Any other value falls back
+    to Sonnet.
     """
     lang = (company.preferred_language or "en").strip().lower()[:2]
     fallback_cases = _FALLBACK_USE_CASES_FR if lang == "fr" else _FALLBACK_USE_CASES_EN
@@ -875,8 +882,10 @@ def get_onboarding_suggestions(
 
         output_lang = "French" if lang == "fr" else "English"
 
+        model_id = ai_models.haiku() if model == "haiku" else ai_models.sonnet()
+
         resp = client.messages.create(
-            model=ai_models.sonnet(),
+            model=model_id,
             max_tokens=400,
             messages=[{
                 "role": "user",
