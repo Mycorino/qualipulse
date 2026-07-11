@@ -876,7 +876,7 @@ def get_onboarding_suggestions(
         output_lang = "French" if lang == "fr" else "English"
 
         resp = client.messages.create(
-            model=ai_models.haiku(),
+            model=ai_models.sonnet(),
             max_tokens=400,
             messages=[{
                 "role": "user",
