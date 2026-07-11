@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
@@ -33,6 +34,12 @@ from app.services.demo_seeder import (
 from app.services import billing_service
 from app.services.feature_gates import require_project_limit, require_question_limit
 from app.services.guide_parser import parse_guide_csv
+from app.services.storage import (
+    IMAGE_EXTENSIONS,
+    MAX_IMAGE_UPLOAD_MB,
+    matches_image_magic,
+    upload_image,
+)
 from app.services.study_provisioning import study_for_new_project
 from app.services.workspace import accessible_workspace_ids, can_edit, get_member_role
 
@@ -555,6 +562,39 @@ def patch_project_settings(
     if body.target_participants is not None:
         project.target_participants = body.target_participants
     _apply_branding_fields(project, body, company, db)
+    db.commit()
+    db.refresh(project)
+    return _project_to_response(project)
+
+
+@router.post("/{project_id}/branding/logo", response_model=ProjectResponse)
+async def upload_branding_logo(
+    project_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ProjectResponse:
+    """Upload a branding logo image and set it as the project's researcher logo.
+
+    Stored in R2 in production (absolute public URL) or under UPLOAD_DIR in
+    local dev (served via /files). Same validation as the blog image upload.
+    """
+    project = _get_project_or_404(project_id, company.id, db)
+    ext = IMAGE_EXTENSIONS.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(
+            status_code=415,
+            detail="Unsupported image type. Allowed: PNG, JPEG, WebP, GIF.",
+        )
+    data = await file.read()
+    if len(data) > MAX_IMAGE_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413, detail=f"Image too large. Max size is {MAX_IMAGE_UPLOAD_MB}MB."
+        )
+    if not matches_image_magic(data, ext):
+        raise HTTPException(status_code=415, detail="File content does not match its image type.")
+    key = f"project-logos/{project.id}/{uuid.uuid4()}{ext}"
+    project.researcher_logo_url = upload_image(data, key)
     db.commit()
     db.refresh(project)
     return _project_to_response(project)

@@ -116,6 +116,29 @@ def download_audio(key: str) -> bytes:
             return f.read()
 
 
+# ── Image upload validation (shared by blog editor + project logo upload) ─────
+MAX_IMAGE_UPLOAD_MB = 8
+IMAGE_EXTENSIONS = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+
+
+def matches_image_magic(data: bytes, ext: str) -> bool:
+    """Cheap signature check so a mislabelled file can't be stored as an image."""
+    if ext == ".png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext == ".jpg":
+        return data.startswith(b"\xff\xd8\xff")
+    if ext == ".gif":
+        return data.startswith((b"GIF87a", b"GIF89a"))
+    if ext == ".webp":
+        return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
 def _content_type(key: str) -> str:
     ext = os.path.splitext(key)[1].lower()
     return {
