@@ -2,10 +2,25 @@
   "overview": {
     "tabs": {
       "overview": "Aperçu",
-      "surveys": "Questionnaires",
-      "interviews": "Entretiens",
+      "instruments": "Instruments",
       "participants": "Participants",
-      "report": "Rapport"
+      "report": "Rapports"
+    },
+    "instruments": {
+      "empty": "Aucun instrument pour l'instant. Commencez par un questionnaire de sélection pour qualifier les répondants, ou passez directement à une série d'entretiens.",
+      "surveyEyebrow": "Questionnaire · {{role}} · {{status}}",
+      "interviewEyebrow": "Entretiens · {{language}}"
+    },
+    "reportsIndex": {
+      "title": "Tous les rapports de cette étude",
+      "scopeStudy": "Cette étude",
+      "scopeRound": "Série d'entretiens",
+      "scopeCross": "Multi-études",
+      "studyReportLabel": "Rapport d'étude méthodes mixtes (cette page)",
+      "ready": "Prêt",
+      "notGenerated": "Pas encore généré",
+      "noAnalysisYet": "Pas encore d'analyse",
+      "memosLabel": "Mémos de décision — synthèse de 2 études analysées ou plus (accueil Études)"
     },
     "toast": {
       "surveyCreateFailed": "Impossible de créer le questionnaire",
@@ -53,6 +68,7 @@
     },
     "report": {
       "loading": "Chargement…",
+      "scopeNote": "Couvre toute l'étude — chiffres du questionnaire et verbatims d'entretiens réunis dans un seul rapport. Chaque série d'entretiens dispose aussi de sa propre analyse dans son onglet Analyse.",
       "generateHeadline": "Générer le rapport de thèmes quantifiés",
       "generateBody": "Combine les agrégats du questionnaire avec les transcriptions d'entretiens en thèmes qui associent ce que les gens ont dit à la fréquence à laquelle ils l'ont dit. Chaque thème s'accompagne d'une prochaine étape recommandée et d'une pastille de confiance — le même contrat méthodologique utilisé partout ailleurs dans l'espace de travail.",
       "lowResponseWarning_one": "⚠ Vous avez {{count}} réponse au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
@@ -120,7 +136,19 @@
     },
     "recommendedAction": {
       "eyebrow": "Prochaine étape recommandée",
-      "takeAction": "Passer à l'action →"
+      "takeAction": "Passer à l'action →",
+      "actions": {
+        "create_survey": "Créez un questionnaire de sélection pour commencer à collecter des réponses.",
+        "publish_survey": "Publiez votre questionnaire pour commencer à collecter des réponses.",
+        "share_survey_link": "Partagez le lien du questionnaire pour recueillir les premières réponses.",
+        "collect_more_responses_one": "Continuez la collecte — encore {{count}} réponse avant le seuil d'inférence.",
+        "collect_more_responses_other": "Continuez la collecte — encore {{count}} réponses avant le seuil d'inférence.",
+        "open_dashboard_invite": "Ouvrez les résultats du questionnaire pour filtrer les répondants et les inviter à des entretiens IA.",
+        "invite_interviews": "Invitez les répondants les plus pertinents à des entretiens IA depuis les résultats du questionnaire.",
+        "collect_more_interviews_one": "Réalisez encore {{count}} entretien avant de générer le rapport de l'étude.",
+        "collect_more_interviews_other": "Réalisez encore {{count}} entretiens avant de générer le rapport de l'étude.",
+        "generate_report": "Générez le rapport de l'étude pour croiser les chiffres du questionnaire et les verbatims d'entretiens."
+      }
     },
     "checklist": {
       "title": "Progression de l'étude",

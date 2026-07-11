@@ -4,6 +4,8 @@
   "iterationCoachmarkDesc": "Tag themes as confirmed, disputed, or needs more evidence — then click Refine for v2.",
   "iterationCoachmarkDismiss": "Dismiss tip",
   "exportMenuLabel": "More export options",
+  "scopeNote": "Covers this interview round only.",
+  "scopeStudyReportLink": "For the whole study (surveys + interviews), see the study report →",
   "noAnalysis": "No analysis yet. Run an AI analysis to get themes, jobs-to-be-done, tensions, and recommendations.",
   "runAnalysis": "Run AI analysis",
   "running": "Generating analysis…",

@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+
 import type { InstrumentSection } from "./InstrumentSubNav";
 import type { InstrumentStatusTone } from "./InstrumentShell";
 
@@ -7,12 +9,17 @@ import type { InstrumentStatusTone } from "./InstrumentShell";
  * A survey's three views — the question builder, the results dashboard,
  * and the respondent preview — are separate routes, but they read as one
  * instrument: the same InstrumentShell with this segmented sub-nav.
+ *
+ * Labels come from the `shell` namespace so they localize with the rest
+ * of the chrome (any page's `t` can reach them via the `shell:` prefix).
  */
-export const SURVEY_SECTIONS: InstrumentSection[] = [
-  { key: "build", label: "Build" },
-  { key: "results", label: "Results" },
-  { key: "preview", label: "Preview" },
-];
+export function surveySections(t: TFunction): InstrumentSection[] {
+  return [
+    { key: "build", label: t("shell:instrument.sectionBuild") },
+    { key: "results", label: t("shell:instrument.sectionResults") },
+    { key: "preview", label: t("shell:instrument.sectionPreview") },
+  ];
+}
 
 export function surveySectionPath(key: string, surveyId: string): string {
   if (key === "results") return `/surveys/${surveyId}/dashboard`;
@@ -23,8 +30,11 @@ export function surveySectionPath(key: string, surveyId: string): string {
 /** Maps a survey status to an InstrumentShell status pill. */
 export function surveyStatusPill(
   status: string,
+  t: TFunction,
 ): { label: string; tone: InstrumentStatusTone } {
-  if (status === "live") return { label: "Live", tone: "live" };
-  if (status === "closed") return { label: "Closed", tone: "closed" };
-  return { label: "Draft", tone: "draft" };
+  if (status === "live")
+    return { label: t("shell:instrument.statusLive"), tone: "live" };
+  if (status === "closed")
+    return { label: t("shell:instrument.statusClosed"), tone: "closed" };
+  return { label: t("shell:instrument.statusDraft"), tone: "draft" };
 }

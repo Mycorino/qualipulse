@@ -9,6 +9,21 @@
   "subNav": {
     "defaultAriaLabel": "Sections"
   },
+  "instrument": {
+    "crumbStudies": "Études",
+    "fallbackStudy": "Étude",
+    "crumbInterviewRound": "Entretiens",
+    "eyebrowInterviewRound": "Série d'entretiens",
+    "eyebrowPlanStep": "Étape {{index}} sur {{total}} · {{plan}}",
+    "statusCollecting": "Collecte en cours",
+    "statusPaused": "En pause",
+    "sectionBuild": "Édition",
+    "sectionResults": "Résultats",
+    "sectionPreview": "Aperçu",
+    "statusLive": "En ligne",
+    "statusClosed": "Clôturé",
+    "statusDraft": "Brouillon"
+  },
   "audio": {
     "unavailable": "Audio indisponible",
     "pause": "Pause",

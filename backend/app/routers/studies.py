@@ -40,6 +40,7 @@ from app.schemas.study import (
     GeneratedValidationSurvey,
     ProjectMini,
     QuantifiedThemeReport,
+    SoleInstrument,
     StudyAnalysisDetail,
     StudyAnalysisSummary,
     StudyDetail,
@@ -140,7 +141,9 @@ def get_study(
         projects=project_minis,
         progress=progress,
         is_demo=any(p.is_demo for p in projects),
-        recommended_action=recommended,
+        recommended_action=recommended[2] if recommended else None,
+        recommended_action_key=recommended[0] if recommended else None,
+        recommended_action_params=recommended[1] if recommended else None,
     )
 
 
@@ -221,6 +224,31 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         .first()
         is not None
     )
+    # Single-instrument studies expose their one instrument so the list
+    # can open it directly instead of forcing the workspace hop.
+    sole_instrument: SoleInstrument | None = None
+    if survey_count + project_count == 1:
+        if survey_count == 1:
+            sole_survey = (
+                db.query(Survey)
+                .filter(Survey.study_id == study.id, Survey.archived_at.is_(None))
+                .first()
+            )
+            if sole_survey:
+                sole_instrument = SoleInstrument(
+                    kind="survey",
+                    id=sole_survey.id,
+                    survey_status=sole_survey.status,
+                )
+        else:
+            sole_project = (
+                db.query(Project)
+                .filter(Project.study_id == study.id, Project.archived_at.is_(None))
+                .first()
+            )
+            if sole_project:
+                sole_instrument = SoleInstrument(kind="interview", id=sole_project.id)
+
     return StudySummary(
         id=study.id,
         name=study.name,
@@ -234,6 +262,7 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         has_report=has_report,
         has_ready_analysis=has_ready_analysis,
         is_demo=is_demo,
+        sole_instrument=sole_instrument,
     )
 
 
@@ -298,6 +327,15 @@ def _project_mini(db: Session, project: Project) -> ProjectMini:
         .scalar()
         or 0
     )
+    has_ready_analysis = (
+        db.query(ProjectAnalysis.id)
+        .filter(
+            ProjectAnalysis.project_id == project.id,
+            ProjectAnalysis.status == "ready",
+        )
+        .first()
+        is not None
+    )
     return ProjectMini(
         id=project.id,
         name=project.name,
@@ -305,6 +343,7 @@ def _project_mini(db: Session, project: Project) -> ProjectMini:
         interview_link_count=link_count,
         completed_participant_count=completed,
         in_progress_participant_count=in_progress,
+        has_ready_analysis=has_ready_analysis,
     )
 
 
@@ -335,38 +374,77 @@ def _recommended_action(
     progress: StudyProgress,
     surveys: list[Survey],
     projects: list[Project],
-) -> str | None:
+) -> tuple[str, dict[str, int], str] | None:
     """Server-computed next-action prompt for the Study Overview chip.
 
     Order matches the progress-checklist order so the prompt always
     points at the next un-done step. Returns None when the study is
     fully complete (or empty — caller decides what to show).
+
+    Returns (key, params, english_text). The key + params let the
+    frontend render the prompt in the user's UI language; the English
+    text is kept as a fallback for older clients.
     """
 
     if not surveys:
-        return "Create a screener survey to start collecting responses."
+        return (
+            "create_survey",
+            {},
+            "Create a screener survey to start collecting responses.",
+        )
 
     if not progress.has_live_survey:
-        return "Publish your survey to start collecting responses."
+        return (
+            "publish_survey",
+            {},
+            "Publish your survey to start collecting responses.",
+        )
 
     if progress.total_completed_responses == 0:
-        return "Share your survey link to collect the first responses."
+        return (
+            "share_survey_link",
+            {},
+            "Share your survey link to collect the first responses.",
+        )
 
     if progress.total_completed_responses < 30:
         remaining = 30 - progress.total_completed_responses
         plural = "response" if remaining == 1 else "responses"
-        return f"Keep collecting — {remaining} more {plural} until inference-grade thresholds."
+        # NOTE: the param is named `count` because i18next pluralization
+        # on the frontend keys plural selection off `count` specifically.
+        return (
+            "collect_more_responses",
+            {"count": remaining},
+            f"Keep collecting — {remaining} more {plural} until inference-grade thresholds.",
+        )
 
     if not projects:
-        return "Open the survey dashboard to filter respondents and invite them to AI interviews."
+        return (
+            "open_dashboard_invite",
+            {},
+            "Open the survey dashboard to filter respondents and invite them to AI interviews.",
+        )
 
     if progress.interviews_completed == 0:
-        return "Use the Screener Bridge to invite high-signal respondents to AI interviews."
+        return (
+            "invite_interviews",
+            {},
+            "Use the Screener Bridge to invite high-signal respondents to AI interviews.",
+        )
 
     if progress.interviews_completed < 5:
-        return f"Conduct {5 - progress.interviews_completed} more interview(s) before generating the mixed-methods report."
+        remaining = 5 - progress.interviews_completed
+        return (
+            "collect_more_interviews",
+            {"count": remaining},
+            f"Conduct {remaining} more interview(s) before generating the mixed-methods report.",
+        )
 
-    return "Generate the mixed-methods report to synthesize quanti + quali into one view."
+    return (
+        "generate_report",
+        {},
+        "Generate the mixed-methods report to synthesize quanti + quali into one view.",
+    )
 
 
 # ── Sprint 11: Quantified Themes report ──────────────────────────────

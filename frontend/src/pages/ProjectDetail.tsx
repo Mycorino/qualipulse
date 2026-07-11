@@ -804,6 +804,34 @@ export default function ProjectDetail() {
     }
   }
 
+  // Landing on the Responses tab with an empty right pane reads as a bug —
+  // auto-open the most recent unlocked transcript instead. Desktop only:
+  // on mobile (≤768px) the detail pane replaces the list, so auto-opening
+  // would hide the participant list the user came for. One-shot per visit —
+  // a deliberate "back to participants" deselect must stick.
+  const autoSelectRef = useRef(false);
+  useEffect(() => {
+    autoSelectRef.current = false;
+  }, [id]);
+  useEffect(() => {
+    if (tab !== "responses" || loading || autoSelectRef.current) return;
+    if (selectedParticipant) {
+      autoSelectRef.current = true;
+      return;
+    }
+    if (!window.matchMedia("(min-width: 769px)").matches) return;
+    const first = [...participants]
+      .sort(
+        (a, b) =>
+          new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
+      )
+      .find((p) => !p.is_locked);
+    if (!first) return;
+    autoSelectRef.current = true;
+    handleViewTranscript(first);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, loading, participants, selectedParticipant]);
+
   async function handleToggleTranslation() {
     if (!selectedParticipant || !transcript) return;
     const targetLang = (i18n.language || "en").slice(0, 2).toLowerCase();
@@ -1608,29 +1636,41 @@ export default function ProjectDetail() {
   return (
     <InstrumentShell
       crumbs={(() => {
-        // A single-instrument study is auto-named after its round, so the
-        // study crumb and the round crumb would read identically. Drop the
-        // redundant study link in that case — show just Studies › <name>.
+        // The parent-study link must NEVER be dropped — it's the only way
+        // back to the study workspace. When the round shares the study's
+        // name (auto-named single-round studies, the demo study), avoid
+        // the duplicated text by labelling the leaf crumb "Interviews"
+        // instead of repeating the name.
         const sameName =
           !!project.study_name &&
           project.study_name.trim() === project.name.trim();
         return [
-          { label: "Studies", to: "/studies" },
-          ...(project.study_id && !sameName
+          { label: tProject("shell:instrument.crumbStudies"), to: "/studies" },
+          ...(project.study_id
             ? [
                 {
-                  label: project.study_name || "Study",
+                  label:
+                    project.study_name ||
+                    tProject("shell:instrument.fallbackStudy"),
                   to: `/studies/${project.study_id}`,
                 },
               ]
             : []),
-          { label: project.name },
+          {
+            label: sameName
+              ? tProject("shell:instrument.crumbInterviewRound")
+              : project.name,
+          },
         ];
       })()}
       eyebrow={
         project.plan_context
-          ? `Step ${project.plan_context.step_index} of ${project.plan_context.total_steps} · ${project.plan_context.plan_name}`
-          : "Interview round"
+          ? tProject("shell:instrument.eyebrowPlanStep", {
+              index: project.plan_context.step_index,
+              total: project.plan_context.total_steps,
+              plan: project.plan_context.plan_name,
+            })
+          : tProject("shell:instrument.eyebrowInterviewRound")
       }
       title={
         <input
@@ -1652,8 +1692,14 @@ export default function ProjectDetail() {
       }
       status={
         isCollecting
-          ? { label: "Collecting", tone: "live" }
-          : { label: "Paused", tone: "draft" }
+          ? {
+              label: tProject("shell:instrument.statusCollecting"),
+              tone: "live" as const,
+            }
+          : {
+              label: tProject("shell:instrument.statusPaused"),
+              tone: "draft" as const,
+            }
       }
       actions={
         <div className="detail-header-actions">
@@ -3204,6 +3250,21 @@ export default function ProjectDetail() {
                   )}
                 </div>
               </div>
+
+              {/* Scope line — three report surfaces exist (round analysis /
+                  study report / decision memo); each states its scope and
+                  links up one level so they stop reading as interchangeable. */}
+              <p className="muted-text" style={{ fontSize: 13, margin: "0 0 16px" }}>
+                {tAnalysis("scopeNote")}
+                {project.study_id && (
+                  <>
+                    {" "}
+                    <Link to={`/studies/${project.study_id}?tab=report`}>
+                      {tAnalysis("scopeStudyReportLink")}
+                    </Link>
+                  </>
+                )}
+              </p>
 
               {/* P2: Filter panel */}
               {hasFilterOptions && (

@@ -32,6 +32,9 @@ class ProjectMini(BaseModel):
     interview_link_count: int = 0
     completed_participant_count: int = 0
     in_progress_participant_count: int = 0
+    # True when the round has a ready ProjectAnalysis — the study's Reports
+    # tab uses it to badge per-round analyses as ready vs not-yet-run.
+    has_ready_analysis: bool = False
 
 
 class SurveyMini(BaseModel):
@@ -61,6 +64,21 @@ class StudyProgress(BaseModel):
     report_ready_placeholder: bool
 
 
+class SoleInstrument(BaseModel):
+    """The one instrument of a single-instrument study.
+
+    Present on StudySummary only when the study holds exactly one
+    instrument. The Studies list uses it to open that instrument
+    directly instead of forcing a hop through the study workspace
+    (still reachable via the instrument's breadcrumb).
+    """
+
+    kind: Literal["survey", "interview"]
+    id: str
+    # Survey status routes the click: draft → builder, live/closed → results.
+    survey_status: str | None = None
+
+
 class StudySummary(BaseModel):
     """List item shape for GET /studies — drives the Studies-list home cards.
 
@@ -87,6 +105,9 @@ class StudySummary(BaseModel):
     # demo rows and keeps demo evidence out of workspace-level totals so the
     # researcher's own progress isn't inflated by tour data.
     is_demo: bool = False
+    # Set only when the study has exactly one instrument — lets the list
+    # link straight to it.
+    sole_instrument: SoleInstrument | None = None
 
 
 class StudyDetail(BaseModel):
@@ -105,7 +126,12 @@ class StudyDetail(BaseModel):
     is_demo: bool = False
     # Researcher-facing recommended next action ("Invite N detractors to interview" etc).
     # Computed server-side based on progress flags; Sprint 10 widens the cases.
+    # `recommended_action` is the English fallback text; the frontend prefers
+    # `recommended_action_key` (+ params) so the prompt renders in the UI
+    # language instead of hardcoded English.
     recommended_action: str | None = None
+    recommended_action_key: str | None = None
+    recommended_action_params: dict[str, int] | None = None
 
 
 # ── Sprint 11: Quantified Themes report ───────────────────────────────

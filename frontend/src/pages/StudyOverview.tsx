@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import type { CSSProperties } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -35,14 +36,22 @@ import { openHtmlDocument } from "../utils/openHtmlDocument";
  * survey responses + completed interviews.
  */
 
-type Tab = "overview" | "surveys" | "interviews" | "participants" | "report";
+type Tab = "overview" | "instruments" | "participants" | "report";
+
+/** Legacy deep links used separate surveys/interviews tabs — fold them in. */
+function normalizeTab(raw: string | null): Tab {
+  if (raw === "surveys" || raw === "interviews") return "instruments";
+  if (raw === "instruments" || raw === "participants" || raw === "report")
+    return raw;
+  return "overview";
+}
 
 export default function StudyOverview() {
   const { t, i18n } = useTranslation(["study", "dashboard"]);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get("tab") as Tab) || "overview";
+  const initialTab = normalizeTab(searchParams.get("tab"));
   const [tab, setTab] = useState<Tab>(initialTab);
   const [study, setStudy] = useState<StudyDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -175,7 +184,7 @@ export default function StudyOverview() {
         aria-label={t("overview.sectionsNav")}
       >
         <div style={{ display: "flex", gap: "var(--space-4)" }}>
-          {(["overview", "surveys", "interviews", "participants", "report"] as Tab[]).map((tabKey) => (
+          {(["overview", "instruments", "participants", "report"] as Tab[]).map((tabKey) => (
             <button
               key={tabKey}
               type="button"
@@ -217,16 +226,22 @@ export default function StudyOverview() {
             billing chrome out of them. */}
         {!study.is_demo && <SurveyQuotaBanner />}
         {tab === "overview" && (
-          <OverviewTab study={study} navigate={navigate} onCreateSurvey={handleCreateSurvey} />
+          <OverviewTab
+            study={study}
+            navigate={navigate}
+            onCreateSurvey={handleCreateSurvey}
+            goToTab={setTabAndUrl}
+          />
         )}
-        {tab === "surveys" && (
-          <SurveysTab study={study} onCreateSurvey={handleCreateSurvey} />
-        )}
-        {tab === "interviews" && (
-          <InterviewsTab study={study} onCreateInterview={handleCreateInterview} />
+        {tab === "instruments" && (
+          <InstrumentsTab
+            study={study}
+            onCreateSurvey={handleCreateSurvey}
+            onCreateInterview={handleCreateInterview}
+          />
         )}
         {tab === "participants" && <ParticipantsTab study={study} />}
-        {tab === "report" && <ReportTab studyId={study.id} progress={study.progress} />}
+        {tab === "report" && <ReportTab study={study} />}
       </main>
     </div>
     </HubShell>
@@ -237,37 +252,87 @@ export default function StudyOverview() {
    Tabs
    ──────────────────────────────────────────────────────────────────── */
 
+/** Recommendation keys this client knows how to localize + route. */
+const KNOWN_ACTION_KEYS = [
+  "create_survey",
+  "publish_survey",
+  "share_survey_link",
+  "collect_more_responses",
+  "open_dashboard_invite",
+  "invite_interviews",
+  "collect_more_interviews",
+  "generate_report",
+] as const;
+
 function OverviewTab({
   study,
   navigate,
   onCreateSurvey,
+  goToTab,
 }: {
   study: StudyDetail;
   navigate: ReturnType<typeof useNavigate>;
   onCreateSurvey: () => void;
+  goToTab: (tab: Tab) => void;
 }) {
+  const { t } = useTranslation("study");
+
+  // Prefer the structured key so the prompt renders in the UI language;
+  // the server's `recommended_action` string is the English fallback for
+  // keys this client doesn't know yet.
+  const actionKey =
+    study.recommended_action_key &&
+    (KNOWN_ACTION_KEYS as readonly string[]).includes(study.recommended_action_key)
+      ? study.recommended_action_key
+      : null;
+  const actionText = actionKey
+    ? t(
+        `overview.recommendedAction.actions.${actionKey}`,
+        study.recommended_action_params ?? {},
+      )
+    : study.recommended_action;
+
   const onAct = () => {
-    // The recommended action is text — for v1 the chip just routes to the
-    // most sensible surface for the current state. Sprint 10 wires the
-    // chip to a structured action (e.g. directly open the bridge for a
-    // suggested segment).
+    const firstSurvey = study.surveys[0];
+    const liveSurvey =
+      study.surveys.find((s) => s.status === "live") ?? firstSurvey;
+    switch (actionKey) {
+      case "create_survey":
+        onCreateSurvey();
+        return;
+      case "publish_survey":
+      case "share_survey_link":
+        // Publishing and the shareable link both live in the builder.
+        if (firstSurvey) navigate(`/surveys/${firstSurvey.id}/edit`);
+        else onCreateSurvey();
+        return;
+      case "collect_more_responses":
+      case "open_dashboard_invite":
+      case "invite_interviews":
+        // Collection progress + the Screener Bridge live on the dashboard.
+        if (liveSurvey) navigate(`/surveys/${liveSurvey.id}/dashboard`);
+        return;
+      case "collect_more_interviews":
+        goToTab("instruments");
+        return;
+      case "generate_report":
+        goToTab("report");
+        return;
+    }
+    // Unknown key (older client vs newer server) — legacy heuristic.
     if (!study.progress.has_live_survey && study.surveys.length === 0) {
       onCreateSurvey();
-      return;
-    }
-    if (!study.progress.has_live_survey && study.surveys.length > 0) {
-      navigate(`/surveys/${study.surveys[0].id}/edit`);
-      return;
-    }
-    if (study.surveys.length > 0) {
-      navigate(`/surveys/${study.surveys[0].id}/dashboard`);
+    } else if (!study.progress.has_live_survey && firstSurvey) {
+      navigate(`/surveys/${firstSurvey.id}/edit`);
+    } else if (firstSurvey) {
+      navigate(`/surveys/${firstSurvey.id}/dashboard`);
     }
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
-      {study.recommended_action && (
-        <RecommendedActionCard text={study.recommended_action} onClick={onAct} />
+      {actionText && (
+        <RecommendedActionCard text={actionText} onClick={onAct} />
       )}
       <ProgressChecklist study={study} />
       <SummaryStrip study={study} />
@@ -275,36 +340,89 @@ function OverviewTab({
   );
 }
 
-function SurveysTab({
+/**
+ * InstrumentsTab — ONE list for everything the study collects with.
+ *
+ * Surveys and interview rounds used to live behind separate tabs; with
+ * ≤3 items each that split forced a which-tab decision without adding
+ * information. Each row carries its kind in the eyebrow, so one list
+ * stays legible. Surveys sort first (screener → interviews mirrors the
+ * methodology flow).
+ */
+function InstrumentsTab({
   study,
   onCreateSurvey,
+  onCreateInterview,
 }: {
   study: StudyDetail;
   onCreateSurvey: () => void;
+  onCreateInterview: () => void;
 }) {
   const { t } = useTranslation("study");
-  if (study.surveys.length === 0) {
+
+  const surveyStatusLabel = (status: string) =>
+    status === "live"
+      ? t("shell:instrument.statusLive")
+      : status === "closed"
+        ? t("shell:instrument.statusClosed")
+        : t("shell:instrument.statusDraft");
+
+  const createButtons = (
+    <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+      <button type="button" className="btn btn-secondary" onClick={onCreateSurvey}>
+        {t("overview.surveys.newSurvey")}
+      </button>
+      <button type="button" className="btn btn-secondary" onClick={onCreateInterview}>
+        {t("overview.interviews.addRound")}
+      </button>
+    </div>
+  );
+
+  if (study.surveys.length === 0 && study.projects.length === 0) {
     return (
-      <EmptyState
-        message={t("overview.surveys.empty")}
-        ctaLabel={t("overview.surveys.newSurvey")}
-        onAct={onCreateSurvey}
-      />
+      <div
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px dashed var(--border-default)",
+          borderRadius: "var(--radius-md)",
+          padding: "var(--space-8)",
+          textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "var(--space-4)",
+        }}
+      >
+        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-md)", maxWidth: 540, margin: 0, lineHeight: 1.5 }}>
+          {t("overview.instruments.empty")}
+        </p>
+        {createButtons}
+      </div>
     );
   }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {study.surveys.map((s) => (
-          <a
+          <Link
             key={s.id}
-            href={`/surveys/${s.id}/edit`}
+            // A draft opens where you left off building it; a live or
+            // closed survey opens on its results — same rule everywhere.
+            to={
+              s.status === "draft"
+                ? `/surveys/${s.id}/edit`
+                : `/surveys/${s.id}/dashboard`
+            }
             className="chart-card chart-card--row"
             style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
           >
             <div className="chart-card__row-main">
               <div className="chart-card__eyebrow">
-                {t("overview.surveys.roleStatus", { role: s.role.toUpperCase(), status: s.status.toUpperCase() })}
+                {t("overview.instruments.surveyEyebrow", {
+                  role: s.role.toUpperCase(),
+                  status: surveyStatusLabel(s.status).toUpperCase(),
+                })}
               </div>
               <div className="chart-card__takeaway">{s.name}</div>
             </div>
@@ -315,50 +433,19 @@ function SurveysTab({
               <span className="chart-card__footer-divider">·</span>
               <span>{t("overview.surveys.total", { count: s.response_count })}</span>
             </div>
-          </a>
+          </Link>
         ))}
-      </div>
-      <button
-        type="button"
-        className="btn btn-secondary"
-        style={{ alignSelf: "flex-start" }}
-        onClick={onCreateSurvey}
-      >
-        {t("overview.surveys.newSurvey")}
-      </button>
-    </div>
-  );
-}
-
-function InterviewsTab({
-  study,
-  onCreateInterview,
-}: {
-  study: StudyDetail;
-  onCreateInterview: () => void;
-}) {
-  const { t } = useTranslation("study");
-  if (study.projects.length === 0) {
-    return (
-      <EmptyState
-        message={t("overview.interviews.empty")}
-        ctaLabel={t("overview.interviews.addRound")}
-        onAct={onCreateInterview}
-      />
-    );
-  }
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {study.projects.map((p) => (
-          <a
+          <Link
             key={p.id}
-            href={`/projects/${p.id}`}
+            to={`/projects/${p.id}`}
             className="chart-card chart-card--row"
             style={{ textDecoration: "none", color: "inherit" }}
           >
             <div className="chart-card__row-main">
-              <div className="chart-card__eyebrow">{t("overview.interviews.eyebrow", { language: p.language.toUpperCase() })}</div>
+              <div className="chart-card__eyebrow">
+                {t("overview.instruments.interviewEyebrow", { language: p.language.toUpperCase() })}
+              </div>
               <div className="chart-card__takeaway">{p.name}</div>
             </div>
             <div className="chart-card__footer tabular">
@@ -368,17 +455,10 @@ function InterviewsTab({
               <span className="chart-card__footer-divider">·</span>
               <span>{t("overview.interviews.links", { count: p.interview_link_count })}</span>
             </div>
-          </a>
+          </Link>
         ))}
       </div>
-      <button
-        type="button"
-        className="btn btn-secondary"
-        style={{ alignSelf: "flex-start" }}
-        onClick={onCreateInterview}
-      >
-        {t("overview.interviews.addRound")}
-      </button>
+      {createButtons}
     </div>
   );
 }
@@ -416,13 +496,9 @@ function ParticipantsTab({ study }: { study: StudyDetail }) {
   );
 }
 
-function ReportTab({
-  studyId,
-  progress,
-}: {
-  studyId: string;
-  progress: StudyDetail["progress"];
-}) {
+function ReportTab({ study }: { study: StudyDetail }) {
+  const studyId = study.id;
+  const progress = study.progress;
   const { t, i18n } = useTranslation("study");
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -508,9 +584,18 @@ function ReportTab({
     return <p className="quanti-showcase__section-meta">{t("overview.report.loading")}</p>;
   }
 
+  // The index of every report artifact this study can produce, each with
+  // its scope named — shown above AND below the study report so the three
+  // report types (round analysis / study report / decision memo) stop
+  // reading as interchangeable exports.
+  const reportsIndex = (
+    <ReportsIndex study={study} studyReportReady={analysis?.status === "ready"} />
+  );
+
   // Empty-state CTA when no analysis exists yet.
   if (!analysis) {
     return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
       <div
         style={{
           background: "var(--bg-surface)",
@@ -566,11 +651,19 @@ function ReportTab({
           {generating ? t("overview.report.generating") : t("overview.report.generate")}
         </button>
       </div>
+      {reportsIndex}
+      </div>
     );
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+      {/* Scope line — this is the study-wide report; each interview round
+          also has its own Analysis tab, and cross-study decision memos live
+          on the Studies home. Naming the scope keeps the three apart. */}
+      <p className="quanti-showcase__section-meta" style={{ margin: 0 }}>
+        {t("overview.report.scopeNote")}
+      </p>
       {/* Report header + regenerate button */}
       <header
         style={{
@@ -814,7 +907,120 @@ function ReportTab({
           </section>
         </>
       )}
+      {reportsIndex}
     </div>
+  );
+}
+
+/**
+ * ReportsIndex — the one place that lists every report artifact a study
+ * can produce, each with a scope badge: per-round analyses (this round
+ * only), the mixed-methods study report (this page), and cross-study
+ * decision memos (Studies home). Answers "which report do I export?"
+ * without hunting across three surfaces.
+ */
+function ReportsIndex({
+  study,
+  studyReportReady,
+}: {
+  study: StudyDetail;
+  studyReportReady: boolean;
+}) {
+  const { t } = useTranslation("study");
+
+  const badge = (label: string) => (
+    <span
+      style={{
+        fontSize: "var(--text-eyebrow)",
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: "var(--text-tertiary)",
+        border: "1px solid var(--border-default)",
+        borderRadius: 999,
+        padding: "2px 10px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+
+  const rowStyle: CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--space-3)",
+    padding: "var(--space-3) var(--space-4)",
+    borderTop: "1px solid var(--border-subtle)",
+    color: "inherit",
+    textDecoration: "none",
+    fontSize: "var(--text-sm)",
+  };
+
+  return (
+    <section
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "var(--text-eyebrow)",
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--text-tertiary)",
+          padding: "var(--space-3) var(--space-4)",
+        }}
+      >
+        {t("overview.reportsIndex.title")}
+      </div>
+
+      {/* This study's mixed-methods report — it renders on this page. */}
+      <div style={rowStyle}>
+        {badge(t("overview.reportsIndex.scopeStudy"))}
+        <span style={{ flex: 1, minWidth: 0 }}>{t("overview.reportsIndex.studyReportLabel")}</span>
+        <span className="tabular" style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)" }}>
+          {studyReportReady
+            ? t("overview.reportsIndex.ready")
+            : t("overview.reportsIndex.notGenerated")}
+        </span>
+      </div>
+
+      {/* Per-round qualitative analyses. */}
+      {study.projects.map((p) => (
+        <Link key={p.id} to={`/projects/${p.id}?tab=analysis`} style={rowStyle}>
+          {badge(t("overview.reportsIndex.scopeRound"))}
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {p.name}
+          </span>
+          <span className="tabular" style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)" }}>
+            {p.has_ready_analysis
+              ? t("overview.reportsIndex.ready")
+              : t("overview.reportsIndex.noAnalysisYet")}
+          </span>
+          <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>→</span>
+        </Link>
+      ))}
+
+      {/* Cross-study decision memos live on the Studies home. */}
+      <Link to="/studies" style={rowStyle}>
+        {badge(t("overview.reportsIndex.scopeCross"))}
+        <span style={{ flex: 1, minWidth: 0 }}>{t("overview.reportsIndex.memosLabel")}</span>
+        <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>→</span>
+      </Link>
+    </section>
   );
 }
 

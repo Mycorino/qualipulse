@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { StudySummary, listStudies } from "../api/studies";
+import { StudySummary, listStudies, studyEntryPath } from "../api/studies";
 import { SynthesisSummary, listSyntheses, openSynthesisMemoInNewTab } from "../api/synthesis";
 import { listProjects } from "../api/projects";
 import { DEMO_TOUR_DONE_KEY } from "../components/DemoTour";
@@ -397,7 +397,10 @@ export default function StudyList() {
     return status === "collecting" ? t("hub.evidence.waiting") : "—";
   };
 
-  const openStudy = (id: string) => navigate(`/studies/${id}`);
+  // Single-instrument studies open their one instrument directly — the
+  // workspace hop added a click without adding information. It stays one
+  // breadcrumb away on the instrument page.
+  const openStudy = (s: StudySummary) => navigate(studyEntryPath(s));
 
   const renderTable = () => (
     <div className="hub-table-wrap">
@@ -415,9 +418,9 @@ export default function StudyList() {
             <tr
               key={s.id}
               tabIndex={0}
-              onClick={() => openStudy(s.id)}
+              onClick={() => openStudy(s)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") openStudy(s.id);
+                if (e.key === "Enter") openStudy(s);
               }}
             >
               <td className="hub-table__name">
@@ -454,7 +457,7 @@ export default function StudyList() {
         return (
           <a
             key={s.id}
-            href={`/studies/${s.id}`}
+            href={studyEntryPath(s)}
             className={`chart-card${needsAttention ? " chart-card--needs-attention" : ""}`}
             style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
           >

@@ -15,6 +15,15 @@ export interface ProjectMini {
   interview_link_count: number;
   completed_participant_count: number;
   in_progress_participant_count: number;
+  /** True when the round has a ready qualitative analysis. */
+  has_ready_analysis: boolean;
+}
+
+/** The one instrument of a single-instrument study (see StudySummary). */
+export interface SoleInstrument {
+  kind: "survey" | "interview";
+  id: string;
+  survey_status: string | null;
 }
 
 export interface SurveyMini {
@@ -51,6 +60,25 @@ export interface StudySummary {
   has_ready_analysis: boolean;
   /** Seeded showcase study — badged in lists, excluded from workspace totals. */
   is_demo: boolean;
+  /** Set only when the study has exactly one instrument — the list links straight to it. */
+  sole_instrument: SoleInstrument | null;
+}
+
+/**
+ * Where a click on a study row should land. Single-instrument studies skip
+ * the workspace hop and open their one instrument (drafts open the builder,
+ * fielding/closed surveys open results); the workspace stays one breadcrumb
+ * away. Multi-instrument studies open the workspace.
+ */
+export function studyEntryPath(s: StudySummary): string {
+  const si = s.sole_instrument;
+  if (!si) return `/studies/${s.id}`;
+  if (si.kind === "survey") {
+    return si.survey_status === "draft"
+      ? `/surveys/${si.id}/edit`
+      : `/surveys/${si.id}/dashboard`;
+  }
+  return `/projects/${si.id}`;
 }
 
 export interface StudyDetail {
@@ -62,7 +90,11 @@ export interface StudyDetail {
   projects: ProjectMini[];
   progress: StudyProgress;
   is_demo: boolean;
+  /** English fallback text — prefer `recommended_action_key` for display. */
   recommended_action: string | null;
+  /** i18n key stem for the recommended action (see study.json → overview.recommendedAction.actions). */
+  recommended_action_key: string | null;
+  recommended_action_params: Record<string, number> | null;
 }
 
 export async function listStudies(): Promise<StudySummary[]> {

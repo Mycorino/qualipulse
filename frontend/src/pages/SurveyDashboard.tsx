@@ -27,7 +27,7 @@ import { ScreenerBridge } from "../components/ScreenerBridge";
 import { useToast } from "../components/Toast";
 import { InstrumentShell } from "../components/InstrumentShell";
 import {
-  SURVEY_SECTIONS,
+  surveySections,
   surveySectionPath,
   surveyStatusPill,
 } from "../components/surveyShellNav";
@@ -169,8 +169,8 @@ export default function SurveyDashboardPage() {
       ]}
       eyebrow={t("dashboard.eyebrow")}
       title={data.name}
-      status={surveyStatusPill(data.status)}
-      sections={SURVEY_SECTIONS}
+      status={surveyStatusPill(data.status, t)}
+      sections={surveySections(t)}
       activeSection="results"
       onSectionChange={(k) => navigate(surveySectionPath(k, data.survey_id))}
       subNavLabel={t("dashboard.sectionsNavLabel")}
