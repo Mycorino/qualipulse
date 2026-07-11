@@ -1706,6 +1706,7 @@ def render_study_report_html(
     participants: list,
     turn_counts: dict,
     company_name: str = "",
+    include_toolbar: bool = True,
 ) -> str:
     """Standalone print-ready HTML for one StudyAnalysis (Quantified Themes).
 
@@ -1719,6 +1720,8 @@ def render_study_report_html(
     ``validation``   — ValidationSummary | None for this analysis.
     ``participants`` — completed Participants across the study's projects.
     ``turn_counts``  — participant_id → number of turns (evidence index).
+    ``include_toolbar`` — False for the in-app embedded view, where the
+    surrounding page owns the export affordances.
     """
     company_lang = getattr(getattr(study, "company", None), "preferred_language", None)
     lang = "fr" if (company_lang or "en").lower().startswith("fr") else "en"
@@ -1989,6 +1992,11 @@ def render_study_report_html(
     """
 
     title = f"{study.name} — {L['doc_type']}"
+    toolbar = (
+        f'<div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>'
+        if include_toolbar
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="{lang}">
 <head>
@@ -1999,7 +2007,7 @@ def render_study_report_html(
 <style>{_STUDY_CSS + _palette_css("mixed")}</style>
 </head>
 <body>
-<div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>
+{toolbar}
 <div class="sheet">
 {header}
 {essentials}

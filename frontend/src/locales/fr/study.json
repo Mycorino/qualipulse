@@ -81,8 +81,8 @@
       "versionEyebrow": "Thèmes quantifiés · v{{version}}",
       "generatedAt": "Généré le {{date}}",
       "generatedAtUnknown": "Généré le —",
-      "exportPdf": "Exporter le rapport (PDF)",
-      "exportPdfTitle": "Ouvrir le rapport de recherche prêt à imprimer",
+      "exportPdf": "Ouvrir le rapport complet (PDF)",
+      "exportPdfTitle": "Ouvrir le rapport complet prêt à imprimer dans un nouvel onglet",
       "exportPdfLoading": "Préparation…",
       "validateThemes": "Valider ces thèmes →",
       "validateGenerating": "Génération…",
@@ -102,7 +102,9 @@
       "methodologyStats_interview_other": "{{count}} entretiens",
       "metaSeparator": " · ",
       "verdict": "Verdict",
-      "gaps": "Ce que nous ne savons pas encore"
+      "gaps": "Ce que nous ne savons pas encore",
+      "embedFailed": "L'aperçu du rapport n'a pas pu être chargé — utilisez « Ouvrir le rapport complet (PDF) » pour l'ouvrir dans un onglet.",
+      "embedTitle": "Rapport d'étude méthodes mixtes"
     },
     "validationBanner": {
       "title": "Validation des thèmes · {{status}}",
