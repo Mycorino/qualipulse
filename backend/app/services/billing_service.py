@@ -634,6 +634,104 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
     return sub
 
 
+# Which legacy feature-gate tier a credits plan should map to, so the
+# ``feature_gates.py`` limits (project / question caps) and the ``limits``
+# block in ``/billing/status`` stay coherent when an admin puts a workspace
+# on a credits plan. Errs generous — a paid credits plan should never be
+# blocked by a stingier legacy cap.
+CREDITS_PLAN_TO_LEGACY_TIER: dict[str, str] = {
+    "trial": "starter",
+    "exploration": "team",
+    "team": "lab",
+    "agency": "enterprise",
+    "enterprise": "enterprise",
+}
+
+
+def admin_set_plan(
+    db: Session,
+    company: Company,
+    plan_id: str,
+    *,
+    billing_interval: str = "monthly",
+) -> WorkspaceSubscription:
+    """Admin-driven plan switch (no Stripe).
+
+    Points the workspace's ``WorkspaceSubscription`` at ``plan_id`` (a
+    credits-native plan), opens a fresh credit period and grants that
+    plan's included credits, and syncs the legacy
+    ``Company.subscription_tier`` so the feature-gate limits
+    (projects / questions) move with it. This is the single control that
+    makes an admin plan change visible everywhere: the account page's
+    ``display`` block (WorkspaceSubscription), the interview / branding
+    gates (credits + entitlements), and the legacy limits.
+
+    Not for legacy plans — the tier dropdown still handles those. Raises
+    ``ValueError`` on an unknown or legacy ``plan_id``.
+    """
+    plan = get_plan(db, plan_id)
+    if plan is None:
+        raise ValueError(f"unknown plan_id {plan_id!r}")
+    if plan.is_legacy:
+        raise ValueError("admin_set_plan is for credits plans; use the tier control for legacy plans")
+
+    now = _utcnow()
+    is_trial = plan.credit_period == "trial_total"
+    is_custom = plan.credit_period == "custom"  # enterprise
+    is_annual = billing_interval == "annual"
+
+    if is_trial:
+        interval = None
+        status = "trialing"
+        period_start, period_end = now, now + TRIAL_CREDIT_HORIZON
+        trial_start, trial_end = now, None
+    elif is_custom:
+        interval = "custom"
+        status = "enterprise_custom"
+        period_start, period_end = now, now + timedelta(days=365)
+        trial_start = trial_end = None
+    else:
+        interval = "annual" if is_annual else "monthly"
+        status = "active"
+        period_start = now
+        period_end = now + (timedelta(days=365) if is_annual else timedelta(days=30))
+        trial_start = trial_end = None
+
+    sub = get_current_subscription(db, company.id)
+    if sub is None:
+        sub = WorkspaceSubscription(
+            id=str(uuid.uuid4()),
+            workspace_id=company.id,
+            plan_id=plan_id,
+        )
+        db.add(sub)
+    sub.plan_id = plan_id
+    sub.status = status
+    sub.billing_interval = interval
+    sub.current_period_start = period_start
+    sub.current_period_end = period_end
+    sub.trial_start = trial_start
+    sub.trial_end = trial_end
+    sub.cancel_at_period_end = False
+    sub.updated_at = now
+
+    # Keep the legacy tier coherent so feature_gates (projects / questions)
+    # and the /billing/status "limits" block reflect the new plan.
+    company.subscription_tier = CREDITS_PLAN_TO_LEGACY_TIER.get(plan_id, "team")
+    company.subscription_status = "active"
+
+    db.commit()
+    db.refresh(sub)
+
+    # Open the new period's credit balance. grant_period_credits is a no-op
+    # for plans with no included_credits (e.g. enterprise custom) — admins
+    # top those up via the credits/adjust endpoint.
+    grant_period_credits(
+        db, sub, source="admin_plan_change", metadata={"plan_id": plan_id, "admin": True}
+    )
+    return sub
+
+
 # ── Subscription lifecycle (Stripe webhook handlers) ────────────────────────
 
 
