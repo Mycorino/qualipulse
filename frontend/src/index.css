@@ -4494,6 +4494,14 @@ select.field-input {
   gap: 4px;
   border-bottom: 2px solid var(--border);
   margin-bottom: 28px;
+  /* Phones: the tab row is wider than the viewport — scroll it in place
+     instead of letting it push the whole page sideways. */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.settings-tab {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .settings-tab {
   display: inline-block;
@@ -14339,6 +14347,139 @@ select.field-input {
   }
   .hub-search input {
     width: 100%;
+  }
+}
+
+/* Recommended-next-step card (StudyOverview) — icon + text + CTA. */
+.reco-card {
+  background: var(--brand-gradient-soft);
+  border: 1.5px solid var(--brand-300);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-xs);
+}
+.reco-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--brand-500);
+  color: #fff;
+  flex: 0 0 auto;
+}
+.reco-card__body {
+  flex: 1;
+  min-width: 0;
+}
+.reco-card__eyebrow {
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-700);
+}
+.reco-card__text {
+  font-size: var(--text-md);
+  color: var(--text-primary);
+  margin: var(--space-1) 0 0;
+  line-height: 1.4;
+}
+@media (max-width: 640px) {
+  .reco-card {
+    flex-wrap: wrap;
+    padding: var(--space-4);
+  }
+  .reco-card__body {
+    flex-basis: calc(100% - 40px - var(--space-4));
+  }
+  .reco-card > .btn {
+    width: 100%;
+  }
+}
+
+/* Phones — the 880px top bar still overflows at iPhone widths (the nav
+   scrolls off-screen and the account menu becomes unreachable). Wrap the
+   rail into two rows instead: logo + search + avatar on top, the nav as
+   a full-width segmented row below. The studies table loses its grid and
+   stacks each row as a small card so nothing scrolls sideways. */
+@media (max-width: 640px) {
+  .hub-rail {
+    flex-wrap: wrap;
+    row-gap: 10px;
+    padding: 10px 12px;
+    overflow-x: visible;
+  }
+  .hub-rail__logo {
+    order: 0;
+  }
+  /* Icon-only search trigger; the palette itself is already responsive. */
+  .hub-rail__search {
+    order: 1;
+    margin-left: auto;
+    padding: 8px;
+  }
+  .hub-rail__search-label {
+    display: none;
+  }
+  .hub-rail__foot {
+    order: 2;
+  }
+  .hub-rail__nav {
+    order: 3;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .hub-rail__item {
+    justify-content: center;
+    font-size: var(--text-sm);
+    padding: 9px 4px;
+    background: var(--surface-emphasis-overlay);
+  }
+
+  .hub-canvas {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  /* Table → stacked cards: hide the header row, let each study row wrap
+     (name on its own line, then status · evidence · next action). */
+  .hub-table-wrap {
+    overflow-x: hidden;
+  }
+  .hub-table,
+  .hub-table tbody {
+    display: block;
+  }
+  .hub-table thead {
+    display: none;
+  }
+  .hub-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: 12px 14px;
+  }
+  .hub-table td {
+    display: block;
+    padding: 0;
+  }
+  .hub-table__name {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .hub-table__evidence {
+    white-space: normal;
+  }
+  .hub-table__next-col {
+    margin-left: auto;
   }
 }
 
