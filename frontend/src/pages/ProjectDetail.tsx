@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
 import { getErrorMessage } from "../utils/errorMessages";
 import { openHtmlDocument } from "../utils/openHtmlDocument";
+import { QUAL_BRAND_SCALE } from "../utils/reportIdentity";
 import { SkeletonTable } from "../components/Skeleton";
 import { AudioClip } from "../components/AudioClip";
 import { InstrumentShell } from "../components/InstrumentShell";
@@ -3181,7 +3182,7 @@ export default function ProjectDetail() {
 
         {/* ══ ANALYSIS ══ */}
         {tab === "analysis" && analysis && (
-          <div className="tab-content" role="tabpanel" id="isection-panel-analysis" aria-labelledby="isection-tab-analysis">
+          <div className="tab-content" role="tabpanel" id="isection-panel-analysis" aria-labelledby="isection-tab-analysis" style={QUAL_BRAND_SCALE}>
             <section className="detail-section">
               {/* Stale banner — above actions so it's seen before clicking Regenerate */}
               {analysis.report && analysis.completed_count > analysis.participant_count && (

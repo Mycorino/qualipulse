@@ -20,6 +20,7 @@ import {
 } from "../api/surveys";
 import { getStudy } from "../api/studies";
 import { openHtmlDocument } from "../utils/openHtmlDocument";
+import { QUANT_BRAND_SCALE } from "../utils/reportIdentity";
 import { ChartCard } from "../components/ChartCard";
 import { DashboardShell, DashboardStrip } from "../components/DashboardShell";
 import { MethodologyBox, SmallNWarning } from "../components/MethodologyBox";
@@ -186,7 +187,7 @@ export default function SurveyDashboardPage() {
         </button>
       }
     >
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "var(--space-6) var(--space-5)" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "var(--space-6) var(--space-5)", ...QUANT_BRAND_SCALE }}>
         <MethodologyBox
           fields={[
             {

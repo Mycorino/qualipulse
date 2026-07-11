@@ -49,6 +49,57 @@ from app.services.stats import DEFAULT_MIN_N
 
 Confidence = Literal["directional", "supported", "strong"]
 
+# Discovery card copy is generated server-side, so it must be localised the
+# same way the report renderers are — otherwise a French (or de/es/it/pt)
+# workspace reads English cards in a localised UI. EN/FR templates; other
+# locales fall back to EN. Number formatting follows the locale too
+# (FR uses a comma decimal).
+_DISCOVERY_STRINGS = {
+    "en": {
+        "num_title_above": '{seg} scores {delta} points above the overall average on "{q}"',
+        "num_title_below": '{seg} scores {delta} points below the overall average on "{q}"',
+        "num_desc": (
+            "{seg} averages {seg_mean} vs {overall_mean} overall "
+            "({n} of {total} respondents; {std}σ standardised). "
+            "Worth interviewing to find out why."
+        ),
+        "cat_title_more": '{seg} are {lift}× more likely to select "{choice}"',
+        "cat_title_less": '{seg} are {lift}× less likely to select "{choice}"',
+        "cat_desc": (
+            "{hits} of {n} {seg_lower} ({rate}%) selected this, "
+            "vs {overall_rate}% overall. "
+            "Worth interviewing to understand what drives the gap."
+        ),
+    },
+    "fr": {
+        "num_title_above": "{seg} obtient {delta} points au-dessus de la moyenne générale sur « {q} »",
+        "num_title_below": "{seg} obtient {delta} points en dessous de la moyenne générale sur « {q} »",
+        "num_desc": (
+            "{seg} obtient en moyenne {seg_mean} contre {overall_mean} au global "
+            "({n} répondants sur {total} ; {std}σ standardisé). "
+            "À creuser en entretien pour comprendre pourquoi."
+        ),
+        "cat_title_more": "{seg} ont {lift}× plus de chances de choisir « {choice} »",
+        "cat_title_less": "{seg} ont {lift}× moins de chances de choisir « {choice} »",
+        "cat_desc": (
+            "{hits} {seg_lower} sur {n} ({rate} %) l'ont sélectionné, "
+            "contre {overall_rate} % au global. "
+            "À creuser en entretien pour comprendre l'écart."
+        ),
+    },
+}
+
+
+def _disc_lang(lang: str | None) -> str:
+    return "fr" if (lang or "en").lower().startswith("fr") else "en"
+
+
+def _fmt_num(value: float, lang: str, dp: int = 1) -> str:
+    """Locale-aware number formatting (FR uses a comma decimal separator)."""
+    s = f"{value:.{dp}f}"
+    return s.replace(".", ",") if lang == "fr" else s
+
+
 # Min n in the segment before we even compute a discovery. Anything tinier
 # is noise no matter how strong the apparent effect.
 MIN_SEGMENT_N = 8
@@ -97,6 +148,7 @@ def compute_discoveries(
     survey: Survey,
     *,
     max_results: int = DEFAULT_MAX_DISCOVERIES,
+    lang: str = "en",
 ) -> list[Discovery]:
     """Walk every (segment, metric) pair → list of ranked discoveries.
 
@@ -156,7 +208,7 @@ def compute_discoveries(
                     continue
                 if metric_q.type in ("likert", "nps"):
                     d = _numeric_discovery(
-                        seg_q, choice_id, seg_label, metric_q, response_ids, by_response, total_n
+                        seg_q, choice_id, seg_label, metric_q, response_ids, by_response, total_n, lang
                     )
                     if d:
                         discoveries.append(d)
@@ -169,6 +221,7 @@ def compute_discoveries(
                         response_ids,
                         by_response,
                         total_n,
+                        lang,
                     )
                     discoveries.extend(found)
 
@@ -232,6 +285,7 @@ def _numeric_discovery(
     response_ids: list[str],
     by_response: dict[str, dict[str, SurveyResponseAnswer]],
     total_n: int,
+    lang: str = "en",
 ) -> Discovery | None:
     """Compute a (segment-mean vs overall-mean) discovery for a numeric metric."""
 
@@ -256,16 +310,20 @@ def _numeric_discovery(
     overall_sd = _stdev(overall_values) or 1.0
     standardised = abs(delta) / overall_sd
     confidence = _numeric_confidence(len(seg_values), len(overall_values), standardised)
-    direction = "above" if delta > 0 else "below"
-    title = (
-        f"{seg_label} score {abs(round(delta, 1))} points {direction} the overall average "
-        f"on \"{_short_prompt(metric_q.prompt)}\""
+    L = _DISCOVERY_STRINGS[_disc_lang(lang)]
+    lg = _disc_lang(lang)
+    title = L["num_title_above" if delta > 0 else "num_title_below"].format(
+        seg=seg_label,
+        delta=_fmt_num(abs(delta), lg, 1),
+        q=_short_prompt(metric_q.prompt),
     )
-    description = (
-        f"{seg_label} averages {seg_mean:.1f} vs {overall_mean:.1f} overall "
-        f"({len(seg_values)} of {len(response_ids)} respondents; "
-        f"{abs(delta) / overall_sd:.2f}σ standardised). "
-        "Worth interviewing to find out why."
+    description = L["num_desc"].format(
+        seg=seg_label,
+        seg_mean=_fmt_num(seg_mean, lg, 1),
+        overall_mean=_fmt_num(overall_mean, lg, 1),
+        n=len(seg_values),
+        total=len(response_ids),
+        std=_fmt_num(abs(delta) / overall_sd, lg, 2),
     )
     return Discovery(
         id=f"d-{metric_q.id}-{seg_q.id}-{seg_choice_id}",
@@ -291,6 +349,7 @@ def _categorical_discoveries(
     response_ids: list[str],
     by_response: dict[str, dict[str, SurveyResponseAnswer]],
     total_n: int,
+    lang: str = "en",
 ) -> list[Discovery]:
     """For each choice of a categorical metric, compute a lift vs overall."""
 
@@ -339,16 +398,22 @@ def _categorical_discoveries(
         )
         confidence = _categorical_confidence(seg_n, total_n - seg_n, chi2)
 
-        title = (
-            f"{seg_label} are {lift:.1f}× more likely to "
-            f"select \"{metric_choice_label}\""
-            if lift >= 1
-            else f"{seg_label} are {1/lift:.1f}× less likely to select \"{metric_choice_label}\""
-        )
-        description = (
-            f"{segment_hits} of {seg_n} {seg_label.lower()} ({seg_rate*100:.0f}%) selected this, "
-            f"vs {overall_rate*100:.0f}% overall. "
-            "Worth interviewing to understand what drives the gap."
+        L = _DISCOVERY_STRINGS[_disc_lang(lang)]
+        lg = _disc_lang(lang)
+        if lift >= 1:
+            title = L["cat_title_more"].format(
+                seg=seg_label, lift=_fmt_num(lift, lg, 1), choice=metric_choice_label
+            )
+        else:
+            title = L["cat_title_less"].format(
+                seg=seg_label, lift=_fmt_num(1 / lift, lg, 1), choice=metric_choice_label
+            )
+        description = L["cat_desc"].format(
+            hits=segment_hits,
+            n=seg_n,
+            seg_lower=seg_label.lower(),
+            rate=f"{seg_rate*100:.0f}",
+            overall_rate=f"{overall_rate*100:.0f}",
         )
         out.append(
             Discovery(

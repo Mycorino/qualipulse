@@ -134,7 +134,7 @@
   },
   "dashboard": {
     "loadFailed": "Could not load dashboard",
-    "exportPdf": "Export results (PDF)",
+    "exportPdf": "Open full report (PDF)",
     "exportPdfTitle": "Open the print-ready survey results report",
     "exportPdfLoading": "Preparing…",
     "exportReportFailed": "Could not export the report",
