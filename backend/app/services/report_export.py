@@ -1785,3 +1785,316 @@ def render_study_report_html(
 </div>
 </body>
 </html>"""
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Standalone survey-results report (quantitative dashboard export)
+# ══════════════════════════════════════════════════════════════════════
+# Same evergreen document language as the study/analysis/memo exports, but
+# driven purely by a SurveyDashboardPayload (build_dashboard). Charts are
+# drawn server-side with the shared _svg_histogram / _svg_choice_bars
+# helpers, so the document always matches the dashboard's actual data and
+# never shows a percentage the stats layer suppressed (n<30 → counts only).
+
+_SURVEY_STRINGS = {
+    "en": {
+        "doc_type": "Survey results report",
+        "responses": "completed responses",
+        "started_meta": "started",
+        "completion_meta": "completion",
+        "exported": "Exported",
+        "fielding": "Fielding",
+        "sec_glance": "Results at a glance",
+        "sec_questions": "Results by question",
+        "sec_methodology": "Methodology & limits",
+        "stat_completed": "Completed responses",
+        "stat_started": "Responses started",
+        "stat_completion": "Completion rate",
+        "stat_questions": "Questions",
+        "status_label": "Status",
+        "chart_n": "n={n}",
+        "chart_mean": "mean {m}",
+        "chart_nps": "NPS {score} · {p} promoters / {pa} passives / {d} detractors",
+        "chart_no_pct": "Sub-threshold group (n<30) — raw counts, no percentages.",
+        "open_text_total": "{n} open-text answers",
+        "open_text_sample": "Sample of verbatim answers",
+        "no_answers": "No responses to this question yet.",
+        "below_threshold": "Below n={n}",
+        "note_below_threshold": "Total responses are below the n={n} threshold for inference — percentages are suppressed and raw counts are shown instead.",
+        "note_wilson": "Percentages carry Wilson 95% confidence intervals. Groups below n={n} are reported as raw counts only, never as percentages.",
+        "contract_title": "Methodology contract",
+        "contract_items": [
+            "No percentage is shown below n=30; sub-threshold groups are reported as raw counts. Confidence intervals are Wilson 95%.",
+            "Open-text answers are sampled, not coded — read the full set in the survey dashboard.",
+            "Every figure is drawn directly from the survey's stored responses; the renderer never computes or invents a value.",
+        ],
+        "footer": "Generated with QualiPulse — quantitative survey signal with a transparent methodology contract.",
+        "print_btn": "Print / Save as PDF",
+    },
+    "fr": {
+        "doc_type": "Rapport de résultats du sondage",
+        "responses": "réponses complètes",
+        "started_meta": "commencées",
+        "completion_meta": "complétion",
+        "exported": "Exporté le",
+        "fielding": "Collecte",
+        "sec_glance": "Les résultats en un coup d'œil",
+        "sec_questions": "Résultats par question",
+        "sec_methodology": "Méthodologie & limites",
+        "stat_completed": "Réponses complètes",
+        "stat_started": "Réponses commencées",
+        "stat_completion": "Taux de complétion",
+        "stat_questions": "Questions",
+        "status_label": "Statut",
+        "chart_n": "n={n}",
+        "chart_mean": "moyenne {m}",
+        "chart_nps": "NPS {score} · {p} promoteurs / {pa} passifs / {d} détracteurs",
+        "chart_no_pct": "Groupe sous le seuil (n<30) — effectifs bruts, pas de pourcentages.",
+        "open_text_total": "{n} réponses libres",
+        "open_text_sample": "Échantillon de réponses verbatim",
+        "no_answers": "Aucune réponse à cette question pour l'instant.",
+        "below_threshold": "Sous n={n}",
+        "note_below_threshold": "Le nombre total de réponses est sous le seuil n={n} pour l'inférence — les pourcentages sont masqués et les effectifs bruts sont affichés à la place.",
+        "note_wilson": "Les pourcentages sont assortis d'intervalles de confiance de Wilson à 95%. Les groupes sous n={n} sont rapportés en effectifs bruts uniquement, jamais en pourcentages.",
+        "contract_title": "Contrat méthodologique",
+        "contract_items": [
+            "Aucun pourcentage affiché sous n=30 ; les sous-groupes sont rapportés en effectifs bruts. Les intervalles de confiance sont des Wilson à 95%.",
+            "Les réponses libres sont échantillonnées, non codées — consultez l'ensemble dans le tableau de bord du sondage.",
+            "Chaque figure est tracée directement à partir des réponses stockées du sondage ; le moteur de rendu ne calcule ni n'invente aucune valeur.",
+        ],
+        "footer": "Généré avec QualiPulse — signal quantitatif de sondage avec un contrat méthodologique transparent.",
+        "print_btn": "Imprimer / Enregistrer en PDF",
+    },
+}
+
+# Evergreen tokens from _BASE_DOC_CSS + the section-head / stat-band / chart
+# scaffolding the survey document needs (mirrors _STUDY_CSS's chart classes).
+_SURVEY_CSS = _BASE_DOC_CSS + """
+.num, .tabular { font-variant-numeric: tabular-nums; }
+.cover__brand { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+
+.sec-head { display: flex; align-items: baseline; gap: 14px;
+  border-bottom: 1px solid var(--rule); padding-bottom: 8px; margin-bottom: 20px; }
+.sec-num { font-family: var(--serif); font-size: 0.95rem; color: var(--ink-3); }
+.sec-title { font-size: 12px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink); }
+
+.stat-band { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-bottom: 26px; }
+@media (max-width: 640px) { .stat-band { grid-template-columns: repeat(2, 1fr); } }
+.stat__value { font-family: var(--serif); font-size: 1.9rem; font-weight: 600;
+  line-height: 1.1; font-variant-numeric: tabular-nums; }
+
+.method-note { font-size: 13.5px; color: var(--ink-2); max-width: 74ch; margin-bottom: 8px; }
+
+figure { margin: 0 0 26px; }
+.chart-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; max-width: 70ch; }
+.chart-meta { font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; }
+.chart-wrap { overflow-x: auto; }
+figcaption { font-size: 12px; color: var(--ink-2); margin-top: 6px; max-width: 70ch; }
+.q-block { border-top: 1px solid var(--rule); padding-top: 22px; }
+.q-block:first-of-type { border-top: 0; padding-top: 0; }
+.samples { list-style: none; margin: 8px 0 0; padding: 0; }
+.samples .quote { margin: 0 0 10px; }
+svg text { font-family: var(--sans); }
+"""
+
+
+def _survey_question_figure(q, L: dict, lang: str) -> str:
+    """Render one dashboard question as a titled figure.
+
+    Reuses the same server-side SVG helpers and suppression rules as the
+    study report: counts are always shown, percentages only when the
+    analytics layer released them (n>=30).
+    """
+    title = f'<div class="chart-title">{_esc(q.prompt)}</div>'
+    if q.n_answered == 0:
+        return (
+            f'<figure class="q-block avoid-break">{title}'
+            f'<figcaption>{L["no_answers"]}</figcaption></figure>'
+        )
+
+    meta_bits = [L["chart_n"].format(n=q.n_answered)]
+    body = ""
+    caption = ""
+
+    if q.type in ("likert", "nps"):
+        hist = (q.breakdown or {}).get("histogram") or []
+        if not any((h.get("count") or 0) for h in hist):
+            return (
+                f'<figure class="q-block avoid-break">{title}'
+                f'<figcaption>{L["no_answers"]}</figcaption></figure>'
+            )
+        if q.mean is not None:
+            meta_bits.append(L["chart_mean"].format(m=f"{q.mean:.1f}"))
+        body = _svg_histogram(hist, q.mean)
+        nps_score = (q.breakdown or {}).get("nps_score")
+        if nps_score is not None:
+            caption = L["chart_nps"].format(
+                score=nps_score,
+                p=(q.breakdown or {}).get("promoters", 0),
+                pa=(q.breakdown or {}).get("passives", 0),
+                d=(q.breakdown or {}).get("detractors", 0),
+            )
+    elif q.type in ("mc_single", "mc_multi"):
+        choices = (q.breakdown or {}).get("choices") or []
+        if not choices:
+            return (
+                f'<figure class="q-block avoid-break">{title}'
+                f'<figcaption>{L["no_answers"]}</figcaption></figure>'
+            )
+        body = _svg_choice_bars(choices, lang)
+        if all(c.get("percentage") is None for c in choices):
+            caption = L["chart_no_pct"]
+    elif q.type in ("open_text", "short_text"):
+        breakdown = q.breakdown or {}
+        total = breakdown.get("total_texts", q.n_answered)
+        samples = (breakdown.get("sample") or [])[:12]
+        items = "".join(
+            f'<li class="quote"><p>«&nbsp;{_esc(s)}&nbsp;»</p></li>'
+            for s in samples
+            if s
+        )
+        sample_block = (
+            f'<figcaption>{L["open_text_sample"]}</figcaption><ul class="samples">{items}</ul>'
+            if items
+            else ""
+        )
+        return (
+            f'<figure class="q-block avoid-break">{title}'
+            f'<div class="chart-meta num">{L["open_text_total"].format(n=total)}</div>'
+            f"{sample_block}</figure>"
+        )
+
+    if not body:
+        return (
+            f'<figure class="q-block avoid-break">{title}'
+            f'<figcaption>{L["no_answers"]}</figcaption></figure>'
+        )
+    caption_html = f"<figcaption>{_esc(caption)}</figcaption>" if caption else ""
+    return (
+        f'<figure class="q-block avoid-break">{title}'
+        f'<div class="chart-meta num">{_esc(" · ".join(meta_bits))}</div>'
+        f'<div class="chart-wrap">{body}</div>{caption_html}</figure>'
+    )
+
+
+def render_survey_dashboard_html(dashboard, company_name: str = "", lang: str = "en") -> str:
+    """Standalone print-ready HTML for a survey's quantitative results.
+
+    ``dashboard`` — a SurveyDashboardPayload (services/survey_analytics).
+    ``lang``      — the researcher's UI language (en/fr), normalised here.
+
+    Everything rendered comes straight from the dashboard aggregates; the
+    renderer never computes a proportion itself and never surfaces a
+    percentage the stats layer suppressed below n=30.
+    """
+    lang = "fr" if (lang or "en").lower().startswith("fr") else "en"
+    L = _SURVEY_STRINGS[lang]
+
+    n_completed = dashboard.n_completed
+    n_started = dashboard.n_started
+    min_n = dashboard.min_n_threshold
+    cr = dashboard.completion_rate_percentage
+    completion_txt = f"{round(cr)}%" if cr is not None else L["below_threshold"].format(n=min_n)
+
+    def _parse(iso: str | None) -> datetime | None:
+        if not iso:
+            return None
+        try:
+            return datetime.fromisoformat(iso)
+        except (TypeError, ValueError):
+            return None
+
+    exported = _fmt_date(datetime.utcnow(), lang)
+    start = _parse(dashboard.fielding_started_at)
+    end = _parse(dashboard.fielding_ended_at)
+    fielding_txt = ""
+    if start:
+        fielding_txt = _fmt_date(start, lang)
+        if end:
+            fielding_txt += f" – {_fmt_date(end, lang)}"
+
+    meta_spans = [
+        f'<span><strong>{n_completed}</strong> {L["responses"]}</span>',
+        f'<span><strong>{n_started}</strong> {L["started_meta"]}</span>',
+        f'<span><strong>{_esc(completion_txt)}</strong> {L["completion_meta"]}</span>',
+        f'<span>{L["status_label"]}: {_esc(str(dashboard.status).upper())}</span>',
+    ]
+    if fielding_txt:
+        meta_spans.append(f'<span>{L["fielding"]}: {_esc(fielding_txt)}</span>')
+    meta_spans.append(f'<span>{L["exported"]} {exported}</span>')
+
+    header = f"""
+    <header class="cover">
+      <div class="cover__brand">
+        <span class="cover__logo">QualiPulse</span>
+        <span class="cover__doctype">{L["doc_type"]}</span>
+      </div>
+      <h1 class="cover__title">{_esc(dashboard.name)}</h1>
+      <div class="cover__meta num">{"".join(meta_spans)}</div>
+    </header>
+    """
+
+    note = (
+        L["note_below_threshold"].format(n=min_n)
+        if n_started < min_n
+        else L["note_wilson"].format(n=min_n)
+    )
+    stat_band = f"""
+    <div class="stat-band">
+      <div class="stat"><div class="stat__value num">{n_completed}</div><div class="stat__label">{L["stat_completed"]}</div></div>
+      <div class="stat"><div class="stat__value num">{n_started}</div><div class="stat__label">{L["stat_started"]}</div></div>
+      <div class="stat"><div class="stat__value num">{_esc(completion_txt)}</div><div class="stat__label">{L["stat_completion"]}</div></div>
+      <div class="stat"><div class="stat__value num">{len(dashboard.questions)}</div><div class="stat__label">{L["stat_questions"]}</div></div>
+    </div>
+    """
+    glance = f"""
+    <section class="avoid-break">
+      <div class="sec-head"><span class="sec-num num">1</span><span class="sec-title">{L["sec_glance"]}</span></div>
+      {stat_band}
+      <p class="method-note">{_esc(note)}</p>
+    </section>
+    """
+
+    figures = "".join(
+        _survey_question_figure(q, L, lang) for q in dashboard.questions
+    )
+    questions_section = f"""
+    <section>
+      <div class="sec-head"><span class="sec-num num">2</span><span class="sec-title">{L["sec_questions"]}</span></div>
+      {figures}
+    </section>
+    """
+
+    contract_items = "".join(f"<li>{_esc(item)}</li>" for item in L["contract_items"])
+    methodology = f"""
+    <section class="avoid-break">
+      <div class="sec-head"><span class="sec-num num">3</span><span class="sec-title">{L["sec_methodology"]}</span></div>
+      <div class="contract"><h4>{L["contract_title"]}</h4><ul>{contract_items}</ul></div>
+    </section>
+    """
+
+    title = f"{dashboard.name} — {L['doc_type']}"
+    return f"""<!doctype html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{_esc(title)}</title>
+<style>{_SURVEY_CSS}</style>
+</head>
+<body>
+<div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>
+<div class="sheet">
+{header}
+{glance}
+{questions_section}
+{methodology}
+<footer class="doc-footer">
+  <span><strong>QualiPulse</strong> · {_esc(company_name)}</span>
+  <span>{L["footer"]}</span>
+</footer>
+</div>
+</body>
+</html>"""

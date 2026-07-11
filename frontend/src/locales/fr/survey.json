@@ -134,6 +134,10 @@
   },
   "dashboard": {
     "loadFailed": "Impossible de charger le tableau de bord",
+    "exportPdf": "Exporter les résultats (PDF)",
+    "exportPdfTitle": "Ouvrir le rapport de résultats prêt à imprimer",
+    "exportPdfLoading": "Préparation…",
+    "exportReportFailed": "Impossible d'exporter le rapport",
     "savedSegmentsInfo": "Les segments enregistrés arrivent au Sprint 10 — pour l'instant, cliquez sur « Inviter à un entretien IA ».",
     "invitesFailed": "Échec de l'envoi des invitations",
     "invitesSent_one": "{{count}} invitation envoyée",

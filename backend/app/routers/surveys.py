@@ -14,10 +14,12 @@ App-level collision check spans BOTH `interview_links.token` and
 """
 
 import json
+import re
 import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -68,6 +70,7 @@ from app.models.interview import InterviewLink
 from app.models.project import InterviewGuideQuestion, Project
 from app.services.email import send_interview_invite
 from app.services.segment_discoveries import compute_discoveries
+from app.services.report_export import render_survey_dashboard_html
 from app.services.survey_analytics import build_dashboard
 from app.services.survey_segments import (
     FilterClause,
@@ -827,6 +830,35 @@ def get_dashboard(
             )
             for q in payload.questions
         ],
+    )
+
+
+@router.get("/{survey_id}/dashboard/report.html", response_class=HTMLResponse)
+def export_survey_report(
+    survey_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Render the survey's quantitative results as a standalone, print-ready
+    HTML document (evergreen report styling, server-drawn SVG charts).
+
+    Charts are built from the same ``build_dashboard`` aggregates the live
+    dashboard uses, so the document always matches the on-screen data and
+    never shows a percentage the stats layer suppressed (n<30 → counts).
+    Localised EN/FR off the researcher's preferred language.
+    """
+
+    survey = _get_survey_or_404(db, survey_id, company)
+    payload = build_dashboard(db, survey)
+    lang = "fr" if (company.preferred_language or "en").lower().startswith("fr") else "en"
+    html_doc = render_survey_dashboard_html(
+        payload, company_name=company.name, lang=lang
+    )
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", survey.name).strip("_") or "survey"
+    filename = f"{slug}_results.html"
+    return HTMLResponse(
+        content=html_doc,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 

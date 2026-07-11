@@ -275,6 +275,18 @@ export async function getDashboard(surveyId: string): Promise<SurveyDashboard> {
   return resp.data;
 }
 
+/**
+ * Fetch the survey's quantitative results as a print-ready HTML document.
+ * Returned as a Blob so the mobile-safe openHtmlDocument helper can claim
+ * the tab synchronously before this network round-trip.
+ */
+export async function fetchSurveyReportHtml(surveyId: string): Promise<Blob> {
+  const { data } = await client.get(`/surveys/${surveyId}/dashboard/report.html`, {
+    responseType: "blob",
+  });
+  return data;
+}
+
 /* ── Templates ─────────────────────────────────────────────────────── */
 
 export interface SurveyTemplate {

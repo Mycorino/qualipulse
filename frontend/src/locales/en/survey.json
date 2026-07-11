@@ -134,6 +134,10 @@
   },
   "dashboard": {
     "loadFailed": "Could not load dashboard",
+    "exportPdf": "Export results (PDF)",
+    "exportPdfTitle": "Open the print-ready survey results report",
+    "exportPdfLoading": "Preparing…",
+    "exportReportFailed": "Could not export the report",
     "savedSegmentsInfo": "Saved segments ship in Sprint 10 — for now, click 'Invite to AI interview'.",
     "invitesFailed": "Invites failed to send",
     "invitesSent_one": "{{count}} invite sent",
