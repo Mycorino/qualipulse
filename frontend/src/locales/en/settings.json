@@ -84,7 +84,21 @@
       "overage": "Overage: €{{price}}/credit"
     },
     "packName": "{{count}}-credit pack",
-    "priceMonthly": "€{{price}}/mo"
+    "priceMonthly": "€{{price}}/mo",
+    "chooseTitle": "Choose your plan",
+    "changeTitle": "Change plan",
+    "chooseSubtitle": "One credit = one completed interview. Included credits refresh every period; overage is billed per credit.",
+    "billingToggleLabel": "Billing period",
+    "billingMonthly": "Monthly",
+    "billingAnnual": "Annual",
+    "billingAnnualSave": "−17%",
+    "recommended": "Most popular",
+    "choosePlan": "Choose {{name}}",
+    "perMonthUnit": "/mo",
+    "billedAnnually": "€{{price}} billed annually",
+    "billedMonthly": "billed monthly",
+    "reassurance": "Cancel anytime · Purchased & rolled-over credits never expire · Secure checkout via Stripe",
+    "packsSecondaryTitle": "Prefer to pay as you go?"
   },
   "language": {
     "title": "Language",
