@@ -21,7 +21,7 @@
     "facts": [
       "No credit card",
       "Participants need only a link",
-      "English, French & more coming",
+      "Interviews in EN, FR, DE, ES, PT, IT & more",
       "GDPR, EU-hosted"
     ]
   },
@@ -247,7 +247,7 @@
       },
       {
         "question": "What languages are supported?",
-        "answer": "Interviews run in the language of your study. English and French are live today and we’re adding more all the time. The researcher workspace is available in English and French, and any transcript can be machine-translated as a reading aid, with the original always kept as the source of truth."
+        "answer": "Interviews run in the language of your study. English, French, German, Spanish, Portuguese and Italian are available today, and we add more regularly. The researcher workspace is available in English and French, and any transcript can be machine-translated as a reading aid, with the original always kept as the source of truth."
       },
       {
         "question": "Who owns the research data?",
