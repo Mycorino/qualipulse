@@ -425,11 +425,14 @@ select.field-input {
   overflow: hidden;
 }
 .analysis-summary {
-  font-size: 1rem;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: var(--text-lg, 1.125rem);
   font-weight: 400;
   color: var(--text-primary);
-  line-height: 1.7;
-  background: linear-gradient(135deg, var(--brand-50) 0%, #f8f4ff 100%);
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  max-width: 68ch;
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   padding: var(--space-6) var(--space-6);
   border-radius: 0;
@@ -6930,8 +6933,8 @@ select.field-input {
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  background: var(--brand-gradient-soft, linear-gradient(135deg, var(--brand-50) 0%, var(--bg-surface) 100%));
-  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
 }
 .analysis-kpi {
