@@ -38,7 +38,9 @@ server {
     #   need it for a hot-fix, prefer a nonce.
     # - connect-src allows Stripe Checkout iframes + our own API.
     # - img-src allows data: for TipTap inline previews and R2 cover images.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.qualipulse.com https://*.sentry.io; frame-src https://js.stripe.com https://hooks.stripe.com; media-src 'self' blob: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+    # - frame-src allows blob: so the Reports tab can embed the server-rendered
+    #   report.html document (fetched with auth, mounted as a same-origin blob).
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.qualipulse.com https://*.sentry.io; frame-src 'self' blob: https://js.stripe.com https://hooks.stripe.com; media-src 'self' blob: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
     add_header Permissions-Policy "microphone=(self), camera=(), geolocation=(), payment=(self)";
 
     # Cache static assets
