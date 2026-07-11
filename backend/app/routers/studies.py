@@ -590,6 +590,7 @@ def get_analysis(
 def export_study_report(
     study_id: str,
     analysis_id: str,
+    embed: bool = False,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
@@ -599,7 +600,9 @@ def export_study_report(
     ``analysis_id`` accepts the literal ``latest`` to export the most
     recent ready analysis. Charts are drawn server-side from the same
     survey aggregates the generation pipeline used, so the document
-    always matches the study's actual data.
+    always matches the study's actual data. ``embed=1`` drops the floating
+    print toolbar — used by the in-app Reports tab, which embeds this very
+    document so the UI and the export can never diverge.
     """
 
     study = _get_study_or_404(db, study_id, company)
@@ -680,6 +683,7 @@ def export_study_report(
         participants,
         turn_counts,
         company_name=company.name,
+        include_toolbar=not embed,
     )
     slug = re.sub(r"[^A-Za-z0-9_-]+", "_", study.name).strip("_") or "study"
     filename = f"{slug}_report_v{analysis.version}.html"

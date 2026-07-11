@@ -81,8 +81,8 @@
       "versionEyebrow": "Quantified Themes · v{{version}}",
       "generatedAt": "Generated {{date}}",
       "generatedAtUnknown": "Generated —",
-      "exportPdf": "Export report (PDF)",
-      "exportPdfTitle": "Open the print-ready research report",
+      "exportPdf": "Open full report (PDF)",
+      "exportPdfTitle": "Open the full print-ready report in a new tab",
       "exportPdfLoading": "Preparing…",
       "validateThemes": "Validate these themes →",
       "validateGenerating": "Generating…",
@@ -102,7 +102,9 @@
       "methodologyStats_interview_other": "{{count}} interviews",
       "metaSeparator": " · ",
       "verdict": "Verdict",
-      "gaps": "What we don't know yet"
+      "gaps": "What we don't know yet",
+      "embedFailed": "The report preview could not be loaded — use “Open full report (PDF)” to open it in a new tab.",
+      "embedTitle": "Mixed-methods study report"
     },
     "validationBanner": {
       "title": "Theme validation · {{status}}",

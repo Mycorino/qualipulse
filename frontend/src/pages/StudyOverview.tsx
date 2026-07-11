@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import {
-  QuantifiedTheme,
   StudyAnalysis,
   StudyDetail,
-  ThemeValidationSnapshot,
   ValidationSummary,
   createValidationSurvey,
   fetchStudyReportHtml,
@@ -733,182 +731,94 @@ function ReportTab({ study }: { study: StudyDetail }) {
         </div>
       )}
 
-      {analysis.report && (
-        <>
-          {/* Executive summary */}
-          <section
-            style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-lg)",
-              padding: "var(--space-6) var(--space-8)",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "var(--text-eyebrow)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--text-tertiary)",
-                marginBottom: "var(--space-3)",
-              }}
-            >
-              {t("overview.report.executiveSummary")}
-            </div>
-            <p
-              style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: "var(--text-lg)",
-                lineHeight: 1.5,
-                color: "var(--text-primary)",
-                margin: 0,
-                letterSpacing: "-0.01em",
-                maxWidth: "62ch",
-              }}
-            >
-              {analysis.report.executive_summary}
-            </p>
-            {analysis.report.verdict && (
-              <div
-                style={{
-                  marginTop: "var(--space-4)",
-                  background: "var(--brand-50)",
-                  borderLeft: "3px solid var(--brand-600)",
-                  padding: "var(--space-3) var(--space-4)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "var(--text-eyebrow)",
-                    fontWeight: 600,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    color: "var(--brand-700)",
-                    marginBottom: "var(--space-1)",
-                  }}
-                >
-                  {t("overview.report.verdict")}
-                </div>
-                <p
-                  style={{
-                    fontFamily: "var(--font-serif)",
-                    fontSize: "var(--text-md)",
-                    fontWeight: 500,
-                    lineHeight: 1.5,
-                    margin: 0,
-                    maxWidth: "62ch",
-                  }}
-                >
-                  {analysis.report.verdict}
-                </p>
-              </div>
-            )}
-          </section>
-
-          {/* Themes */}
-          <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-            <div
-              style={{
-                fontSize: "var(--text-eyebrow)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--text-tertiary)",
-              }}
-            >
-              {t("overview.report.themes", { count: analysis.report.themes.length })}
-            </div>
-            {analysis.report.themes.map((theme, i) => (
-              <ThemeCard
-                key={i}
-                theme={theme}
-                validation={validation?.per_theme?.[String(i)] ?? null}
-              />
-            ))}
-          </section>
-
-          {/* Gaps — what the data cannot answer */}
-          {(analysis.report.gaps ?? []).length > 0 && (
-            <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-              <div
-                style={{
-                  fontSize: "var(--text-eyebrow)",
-                  fontWeight: 600,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                {t("overview.report.gaps")}
-              </div>
-              {(analysis.report.gaps ?? []).map((gap, i) => (
-                <div
-                  key={i}
-                  style={{
-                    background: "var(--warning-bg, var(--bg-sunken))",
-                    borderLeft: "3px solid var(--warning-text)",
-                    padding: "var(--space-3) var(--space-4)",
-                    fontSize: "var(--text-sm)",
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {gap}
-                </div>
-              ))}
-            </section>
-          )}
-
-          {/* Methodology */}
-          <section
-            style={{
-              background: "var(--bg-sunken)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-4) var(--space-5)",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "var(--text-eyebrow)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--text-tertiary)",
-                marginBottom: "var(--space-2)",
-              }}
-            >
-              {t("overview.report.methodology")}
-            </div>
-            <p
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--text-secondary)",
-                lineHeight: 1.5,
-                margin: 0,
-              }}
-            >
-              {analysis.report.methodology_note}
-            </p>
-            <div
-              className="tabular"
-              style={{
-                fontSize: "var(--text-xs)",
-                color: "var(--text-tertiary)",
-                marginTop: "var(--space-2)",
-              }}
-            >
-              {t("overview.report.methodologyStats_survey", { count: analysis.report.generated_with_survey_count })}
-              {t("overview.report.metaSeparator")}
-              {t("overview.report.methodologyStats_responses", { count: analysis.report.generated_with_response_count })}
-              {t("overview.report.metaSeparator")}
-              {t("overview.report.methodologyStats_interview", { count: analysis.report.generated_with_interview_count })}
-            </div>
-          </section>
-        </>
+      {/* The report body IS the exported document — same endpoint, same
+          renderer, embedded without its floating print toolbar. The in-app
+          view and the PDF can never diverge again. */}
+      {analysis.status === "ready" && analysis.report && (
+        <EmbeddedStudyReport
+          studyId={studyId}
+          analysisId={analysis.id}
+          refreshKey={analysis.generated_at ?? String(analysis.version)}
+        />
       )}
       {reportsIndex}
     </div>
+  );
+}
+
+/**
+ * EmbeddedStudyReport — renders the server-generated report.html inside the
+ * Reports tab. The document is fetched with auth (iframes can't carry the
+ * bearer token) and mounted via a blob URL, which stays same-origin so the
+ * frame can be auto-sized to its content.
+ */
+function EmbeddedStudyReport({
+  studyId,
+  analysisId,
+  refreshKey,
+}: {
+  studyId: string;
+  analysisId: string;
+  refreshKey: string;
+}) {
+  const { t } = useTranslation("study");
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [height, setHeight] = useState(900);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setUrl(null);
+    setFailed(false);
+    (async () => {
+      try {
+        const blob = await fetchStudyReportHtml(studyId, analysisId, { embed: true });
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([blob], { type: "text/html" }));
+        setUrl(objectUrl);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [studyId, analysisId, refreshKey]);
+
+  const measure = () => {
+    const body = iframeRef.current?.contentDocument?.body;
+    if (body) setHeight(Math.max(600, body.scrollHeight + 32));
+  };
+
+  if (failed) {
+    return <p className="quanti-showcase__section-meta">{t("overview.report.embedFailed")}</p>;
+  }
+  if (!url) {
+    return <p className="quanti-showcase__section-meta">{t("overview.report.loading")}</p>;
+  }
+  return (
+    <iframe
+      ref={iframeRef}
+      src={url}
+      title={t("overview.report.embedTitle")}
+      onLoad={() => {
+        measure();
+        // Re-measure after fonts/SVGs settle the layout.
+        window.setTimeout(measure, 300);
+        window.setTimeout(measure, 1200);
+      }}
+      style={{
+        width: "100%",
+        height,
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)",
+        background: "#fcfcfa",
+        display: "block",
+      }}
+    />
   );
 }
 
@@ -1101,299 +1011,6 @@ function ValidationBanner({
       >
         {isDraft ? t("overview.validationBanner.editPublish") : t("overview.validationBanner.openSurvey")}
       </button>
-    </div>
-  );
-}
-
-function ThemeCard({
-  theme,
-  validation,
-}: {
-  theme: QuantifiedTheme;
-  validation: ThemeValidationSnapshot | null;
-}) {
-  const { t } = useTranslation("study");
-  return (
-    <article
-      style={{
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-lg)",
-        padding: "var(--space-6) var(--space-7)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--space-4)",
-      }}
-    >
-      <header
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: "var(--space-3)",
-        }}
-      >
-        <h3
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-headline)",
-            letterSpacing: "-0.02em",
-            lineHeight: 1.2,
-            margin: 0,
-            maxWidth: "44ch",
-          }}
-        >
-          {theme.title}
-        </h3>
-        <span className={`confidence-pill confidence-pill--${theme.confidence}`}>
-          <span className="confidence-pill__dot" aria-hidden="true" />
-          {t(`overview.theme.confidence.${theme.confidence}`)}
-        </span>
-      </header>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "var(--space-4)",
-        }}
-      >
-        {/* Survey signal */}
-        {theme.survey_signal && (
-          <div>
-            <div
-              style={{
-                fontSize: "var(--text-eyebrow)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--text-tertiary)",
-                marginBottom: "var(--space-2)",
-              }}
-            >
-              {t("overview.theme.surveySignal")}
-            </div>
-            <p
-              style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: "var(--text-md)",
-                lineHeight: 1.4,
-                color: "var(--text-primary)",
-                margin: 0,
-              }}
-            >
-              {theme.survey_signal.summary}
-            </p>
-            <div
-              className="tabular"
-              style={{
-                fontSize: "var(--text-xs)",
-                color: "var(--text-tertiary)",
-                marginTop: "var(--space-1)",
-              }}
-            >
-              {t("overview.theme.n", { count: theme.survey_signal.n })}
-              {theme.survey_signal.segment_over_index
-                ? t("overview.theme.overIndex", { value: theme.survey_signal.segment_over_index.toFixed(1) })
-                : ""}
-              {theme.survey_signal.segment_label
-                ? t("overview.theme.segmentLabel", { label: theme.survey_signal.segment_label })
-                : ""}
-            </div>
-          </div>
-        )}
-
-        {/* Interview evidence */}
-        {theme.interview_evidence && (
-          <div>
-            <div
-              style={{
-                fontSize: "var(--text-eyebrow)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--text-tertiary)",
-                marginBottom: "var(--space-2)",
-              }}
-            >
-              {t("overview.theme.interviewEvidence", { xOfY: theme.interview_evidence.x_of_y })}
-            </div>
-            <blockquote
-              style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: "var(--text-md)",
-                fontStyle: "italic",
-                lineHeight: 1.5,
-                color: "var(--text-primary)",
-                margin: 0,
-                paddingLeft: "var(--space-3)",
-                borderLeft: "3px solid var(--brand-500)",
-              }}
-            >
-              "{theme.interview_evidence.anchor_quote}"
-            </blockquote>
-          </div>
-        )}
-      </div>
-
-      {theme.counter_evidence && (
-        <div
-          style={{
-            background: "var(--warning-bg)",
-            borderLeft: "3px solid var(--warning-text)",
-            padding: "var(--space-3) var(--space-4)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "var(--text-eyebrow)",
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--warning-text)",
-              marginBottom: "var(--space-1)",
-            }}
-          >
-            {t("overview.theme.counterEvidence")}
-          </div>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", margin: 0, lineHeight: 1.5 }}>
-            {theme.counter_evidence}
-          </p>
-        </div>
-      )}
-
-      {validation && <ThemeValidationPanel validation={validation} />}
-
-      {/* Recommendation footer */}
-      <footer
-        style={{
-          borderTop: "1px solid var(--border-subtle)",
-          paddingTop: "var(--space-4)",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "var(--text-eyebrow)",
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--brand-700)",
-            marginBottom: "var(--space-2)",
-          }}
-        >
-          {t(`overview.theme.kind.${theme.recommendation.kind}`)}
-        </div>
-        <p
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-md)",
-            fontWeight: 500,
-            color: "var(--text-primary)",
-            margin: 0,
-            lineHeight: 1.4,
-          }}
-        >
-          {theme.recommendation.action}
-        </p>
-        {theme.recommendation.rationale && (
-          <p
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--text-secondary)",
-              marginTop: "var(--space-2)",
-              lineHeight: 1.5,
-            }}
-          >
-            {theme.recommendation.rationale}
-          </p>
-        )}
-        {theme.recommendation.success_test && (
-          <p
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--text-secondary)",
-              marginTop: "var(--space-2)",
-              lineHeight: 1.5,
-            }}
-          >
-            <strong style={{ color: "var(--text-primary)" }}>{t("overview.theme.successTest")}</strong>{" "}
-            {theme.recommendation.success_test}
-          </p>
-        )}
-      </footer>
-    </article>
-  );
-}
-
-function ThemeValidationPanel({
-  validation,
-}: {
-  validation: ThemeValidationSnapshot;
-}) {
-  const { t } = useTranslation("study");
-  if (validation.n_answered === 0) {
-    return (
-      <div
-        style={{
-          padding: "var(--space-3) var(--space-4)",
-          background: "var(--bg-sunken)",
-          borderRadius: "var(--radius-sm)",
-          fontSize: "var(--text-xs)",
-          color: "var(--text-tertiary)",
-        }}
-      >
-        {t("overview.themeValidation.awaiting")}
-      </div>
-    );
-  }
-  const pct = validation.agreement_pct;
-  return (
-    <div
-      style={{
-        background: "var(--info-bg)",
-        border: "1px solid var(--info-border)",
-        borderRadius: "var(--radius-sm)",
-        padding: "var(--space-3) var(--space-4)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: "var(--text-eyebrow)",
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: "var(--info-text)",
-          marginBottom: "var(--space-1)",
-        }}
-      >
-        {t("overview.themeValidation.title", { count: validation.n_answered })}
-      </div>
-      <div
-        className="tabular"
-        style={{
-          fontFamily: "var(--font-serif)",
-          fontSize: "var(--text-md)",
-          color: "var(--info-text)",
-        }}
-      >
-        {pct === null ? (
-          <span>
-            {t("overview.themeValidation.agreedCounts", {
-              agreed: validation.distribution["4"] + validation.distribution["5"],
-              total: validation.n_answered,
-            })}
-          </span>
-        ) : (
-          <span>
-            <strong>{Math.round(pct)}%</strong> {t("overview.themeValidation.agreedPct")}
-            {validation.ci_low !== null && validation.ci_high !== null && (
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
-                {t("overview.themeValidation.ci", { low: Math.round(validation.ci_low), high: Math.round(validation.ci_high) })}
-              </span>
-            )}
-          </span>
-        )}
-      </div>
     </div>
   );
 }

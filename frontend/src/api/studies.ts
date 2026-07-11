@@ -184,9 +184,14 @@ export async function listAnalyses(studyId: string): Promise<StudyAnalysis[]> {
   return resp.data;
 }
 
-export async function fetchStudyReportHtml(studyId: string, analysisId: string): Promise<Blob> {
+export async function fetchStudyReportHtml(
+  studyId: string,
+  analysisId: string,
+  opts?: { embed?: boolean },
+): Promise<Blob> {
   const { data } = await client.get(`/studies/${studyId}/analyses/${analysisId}/report.html`, {
     responseType: "blob",
+    params: opts?.embed ? { embed: 1 } : undefined,
   });
   return data;
 }
