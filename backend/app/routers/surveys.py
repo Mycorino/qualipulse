@@ -582,7 +582,7 @@ def get_discoveries(
     """
 
     survey = _get_survey_or_404(db, survey_id, company)
-    found = compute_discoveries(db, survey)
+    found = compute_discoveries(db, survey, lang=company.preferred_language or "en")
     return DiscoveriesResponse(
         survey_id=survey.id,
         discoveries=[
