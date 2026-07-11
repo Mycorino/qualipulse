@@ -730,10 +730,18 @@ function QuestionPanel({ q, minN }: { q: QuestionAnalytics; minN: number }) {
     <div id={`q-${q.question_id}`} style={{ scrollMarginTop: "var(--space-6)" }}>
       <ChartCard
         eyebrow={eyebrow}
-        takeaway={q.prompt || t("common.untitledQuestion")}
+        takeaway={q.takeaway || q.prompt || t("common.untitledQuestion")}
         n={q.n_answered}
         minN={minN}
       >
+        {q.takeaway && (
+          <p
+            className="quanti-showcase__section-meta"
+            style={{ marginBottom: "var(--space-3)" }}
+          >
+            {q.prompt}
+          </p>
+        )}
         <BreakdownRenderer q={q} minN={minN} />
       </ChartCard>
     </div>

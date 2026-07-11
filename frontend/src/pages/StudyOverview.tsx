@@ -919,6 +919,16 @@ function ReportTab({ study }: { study: StudyDetail }) {
  * decision memos (Studies home). Answers "which report do I export?"
  * without hunting across three surfaces.
  */
+// The three report families share one colour identity with the exported
+// PDFs (services/report_export.py): qual rounds are forest green, survey
+// results are ink blue, and mixed-methods artifacts (study report +
+// decision memos) are bordeaux. Keep in sync with _PALETTES server-side.
+const REPORT_FAMILY_COLORS = {
+  qual: { color: "#1d5c3f", background: "#eef4ef" },
+  quant: { color: "#1e4a73", background: "#edf2f8" },
+  mixed: { color: "#7c2434", background: "#f8eef0" },
+} as const;
+
 function ReportsIndex({
   study,
   studyReportReady,
@@ -928,17 +938,17 @@ function ReportsIndex({
 }) {
   const { t } = useTranslation("study");
 
-  const badge = (label: string) => (
+  const badge = (label: string, family: keyof typeof REPORT_FAMILY_COLORS) => (
     <span
       style={{
         fontSize: "var(--text-eyebrow)",
         fontWeight: 600,
         letterSpacing: "0.06em",
         textTransform: "uppercase",
-        color: "var(--text-tertiary)",
-        border: "1px solid var(--border-default)",
+        color: REPORT_FAMILY_COLORS[family].color,
+        background: REPORT_FAMILY_COLORS[family].background,
         borderRadius: 999,
-        padding: "2px 10px",
+        padding: "3px 10px",
         whiteSpace: "nowrap",
       }}
     >
@@ -981,7 +991,7 @@ function ReportsIndex({
 
       {/* This study's mixed-methods report — it renders on this page. */}
       <div style={rowStyle}>
-        {badge(t("overview.reportsIndex.scopeStudy"))}
+        {badge(t("overview.reportsIndex.scopeStudy"), "mixed")}
         <span style={{ flex: 1, minWidth: 0 }}>{t("overview.reportsIndex.studyReportLabel")}</span>
         <span className="tabular" style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)" }}>
           {studyReportReady
@@ -993,7 +1003,7 @@ function ReportsIndex({
       {/* Per-round qualitative analyses. */}
       {study.projects.map((p) => (
         <Link key={p.id} to={`/projects/${p.id}?tab=analysis`} style={rowStyle}>
-          {badge(t("overview.reportsIndex.scopeRound"))}
+          {badge(t("overview.reportsIndex.scopeRound"), "qual")}
           <span
             style={{
               flex: 1,
@@ -1014,9 +1024,36 @@ function ReportsIndex({
         </Link>
       ))}
 
+      {/* Quantitative survey results — each source survey exports its own
+          ink-blue results report from its dashboard. Validation
+          micro-surveys are folded into the study report, so they don't get
+          a row of their own. */}
+      {study.surveys
+        .filter((s) => s.role !== "validation")
+        .map((s) => (
+          <Link key={s.id} to={`/surveys/${s.id}/dashboard`} style={rowStyle}>
+            {badge(t("overview.reportsIndex.scopeSurvey"), "quant")}
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {s.name}
+            </span>
+            <span className="tabular" style={{ color: "var(--text-tertiary)", fontSize: "var(--text-xs)" }}>
+              {t("overview.reportsIndex.surveyResponses", { count: s.completed_count })}
+            </span>
+            <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>→</span>
+          </Link>
+        ))}
+
       {/* Cross-study decision memos live on the Studies home. */}
       <Link to="/studies" style={rowStyle}>
-        {badge(t("overview.reportsIndex.scopeCross"))}
+        {badge(t("overview.reportsIndex.scopeCross"), "mixed")}
         <span style={{ flex: 1, minWidth: 0 }}>{t("overview.reportsIndex.memosLabel")}</span>
         <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>→</span>
       </Link>

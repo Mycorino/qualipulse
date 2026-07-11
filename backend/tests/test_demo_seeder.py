@@ -310,14 +310,17 @@ class TestDemoStudyIsHybrid:
         assert survey.status == "live"
         assert survey.company_id == company.id
 
-        # Two questions: a frequency mc_single and an NPS.
+        # A real stat instrument: frequency, current stack, value-for-money,
+        # NPS, and an open churn-trigger question.
         questions = (
             db_session.query(SurveyQuestion)
             .filter(SurveyQuestion.survey_id == survey.id)
             .order_by(SurveyQuestion.sort_order)
             .all()
         )
-        assert [q.type for q in questions] == ["mc_single", "nps"]
+        assert [q.type for q in questions] == [
+            "mc_single", "mc_multi", "likert", "nps", "open_text",
+        ]
 
         # 44 completed responses → above the n>=30 inference threshold.
         responses = (
@@ -344,7 +347,7 @@ class TestDemoStudyIsHybrid:
 
         # Report must validate against the public schema.
         report = QuantifiedThemeReport.model_validate_json(analysis.report)
-        assert len(report.themes) == 2
+        assert len(report.themes) == 4
         assert report.generated_with_survey_count == 1
         assert report.generated_with_interview_count == 4
 
@@ -548,10 +551,18 @@ class TestDemoCrossStudySynthesis:
             .one()
         )
         transcripts = self._all_transcripts(db_session, company.id)
+        quoted = 0
         for finding in json.loads(memo.report)["key_findings"]:
             match = re.search(r'[“"«]\s?(.+?)\s?[”"»]', finding["evidence"])
-            assert match, f"evidence has no quoted segment: {finding['evidence']!r}"
+            if match is None:
+                # Survey-grounded findings cite released aggregates (means,
+                # counts, NPS) instead of a verbatim — that's legitimate.
+                continue
+            quoted += 1
             assert match.group(1) in transcripts, f"Memo quote not verbatim: {match.group(1)!r}"
+        # The memo must still walk back to real voices: most findings carry
+        # a verbatim quote.
+        assert quoted >= 3, f"only {quoted} memo findings carry a verbatim quote"
 
     def test_fr_seed_creates_french_memo_and_studies(self, db_session):
         from app.models.study import Study
@@ -573,12 +584,18 @@ class TestDemoCrossStudySynthesis:
         )
         assert memo.name == DEMO_MEMO_NAME_FR
         assert memo.language == "fr"
-        # Evidence quotes verbatim in FR transcripts too
+        # Evidence quotes verbatim in FR transcripts too (survey-grounded
+        # findings may cite aggregates instead of a verbatim).
         transcripts = self._all_transcripts(db_session, company.id)
         import re
+        quoted = 0
         for finding in json.loads(memo.report)["key_findings"]:
             match = re.search(r'[“"«]\s?(.+?)\s?[”"»]', finding["evidence"])
-            assert match and match.group(1) in transcripts, finding["evidence"]
+            if match is None:
+                continue
+            quoted += 1
+            assert match.group(1) in transcripts, finding["evidence"]
+        assert quoted >= 3, f"only {quoted} memo findings carry a verbatim quote"
 
     def test_demo_memo_export_renders(self, client, db_session, registered_company, auth_headers):
         from app.models.synthesis import CrossStudySynthesis

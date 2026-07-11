@@ -803,7 +803,7 @@ def get_dashboard(
     """
 
     survey = _get_survey_or_404(db, survey_id, company)
-    payload = build_dashboard(db, survey)
+    payload = build_dashboard(db, survey, lang=company.preferred_language or "en")
     return SurveyDashboardSchema(
         survey_id=payload.survey_id,
         name=payload.name,
@@ -849,8 +849,8 @@ def export_survey_report(
     """
 
     survey = _get_survey_or_404(db, survey_id, company)
-    payload = build_dashboard(db, survey)
     lang = "fr" if (company.preferred_language or "en").lower().startswith("fr") else "en"
+    payload = build_dashboard(db, survey, lang=lang)
     html_doc = render_survey_dashboard_html(
         payload, company_name=company.name, lang=lang
     )

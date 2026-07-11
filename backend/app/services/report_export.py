@@ -45,6 +45,8 @@ _STRINGS = {
         "duration": "Interview length",
         "duration_value": "{m} minutes (target)",
         "field_dates": "Fieldwork window",
+        "sample_profile": "Sample profile",
+        "sample_profile_value": "{n} participants · {professions} professions · {countries} countries",
         "analysis_lineage": "Analysis version",
         "lineage_refined": "v{v} — refined by the researcher from v{p}",
         "lineage_ai": "v{v} — AI discovery synthesis",
@@ -112,6 +114,8 @@ _STRINGS = {
         "duration": "Durée d'entretien",
         "duration_value": "{m} minutes (cible)",
         "field_dates": "Période de terrain",
+        "sample_profile": "Profil de l'échantillon",
+        "sample_profile_value": "{n} participants · {professions} professions · {countries} pays",
         "analysis_lineage": "Version d'analyse",
         "lineage_refined": "v{v} — affinée par le chercheur à partir de la v{p}",
         "lineage_ai": "v{v} — synthèse de découverte IA",
@@ -167,6 +171,37 @@ def _fmt_date(dt: datetime | None, lang: str) -> str:
         return "—"
     months = _MONTHS_FR if lang == "fr" else _MONTHS_EN
     return f"{dt.day} {months[dt.month - 1]} {dt.year}"
+
+
+# ── Report colour identities ───────────────────────────────────────────
+# Three document families, three inks — a reader can tell which kind of
+# evidence they are holding from across the room:
+#   qual  — forest green (interview findings: the field notebook)
+#   quant — ink blue     (survey results: the statistical tables)
+#   mixed — bordeaux     (quantified themes + decision memo: the board document)
+# The decision memo is the flagship: same bordeaux ink, boldest layout.
+_PALETTES = {
+    "qual":  {"accent": "#1d5c3f", "tint": "#eef4ef", "deep": "#10382a", "hover": "#16452f"},
+    "quant": {"accent": "#1e4a73", "tint": "#edf2f8", "deep": "#132f4b", "hover": "#173a5b"},
+    "mixed": {"accent": "#7c2434", "tint": "#f8eef0", "deep": "#4d1420", "hover": "#651c2a"},
+}
+
+
+def _palette_css(kind: str) -> str:
+    """CSS variable override appended after a document's stylesheet.
+
+    Later rules win, so this re-inks --accent / --accent-tint (and the
+    hardcoded toolbar hover) without touching the shared layout CSS.
+    """
+    p = _PALETTES.get(kind, _PALETTES["qual"])
+    return (
+        "\n:root { --accent: %(accent)s; --accent-tint: %(tint)s; --accent-deep: %(deep)s; }\n"
+        ".toolbar button:hover { background: %(hover)s; }\n" % p
+    )
+
+
+def _accent(kind: str) -> str:
+    return _PALETTES.get(kind, _PALETTES["qual"])["accent"]
 
 
 def _freq_meter(frequency: str, L: dict) -> str:
@@ -487,6 +522,17 @@ def render_analysis_report_html(
     if getattr(project, "target_customer_description", None):
         design_rows.append((L["target"], _esc(project.target_customer_description)))
     design_rows.append((L["duration"], L["duration_value"].format(m=project.interview_duration_minutes)))
+    if completed:
+        professions = {p.profession for p in completed if p.profession}
+        countries = {p.country for p in completed if p.country}
+        design_rows.append((
+            L["sample_profile"],
+            L["sample_profile_value"].format(
+                n=len(completed),
+                professions=len(professions) or "—",
+                countries=len(countries) or "—",
+            ),
+        ))
     if field_start and field_end:
         window = _fmt_date(field_start, lang) if field_start.date() == field_end.date() \
             else f"{_fmt_date(field_start, lang)} → {_fmt_date(field_end, lang)}"
@@ -703,7 +749,7 @@ def render_analysis_report_html(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>{_esc(title)}</title>
-<style>{_ANALYSIS_CSS}</style>
+<style>{_ANALYSIS_CSS + _palette_css("qual")}</style>
 </head>
 <body>
 <div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>
@@ -753,6 +799,13 @@ _MEMO_STRINGS = {
         "gaps": "What we still don't know",
         "recos": "Recommendations",
         "recos_sub": "Decision-oriented next steps. Each one states what evidence would prove it wrong.",
+        "stat_studies": "Studies synthesised",
+        "stat_interviews": "Interviews behind this memo",
+        "stat_findings": "Cross-study findings",
+        "stat_conflicts": "Conflicts surfaced",
+        "matrix": "Evidence matrix",
+        "matrix_sub": "Which studies support each finding. A filled dot marks corroboration in that study's analysis.",
+        "col_finding": "Finding",
         "included": "Studies included",
         "col_study": "Study", "col_n": "Interviews", "col_conf": "Confidence",
         "col_date": "Analysed", "col_mixed": "Mixed methods",
@@ -788,6 +841,13 @@ _MEMO_STRINGS = {
         "gaps": "Ce que nous ne savons toujours pas",
         "recos": "Recommandations",
         "recos_sub": "Prochaines étapes orientées décision. Chacune précise ce qui la réfuterait.",
+        "stat_studies": "Études synthétisées",
+        "stat_interviews": "Entretiens derrière ce mémo",
+        "stat_findings": "Enseignements transverses",
+        "stat_conflicts": "Divergences relevées",
+        "matrix": "Matrice des preuves",
+        "matrix_sub": "Quelles études soutiennent chaque enseignement. Un point plein marque une corroboration dans l'analyse de l'étude.",
+        "col_finding": "Enseignement",
         "included": "Études incluses",
         "col_study": "Étude", "col_n": "Entretiens", "col_conf": "Confiance",
         "col_date": "Analysée le", "col_mixed": "Méthodes mixtes",
@@ -808,12 +868,46 @@ _MEMO_STRINGS = {
 _STRENGTH_LEVEL = {"strong": 3, "moderate": 2, "weak": 1}
 
 _MEMO_CSS = _BASE_DOC_CSS + """
-.decision-q { font-family: var(--serif); font-size: 1.1rem; font-style: italic;
+/* Flagship treatment: the decision memo opens on a full-ink cover band —
+   the boldest document in the system, since it carries everything we know. */
+.cover--band { background: var(--accent-deep); color: #fff; border-bottom: 0;
+  margin: -56px -40px 0; padding: 72px 40px 52px; }
+.cover--band .cover__logo { color: #fff; }
+.cover--band .cover__doctype { color: #fff; background: rgba(255,255,255,0.16);
+  padding: 3px 10px; border-radius: 3px; letter-spacing: 0.14em; }
+.cover--band .cover__title { color: #fff; font-size: 2.5rem; margin: 26px 0 18px; }
+.cover--band .cover__meta, .cover--band .cover__meta .chip { color: rgba(255,255,255,0.85); }
+.cover--band .cover__meta .chip--strong { color: #fff; }
+.cover--band .cover__meta .chip--conf-high, .cover--band .cover__meta .chip--conf-medium,
+.cover--band .cover__meta .chip--conf-low { background: rgba(255,255,255,0.16); color: #fff; }
+@media (max-width: 720px) { .cover--band { margin: -32px -20px 0; padding: 44px 20px 34px; } }
+@media print { .cover--band { margin: 0; padding: 44px 34px 36px; } }
+
+.sec-head { display: flex; align-items: baseline; gap: 14px;
+  border-bottom: 1px solid var(--rule); padding-bottom: 8px; margin-bottom: 8px; }
+.sec-num { font-family: var(--serif); font-size: 0.95rem; color: var(--ink-3); }
+.sec-title { font-size: 12px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink); }
+
+.stats--memo { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 720px) { .stats--memo { grid-template-columns: repeat(2, 1fr); } }
+
+.decision-q { font-family: var(--serif); font-size: 1.2rem; font-style: italic;
   color: var(--ink-2); max-width: 62ch; }
 .verdict { background: var(--accent-tint); border-left: 3px solid var(--accent);
-  padding: 18px 22px; max-width: 680px; }
-.verdict p { font-family: var(--serif); font-size: 1.3rem; line-height: 1.45; font-weight: 500; }
+  padding: 20px 24px; max-width: 680px; }
+.verdict p { font-family: var(--serif); font-size: 1.45rem; line-height: 1.42; font-weight: 500; }
 .summary-text { font-size: 14.5px; color: var(--ink-2); max-width: 70ch; }
+
+.ev { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ev th { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-2); border-bottom: 1.5px solid var(--rule-strong); padding: 0 8px 6px; text-align: center; }
+.ev td { border-bottom: 1px solid var(--rule); padding: 8px; text-align: center; }
+.ev__theme { text-align: left !important; font-weight: 600; max-width: 340px; padding-left: 0 !important; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.dot--on { background: var(--accent); }
+.dot--off { background: var(--rule); width: 6px; height: 6px; }
+.ev__legend { font-size: 11.5px; color: var(--ink-3); margin-top: 10px; }
 
 .finding { border-top: 1px solid var(--rule); padding: 20px 0 24px; }
 .finding:first-of-type { border-top: 0; padding-top: 6px; }
@@ -880,7 +974,7 @@ def render_decision_memo_html(synthesis, studies_meta: list, company_name: str =
     sep = "&nbsp;:" if lang == "fr" else ":"
 
     header = f"""
-    <header class="cover">
+    <header class="cover cover--band">
       <div class="cover__brand">
         <span class="cover__logo">QualiPulse</span>
         <span class="cover__doctype">{L["doc_type"]}</span>
@@ -894,42 +988,75 @@ def render_decision_memo_html(synthesis, studies_meta: list, company_name: str =
     </header>
     """
 
-    decision_section = f"""
+    # Key numbers directly under the cover band — the memo leads with the
+    # weight of evidence behind it.
+    total_interviews = sum(m.get("participant_count") or 0 for m in studies_meta)
+    memo_stats = [
+        (len(studies_meta), L["stat_studies"]),
+        (total_interviews or "—", L["stat_interviews"]),
+        (len(findings), L["stat_findings"]),
+        (len(conflicts), L["stat_conflicts"]),
+    ]
+    stat_tiles = "".join(
+        f'<div class="stat"><div class="stat__num">{n}</div><div class="stat__label">{lbl}</div></div>'
+        for n, lbl in memo_stats
+    )
+    stat_band = f'<section class="avoid-break"><div class="stats stats--memo">{stat_tiles}</div></section>'
+
+    # Numbered section heads — the counter only advances for sections that
+    # actually render, so the numbering never skips.
+    _sec_counter = {"n": 0}
+
+    def _head(title_text: str, sub: str = "") -> str:
+        _sec_counter["n"] += 1
+        sub_html = f'<p class="section-sub">{sub}</p>' if sub else ""
+        return (
+            f'<div class="sec-head"><span class="sec-num">{_sec_counter["n"]:02d}</span>'
+            f'<span class="sec-title">{title_text}</span></div>{sub_html}'
+        )
+
+    sections = [stat_band]
+
+    decision_text = report.get("decision", synthesis.decision_question or "")
+    if decision_text:
+        sections.append(f"""
     <section class="avoid-break">
-      <h2 class="eyebrow">{L["decision"]}</h2>
-      <p class="decision-q">{_esc(report.get("decision", synthesis.decision_question or ""))}</p>
+      {_head(L["decision"])}
+      <p class="decision-q">{_esc(decision_text)}</p>
     </section>
-    """
+    """)
 
     rationale = report.get("confidence_rationale", "")
-    verdict_section = f"""
+    sections.append(f"""
     <section class="avoid-break">
-      <h2 class="eyebrow">{L["verdict"]}</h2>
+      {_head(L["verdict"])}
       <div class="verdict"><p>{_esc(report.get("verdict", ""))}</p></div>
       {f'<p class="rationale"><strong>{L["confidence_note"]}:</strong> {_esc(rationale)}</p>' if rationale else ""}
     </section>
-    """
+    """)
 
-    summary_section = f"""
+    if report.get("summary"):
+        sections.append(f"""
     <section class="avoid-break">
-      <h2 class="eyebrow">{L["summary"]}</h2>
+      {_head(L["summary"])}
       <p class="summary-text">{_esc(report.get("summary", ""))}</p>
     </section>
-    """ if report.get("summary") else ""
+    """)
 
-    finding_cards = []
-    for i, f in enumerate(findings):
-        chips = "".join(
-            '<span class="chip">{}</span>'.format(_esc(s))
-            for s in (f.get("supporting_studies", []) or [])
-        )
-        evidence = f.get("evidence", "")
-        evidence_html = f"""
+    if findings:
+        finding_cards = []
+        for i, f in enumerate(findings):
+            chips = "".join(
+                '<span class="chip">{}</span>'.format(_esc(s))
+                for s in (f.get("supporting_studies", []) or [])
+            )
+            evidence = f.get("evidence", "")
+            evidence_html = f"""
           <div class="finding__evidence avoid-break">
             <span class="lbl">{L["evidence"]}</span>
             <p>{_esc(evidence)}</p>
           </div>""" if evidence else ""
-        finding_cards.append(f"""
+            finding_cards.append(f"""
         <article class="finding avoid-break">
           <div class="finding__head">
             <span class="finding__num">{i + 1:02d}</span>
@@ -940,51 +1067,94 @@ def render_decision_memo_html(synthesis, studies_meta: list, company_name: str =
           <div class="finding__studies">{chips}</div>
           {evidence_html}
         </article>""")
-    findings_section = f"""
+        sections.append(f"""
     <section>
-      <h2 class="section-title">{L["findings"]}</h2>
-      <p class="section-sub">{L["findings_sub"]}</p>
+      {_head(L["findings"], L["findings_sub"])}
       {"".join(finding_cards)}
     </section>
-    """ if findings else ""
+    """)
 
-    conflict_cards = "".join(f"""
+    # Evidence matrix: findings × studies — the memo's signature exhibit.
+    if findings and studies_meta:
+        study_names = [m.get("name", "") for m in studies_meta]
+        head_cells = "".join(
+            '<th title="{}">S{}</th>'.format(_esc(name), i + 1)
+            for i, name in enumerate(study_names)
+        )
+        body_rows = ""
+        for i, f in enumerate(findings):
+            supporting = set(f.get("supporting_studies", []) or [])
+            cells = "".join(
+                "<td>{}</td>".format(
+                    '<span class="dot dot--on"></span>'
+                    if name in supporting
+                    else '<span class="dot dot--off"></span>'
+                )
+                for name in study_names
+            )
+            label = _truncate_label(f.get("finding", ""), 72)
+            body_rows += (
+                f'<tr><td class="ev__theme">{i + 1:02d} — {_esc(label)}</td>{cells}</tr>'
+            )
+        legend = " · ".join(
+            "<strong>S{}</strong> {}".format(i + 1, _esc(name))
+            for i, name in enumerate(study_names)
+        )
+        sections.append(f"""
+    <section class="avoid-break">
+      {_head(L["matrix"], L["matrix_sub"])}
+      <table class="ev">
+        <thead><tr><th class="ev__theme">{L["col_finding"]}</th>{head_cells}</tr></thead>
+        <tbody>{body_rows}</tbody>
+      </table>
+      <p class="ev__legend">{legend}</p>
+    </section>
+    """)
+
+    if conflicts:
+        conflict_cards = "".join(f"""
         <article class="conflict avoid-break">
           <h3>{_esc(c.get("topic", ""))}</h3>
           <p>{_esc(c.get("detail", ""))}</p>
         </article>""" for c in conflicts)
-    conflicts_section = f"""
+        sections.append(f"""
     <section>
-      <h2 class="section-title">{L["conflicts"]}</h2>
-      <p class="section-sub">{L["conflicts_sub"]}</p>
+      {_head(L["conflicts"], L["conflicts_sub"])}
       {conflict_cards}
     </section>
-    """ if conflicts else ""
+    """)
 
-    gap_items = "".join(f'<li class="avoid-break">{_esc(g)}</li>' for g in gaps)
-    gaps_section = f"""
+    if gaps:
+        gap_items = "".join(f'<li class="avoid-break">{_esc(g)}</li>' for g in gaps)
+        sections.append(f"""
     <section class="avoid-break">
-      <h2 class="section-title">{L["gaps"]}</h2>
+      {_head(L["gaps"])}
       <ul class="gaps">{gap_items}</ul>
     </section>
-    """ if gaps else ""
+    """)
 
-    reco_items = "".join(f"""
+    if recommendations:
+        reco_items = "".join(f"""
         <li class="reco avoid-break"><span class="reco__num">{i + 1}</span><p>{_esc(r)}</p></li>"""
-        for i, r in enumerate(recommendations))
-    recos_section = f"""
+            for i, r in enumerate(recommendations))
+        sections.append(f"""
     <section class="avoid-break">
-      <h2 class="section-title">{L["recos"]}</h2>
-      <p class="section-sub">{L["recos_sub"]}</p>
+      {_head(L["recos"], L["recos_sub"])}
       <ol class="recos">{reco_items}</ol>
     </section>
-    """ if recommendations else ""
+    """)
 
-    included_rows = ""
-    for m in studies_meta:
-        m_conf = (m.get("confidence") or "").lower()
-        m_conf_label = L.get("confidence_{}".format(m_conf), "—") if m_conf else "—"
-        included_rows += f"""
+    contract_items = "".join(f"<li>{item}</li>" for item in L["contract_items"])
+    sections.append(f"""
+    <div class="contract avoid-break"><h4>{L["contract_title"]}</h4><ul>{contract_items}</ul></div>
+    """)
+
+    if studies_meta:
+        included_rows = ""
+        for m in studies_meta:
+            m_conf = (m.get("confidence") or "").lower()
+            m_conf_label = L.get("confidence_{}".format(m_conf), "—") if m_conf else "—"
+            included_rows += f"""
         <tr>
           <td>{_esc(m.get("name", ""))}</td>
           <td>{m.get("participant_count") if m.get("participant_count") is not None else "—"}</td>
@@ -992,9 +1162,9 @@ def render_decision_memo_html(synthesis, studies_meta: list, company_name: str =
           <td>{_fmt_date(m.get("generated_at"), lang)}</td>
           <td>{L["yes"] if m.get("has_mixed_methods") else L["no"]}</td>
         </tr>"""
-    included_section = f"""
+        sections.append(f"""
     <section class="avoid-break">
-      <h2 class="section-title">{L["included"]}</h2>
+      {_head(L["included"])}
       <table class="included">
         <thead><tr>
           <th>{L["col_study"]}</th><th>{L["col_n"]}</th><th>{L["col_conf"]}</th>
@@ -1003,12 +1173,7 @@ def render_decision_memo_html(synthesis, studies_meta: list, company_name: str =
         <tbody>{included_rows}</tbody>
       </table>
     </section>
-    """ if studies_meta else ""
-
-    contract_items = "".join(f"<li>{item}</li>" for item in L["contract_items"])
-    contract = f"""
-    <div class="contract avoid-break"><h4>{L["contract_title"]}</h4><ul>{contract_items}</ul></div>
-    """
+    """)
 
     title = f"{synthesis.name} — {L['doc_type']}"
 
@@ -1019,21 +1184,13 @@ def render_decision_memo_html(synthesis, studies_meta: list, company_name: str =
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>{_esc(title)}</title>
-<style>{_MEMO_CSS}</style>
+<style>{_MEMO_CSS + _palette_css("mixed")}</style>
 </head>
 <body>
 <div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>
 <div class="sheet">
 {header}
-{decision_section}
-{verdict_section}
-{summary_section}
-{findings_section}
-{conflicts_section}
-{gaps_section}
-{recos_section}
-{contract}
-{included_section}
+{"".join(sections)}
 <footer class="doc-footer">
   <span><strong>QualiPulse</strong> · {_esc(company_name)}</span>
   <span>{L["footer"]}</span>
@@ -1092,6 +1249,9 @@ _STUDY_STRINGS = {
         "chart_no_pct": "Sub-threshold group (n<30) — raw counts, no percentages.",
         "chart_mean": "mean {m}",
         "chart_nps": "NPS {score} · {p} promoters / {pa} passives / {d} detractors",
+        "nps_detractors": "Detractors (0–6)",
+        "nps_passives": "Passives (7–8)",
+        "nps_promoters": "Promoters (9–10)",
         "chart_open_text": "{n} open-text answers — read them in the survey dashboard.",
         "methodology_note": "How this report was produced",
         "contract_title": "Methodology contract",
@@ -1156,6 +1316,9 @@ _STUDY_STRINGS = {
         "chart_no_pct": "Groupe sous le seuil (n<30) — effectifs bruts, pas de pourcentages.",
         "chart_mean": "moyenne {m}",
         "chart_nps": "NPS {score} · {p} promoteurs / {pa} passifs / {d} détracteurs",
+        "nps_detractors": "Détracteurs (0–6)",
+        "nps_passives": "Passifs (7–8)",
+        "nps_promoters": "Promoteurs (9–10)",
         "chart_open_text": "{n} réponses libres — à lire dans le tableau de bord du questionnaire.",
         "methodology_note": "Comment ce rapport a été produit",
         "contract_title": "Contrat méthodologique",
@@ -1237,6 +1400,8 @@ section { margin-top: 46px; }
 
 figure { margin: 0 0 26px; }
 .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; max-width: 70ch; }
+.fig-takeaway { font-family: var(--serif); font-size: 1.02rem; line-height: 1.45;
+  margin: 2px 0 6px; max-width: 66ch; }
 .chart-meta { font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; }
 .chart-wrap { overflow-x: auto; }
 figcaption { font-size: 12px; color: var(--ink-2); margin-top: 6px; max-width: 70ch; }
@@ -1324,7 +1489,7 @@ def _truncate_label(text: str, limit: int = 36) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
-def _svg_choice_bars(choices: list[dict], lang: str) -> str:
+def _svg_choice_bars(choices: list[dict], lang: str, accent: str = "#1d5c3f") -> str:
     """Horizontal bar chart for a multiple-choice breakdown.
 
     Counts are always printed on the bar; percentages (+ Wilson CI) only
@@ -1358,7 +1523,7 @@ def _svg_choice_bars(choices: list[dict], lang: str) -> str:
         if count:
             parts.append(
                 f'<rect x="{label_w}" y="{y + 8}" width="{w}" height="13" '
-                f'fill="#1d5c3f" opacity="{opacity:.2f}"/>'
+                f'fill="{accent}" opacity="{opacity:.2f}"/>'
             )
         parts.append(
             f'<text x="{label_w + w + 8}" y="{y + 19}" font-size="11.5" '
@@ -1368,7 +1533,61 @@ def _svg_choice_bars(choices: list[dict], lang: str) -> str:
     return "".join(parts)
 
 
-def _svg_histogram(histogram: list[dict], mean: float | None) -> str:
+def _svg_nps_band(breakdown: dict, L: dict, accent: str = "#1d5c3f") -> str:
+    """NPS composition band: score + detractor/passive/promoter stacked bar.
+
+    Only rendered when the analytics layer released the NPS decomposition
+    (n>=30); segment widths come straight from the released counts.
+    """
+    promoters = breakdown.get("promoters")
+    passives = breakdown.get("passives")
+    detractors = breakdown.get("detractors")
+    score = breakdown.get("nps_score")
+    if score is None or promoters is None or passives is None or detractors is None:
+        return ""
+    total = (promoters or 0) + (passives or 0) + (detractors or 0)
+    if total <= 0:
+        return ""
+    bar_x, bar_w, bar_y, bar_h = 128, 552, 16, 24
+    seg = [
+        (detractors, "#a2541f", L["nps_detractors"]),
+        (passives, "#b9c2bb", L["nps_passives"]),
+        (promoters, accent, L["nps_promoters"]),
+    ]
+    parts = [
+        '<svg viewBox="0 0 680 84" width="100%" role="img">',
+        f'<text x="0" y="{bar_y + 22}" font-size="30" font-weight="700" '
+        f'fill="{accent}" font-family="Georgia, serif">{score:+d}</text>',
+        f'<text x="0" y="{bar_y + 40}" font-size="10.5" fill="#7a847e">NPS</text>',
+    ]
+    x = float(bar_x)
+    for count, color, label in seg:
+        w = bar_w * count / total
+        if count:
+            parts.append(
+                f'<rect x="{x:.1f}" y="{bar_y}" width="{max(w, 1.5):.1f}" '
+                f'height="{bar_h}" fill="{color}"/>'
+            )
+            if w >= 26:
+                parts.append(
+                    f'<text x="{x + w / 2:.1f}" y="{bar_y + 16}" font-size="11" '
+                    f'font-weight="600" text-anchor="middle" fill="#ffffff">{count}</text>'
+                )
+        x += w
+    # segment legend under the bar
+    lx = bar_x
+    for count, color, label in seg:
+        parts.append(f'<rect x="{lx}" y="{bar_y + 36}" width="9" height="9" fill="{color}"/>')
+        parts.append(
+            f'<text x="{lx + 14}" y="{bar_y + 44}" font-size="11" fill="#4c5852">'
+            f"{_esc(label)} · {count}</text>"
+        )
+        lx += 184
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _svg_histogram(histogram: list[dict], mean: float | None, accent: str = "#1d5c3f") -> str:
     """Column chart for a likert / NPS bucket histogram (counts always shown)."""
     buckets = [(h.get("bucket"), h.get("count") or 0) for h in histogram]
     if not buckets:
@@ -1388,7 +1607,7 @@ def _svg_histogram(histogram: list[dict], mean: float | None) -> str:
         if count:
             parts.append(
                 f'<rect x="{cx - bar_w / 2:.1f}" y="{base_y - h}" width="{bar_w:.1f}" '
-                f'height="{h}" fill="#1d5c3f"/>'
+                f'height="{h}" fill="{accent}"/>'
             )
             parts.append(
                 f'<text x="{cx:.1f}" y="{base_y - h - 5}" font-size="10.5" '
@@ -1573,6 +1792,7 @@ def render_study_report_html(
     </div>
     """
 
+    accent = _accent("mixed")
     chart_blocks = []
     for dash in dashboards:
         figures = []
@@ -1580,6 +1800,11 @@ def render_study_report_html(
             if q.n_answered == 0:
                 continue
             meta_bits = [L["chart_n"].format(n=q.n_answered)]
+            takeaway_html = (
+                f'<p class="fig-takeaway">{_esc(q.takeaway)}</p>'
+                if getattr(q, "takeaway", None)
+                else ""
+            )
             body = ""
             caption = ""
             if q.type in ("likert", "nps"):
@@ -1588,11 +1813,13 @@ def render_study_report_html(
                     continue
                 if q.mean is not None:
                     meta_bits.append(L["chart_mean"].format(m=f"{q.mean:.1f}"))
-                body = _svg_histogram(hist, q.mean)
-                nps_score = (q.breakdown or {}).get("nps_score")
-                if nps_score is not None:
+                body = _svg_histogram(hist, q.mean, accent)
+                nps_band = _svg_nps_band(q.breakdown or {}, L, accent)
+                if nps_band:
+                    body += nps_band
+                elif (q.breakdown or {}).get("nps_score") is not None:
                     caption = L["chart_nps"].format(
-                        score=nps_score,
+                        score=(q.breakdown or {}).get("nps_score"),
                         p=(q.breakdown or {}).get("promoters", 0),
                         pa=(q.breakdown or {}).get("passives", 0),
                         d=(q.breakdown or {}).get("detractors", 0),
@@ -1601,13 +1828,14 @@ def render_study_report_html(
                 choices = (q.breakdown or {}).get("choices") or []
                 if not choices:
                     continue
-                body = _svg_choice_bars(choices, lang)
+                body = _svg_choice_bars(choices, lang, accent)
                 if all(c.get("percentage") is None for c in choices):
                     caption = L["chart_no_pct"]
             elif q.type in ("open_text", "short_text"):
                 total = (q.breakdown or {}).get("total_texts", q.n_answered)
                 figures.append(
                     f'<figure class="avoid-break"><div class="chart-title">{_esc(q.prompt)}</div>'
+                    f"{takeaway_html}"
                     f'<figcaption>{L["chart_open_text"].format(n=total)}</figcaption></figure>'
                 )
                 continue
@@ -1616,6 +1844,7 @@ def render_study_report_html(
             caption_html = f"<figcaption>{_esc(caption)}</figcaption>" if caption else ""
             figures.append(
                 f'<figure class="avoid-break"><div class="chart-title">{_esc(q.prompt)}</div>'
+                f"{takeaway_html}"
                 f'<div class="chart-meta num">{_esc(" · ".join(meta_bits))}</div>'
                 f'<div class="chart-wrap">{body}</div>{caption_html}</figure>'
             )
@@ -1767,7 +1996,7 @@ def render_study_report_html(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>{_esc(title)}</title>
-<style>{_STUDY_CSS}</style>
+<style>{_STUDY_CSS + _palette_css("mixed")}</style>
 </head>
 <body>
 <div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>
@@ -1815,6 +2044,9 @@ _SURVEY_STRINGS = {
         "chart_n": "n={n}",
         "chart_mean": "mean {m}",
         "chart_nps": "NPS {score} · {p} promoters / {pa} passives / {d} detractors",
+        "nps_detractors": "Detractors (0–6)",
+        "nps_passives": "Passives (7–8)",
+        "nps_promoters": "Promoters (9–10)",
         "chart_no_pct": "Sub-threshold group (n<30) — raw counts, no percentages.",
         "open_text_total": "{n} open-text answers",
         "open_text_sample": "Sample of verbatim answers",
@@ -1849,6 +2081,9 @@ _SURVEY_STRINGS = {
         "chart_n": "n={n}",
         "chart_mean": "moyenne {m}",
         "chart_nps": "NPS {score} · {p} promoteurs / {pa} passifs / {d} détracteurs",
+        "nps_detractors": "Détracteurs (0–6)",
+        "nps_passives": "Passifs (7–8)",
+        "nps_promoters": "Promoteurs (9–10)",
         "chart_no_pct": "Groupe sous le seuil (n<30) — effectifs bruts, pas de pourcentages.",
         "open_text_total": "{n} réponses libres",
         "open_text_sample": "Échantillon de réponses verbatim",
@@ -1888,6 +2123,8 @@ _SURVEY_CSS = _BASE_DOC_CSS + """
 
 figure { margin: 0 0 26px; }
 .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; max-width: 70ch; }
+.fig-takeaway { font-family: var(--serif); font-size: 1.02rem; line-height: 1.45;
+  margin: 2px 0 6px; max-width: 66ch; }
 .chart-meta { font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; }
 .chart-wrap { overflow-x: auto; }
 figcaption { font-size: 12px; color: var(--ink-2); margin-top: 6px; max-width: 70ch; }
@@ -1899,7 +2136,7 @@ svg text { font-family: var(--sans); }
 """
 
 
-def _survey_question_figure(q, L: dict, lang: str) -> str:
+def _survey_question_figure(q, L: dict, lang: str, accent: str = "#1e4a73") -> str:
     """Render one dashboard question as a titled figure.
 
     Reuses the same server-side SVG helpers and suppression rules as the
@@ -1907,6 +2144,11 @@ def _survey_question_figure(q, L: dict, lang: str) -> str:
     analytics layer released them (n>=30).
     """
     title = f'<div class="chart-title">{_esc(q.prompt)}</div>'
+    takeaway_html = (
+        f'<p class="fig-takeaway">{_esc(q.takeaway)}</p>'
+        if getattr(q, "takeaway", None)
+        else ""
+    )
     if q.n_answered == 0:
         return (
             f'<figure class="q-block avoid-break">{title}'
@@ -1926,11 +2168,13 @@ def _survey_question_figure(q, L: dict, lang: str) -> str:
             )
         if q.mean is not None:
             meta_bits.append(L["chart_mean"].format(m=f"{q.mean:.1f}"))
-        body = _svg_histogram(hist, q.mean)
-        nps_score = (q.breakdown or {}).get("nps_score")
-        if nps_score is not None:
+        body = _svg_histogram(hist, q.mean, accent)
+        nps_band = _svg_nps_band(q.breakdown or {}, L, accent)
+        if nps_band:
+            body += nps_band
+        elif (q.breakdown or {}).get("nps_score") is not None:
             caption = L["chart_nps"].format(
-                score=nps_score,
+                score=(q.breakdown or {}).get("nps_score"),
                 p=(q.breakdown or {}).get("promoters", 0),
                 pa=(q.breakdown or {}).get("passives", 0),
                 d=(q.breakdown or {}).get("detractors", 0),
@@ -1942,7 +2186,7 @@ def _survey_question_figure(q, L: dict, lang: str) -> str:
                 f'<figure class="q-block avoid-break">{title}'
                 f'<figcaption>{L["no_answers"]}</figcaption></figure>'
             )
-        body = _svg_choice_bars(choices, lang)
+        body = _svg_choice_bars(choices, lang, accent)
         if all(c.get("percentage") is None for c in choices):
             caption = L["chart_no_pct"]
     elif q.type in ("open_text", "short_text"):
@@ -1960,7 +2204,7 @@ def _survey_question_figure(q, L: dict, lang: str) -> str:
             else ""
         )
         return (
-            f'<figure class="q-block avoid-break">{title}'
+            f'<figure class="q-block avoid-break">{title}{takeaway_html}'
             f'<div class="chart-meta num">{L["open_text_total"].format(n=total)}</div>'
             f"{sample_block}</figure>"
         )
@@ -1972,7 +2216,7 @@ def _survey_question_figure(q, L: dict, lang: str) -> str:
         )
     caption_html = f"<figcaption>{_esc(caption)}</figcaption>" if caption else ""
     return (
-        f'<figure class="q-block avoid-break">{title}'
+        f'<figure class="q-block avoid-break">{title}{takeaway_html}'
         f'<div class="chart-meta num">{_esc(" · ".join(meta_bits))}</div>'
         f'<div class="chart-wrap">{body}</div>{caption_html}</figure>'
     )
@@ -2057,7 +2301,7 @@ def render_survey_dashboard_html(dashboard, company_name: str = "", lang: str = 
     """
 
     figures = "".join(
-        _survey_question_figure(q, L, lang) for q in dashboard.questions
+        _survey_question_figure(q, L, lang, _accent("quant")) for q in dashboard.questions
     )
     questions_section = f"""
     <section>
@@ -2082,7 +2326,7 @@ def render_survey_dashboard_html(dashboard, company_name: str = "", lang: str = 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>{_esc(title)}</title>
-<style>{_SURVEY_CSS}</style>
+<style>{_SURVEY_CSS + _palette_css("quant")}</style>
 </head>
 <body>
 <div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>

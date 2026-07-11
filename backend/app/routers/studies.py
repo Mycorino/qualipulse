@@ -638,7 +638,10 @@ def export_study_report(
         .order_by(Survey.created_at)
         .all()
     )
-    dashboards = [build_dashboard(db, s) for s in surveys]
+    dashboards = [
+        build_dashboard(db, s, lang=company.preferred_language or "en")
+        for s in surveys
+    ]
     validation = compute_validation_summary(db, analysis)
 
     project_ids = [

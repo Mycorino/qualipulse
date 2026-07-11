@@ -631,32 +631,229 @@ DEMO_MEMOS_FR = [
 DEMO_SURVEY_NAME = "Streaming habits — quick pulse"
 DEMO_SURVEY_NAME_FR = "Courses en ligne — pouls rapide"
 
-# Per-language survey plan. `cohorts` is a list of
-# (choice_id, response_count, [nps_scores_to_cycle]).
+# Per-language survey plan — a real stat questionnaire, not a two-question
+# pulse: frequency (mc_single), current stack (mc_multi), value-for-money
+# (likert 1–5), recommendation (NPS 0–10) and an open churn-trigger question.
+#
+# `questions` defines the instrument; `cohorts` defines who answers what.
+# Each cohort carries a per-question answer plan that is cycled over the
+# cohort's `count` responses (None = respondent skipped the question). The
+# distributions are chosen so the hand-authored Quantified Themes report
+# quotes numbers the analytics layer actually reproduces:
+#   EN — heavy NPS mean 9.1 / light 4.1; likert 4.2 vs 2.4; Netflix in 38/44.
+#   FR — régulières NPS 9,1 / occasionnelles 4,6 ; Carrefour Drive dans 26/44.
 DEMO_SURVEY_EN = {
     "name": DEMO_SURVEY_NAME,
-    "freq_q": "Which best describes how much you stream?",
-    "freq_choices": [
-        {"id": "heavy", "label": "Heavy — I watch most days"},
-        {"id": "light", "label": "Light — a few times a week"},
+    "questions": [
+        {
+            "key": "freq", "type": "mc_single",
+            "prompt": "Which best describes how much you stream?",
+            "config": {"choices": [
+                {"id": "daily", "label": "Every day"},
+                {"id": "most_days", "label": "Most days"},
+                {"id": "weekly", "label": "A few times a week"},
+                {"id": "monthly", "label": "A few times a month or less"},
+            ], "randomize": False, "has_other": False},
+        },
+        {
+            "key": "services", "type": "mc_multi",
+            "prompt": "Which paid streaming services does your household currently have?",
+            "config": {"choices": [
+                {"id": "netflix", "label": "Netflix"},
+                {"id": "prime", "label": "Prime Video"},
+                {"id": "disney", "label": "Disney+"},
+                {"id": "hbo", "label": "HBO Max"},
+                {"id": "apple", "label": "Apple TV+"},
+            ], "randomize": False, "has_other": False},
+        },
+        {
+            "key": "value", "type": "likert",
+            "prompt": "The catalogue on my main service is worth what I pay for it.",
+            "config": {"scale": 5, "anchors": ["Strongly disagree", "Strongly agree"],
+                       "reverse_coded": False},
+        },
+        {
+            "key": "nps", "type": "nps",
+            "prompt": "How likely are you to recommend your main streaming service to a friend?",
+            "config": {},
+        },
+        {
+            "key": "churn", "type": "open_text",
+            "prompt": "What would make you cancel your main service tomorrow?",
+            "config": {"max_chars": 500, "ai_cluster": False},
+        },
     ],
-    "nps_q": "How likely are you to recommend your main streaming service to a friend?",
     "cohorts": [
-        ("heavy", 26, [9, 10, 8, 9, 10, 9, 8, 10]),
-        ("light", 18, [4, 3, 5, 2, 6, 4, 5, 4]),
+        {
+            "id": "heavy", "count": 26,
+            "answers": {
+                "freq": ["daily", "daily", "most_days"],
+                "services": [
+                    ["netflix", "disney", "prime"],
+                    ["netflix", "hbo"],
+                    ["netflix", "prime", "apple"],
+                    ["netflix", "disney"],
+                ],
+                "value": [5, 4, 4, 5, 4, 3],
+                "nps": [9, 10, 8, 9, 10, 9, 8, 10],
+                # Full-length plan (one slot per respondent) so every open
+                # answer in the sample is unique — no cycled duplicates.
+                "churn": [
+                    "A big price rise with nothing new to watch.",
+                    None,
+                    "If they lost the shows my family watches every week.",
+                    None, None,
+                    "Ads showing up on the plan I already pay for.",
+                    None, None,
+                    "Another price increase right after the last one.",
+                    None, None,
+                    "If the recommendations stopped being good, I'd drift off.",
+                    None, None, None,
+                    "Losing 4K on the family plan while keeping the price.",
+                    None, None,
+                    "If my kids' profiles stopped working on trips.",
+                    None, None, None,
+                    "Honestly, not much — it's the default in our house.",
+                    None, None, None,
+                ],
+            },
+        },
+        {
+            "id": "light", "count": 18,
+            "answers": {
+                "freq": ["weekly", "monthly", "weekly"],
+                "services": [["netflix"], ["prime"], ["netflix", "prime"]],
+                "value": [2, 3, 2, 3, 2],
+                "nps": [4, 3, 5, 2, 6, 4, 5, 4],
+                "churn": [
+                    "Honestly I only keep it for one show — the day it ends, I cancel.",
+                    "The price keeps creeping up and I barely watch.",
+                    None,
+                    "Nothing left to watch after I finish the series I came for.",
+                    None,
+                    "I already plan to cancel and resubscribe when the next season drops.",
+                    None,
+                    "Any price rise at all — it's already borderline for how little I use it.",
+                    None,
+                    "The catalogue feels the same as everywhere else.",
+                    "I mostly watch YouTube anyway.",
+                    None,
+                    "When the football season ends, so does my subscription.",
+                    None,
+                    "Seeing it on my bank statement is usually the trigger.",
+                    None,
+                    "A month with nothing new in my genres.",
+                    None,
+                ],
+            },
+        },
     ],
 }
 DEMO_SURVEY_FR = {
     "name": DEMO_SURVEY_NAME_FR,
-    "freq_q": "À quelle fréquence faites-vous vos courses alimentaires en ligne ?",
-    "freq_choices": [
-        {"id": "souvent", "label": "Souvent — chaque semaine"},
-        {"id": "rarement", "label": "De temps en temps"},
+    "questions": [
+        {
+            "key": "freq", "type": "mc_single",
+            "prompt": "À quelle fréquence faites-vous vos courses alimentaires en ligne ?",
+            "config": {"choices": [
+                {"id": "chaque_semaine", "label": "Chaque semaine"},
+                {"id": "deux_trois", "label": "Deux à trois fois par mois"},
+                {"id": "une_fois", "label": "Environ une fois par mois"},
+                {"id": "moins", "label": "Moins souvent"},
+            ], "randomize": False, "has_other": False},
+        },
+        {
+            "key": "services", "type": "mc_multi",
+            "prompt": "Quelles enseignes utilisez-vous pour vos courses en ligne ?",
+            "config": {"choices": [
+                {"id": "carrefour", "label": "Carrefour Drive"},
+                {"id": "leclerc", "label": "Leclerc Drive"},
+                {"id": "picard", "label": "Picard"},
+                {"id": "amazon", "label": "Amazon Fresh"},
+                {"id": "coop", "label": "Coop@home"},
+            ], "randomize": False, "has_other": False},
+        },
+        {
+            "key": "value", "type": "likert",
+            "prompt": "Le service de mon enseigne principale vaut ce qu'il me coûte.",
+            "config": {"scale": 5, "anchors": ["Pas du tout d'accord", "Tout à fait d'accord"],
+                       "reverse_coded": False},
+        },
+        {
+            "key": "nps", "type": "nps",
+            "prompt": "Quelle est la probabilité que vous recommandiez votre enseigne principale ?",
+            "config": {},
+        },
+        {
+            "key": "churn", "type": "open_text",
+            "prompt": "Qu'est-ce qui vous ferait abandonner les courses en ligne demain ?",
+            "config": {"max_chars": 500, "ai_cluster": False},
+        },
     ],
-    "nps_q": "Quelle est la probabilité que vous recommandiez votre enseigne principale ?",
     "cohorts": [
-        ("souvent", 26, [9, 10, 8, 9, 10, 9, 8, 10]),
-        ("rarement", 18, [5, 4, 6, 4, 5, 4, 6, 3]),
+        {
+            "id": "regulieres", "count": 26,
+            "answers": {
+                "freq": ["chaque_semaine", "chaque_semaine", "deux_trois"],
+                "services": [
+                    ["carrefour", "picard"],
+                    ["carrefour", "leclerc"],
+                    ["carrefour", "picard", "amazon"],
+                    ["carrefour"],
+                ],
+                "value": [5, 4, 4, 5, 4, 3],
+                "nps": [9, 10, 8, 9, 10, 9, 8, 10],
+                # Full-length plan (one slot per respondent) so every open
+                # answer in the sample is unique — no cycled duplicates.
+                "churn": [
+                    "Une commande avec trop de produits manquants, encore une fois.",
+                    None,
+                    "Des substitutions imposées sans me demander mon avis.",
+                    None, None,
+                    "Si les créneaux fiables disparaissaient.",
+                    None, None,
+                    "Une hausse des frais de préparation sans amélioration du service.",
+                    None, None,
+                    "Des fruits et légumes choisis n'importe comment.",
+                    None, None, None,
+                    "Si je devais refaire toutes mes listes après un changement de site.",
+                    None, None,
+                    "Un service client injoignable quand une commande se passe mal.",
+                    None, None, None,
+                    "Franchement pas grand-chose, c'est devenu notre routine du mercredi.",
+                    None, None, None,
+                ],
+            },
+        },
+        {
+            "id": "occasionnelles", "count": 18,
+            "answers": {
+                "freq": ["une_fois", "moins", "une_fois"],
+                "services": [["leclerc"], ["amazon"], ["leclerc", "coop"]],
+                "value": [2, 3, 2, 3, 2],
+                "nps": [5, 4, 6, 4, 5, 4, 6, 3],
+                "churn": [
+                    "Les frais de livraison — dès que ça dépasse le prix du bus, j'y vais moi-même.",
+                    "Trop de ruptures de stock, je finis toujours par devoir passer en magasin.",
+                    None,
+                    "Le minimum de commande est trop haut pour mon panier.",
+                    None,
+                    "Recevoir des produits presque périmés une fois de plus.",
+                    None,
+                    "Les créneaux jamais disponibles le soir même.",
+                    None,
+                    "Payer des frais pour un service que je n'utilise qu'une fois par mois.",
+                    "Une appli trop lente pour un panier de dix articles.",
+                    None,
+                    "Je préfère choisir mes produits frais moi-même.",
+                    None,
+                    "Le drive près du travail a fermé, ça ne vaut plus le détour.",
+                    None,
+                    "Un abonnement obligatoire me ferait fuir tout de suite.",
+                    None,
+                ],
+            },
+        },
     ],
 }
 
@@ -672,30 +869,35 @@ def _quanti_report(lang: str) -> dict:
         notable = NOTABLE_QUOTES_FR
         return {
             "executive_summary": (
-                "Un sondage éclair (n=44) et quatre entretiens approfondis "
-                "convergent : la fidélité aux enseignes de courses en ligne "
-                "tient à un coût de switch invisible, pas au prix. Les "
-                "clientes régulières notent leur enseigne 9,1 sur 10 en "
-                "recommandation ; les clientes occasionnelles la notent 4,6. "
-                "Les ruptures de stock sont la friction qui fait basculer "
-                "cette note."
+                "Un questionnaire en cinq questions (n=44) et quatre "
+                "entretiens approfondis convergent : la fidélité aux "
+                "enseignes de courses en ligne tient à un coût de switch "
+                "invisible, pas au prix. Les clientes régulières notent leur "
+                "enseigne 9,1 sur 10 en recommandation et 4,2 sur 5 en "
+                "rapport qualité-prix ; les occasionnelles tombent à 4,6 et "
+                "2,4. Carrefour Drive sert d'enseigne d'ancrage (26 paniers "
+                "sur 44) et les ruptures de stock sont la friction qui fait "
+                "basculer les notes — les réponses libres annoncent un "
+                "abandon opérationnel, pas tarifaire."
             ),
             "verdict": (
                 "Investir d'abord sur l'expérience de rupture de stock "
                 "(validation des substitutions à l'avance) plutôt que sur le "
-                "prix : c'est la friction la plus citée chez les détractrices "
-                "et le seul levier corroboré par les deux méthodes. Réserve : "
-                "le coût de switch n'est pas encore chiffré — le sondage de "
+                "prix : c'est la friction la plus citée chez les détractrices, "
+                "le premier motif d'abandon dans les réponses libres, et le "
+                "seul levier corroboré par les deux méthodes. Réserve : le "
+                "coût de switch n'est pas encore chiffré — le sondage de "
                 "suivi doit précéder tout investissement lourd."
             ),
             "themes": [
                 {
-                    "title": "Les clientes occasionnelles recommandent beaucoup moins leur enseigne",
+                    "title": "Les clientes occasionnelles recommandent deux fois moins leur enseigne",
                     "survey_signal": {
                         "summary": (
                             "Les clientes occasionnelles donnent une note de "
                             "recommandation moyenne de 4,6, contre 9,1 pour "
-                            "les clientes régulières."
+                            "les clientes régulières — un écart de 4,5 points "
+                            "sur la même échelle."
                         ),
                         "n": 18,
                         "percentage": None,
@@ -735,16 +937,61 @@ def _quanti_report(lang: str) -> dict:
                     "confidence": "supported",
                 },
                 {
-                    "title": "La fidélité repose sur un coût de switch invisible, pas sur le prix",
+                    "title": "Le rapport qualité-prix perçu suit l'usage, pas les tarifs",
                     "survey_signal": {
                         "summary": (
-                            "Les clientes régulières — seul groupe à se "
-                            "déclarer promotrices — restent malgré des écarts "
-                            "de prix connus."
+                            "À l'affirmation « le service vaut ce qu'il me "
+                            "coûte », les régulières répondent 4,2 sur 5 en "
+                            "moyenne, les occasionnelles 2,4 — alors que les "
+                            "deux groupes paient les mêmes frais."
                         ),
-                        "n": 26,
+                        "n": 44,
                         "percentage": None,
-                        "segment_label": "Clientes régulières",
+                        "segment_label": None,
+                        "segment_over_index": None,
+                    },
+                    "interview_evidence": {
+                        "x_of_y": "2 sur 4",
+                        "interview_count": 2,
+                        "anchor_quote": notable[2]["text"],
+                        "segments_mentioned": [],
+                    },
+                    "counter_evidence": (
+                        "Le questionnaire ne distingue pas « je paie trop "
+                        "cher » de « je n'utilise pas assez » — l'écart peut "
+                        "refléter la fréquence d'usage plutôt qu'un jugement "
+                        "sur les tarifs."
+                    ),
+                    "recommendation": {
+                        "kind": "marketing",
+                        "action": (
+                            "Cibler les occasionnelles avec la valeur d'usage "
+                            "(créneaux fiables, listes, gain de temps) plutôt "
+                            "qu'avec des promotions prix."
+                        ),
+                        "rationale": (
+                            "Le déficit de valeur perçue vient de l'usage, "
+                            "pas du tarif — une promo ne le comble pas."
+                        ),
+                        "success_test": (
+                            "La note qualité-prix des occasionnelles remonte "
+                            "au-dessus de 3/5 après une campagne usage, sans "
+                            "baisse de prix."
+                        ),
+                    },
+                    "confidence": "supported",
+                },
+                {
+                    "title": "Une enseigne d'ancrage, des compléments qui tournent",
+                    "survey_signal": {
+                        "summary": (
+                            "Carrefour Drive apparaît dans 26 paniers sur 44 "
+                            "(59 %) et dans la totalité des paniers des "
+                            "régulières ; le foyer moyen combine 2 enseignes."
+                        ),
+                        "n": 44,
+                        "percentage": 59.1,
+                        "segment_label": None,
                         "segment_over_index": None,
                     },
                     "interview_evidence": {
@@ -754,23 +1001,71 @@ def _quanti_report(lang: str) -> dict:
                         "segments_mentioned": [],
                     },
                     "counter_evidence": (
-                        "En entretien, une participante attribue sa fidélité "
-                        "au prix seul — si ce profil pèse lourd dans la base, "
-                        "le coût de switch protège moins qu'il n'y paraît."
+                        "Les occasionnelles n'ont pas d'enseigne d'ancrage "
+                        "(Leclerc et Amazon Fresh se partagent leurs paniers) "
+                        "— l'ancrage est peut-être la conséquence de la "
+                        "régularité, pas sa cause."
+                    ),
+                    "recommendation": {
+                        "kind": "product",
+                        "action": (
+                            "Rendre l'historique et les listes portables pour "
+                            "attaquer l'ancrage des enseignes concurrentes — "
+                            "et défendre le sien par la fiabilité."
+                        ),
+                        "rationale": (
+                            "L'ancrage tient aux actifs accumulés ; celui qui "
+                            "abaisse la barrière d'import capte les foyers "
+                            "multi-enseignes."
+                        ),
+                        "success_test": (
+                            "Les foyers qui importent une liste concurrente "
+                            "passent au moins 2 commandes dans le mois qui "
+                            "suit."
+                        ),
+                    },
+                    "confidence": "supported",
+                },
+                {
+                    "title": "L'abandon annoncé est opérationnel, pas tarifaire",
+                    "survey_signal": {
+                        "summary": (
+                            "Dans les réponses libres « qu'est-ce qui vous "
+                            "ferait abandonner ? », ruptures, substitutions "
+                            "imposées et créneaux dominent chez les "
+                            "régulières ; les frais n'arrivent en tête que "
+                            "chez les occasionnelles."
+                        ),
+                        "n": 18,
+                        "percentage": None,
+                        "segment_label": "Réponses libres",
+                        "segment_over_index": None,
+                    },
+                    "interview_evidence": {
+                        "x_of_y": "2 sur 4",
+                        "interview_count": 2,
+                        "anchor_quote": notable[3]["text"],
+                        "segments_mentioned": [],
+                    },
+                    "counter_evidence": (
+                        "Les réponses libres sont peu nombreuses (18) et "
+                        "déclaratives — un motif d'abandon déclaré n'est pas "
+                        "un abandon observé."
                     ),
                     "recommendation": {
                         "kind": "next_research",
                         "action": (
-                            "Lancer un sondage de suivi pour chiffrer le coût "
-                            "de switch perçu avant d'investir côté produit."
+                            "Croiser ces motifs déclarés avec une étude de "
+                            "sortie auprès de clientes réellement parties."
                         ),
                         "rationale": (
-                            "Quatre entretiens suggèrent l'effet mais ne "
-                            "permettent pas de le dimensionner."
+                            "Seule la comparaison déclaré/observé dira si la "
+                            "fiabilité est bien le levier anti-churn n°1."
                         ),
                         "success_test": (
-                            "Le sondage de suivi produit un seuil chiffré "
-                            "d'écart de prix toléré, avec n≥30 par segment."
+                            "L'étude de sortie retrouve les ruptures et "
+                            "substitutions comme déclencheur majoritaire des "
+                            "départs réels."
                         ),
                     },
                     "confidence": "directional",
@@ -782,14 +1077,18 @@ def _quanti_report(lang: str) -> dict:
                 "L'échantillon ne contient que des clientes actives — les "
                 "défections réelles ne sont connues que par ouï-dire "
                 "(biais de survivance).",
+                "Les sous-groupes (26 régulières, 18 occasionnelles) sont "
+                "sous le seuil n=30 : leurs écarts sont rapportés en "
+                "moyennes, jamais en pourcentages.",
             ],
             "methodology_note": (
-                "Sondage : 44 réponses complètes, recueillies sur 7 jours. "
-                "Entretiens : 4 complétés. Conformément au contrat "
-                "méthodologique, les pourcentages ne sont affichés qu'à "
-                "n≥30 ; les sous-groupes en deçà sont rapportés en moyennes "
-                "et effectifs. La confiance reflète l'accord entre le signal "
-                "du sondage et les entretiens."
+                "Questionnaire : 5 questions (fréquence, enseignes, "
+                "qualité-prix, recommandation, question ouverte), 44 réponses "
+                "complètes recueillies sur 7 jours. Entretiens : 4 complétés. "
+                "Conformément au contrat méthodologique, les pourcentages ne "
+                "sont affichés qu'à n≥30 ; les sous-groupes en deçà sont "
+                "rapportés en moyennes et effectifs. La confiance reflète "
+                "l'accord entre le signal du questionnaire et les entretiens."
             ),
             "generated_with_survey_count": 1,
             "generated_with_response_count": 44,
@@ -799,21 +1098,25 @@ def _quanti_report(lang: str) -> dict:
     notable = NOTABLE_QUOTES_EN
     return {
         "executive_summary": (
-            "A quick-pulse survey (n=44) and four in-depth interviews point "
-            "the same direction: streaming loyalty is thin and concentrated. "
-            "Heavy streamers rate their main service an average 9.1 on a "
-            "0–10 recommendation scale; light streamers rate it 4.1 — a "
-            "5-point gap the interviews explain as show-driven, "
-            "rotate-in-rotate-out behaviour. The clearest product opening is "
-            "a pause state between subscribed and cancelled."
+            "A five-question survey (n=44) and four in-depth interviews "
+            "point the same direction: streaming loyalty is thin, "
+            "concentrated, and rented by the show. Heavy streamers rate "
+            "their main service 9.1 on the 0–10 recommendation scale and "
+            "4.2 of 5 on value-for-money; light streamers drop to 4.1 and "
+            "2.4. Netflix anchors 38 of 44 household stacks (86%), the rest "
+            "of the stack rotates, and the open answers describe planned, "
+            "show-driven cancellation rather than dissatisfaction. The "
+            "clearest product opening is a pause state between subscribed "
+            "and cancelled."
         ),
         "verdict": (
             "Build the pause state before touching catalogue spend: it is "
-            "the only intervention corroborated by both methods, and it "
-            "converts decisive light-streamer churn into dormancy. Caveat: "
-            "which exclusives actually drive heavy-streamer renewal is not "
-            "yet sized — run the follow-up survey before committing "
-            "catalogue budget."
+            "the only intervention corroborated by both methods, it matches "
+            "the planned churn the open answers describe, and it converts "
+            "decisive light-streamer churn into dormancy. Caveat: which "
+            "exclusives actually drive heavy-streamer renewal is not yet "
+            "sized — run the follow-up survey before committing catalogue "
+            "budget."
         ),
         "themes": [
             {
@@ -822,7 +1125,7 @@ def _quanti_report(lang: str) -> dict:
                     "summary": (
                         "Light streamers gave their main service an average "
                         "recommendation score of 4.1, against 9.1 for heavy "
-                        "streamers."
+                        "streamers — a 5-point split on the same scale."
                     ),
                     "n": 18,
                     "percentage": None,
@@ -860,16 +1163,16 @@ def _quanti_report(lang: str) -> dict:
                 "confidence": "supported",
             },
             {
-                "title": "The loyalty that exists is locked in by exclusive content, not the brand",
+                "title": "Perceived value tracks usage, not price",
                 "survey_signal": {
                     "summary": (
-                        "Heavy streamers — the only group scoring their "
-                        "service as a clear promoter — concentrate on "
-                        "services with exclusive catalogue."
+                        "On “the catalogue is worth what I pay”, heavy "
+                        "streamers average 4.2 of 5; light streamers 2.4 — "
+                        "both groups pay the same prices."
                     ),
-                    "n": 26,
+                    "n": 44,
                     "percentage": None,
-                    "segment_label": "Heavy streamers",
+                    "segment_label": None,
                     "segment_over_index": None,
                 },
                 "interview_evidence": {
@@ -879,26 +1182,110 @@ def _quanti_report(lang: str) -> dict:
                     "segments_mentioned": [],
                 },
                 "counter_evidence": (
-                    "The survey cannot separate exclusive-title pull from "
-                    "sheer catalogue size; one heavy streamer credits a "
-                    "price bundle, not exclusives, for staying."
+                    "The survey cannot separate “too expensive” from “I "
+                    "barely use it” — the value gap may be a usage gap "
+                    "wearing price language."
+                ),
+                "recommendation": {
+                    "kind": "marketing",
+                    "action": (
+                        "Time price changes and win-back offers to high-watch "
+                        "months instead of discounting flatly — the value "
+                        "deficit is usage-driven, not price-driven."
+                    ),
+                    "rationale": (
+                        "A discount cannot fix a value score that collapses "
+                        "when usage does; timing can."
+                    ),
+                    "success_test": (
+                        "Price changes sequenced after flagship releases show "
+                        "measurably lower cancellation than mid-lull changes."
+                    ),
+                },
+                "confidence": "supported",
+            },
+            {
+                "title": "Households anchor on one service; the rest of the stack rotates",
+                "survey_signal": {
+                    "summary": (
+                        "Netflix appears in 38 of 44 household stacks (86%) "
+                        "and in every heavy-streamer stack; the average "
+                        "household holds 2 paid services."
+                    ),
+                    "n": 44,
+                    "percentage": 86.4,
+                    "segment_label": None,
+                    "segment_over_index": None,
+                },
+                "interview_evidence": {
+                    "x_of_y": "3 of 4",
+                    "interview_count": 3,
+                    "anchor_quote": notable[3]["text"],
+                    "segments_mentioned": [],
+                },
+                "counter_evidence": (
+                    "Anchor status may be an artefact of catalogue size "
+                    "rather than loyalty — no interviewee described choosing "
+                    "the anchor; they inherited it."
+                ),
+                "recommendation": {
+                    "kind": "product",
+                    "action": (
+                        "Compete for the rotating second slot, not the "
+                        "anchor slot: make joining-for-one-show and leaving "
+                        "gracefully a first-class flow."
+                    ),
+                    "rationale": (
+                        "The anchor slot is locked; the second slot turns "
+                        "over constantly and rewards the service that "
+                        "welcomes returners."
+                    ),
+                    "success_test": (
+                        "Resubscription rate among lapsed subscribers rises "
+                        "measurably after simplifying the return flow."
+                    ),
+                },
+                "confidence": "supported",
+            },
+            {
+                "title": "Stated cancellation is planned and show-driven, not dissatisfied",
+                "survey_signal": {
+                    "summary": (
+                        "In the open “what would make you cancel?” answers, "
+                        "finishing a show and planned resubscription dominate "
+                        "among light streamers; price alone leads only when "
+                        "paired with a dead catalogue month."
+                    ),
+                    "n": 18,
+                    "percentage": None,
+                    "segment_label": "Open answers",
+                    "segment_over_index": None,
+                },
+                "interview_evidence": {
+                    "x_of_y": "2 of 4",
+                    "interview_count": 2,
+                    "anchor_quote": notable[1]["text"],
+                    "segments_mentioned": [],
+                },
+                "counter_evidence": (
+                    "Only 18 respondents answered the open question, and "
+                    "stated churn intent is not observed churn."
                 ),
                 "recommendation": {
                     "kind": "next_research",
                     "action": (
-                        "Run a follow-up survey isolating which exclusive "
-                        "titles drive renewal before committing catalogue "
-                        "spend."
+                        "Run exit interviews with actually-churned "
+                        "subscribers to test whether real cancellations "
+                        "follow the planned, show-driven pattern."
                     ),
                     "rationale": (
-                        "Four interviews suggest exclusives carry loyalty "
-                        "but can't size which ones — a targeted survey "
-                        "closes the gap."
+                        "Only a stated-vs-observed comparison can confirm "
+                        "the churn mechanics before product bets on them."
                     ),
                     "success_test": (
-                        "The follow-up survey names specific titles that a "
-                        "measurable share of heavy streamers cite as "
-                        "renewal-critical (n≥30)."
+                        "Exit interviews date most real cancellations to a "
+                        "show ending or a mistimed price event, not to "
+                        "service dissatisfaction."
                     ),
                 },
                 "confidence": "directional",
@@ -910,14 +1297,17 @@ def _quanti_report(lang: str) -> dict:
             "The sample contains only current subscribers — churned users' "
             "cancellation triggers are known only second-hand "
             "(survivorship bias).",
+            "Cohort cuts (26 heavy, 18 light) sit below the n=30 threshold: "
+            "their gaps are reported as averages, never as percentages.",
         ],
         "methodology_note": (
-            "Survey: 44 completed responses, fielded over 7 days. "
-            "Interviews: 4 completed, 7–9 turns each. Per the methodology "
-            "contract, percentages are shown only at n≥30; cohort cuts below "
-            "that threshold are reported as averages and counts. Confidence "
-            "reflects agreement between the survey signal and the interview "
-            "evidence."
+            "Survey: 5 questions (frequency, current stack, value-for-money, "
+            "recommendation, open churn trigger), 44 completed responses "
+            "fielded over 7 days. Interviews: 4 completed, 7–9 turns each. "
+            "Per the methodology contract, percentages are shown only at "
+            "n≥30; cohort cuts below that threshold are reported as averages "
+            "and counts. Confidence reflects agreement between the survey "
+            "signal and the interview evidence."
         ),
         "generated_with_survey_count": 1,
         "generated_with_response_count": 44,
@@ -928,7 +1318,7 @@ def _quanti_report(lang: str) -> dict:
 def _seed_demo_survey(
     db: Session, study: Study, company_id: str, lang: str, now: datetime
 ) -> Survey:
-    """Add a published quick-pulse survey with 44 completed responses to the
+    """Add a published five-question survey with 44 completed responses to the
     demo Study, so the Study reads as a true hybrid (survey + interviews)."""
     cfg = DEMO_SURVEY_FR if lang == "fr" else DEMO_SURVEY_EN
     fielding_start = now - timedelta(days=9)
@@ -947,25 +1337,18 @@ def _seed_demo_survey(
     db.add(survey)
     db.flush()
 
-    freq_q = SurveyQuestion(
-        survey_id=survey.id,
-        sort_order=0,
-        type="mc_single",
-        prompt=cfg["freq_q"],
-        is_required=True,
-        config=json.dumps(
-            {"choices": cfg["freq_choices"], "randomize": False, "has_other": False}
-        ),
-    )
-    nps_q = SurveyQuestion(
-        survey_id=survey.id,
-        sort_order=1,
-        type="nps",
-        prompt=cfg["nps_q"],
-        is_required=True,
-        config="{}",
-    )
-    db.add_all([freq_q, nps_q])
+    question_by_key: dict[str, SurveyQuestion] = {}
+    for i, q_plan in enumerate(cfg["questions"]):
+        question = SurveyQuestion(
+            survey_id=survey.id,
+            sort_order=i,
+            type=q_plan["type"],
+            prompt=q_plan["prompt"],
+            is_required=q_plan["type"] not in ("open_text", "short_text"),
+            config=json.dumps(q_plan.get("config") or {}),
+        )
+        db.add(question)
+        question_by_key[q_plan["key"]] = question
     db.flush()
 
     link = SurveyLink(
@@ -979,8 +1362,9 @@ def _seed_demo_survey(
     db.flush()
 
     n = 0
-    for choice_id, count, scores in cfg["cohorts"]:
-        for i in range(count):
+    for cohort in cfg["cohorts"]:
+        answers = cohort["answers"]
+        for i in range(cohort["count"]):
             n += 1
             started = fielding_start + timedelta(hours=n * 3)
             response = SurveyResponse(
@@ -992,20 +1376,27 @@ def _seed_demo_survey(
             )
             db.add(response)
             db.flush()
-            db.add(
-                SurveyResponseAnswer(
+            for key, question in question_by_key.items():
+                plan = answers.get(key)
+                if not plan:
+                    continue
+                value = plan[i % len(plan)]
+                if value is None:
+                    continue  # respondent skipped this (optional) question
+                answer = SurveyResponseAnswer(
                     response_id=response.id,
-                    question_id=freq_q.id,
-                    value_choice_ids=json.dumps([choice_id]),
+                    question_id=question.id,
+                    answered_at=started + timedelta(minutes=2),
                 )
-            )
-            db.add(
-                SurveyResponseAnswer(
-                    response_id=response.id,
-                    question_id=nps_q.id,
-                    value_numeric=float(scores[i % len(scores)]),
-                )
-            )
+                if question.type == "mc_single":
+                    answer.value_choice_ids = json.dumps([value])
+                elif question.type == "mc_multi":
+                    answer.value_choice_ids = json.dumps(list(value))
+                elif question.type in ("likert", "nps"):
+                    answer.value_numeric = float(value)
+                else:  # open_text / short_text
+                    answer.value_text = value
+                db.add(answer)
     db.flush()
     return survey
 
@@ -1662,6 +2053,33 @@ def _memo_report(lang: str) -> dict:
                     "evidence": "« Me laisser valider les substitutions, tout simplement. » (Entretiens de sortie — Julien P.)",
                     "strength": "moderate",
                 },
+                {
+                    "finding": "L'écart d'engagement est désormais chiffré : 4,5 points de recommandation",
+                    "detail": (
+                        "Le questionnaire (n=44) met des chiffres sur le schéma "
+                        "des entretiens : les régulières notent leur enseigne "
+                        "9,1 sur 10 en recommandation et 4,2 sur 5 en "
+                        "qualité-prix ; les occasionnelles tombent à 4,6 et "
+                        "2,4 à frais identiques. La moitié à risque de la "
+                        "base est identifiable avant de partir."
+                    ),
+                    "supporting_studies": [s1],
+                    "evidence": "Les occasionnelles notent leur enseigne 4,6 sur 10 en recommandation contre 9,1 pour les régulières — questionnaire de l'étude d'usage, n=44.",
+                    "strength": "moderate",
+                },
+                {
+                    "finding": "Carrefour Drive sert d'ancrage — la régularité et l'ancrage vont ensemble",
+                    "detail": (
+                        "Carrefour Drive apparaît dans 26 paniers sondés sur 44 "
+                        "(59 %) et dans la totalité des paniers des régulières ; "
+                        "aucune occasionnelle ne l'utilise. Le foyer moyen "
+                        "combine 2 enseignes — la fidélité se joue sur "
+                        "l'enseigne d'ancrage, le reste tourne."
+                    ),
+                    "supporting_studies": [s1],
+                    "evidence": "Carrefour Drive apparaît dans 26 des 44 paniers sondés et dans la totalité des paniers des clientes régulières — questionnaire, n=44.",
+                    "strength": "moderate",
+                },
             ],
             "conflicts": [
                 {
@@ -1673,6 +2091,18 @@ def _memo_report(lang: str) -> dict:
                         "chez Marta (petits paniers). Réconciliation la plus plausible : "
                         "le prix segmente la clientèle mais ne déclenche l'abandon que "
                         "là où l'actif accumulé est faible."
+                    ),
+                },
+                {
+                    "topic": "La fidélité déclarée survivrait-elle à un incident ?",
+                    "detail": (
+                        "Le questionnaire lit 26 répondantes sur 44 comme des "
+                        "promotrices installées ; mais toutes les clientes de "
+                        "l'étude de sortie étaient d'anciennes régulières. "
+                        "Réconciliation la plus plausible : la recommandation "
+                        "mesure la satisfaction du moment, pas la résilience à "
+                        "l'incident — une promotrice churne aussi quand une "
+                        "commande tourne mal sans préavis."
                     ),
                 },
             ],
@@ -1687,7 +2117,7 @@ def _memo_report(lang: str) -> dict:
                 "Étudier une offre petits paniers avant de conclure que la fiabilité suffit — le segment solo churne sur les frais. Serait invalidé si le churn solo restait stable après un tarif adapté.",
             ],
             "confidence": "medium",
-            "confidence_rationale": "Deux études qualitatives convergentes (7 entretiens au total) à confiances élevée et moyenne, mais aucune donnée quantitative sur les volumes par segment.",
+            "confidence_rationale": "Deux études qualitatives convergentes (7 entretiens au total) et un questionnaire de 44 réponses ; confiances individuelles élevée et moyenne, mais aucune donnée longitudinale ne relie l'intention déclarée au churn observé.",
         }
 
     s1, s2 = DEMO_PROJECT_NAME, DEMO2_PROJECT_NAME
@@ -1747,6 +2177,33 @@ def _memo_report(lang: str) -> dict:
                 "evidence": "\"I'd been meaning to cancel for months, but my watch history felt like a diary I didn't want to throw away.\" (Exit interviews — Fatima B.)",
                 "strength": "moderate",
             },
+            {
+                "finding": "The engagement split is now quantified: a 5-point NPS gap",
+                "detail": (
+                    "The five-question survey (n=44) puts numbers on the "
+                    "interview pattern: heavy streamers average 9.1 on the "
+                    "0–10 recommendation scale and 4.2 of 5 on value-for-money; "
+                    "light streamers average 4.1 and 2.4 at identical prices. "
+                    "The at-risk half of the base is identifiable before it "
+                    "churns."
+                ),
+                "supporting_studies": [s1],
+                "evidence": "Light streamers average 4.1 of 10 on recommendation against 9.1 for heavy streamers — usage-study survey, n=44.",
+                "strength": "moderate",
+            },
+            {
+                "finding": "The anchor slot is locked; churn happens in the rotating slot",
+                "detail": (
+                    "Netflix appears in 38 of 44 surveyed household stacks "
+                    "(86%) while the average stack holds two services. The "
+                    "retention battle is over the rotating second slot — "
+                    "which is where every cancellation in the exit study "
+                    "took place."
+                ),
+                "supporting_studies": [s1, s2],
+                "evidence": "Netflix anchors 38 of 44 surveyed households; the observed cancellations all hit the rotating, non-anchor slot.",
+                "strength": "moderate",
+            },
         ],
         "conflicts": [
             {
@@ -1761,6 +2218,18 @@ def _memo_report(lang: str) -> dict:
                     "Both matter, but only the second is being mismanaged."
                 ),
             },
+            {
+                "topic": "How big is the loyal segment?",
+                "detail": (
+                    "The survey reads 26 of 44 respondents (59%) as heavy, "
+                    "promoter-grade streamers — a majority-loyal base. The "
+                    "interviews, including the exit study, describe even "
+                    "engaged subscribers as rotating renters. Most plausible "
+                    "reconciliation: heavy usage predicts advocacy, not "
+                    "immunity — promoters still cancel when a price email "
+                    "lands in a dead month."
+                ),
+            },
         ],
         "gaps": [
             "No never-subscribers in either sample — acquisition questions are only answered from the subscriber side.",
@@ -1773,7 +2242,7 @@ def _memo_report(lang: str) -> dict:
             "Add a save step to the cancel flow (pause proposal or targeted offer) — every observed exit was silent. Would be wrong if save acceptance stays under 5% in an A/B test.",
         ],
         "confidence": "medium",
-        "confidence_rationale": "Two converging qualitative studies (7 interviews total) with high and medium individual confidence, but no quantitative sizing of the segments involved.",
+        "confidence_rationale": "Two converging qualitative studies (7 interviews total) plus a 44-response survey; individual confidences high and medium, but no longitudinal churn data ties stated intent to observed behaviour.",
     }
 
 
