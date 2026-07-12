@@ -496,6 +496,14 @@
       "clickHint": "Click the highlighted study to look inside",
       "skip": "No thanks, I'll explore on my own"
     },
+    "memoTour": {
+      "eyebrow": "Demo tour · the payoff",
+      "title": "One decision memo across studies",
+      "body": "When a workspace holds several studies, QualiPulse reads all their findings and writes a single decision-ready memo — corroboration and conflicts included. This demo already has one.",
+      "clickHint": "The highlighted card is your decision memo",
+      "open": "📄 Open the report",
+      "skip": "Finish tour"
+    },
     "plan": {
       "freeTrial": "Free trial",
       "upgrade": "Upgrade",

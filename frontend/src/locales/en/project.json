@@ -228,8 +228,9 @@
     "goAnalysis_body": "The Analysis tab shows what the AI made of all the interviews. Open it for the finale.",
     "analysisReport_title": "Themes backed by evidence",
     "analysisReport_body": "The AI synthesises themes, tensions and recommendations across interviews — every claim cites verbatim quotes you can trace back to a transcript. Scroll through to see the full report.",
-    "finale_title": "That's the whole loop",
-    "finale_body": "Guide → interviews → transcripts → analysis. This demo stays in your workspace to explore anytime — but the fastest way to learn is with your own questions.",
+    "finale_title": "That's one study, end to end",
+    "finale_body": "Guide → interviews → transcripts → analysis. But the real payoff comes across studies — let me show you the cross-study decision memo.",
+    "finale_cta_memo": "See the decision memo",
     "finale_cta_create": "Create your own study",
     "finale_cta_explore": "Keep exploring the demo"
   },
