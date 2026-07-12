@@ -409,6 +409,14 @@
       "responses_other": "{{count}} réponses aux sondages",
       "quiet": "Tout est calme — vos études sont prêtes."
     },
+    "firstRun": {
+      "sub": "Vous n'avez pas encore d'étude — créons la première.",
+      "heroText": "Une étude regroupe vos entretiens, transcriptions et analyses. Créez la première et partagez un lien — les participants y répondent depuis leur navigateur.",
+      "exampleLabel": "🎓 Envie d'en voir une d'abord ? Explorez un exemple terminé",
+      "show": "Afficher",
+      "hide": "Masquer",
+      "exampleOpen": "Ouvrir l'exemple"
+    },
     "filters": {
       "all": "Toutes",
       "attention": "À traiter",

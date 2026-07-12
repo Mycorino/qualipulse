@@ -170,6 +170,7 @@ export default function StudyList() {
   const [memoOpenSignal, setMemoOpenSignal] = useState(0);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
+  const [exampleOpen, setExampleOpen] = useState(false);
   const [view, setView] = useState<HubView>(() =>
     localStorage.getItem(HUB_VIEW_KEY) === "cards" ? "cards" : "table",
   );
@@ -512,6 +513,56 @@ export default function StudyList() {
 
   const hasStudies = studies !== null && studies.length > 0;
 
+  // First-run home: the account has only the seeded demo and no real study
+  // yet, so every workspace CTA (workspace NBA, filter tabs, stats sidecar,
+  // decision memos) would point at demo data. Collapse the screen to a single
+  // primary action + a passive example.
+  //
+  // The demo tour (PR #286) owns the *first* landing and rings the demo study
+  // row — it needs that row rendered as a plain, clickable list item. So the
+  // reframe is hard-gated OFF whenever the tour is requested, armed, or has a
+  // ringed row (`tourStudyId`). If ever unsure, we render today's full layout.
+  const hasRealStudy = totals.studies > 0;
+  const tourActive = tourRequested || tourStudyId !== null || isDemoTourArmed();
+  const firstRun = hasStudies && !hasRealStudy && !tourActive;
+
+  const demoRows = useMemo(() => rows.filter((r) => r.study.is_demo), [rows]);
+
+  // Passive example list for the first-run screen: demo studies read as a
+  // sample, not a backlog — no per-row next-step CTA, just one "open" cue.
+  const renderExample = () => (
+    <div className="hub-example">
+      <button
+        type="button"
+        className="hub-example__head"
+        aria-expanded={exampleOpen}
+        onClick={() => setExampleOpen((o) => !o)}
+      >
+        <span className="hub-example__label">{t("hub.firstRun.exampleLabel")}</span>
+        <span className="hub-example__toggle">
+          {exampleOpen ? t("hub.firstRun.hide") : t("hub.firstRun.show")}
+        </span>
+      </button>
+      {exampleOpen && (
+        <div className="hub-example__rows">
+          {demoRows.map(({ study: s, mix }) => (
+            <button
+              key={s.id}
+              type="button"
+              className="hub-example__row"
+              onClick={() => openStudy(s)}
+            >
+              <span className="hub-example__row-name">
+                <MixGlyph mix={mix} /> {s.name}
+              </span>
+              <span className="hub-example__row-cue">{t("hub.firstRun.exampleOpen")} →</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <HubShell
       active="studies"
@@ -527,33 +578,37 @@ export default function StudyList() {
             <div className="hub-head__eyebrow">{t("studyList.eyebrow")}</div>
             <h1 className="hub-head__title">{t("studyList.title")}</h1>
             <p className="hub-head__sub">
-              {hasStudies
-                ? [
-                    counts.collecting > 0
-                      ? t("hub.subline.collecting", { count: counts.collecting })
-                      : null,
-                    totals.interviews > 0
-                      ? t("hub.subline.interviews", { count: totals.interviews })
-                      : null,
-                    totals.responses > 0
-                      ? t("hub.subline.responses", { count: totals.responses })
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || t("hub.subline.quiet")
-                : t("studyList.subtitle")}
+              {firstRun
+                ? t("hub.firstRun.sub")
+                : hasStudies
+                  ? [
+                      counts.collecting > 0
+                        ? t("hub.subline.collecting", { count: counts.collecting })
+                        : null,
+                      totals.interviews > 0
+                        ? t("hub.subline.interviews", { count: totals.interviews })
+                        : null,
+                      totals.responses > 0
+                        ? t("hub.subline.responses", { count: totals.responses })
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || t("hub.subline.quiet")
+                  : t("studyList.subtitle")}
             </p>
           </div>
-          <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
-            {t("studyList.newStudy")}
-          </button>
+          {!firstRun && (
+            <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
+              {t("studyList.newStudy")}
+            </button>
+          )}
         </header>
 
         <div className="sr-only" aria-live="polite" role="status">
           {announce}
         </div>
 
-        {hasStudies && (() => {
+        {hasStudies && !firstRun && (() => {
           const nba = resolveWorkspaceNextAction(studies!.map(toNbaSummary), {
             eligibleStudyCount: memoEligibleCount,
             readyMemoCount: readyMemos.length,
@@ -591,9 +646,9 @@ export default function StudyList() {
           );
         })()}
 
-        <div className={`hub-grid${hasStudies ? "" : " hub-grid--single"}`}>
+        <div className={`hub-grid${hasStudies && !firstRun ? "" : " hub-grid--single"}`}>
           <div className="hub-main">
-            {hasStudies && (
+            {hasStudies && !firstRun && (
               <div className="hub-toolbar">
                 {(["all", "attention", "collecting", "complete"] as StatusFilter[]).map((f) => (
                   <button
@@ -674,6 +729,30 @@ export default function StudyList() {
                   {t("studyList.newStudy")}
                 </button>
               </div>
+            ) : firstRun ? (
+              <>
+                <div
+                  style={{
+                    background: "var(--bg-surface)",
+                    border: "1px dashed var(--border-default)",
+                    borderRadius: "var(--radius-md)",
+                    padding: "var(--space-8)",
+                    textAlign: "center",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "var(--space-4)",
+                  }}
+                >
+                  <p style={{ color: "var(--text-secondary)", maxWidth: 520, margin: 0, lineHeight: 1.5 }}>
+                    {t("hub.firstRun.heroText")}
+                  </p>
+                  <button type="button" className="btn btn-primary" onClick={() => setPickerOpen(true)}>
+                    {t("studyList.newStudy")}
+                  </button>
+                </div>
+                {renderExample()}
+              </>
             ) : visibleRows.length === 0 ? (
               <div className="hub-nomatch">
                 <h3>{t("hub.noMatch.title")}</h3>
@@ -695,7 +774,7 @@ export default function StudyList() {
               renderCards()
             )}
 
-            {studies !== null && (
+            {studies !== null && !firstRun && (
               <DecisionMemoSection
                 studies={studies}
                 memos={memos}
@@ -705,7 +784,7 @@ export default function StudyList() {
             )}
           </div>
 
-          {hasStudies && (
+          {hasStudies && !firstRun && (
             <aside className="hub-sidecar">
               <div className="hub-panel">
                 <h3>{t("hub.stats.title")}</h3>
