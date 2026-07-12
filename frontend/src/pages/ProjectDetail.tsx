@@ -59,7 +59,7 @@ import {
 import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, regenerateScreeningTranslations, type PaywallDetail } from "../api/projects";
 import ScreeningTranslationsEditor from "../components/ScreeningTranslationsEditor";
 import BrandingSettings from "../components/BrandingSettings";
-import DemoTour from "../components/DemoTour";
+import DemoTour, { isDemoTourArmed } from "../components/DemoTour";
 import { getCreditUsage } from "../api/billing";
 import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
@@ -434,8 +434,12 @@ export default function ProjectDetail() {
       setAnalysis(ana);
       // Credit balance powers the link-gate (target > credits → block).
       getCreditUsage().then((u) => setAvailableCredits(u?.available_credits ?? null));
-      // Only auto-switch to responses if no tab was explicitly requested in URL
-      if (parts.length > 0 && !searchParams.get("tab")) setTab("responses");
+      // Only auto-switch to responses if no tab was explicitly requested in
+      // URL — and never while the demo tour is guiding the user from
+      // Overview onwards (the auto-switch would yank the tour to step 7).
+      const tourActive =
+        (proj.is_demo && isDemoTourArmed()) || searchParams.get("tour") === "1";
+      if (parts.length > 0 && !searchParams.get("tab") && !tourActive) setTab("responses");
       if (ana.filters) {
         setActiveFilterBy(ana.filters.filter_by);
         setActiveFilterValues(ana.filters.filter_values);
@@ -1790,9 +1794,13 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        {/* ── Guided tour of the demo project (onboarding hand-off or replay) ── */}
-        {project.is_demo && searchParams.get("tour") === "1" && (
+        {/* ── Guided tour of the demo project. Mounts when the Studies-home
+            callout armed it (sessionStorage) or on an explicit ?tour=1
+            replay from the demo banner. The user drives it — the tour only
+            reacts to their own tab clicks via currentTab. ── */}
+        {project.is_demo && (searchParams.get("tour") === "1" || isDemoTourArmed()) && (
           <DemoTour
+            currentTab={tab as "overview" | "setup" | "responses" | "analysis"}
             goToTab={(k) => applyTab(k as Tab)}
             onExit={() => {
               const sp = new URLSearchParams(searchParams);
@@ -1952,7 +1960,7 @@ export default function ProjectDetail() {
                 </p>
               )}
             </section>
-            <section className="detail-section">
+            <section className="detail-section" data-tour="overview-link">
               <div className="section-header-row">
                 <h2>{tProject("overview.interviewLinkTitle")}</h2>
                 <button

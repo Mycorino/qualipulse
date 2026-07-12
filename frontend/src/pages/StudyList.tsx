@@ -4,8 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { StudySummary, listStudies, studyEntryPath } from "../api/studies";
 import { SynthesisSummary, listSyntheses, openSynthesisMemoInNewTab } from "../api/synthesis";
-import { listProjects } from "../api/projects";
-import { DEMO_TOUR_DONE_KEY } from "../components/DemoTour";
+import { DEMO_TOUR_DONE_KEY, DemoCallout, armDemoTour } from "../components/DemoTour";
 import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
@@ -216,56 +215,54 @@ export default function StudyList() {
     refreshMemos();
   }, [refreshMemos]);
 
-  // Onboarding hands off here with ?tour=1. The demo project is seeded in a
-  // backend background thread right after onboarding completes, so it may
-  // not exist yet on first load — poll briefly, then drop the researcher
-  // into the flagship demo with the tour overlay armed. On timeout (seed
-  // failed or account predates demos) just stay on the dashboard.
-  useEffect(() => {
-    if (searchParams.get("tour") !== "1") return;
-    const stripParam = () => {
-      setSearchParams((sp) => {
+  // Onboarding hands off here with ?tour=1. The tour never auto-navigates:
+  // the researcher gets to see their home first, then a callout points at
+  // the demo study row and *they* click their way in. The demo is seeded in
+  // a backend background thread right after onboarding completes, so it may
+  // not be in the list yet — re-fetch briefly until it lands. On timeout
+  // (seed failed or account predates demos) just drop the param quietly.
+  const stripTourParam = useCallback(() => {
+    setSearchParams(
+      (sp) => {
         const next = new URLSearchParams(sp);
         next.delete("tour");
         return next;
-      }, { replace: true });
-    };
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
+  const [tourStudyId, setTourStudyId] = useState<string | null>(null);
+  const [tourAttempts, setTourAttempts] = useState(0);
+  const tourRequested = searchParams.get("tour") === "1";
+  useEffect(() => {
+    if (!tourRequested) return;
     if (localStorage.getItem(DEMO_TOUR_DONE_KEY) === "1") {
-      stripParam();
+      stripTourParam();
       return;
     }
-    let cancelled = false;
-    let attempts = 0;
-    let timer: number | undefined;
-    const tryFind = async () => {
-      attempts += 1;
-      try {
-        const projects = await listProjects();
-        const demos = projects.filter((p) => p.is_demo && !p.archived_at);
-        if (demos.length) {
-          // The seeder backdates the flagship study furthest — oldest wins.
-          const flagship = [...demos].sort((a, b) =>
-            a.created_at.localeCompare(b.created_at),
-          )[0];
-          if (!cancelled) {
-            navigate(`/projects/${flagship.id}?tab=overview&tour=1`, { replace: true });
-          }
-          return;
-        }
-      } catch {
-        // transient — keep polling
-      }
-      if (cancelled) return;
-      if (attempts < 8) timer = window.setTimeout(tryFind, 1200);
-      else stripParam();
-    };
-    tryFind();
-    return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (studies === null) return; // initial load still in flight
+    const demos = studies.filter((s) => s.is_demo && !s.archived_at);
+    if (demos.length) {
+      // The seeder backdates the flagship study furthest — oldest wins.
+      const flagship = [...demos].sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
+      armDemoTour();
+      setTourStudyId(flagship.id);
+      return;
+    }
+    if (tourAttempts >= 8) {
+      stripTourParam();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      listStudies()
+        .then(setStudies)
+        .catch(() => {
+          /* transient — the attempt bump below retries */
+        })
+        .finally(() => setTourAttempts((n) => n + 1));
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [tourRequested, studies, tourAttempts, stripTourParam]);
 
   // Detect studies that gained a report, memos that finished generating,
   // and memos that went stale since the researcher's last visit.
@@ -418,6 +415,7 @@ export default function StudyList() {
             <tr
               key={s.id}
               tabIndex={0}
+              data-tour={s.id === tourStudyId ? "demo-study-row" : undefined}
               onClick={() => openStudy(s)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") openStudy(s);
@@ -458,6 +456,7 @@ export default function StudyList() {
           <a
             key={s.id}
             href={studyEntryPath(s)}
+            data-tour={s.id === tourStudyId ? "demo-study-row" : undefined}
             className={`chart-card${needsAttention ? " chart-card--needs-attention" : ""}`}
             style={{ textDecoration: "none", color: "inherit", cursor: "pointer" }}
           >
@@ -758,6 +757,24 @@ export default function StudyList() {
       </div>
 
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
+
+      {/* Demo-tour entry point: rings the demo study row and waits for the
+          user's own click — the row's normal navigation carries them into
+          the study, where DemoTour picks up (sessionStorage-armed). */}
+      {tourStudyId && (
+        <DemoCallout
+          selector='[data-tour="demo-study-row"]'
+          eyebrow={t("hub.tour.eyebrow")}
+          title={t("hub.tour.title")}
+          body={t("hub.tour.body")}
+          clickHint={t("hub.tour.clickHint")}
+          skipLabel={t("hub.tour.skip")}
+          onSkip={() => {
+            setTourStudyId(null);
+            stripTourParam();
+          }}
+        />
+      )}
 
       {/* First-run handhold: only on the empty studies screen. The Copilot
           dock explains research and points at "+ New study" when opened —

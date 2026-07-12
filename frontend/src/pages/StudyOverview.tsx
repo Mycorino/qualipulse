@@ -3,6 +3,8 @@ import type { CSSProperties } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
+import { DemoCallout, isDemoTourArmed } from "../components/DemoTour";
+
 import {
   StudyAnalysis,
   StudyDetail,
@@ -53,6 +55,7 @@ export default function StudyOverview() {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [study, setStudy] = useState<StudyDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tourDismissed, setTourDismissed] = useState(false);
   const { toast } = useToast();
 
   /** Create a survey inside THIS study and open its editor. Surveys live
@@ -186,6 +189,7 @@ export default function StudyOverview() {
             <button
               key={tabKey}
               type="button"
+              data-tour={tabKey === "instruments" ? "study-tab-instruments" : undefined}
               onClick={() => setTabAndUrl(tabKey)}
               style={{
                 padding: "var(--space-3) 0",
@@ -241,6 +245,37 @@ export default function StudyOverview() {
         {tab === "participants" && <ParticipantsTab study={study} />}
         {tab === "report" && <ReportTab study={study} />}
       </main>
+
+      {/* Demo-tour waypoints through the workspace: first point at the
+          Instruments tab, then at the interview round — always the user's
+          own click, never a programmatic jump. */}
+      {study.is_demo && isDemoTourArmed() && !tourDismissed && (
+        <DemoCallout
+          selector={
+            tab === "instruments"
+              ? '[data-tour="workspace-interview-round"]'
+              : '[data-tour="study-tab-instruments"]'
+          }
+          eyebrow={t("overview.tour.eyebrow")}
+          title={t(
+            tab === "instruments"
+              ? "overview.tour.interviewRound_title"
+              : "overview.tour.instrumentsTab_title",
+          )}
+          body={t(
+            tab === "instruments"
+              ? "overview.tour.interviewRound_body"
+              : "overview.tour.instrumentsTab_body",
+          )}
+          clickHint={t(
+            tab === "instruments"
+              ? "overview.tour.interviewRound_clickHint"
+              : "overview.tour.instrumentsTab_clickHint",
+          )}
+          skipLabel={t("overview.tour.skip")}
+          onSkip={() => setTourDismissed(true)}
+        />
+      )}
     </div>
     </HubShell>
   );
@@ -433,10 +468,11 @@ function InstrumentsTab({
             </div>
           </Link>
         ))}
-        {study.projects.map((p) => (
+        {study.projects.map((p, pi) => (
           <Link
             key={p.id}
             to={`/projects/${p.id}`}
+            data-tour={study.is_demo && pi === 0 ? "workspace-interview-round" : undefined}
             className="chart-card chart-card--row"
             style={{ textDecoration: "none", color: "inherit" }}
           >

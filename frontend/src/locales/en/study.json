@@ -179,6 +179,16 @@
       "interviews": "Interviews",
       "projects_one": "{{count}} project",
       "projects_other": "{{count}} projects"
+    },
+    "tour": {
+      "eyebrow": "Demo tour",
+      "instrumentsTab_title": "You're in the study workspace",
+      "instrumentsTab_body": "A study can hold several instruments — this demo pairs a survey with an interview round. Open the Instruments tab to see them.",
+      "instrumentsTab_clickHint": "Click the Instruments tab",
+      "interviewRound_title": "The interview round",
+      "interviewRound_body": "The interview round is where the AI-led conversations live — the guide, the transcripts and the analysis. Open it to look around.",
+      "interviewRound_clickHint": "Click the interview round",
+      "skip": "Skip tour"
     }
   },
   "chartCard": {
