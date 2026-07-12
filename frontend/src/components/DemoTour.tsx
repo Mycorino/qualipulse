@@ -1,222 +1,407 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 /**
- * DemoTour — guided spotlight tour of the seeded demo project.
+ * DemoTour — click-through guided tour of the seeded demo study.
  *
- * Rendered by ProjectDetail when the URL carries `?tour=1` on a demo
- * project (onboarding hands off there via StudyList). The tour drives the
- * real page — each step switches to an actual tab and spotlights its
- * panel — so the user sees live seeded data, not screenshots. Ends on a
- * "create your own study" CTA back on the Studies home.
+ * The tour never drives the app for the user. It starts as a callout on
+ * the Studies home pointing at the demo study row (DemoStudyCallout); the
+ * user clicks the row themselves to open it. Inside the study, "go" steps
+ * highlight the real tab buttons and wait for the user's own click before
+ * advancing, and "describe" steps ring a specific element with a small
+ * card placed next to it — no full-screen backdrop, the page stays
+ * scrollable and interactive throughout.
  *
- * No tour library: six fixed steps over stable panel ids, one cutout div
- * (box-shadow dim trick) and a fixed caption card. Intro and finale reuse
- * the app's modal classes.
+ * Handoff: onboarding lands on /dashboard?tour=1 → StudyList shows the
+ * callout and arms sessionStorage (DEMO_TOUR_ARMED_KEY) → the user opens
+ * the demo study → ProjectDetail mounts DemoTour. Completion or skip
+ * writes DEMO_TOUR_DONE_KEY so it never re-triggers; the demo banner's
+ * "Replay tour" (?tour=1 on the project page) overrides the done flag.
  */
 
 export const DEMO_TOUR_DONE_KEY = "qp_demo_tour_done";
+export const DEMO_TOUR_ARMED_KEY = "qp_demo_tour_armed";
+
+export function armDemoTour() {
+  sessionStorage.setItem(DEMO_TOUR_ARMED_KEY, "1");
+}
+
+/** Armed by the Studies-home callout and not yet completed/skipped. */
+export function isDemoTourArmed(): boolean {
+  return (
+    sessionStorage.getItem(DEMO_TOUR_ARMED_KEY) === "1" &&
+    localStorage.getItem(DEMO_TOUR_DONE_KEY) !== "1"
+  );
+}
+
+/** Complete or dismiss the tour everywhere — it never re-triggers. */
+export function skipDemoTour() {
+  localStorage.setItem(DEMO_TOUR_DONE_KEY, "1");
+  sessionStorage.removeItem(DEMO_TOUR_ARMED_KEY);
+}
 
 type TourTab = "overview" | "setup" | "responses" | "analysis";
 
 interface TourStep {
   key: string;
-  /** Tab to activate + spotlight; undefined → centered modal step. */
-  tab?: TourTab;
+  /** Tab this step lives on. */
+  tab: TourTab;
+  /** Describe steps: element to ring. Falls back to the tab's panel. */
+  anchor?: string;
+  /** Go steps: highlight this tab's button and wait for the user to click it. */
+  clickTab?: TourTab;
 }
 
 const STEPS: TourStep[] = [
-  { key: "intro" },
-  { key: "overview", tab: "overview" },
-  { key: "setup", tab: "setup" },
-  { key: "responses", tab: "responses" },
-  { key: "analysis", tab: "analysis" },
-  { key: "finale" },
+  { key: "overviewHero", tab: "overview", anchor: "#isection-panel-overview .project-hero-strip" },
+  { key: "overviewStats", tab: "overview", anchor: "#isection-panel-overview .stats-row" },
+  { key: "overviewLink", tab: "overview", anchor: '[data-tour="overview-link"]' },
+  { key: "goSetup", tab: "overview", clickTab: "setup" },
+  { key: "setupGuide", tab: "setup", anchor: "#isection-panel-setup .guide-section" },
+  { key: "goResponses", tab: "setup", clickTab: "responses" },
+  { key: "responsesList", tab: "responses", anchor: "#isection-panel-responses .participants-list" },
+  { key: "goAnalysis", tab: "responses", clickTab: "analysis" },
+  { key: "analysisReport", tab: "analysis", anchor: "#isection-panel-analysis .analysis-report" },
+  { key: "finale", tab: "analysis" },
 ];
 
-interface SpotlightRect {
+interface Rect {
   top: number;
   left: number;
   width: number;
   height: number;
 }
 
-interface DemoTourProps {
-  goToTab: (tab: TourTab) => void;
-  onExit: () => void;
+function rectsEqual(a: Rect | null, b: Rect | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height;
 }
 
-export default function DemoTour({ goToTab, onExit }: DemoTourProps) {
-  const { t } = useTranslation("project");
-  const navigate = useNavigate();
-  const [stepIndex, setStepIndex] = useState(0);
-  const [spotlight, setSpotlight] = useState<SpotlightRect | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const step = STEPS[stepIndex];
-
-  const finish = useCallback(() => {
-    localStorage.setItem(DEMO_TOUR_DONE_KEY, "1");
-    onExit();
-  }, [onExit]);
-
-  // Activate the step's tab, then track its panel while content mounts and
-  // async data (participants, analysis) reflows the layout.
+/**
+ * Track the viewport rect of the first element matching `selector`,
+ * re-measuring through layout shifts, scrolling and async data loads.
+ * Scrolls the element into view once per selector change.
+ */
+function useAnchorRect(selector: string | null, fallbackSelector?: string): Rect | null {
+  const [rect, setRect] = useState<Rect | null>(null);
   useEffect(() => {
-    if (!step.tab) {
-      setSpotlight(null);
+    if (!selector) {
+      setRect(null);
       return;
     }
-    goToTab(step.tab);
-    window.scrollTo({ top: 0 });
     let cancelled = false;
+    let scrolled = false;
     const measure = () => {
       if (cancelled) return;
-      const el = document.getElementById(`isection-panel-${step.tab}`);
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const pad = 8;
-      const top = Math.max(rect.top - pad, 0);
-      setSpotlight({
-        top,
-        left: Math.max(rect.left - pad, 0),
-        width: Math.min(rect.width + pad * 2, window.innerWidth),
-        height: Math.min(rect.height + pad * 2, window.innerHeight - top - 16),
-      });
+      const el =
+        document.querySelector(selector) ??
+        (fallbackSelector ? document.querySelector(fallbackSelector) : null);
+      if (!el) {
+        setRect(null);
+        return;
+      }
+      if (!scrolled) {
+        scrolled = true;
+        const r = el.getBoundingClientRect();
+        // Bring the anchor comfortably into view. Absolute target instead of
+        // scrollIntoView/scrollBy: it never tucks the anchor under sticky
+        // headers, handles anchors taller than the viewport, and stays
+        // idempotent when StrictMode double-runs the effect.
+        if (r.top < 80 || r.top > window.innerHeight - 240) {
+          window.scrollTo({
+            top: Math.max(window.scrollY + r.top - 120, 0),
+            behavior: "smooth",
+          });
+        }
+      }
+      const r = el.getBoundingClientRect();
+      const next = { top: r.top, left: r.left, width: r.width, height: r.height };
+      setRect((prev) => (rectsEqual(prev, next) ? prev : next));
     };
     const raf = requestAnimationFrame(measure);
-    const interval = window.setInterval(measure, 400);
+    const interval = window.setInterval(measure, 300);
     window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
       clearInterval(interval);
       window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepIndex]);
+  }, [selector, fallbackSelector]);
+  return rect;
+}
 
-  // Keyboard: Esc skips, focus stays inside the card.
-  useEffect(() => {
+/**
+ * Place the card adjacent to the anchor — below if it fits, above
+ * otherwise. Returns null when neither fits (caller docks the card so it
+ * never sits on top of the anchored content).
+ */
+function useCardPos(
+  rect: Rect | null,
+  cardRef: React.RefObject<HTMLDivElement>,
+  contentKey: string,
+): { top: number; left: number } | null {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  useLayoutEffect(() => {
     const card = cardRef.current;
-    card?.querySelector<HTMLButtonElement>("[data-tour-primary]")?.focus();
+    if (!rect || !card) {
+      setPos(null);
+      return;
+    }
+    const gap = 14;
+    const ch = card.offsetHeight;
+    const cw = card.offsetWidth;
+    let top: number;
+    if (rect.top + rect.height + gap + ch <= window.innerHeight - 16) {
+      top = rect.top + rect.height + gap;
+    } else if (rect.top - gap - ch >= 16) {
+      top = rect.top - gap - ch;
+    } else {
+      setPos(null);
+      return;
+    }
+    const left = Math.min(Math.max(rect.left, 16), Math.max(window.innerWidth - cw - 16, 16));
+    setPos({ top, left });
+  }, [rect, cardRef, contentKey]);
+  return pos;
+}
+
+interface DemoTourProps {
+  /** The instrument tab currently active — the tour advances on the user's own tab clicks. */
+  currentTab: TourTab;
+  goToTab: (tab: TourTab) => void;
+  onExit: () => void;
+}
+
+export default function DemoTour({ currentTab, goToTab, onExit }: DemoTourProps) {
+  const { t } = useTranslation("project");
+  const navigate = useNavigate();
+  const [stepIndex, setStepIndex] = useState(0);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const step = STEPS[stepIndex];
+  const isFinale = step.key === "finale";
+
+  const finish = useCallback(() => {
+    skipDemoTour();
+    onExit();
+  }, [onExit]);
+
+  // The tour always starts on Overview (relevant for banner replays from
+  // another tab).
+  useEffect(() => {
+    goToTab("overview");
+    window.scrollTo({ top: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // React to the user's own tab clicks: a "go" step advances when its
+  // target tab opens; on a describe step, wandering to another tab jumps
+  // to that tab's step so the card never talks about an invisible panel.
+  const stepIndexRef = useRef(stepIndex);
+  useEffect(() => {
+    stepIndexRef.current = stepIndex;
+  }, [stepIndex]);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    const current = STEPS[stepIndexRef.current];
+    if (current.clickTab) {
+      if (currentTab === current.clickTab) setStepIndex(stepIndexRef.current + 1);
+      return;
+    }
+    if (current.tab !== currentTab) {
+      const idx = STEPS.findIndex((s) => !s.clickTab && s.tab === currentTab);
+      if (idx >= 0) setStepIndex(idx);
+    }
+  }, [currentTab]);
+
+  const selector = step.clickTab ? `#isection-tab-${step.clickTab}` : step.anchor ?? null;
+  const rect = useAnchorRect(selector, step.clickTab ? undefined : `#isection-panel-${step.tab}`);
+  const pos = useCardPos(rect, cardRef, step.key);
+
+  // Focus follows the expected action: the real tab button on "go" steps,
+  // the card's primary button otherwise.
+  useEffect(() => {
+    if (step.clickTab) {
+      document.getElementById(`isection-tab-${step.clickTab}`)?.focus();
+    } else {
+      cardRef.current?.querySelector<HTMLButtonElement>("[data-tour-primary]")?.focus();
+    }
+  }, [stepIndex, step.clickTab]);
+
+  // Esc skips from anywhere. No focus trap — the page stays interactive.
+  useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        finish();
-        return;
-      }
-      if (e.key !== "Tab" || !card) return;
-      const focusables = card.querySelectorAll<HTMLElement>("button, a[href]");
-      if (!focusables.length) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
+      if (e.key === "Escape") finish();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [stepIndex, finish]);
+  }, [finish]);
+
+  const goBack = () => {
+    for (let i = stepIndex - 1; i >= 0; i--) {
+      if (!STEPS[i].clickTab) {
+        if (STEPS[i].tab !== currentTab) goToTab(STEPS[i].tab);
+        setStepIndex(i);
+        return;
+      }
+    }
+  };
 
   const title = t(`tour.${step.key}_title`);
   const body = t(`tour.${step.key}_body`);
-
-  // Intro + finale: plain centered modals (reuse app modal styles).
-  if (!step.tab) {
-    const isIntro = step.key === "intro";
-    return (
-      <div className="modal-overlay demo-tour" role="dialog" aria-modal="true" aria-label={title}>
-        <div className="modal-content demo-tour__modal" ref={cardRef}>
-          <h2 className="demo-tour__title">{title}</h2>
-          <p className="demo-tour__body">{body}</p>
-          <div className="demo-tour__actions">
-            {isIntro ? (
-              <>
-                <button type="button" className="btn btn-ghost" onClick={finish}>
-                  {t("tour.skip")}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  data-tour-primary
-                  onClick={() => setStepIndex(1)}
-                >
-                  {t("tour.start")}
-                </button>
-              </>
-            ) : (
-              <>
-                <button type="button" className="btn btn-ghost" onClick={finish}>
-                  {t("tour.finale_cta_explore")}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  data-tour-primary
-                  onClick={() => {
-                    localStorage.setItem(DEMO_TOUR_DONE_KEY, "1");
-                    navigate("/dashboard?new=1");
-                  }}
-                >
-                  {t("tour.finale_cta_create")} →
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const docked = pos === null;
 
   return (
-    <div className="demo-tour" role="dialog" aria-modal="true" aria-label={title}>
-      {/* Dim everything except the spotlit panel; blocks page interaction
-          so the tour stays linear. */}
-      {spotlight ? (
+    <div className="demo-tour">
+      {rect && (
         <div
-          className="demo-tour__cutout"
+          className={`demo-tour__ring${step.clickTab ? " demo-tour__ring--pulse" : ""}`}
           style={{
-            top: spotlight.top,
-            left: spotlight.left,
-            width: spotlight.width,
-            height: spotlight.height,
+            top: rect.top - 6,
+            left: rect.left - 6,
+            width: rect.width + 12,
+            height: rect.height + 12,
           }}
         />
-      ) : (
-        <div className="demo-tour__backdrop" />
       )}
 
-      <div className="demo-tour__card" ref={cardRef}>
-        <span className="demo-tour__progress">
-          {t("tour.stepOf", { current: stepIndex, total: STEPS.length - 2 })}
-        </span>
+      <div
+        className={`demo-tour__card${docked ? " demo-tour__card--dock" : ""}`}
+        style={docked ? undefined : { top: pos.top, left: pos.left }}
+        ref={cardRef}
+        role="dialog"
+        aria-label={title}
+      >
+        {!isFinale && (
+          <span className="demo-tour__progress">
+            {t("tour.stepOf", { current: stepIndex + 1, total: STEPS.length - 1 })}
+          </span>
+        )}
         <h2 className="demo-tour__title">{title}</h2>
         <p className="demo-tour__body">{body}</p>
+        {step.clickTab && <p className="demo-tour__click-hint">☝︎ {t("tour.clickHint")}</p>}
         <div className="demo-tour__actions">
-          <button type="button" className="demo-tour__skip" onClick={finish}>
-            {t("tour.skip")}
+          {isFinale ? (
+            <>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={finish}>
+                {t("tour.finale_cta_explore")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                data-tour-primary
+                onClick={() => {
+                  skipDemoTour();
+                  navigate("/dashboard?new=1");
+                }}
+              >
+                {t("tour.finale_cta_create")} →
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="demo-tour__skip" onClick={finish}>
+                {t("tour.skip")}
+              </button>
+              <div className="demo-tour__nav">
+                {stepIndex > 0 && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={goBack}>
+                    {t("tour.back")}
+                  </button>
+                )}
+                {!step.clickTab && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    data-tour-primary
+                    onClick={() => setStepIndex((i) => i + 1)}
+                  >
+                    {t("tour.next")}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface DemoCalloutProps {
+  /** Element to ring — the callout renders nothing until it's in the DOM. */
+  selector: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+  clickHint: string;
+  skipLabel: string;
+  /** Called after skipDemoTour() has run — hide any local state. */
+  onSkip: () => void;
+}
+
+/**
+ * DemoCallout — a single coach mark used on the way *to* the demo study
+ * (Studies home row, workspace tab, interview round card). It rings a
+ * real click target and waits: the user's own click navigates, nothing
+ * is automatic. Renders nothing until the anchor is in the DOM, so the
+ * seeding delay just means the callout pops in when the row does.
+ */
+export function DemoCallout({
+  selector,
+  eyebrow,
+  title,
+  body,
+  clickHint,
+  skipLabel,
+  onSkip,
+}: DemoCalloutProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const rect = useAnchorRect(selector);
+  const pos = useCardPos(rect, cardRef, title);
+
+  if (!rect) return null;
+
+  return (
+    <div className="demo-tour">
+      <div
+        className="demo-tour__ring demo-tour__ring--pulse"
+        style={{
+          top: rect.top - 6,
+          left: rect.left - 6,
+          width: rect.width + 12,
+          height: rect.height + 12,
+        }}
+      />
+      <div
+        className={`demo-tour__card${pos === null ? " demo-tour__card--dock" : ""}`}
+        style={pos === null ? undefined : { top: pos.top, left: pos.left }}
+        ref={cardRef}
+        role="dialog"
+        aria-label={title}
+      >
+        <span className="demo-tour__progress">{eyebrow}</span>
+        <h2 className="demo-tour__title">{title}</h2>
+        <p className="demo-tour__body">{body}</p>
+        <p className="demo-tour__click-hint">☝︎ {clickHint}</p>
+        <div className="demo-tour__actions">
+          <button
+            type="button"
+            className="demo-tour__skip"
+            onClick={() => {
+              skipDemoTour();
+              onSkip();
+            }}
+          >
+            {skipLabel}
           </button>
-          <div className="demo-tour__nav">
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setStepIndex((i) => i - 1)}
-            >
-              {t("tour.back")}
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              data-tour-primary
-              onClick={() => setStepIndex((i) => i + 1)}
-            >
-              {t("tour.next")}
-            </button>
-          </div>
         </div>
       </div>
     </div>

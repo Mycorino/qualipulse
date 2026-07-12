@@ -489,6 +489,13 @@
       "close": "fermer"
     },
     "demoBadge": "Démo",
+    "tour": {
+      "eyebrow": "Commencez ici",
+      "title": "Nous avons préparé une étude de démonstration",
+      "body": "Un exemple réel et complet — des entretiens déjà menés, transcrits et analysés — pour voir comment tout fonctionne avant de lancer la vôtre. Prenez votre temps ; quand vous êtes curieux, ouvrez-la.",
+      "clickHint": "Cliquez sur l'étude encadrée pour regarder à l'intérieur",
+      "skip": "Non merci, j'explore par moi-même"
+    },
     "plan": {
       "freeTrial": "Essai gratuit",
       "upgrade": "Passer à un plan",

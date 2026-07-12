@@ -4718,7 +4718,7 @@ select.field-input {
 .plan-card { position: relative; }
 .plan-card--recommended {
   border-color: var(--brand-500);
-  box-shadow: 0 0 0 1px var(--brand-500), 0 8px 24px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 1px var(--brand-500), 0 8px 24px rgba(67, 105, 245, 0.12);
 }
 .plan-flag {
   position: absolute;
@@ -13356,39 +13356,56 @@ select.field-input {
   border-color: var(--brand-600);
 }
 
-/* ── Demo project tour (DemoTour.tsx) ────────────────────────────── */
+/* ── Demo study tour (DemoTour.tsx) ──────────────────────────────────
+   Click-through coach marks, deliberately NOT a modal takeover: the
+   container ignores pointer events so the page stays fully interactive,
+   a ring outlines the element being talked about (pulsing when the user
+   is asked to click it), and the caption card sits *next to* the ring —
+   never on top of the content it describes (docks bottom-right when
+   neither side fits). */
 .demo-tour {
   position: fixed;
   inset: 0;
   z-index: 1100; /* above .modal-overlay (1000) so nothing under it competes */
+  pointer-events: none;
 }
-.demo-tour__backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.55);
-  animation: modal-overlay-fade 180ms ease-out;
-}
-.demo-tour__cutout {
+.demo-tour__ring {
   position: fixed;
   border-radius: var(--radius-md);
-  /* The giant shadow dims everything around the spotlit panel */
-  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55);
-  outline: 2px solid var(--brand-400);
+  outline: 2px solid var(--brand-500);
   outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(67, 105, 245, 0.12);
   transition: top 220ms ease, left 220ms ease, width 220ms ease, height 220ms ease;
   pointer-events: none;
 }
+.demo-tour__ring--pulse {
+  animation: demo-tour-pulse 1.6s ease-in-out infinite;
+}
+@keyframes demo-tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(67, 105, 245, 0.1); }
+  50% { box-shadow: 0 0 0 10px rgba(67, 105, 245, 0.22); }
+}
 .demo-tour__card {
   position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(520px, calc(100vw - 32px));
+  width: min(380px, calc(100vw - 32px));
   background: var(--bg-white);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-  padding: 20px 24px;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.22);
+  padding: 16px 20px;
+  pointer-events: auto;
   animation: modal-content-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* No room beside the anchor → dock in the corner, off the content. */
+.demo-tour__card--dock {
+  bottom: 24px;
+  right: 24px;
+}
+.demo-tour__click-hint {
+  margin: 10px 0 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--brand-600);
 }
 .demo-tour__progress {
   font-size: var(--text-xs);
@@ -13415,9 +13432,6 @@ select.field-input {
   gap: 12px;
   margin-top: 16px;
 }
-.demo-tour__modal .demo-tour__actions {
-  justify-content: flex-end;
-}
 .demo-tour__nav {
   display: flex;
   gap: 8px;
@@ -13436,8 +13450,11 @@ select.field-input {
 }
 @media (max-width: 640px) {
   .demo-tour__card {
+    padding: 14px 16px;
+  }
+  .demo-tour__card--dock {
     bottom: 12px;
-    padding: 16px;
+    right: 12px;
   }
 }
 

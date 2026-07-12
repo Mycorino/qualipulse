@@ -489,6 +489,13 @@
       "close": "close"
     },
     "demoBadge": "Demo",
+    "tour": {
+      "eyebrow": "Start here",
+      "title": "We set up a demo study for you",
+      "body": "A complete, real example — interviews already answered, transcribed and analysed — so you can see how everything works before running your own. Take your time; when you're curious, open it.",
+      "clickHint": "Click the highlighted study to look inside",
+      "skip": "No thanks, I'll explore on my own"
+    },
     "plan": {
       "freeTrial": "Free trial",
       "upgrade": "Upgrade",
