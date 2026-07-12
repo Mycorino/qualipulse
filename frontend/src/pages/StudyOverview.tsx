@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { DemoCallout, isDemoTourArmed } from "../components/DemoTour";
+import { DemoCallout, getDemoTourPhase, isDemoTourArmed } from "../components/DemoTour";
 
 import {
   StudyAnalysis,
@@ -249,7 +249,7 @@ export default function StudyOverview() {
       {/* Demo-tour waypoints through the workspace: first point at the
           Instruments tab, then at the interview round — always the user's
           own click, never a programmatic jump. */}
-      {study.is_demo && isDemoTourArmed() && !tourDismissed && (
+      {study.is_demo && isDemoTourArmed() && getDemoTourPhase() === "study" && !tourDismissed && (
         <DemoCallout
           selector={
             tab === "instruments"

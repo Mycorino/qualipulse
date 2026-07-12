@@ -4,7 +4,13 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { StudySummary, listStudies, studyEntryPath } from "../api/studies";
 import { SynthesisSummary, listSyntheses, openSynthesisMemoInNewTab } from "../api/synthesis";
-import { DEMO_TOUR_DONE_KEY, DemoCallout, armDemoTour } from "../components/DemoTour";
+import {
+  DEMO_TOUR_DONE_KEY,
+  DemoCallout,
+  armDemoTour,
+  getDemoTourPhase,
+  isDemoTourArmed,
+} from "../components/DemoTour";
 import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
@@ -233,9 +239,13 @@ export default function StudyList() {
   }, [setSearchParams]);
   const [tourStudyId, setTourStudyId] = useState<string | null>(null);
   const [tourAttempts, setTourAttempts] = useState(0);
+  const [memoTourDismissed, setMemoTourDismissed] = useState(false);
   const tourRequested = searchParams.get("tour") === "1";
   useEffect(() => {
     if (!tourRequested) return;
+    // The memo phase points at the decision-memo card, not the study row —
+    // handled separately below; don't re-arm the study-row callout here.
+    if (getDemoTourPhase() === "memo") return;
     if (localStorage.getItem(DEMO_TOUR_DONE_KEY) === "1") {
       stripTourParam();
       return;
@@ -721,7 +731,7 @@ export default function StudyList() {
               </div>
 
               {highlightMemo ? (
-                <div className="hub-memo">
+                <div className="hub-memo" data-tour="decision-memo">
                   <div className="hub-memo__kicker">
                     {t("hub.memoCard.kicker")} · {t("hub.memoCard.studies", { count: highlightMemo.study_count })}
                   </div>
@@ -761,7 +771,7 @@ export default function StudyList() {
       {/* Demo-tour entry point: rings the demo study row and waits for the
           user's own click — the row's normal navigation carries them into
           the study, where DemoTour picks up (sessionStorage-armed). */}
-      {tourStudyId && (
+      {tourStudyId && getDemoTourPhase() === "study" && (
         <DemoCallout
           selector='[data-tour="demo-study-row"]'
           eyebrow={t("hub.tour.eyebrow")}
@@ -775,6 +785,27 @@ export default function StudyList() {
           }}
         />
       )}
+
+      {/* Capstone: after the interview-round tour, the finale hands back here
+          in the "memo" phase. Ring the cross-study decision memo card and let
+          the user open its print-ready report — the end of the arc
+          interviews → per-study analysis → cross-study decision memo. */}
+      {isDemoTourArmed() &&
+        getDemoTourPhase() === "memo" &&
+        highlightMemo &&
+        !memoTourDismissed && (
+          <DemoCallout
+            selector='[data-tour="decision-memo"]'
+            eyebrow={t("hub.memoTour.eyebrow")}
+            title={t("hub.memoTour.title")}
+            body={t("hub.memoTour.body")}
+            clickHint={t("hub.memoTour.clickHint")}
+            skipLabel={t("hub.memoTour.skip")}
+            primaryLabel={t("hub.memoTour.open")}
+            onPrimary={() => openMemo(highlightMemo.id)}
+            onSkip={() => setMemoTourDismissed(true)}
+          />
+        )}
 
       {/* First-run handhold: only on the empty studies screen. The Copilot
           dock explains research and points at "+ New study" when opened —

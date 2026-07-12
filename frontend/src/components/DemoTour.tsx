@@ -22,9 +22,28 @@ import { useNavigate } from "react-router-dom";
 
 export const DEMO_TOUR_DONE_KEY = "qp_demo_tour_done";
 export const DEMO_TOUR_ARMED_KEY = "qp_demo_tour_armed";
+const DEMO_TOUR_PHASE_KEY = "qp_demo_tour_phase";
+
+/**
+ * The tour runs in two phases. "study" is the main arc — home → workspace →
+ * interview round. "memo" is the capstone after the interview-round finale:
+ * back on the Studies home, ringing the cross-study decision memo card so
+ * the user opens its print-ready report. Phase gates which surface's coach
+ * marks are live, so nothing double-fires when the user revisits a page.
+ */
+export type DemoTourPhase = "study" | "memo";
+
+export function getDemoTourPhase(): DemoTourPhase {
+  return sessionStorage.getItem(DEMO_TOUR_PHASE_KEY) === "memo" ? "memo" : "study";
+}
+
+export function setDemoTourPhase(phase: DemoTourPhase) {
+  sessionStorage.setItem(DEMO_TOUR_PHASE_KEY, phase);
+}
 
 export function armDemoTour() {
   sessionStorage.setItem(DEMO_TOUR_ARMED_KEY, "1");
+  setDemoTourPhase("study");
 }
 
 /** Armed by the Studies-home callout and not yet completed/skipped. */
@@ -39,6 +58,7 @@ export function isDemoTourArmed(): boolean {
 export function skipDemoTour() {
   localStorage.setItem(DEMO_TOUR_DONE_KEY, "1");
   sessionStorage.removeItem(DEMO_TOUR_ARMED_KEY);
+  sessionStorage.removeItem(DEMO_TOUR_PHASE_KEY);
 }
 
 type TourTab = "overview" | "setup" | "responses" | "analysis";
@@ -190,8 +210,10 @@ export default function DemoTour({ currentTab, goToTab, onExit }: DemoTourProps)
   }, [onExit]);
 
   // The tour always starts on Overview (relevant for banner replays from
-  // another tab).
+  // another tab). A fresh interview-round run is always the "study" phase —
+  // the finale flips it to "memo" right before handing back to the home.
   useEffect(() => {
+    setDemoTourPhase("study");
     goToTab("overview");
     window.scrollTo({ top: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -298,11 +320,13 @@ export default function DemoTour({ currentTab, goToTab, onExit }: DemoTourProps)
                 className="btn btn-primary btn-sm"
                 data-tour-primary
                 onClick={() => {
-                  skipDemoTour();
-                  navigate("/dashboard?new=1");
+                  // Bridge to the capstone: hand back to the Studies home
+                  // where the decision-memo callout picks up (phase=memo).
+                  setDemoTourPhase("memo");
+                  navigate("/dashboard");
                 }}
               >
-                {t("tour.finale_cta_create")} →
+                {t("tour.finale_cta_memo")} →
               </button>
             </>
           ) : (
@@ -345,14 +369,22 @@ interface DemoCalloutProps {
   skipLabel: string;
   /** Called after skipDemoTour() has run — hide any local state. */
   onSkip: () => void;
+  /**
+   * Optional in-card primary action. Used by the capstone memo callout so
+   * the report opens from the card itself (not only the ringed control).
+   * The handler runs first, then skipDemoTour() + onSkip() end the tour.
+   */
+  primaryLabel?: string;
+  onPrimary?: () => void;
 }
 
 /**
- * DemoCallout — a single coach mark used on the way *to* the demo study
- * (Studies home row, workspace tab, interview round card). It rings a
- * real click target and waits: the user's own click navigates, nothing
- * is automatic. Renders nothing until the anchor is in the DOM, so the
- * seeding delay just means the callout pops in when the row does.
+ * DemoCallout — a single coach mark used on the way *to* something (Studies
+ * home row, workspace tab, interview round card, the decision memo). It
+ * rings a real click target and waits: the user's own click navigates or
+ * opens, nothing is automatic. Renders nothing until the anchor is in the
+ * DOM, so a seeding/loading delay just means the callout pops in when the
+ * target does.
  */
 export function DemoCallout({
   selector,
@@ -362,12 +394,19 @@ export function DemoCallout({
   clickHint,
   skipLabel,
   onSkip,
+  primaryLabel,
+  onPrimary,
 }: DemoCalloutProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const rect = useAnchorRect(selector);
   const pos = useCardPos(rect, cardRef, title);
 
   if (!rect) return null;
+
+  const end = () => {
+    skipDemoTour();
+    onSkip();
+  };
 
   return (
     <div className="demo-tour">
@@ -392,16 +431,22 @@ export function DemoCallout({
         <p className="demo-tour__body">{body}</p>
         <p className="demo-tour__click-hint">☝︎ {clickHint}</p>
         <div className="demo-tour__actions">
-          <button
-            type="button"
-            className="demo-tour__skip"
-            onClick={() => {
-              skipDemoTour();
-              onSkip();
-            }}
-          >
+          <button type="button" className="demo-tour__skip" onClick={end}>
             {skipLabel}
           </button>
+          {primaryLabel && onPrimary && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              data-tour-primary
+              onClick={() => {
+                onPrimary();
+                end();
+              }}
+            >
+              {primaryLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

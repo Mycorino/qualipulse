@@ -496,6 +496,14 @@
       "clickHint": "Cliquez sur l'étude encadrée pour regarder à l'intérieur",
       "skip": "Non merci, j'explore par moi-même"
     },
+    "memoTour": {
+      "eyebrow": "Visite de la démo · le point d'orgue",
+      "title": "Un mémo de décision transversal",
+      "body": "Quand un espace contient plusieurs études, QualiPulse lit tous leurs résultats et rédige un seul mémo prêt pour la décision — corroborations et contradictions comprises. Cette démo en contient déjà un.",
+      "clickHint": "La carte encadrée est votre mémo de décision",
+      "open": "📄 Ouvrir le rapport",
+      "skip": "Terminer la visite"
+    },
     "plan": {
       "freeTrial": "Essai gratuit",
       "upgrade": "Passer à un plan",

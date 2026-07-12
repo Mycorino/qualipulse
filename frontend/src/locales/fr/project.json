@@ -228,8 +228,9 @@
     "goAnalysis_body": "L'onglet Analyse montre ce que l'IA a tiré de tous les entretiens. Ouvrez-le pour le final.",
     "analysisReport_title": "Des thèmes appuyés par des preuves",
     "analysisReport_body": "L'IA synthétise thèmes, tensions et recommandations à travers les entretiens — chaque affirmation cite des verbatims traçables jusqu'à la transcription. Faites défiler pour voir le rapport complet.",
-    "finale_title": "Voilà la boucle complète",
-    "finale_body": "Guide → entretiens → transcriptions → analyse. Cette démo reste dans votre espace pour l'explorer à tout moment — mais le plus rapide pour apprendre, c'est avec vos propres questions.",
+    "finale_title": "Voilà une étude, de bout en bout",
+    "finale_body": "Guide → entretiens → transcriptions → analyse. Mais le vrai point d'orgue est transversal — laissez-moi vous montrer le mémo de décision inter-études.",
+    "finale_cta_memo": "Voir le mémo de décision",
     "finale_cta_create": "Créer votre propre étude",
     "finale_cta_explore": "Continuer à explorer la démo"
   },

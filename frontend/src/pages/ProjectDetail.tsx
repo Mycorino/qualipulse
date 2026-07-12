@@ -59,7 +59,7 @@ import {
 import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, regenerateScreeningTranslations, type PaywallDetail } from "../api/projects";
 import ScreeningTranslationsEditor from "../components/ScreeningTranslationsEditor";
 import BrandingSettings from "../components/BrandingSettings";
-import DemoTour, { isDemoTourArmed } from "../components/DemoTour";
+import DemoTour, { getDemoTourPhase, isDemoTourArmed } from "../components/DemoTour";
 import { getCreditUsage } from "../api/billing";
 import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
@@ -1798,7 +1798,9 @@ export default function ProjectDetail() {
             callout armed it (sessionStorage) or on an explicit ?tour=1
             replay from the demo banner. The user drives it — the tour only
             reacts to their own tab clicks via currentTab. ── */}
-        {project.is_demo && (searchParams.get("tour") === "1" || isDemoTourArmed()) && (
+        {project.is_demo &&
+          (searchParams.get("tour") === "1" ||
+            (isDemoTourArmed() && getDemoTourPhase() === "study")) && (
           <DemoTour
             currentTab={tab as "overview" | "setup" | "responses" | "analysis"}
             goToTab={(k) => applyTab(k as Tab)}
