@@ -409,6 +409,14 @@
       "responses_other": "{{count}} survey responses",
       "quiet": "All quiet — your studies are set up and waiting."
     },
+    "firstRun": {
+      "sub": "You don't have a study yet — let's create your first one.",
+      "heroText": "A study is where your interviews, transcripts, and analysis live. Create your first one and share a link — participants complete it in their browser.",
+      "exampleLabel": "🎓 Want to see one first? Explore a finished example",
+      "show": "Show",
+      "hide": "Hide",
+      "exampleOpen": "Open the example"
+    },
     "filters": {
       "all": "All",
       "attention": "Needs attention",
