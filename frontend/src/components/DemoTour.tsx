@@ -61,33 +61,6 @@ export function skipDemoTour() {
   sessionStorage.removeItem(DEMO_TOUR_PHASE_KEY);
 }
 
-export function isDemoTourDone(): boolean {
-  return localStorage.getItem(DEMO_TOUR_DONE_KEY) === "1";
-}
-
-// ── First-run greeter ───────────────────────────────────────────────────
-// The Studies home shows a one-time gentle callout pointing at the seeded
-// example when a demo-only account lands *without* the onboarding tour
-// running. Its dismissal is tracked separately from the tour-done flag so
-// dismissing the greeter never blocks the tour itself (and vice-versa).
-const DEMO_FIRSTRUN_HINT_KEY = "qp_demo_firstrun_hint";
-
-export function firstRunHintDismissed(): boolean {
-  return localStorage.getItem(DEMO_FIRSTRUN_HINT_KEY) === "1";
-}
-
-export function dismissFirstRunHint() {
-  localStorage.setItem(DEMO_FIRSTRUN_HINT_KEY, "1");
-}
-
-/** Replay the guided tour from scratch — clears the done flag so a prior
- *  run doesn't suppress it, and dismisses the greeter so it won't re-nag. */
-export function restartDemoTour() {
-  localStorage.removeItem(DEMO_TOUR_DONE_KEY);
-  dismissFirstRunHint();
-  armDemoTour();
-}
-
 type TourTab = "overview" | "setup" | "responses" | "analysis";
 
 interface TourStep {

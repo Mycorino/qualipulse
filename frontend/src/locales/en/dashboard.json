@@ -410,26 +410,7 @@
       "quiet": "All quiet — your studies are set up and waiting."
     },
     "firstRun": {
-      "sub": "You don't have a study yet — let's create your first one.",
-      "heroText": "A study is where your interviews, transcripts, and analysis live. Create your first one and share a link — participants complete it in their browser.",
-      "exampleLabel": "🎓 Want to see one first? Explore a finished example",
-      "show": "Show",
-      "hide": "Hide",
-      "exampleOpen": "Open the example",
-      "exampleLead": "Not ready to build yours? Here's a complete example to explore — real interviews, AI analysis, and a cross-study decision memo.",
-      "guidedTour": "Guided tour (60s)",
-      "exampleInterviews_one": "{{count}} interview",
-      "exampleInterviews_other": "{{count}} interviews",
-      "exampleAnalysisReady": "analysis ready",
-      "exampleReportReady": "report ready",
-      "exampleMemo": "Cross-study decision memo",
-      "exampleOpenReport": "Open report",
-      "hintEyebrow": "Start here",
-      "hintTitle": "See what a finished study looks like",
-      "hintBody": "We've set up a complete example — real interviews, AI analysis, and a decision memo. Explore it at your own pace, or take a quick guided tour.",
-      "hintClickHint": "This example is ready to explore",
-      "hintTakeTour": "▶ Take the guided tour",
-      "hintSkip": "I'll explore on my own"
+      "sub": "You don't have a study yet — let's create your first one."
     },
     "filters": {
       "all": "All",
@@ -531,6 +512,11 @@
       "upgrade": "Upgrade",
       "manage": "Manage",
       "manageAria": "Plan and billing — open account settings"
+    },
+    "copilotWelcome": "Once you start your first study, I'll be right here to help you shape it and make sense of the results.",
+    "memoExplainer": {
+      "title": "Decide across studies",
+      "body": "A decision memo synthesises the findings from 2 or more studies into one clear recommendation — corroboration and conflicts included. It unlocks once you've run a couple of studies."
     }
   }
 }

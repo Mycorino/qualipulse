@@ -10441,6 +10441,14 @@ select.field-input {
 .workspace-nba--quiet .nba-chip__reason {
   margin-top: 0;
 }
+/* First-timer welcome line in the copilot strip (no real study yet). */
+.workspace-nba__welcome {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-width: 60ch;
+}
 
 /* The instrument summary in the study tab bar is supplementary — hide it on
    narrow viewports so the tabs themselves keep the row. */
@@ -14295,6 +14303,10 @@ select.field-input {
   line-height: var(--leading-normal);
   color: #cbd5e1;
   margin: 0 0 var(--space-3);
+}
+/* First-timer explainer variant: same dark card, no CTA below the copy. */
+.hub-memo--explainer p {
+  margin-bottom: 0;
 }
 .hub-memo__stale {
   display: inline-block;
