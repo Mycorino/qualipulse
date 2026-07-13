@@ -8,8 +8,11 @@ import {
   DEMO_TOUR_DONE_KEY,
   DemoCallout,
   armDemoTour,
+  dismissFirstRunHint,
+  firstRunHintDismissed,
   getDemoTourPhase,
   isDemoTourArmed,
+  isDemoTourDone,
 } from "../components/DemoTour";
 import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { useToast } from "../components/Toast";
@@ -170,7 +173,12 @@ export default function StudyList() {
   const [memoOpenSignal, setMemoOpenSignal] = useState(0);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
-  const [exampleOpen, setExampleOpen] = useState(false);
+  // First-run greeter: a gentle one-time callout ringing the seeded example.
+  // Shown only on the collapsed first-run home and only until dismissed or
+  // the tour has been taken.
+  const [firstRunHintOpen, setFirstRunHintOpen] = useState(
+    () => !firstRunHintDismissed() && !isDemoTourDone(),
+  );
   const [view, setView] = useState<HubView>(() =>
     localStorage.getItem(HUB_VIEW_KEY) === "cards" ? "cards" : "table",
   );
@@ -528,39 +536,69 @@ export default function StudyList() {
 
   const demoRows = useMemo(() => rows.filter((r) => r.study.is_demo), [rows]);
 
-  // Passive example list for the first-run screen: demo studies read as a
-  // sample, not a backlog — no per-row next-step CTA, just one "open" cue.
+  // Launch the guided click-through from the first-run home. Clearing the
+  // done flag lets it replay, and setting ?tour=1 hands off to the existing
+  // tour effect (finds the flagship demo, arms it, rings the study row).
+  const startGuidedTour = () => {
+    localStorage.removeItem(DEMO_TOUR_DONE_KEY);
+    dismissFirstRunHint();
+    setFirstRunHintOpen(false);
+    setSearchParams((sp) => {
+      const next = new URLSearchParams(sp);
+      next.set("tour", "1");
+      return next;
+    });
+  };
+
+  // First-run showcase: the seeded demo studies rendered as a tangible,
+  // enticing worked example (completion signals + the decision memo), always
+  // visible — the "wow" that a bare create-CTA screen was missing — plus a
+  // one-click entry into the guided tour.
   const renderExample = () => (
-    <div className="hub-example">
-      <button
-        type="button"
-        className="hub-example__head"
-        aria-expanded={exampleOpen}
-        onClick={() => setExampleOpen((o) => !o)}
-      >
-        <span className="hub-example__label">{t("hub.firstRun.exampleLabel")}</span>
-        <span className="hub-example__toggle">
-          {exampleOpen ? t("hub.firstRun.hide") : t("hub.firstRun.show")}
-        </span>
-      </button>
-      {exampleOpen && (
-        <div className="hub-example__rows">
-          {demoRows.map(({ study: s, mix }) => (
-            <button
-              key={s.id}
-              type="button"
-              className="hub-example__row"
-              onClick={() => openStudy(s)}
-            >
-              <span className="hub-example__row-name">
-                <MixGlyph mix={mix} /> {s.name}
-              </span>
-              <span className="hub-example__row-cue">{t("hub.firstRun.exampleOpen")} →</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <section className="hub-example" data-tour="firstrun-example">
+      <div className="hub-example__intro">
+        <span className="hub-example__label">{t("hub.firstRun.exampleLead")}</span>
+        <button type="button" className="hub-example__tour" onClick={startGuidedTour}>
+          ▶ {t("hub.firstRun.guidedTour")}
+        </button>
+      </div>
+      <div className="hub-example__rows">
+        {demoRows.map(({ study: s, mix }) => (
+          <button
+            key={s.id}
+            type="button"
+            className="hub-example__row"
+            onClick={() => openStudy(s)}
+          >
+            <span className="hub-example__row-name">
+              <MixGlyph mix={mix} /> {s.name}
+            </span>
+            <span className="hub-example__row-meta">
+              {t("hub.firstRun.exampleInterviews", { count: s.completed_interview_count })}
+              {s.has_report
+                ? ` · ${t("hub.firstRun.exampleReportReady")}`
+                : s.has_ready_analysis
+                  ? ` · ${t("hub.firstRun.exampleAnalysisReady")}`
+                  : ""}
+            </span>
+            <span className="hub-example__row-cue">{t("hub.firstRun.exampleOpen")} →</span>
+          </button>
+        ))}
+        {readyMemos.length > 0 && (
+          <button
+            type="button"
+            className="hub-example__row hub-example__row--memo"
+            onClick={() => openMemo(readyMemos[0].id)}
+          >
+            <span className="hub-example__row-name">
+              <span aria-hidden="true">📄 </span>
+              {t("hub.firstRun.exampleMemo")}
+            </span>
+            <span className="hub-example__row-cue">{t("hub.firstRun.exampleOpenReport")} →</span>
+          </button>
+        )}
+      </div>
+    </section>
   );
 
   return (
@@ -846,6 +884,30 @@ export default function StudyList() {
       </div>
 
       {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
+
+      {/* First-run greeter: on the collapsed first-run home (demo-only, tour
+          not running), gently ring the seeded example and offer the guided
+          tour. Its primary STARTS the tour; skip only dismisses the greeter
+          (neither touches the tour-done flag — endOn* are false). */}
+      {firstRun && firstRunHintOpen && demoRows.length > 0 && (
+        <DemoCallout
+          selector='[data-tour="firstrun-example"]'
+          eyebrow={t("hub.firstRun.hintEyebrow")}
+          title={t("hub.firstRun.hintTitle")}
+          body={t("hub.firstRun.hintBody")}
+          clickHint={t("hub.firstRun.hintClickHint")}
+          skipLabel={t("hub.firstRun.hintSkip")}
+          primaryLabel={t("hub.firstRun.hintTakeTour")}
+          onPrimary={startGuidedTour}
+          onSkip={() => {
+            dismissFirstRunHint();
+            setFirstRunHintOpen(false);
+          }}
+          endOnPrimary={false}
+          endOnSkip={false}
+          dock
+        />
+      )}
 
       {/* Demo-tour entry point: rings the demo study row and waits for the
           user's own click — the row's normal navigation carries them into

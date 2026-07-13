@@ -415,7 +415,21 @@
       "exampleLabel": "🎓 Want to see one first? Explore a finished example",
       "show": "Show",
       "hide": "Hide",
-      "exampleOpen": "Open the example"
+      "exampleOpen": "Open the example",
+      "exampleLead": "Not ready to build yours? Here's a complete example to explore — real interviews, AI analysis, and a cross-study decision memo.",
+      "guidedTour": "Guided tour (60s)",
+      "exampleInterviews_one": "{{count}} interview",
+      "exampleInterviews_other": "{{count}} interviews",
+      "exampleAnalysisReady": "analysis ready",
+      "exampleReportReady": "report ready",
+      "exampleMemo": "Cross-study decision memo",
+      "exampleOpenReport": "Open report",
+      "hintEyebrow": "Start here",
+      "hintTitle": "See what a finished study looks like",
+      "hintBody": "We've set up a complete example — real interviews, AI analysis, and a decision memo. Explore it at your own pace, or take a quick guided tour.",
+      "hintClickHint": "This example is ready to explore",
+      "hintTakeTour": "▶ Take the guided tour",
+      "hintSkip": "I'll explore on my own"
     },
     "filters": {
       "all": "All",

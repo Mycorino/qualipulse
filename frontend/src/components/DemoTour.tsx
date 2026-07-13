@@ -61,6 +61,33 @@ export function skipDemoTour() {
   sessionStorage.removeItem(DEMO_TOUR_PHASE_KEY);
 }
 
+export function isDemoTourDone(): boolean {
+  return localStorage.getItem(DEMO_TOUR_DONE_KEY) === "1";
+}
+
+// ── First-run greeter ───────────────────────────────────────────────────
+// The Studies home shows a one-time gentle callout pointing at the seeded
+// example when a demo-only account lands *without* the onboarding tour
+// running. Its dismissal is tracked separately from the tour-done flag so
+// dismissing the greeter never blocks the tour itself (and vice-versa).
+const DEMO_FIRSTRUN_HINT_KEY = "qp_demo_firstrun_hint";
+
+export function firstRunHintDismissed(): boolean {
+  return localStorage.getItem(DEMO_FIRSTRUN_HINT_KEY) === "1";
+}
+
+export function dismissFirstRunHint() {
+  localStorage.setItem(DEMO_FIRSTRUN_HINT_KEY, "1");
+}
+
+/** Replay the guided tour from scratch — clears the done flag so a prior
+ *  run doesn't suppress it, and dismisses the greeter so it won't re-nag. */
+export function restartDemoTour() {
+  localStorage.removeItem(DEMO_TOUR_DONE_KEY);
+  dismissFirstRunHint();
+  armDemoTour();
+}
+
 type TourTab = "overview" | "setup" | "responses" | "analysis";
 
 interface TourStep {
@@ -367,15 +394,29 @@ interface DemoCalloutProps {
   body: string;
   clickHint: string;
   skipLabel: string;
-  /** Called after skipDemoTour() has run — hide any local state. */
+  /** Called after (optionally) skipDemoTour() has run — hide any local state. */
   onSkip: () => void;
   /**
    * Optional in-card primary action. Used by the capstone memo callout so
    * the report opens from the card itself (not only the ringed control).
-   * The handler runs first, then skipDemoTour() + onSkip() end the tour.
    */
   primaryLabel?: string;
   onPrimary?: () => void;
+  /**
+   * Whether clicking primary/skip should also END the tour (skipDemoTour()).
+   * True for tour callouts (skip = abandon, primary = finish). The first-run
+   * greeter sets both false: its primary *starts* the tour and its skip only
+   * dismisses the greeter, so neither should touch the tour-done flag.
+   */
+  endOnPrimary?: boolean;
+  endOnSkip?: boolean;
+  /**
+   * Force the card to the bottom-right corner instead of placing it beside
+   * the ring. Used by the first-run greeter, whose anchor (the whole example
+   * showcase) is tall enough that a beside-placement would cover the primary
+   * "+ New study" CTA.
+   */
+  dock?: boolean;
 }
 
 /**
@@ -396,16 +437,25 @@ export function DemoCallout({
   onSkip,
   primaryLabel,
   onPrimary,
+  endOnPrimary = true,
+  endOnSkip = true,
+  dock = false,
 }: DemoCalloutProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const rect = useAnchorRect(selector);
-  const pos = useCardPos(rect, cardRef, title);
+  const beside = useCardPos(rect, cardRef, title);
+  const pos = dock ? null : beside;
 
   if (!rect) return null;
 
-  const end = () => {
-    skipDemoTour();
+  const handleSkip = () => {
+    if (endOnSkip) skipDemoTour();
     onSkip();
+  };
+  const handlePrimary = () => {
+    onPrimary?.();
+    if (endOnPrimary) skipDemoTour();
+    if (endOnPrimary) onSkip();
   };
 
   return (
@@ -431,7 +481,7 @@ export function DemoCallout({
         <p className="demo-tour__body">{body}</p>
         <p className="demo-tour__click-hint">☝︎ {clickHint}</p>
         <div className="demo-tour__actions">
-          <button type="button" className="demo-tour__skip" onClick={end}>
+          <button type="button" className="demo-tour__skip" onClick={handleSkip}>
             {skipLabel}
           </button>
           {primaryLabel && onPrimary && (
@@ -439,10 +489,7 @@ export function DemoCallout({
               type="button"
               className="btn btn-primary btn-sm"
               data-tour-primary
-              onClick={() => {
-                onPrimary();
-                end();
-              }}
+              onClick={handlePrimary}
             >
               {primaryLabel}
             </button>

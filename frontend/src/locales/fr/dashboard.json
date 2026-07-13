@@ -415,7 +415,21 @@
       "exampleLabel": "🎓 Envie d'en voir une d'abord ? Explorez un exemple terminé",
       "show": "Afficher",
       "hide": "Masquer",
-      "exampleOpen": "Ouvrir l'exemple"
+      "exampleOpen": "Ouvrir l'exemple",
+      "exampleLead": "Pas prêt à créer la vôtre ? Voici un exemple complet à explorer — de vrais entretiens, une analyse IA et un mémo de décision inter-études.",
+      "guidedTour": "Visite guidée (60 s)",
+      "exampleInterviews_one": "{{count}} entretien",
+      "exampleInterviews_other": "{{count}} entretiens",
+      "exampleAnalysisReady": "analyse prête",
+      "exampleReportReady": "rapport prêt",
+      "exampleMemo": "Mémo de décision inter-études",
+      "exampleOpenReport": "Ouvrir le rapport",
+      "hintEyebrow": "Commencez ici",
+      "hintTitle": "Voyez à quoi ressemble une étude terminée",
+      "hintBody": "Nous avons préparé un exemple complet — de vrais entretiens, une analyse IA et un mémo de décision. Explorez-le à votre rythme, ou suivez une courte visite guidée.",
+      "hintClickHint": "Cet exemple est prêt à être exploré",
+      "hintTakeTour": "▶ Suivre la visite guidée",
+      "hintSkip": "J'explore par moi-même"
     },
     "filters": {
       "all": "Toutes",

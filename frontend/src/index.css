@@ -14115,10 +14115,33 @@ select.field-input {
   text-align: left;
   font: inherit;
 }
+.hub-example__intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  flex-wrap: wrap;
+}
 .hub-example__label {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--text-secondary);
+  max-width: 46ch;
+  line-height: 1.45;
+}
+.hub-example__tour {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--brand-600, var(--text-tertiary));
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 4px 0;
+}
+.hub-example__tour:hover {
+  text-decoration: underline;
 }
 .hub-example__toggle {
   font-size: var(--text-sm);
@@ -14154,6 +14177,19 @@ select.field-input {
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
+  flex: 1;
+  min-width: 0;
+}
+.hub-example__row-meta {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.hub-example__row--memo .hub-example__row-name {
+  color: var(--brand-700, var(--text-primary));
+  font-weight: var(--weight-medium);
 }
 .hub-example__row-cue {
   font-size: var(--text-xs);
