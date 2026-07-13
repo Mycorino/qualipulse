@@ -82,6 +82,16 @@ def opus() -> str:
     return _resolved()["opus"]
 
 
+def analysis() -> str:
+    """Interview-analysis synthesis (Opus 4.8 + adaptive thinking).
+
+    Defaults to the Opus pin so the judgment-heavy synthesis path runs on the
+    strongest model; ``MODEL_ANALYSIS`` overrides it (e.g. flip back to a Sonnet
+    id to trade quality for cost) without affecting the Copilot's ``opus()``.
+    """
+    return settings.MODEL_ANALYSIS or opus()
+
+
 def haiku() -> str:
     """Lightweight tasks — onboarding personalisation, name lookup, etc."""
     return _resolved()["haiku"]

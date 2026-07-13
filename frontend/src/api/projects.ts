@@ -240,12 +240,33 @@ export interface AnalysisTension {
   tension: string;
   detail: string;
 }
+// Recommendations were upgraded from plain strings to objects (action + owner +
+// horizon + impact + effort + kpi + falsifier). Both shapes coexist: analyses
+// generated before the upgrade stay strings. Always read them through
+// `recommendationText()` so old and new data render safely.
+export interface AnalysisRecommendation {
+  action: string;
+  rationale?: string;
+  owner_role?: string;
+  horizon?: string;
+  impact?: string;
+  effort?: string;
+  kpi?: string;
+  falsifier?: string;
+}
+export type Recommendation = string | AnalysisRecommendation;
+
+/** Display headline for a recommendation of either shape. */
+export function recommendationText(r: Recommendation): string {
+  return typeof r === "string" ? r : r?.action ?? "";
+}
+
 export interface AnalysisReport {
   summary: string;
   themes: AnalysisTheme[];
   jobs_to_be_done: AnalysisJTBD[];
   tensions: AnalysisTension[];
-  recommendations: string[];
+  recommendations: Recommendation[];
   confidence: string;
   confidence_rationale?: string;
   participant_count: number;
