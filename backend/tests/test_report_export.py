@@ -233,3 +233,146 @@ def test_report_export_requires_auth(client, project_with_analysis):
     project, _ = project_with_analysis
     resp = client.get(f"/projects/{project.id}/analysis/report.html")
     assert resp.status_code in (401, 403)
+
+
+# ── Object recommendations + personas + journey (report v2 fields) ──────────
+
+def _make_rich_report():
+    """A report exercising object recommendations, personas and a journey."""
+    rep = _make_report()
+    rep["recommendations"] = [
+        {
+            "action": "Ship a proactive delay notification.",
+            "rationale": "P1 and P2 lose trust on silent delays.",
+            "owner_role": "Product", "horizon": "30d",
+            "impact": "high", "effort": "low",
+            "kpi": "Notification open rate above 40%.",
+            "falsifier": "Open rates stay under 10%.",
+        },
+        {
+            "action": "Redesign the tracking page.",
+            "rationale": "Confusion at the tracking step.",
+            "owner_role": "Design", "horizon": "60_90d",
+            "impact": "high", "effort": "high",
+            "kpi": "Support tickets about tracking fall.",
+            "falsifier": "Tickets unchanged after launch.",
+        },
+        "Legacy string recommendation stays valid.",
+    ]
+    rep["personas"] = [
+        {
+            "name": "The Anxious Reorderer", "grounded_in": ["P1", "P2"],
+            "segment": "Frequent online shoppers",
+            "one_liner": "Checks tracking obsessively until the parcel lands.",
+            "goals": ["Stop worrying about delivery"],
+            "frustrations": ["Silent delays"],
+            "behaviours": ["Refreshes the tracking page"],
+            "primary_job": "Know where my order is.",
+            "anchor_quote": {
+                "text": "I always check the tracking page twice a day",
+                "participant_identifier": "P1", "verified": True,
+            },
+        }
+    ]
+    rep["journey"] = {
+        "applicable": True, "label": "Reordering online", "stages": [
+            {"name": "Order", "goal": "Place the order", "emotion": 1,
+             "quote": {"text": "I always check the tracking page twice a day",
+                       "participant_identifier": "P1", "verified": True},
+             "pain": "", "opportunity": "Set expectations early"},
+            {"name": "Wait", "goal": "Track the parcel", "emotion": -2,
+             "quote": {"text": "If the package is late and nobody tells me, I'm done.",
+                       "participant_identifier": "P2", "verified": True},
+             "pain": "Silence on delays", "opportunity": "Proactive comms"},
+            {"name": "Receive", "goal": "Get the parcel", "emotion": 2,
+             "quote": {"text": "", "participant_identifier": ""}, "pain": "", "opportunity": ""},
+        ]
+    }
+    return rep
+
+
+def test_report_export_object_recommendations(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    analysis.report = json.dumps(_make_rich_report())
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+
+    # Rich fields rendered
+    assert "Ship a proactive delay notification." in body
+    assert "Owner" in body and "Product" in body
+    assert "Success metric" in body and "Would be wrong if" in body
+    # Legacy string recommendation still renders (dual-shape, no crash)
+    assert "Legacy string recommendation stays valid." in body
+    # Priority matrix + quadrants
+    assert "Priority matrix" in body
+    assert "Quick wins" in body and "Big bets" in body
+    # 30-60-90 plan bucketed by horizon
+    assert "Activation plan" in body and "30 days" in body
+
+
+def test_report_export_personas(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    analysis.report = json.dumps(_make_rich_report())
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+
+    assert "Personas" in body
+    assert "The Anxious Reorderer" in body
+    assert "Built from" in body and "persona__pill" in body
+    assert "Stop worrying about delivery" in body
+
+
+def test_report_export_journey(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    analysis.report = json.dumps(_make_rich_report())
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+
+    assert "Experience journey" in body
+    assert "Reordering online" in body
+    assert "<polyline" in body  # the emotion arc SVG
+    assert "journey__table" in body
+    assert "Silence on delays" in body
+
+
+def test_report_export_journey_omitted_when_not_applicable(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    rep = _make_rich_report()
+    rep["journey"] = {"applicable": False, "stages": []}
+    analysis.report = json.dumps(rep)
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+    assert "Experience journey" not in body
+
+
+def test_report_export_personas_omitted_when_empty(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    rep = _make_rich_report()
+    rep["personas"] = []
+    analysis.report = json.dumps(rep)
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+    assert "The Anxious Reorderer" not in body
+    assert "Built from" not in body  # persona-card label, only present when a card renders
+
+
+def test_report_export_unverified_persona_quote_flagged(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    rep = _make_rich_report()
+    rep["personas"][0]["anchor_quote"]["verified"] = False
+    analysis.report = json.dumps(rep)
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+    assert "verify before citing" in body
+
+
+def test_report_export_new_sections_french(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    project.company.preferred_language = "fr"
+    analysis.report = json.dumps(_make_rich_report())
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+    assert "Matrice de priorisation" in body and "Gains rapides" in body
+    assert "Parcours d'expérience" in body
+    assert "Plan d'activation" in body
+    assert "Responsable" in body  # reco owner label localised

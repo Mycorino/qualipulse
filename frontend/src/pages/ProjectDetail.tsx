@@ -56,7 +56,7 @@ import {
   AttributedQuote,
   ScreeningQuestionCreate,
 } from "../api/projects";
-import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, regenerateScreeningTranslations, type PaywallDetail } from "../api/projects";
+import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, regenerateScreeningTranslations, recommendationText, type PaywallDetail } from "../api/projects";
 import ScreeningTranslationsEditor from "../components/ScreeningTranslationsEditor";
 import BrandingSettings from "../components/BrandingSettings";
 import DemoTour, { getDemoTourPhase, isDemoTourArmed } from "../components/DemoTour";
@@ -562,7 +562,7 @@ export default function ProjectDetail() {
     }
     if (r.recommendations?.length) {
       lines.push("\n## Recommendations");
-      r.recommendations.forEach((rec) => lines.push(`- ${rec}`));
+      r.recommendations.forEach((rec) => lines.push(`- ${recommendationText(rec)}`));
     }
     return lines.join("\n");
   }
@@ -3487,7 +3487,7 @@ export default function ProjectDetail() {
                           <div className="analysis-block">
                             <h3>{tAnalysis("topRecommendations")}</h3>
                             <ol className="analysis-recommendations">
-                              {r.recommendations.slice(0, 3).map((rec, i) => <li key={i}>{rec}</li>)}
+                              {r.recommendations.slice(0, 3).map((rec, i) => <li key={i}>{recommendationText(rec)}</li>)}
                             </ol>
                             {r.recommendations.length > 3 && (
                               <button
@@ -3683,7 +3683,7 @@ export default function ProjectDetail() {
                       <div className="analysis-block" id="analysis-recommendations">
                         <h3>{tAnalysis("recommendations")}</h3>
                         <ol className="analysis-recommendations">
-                          {r.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
+                          {r.recommendations.map((rec, i) => <li key={i}>{recommendationText(rec)}</li>)}
                         </ol>
                       </div>
                     )}

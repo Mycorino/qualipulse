@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     MODEL_SONNET: str = ""
     MODEL_OPUS: str = ""
     MODEL_HAIKU: str = ""
+    # Interview-analysis synthesis model. Blank => the Opus pin (see
+    # ai_models.analysis()). Set to a Sonnet id to dial the analysis path back
+    # to cheaper synthesis without touching the Copilot's Opus usage.
+    MODEL_ANALYSIS: str = ""
     # When true, resolve the newest available model per family from the Models
     # API at startup (falls back to the pinned/env value on any error). Off by
     # default: a brand-new model can change the request surface (e.g. dropped

@@ -39,7 +39,9 @@ Banned phrasing (REJECT before output):
 - Themes built on a single quote
 - Recommendations that read like motherhood statements ("improve onboarding")
 
-Output: ONE valid JSON object. No markdown fences. No preamble. No trailing commentary."""
+Output: your visible answer is ONE valid JSON object and nothing else — no markdown fences, \
+no preamble, no trailing commentary. All reasoning and self-critique belong in your thinking, \
+never in the visible answer."""
 
 
 def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict[str, dict]]:
@@ -133,26 +135,54 @@ def _verify_report_quotes(report: dict, participants: list[Participant]) -> tupl
         all_text_parts.append(norm)
     all_text = " ".join(all_text_parts)
 
+    def _check(quote: dict) -> bool:
+        """Set ``quote['verified']`` from a substring match and return it."""
+        needle = _normalize_for_match(quote.get("text") or "")
+        if not needle:
+            quote["verified"] = False
+            return False
+        ident = quote.get("participant_identifier")
+        haystack = by_identifier.get(ident, "") if ident else ""
+        ok = (needle in haystack) or (needle in all_text)
+        quote["verified"] = ok
+        return ok
+
+    if not isinstance(report, dict):
+        return 0, 0
+
     verified = 0
     total = 0
-    themes = report.get("themes") if isinstance(report, dict) else None
-    for theme in themes or []:
+    # Theme quotes (list of quote objects per theme).
+    for theme in report.get("themes") or []:
         if not isinstance(theme, dict):
             continue
         for quote in theme.get("quotes") or []:
             if not isinstance(quote, dict):
                 continue
             total += 1
-            needle = _normalize_for_match(quote.get("text") or "")
-            if not needle:
-                quote["verified"] = False
-                continue
-            ident = quote.get("participant_identifier")
-            haystack = by_identifier.get(ident, "") if ident else ""
-            ok = (needle in haystack) or (needle in all_text)
-            quote["verified"] = ok
-            if ok:
+            if _check(quote):
                 verified += 1
+    # Persona anchor quotes (one per persona) — the persona exhibit must honour
+    # the same traceability guarantee as themes, or it's decoration.
+    for persona in report.get("personas") or []:
+        if not isinstance(persona, dict):
+            continue
+        aq = persona.get("anchor_quote")
+        if isinstance(aq, dict):
+            total += 1
+            if _check(aq):
+                verified += 1
+    # Journey stage quotes (one per stage).
+    journey = report.get("journey")
+    if isinstance(journey, dict):
+        for stage in journey.get("stages") or []:
+            if not isinstance(stage, dict):
+                continue
+            q = stage.get("quote")
+            if isinstance(q, dict):
+                total += 1
+                if _check(q):
+                    verified += 1
     return verified, total
 
 
@@ -195,10 +225,21 @@ not a feature gap. Frame as "X says/does this, BUT also Y" with both halves \
 grounded in transcript evidence.
 
 RECOMMENDATION RULES:
-- Each recommendation must (a) point at a specific decision, (b) name the \
-behaviour or theme it addresses, and (c) include a falsifier — what would \
-prove it wrong (e.g. "If 3+ further interviews show users do X anyway, drop this").
-- No motherhood statements. No "consider", "explore", "leverage".
+- Each recommendation is an OBJECT, not a sentence. Fields: action, rationale, \
+owner_role, horizon, impact, effort, kpi, falsifier.
+- action is imperative and specific — no "consider", "explore", "leverage", no \
+motherhood statements. rationale names the behaviour/theme it addresses.
+- owner_role is the responsible FUNCTION (Product / Growth / Marketing / CX / \
+Research / Ops), never a person and never a participant.
+- horizon is one of: "now" (do this week) / "30d" (next sprint) / "60_90d" \
+(this quarter) / "later" (needs more evidence first).
+- impact and effort are each one of "low" / "medium" / "high". impact = expected \
+effect on the study's decision; effort = build/operational cost. Be honest — not \
+everything is high-impact / low-effort.
+- kpi is one observable metric or threshold that tells you it worked.
+- falsifier states what evidence would prove the recommendation wrong.
+- Calibrate to N: at low N, prefer "60_90d"/"later" + a "validate first" framing \
+over "now".
 
 DATA QUALITY:
 - If a participant's transcript is thin (quality: low/fair, or many one-word \
@@ -206,6 +247,27 @@ answers), DO NOT use them as a primary source for a theme. You may still cite \
 them, but flag the thinness.
 - If the sample is too small or too thin to support themes, return fewer themes \
 (or zero) and explain in confidence_rationale rather than padding.
+
+PERSONA RULES:
+- Produce personas ONLY when the sample supports distinct archetypes. Each persona \
+must be grounded_in ≥2 named participants (e.g. ["P1","P4"]). If N<4 or participants \
+do not cluster, return "personas": []. An honest empty array beats an invented persona.
+- name is an archetype label (≤4 words), never a real or fabricated person's name.
+- Every field must trace to what grounded_in participants actually said. Do not \
+import stock-persona clichés the transcripts don't support.
+- anchor_quote.text must be a verbatim substring of that participant's transcript.
+- Do not claim a participant for a persona whose profile they contradict.
+
+JOURNEY RULES:
+- Only build a journey when the interviews describe an experience that unfolds over \
+time (a process with stages). For attitudinal/opinion studies with no temporal arc, \
+set "applicable": false and "stages": []. Do not force a journey.
+- 4-6 stages. Derive stages from the experience participants describe, NOT from the \
+interview guide's section order.
+- emotion is an integer from -2 (frustrated) to +2 (delighted), grounded in tone/words. \
+quote.text must be a verbatim substring of that participant's transcript and should \
+justify the emotion score.
+- pain/opportunity may be empty strings for smooth stages. Do not manufacture friction.
 </rules>"""
 
 _ANALYSIS_SCHEMA_BLOCK = """\
@@ -244,8 +306,50 @@ Return ONE JSON object with this exact shape:
     }
   ],
   "recommendations": [
-    "Specific decision-oriented recommendation. Include a falsifier ('would be wrong if …')."
+    {
+      "action": "Imperative, specific next move. No 'consider/explore/leverage'.",
+      "rationale": "One line: which theme/behaviour it addresses and why now.",
+      "owner_role": "Responsible function — Product | Growth | Marketing | CX | Research | Ops.",
+      "horizon": "now | 30d | 60_90d | later",
+      "impact": "low | medium | high",
+      "effort": "low | medium | high",
+      "kpi": "The single observable metric or threshold that shows it worked.",
+      "falsifier": "What evidence would prove this recommendation wrong."
+    }
   ],
+  "personas": [
+    {
+      "name": "Evocative archetype label, ≤4 words (e.g. 'The Reluctant Switcher'). Not a real name.",
+      "grounded_in": ["P1", "P4"],
+      "one_liner": "One sentence: who they are in this study's context.",
+      "segment": "Demographic/behavioural cluster (e.g. 'Designers, <2y tenure'), or empty string if cross-cutting.",
+      "goals": ["What they are trying to achieve (user outcome, not company metric)."],
+      "frustrations": ["Concrete pains grounded in what these participants said."],
+      "behaviours": ["Observable behaviours/workarounds they described."],
+      "primary_job": "The dominant JTBD for this persona.",
+      "anchor_quote": {
+        "text": "verbatim quote that best captures this persona",
+        "participant_identifier": "P1"
+      }
+    }
+  ],
+  "journey": {
+    "applicable": true,
+    "label": "Short name for the journey (e.g. 'Switching grocery providers').",
+    "stages": [
+      {
+        "name": "Stage label, ≤4 words.",
+        "goal": "What the participant is trying to do at this stage.",
+        "emotion": 0,
+        "quote": {
+          "text": "verbatim quote anchoring this stage's emotional reality",
+          "participant_identifier": "P3"
+        },
+        "pain": "The dominant friction here, or empty string.",
+        "opportunity": "The improvement this friction implies, or empty string."
+      }
+    ]
+  },
   "confidence": "low | medium | high",
   "confidence_rationale": "1-2 sentences. State N, response depth, sample diversity, and any quality concerns.",
   "participant_count": <integer>
@@ -271,12 +375,231 @@ REJECT (theme — single quote, vague frequency, no participant naming):
 Why rejected: marketing-speak title, single fuzzy quote with no attribution, no disconfirming evidence, "many" without naming.
 
 ACCEPT (recommendation):
-"Move the price-justification copy above the fold on the PDP — three of six participants (P1, P4, P6) bounced when they had to scroll to find it. Falsifier: a follow-up study where 2+ participants ignore the moved copy and still bounce."
+{
+  "action": "Move the price-justification copy above the fold on the product page.",
+  "rationale": "Three of six participants (P1, P4, P6) bounced when they had to scroll to find it.",
+  "owner_role": "Product",
+  "horizon": "30d",
+  "impact": "high",
+  "effort": "low",
+  "kpi": "Add-to-cart rate on the PDP rises; scroll-past-price rate falls.",
+  "falsifier": "A follow-up study where 2+ participants ignore the moved copy and still bounce."
+}
 
 REJECT (recommendation):
-"Improve the onboarding experience to drive engagement."
-Why rejected: motherhood statement, no decision, no falsifier, banned vocabulary.
+{"action": "Improve the onboarding experience to drive engagement."}
+Why rejected: motherhood statement, banned vocabulary, no rationale/owner/horizon/kpi/falsifier.
+
+ACCEPT (persona):
+{
+  "name": "The Reluctant Switcher",
+  "grounded_in": ["P1", "P4"],
+  "one_liner": "Long-time incumbent user who only moved after a concrete failure, not marketing.",
+  "goals": ["Avoid disruption to a working routine"],
+  "frustrations": ["Migration effort", "Fear of losing history"],
+  "anchor_quote": {"text": "I only left because it lost my data twice.", "participant_identifier": "P1"}
+}
+
+REJECT (persona):
+{"name": "Tech-Savvy Millennial", "grounded_in": ["P2"]}
+Why rejected: single participant, stock cliché not grounded in transcripts, no anchor quote.
+
+ACCEPT (journey — experiential study):
+{"applicable": true, "label": "Switching providers",
+ "stages": [{"name": "Trigger", "goal": "Decide something must change", "emotion": -2,
+   "quote": {"text": "it lost my data twice", "participant_identifier": "P1"},
+   "pain": "Loss of trust", "opportunity": "Proactive incident comms"}]}
+
+REJECT (journey — attitudinal study forced into stages):
+{"applicable": true, "stages": [{"name": "Opinion", "goal": "Have a view on the brand", "emotion": 0}]}
+Why rejected: no temporal process in the data — should be {"applicable": false, "stages": []}.
 </examples>"""
+
+
+def _lang_instruction(lang: str) -> str:
+    """Force the output language for every model-authored text field.
+
+    Verbatim quotes and canonical enum tokens (horizon/impact/effort/emotion/
+    applicable) are exempt. Shared by the v1 and refined runs so the field list
+    stays in one place as the schema grows.
+    """
+    if lang == "en":
+        return ""
+    target = "French" if lang == "fr" else "English"
+    return (
+        f"\n\nIMPORTANT — OUTPUT LANGUAGE: Write ALL text fields (summary, theme titles, "
+        f"theme summaries, JTBD jobs/insights, tension labels/details, recommendation "
+        f"action/rationale/owner_role/kpi/falsifier, persona name/one_liner/segment/goals/"
+        f"frustrations/behaviours/primary_job, journey label and stage name/goal/pain/opportunity, "
+        f"confidence_rationale) in {target}. Keep enum tokens (horizon, impact, effort, emotion, "
+        f"applicable) exactly as specified. Verbatim quotes must stay in the original transcript "
+        f"language — never translate quotes."
+    )
+
+
+# ── Structured-output schema (mirrors _ANALYSIS_SCHEMA_BLOCK) ────────────────
+# Opus 4.8 structured outputs constrain the response to this exact shape, so the
+# report is always a valid object — no markdown-fence stripping, no parse-failure
+# branch. Only constructs structured outputs supports are used (objects with
+# additionalProperties:false + required, arrays, enums, string/integer/boolean).
+# NB: `verified` is intentionally ABSENT — the quote verifier adds it post-gen.
+def _sobj(props: dict) -> dict:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": props,
+        "required": list(props.keys()),
+    }
+
+
+_S_STR = {"type": "string"}
+_S_INT = {"type": "integer"}
+_S_BOOL = {"type": "boolean"}
+_S_STR_ARR = {"type": "array", "items": {"type": "string"}}
+_S_FREQ = {"type": "string", "enum": ["all", "most", "some", "few"]}
+_S_LEVEL = {"type": "string", "enum": ["low", "medium", "high"]}
+_S_QUOTE = _sobj({
+    "text": _S_STR,
+    "participant_identifier": _S_STR,
+    "participant_display_name": _S_STR,
+    "turn_index": _S_INT,
+    "question_text": _S_STR,
+})
+_S_ANCHOR = _sobj({"text": _S_STR, "participant_identifier": _S_STR})
+
+_REPORT_SCHEMA = _sobj({
+    "summary": _S_STR,
+    "themes": {"type": "array", "items": _sobj({
+        "title": _S_STR,
+        "summary": _S_STR,
+        "quotes": {"type": "array", "items": _S_QUOTE},
+        "frequency": _S_FREQ,
+        "disconfirming_evidence": _S_STR,
+    })},
+    "jobs_to_be_done": {"type": "array", "items": _sobj({
+        "job": _S_STR, "insight": _S_STR, "frequency": _S_FREQ,
+    })},
+    "tensions": {"type": "array", "items": _sobj({
+        "tension": _S_STR, "detail": _S_STR,
+    })},
+    "recommendations": {"type": "array", "items": _sobj({
+        "action": _S_STR,
+        "rationale": _S_STR,
+        "owner_role": _S_STR,
+        "horizon": {"type": "string", "enum": ["now", "30d", "60_90d", "later"]},
+        "impact": _S_LEVEL,
+        "effort": _S_LEVEL,
+        "kpi": _S_STR,
+        "falsifier": _S_STR,
+    })},
+    "personas": {"type": "array", "items": _sobj({
+        "name": _S_STR,
+        "grounded_in": _S_STR_ARR,
+        "one_liner": _S_STR,
+        "segment": _S_STR,
+        "goals": _S_STR_ARR,
+        "frustrations": _S_STR_ARR,
+        "behaviours": _S_STR_ARR,
+        "primary_job": _S_STR,
+        "anchor_quote": _S_ANCHOR,
+    })},
+    "journey": _sobj({
+        "applicable": _S_BOOL,
+        "label": _S_STR,
+        "stages": {"type": "array", "items": _sobj({
+            "name": _S_STR,
+            "goal": _S_STR,
+            "emotion": _S_INT,
+            "quote": _S_ANCHOR,
+            "pain": _S_STR,
+            "opportunity": _S_STR,
+        })},
+    }),
+    "confidence": _S_LEVEL,
+    "confidence_rationale": _S_STR,
+    "participant_count": _S_INT,
+})
+
+# Streamed so Opus's longer, thinking-augmented turns don't trip the non-stream
+# HTTP-timeout guard, and so max_tokens can stay high without truncating the
+# rich report (thinking tokens share the output budget).
+_ANALYSIS_MAX_TOKENS = 28000
+
+
+def _is_output_format_error(exc: Exception) -> bool:
+    """True when a request failed because the server rejected output_config /
+    the json_schema — so we can retry once without structured output rather than
+    fail the whole analysis on a schema issue."""
+    status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+    msg = str(exc).lower()
+    hit = any(k in msg for k in ("output_config", "json_schema", "schema", "format"))
+    return hit and (status in (400, None))
+
+
+def _synthesize_response(prompt: str, effort: str = "high"):
+    """Run one Opus 4.8 synthesis turn — adaptive thinking + effort + structured
+    output, streamed — and return the final Message.
+
+    Structured output is best-effort: if the server rejects the schema we retry
+    once without it (thinking + effort + streaming stay on), so a schema issue
+    can never take the analysis path down — the model still returns the same JSON
+    shape from the prompt contract. Temperature is dropped automatically on Opus
+    via ``temperature_kwargs``.
+    """
+    client = get_anthropic_client()
+    model = ai_models.analysis()
+    base = dict(
+        model=model,
+        max_tokens=_ANALYSIS_MAX_TOKENS,
+        thinking={"type": "adaptive"},
+        system=ANALYSIS_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": prompt}],
+        **ai_models.temperature_kwargs(model, 0.3),
+    )
+    for use_schema in (True, False):
+        output_config = {"effort": effort}
+        if use_schema:
+            output_config["format"] = {"type": "json_schema", "schema": _REPORT_SCHEMA}
+        try:
+            with client.messages.stream(output_config=output_config, **base) as stream:
+                return stream.get_final_message()
+        except Exception as exc:  # noqa: BLE001
+            if use_schema and _is_output_format_error(exc):
+                logger.warning("structured output rejected; retrying without schema: %s", exc)
+                continue
+            raise
+
+
+def _raise_on_bad_stop(response) -> None:
+    """Turn a truncated or refused synthesis into a clear failure message."""
+    stop = getattr(response, "stop_reason", None)
+    if stop == "max_tokens":
+        raise ValueError(
+            "Analysis output was truncated (hit max_tokens). Try filtering to "
+            "a segment or fewer participants."
+        )
+    if stop == "refusal":
+        raise ValueError(
+            "The model declined to analyse this material. This is unusual for "
+            "research transcripts — contact support if it persists."
+        )
+
+
+def _parse_report(response) -> dict:
+    """Extract the report JSON from a (possibly thinking-augmented) response.
+
+    Selects the text block explicitly — with adaptive thinking on, a thinking
+    block precedes it, so ``content[0]`` is not the answer. Fence-stripping is a
+    belt-and-suspenders fallback for the no-structured-output retry path.
+    """
+    raw = next(
+        (b.text for b in response.content if getattr(b, "type", None) == "text"),
+        "",
+    ).strip()
+    if raw.startswith("```"):
+        lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
+        raw = "\n".join(lines).strip()
+    return json.loads(raw)
 
 
 def _filter_participants(
@@ -364,12 +687,7 @@ def run_analysis(
             filter_note = f"NOTE: This analysis covers only participants filtered by {filter_by} = {', '.join(filter_values)}.\n\n"
 
         lang = getattr(company, "preferred_language", None) or "en"
-        lang_instruction = (
-            f"\n\nIMPORTANT — OUTPUT LANGUAGE: Write ALL text fields (summary, theme titles, "
-            f"theme summaries, JTBD jobs/insights, tension labels/details, recommendations, "
-            f"confidence_rationale) in {'French' if lang == 'fr' else 'English'}. "
-            f"Verbatim quotes must stay in the original transcript language — never translate quotes."
-        ) if lang != "en" else ""
+        lang_instruction = _lang_instruction(lang)
 
         # Static blocks first (rules + schema + examples) → cached prefix.
         # Dynamic blocks last (context, objective, filters, transcripts).
@@ -384,39 +702,14 @@ def run_analysis(
             f"Return the JSON object now. participant_count must be {len(completed)}."
         )
 
-        client = get_anthropic_client()
-        response = client.messages.create(
-            model=ai_models.sonnet(),
-            # 8192: a full report (6-8 themes × attributed quotes + JTBDs +
-            # tensions + recommendations) can exceed 4096 output tokens, which
-            # truncated the JSON mid-object and marked the analysis "failed" with
-            # a cryptic parse error — worst on the data-richest studies.
-            max_tokens=8192,
-            # 0.3: synthesis requires judgment but not creativity. Lower
-            # temperature reduces hallucinated quotes and inflated frequency
-            # claims — the dominant failure mode of analysis at small N.
-            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
-            system=ANALYSIS_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
+        response = _synthesize_response(prompt, effort="high")
         log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
+        _raise_on_bad_stop(response)
 
-        if getattr(response, "stop_reason", None) == "max_tokens":
-            raise ValueError(
-                "Analysis output was truncated (hit max_tokens). Try filtering to "
-                "a segment or fewer participants."
-            )
-
-        raw = response.content[0].text.strip()
-        # Strip markdown fences if present
-        if raw.startswith("```"):
-            lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
-            raw = "\n".join(lines).strip()
-
-        # Parse, then verify every quote against the real transcripts so
-        # hallucinated evidence is flagged (verified=false) rather than trusted.
-        report_obj = json.loads(raw)
+        # Parse (structured output guarantees a valid object), then verify every
+        # quote against the real transcripts so hallucinated evidence is flagged
+        # (verified=false) rather than trusted.
+        report_obj = _parse_report(response)
         v_count, v_total = _verify_report_quotes(report_obj, completed)
         if v_total:
             logger.info(
@@ -570,12 +863,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         transcripts_block, _ = _build_transcripts_block(all_completed)
 
         lang = getattr(company, "preferred_language", None) or "en"
-        lang_instruction = (
-            f"\n\nIMPORTANT — OUTPUT LANGUAGE: Write ALL text fields (summary, theme titles, "
-            f"theme summaries, JTBD jobs/insights, tension labels/details, recommendations, "
-            f"confidence_rationale) in {'French' if lang == 'fr' else 'English'}. "
-            f"Verbatim quotes must stay in the original transcript language — never translate quotes."
-        ) if lang != "en" else ""
+        lang_instruction = _lang_instruction(lang)
 
         prompt = (
             f"{_ANALYSIS_RULES_BLOCK}\n\n"
@@ -593,39 +881,21 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
             f"now support them. Otherwise drop.\n"
             f"In the `summary` field, add one sentence noting this is a researcher-refined synthesis.\n"
             f"All other rules (calibration to N={len(all_completed)}, ≥2 distinct participants per theme, "
-            f"named participants in frequency, disconfirming evidence, falsifiable recommendations) "
-            f"still apply without exception.{lang_instruction}\n</task>\n\n"
+            f"named participants in frequency, disconfirming evidence, object-shaped falsifiable "
+            f"recommendations, personas grounded in ≥2 named participants, journey only when the "
+            f"experience is temporal) still apply without exception.{lang_instruction}\n</task>\n\n"
             f"{context_block}{objective_block}{annotations_block}\n"
             f"<transcripts count=\"{len(all_completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
             f"Return the JSON object now. participant_count must be {len(all_completed)}."
         )
 
-        client = get_anthropic_client()
-        response = client.messages.create(
-            model=ai_models.sonnet(),
-            max_tokens=8192,  # avoid truncating data-rich reports (see run_analysis)
-            # 0.3: synthesis requires judgment but not creativity. Lower
-            # temperature reduces hallucinated quotes and inflated frequency
-            # claims — the dominant failure mode of analysis at small N.
-            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
-            system=ANALYSIS_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
+        # Refined synthesis is the researcher's high-stakes pass (they've reviewed
+        # v1 and annotated) → run it at xhigh effort.
+        response = _synthesize_response(prompt, effort="xhigh")
         log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
+        _raise_on_bad_stop(response)
 
-        if getattr(response, "stop_reason", None) == "max_tokens":
-            raise ValueError(
-                "Refined analysis output was truncated (hit max_tokens). Try "
-                "filtering to a segment or fewer participants."
-            )
-
-        raw = response.content[0].text.strip()
-        if raw.startswith("```"):
-            lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
-            raw = "\n".join(lines).strip()
-
-        report_obj = json.loads(raw)
+        report_obj = _parse_report(response)
         v_count, v_total = _verify_report_quotes(report_obj, all_completed)
         if v_total:
             logger.info(

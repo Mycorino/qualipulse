@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useHead } from "../hooks/useHead";
 import type { AnalysisReport, AttributedQuote } from "../api/projects";
+import { recommendationText } from "../api/projects";
 import { Skeleton } from "../components/Skeleton";
 
 interface SharedReportData {
@@ -218,7 +219,7 @@ export default function SharedReport() {
             <h2 className="shared-report-section-title">{t("sharedReport.recommendations")}</h2>
             <ol style={{ paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8 }}>
               {report.recommendations.map((r, i) => (
-                <li key={i} style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>{r}</li>
+                <li key={i} style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>{recommendationText(r)}</li>
               ))}
             </ol>
           </section>
