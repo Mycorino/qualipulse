@@ -92,6 +92,7 @@
   "handoff_title": "Your workspace is set up.",
   "handoff_sub": "We placed a worked example inside — two demo studies with real transcripts and a cross-study decision memo — so you can see the full arc before running your own.",
   "handoff_note": "The example takes a few seconds to finish preparing — it may still be settling when you arrive.",
+  "handoff_preparing": "Finalizing your demo studies — preparing everything for you…",
   "handoff_memo_kicker": "Decision memo",
   "handoff_memo_title": "A worked example, ready to open",
   "handoff_cta": "Open your workspace →"
