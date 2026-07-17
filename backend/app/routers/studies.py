@@ -502,21 +502,22 @@ def create_analysis(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> StudyAnalysisDetail:
-    """Trigger generation of a new study analysis.
+    """Trigger generation of a new **Decision report** (the canonical study report).
 
-    v1 is synchronous: ~10-20s with the input budget we use.
+    Synchronous (~10-20s). Produces the composed superset (approach B): it reuses
+    the interview ProjectAnalysis for the qualitative dimension (themes / personas
+    / journey / activated recs) and layers the survey signal + an integration
+    (verdict / joint display / gaps) on top — stored as schema:"decision_v1" and
+    served by report.html via the dual-path renderer.
 
-    The **Decision report** (approach B — the superset that reuses the interview
-    ProjectAnalysis and layers survey + integration on top, schema:"decision_v1")
-    is fully wired: `trigger_decision_analysis` generates it and report.html
-    serves it via the dual-path renderer. To make it the canonical study report,
-    swap the call below to ``trigger_decision_analysis`` (and update the
-    Quantified-Themes assertions in test_study_report_export). Kept on the legacy
-    generator by default until that switch is made deliberately.
+    The JSON response's `report` is null for this shape (it is not a
+    Quantified-Themes payload); the document is fetched from report.html. The
+    legacy `trigger_study_analysis` generator + Quantified-Themes renderer remain
+    for previously-stored reports.
     """
 
     study = _get_study_or_404(db, study_id, company)
-    analysis = trigger_study_analysis(db, study)
+    analysis = trigger_decision_analysis(db, study)
     return _analysis_to_detail(analysis)
 
 

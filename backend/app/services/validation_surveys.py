@@ -69,6 +69,14 @@ def generate_validation_survey(
         raise ValueError(f"Analysis report is not valid JSON: {exc}") from exc
 
     themes = report.get("themes", []) or []
+    if not themes and report.get("schema") == "decision_v1":
+        # Decision report: the themes live in the joint display, each keyed to a
+        # qualitative theme title. Validate those.
+        themes = [
+            {"title": x.get("theme_title", "")}
+            for x in (report.get("joint_display") or [])
+            if isinstance(x, dict) and x.get("theme_title")
+        ]
     if not themes:
         raise ValueError("Analysis report has no themes to validate")
 

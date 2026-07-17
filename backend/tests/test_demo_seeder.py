@@ -663,13 +663,12 @@ class TestDecisionIntegration:
                        "Priority matrix", "Survey evidence", "decision-verdict", 'class="joint"'):
             assert needle in html, f"missing {needle}"
 
-    def test_decision_report_served_via_report_html(self, client, auth_headers, db_session, registered_company, monkeypatch):
-        """trigger_decision_analysis persists a decision_v1 StudyAnalysis and the
-        report.html dual-path serves the composed superset Decision report."""
+    def test_post_analyses_generates_and_serves_decision_report(self, client, auth_headers, db_session, registered_company, monkeypatch):
+        """POST /studies/{id}/analyses now generates the Decision report
+        (schema:"decision_v1"), and report.html serves the composed superset."""
         monkeypatch.setattr("app.config.settings.ANTHROPIC_API_KEY", "")  # force stub
         from app.models.company import Company
-        from app.models.study import Study
-        from app.services.study_analysis import trigger_decision_analysis
+        from app.models.study import Study, StudyAnalysis
 
         company = db_session.query(Company).filter(Company.email == registered_company["email"]).first()
         company.preferred_language = "en"           # pin so EN chrome assertions hold
@@ -678,8 +677,10 @@ class TestDecisionIntegration:
         db_session.commit()
         study = db_session.query(Study).filter(Study.company_id == company.id).first()
 
-        analysis = trigger_decision_analysis(db_session, study)
-        assert analysis.status == "ready"
+        # The flipped endpoint generates the Decision report.
+        posted = client.post(f"/studies/{study.id}/analyses", headers=auth_headers).json()
+        assert posted["status"] == "ready"
+        analysis = db_session.query(StudyAnalysis).filter(StudyAnalysis.id == posted["id"]).first()
         integ = json.loads(analysis.report)
         assert integ["schema"] == "decision_v1" and integ["verdict"]
 

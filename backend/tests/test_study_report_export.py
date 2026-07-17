@@ -8,11 +8,18 @@ Uses the same stub-mode generation path as test_studies.py — no AI key.
 import json
 
 from app.models.company import Company
-from app.models.study import StudyAnalysis
+from app.models.study import Study, StudyAnalysis
 
 
-def _seed_study_with_analysis(client, auth_headers, n_per_cohort: int = 40):
-    """Survey (mc_single segment + nps) with two cohorts, then a stub analysis."""
+def _seed_study_with_analysis(client, auth_headers, db_session, n_per_cohort: int = 40):
+    """Survey (mc_single segment + nps) with two cohorts, then a *legacy*
+    Quantified-Themes analysis.
+
+    The POST /analyses endpoint now generates the Decision report
+    (schema:"decision_v1"); this fixture exercises the legacy Quantified-Themes
+    generator + renderer directly (both still ship via the report.html dual-path
+    for previously-stored reports), so these tests keep that path covered.
+    """
 
     survey = client.post(
         "/surveys/", headers=auth_headers, json={"name": "Export fixture"}
@@ -62,10 +69,13 @@ def _seed_study_with_analysis(client, auth_headers, n_per_cohort: int = 40):
                 },
             )
 
-    analysis = client.post(
-        f"/studies/{survey['study_id']}/analyses", headers=auth_headers
-    ).json()
-    assert analysis["status"] == "ready"
+    from app.services.study_analysis import trigger_study_analysis
+
+    study = db_session.query(Study).filter(Study.id == survey["study_id"]).first()
+    row = trigger_study_analysis(db_session, study)
+    assert row.status == "ready"
+    analysis = {"id": row.id, "version": row.version, "status": row.status,
+                "report": json.loads(row.report)}
     return survey["study_id"], analysis
 
 
@@ -78,7 +88,7 @@ def _set_language(db_session, lang: str) -> None:
 
 
 def test_study_report_export_renders_full_document(client, auth_headers, db_session):
-    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers, db_session)
     _set_language(db_session, "en")
 
     resp = client.get(
@@ -109,7 +119,7 @@ def test_study_report_export_renders_full_document(client, auth_headers, db_sess
 
 
 def test_study_report_export_latest_alias(client, auth_headers, db_session):
-    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers, db_session)
     _set_language(db_session, "en")
     resp = client.get(
         f"/studies/{study_id}/analyses/latest/report.html", headers=auth_headers
@@ -129,14 +139,14 @@ def test_study_report_export_404_without_ready_analysis(client, auth_headers):
     assert resp.status_code == 404
 
 
-def test_study_report_export_requires_auth(client, auth_headers):
-    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+def test_study_report_export_requires_auth(client, auth_headers, db_session):
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers, db_session)
     resp = client.get(f"/studies/{study_id}/analyses/{analysis['id']}/report.html")
     assert resp.status_code in (401, 403)
 
 
 def test_study_report_export_localised_french(client, auth_headers, db_session):
-    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers, db_session)
     _set_language(db_session, "fr")
 
     resp = client.get(
@@ -150,7 +160,7 @@ def test_study_report_export_localised_french(client, auth_headers, db_session):
 
 
 def test_study_report_export_escapes_html(client, auth_headers, db_session):
-    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers, db_session)
     row = (
         db_session.query(StudyAnalysis)
         .filter(StudyAnalysis.id == analysis["id"])
@@ -175,7 +185,7 @@ def test_study_report_suppresses_percentages_below_threshold(client, auth_header
     n is under 30 renders raw counts and the sub-threshold notice, never
     a computed percentage."""
 
-    study_id, analysis = _seed_study_with_analysis(client, auth_headers, n_per_cohort=4)
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers, db_session, n_per_cohort=4)
     _set_language(db_session, "en")
     resp = client.get(
         f"/studies/{study_id}/analyses/{analysis['id']}/report.html",
@@ -189,7 +199,7 @@ def test_study_report_renders_verdict_gaps_and_success_test(client, auth_headers
     """The stub report carries verdict + gaps + success_test; the document
     must render all three rigor blocks."""
 
-    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers, db_session)
     _set_language(db_session, "en")
     resp = client.get(
         f"/studies/{study_id}/analyses/{analysis['id']}/report.html",
@@ -206,7 +216,7 @@ def test_study_analysis_inputs_include_study_context(client, auth_headers, db_se
     """The generation snapshot must carry the study context (name at minimum)
     so the model can anchor its verdict to the research question."""
 
-    study_id, analysis = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis = _seed_study_with_analysis(client, auth_headers, db_session)
     row = (
         db_session.query(StudyAnalysis)
         .filter(StudyAnalysis.id == analysis["id"])
