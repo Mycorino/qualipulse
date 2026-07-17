@@ -1,6 +1,5 @@
 import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
 
 import {
   ReportCatalogEntry,
@@ -12,9 +11,7 @@ import {
   listReportCatalog,
   listStudies,
 } from "../api/studies";
-import { SynthesisSummary, listSyntheses } from "../api/synthesis";
 import { openHtmlDocument } from "../utils/openHtmlDocument";
-import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { HubShell } from "../components/HubShell";
 import { useToast } from "../components/Toast";
 
@@ -22,19 +19,18 @@ import { useToast } from "../components/Toast";
  * Reports — `/reports`, the library of every generated report document.
  *
  * This is not a launcher into studies: each row opens the finished report
- * itself (the print-ready HTML the study/analysis produced), the same way
- * decision memos open. The hub lists every ready report by its **type**, and
- * each row wears the ink of the document it opens — mirroring the three
- * palettes in services/report_export.py (_PALETTES):
+ * itself (the print-ready HTML the study/analysis produced). The hub lists
+ * every ready report by its **type**, and each row wears the ink of the
+ * document it opens — mirroring the three palettes in
+ * services/report_export.py (_PALETTES):
  *
  *   • Decision reports — the mixed-methods superset a study produces (bordeaux)
  *   • Qualitative findings — the interview-only analysis (green)
  *   • Survey results — the quantitative survey document (blue)
- *   • Decision memos — cross-study syntheses (bordeaux; DecisionMemoSection)
  *
- * A mixed-methods study contributes all three of the first families: its two
- * single-method component reports plus the Decision report that supersets them,
- * so the reader can open either the components or the merged board document.
+ * A mixed-methods study contributes all three families: its two single-method
+ * component reports plus the Decision report that supersets them, so the reader
+ * can open either the components or the merged board document.
  */
 
 // Mirror of report_export.py _PALETTES + _BASE_DOC_CSS neutrals. Keep in sync.
@@ -56,7 +52,7 @@ const DECISION_INK: ReportInk = { accent: "#7c2434", tint: "#f8eef0", deep: "#4d
 const QUAL_INK: ReportInk = { accent: "#1d5c3f", tint: "#eef4ef", deep: "#10382a", ...PAPER };
 const SURVEY_INK: ReportInk = { accent: "#1e4a73", tint: "#edf2f8", deep: "#132f4b", ...PAPER };
 
-// Bordeaux is the page's own ink (headings, memos section).
+// Bordeaux is the page's own ink (headings, empty state).
 export const REPORT_INK = DECISION_INK;
 
 /** A report row styled as the document it opens: warm paper, a coloured spine
@@ -76,8 +72,6 @@ function rowStyleFor(ink: ReportInk): CSSProperties {
     color: ink.ink,
   };
 }
-
-export const reportRowStyle = rowStyleFor(DECISION_INK);
 
 function ReportBadge({ label, ink }: { label: string; ink: ReportInk }) {
   return (
@@ -201,16 +195,11 @@ function rowKey(e: ReportCatalogEntry): string {
 export default function Reports() {
   const { t } = useTranslation("dashboard");
   const { toast } = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
   const [catalog, setCatalog] = useState<ReportCatalogEntry[] | null>(null);
-  const [memos, setMemos] = useState<SynthesisSummary[] | null>(null);
   // Which report row is currently being fetched (prevents double-open).
   const [openingId, setOpeningId] = useState<string | null>(null);
-  // ?newMemo=1 (from the workspace NBA / studies sidecar) opens the create
-  // modal in DecisionMemoSection via its openSignal prop.
-  const [memoOpenSignal, setMemoOpenSignal] = useState(0);
 
   useEffect(() => {
     listStudies()
@@ -221,42 +210,12 @@ export default function Reports() {
       .catch(() => toast(t("reports.openError"), "error"));
   }, [toast, t]);
 
-  const refreshMemos = () => {
-    listSyntheses()
-      .then(setMemos)
-      .catch(() => toast(t("decisionMemos.loadError"), "error"));
-  };
-  useEffect(refreshMemos, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (searchParams.get("newMemo") === "1") {
-      setMemoOpenSignal((n) => n + 1);
-      setSearchParams(
-        (sp) => {
-          const next = new URLSearchParams(sp);
-          next.delete("newMemo");
-          return next;
-        },
-        { replace: true },
-      );
-    }
-  }, [searchParams, setSearchParams]);
-
-  const activeStudies = useMemo(
-    () => (studies ?? []).filter((s) => !s.archived_at),
-    [studies],
-  );
-
   const byKind = (kind: ReportKind) => (catalog ?? []).filter((e) => e.kind === kind);
   const decisionReports = useMemo(() => byKind("decision"), [catalog]);
   const qualReports = useMemo(() => byKind("qualitative"), [catalog]);
   const surveyReports = useMemo(() => byKind("survey"), [catalog]);
 
-  const readyMemoCount = useMemo(
-    () => (memos ?? []).filter((m) => m.status === "ready").length,
-    [memos],
-  );
-  const reportsCount = (catalog?.length ?? 0) + readyMemoCount;
+  const reportsCount = catalog?.length ?? 0;
 
   // Open a report document directly in a new tab — openHtmlDocument claims the
   // tab synchronously (mobile-safe), then the callback fetches the right
@@ -293,7 +252,7 @@ export default function Reports() {
     return parts.join(" · ") || "—";
   };
 
-  const hasAnyReport = (catalog?.length ?? 0) > 0 || (memos ?? []).length > 0;
+  const hasAnyReport = (catalog?.length ?? 0) > 0;
   const demoBadge = t("hub.demoBadge");
   const loading = studies === null || catalog === null;
 
@@ -380,18 +339,6 @@ export default function Reports() {
               evidenceLabel={(e) => responsesLabel(e.responses)}
               demoBadge={demoBadge}
               onOpen={openReport}
-            />
-
-            {/* ── Decision memos (bordeaux) ─────────────────────────────── */}
-            {/* DecisionMemoSection self-guards: renders create + list at ≥2
-                studies, returns null below that. It wears the report's
-                bordeaux ink (spine, warm paper) via the `ink` prop. */}
-            <DecisionMemoSection
-              studies={activeStudies}
-              memos={memos}
-              onRefresh={refreshMemos}
-              openSignal={memoOpenSignal}
-              ink={{ ...DECISION_INK, rowStyle: reportRowStyle }}
             />
           </>
         )}

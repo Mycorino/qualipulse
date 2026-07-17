@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 
 /**
  * DemoTour — click-through guided tour of the seeded demo study.
@@ -25,16 +24,15 @@ export const DEMO_TOUR_ARMED_KEY = "qp_demo_tour_armed";
 const DEMO_TOUR_PHASE_KEY = "qp_demo_tour_phase";
 
 /**
- * The tour runs in two phases. "study" is the main arc — home → workspace →
- * interview round. "memo" is the capstone after the interview-round finale:
- * back on the Studies home, ringing the cross-study decision memo card so
- * the user opens its print-ready report. Phase gates which surface's coach
- * marks are live, so nothing double-fires when the user revisits a page.
+ * The tour is a single arc — home → workspace → interview round → analysis
+ * report finale. (It previously had a "memo" capstone ringing a cross-study
+ * decision memo; that feature was retired, so only the "study" phase remains.
+ * The phase accessor is kept so the per-surface coach-mark gates read clearly.)
  */
-export type DemoTourPhase = "study" | "memo";
+export type DemoTourPhase = "study";
 
 export function getDemoTourPhase(): DemoTourPhase {
-  return sessionStorage.getItem(DEMO_TOUR_PHASE_KEY) === "memo" ? "memo" : "study";
+  return "study";
 }
 
 export function setDemoTourPhase(phase: DemoTourPhase) {
@@ -198,7 +196,6 @@ interface DemoTourProps {
 
 export default function DemoTour({ currentTab, goToTab, onExit }: DemoTourProps) {
   const { t } = useTranslation("project");
-  const navigate = useNavigate();
   const [stepIndex, setStepIndex] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const step = STEPS[stepIndex];
@@ -311,24 +308,14 @@ export default function DemoTour({ currentTab, goToTab, onExit }: DemoTourProps)
         {step.clickTab && <p className="demo-tour__click-hint">☝︎ {t("tour.clickHint")}</p>}
         <div className="demo-tour__actions">
           {isFinale ? (
-            <>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={finish}>
-                {t("tour.finale_cta_explore")}
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                data-tour-primary
-                onClick={() => {
-                  // Bridge to the capstone: hand back to the Studies home
-                  // where the decision-memo callout picks up (phase=memo).
-                  setDemoTourPhase("memo");
-                  navigate("/dashboard");
-                }}
-              >
-                {t("tour.finale_cta_memo")} →
-              </button>
-            </>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              data-tour-primary
+              onClick={finish}
+            >
+              {t("tour.finale_cta_explore")}
+            </button>
           ) : (
             <>
               <button type="button" className="demo-tour__skip" onClick={finish}>

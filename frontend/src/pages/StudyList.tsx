@@ -3,14 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { StudySummary, listStudies, studyEntryPath } from "../api/studies";
-import { SynthesisSummary, listSyntheses, openSynthesisMemoInNewTab } from "../api/synthesis";
-import {
-  DEMO_TOUR_DONE_KEY,
-  DemoCallout,
-  armDemoTour,
-  getDemoTourPhase,
-  isDemoTourArmed,
-} from "../components/DemoTour";
+import { DEMO_TOUR_DONE_KEY, DemoCallout, armDemoTour } from "../components/DemoTour";
 import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
 import { AccountNudges } from "../components/AccountNudges";
@@ -34,7 +27,7 @@ import { useNudgeAnnounce } from "../copilot/useNudgeAnnounce";
  * Hub redesign (this file): the flat card grid became a real workspace —
  * navy rail (HubShell), quiet header, one next-best-action strip, a
  * filterable/searchable studies list with a table ↔ card toggle, and a
- * sidecar carrying workspace stats plus the latest decision memo. The
+ * sidecar carrying workspace stats. The
  * visual language extends the marketing page: navy emphasis surfaces,
  * the brand-strip accent, mono meta text.
  *
@@ -163,10 +156,6 @@ export default function StudyList() {
   // ?new=1 opens the picker directly — used by the demo tour's final CTA.
   const [pickerOpen, setPickerOpen] = useState(() => searchParams.get("new") === "1");
   const [nudges, setNudges] = useState<Nudge[]>([]);
-  // Memos are still loaded here — they feed the workspace NBA rungs, memo
-  // nudges, and the sidecar highlight card. Create/list/delete live on
-  // /reports (DecisionMemoSection).
-  const [memos, setMemos] = useState<SynthesisSummary[] | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<HubView>(() =>
@@ -199,16 +188,6 @@ export default function StudyList() {
       .catch(() => toast(t("studyList.loadError"), "error"));
   }, [toast, t]);
 
-  const refreshMemos = useCallback(() => {
-    listSyntheses()
-      .then(setMemos)
-      .catch(() => toast(t("decisionMemos.loadError"), "error"));
-  }, [toast, t]);
-
-  useEffect(() => {
-    refreshMemos();
-  }, [refreshMemos]);
-
   // Onboarding hands off here with ?tour=1. The tour never auto-navigates:
   // the researcher gets to see their home first, then a callout points at
   // the demo study row and *they* click their way in. The demo is seeded in
@@ -227,13 +206,9 @@ export default function StudyList() {
   }, [setSearchParams]);
   const [tourStudyId, setTourStudyId] = useState<string | null>(null);
   const [tourAttempts, setTourAttempts] = useState(0);
-  const [memoTourDismissed, setMemoTourDismissed] = useState(false);
   const tourRequested = searchParams.get("tour") === "1";
   useEffect(() => {
     if (!tourRequested) return;
-    // The memo phase points at the decision-memo card, not the study row —
-    // handled separately below; don't re-arm the study-row callout here.
-    if (getDemoTourPhase() === "memo") return;
     if (localStorage.getItem(DEMO_TOUR_DONE_KEY) === "1") {
       stripTourParam();
       return;
@@ -262,39 +237,25 @@ export default function StudyList() {
     return () => window.clearTimeout(timer);
   }, [tourRequested, studies, tourAttempts, stripTourParam]);
 
-  // Detect studies that gained a report, memos that finished generating,
-  // and memos that went stale since the researcher's last visit.
+  // Detect studies that gained a report since the researcher's last visit.
   useEffect(() => {
     if (!studies) return;
     setNudges(
       detectWorkspaceNudges(
         studies.map((s) => ({ id: s.id, name: s.name, hasReport: s.has_report })),
-        (memos ?? []).map((m) => ({
-          id: m.id,
-          name: m.name,
-          status: m.status,
-          stale: m.stale ?? false,
-        })),
       ),
     );
-  }, [studies, memos]);
+  }, [studies]);
 
   const setViewPersisted = (v: HubView) => {
     setView(v);
     localStorage.setItem(HUB_VIEW_KEY, v);
   };
 
-  // Decision memos now live on the dedicated /reports hub — the create flow
-  // and full list moved there. `?newMemo=1` asks that page to open the
-  // create modal on arrival.
-  const goReports = useCallback(() => navigate("/reports"), [navigate]);
-
   // The copilot's portfolio-triage suggestion — which study needs you.
   const runWorkspaceAction = (a: NextAction) => {
     if (a.actionType === "start_study") setPickerOpen(true);
-    else if (a.actionType === "generate_memo" || a.actionType === "refresh_memo") {
-      navigate("/reports?newMemo=1");
-    } else if (a.targetId) navigate(`/studies/${a.targetId}`);
+    else if (a.targetId) navigate(`/studies/${a.targetId}`);
   };
 
   const rows = useMemo<StudyRow[]>(() => {
@@ -352,61 +313,11 @@ export default function StudyList() {
     [rows],
   );
 
-  // Studies that can join a cross-study decision memo (server requires a
-  // ready analysis per study) — gates the sidecar CTA so it never leads to
-  // a request the backend would reject.
-  const memoEligibleCount = useMemo(
-    () => (studies ?? []).filter((s) => s.has_ready_analysis).length,
-    [studies],
-  );
-
-  const readyMemos = useMemo(
-    () =>
-      (memos ?? [])
-        .filter((m) => m.status === "ready")
-        .sort((a, b) => (b.generated_at ?? "").localeCompare(a.generated_at ?? "")),
-    [memos],
-  );
-  const generatingMemo = (memos ?? []).some((m) => m.status === "generating");
-  const highlightMemo = readyMemos[0] ?? null;
-
-  // Workspace-level chrome (copilot strip, decision-memo section + card,
-  // memo stat) describes the researcher's OWN work, so it must ignore the
-  // seeded demo entirely — otherwise a brand-new account sees a copilot
-  // pointing at the demo and a decision-memo CTA that's worthless without
-  // 2+ real studies. "Real" = non-demo.
+  // Workspace-level chrome (copilot strip, stats) describes the researcher's
+  // OWN work, so it ignores the seeded demo entirely — otherwise a brand-new
+  // account sees a copilot pointing at the demo. "Real" = non-demo.
   const realStudyCount = totals.studies; // totals already excludes demo
-  const demoStudyNames = useMemo(
-    () => new Set((studies ?? []).filter((s) => s.is_demo).map((s) => s.name)),
-    [studies],
-  );
-  // A memo is the seeded demo one when every study it spans is a demo study.
-  const realMemos = useMemo(
-    () =>
-      readyMemos.filter(
-        (m) => !(m.study_names.length > 0 && m.study_names.every((n) => demoStudyNames.has(n))),
-      ),
-    [readyMemos, demoStudyNames],
-  );
-  const realHighlightMemo = realMemos[0] ?? null;
-  const realMemoEligibleCount = useMemo(
-    () => (studies ?? []).filter((s) => !s.is_demo && s.has_ready_analysis).length,
-    [studies],
-  );
   const realStudies = useMemo(() => (studies ?? []).filter((s) => !s.is_demo), [studies]);
-  // During the demo tour's capstone (memo phase) we DO surface the demo memo
-  // in the sidecar so the coach-mark has a card to ring — but only then.
-  const showDemoMemoForCapstone =
-    !realHighlightMemo && isDemoTourArmed() && getDemoTourPhase() === "memo" && !!highlightMemo;
-  const sidecarMemo = realHighlightMemo ?? (showDemoMemoForCapstone ? highlightMemo : null);
-
-  const openMemo = async (id: string) => {
-    try {
-      await openSynthesisMemoInNewTab(id);
-    } catch {
-      toast(t("decisionMemos.openError"), "error");
-    }
-  };
 
   const evidenceLabel = (s: StudySummary, status: StudyStatus) => {
     const parts: string[] = [];
@@ -532,18 +443,12 @@ export default function StudyList() {
 
   // One hub UX, always. A brand-new account (only the seeded demo, no real
   // study) sees the SAME layout as everyone else — just thinner: the copilot
-  // strip shows a welcome instead of a demo action, and the decision-memo
-  // section/card only surface once there's real cross-study work. See the
-  // `realStudy*` / `realMemos` values above for the demo-vs-real split.
+  // strip shows a welcome instead of a demo action. See the `realStudy*`
+  // values above for the demo-vs-real split.
   const isFirstTimer = realStudyCount === 0;
 
   return (
-    <HubShell
-      active="studies"
-      studies={studies}
-      memoCount={realMemos.length}
-      studyCount={studies?.length}
-    >
+    <HubShell active="studies" studies={studies} studyCount={studies?.length}>
       <div className="hub-canvas">
         <AccountNudges />
 
@@ -586,13 +491,9 @@ export default function StudyList() {
         )}
 
         {hasStudies && !isFirstTimer && (() => {
-          // Feed the resolver the researcher's OWN studies + memos only, so a
-          // seeded demo never drives the next-best-action.
-          const nba = resolveWorkspaceNextAction(realStudies.map(toNbaSummary), {
-            eligibleStudyCount: realMemoEligibleCount,
-            readyMemoCount: realMemos.length,
-            staleMemoCount: realMemos.filter((m) => m.stale).length,
-          });
+          // Feed the resolver the researcher's OWN studies only, so a seeded
+          // demo never drives the next-best-action.
+          const nba = resolveWorkspaceNextAction(realStudies.map(toNbaSummary));
           // When nothing needs the researcher (no actionable NBA, no fresh
           // nudges) the strip is purely reassurance — demote it to a quiet
           // inline line so it doesn't out-shout the actual studies below.
@@ -747,51 +648,9 @@ export default function StudyList() {
                     <strong>{totals.responses}</strong>
                     <span>{t("hub.stats.responses", { count: totals.responses })}</span>
                   </div>
-                  <div>
-                    <strong>{realMemos.length}</strong>
-                    <span>{t("hub.stats.memos", { count: realMemos.length })}</span>
-                  </div>
                 </div>
                 {hasDemo && <p className="hub-stats__note">{t("hub.stats.excludesDemo")}</p>}
               </div>
-
-              {sidecarMemo ? (
-                <div className="hub-memo" data-tour="decision-memo">
-                  <div className="hub-memo__kicker">
-                    {t("hub.memoCard.kicker")} · {t("hub.memoCard.studies", { count: sidecarMemo.study_count })}
-                  </div>
-                  <h3>{sidecarMemo.name}</h3>
-                  {sidecarMemo.decision_question && <p>{sidecarMemo.decision_question}</p>}
-                  {sidecarMemo.stale && (
-                    <span className="hub-memo__stale" title={t("decisionMemos.staleHint")}>
-                      {t("decisionMemos.statusStale")}
-                    </span>
-                  )}
-                  <div className="hub-memo__actions">
-                    <button type="button" className="hub-memo__cta" onClick={() => openMemo(sidecarMemo.id)}>
-                      {t("hub.memoCard.open")} →
-                    </button>
-                    <button type="button" className="hub-memo__all" onClick={goReports}>
-                      {t("hub.memoCard.all")}
-                    </button>
-                  </div>
-                </div>
-              ) : realStudyCount >= 2 && generatingMemo ? (
-                <div className="hub-memo">
-                  <div className="hub-memo__kicker">{t("hub.memoCard.kicker")}</div>
-                  <h3>{t("hub.memoCard.generatingTitle")}</h3>
-                  <p>{t("hub.memoCard.generatingText")}</p>
-                </div>
-              ) : (
-                // No real memo yet — keep the black box, but as a first-timer
-                // explainer (no worthless CTA). It fills with a real memo once
-                // there are 2+ of the researcher's own studies.
-                <div className="hub-memo hub-memo--explainer">
-                  <div className="hub-memo__kicker">{t("hub.memoCard.kicker")}</div>
-                  <h3>{t("hub.memoExplainer.title")}</h3>
-                  <p>{t("hub.memoExplainer.body")}</p>
-                </div>
-              )}
             </aside>
           )}
         </div>
@@ -807,7 +666,7 @@ export default function StudyList() {
       {/* Demo-tour entry point: rings the demo study row and waits for the
           user's own click — the row's normal navigation carries them into
           the study, where DemoTour picks up (sessionStorage-armed). */}
-      {tourStudyId && getDemoTourPhase() === "study" && (
+      {tourStudyId && (
         <DemoCallout
           selector='[data-tour="demo-study-row"]'
           eyebrow={t("hub.tour.eyebrow")}
@@ -821,27 +680,6 @@ export default function StudyList() {
           }}
         />
       )}
-
-      {/* Capstone: after the interview-round tour, the finale hands back here
-          in the "memo" phase. Ring the cross-study decision memo card and let
-          the user open its print-ready report — the end of the arc
-          interviews → per-study analysis → cross-study decision memo. */}
-      {isDemoTourArmed() &&
-        getDemoTourPhase() === "memo" &&
-        highlightMemo &&
-        !memoTourDismissed && (
-          <DemoCallout
-            selector='[data-tour="decision-memo"]'
-            eyebrow={t("hub.memoTour.eyebrow")}
-            title={t("hub.memoTour.title")}
-            body={t("hub.memoTour.body")}
-            clickHint={t("hub.memoTour.clickHint")}
-            skipLabel={t("hub.memoTour.skip")}
-            primaryLabel={t("hub.memoTour.open")}
-            onPrimary={() => openMemo(highlightMemo.id)}
-            onSkip={() => setMemoTourDismissed(true)}
-          />
-        )}
 
       {/* First-run handhold: only on the empty studies screen. The Copilot
           dock explains research and points at "+ New study" when opened —
