@@ -126,6 +126,17 @@ DEMO_GUIDE: list[dict] = [
             {
                 "q": "How do you decide which streaming services to subscribe to right now?",
                 "learning": "Decision criteria, trade-offs, household-vs-solo dynamics, role of price vs content.",
+                "notes": (
+                    "Open broad, then anchor on the most recent real decision: "
+                    "the last service they added or dropped, and why that week. "
+                    "Probe who in the household actually decides. If price comes "
+                    "up, get the real monthly figure — don't accept 'it depends'."
+                ),
+                "researcher": (
+                    "Hypothesis from support tickets: subscription decisions are "
+                    "household negotiations, not individual picks. Watch for who "
+                    "owns the decision."
+                ),
             },
         ],
     },
@@ -135,6 +146,17 @@ DEMO_GUIDE: list[dict] = [
             {
                 "q": "Walk me through your experience signing up for a new service and what those first few weeks felt like.",
                 "learning": "Sign-up friction, content discovery, time-to-value, cancellation flow perception.",
+                "notes": (
+                    "Keep them in story mode — one named service, one specific "
+                    "first week. Probe the first evening: how long until they "
+                    "found something to watch? If cancellation comes up "
+                    "spontaneously, follow that thread before returning to "
+                    "onboarding."
+                ),
+                "researcher": (
+                    "Funnel data shows a drop at profile creation — listen for "
+                    "anything that corroborates or kills that."
+                ),
             },
         ],
     },
@@ -144,6 +166,17 @@ DEMO_GUIDE: list[dict] = [
             {
                 "q": "What makes you stay loyal to a service, versus jumping between them?",
                 "learning": "Retention drivers, churn triggers, exclusive-content lock-in, price-increase tolerance.",
+                "notes": (
+                    "Separate loyalty from inertia: ask what would have to "
+                    "happen for them to cancel this month. Test price tolerance "
+                    "concretely (one more price rise — stay or go?). Note "
+                    "whether exclusive titles are named spontaneously; never "
+                    "prompt with examples."
+                ),
+                "researcher": (
+                    "Feeds the Q3 pricing review. If price tolerance clusters "
+                    "by usage, we segment the offer rather than the price."
+                ),
             },
         ],
     },
@@ -156,6 +189,16 @@ DEMO_GUIDE_FR: list[dict] = [
             {
                 "q": "Comment avez-vous commencé à faire vos courses alimentaires en ligne, et qu'est-ce qui vous a poussé à essayer ?",
                 "learning": "Déclencheur initial, canal d'entrée, rôle des contraintes de vie (enfants, télétravail).",
+                "notes": (
+                    "Faites raconter le vrai premier déclencheur (naissance, "
+                    "déménagement, télétravail…) plutôt qu'une explication "
+                    "générale. Creusez le canal d'entrée : qui leur a montré, "
+                    "quelle enseigne en premier, et pourquoi celle-là."
+                ),
+                "researcher": (
+                    "Hypothèse de l'équipe growth : l'entrée se fait par le "
+                    "Drive, pas par la livraison. À confirmer ou infirmer."
+                ),
             },
         ],
     },
@@ -165,6 +208,17 @@ DEMO_GUIDE_FR: list[dict] = [
             {
                 "q": "Racontez-moi votre dernière expérience de courses en ligne, du moment où vous remplissez le panier jusqu'à ce que vous récupériez les produits. Qu'est-ce qui s'est bien passé, qu'est-ce qui était galère ?",
                 "learning": "Frictions de panier, ruptures de stock, qualité produits, livraison vs Drive, service après-vente.",
+                "notes": (
+                    "Une commande précise — la dernière, pas une moyenne. "
+                    "Déroulez chronologiquement : panier, créneau, "
+                    "retrait/livraison, après-vente. Aux ruptures de stock, "
+                    "demandez ce qu'ils ont fait concrètement (substitution "
+                    "acceptée ? passage en magasin ?)."
+                ),
+                "researcher": (
+                    "Les tickets SAV pointent les substitutions imposées comme "
+                    "irritant n°1 — vérifier si ça sort spontanément."
+                ),
             },
         ],
     },
@@ -174,6 +228,17 @@ DEMO_GUIDE_FR: list[dict] = [
             {
                 "q": "Qu'est-ce qui vous fait revenir vers le même service plutôt que d'en tester un autre ? Et qu'est-ce qui pourrait vous faire abandonner ?",
                 "learning": "Moteurs de fidélité, coût de switch, sensibilité prix, seuils de tolérance qualité.",
+                "notes": (
+                    "Distinguez fidélité et habitude : que devrait-il se passer "
+                    "ce mois-ci pour qu'ils changent d'enseigne ? Faites "
+                    "estimer le coût de switch perçu (listes, historique, "
+                    "habitudes). Ne suggérez pas de seuils — laissez-les "
+                    "venir."
+                ),
+                "researcher": (
+                    "Alimente l'arbitrage fiabilité vs acquisition du prochain "
+                    "trimestre."
+                ),
             },
         ],
     },
@@ -799,16 +864,22 @@ DEMO_SURVEY_NAME = "Streaming habits — quick pulse"
 DEMO_SURVEY_NAME_FR = "Courses en ligne — pouls rapide"
 
 # Per-language survey plan — a real stat questionnaire, not a two-question
-# pulse: frequency (mc_single), current stack (mc_multi), value-for-money
-# (likert 1–5), recommendation (NPS 0–10) and an open churn-trigger question.
+# pulse: frequency (mc_single), current stack (mc_multi), stack size
+# (mc_single), a three-item likert battery (value-for-money, price-rise
+# tolerance, and a reverse-coded friction item), recommendation (NPS 0–10)
+# and an open churn-trigger question.
 #
 # `questions` defines the instrument; `cohorts` defines who answers what.
 # Each cohort carries a per-question answer plan that is cycled over the
 # cohort's `count` responses (None = respondent skipped the question). The
+# `services` and `stack_size` plans share a cycle length so each simulated
+# respondent's stack count matches their stated stack size. The
 # distributions are chosen so the hand-authored Quantified Themes report
 # quotes numbers the analytics layer actually reproduces:
-#   EN — heavy NPS mean 9.1 / light 4.1; likert 4.2 vs 2.4; Netflix in 38/44.
-#   FR — régulières NPS 9,1 / occasionnelles 4,6 ; Carrefour Drive dans 26/44.
+#   EN — heavy NPS mean 9.1 / light 4.1; value 4.2 vs 2.4; price-rise
+#        cancel-intent 2.2 vs 4.4; Netflix in 38/44.
+#   FR — régulières NPS 9,1 / occasionnelles 4,6 ; qualité-prix 4,2 vs 2,4 ;
+#        intention d'arrêt sur hausse 2,2 vs 4,4 ; Carrefour Drive dans 26/44.
 DEMO_SURVEY_EN = {
     "name": DEMO_SURVEY_NAME,
     "questions": [
@@ -834,10 +905,32 @@ DEMO_SURVEY_EN = {
             ], "randomize": False, "has_other": False},
         },
         {
+            "key": "stack_size", "type": "mc_single",
+            "prompt": "How many paid streaming services does your household pay for right now?",
+            "config": {"choices": [
+                {"id": "one", "label": "Just one"},
+                {"id": "two", "label": "Two"},
+                {"id": "three", "label": "Three"},
+                {"id": "four_plus", "label": "Four or more"},
+            ], "randomize": False, "has_other": False},
+        },
+        {
             "key": "value", "type": "likert",
             "prompt": "The catalogue on my main service is worth what I pay for it.",
             "config": {"scale": 5, "anchors": ["Strongly disagree", "Strongly agree"],
                        "reverse_coded": False},
+        },
+        {
+            "key": "price_rise", "type": "likert",
+            "prompt": "If my main service raised its price again this year, I would cancel.",
+            "config": {"scale": 5, "anchors": ["Strongly disagree", "Strongly agree"],
+                       "reverse_coded": False},
+        },
+        {
+            "key": "browse", "type": "likert",
+            "prompt": "I often scroll for a long time without finding anything I actually want to watch.",
+            "config": {"scale": 5, "anchors": ["Strongly disagree", "Strongly agree"],
+                       "reverse_coded": True},
         },
         {
             "key": "nps", "type": "nps",
@@ -861,7 +954,12 @@ DEMO_SURVEY_EN = {
                     ["netflix", "prime", "apple"],
                     ["netflix", "disney"],
                 ],
+                # Same cycle length as `services` so each respondent's stated
+                # stack size matches the stack they ticked above.
+                "stack_size": ["three", "two", "three", "two"],
                 "value": [5, 4, 4, 5, 4, 3],
+                "price_rise": [2, 3, 2, 1, 3, 2],
+                "browse": [2, 3, 2, 4, 2],
                 "nps": [9, 10, 8, 9, 10, 9, 8, 10],
                 # Full-length plan (one slot per respondent) so every open
                 # answer in the sample is unique — no cycled duplicates.
@@ -890,7 +988,10 @@ DEMO_SURVEY_EN = {
             "answers": {
                 "freq": ["weekly", "monthly", "weekly"],
                 "services": [["netflix"], ["prime"], ["netflix", "prime"]],
+                "stack_size": ["one", "one", "two"],
                 "value": [2, 3, 2, 3, 2],
+                "price_rise": [5, 4, 5, 4, 4],
+                "browse": [4, 4, 5, 3, 4],
                 "nps": [4, 3, 5, 2, 6, 4, 5, 4],
                 "churn": [
                     "Honestly I only keep it for one show — the day it ends, I cancel.",
@@ -941,10 +1042,32 @@ DEMO_SURVEY_FR = {
             ], "randomize": False, "has_other": False},
         },
         {
+            "key": "stack_size", "type": "mc_single",
+            "prompt": "Combien d'enseignes différentes utilisez-vous régulièrement pour vos courses en ligne ?",
+            "config": {"choices": [
+                {"id": "une", "label": "Une seule"},
+                {"id": "deux", "label": "Deux"},
+                {"id": "trois", "label": "Trois"},
+                {"id": "quatre_plus", "label": "Quatre ou plus"},
+            ], "randomize": False, "has_other": False},
+        },
+        {
             "key": "value", "type": "likert",
             "prompt": "Le service de mon enseigne principale vaut ce qu'il me coûte.",
             "config": {"scale": 5, "anchors": ["Pas du tout d'accord", "Tout à fait d'accord"],
                        "reverse_coded": False},
+        },
+        {
+            "key": "price_rise", "type": "likert",
+            "prompt": "Si les frais de service ou de livraison augmentaient encore, j'arrêterais les courses en ligne.",
+            "config": {"scale": 5, "anchors": ["Pas du tout d'accord", "Tout à fait d'accord"],
+                       "reverse_coded": False},
+        },
+        {
+            "key": "browse", "type": "likert",
+            "prompt": "Je dois souvent compléter ma commande en magasin à cause des produits manquants.",
+            "config": {"scale": 5, "anchors": ["Pas du tout d'accord", "Tout à fait d'accord"],
+                       "reverse_coded": True},
         },
         {
             "key": "nps", "type": "nps",
@@ -968,7 +1091,12 @@ DEMO_SURVEY_FR = {
                     ["carrefour", "picard", "amazon"],
                     ["carrefour"],
                 ],
+                # Même longueur de cycle que `services` : la taille de stack
+                # déclarée colle aux enseignes cochées par la même répondante.
+                "stack_size": ["deux", "deux", "trois", "une"],
                 "value": [5, 4, 4, 5, 4, 3],
+                "price_rise": [2, 3, 2, 1, 3, 2],
+                "browse": [3, 2, 4, 3, 2],
                 "nps": [9, 10, 8, 9, 10, 9, 8, 10],
                 # Full-length plan (one slot per respondent) so every open
                 # answer in the sample is unique — no cycled duplicates.
@@ -997,7 +1125,10 @@ DEMO_SURVEY_FR = {
             "answers": {
                 "freq": ["une_fois", "moins", "une_fois"],
                 "services": [["leclerc"], ["amazon"], ["leclerc", "coop"]],
+                "stack_size": ["une", "une", "deux"],
                 "value": [2, 3, 2, 3, 2],
+                "price_rise": [5, 4, 5, 4, 4],
+                "browse": [4, 5, 4, 3, 5],
                 "nps": [5, 4, 6, 4, 5, 4, 6, 3],
                 "churn": [
                     "Les frais de livraison — dès que ça dépasse le prix du bus, j'y vais moi-même.",
@@ -1036,7 +1167,7 @@ def _quanti_report(lang: str) -> dict:
         notable = NOTABLE_QUOTES_FR
         return {
             "executive_summary": (
-                "Un questionnaire en cinq questions (n=44) et quatre "
+                "Un questionnaire en huit questions (n=44) et quatre "
                 "entretiens approfondis convergent : la fidélité aux "
                 "enseignes de courses en ligne tient à un coût de switch "
                 "invisible, pas au prix. Les clientes régulières notent leur "
@@ -1110,7 +1241,10 @@ def _quanti_report(lang: str) -> dict:
                             "À l'affirmation « le service vaut ce qu'il me "
                             "coûte », les régulières répondent 4,2 sur 5 en "
                             "moyenne, les occasionnelles 2,4 — alors que les "
-                            "deux groupes paient les mêmes frais."
+                            "deux groupes paient les mêmes frais. Sur « "
+                            "j'arrêterais si les frais augmentaient encore », "
+                            "l'écart se répète : 4,4 sur 5 chez les "
+                            "occasionnelles contre 2,2 chez les régulières."
                         ),
                         "n": 44,
                         "percentage": None,
@@ -1249,8 +1383,10 @@ def _quanti_report(lang: str) -> dict:
                 "moyennes, jamais en pourcentages.",
             ],
             "methodology_note": (
-                "Questionnaire : 5 questions (fréquence, enseignes, "
-                "qualité-prix, recommandation, question ouverte), 44 réponses "
+                "Questionnaire : 8 questions (fréquence, enseignes, nombre "
+                "d'enseignes, batterie Likert qualité-prix / tolérance à la "
+                "hausse / fiabilité perçue (item inversé), recommandation, "
+                "question ouverte), 44 réponses "
                 "complètes recueillies sur 7 jours. Entretiens : 4 complétés. "
                 "Conformément au contrat méthodologique, les pourcentages ne "
                 "sont affichés qu'à n≥30 ; les sous-groupes en deçà sont "
@@ -1265,7 +1401,7 @@ def _quanti_report(lang: str) -> dict:
     notable = NOTABLE_QUOTES_EN
     return {
         "executive_summary": (
-            "A five-question survey (n=44) and four in-depth interviews "
+            "An eight-question survey (n=44) and four in-depth interviews "
             "point the same direction: streaming loyalty is thin, "
             "concentrated, and rented by the show. Heavy streamers rate "
             "their main service 9.1 on the 0–10 recommendation scale and "
@@ -1335,7 +1471,10 @@ def _quanti_report(lang: str) -> dict:
                     "summary": (
                         "On “the catalogue is worth what I pay”, heavy "
                         "streamers average 4.2 of 5; light streamers 2.4 — "
-                        "both groups pay the same prices."
+                        "both groups pay the same prices. The gap repeats on "
+                        "“I would cancel if the price rose again this year”: "
+                        "light streamers average 4.4 of 5 agreement, heavy "
+                        "streamers 2.2."
                     ),
                     "n": 44,
                     "percentage": None,
@@ -1468,8 +1607,10 @@ def _quanti_report(lang: str) -> dict:
             "their gaps are reported as averages, never as percentages.",
         ],
         "methodology_note": (
-            "Survey: 5 questions (frequency, current stack, value-for-money, "
-            "recommendation, open churn trigger), 44 completed responses "
+            "Survey: 8 questions (frequency, current stack, stack size, a "
+            "likert battery covering value-for-money, price-rise tolerance "
+            "and a reverse-coded discovery-friction item, recommendation, "
+            "open churn trigger), 44 completed responses "
             "fielded over 7 days. Interviews: 4 completed, 7–9 turns each. "
             "Per the methodology contract, percentages are shown only at "
             "n≥30; cohort cuts below that threshold are reported as averages "
@@ -1612,7 +1753,7 @@ def _decision_integration(lang: str) -> dict:
 def _seed_demo_survey(
     db: Session, study: Study, company_id: str, lang: str, now: datetime
 ) -> Survey:
-    """Add a published five-question survey with 44 completed responses to the
+    """Add a published eight-question survey with 44 completed responses to the
     demo Study, so the Study reads as a true hybrid (survey + interviews)."""
     cfg = DEMO_SURVEY_FR if lang == "fr" else DEMO_SURVEY_EN
     fielding_start = now - timedelta(days=9)
@@ -1787,8 +1928,9 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
                     section_title=section["section"],
                     question_index=question_index,
                     main_question=item["q"],
-                    interview_notes="",
+                    interview_notes=item.get("notes", ""),
                     desired_learning=item["learning"],
+                    researcher_notes=item.get("researcher"),
                     sort_order=sort_order,
                 )
             )
@@ -2054,10 +2196,26 @@ DEMO2_GUIDE: list[dict] = [
             {
                 "q": "Walk me through the last streaming service you cancelled — what happened that week?",
                 "learning": "The concrete trigger event, its timing, and how long the decision had been latent.",
+                "notes": (
+                    "Get the actual week: what happened, in what order, and how "
+                    "long the decision had been brewing. Ask what else was "
+                    "going on that month — cancellations rarely happen in a "
+                    "vacuum."
+                ),
+                "researcher": (
+                    "Recruited from a churned-subscriber panel — screen out "
+                    "anyone who cancelled more than 6 months ago (recall "
+                    "decays fast)."
+                ),
             },
             {
                 "q": "What, if anything, could the service have done to keep you?",
                 "learning": "Save-offer receptivity, pause/step-down demand, perceived silence at the exit.",
+                "notes": (
+                    "Probe save-offer receptivity without pitching: 'was there "
+                    "anything they could have said?' Listen for pause or "
+                    "step-down language before ever naming it."
+                ),
             },
         ],
     },
@@ -2067,6 +2225,11 @@ DEMO2_GUIDE: list[dict] = [
             {
                 "q": "How do you feel about that service now — would you ever go back?",
                 "learning": "Win-back conditions, whether history/profiles still bind them, emotional residue.",
+                "notes": (
+                    "Watch the emotional register — relief vs regret predicts "
+                    "win-back. Ask whether their profile, lists and history "
+                    "still matter to them."
+                ),
             },
         ],
     },
@@ -2079,10 +2242,26 @@ DEMO2_GUIDE_FR: list[dict] = [
             {
                 "q": "Racontez-moi la dernière fois que vous avez arrêté de commander vos courses en ligne — que s'est-il passé ?",
                 "learning": "L'événement déclencheur concret, son timing, et depuis combien de temps la décision couvait.",
+                "notes": (
+                    "Faites raconter la semaine exacte : l'incident, son "
+                    "ordre, et depuis quand la décision couvait. Demandez ce "
+                    "qui se passait d'autre ce mois-là — un départ arrive "
+                    "rarement seul."
+                ),
+                "researcher": (
+                    "Panel de clientes parties il y a moins de 6 mois — "
+                    "exclure les départs plus anciens (la mémoire s'efface "
+                    "vite)."
+                ),
             },
             {
                 "q": "Qu'est-ce que l'enseigne aurait pu faire pour vous garder ?",
                 "learning": "Réceptivité aux offres de rétention, demande de validation des substitutions, silence perçu au départ.",
+                "notes": (
+                    "Sondez la réceptivité aux gestes de rétention sans les "
+                    "vendre : « qu'auraient-ils pu dire ? ». Laissez venir la "
+                    "validation des substitutions avant de la nommer."
+                ),
             },
         ],
     },
@@ -2092,6 +2271,11 @@ DEMO2_GUIDE_FR: list[dict] = [
             {
                 "q": "Que faudrait-il pour que vous y retourniez ?",
                 "learning": "Conditions de retour, poids de l'historique/des listes, résidu émotionnel.",
+                "notes": (
+                    "Repérez le registre émotionnel — soulagement ou regret "
+                    "prédit le retour. Demandez si l'historique et les listes "
+                    "comptent encore pour elles."
+                ),
             },
         ],
     },
@@ -2628,8 +2812,9 @@ def _seed_second_demo_study(db: Session, company_id: str, lang: str, now: dateti
                     section_title=section["section"],
                     question_index=question_index,
                     main_question=item["q"],
-                    interview_notes="",
+                    interview_notes=item.get("notes", ""),
                     desired_learning=item["learning"],
+                    researcher_notes=item.get("researcher"),
                     sort_order=sort_order,
                 )
             )

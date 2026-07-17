@@ -51,13 +51,17 @@ class TestDemoSeeder:
         company = _make_company(db_session)
         project = seed_demo_project(db_session, company.id)
 
-        # Guide: 3 main questions across 3 sections
+        # Guide: 3 main questions across 3 sections, each with interviewer
+        # notes + desired learning so the Setup tab shows the full craft.
         questions = (
             db_session.query(InterviewGuideQuestion)
             .filter(InterviewGuideQuestion.project_id == project.id)
             .all()
         )
         assert len(questions) == 3
+        assert all(q.interview_notes for q in questions)
+        assert all(q.desired_learning for q in questions)
+        assert any(q.researcher_notes for q in questions)
 
         # 1 screening question with a disqualifying option
         screening = (
@@ -212,6 +216,10 @@ class TestDemoSeeder:
         assert len(questions) == 3
         joined = " ".join(q.main_question.lower() for q in questions)
         assert any(word in joined for word in ("course", "livraison", "alimentaire"))
+        # Interviewer notes are localised too, not left in English.
+        assert all(q.interview_notes for q in questions)
+        notes_joined = " ".join(q.interview_notes.lower() for q in questions)
+        assert any(word in notes_joined for word in ("enseigne", "commande", "magasin"))
 
         # Participants must all be in French-speaking countries — the FR
         # demo is now mono-language.
@@ -309,8 +317,9 @@ class TestDemoStudyIsHybrid:
         assert survey.status == "live"
         assert survey.company_id == company.id
 
-        # A real stat instrument: frequency, current stack, value-for-money,
-        # NPS, and an open churn-trigger question.
+        # A real stat instrument: frequency, current stack, stack size, a
+        # three-item likert battery (value / price-rise tolerance / a
+        # reverse-coded friction item), NPS, and an open churn question.
         questions = (
             db_session.query(SurveyQuestion)
             .filter(SurveyQuestion.survey_id == survey.id)
@@ -318,8 +327,13 @@ class TestDemoStudyIsHybrid:
             .all()
         )
         assert [q.type for q in questions] == [
-            "mc_single", "mc_multi", "likert", "nps", "open_text",
+            "mc_single", "mc_multi", "mc_single",
+            "likert", "likert", "likert",
+            "nps", "open_text",
         ]
+        # One battery item is reverse-coded — the demo should showcase it.
+        likert_configs = [json.loads(q.config) for q in questions if q.type == "likert"]
+        assert any(c.get("reverse_coded") for c in likert_configs)
 
         # 44 completed responses → above the n>=30 inference threshold.
         responses = (
