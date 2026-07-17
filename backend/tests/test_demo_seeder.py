@@ -762,3 +762,142 @@ class TestDecisionIntegration:
         # Evidence counts are populated per type.
         assert any(e["interviews"] > 0 for e in entries if e["kind"] == "qualitative")
         assert any(e["responses"] > 0 for e in entries if e["kind"] == "survey")
+
+class TestDemoShowcaseBackfill:
+    """`scripts/backfill_demo_showcase.py` upgrades pre-showcase demo seeds
+    (no guide notes, five-question survey, stale decision report) in place."""
+
+    def _downgrade_to_legacy(self, db_session, company):
+        """Rewind a freshly seeded demo to its pre-showcase shape."""
+        from app.models.survey import SurveyResponseAnswer
+
+        projects = (
+            db_session.query(Project)
+            .filter(Project.company_id == company.id, Project.is_demo.is_(True))
+            .all()
+        )
+        for q in (
+            db_session.query(InterviewGuideQuestion)
+            .filter(InterviewGuideQuestion.project_id.in_([p.id for p in projects]))
+            .all()
+        ):
+            q.interview_notes = ""
+            q.researcher_notes = None
+
+        survey = db_session.query(Survey).filter(Survey.company_id == company.id).one()
+        questions = (
+            db_session.query(SurveyQuestion)
+            .filter(SurveyQuestion.survey_id == survey.id)
+            .order_by(SurveyQuestion.sort_order)
+            .all()
+        )
+        legacy_prompts = {"freq": 0, "services": 1, "value": 2, "nps": 3, "churn": 4}
+        new_ids = []
+        keep_order = []
+        for q in questions:
+            if q.sort_order in (2, 4, 5):  # stack_size / price_rise / browse
+                new_ids.append(q.id)
+            else:
+                keep_order.append(q)
+        db_session.query(SurveyResponseAnswer).filter(
+            SurveyResponseAnswer.question_id.in_(new_ids)
+        ).delete(synchronize_session=False)
+        db_session.query(SurveyQuestion).filter(
+            SurveyQuestion.id.in_(new_ids)
+        ).delete(synchronize_session=False)
+        for i, q in enumerate(keep_order):
+            q.sort_order = i
+        assert len(legacy_prompts) == len(keep_order)
+
+        analysis = (
+            db_session.query(StudyAnalysis)
+            .join(Project, StudyAnalysis.study_id == Project.study_id)
+            .filter(Project.company_id == company.id)
+            .first()
+        )
+        stale = json.loads(analysis.report)
+        stale["joint_display"][1]["survey_signal"] = "old pre-showcase signal"
+        analysis.report = json.dumps(stale)
+        db_session.commit()
+
+    def test_backfill_restores_showcase_shape(self, db_session):
+        from app.models.survey import SurveyResponseAnswer
+        from app.services.demo_seeder import _decision_integration
+        from scripts.backfill_demo_showcase import run as backfill_run
+
+        company = _make_company(db_session)
+        seed_demo_project(db_session, company.id)
+        db_session.commit()
+        self._downgrade_to_legacy(db_session, company)
+
+        result = backfill_run(dry_run=False, company_id=company.id, db=db_session)
+        assert result["surveys"] == 1
+        assert result["reports"] == 1
+        assert result["guide_questions"] > 0
+
+        # Guide notes are back on every question that the fixtures define.
+        flagship = (
+            db_session.query(Project)
+            .filter(Project.company_id == company.id, Project.name == DEMO_PROJECT_NAME)
+            .one()
+        )
+        for q in (
+            db_session.query(InterviewGuideQuestion)
+            .filter(InterviewGuideQuestion.project_id == flagship.id)
+            .all()
+        ):
+            assert q.interview_notes
+
+        # Survey is the full eight-question instrument again…
+        survey = db_session.query(Survey).filter(Survey.company_id == company.id).one()
+        questions = (
+            db_session.query(SurveyQuestion)
+            .filter(SurveyQuestion.survey_id == survey.id)
+            .order_by(SurveyQuestion.sort_order)
+            .all()
+        )
+        assert [q.type for q in questions] == [
+            "mc_single", "mc_multi", "mc_single",
+            "likert", "likert", "likert",
+            "nps", "open_text",
+        ]
+        # …and every seeded response answered the three new questions.
+        new_ids = [q.id for q in questions if q.sort_order in (2, 4, 5)]
+        answers = (
+            db_session.query(SurveyResponseAnswer)
+            .filter(SurveyResponseAnswer.question_id.in_(new_ids))
+            .count()
+        )
+        assert answers == 44 * 3
+
+        # Decision report matches the current fixture again.
+        analysis = (
+            db_session.query(StudyAnalysis)
+            .join(Project, StudyAnalysis.study_id == Project.study_id)
+            .filter(Project.company_id == company.id)
+            .first()
+        )
+        assert json.loads(analysis.report) == _decision_integration("en")
+
+        # Idempotent: a second run finds nothing to do.
+        again = backfill_run(dry_run=False, company_id=company.id, db=db_session)
+        assert again == {"guide_questions": 0, "surveys": 0, "reports": 0}
+
+    def test_backfill_dry_run_writes_nothing(self, db_session):
+        from scripts.backfill_demo_showcase import run as backfill_run
+
+        company = _make_company(db_session)
+        seed_demo_project(db_session, company.id)
+        db_session.commit()
+        self._downgrade_to_legacy(db_session, company)
+
+        result = backfill_run(dry_run=True, company_id=company.id, db=db_session)
+        assert result["surveys"] == 1
+
+        survey = db_session.query(Survey).filter(Survey.company_id == company.id).one()
+        count = (
+            db_session.query(SurveyQuestion)
+            .filter(SurveyQuestion.survey_id == survey.id)
+            .count()
+        )
+        assert count == 5  # still legacy — dry-run wrote nothing
