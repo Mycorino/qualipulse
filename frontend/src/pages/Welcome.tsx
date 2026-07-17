@@ -10,6 +10,7 @@ import {
   type CompanyResponse,
   type OnboardingSuggestions,
 } from "../api/auth";
+import { listStudies } from "../api/studies";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -70,6 +71,10 @@ export default function Welcome() {
   // instead of navigating cold — it previews the seeded example and
   // absorbs the few seconds the backend needs to finish seeding it.
   const [done, setDone] = useState(false);
+  // While the demo studies finish seeding in a backend background thread we
+  // hold the user on the handoff screen rather than dropping them onto an
+  // empty dashboard.
+  const [preparing, setPreparing] = useState(false);
 
   // Step 1
   const [companyName, setCompanyName] = useState("");
@@ -254,9 +259,28 @@ export default function Welcome() {
     }
   }
 
-  function handleEnterWorkspace() {
-    // Hand off to the demo-project tour: the dashboard waits for the
-    // background-seeded demo study, then opens it with the tour armed.
+  async function handleEnterWorkspace() {
+    // The demo studies are seeded in a backend background thread right after
+    // onboarding completes. Rather than drop the user onto an empty dashboard
+    // and let it fill in under them, hold them here on a "preparing" state and
+    // poll until the demo study lands. Bounded so a seed failure (or an account
+    // that already has a real study, where the demo is skipped) never traps the
+    // user — after the budget we hand off anyway and the dashboard's own tour
+    // poll takes over.
+    if (preparing) return;
+    setPreparing(true);
+    const MAX_ATTEMPTS = 12; // ~13s ceiling
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        const studies = await listStudies();
+        if (studies.some((s) => s.is_demo && !s.archived_at)) break;
+      } catch {
+        /* transient — retry until the budget runs out */
+      }
+      if (attempt < MAX_ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1100));
+      }
+    }
     navigate("/dashboard?tour=1", { replace: true });
   }
 
@@ -289,7 +313,9 @@ export default function Welcome() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "BUTTON" || tag === "TEXTAREA") return;
       if (e.key === "Enter" && !saving) {
-        if (done) handleEnterWorkspace();
+        if (done) {
+          if (!preparing) handleEnterWorkspace();
+        }
         else if (step === 1 && step1Valid) handleStep1Next();
         else if (step === 2 && step2Valid) handleStep2Next();
         else if (step === 3 && phase3 === "ask") handleGenerateThemes();
@@ -299,7 +325,7 @@ export default function Welcome() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, phase3, step1Valid, step2Valid, saving, suggestionsLoading, done, companyName, roleFamily, roleKey, roleOther, teamSize, goals, goalsUsed]);
+  }, [step, phase3, step1Valid, step2Valid, saving, suggestionsLoading, done, preparing, companyName, roleFamily, roleKey, roleOther, teamSize, goals, goalsUsed]);
 
   if (loading || !me) {
     return (
@@ -387,13 +413,29 @@ export default function Welcome() {
               </div>
             </div>
 
-            <p className="welcome-handoff__note">{t("handoff_note")}</p>
+            {preparing ? (
+              <div
+                className="welcome-handoff__preparing"
+                role="status"
+                aria-live="polite"
+                style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20 }}
+              >
+                <div className="spinner" />
+                <span style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>
+                  {t("handoff_preparing")}
+                </span>
+              </div>
+            ) : (
+              <>
+                <p className="welcome-handoff__note">{t("handoff_note")}</p>
 
-            <div className="welcome-setup__actions">
-              <button type="button" className="btn btn-primary" onClick={handleEnterWorkspace}>
-                {t("handoff_cta")}
-              </button>
-            </div>
+                <div className="welcome-setup__actions">
+                  <button type="button" className="btn btn-primary" onClick={handleEnterWorkspace}>
+                    {t("handoff_cta")}
+                  </button>
+                </div>
+              </>
+            )}
           </section>
         )}
 
@@ -635,17 +677,6 @@ export default function Welcome() {
                       {t("step_3_summary_label")}
                     </span>
                     <p>{suggestions.profile_summary}</p>
-                  </div>
-                )}
-
-                {/* Read-only recap of the words that drove these themes, with
-                    a one-click way back to the ask phase to edit + regenerate. */}
-                {goalsUsed.trim() && (
-                  <div className="welcome-setup__field">
-                    <span className="welcome-setup__field-label">{t("step_3_your_goal_label")}</span>
-                    <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: "0 0 6px", fontStyle: "italic" }}>
-                      “{goalsUsed}”
-                    </p>
                   </div>
                 )}
               </>
