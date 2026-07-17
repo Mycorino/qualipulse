@@ -130,13 +130,26 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    # The API only ever returns JSON / audio bytes — it never serves an HTML
-    # document — so a deny-everything CSP is safe and neutralises any
+    # JSON / audio responses get a deny-everything CSP, which neutralises any
     # reflected-content injection if a response is ever coerced into being
     # rendered. (The SPA's real CSP lives in the frontend nginx config.)
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-    )
+    # The report.html exports are the one HTML surface the API serves directly
+    # (e.g. the public shared report) — they need their inline <style> blocks
+    # and the onclick="window.print()" toolbar handler, nothing else. The
+    # sha256 hash is base64(sha256("window.print()")); keep it in sync with
+    # the frontend nginx CSP and services/report_export.py.
+    content_type = response.headers.get("content-type", "")
+    if content_type.startswith("text/html"):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; style-src 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "script-src 'unsafe-hashes' 'sha256-MguIPR6qNR8D3B+eAlK+bIRTZe8t3wkOY4B/56Me9FU='; "
+            "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+        )
+    else:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
     if settings.is_production:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
