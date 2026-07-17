@@ -797,7 +797,12 @@ export default function StudyList() {
         </div>
       </div>
 
-      {pickerOpen && <NewStudyModal onClose={() => setPickerOpen(false)} />}
+      {pickerOpen && (
+        <NewStudyModal
+          onClose={() => setPickerOpen(false)}
+          firstRealStudy={realStudyCount === 0}
+        />
+      )}
 
       {/* Demo-tour entry point: rings the demo study row and waits for the
           user's own click — the row's normal navigation carries them into

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -22,6 +22,12 @@ import { useToast } from "./Toast";
  * via the Screener Bridge; an interview study can grow a validation
  * survey. The angle just routes to the right builder.
  *
+ * The "Recommended" badge is context-aware: mixed methods ("both") is
+ * the methodologically honest default, but a researcher creating their
+ * FIRST real study is steered to interviews instead — the survey-first
+ * path blocks on external respondents for days, while an interview can
+ * be experienced (and its value felt) within minutes.
+ *
  * Mechanically there's no "create Study" call — Studies are auto-created
  * by the first instrument (Decision 8):
  *   - Survey / Both → POST /surveys/ (study auto-created) → survey editor
@@ -31,38 +37,81 @@ import { useToast } from "./Toast";
 
 type Angle = "survey" | "interview" | "both";
 
+const SurveyIcon = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+  >
+    <line x1="6" y1="20" x2="6" y2="14" />
+    <line x1="12" y1="20" x2="12" y2="8" />
+    <line x1="18" y1="20" x2="18" y2="4" />
+  </svg>
+);
+
+const MicIcon = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="22" />
+  </svg>
+);
+
 interface AngleCard {
   angle: Angle;
-  icon: string;
+  icon: ReactNode;
   /** i18n key suffixes under dashboard:newStudyModal.angles */
   titleKey: string;
   blurbKey: string;
-  recommended?: boolean;
 }
 
 const ANGLES: AngleCard[] = [
   {
     angle: "survey",
-    icon: "📊",
+    icon: <SurveyIcon />,
     titleKey: "surveyTitle",
     blurbKey: "surveyBlurb",
   },
   {
     angle: "interview",
-    icon: "🎙",
+    icon: <MicIcon />,
     titleKey: "interviewTitle",
     blurbKey: "interviewBlurb",
   },
   {
     angle: "both",
-    icon: "📊🎙",
+    icon: (
+      <>
+        <SurveyIcon />
+        <MicIcon />
+      </>
+    ),
     titleKey: "bothTitle",
     blurbKey: "bothBlurb",
-    recommended: true,
   },
 ];
 
-export function NewStudyModal({ onClose }: { onClose: () => void }) {
+export function NewStudyModal({
+  onClose,
+  firstRealStudy = false,
+}: {
+  onClose: () => void;
+  /** True when the workspace has no real (non-demo) study yet. */
+  firstRealStudy?: boolean;
+}) {
   const { t, i18n } = useTranslation("dashboard");
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -135,15 +184,17 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
         />
 
         <div className="new-study-modal__angles">
-          {ANGLES.map((a) => (
+          {ANGLES.map((a) => {
+            const recommended = a.angle === (firstRealStudy ? "interview" : "both");
+            return (
             <button
               key={a.angle}
               type="button"
-              className={`new-study-modal__angle${a.recommended ? " new-study-modal__angle--recommended" : ""}`}
+              className={`new-study-modal__angle${recommended ? " new-study-modal__angle--recommended" : ""}`}
               onClick={() => go(a.angle)}
               disabled={busy || !name.trim()}
             >
-              {a.recommended && (
+              {recommended && (
                 <span className="new-study-modal__badge">{t("newStudyModal.recommended")}</span>
               )}
               <span className="new-study-modal__angle-icon" aria-hidden="true">
@@ -152,7 +203,8 @@ export function NewStudyModal({ onClose }: { onClose: () => void }) {
               <span className="new-study-modal__angle-title">{t(`newStudyModal.angles.${a.titleKey}`)}</span>
               <span className="new-study-modal__angle-blurb">{t(`newStudyModal.angles.${a.blurbKey}`)}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
 
         {!name.trim() && (

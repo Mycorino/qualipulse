@@ -84,6 +84,34 @@
       "cwd": "frontend"
     },
     {
+      "name": "backend-reco-preview",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "SENDGRID_API_KEY=",
+        "/opt/anaconda3/bin/uvicorn",
+        "app.main:app",
+        "--port",
+        "8095"
+      ],
+      "port": 8095,
+      "cwd": "backend"
+    },
+    {
+      "name": "frontend-reco-preview",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_BACKEND_URL=http://localhost:8095",
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5195"
+      ],
+      "port": 5195,
+      "cwd": "frontend"
+    },
+    {
       "name": "backend-panel-join",
       "runtimeExecutable": "/opt/anaconda3/bin/uvicorn",
       "runtimeArgs": [
