@@ -386,6 +386,21 @@
     "ineligibleNote_one": "{{count}} study without a ready analysis can't be included yet.",
     "ineligibleNote_other": "{{count}} studies without a ready analysis can't be included yet."
   },
+  "reports": {
+    "eyebrow": "Your outputs",
+    "title": "Reports",
+    "sub": "Every generated report in one place — open any document directly.",
+    "emptyAll": "No reports generated yet. Run the analysis on a study to produce its report, and it will appear here.",
+    "studyReports": {
+      "eyebrow": "Per study",
+      "title": "Study reports",
+      "sub": "The mixed-methods report each study produces. Opens the finished document.",
+      "badge": "Study",
+      "open": "Open report",
+      "opening": "Opening…",
+      "openError": "Could not open the report."
+    }
+  },
   "hub": {
     "nav": {
       "aria": "Hub navigation",
@@ -393,6 +408,7 @@
       "search": "Search…",
       "studies": "Studies",
       "memos": "Decision memos",
+      "reports": "Reports",
       "account": "Account",
       "breadcrumbAria": "Breadcrumb"
     },

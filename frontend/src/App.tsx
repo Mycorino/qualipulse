@@ -82,6 +82,7 @@ const SurveyPreview = lazyWithRetry(() => import("./pages/SurveyPreview"));
 const SurveyDashboardPage = lazyWithRetry(() => import("./pages/SurveyDashboard"));
 const PublicResponse = lazyWithRetry(() => import("./pages/PublicResponse"));
 const StudyOverview = lazyWithRetry(() => import("./pages/StudyOverview"));
+const Reports = lazyWithRetry(() => import("./pages/Reports"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -260,6 +261,14 @@ export default function App() {
         element={
           <OnboardedRoute>
             <StudyOverview />
+          </OnboardedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <OnboardedRoute>
+            <Reports />
           </OnboardedRoute>
         }
       />
