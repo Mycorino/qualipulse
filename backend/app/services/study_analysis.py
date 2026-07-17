@@ -359,6 +359,231 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
     return raw, snapshot_json
 
 
+# ── Decision report integration pass (approach B) ───────────────────────────
+# The qualitative themes are ALREADY synthesised in a ProjectAnalysis. This pass
+# does NOT re-read transcripts or re-derive themes — it only INTEGRATES: map each
+# theme to the survey signal that supports/complicates it, calibrate confidence,
+# state a verdict, list gaps. Its output feeds render_decision_report_html
+# alongside the reused ProjectAnalysis (qual) and the dashboards (survey), making
+# the Decision report a strict superset with the qual synthesis authored once.
+
+INTEGRATION_SYSTEM_PROMPT = """\
+You are a senior mixed-methods researcher producing the INTEGRATION layer of a
+decision report. The qualitative themes provided are ALREADY synthesised from
+interviews — do NOT re-derive, rename, or re-quote them. Your only job:
+- verdict: the decision-oriented bottom line (recommendation + strongest reason
+  + biggest caveat), answering the study's decision when one is given.
+- joint_display: for EACH provided theme, the single survey signal that
+  corroborates or complicates it (quote the exact number from the aggregates;
+  empty string if the survey is silent), a confidence pill, and any
+  counter-evidence. theme_title MUST be copied verbatim from a provided theme.
+- confidence: overall confidence in the verdict.
+- gaps: what the combined data still cannot answer.
+
+Rules: never invent survey numbers not present in the aggregates. Calibrate
+confidence to n (directional: n<30 or single method; supported: n>=30 with
+agreement; strong: n>=100 with a strong effect). An empty gaps list is almost
+always wrong. Output ONE JSON object — no fences, no preamble. All reasoning
+belongs in your thinking, never in the visible answer."""
+
+
+def _integration_schema() -> dict:
+    _s = {"type": "string"}
+    _conf = {"type": "string", "enum": ["directional", "supported", "strong"]}
+
+    def obj(props):
+        return {"type": "object", "additionalProperties": False,
+                "properties": props, "required": list(props)}
+
+    return obj({
+        "verdict": _s,
+        "confidence": _conf,
+        "joint_display": {"type": "array", "items": obj({
+            "theme_title": _s, "survey_signal": _s,
+            "confidence": _conf, "counter_evidence": _s,
+        })},
+        "gaps": {"type": "array", "items": _s},
+    })
+
+
+def _build_study_context(db: Session, study: Study) -> dict:
+    projects = (
+        db.query(Project)
+        .filter(Project.study_id == study.id, Project.archived_at.is_(None))
+        .all()
+    )
+    ctx: dict = {"study_name": study.name}
+    for p in projects:
+        if p.research_objective and "research_objective" not in ctx:
+            ctx["research_objective"] = p.research_objective
+        if getattr(p, "decision_to_inform", None) and "decision_to_inform" not in ctx:
+            ctx["decision_to_inform"] = p.decision_to_inform
+        if getattr(p, "target_customer_description", None) and "target_audience" not in ctx:
+            ctx["target_audience"] = p.target_customer_description
+    return ctx
+
+
+def _build_survey_inputs(db: Session, surveys: list) -> list[dict]:
+    out = []
+    for s in surveys:
+        dash = build_dashboard(db, s)
+        discoveries = compute_discoveries(db, s)
+        out.append({
+            "survey": {"id": s.id, "name": s.name, "role": s.role,
+                       "n_completed": dash.n_completed,
+                       "completion_rate": dash.completion_rate_percentage},
+            "questions": [
+                {"prompt": q.prompt, "type": q.type, "n": q.n_answered,
+                 "mean": q.mean, "breakdown": q.breakdown}
+                for q in dash.questions
+            ],
+            "discoveries": [
+                {"title": d.title, "description": d.description,
+                 "confidence": d.confidence, "segment_n": d.segment_n,
+                 "metric_question_prompt": d.metric_question_prompt}
+                for d in discoveries
+            ],
+        })
+    return out
+
+
+def _latest_ready_project_analysis(db: Session, study: Study):
+    """The freshest ready ProjectAnalysis across the study's interview projects —
+    the qual brain the Decision report reuses. None for a survey-only study."""
+    from app.models.interview import ProjectAnalysis
+
+    best = None
+    for project in study.projects:
+        cand = (
+            db.query(ProjectAnalysis)
+            .filter(ProjectAnalysis.project_id == project.id, ProjectAnalysis.status == "ready")
+            .order_by(ProjectAnalysis.version.desc())
+            .first()
+        )
+        if cand and (best is None or (cand.generated_at or datetime.min) > (best.generated_at or datetime.min)):
+            best = cand
+    return best
+
+
+def _stub_integration(themes: list[dict], survey_inputs: list[dict], study_context: dict) -> dict:
+    """Deterministic integration for dev/test (no Anthropic key)."""
+    first_signal = ""
+    for s in survey_inputs:
+        for d in s.get("discoveries", []):
+            first_signal = d.get("title", "")
+            break
+        if first_signal:
+            break
+    jd = [{
+        "theme_title": t.get("title", ""),
+        "survey_signal": first_signal if i == 0 else "",
+        "confidence": "supported" if (i == 0 and first_signal) else "directional",
+        "counter_evidence": "",
+    } for i, t in enumerate(themes)]
+    decision = study_context.get("decision_to_inform") or study_context.get("study_name", "the decision")
+    return {
+        "verdict": f"Act on what the interviews surfaced; the survey corroborates the leading theme. ({decision})",
+        "confidence": "supported" if first_signal else "directional",
+        "joint_display": jd,
+        "gaps": ["Survey and interviews cover the same population but not the same time window."],
+    }
+
+
+def _integration_llm(db: Session, study: Study, inputs: dict) -> dict:
+    from app.services._clients import get_anthropic_client
+    from app.services.usage_logger import log_claude_usage
+    from app.services.analysis import _is_output_format_error
+
+    model = ai_models.analysis()  # Opus 4.8
+    user = f"<inputs>\n{json.dumps(inputs)}\n</inputs>\n\nReturn the integration JSON now."
+    client = get_anthropic_client()
+    base = dict(
+        model=model, max_tokens=4096,
+        thinking={"type": "adaptive"},
+        system=INTEGRATION_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user}],
+        **ai_models.temperature_kwargs(model, 0.3),
+    )
+    for use_schema in (True, False):
+        oc = {"effort": "high"}
+        if use_schema:
+            oc["format"] = {"type": "json_schema", "schema": _integration_schema()}
+        try:
+            resp = client.messages.create(output_config=oc, **base)
+            break
+        except Exception as exc:  # noqa: BLE001
+            if use_schema and _is_output_format_error(exc):
+                logger.warning("integration structured output rejected; retrying without schema: %s", exc)
+                continue
+            raise
+    log_claude_usage(db, resp, "study_analysis", company_id=study.company_id)
+    raw = next((b.text for b in resp.content if getattr(b, "type", None) == "text"), "").strip()
+    if raw.startswith("```"):
+        raw = "\n".join(l for l in raw.split("\n") if not l.strip().startswith("```")).strip()
+    return json.loads(raw)
+
+
+def run_decision_integration(db: Session, study: Study, project_analysis=None) -> dict:
+    """Produce the Decision report's integration layer (verdict / joint_display /
+    gaps). Sources qual themes from a ProjectAnalysis (NOT transcripts) and the
+    survey layer from the study's dashboards. Returns the integration dict with a
+    ``schema: "decision_v1"`` marker so the renderer/endpoint can detect it.
+    """
+    pa = project_analysis or _latest_ready_project_analysis(db, study)
+    qual = json.loads(pa.report) if (pa and pa.report) else {}
+    themes = [
+        {"title": t.get("title", ""), "summary": t.get("summary", "")}
+        for t in (qual.get("themes") or []) if isinstance(t, dict)
+    ]
+    surveys = (
+        db.query(Survey)
+        .filter(Survey.study_id == study.id, Survey.archived_at.is_(None))
+        .all()
+    )
+    survey_inputs = _build_survey_inputs(db, surveys)
+    study_context = _build_study_context(db, study)
+    inputs = {"decision": study_context, "themes": themes,
+              "surveys": survey_inputs, "min_n_threshold": DEFAULT_MIN_N}
+
+    if not settings.ANTHROPIC_API_KEY:
+        integ = _stub_integration(themes, survey_inputs, study_context)
+    else:
+        integ = _integration_llm(db, study, inputs)
+    integ["schema"] = "decision_v1"
+    return integ
+
+
+def trigger_decision_analysis(db: Session, study: Study) -> StudyAnalysis:
+    """Generate + persist the Decision report's integration as a StudyAnalysis
+    row (report marked schema:"decision_v1"). The report.html endpoint detects
+    the marker and renders the composed superset; legacy rows fall through to the
+    Quantified-Themes renderer. Mirrors trigger_study_analysis' version/error
+    handling."""
+    last = (
+        db.query(StudyAnalysis)
+        .filter(StudyAnalysis.study_id == study.id)
+        .order_by(StudyAnalysis.version.desc())
+        .first()
+    )
+    analysis = StudyAnalysis(study_id=study.id, version=(last.version + 1) if last else 1, status="generating")
+    db.add(analysis)
+    db.flush()
+    try:
+        pa = _latest_ready_project_analysis(db, study)
+        integ = run_decision_integration(db, study, pa)
+        analysis.report = json.dumps(integ)
+        analysis.inputs_snapshot = json.dumps({"project_analysis_id": getattr(pa, "id", None)})
+        analysis.status = "ready"
+        analysis.generated_at = datetime.now(timezone.utc)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Decision integration failed for study %s", study.id)
+        analysis.status = "failed"
+        analysis.error = str(exc)[:500]
+    db.commit()
+    db.refresh(analysis)
+    return analysis
+
+
 def _stub_report(
     survey_inputs: list[dict],
     transcripts: list[dict],

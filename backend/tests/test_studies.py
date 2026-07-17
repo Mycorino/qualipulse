@@ -263,11 +263,13 @@ def _seed_full_study(client, auth_headers):
     return survey
 
 
-def test_create_analysis_returns_ready_report_in_stub_mode(client, auth_headers):
-    """With no ANTHROPIC_API_KEY the service emits a deterministic stub
-    so the rest of the system can be exercised end-to-end without an
-    AI dependency. Tests run with the key blanked out, so this hits
-    the stub path."""
+def test_create_analysis_returns_ready_report_in_stub_mode(client, auth_headers, db_session):
+    """POST /analyses now generates the Decision report (schema:"decision_v1")
+    via the deterministic stub (no ANTHROPIC_API_KEY). Its JSON `report` is null
+    (it is not a Quantified-Themes payload); the document is served by report.html.
+    """
+    import json as _json
+    from app.models.study import StudyAnalysis
 
     survey = _seed_full_study(client, auth_headers)
     resp = client.post(
@@ -276,12 +278,17 @@ def test_create_analysis_returns_ready_report_in_stub_mode(client, auth_headers)
     assert resp.status_code == 201, resp.text
     data = resp.json()
     assert data["status"] == "ready"
-    assert data["report"] is not None
-    assert isinstance(data["report"]["themes"], list)
-    assert len(data["report"]["themes"]) >= 1
-    # Stub uses the discovery service as its data source; cohort gap → directional or supported.
-    confidences = {t["confidence"] for t in data["report"]["themes"]}
-    assert confidences.issubset({"directional", "supported", "strong"})
+    assert data["report"] is None  # decision_v1 doesn't validate as QuantifiedThemeReport
+
+    row = db_session.query(StudyAnalysis).filter(StudyAnalysis.id == data["id"]).first()
+    integ = _json.loads(row.report)
+    assert integ["schema"] == "decision_v1" and integ["verdict"]
+
+    html = client.get(
+        f"/studies/{survey['study_id']}/analyses/{data['id']}/report.html",
+        headers=auth_headers,
+    ).text
+    assert "Decision report" in html or "Rapport de décision" in html
 
 
 def test_latest_analysis_returns_null_initially_then_the_one_we_made(client, auth_headers):

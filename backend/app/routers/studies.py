@@ -50,8 +50,8 @@ from app.schemas.study import (
     ThemeValidationSnapshotSchema,
     ValidationSummarySchema,
 )
-from app.services.report_export import render_study_report_html
-from app.services.study_analysis import trigger_study_analysis
+from app.services.report_export import render_study_report_html, render_decision_report_html
+from app.services.study_analysis import trigger_study_analysis, trigger_decision_analysis
 from app.services.survey_analytics import build_dashboard
 from app.services.validation_surveys import (
     compute_validation_summary,
@@ -502,15 +502,22 @@ def create_analysis(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> StudyAnalysisDetail:
-    """Trigger generation of a new Quantified Themes report.
+    """Trigger generation of a new **Decision report** (the canonical study report).
 
-    v1 is synchronous: ~10-20s with the input budget we use. The endpoint
-    returns the completed (or failed) analysis. A future iteration can
-    move this to a background job + polling once the volume warrants it.
+    Synchronous (~10-20s). Produces the composed superset (approach B): it reuses
+    the interview ProjectAnalysis for the qualitative dimension (themes / personas
+    / journey / activated recs) and layers the survey signal + an integration
+    (verdict / joint display / gaps) on top — stored as schema:"decision_v1" and
+    served by report.html via the dual-path renderer.
+
+    The JSON response's `report` is null for this shape (it is not a
+    Quantified-Themes payload); the document is fetched from report.html. The
+    legacy `trigger_study_analysis` generator + Quantified-Themes renderer remain
+    for previously-stored reports.
     """
 
     study = _get_study_or_404(db, study_id, company)
-    analysis = trigger_study_analysis(db, study)
+    analysis = trigger_decision_analysis(db, study)
     return _analysis_to_detail(analysis)
 
 
@@ -675,16 +682,37 @@ def export_study_report(
             )
             turn_counts = dict(rows)
 
-    html_doc = render_study_report_html(
-        study,
-        analysis,
-        dashboards,
-        validation,
-        participants,
-        turn_counts,
-        company_name=company.name,
-        include_toolbar=not embed,
-    )
+    # Dual-path: a decision_v1 analysis renders the composed superset Decision
+    # report (qual from the ProjectAnalysis + these survey charts + integration);
+    # legacy Quantified-Themes reports render exactly as before.
+    try:
+        _rep = json.loads(analysis.report)
+    except (TypeError, ValueError):
+        _rep = {}
+    if isinstance(_rep, dict) and _rep.get("schema") == "decision_v1":
+        from app.services.study_analysis import _latest_ready_project_analysis
+        pa = _latest_ready_project_analysis(db, study)
+        html_doc = render_decision_report_html(
+            study,
+            pa,
+            dashboards,
+            _rep,
+            participants,
+            turn_counts,
+            company_name=company.name,
+            include_toolbar=not embed,
+        )
+    else:
+        html_doc = render_study_report_html(
+            study,
+            analysis,
+            dashboards,
+            validation,
+            participants,
+            turn_counts,
+            company_name=company.name,
+            include_toolbar=not embed,
+        )
     slug = re.sub(r"[^A-Za-z0-9_-]+", "_", study.name).strip("_") or "study"
     filename = f"{slug}_report_v{analysis.version}.html"
     return HTMLResponse(

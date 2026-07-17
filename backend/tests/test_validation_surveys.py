@@ -12,8 +12,13 @@ question count.
 from app.models.survey import Survey
 
 
-def _seed_study_with_analysis(client, auth_headers):
-    """Build a survey + responses + analysis, returns (study_id, analysis_id)."""
+def _seed_study_with_analysis(client, auth_headers, db_session):
+    """Build a survey + responses + a *legacy* Quantified-Themes analysis (which
+    carries the top-level themes the validation feature is built around).
+
+    POST /analyses now generates the Decision report (whose themes come from a
+    ProjectAnalysis); this fixture is survey-only, so it exercises the legacy
+    themed generator directly. Returns (study_id, analysis_id)."""
 
     survey = client.post(
         "/surveys/", headers=auth_headers, json={"name": "Validation fixture"}
@@ -66,16 +71,18 @@ def _seed_study_with_analysis(client, auth_headers):
                 },
             )
 
-    analysis = client.post(
-        f"/studies/{survey['study_id']}/analyses", headers=auth_headers
-    ).json()
-    return survey["study_id"], analysis["id"]
+    from app.models.study import Study
+    from app.services.study_analysis import trigger_study_analysis
+
+    study = db_session.query(Study).filter(Study.id == survey["study_id"]).first()
+    row = trigger_study_analysis(db_session, study)
+    return survey["study_id"], row.id
 
 
 def test_generate_validation_survey_creates_one_question_per_theme(
     client, auth_headers, db_session
 ):
-    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers, db_session)
     analysis = client.get(
         f"/studies/{study_id}/analyses/{analysis_id}", headers=auth_headers
     ).json()
@@ -106,7 +113,7 @@ def test_generate_validation_400_when_analysis_not_ready(
 ):
     """Failed-status analyses shouldn't spawn validation surveys."""
 
-    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers, db_session)
     # Force the analysis into failed state.
     from app.models.study import StudyAnalysis
     a = db_session.query(StudyAnalysis).filter(StudyAnalysis.id == analysis_id).first()
@@ -120,8 +127,8 @@ def test_generate_validation_400_when_analysis_not_ready(
     assert resp.status_code == 400
 
 
-def test_validation_summary_null_until_generated(client, auth_headers):
-    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers)
+def test_validation_summary_null_until_generated(client, auth_headers, db_session):
+    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers, db_session)
     resp = client.get(
         f"/studies/{study_id}/analyses/{analysis_id}/validation",
         headers=auth_headers,
@@ -130,10 +137,10 @@ def test_validation_summary_null_until_generated(client, auth_headers):
     assert resp.json() is None
 
 
-def test_validation_summary_aggregates_responses(client, auth_headers):
+def test_validation_summary_aggregates_responses(client, auth_headers, db_session):
     """Submit a few validation responses, then check the per-theme summary."""
 
-    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers)
+    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers, db_session)
     # Spawn the validation survey.
     spawn = client.post(
         f"/studies/{study_id}/analyses/{analysis_id}/validation-survey",
@@ -185,8 +192,8 @@ def test_validation_summary_aggregates_responses(client, auth_headers):
         assert snap["distribution"]["5"] == 5
 
 
-def test_validation_404_for_other_workspace(client, auth_headers):
-    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers)
+def test_validation_404_for_other_workspace(client, auth_headers, db_session):
+    study_id, analysis_id = _seed_study_with_analysis(client, auth_headers, db_session)
     # Sign up Company B.
     client.post(
         "/auth/signup",

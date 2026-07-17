@@ -519,6 +519,341 @@ _ANALYSIS_CSS = _BASE_DOC_CSS + """
 """
 
 
+# ── Reusable qualitative report sections ────────────────────────────────────
+# Extracted from render_analysis_report_html so the Decision report can compose
+# the SAME qual exhibits (themes, personas, journey, activated recs, matrix,
+# plan) from a ProjectAnalysis without duplicating the markup. Each returns the
+# section HTML, or "" when its data is empty. `accent` params let the Decision
+# report re-ink the SVGs bordeaux while the qual report stays green.
+
+def _themes_section_html(themes: list, roster: list, annot_by_theme: dict, L: dict) -> str:
+    theme_cards = []
+    for i, theme in enumerate(themes):
+        quotes_html = ""
+        for q in theme.get("quotes", []) or []:
+            if isinstance(q, dict):
+                text, who = q.get("text", ""), q.get("participant_display_name", "")
+                ident = q.get("participant_identifier", "")
+                prompt = q.get("question_text", "")
+            else:
+                text, who, ident, prompt = str(q), "", "", ""
+            attribution = " · ".join(x for x in [_esc(ident), _esc(who)] if x)
+            prompt_html = f'<div class="quote__prompt">{L["quote_prompt"]}: “{_esc(prompt)}”</div>' if prompt else ""
+            unverified_html = (
+                f'<div class="quote__unverified">{L["quote_unverified"]}</div>'
+                if isinstance(q, dict) and q.get("verified") is False
+                else ""
+            )
+            quotes_html += f"""
+            <blockquote class="quote avoid-break">
+              <p>“{_esc(text)}”</p>
+              <footer>— {attribution or L["anonymous"]}</footer>
+              {prompt_html}
+              {unverified_html}
+            </blockquote>"""
+
+        disconfirm = theme.get("disconfirming_evidence", "")
+        disconfirm_html = f"""
+            <div class="callout callout--warn avoid-break">
+              <div class="callout__title">{L["disconfirming"]}</div>
+              <p>{_esc(disconfirm)}</p>
+            </div>""" if disconfirm else ""
+
+        rnote = theme.get("researcher_note", "")
+        rnote_html = f"""
+            <div class="callout callout--note avoid-break">
+              <div class="callout__title">{L["researcher_note"]}</div>
+              <p>{_esc(rnote)}</p>
+            </div>""" if rnote else ""
+
+        annot = annot_by_theme.get(theme.get("title", ""))
+        annot_html = ""
+        if annot:
+            annot_label = L.get(f"annot_{annot.status}", _esc(annot.status))
+            note = f' — {_esc(annot.researcher_note)}' if annot.researcher_note else ""
+            annot_html = f'<div class="annot annot--{_esc(annot.status)}">{annot_label}{note}</div>'
+
+        theme_cards.append(f"""
+        <article class="theme">
+          <div class="theme__head avoid-break">
+            <span class="theme__num">{i + 1:02d}</span>
+            <h3 class="theme__title">{_esc(theme.get("title", ""))}</h3>
+            {_freq_meter(theme.get("frequency", ""), L)}
+          </div>
+          {annot_html}
+          <p class="theme__summary">{_esc(theme.get("summary", ""))}</p>
+          {quotes_html}
+          {disconfirm_html}
+          {rnote_html}
+        </article>""")
+
+    return f"""
+    <section class="page-break">
+      <h2 class="section-title">{L["themes_title"]}</h2>
+      <p class="section-sub">{L["themes_sub"]}</p>
+      {"".join(theme_cards)}
+    </section>
+    """ if themes else ""
+
+
+def _evidence_map_html(themes: list, roster: list, L: dict) -> str:
+    if not (themes and roster):
+        return ""
+    head_cells = "".join(
+        '<th title="{}">{}</th>'.format(_esc(name), pid)
+        for pid, name, _ in roster
+    )
+    off_dot = '<span class="dot dot--off"></span>'
+    body_rows = ""
+    for i, theme in enumerate(themes):
+        on_dot = '<span class="dot dot--on"></span>'
+        quoted = {
+            q.get("participant_display_name", "")
+            for q in (theme.get("quotes", []) or [])
+            if isinstance(q, dict)
+        }
+        cells = "".join(
+            "<td>{}</td>".format(on_dot if (p.display_name or "") in quoted else off_dot)
+            for _, _, p in roster
+        )
+        title_cell = _esc(theme.get("title", ""))
+        body_rows += '<tr><td class="ev__theme">{}</td>{}</tr>'.format(title_cell, cells)
+    legend = " · ".join(
+        "<strong>{}</strong> {}".format(pid, _esc(name))
+        for pid, name, _ in roster
+    )
+    return f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["evidence_map"]}</h2>
+      <p class="section-sub">{L["evidence_map_sub"]}</p>
+      <table class="ev">
+        <thead><tr><th class="ev__theme">{L["theme_col"]}</th>{head_cells}</tr></thead>
+        <tbody>{body_rows}</tbody>
+      </table>
+      <p class="ev__legend">{legend}</p>
+    </section>
+    """
+
+
+def _personas_section_html(personas: list, L: dict) -> str:
+    def _persona_list(persona: dict, key: str, label: str) -> str:
+        items = [x for x in (persona.get(key) or []) if x]
+        if not items:
+            return ""
+        lis = "".join(f"<li>{_esc(x)}</li>" for x in items)
+        return f'<div class="persona__list"><h5>{label}</h5><ul>{lis}</ul></div>'
+
+    def _persona_html(p: dict) -> str:
+        seg = p.get("segment") or ""
+        seg_html = f'<div class="persona__seg">{_esc(seg)}</div>' if seg else ""
+        pills = "".join(
+            f'<span class="persona__pill">{_esc(x)}</span>'
+            for x in (p.get("grounded_in") or []) if x
+        )
+        from_html = (
+            f'<div class="persona__from"><span class="persona__from-label">'
+            f'{L["persona_built_from"]}</span>{pills}</div>' if pills else ""
+        )
+        goals = _persona_list(p, "goals", L["persona_goals"])
+        frus = _persona_list(p, "frustrations", L["persona_frustrations"])
+        behav = _persona_list(p, "behaviours", L["persona_behaviours"])
+        job = (
+            f'<p class="persona__job"><b>{L["persona_job"]}</b> {_esc(p.get("primary_job", ""))}</p>'
+            if p.get("primary_job") else ""
+        )
+        aq = p.get("anchor_quote")
+        aq_html = ""
+        if isinstance(aq, dict) and aq.get("text"):
+            unv = (
+                f'<div class="quote__unverified">{L["quote_unverified"]}</div>'
+                if aq.get("verified") is False else ""
+            )
+            who = _esc(aq.get("participant_identifier", ""))
+            aq_html = (
+                f'<blockquote class="quote avoid-break"><p>“{_esc(aq["text"])}”</p>'
+                f'<footer>— {who or L["anonymous"]}</footer>{unv}</blockquote>'
+            )
+        return f"""
+        <article class="persona avoid-break">
+          <h3 class="persona__name">{_esc(p.get("name", ""))}</h3>
+          {seg_html}{from_html}
+          <p class="persona__oneliner">{_esc(p.get("one_liner", ""))}</p>
+          {goals}{frus}{behav}{job}{aq_html}
+        </article>"""
+
+    return f"""
+    <section>
+      <h2 class="section-title">{L["personas_title"]}</h2>
+      <p class="section-sub">{L["personas_sub"]}</p>
+      <div class="persona-grid">{"".join(_persona_html(p) for p in personas if isinstance(p, dict))}</div>
+    </section>
+    """ if personas else ""
+
+
+def _journey_section_html(journey, L: dict, accent: str) -> str:
+    journey_stages = [s for s in (journey.get("stages") or []) if isinstance(s, dict)] \
+        if isinstance(journey, dict) else []
+    journey_applicable = bool(journey.get("applicable")) if isinstance(journey, dict) else False
+    if not (journey_applicable and len(journey_stages) >= 2):
+        return ""
+    j_svg = _svg_journey_map(journey, L, accent)
+    rows = ""
+    for s in journey_stages:
+        q = s.get("quote") if isinstance(s.get("quote"), dict) else {}
+        qtext = (q or {}).get("text", "")
+        unv = (
+            f' <span class="quote__unverified">{L["quote_unverified"]}</span>'
+            if isinstance(q, dict) and q.get("verified") is False else ""
+        )
+        try:
+            emo_str = f"{int(round(float(s.get('emotion', 0)))):+d}"
+        except (TypeError, ValueError):
+            emo_str = "0"
+        qcell = f'“{_esc(qtext)}”{unv}' if qtext else "—"
+        rows += (
+            f'<tr><td class="journey__stage">{_esc(s.get("name", ""))}</td>'
+            f'<td>{_esc(s.get("goal", ""))}</td>'
+            f'<td class="journey__emo">{emo_str}</td>'
+            f'<td>{qcell}</td>'
+            f'<td class="journey__pain">{_esc(s.get("pain", "")) or "—"}</td>'
+            f'<td>{_esc(s.get("opportunity", "")) or "—"}</td></tr>'
+        )
+    jlabel = _esc(journey.get("label", ""))
+    jlabel_html = f'<p class="journey__label">{jlabel}</p>' if jlabel else ""
+    return f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["journey_title"]}</h2>
+      <p class="section-sub">{L["journey_sub"]}</p>
+      {jlabel_html}
+      {j_svg}
+      <table class="journey__table">
+        <thead><tr>
+          <th>{L["journey_stage"]}</th><th>{L["journey_goal"]}</th><th>{L["journey_emotion"]}</th>
+          <th>{L["journey_quote_col"]}</th><th>{L["journey_pain"]}</th><th>{L["journey_opportunity"]}</th>
+        </tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </section>
+    """
+
+
+def _jtbd_section_html(jtbds: list, L: dict) -> str:
+    jtbd_cards = "".join(f"""
+        <article class="jtbd avoid-break">
+          <p class="jtbd__job">{_esc(j.get("job", ""))}</p>
+          <p class="jtbd__insight"><strong>{L["insight"]}:</strong> {_esc(j.get("insight", ""))}</p>
+          {_freq_meter(j.get("frequency", ""), L)}
+        </article>""" for j in jtbds)
+    return f"""
+    <section>
+      <h2 class="section-title">{L["jtbd_title"]}</h2>
+      <p class="section-sub">{L["jtbd_sub"]}</p>
+      <div class="jtbd-grid">{jtbd_cards}</div>
+    </section>
+    """ if jtbds else ""
+
+
+def _tensions_section_html(tensions: list, L: dict) -> str:
+    tension_cards = "".join(f"""
+        <article class="tension avoid-break">
+          <h3 class="tension__label">{_esc(t.get("tension", ""))}</h3>
+          <p>{_esc(t.get("detail", ""))}</p>
+        </article>""" for t in tensions)
+    return f"""
+    <section>
+      <h2 class="section-title">{L["tensions_title"]}</h2>
+      <p class="section-sub">{L["tensions_sub"]}</p>
+      {tension_cards}
+    </section>
+    """ if tensions else ""
+
+
+def _reco_card_html(r, i: int, L: dict) -> str:
+    """One recommendation — rich card for objects, plain line for legacy strings."""
+    if not isinstance(r, dict):
+        return (
+            f'<li class="reco avoid-break"><span class="reco__num">{i + 1}</span>'
+            f'<p>{_esc(r)}</p></li>'
+        )
+    horizon = L.get("horizon_" + str(r.get("horizon", "")).replace("-", "_"), "")
+    tags = []
+    if r.get("owner_role"):
+        tags.append(f'<span class="reco__tag"><b>{L["reco_owner"]}</b>{_esc(r["owner_role"])}</span>')
+    if horizon:
+        tags.append(f'<span class="reco__tag"><b>{L["reco_horizon"]}</b>{horizon}</span>')
+    if r.get("impact"):
+        lvl = L.get("level_" + str(r["impact"]).lower(), _esc(r["impact"]))
+        tags.append(f'<span class="reco__tag reco__tag--impact"><b>{L["impact_label"]}</b>{lvl}</span>')
+    if r.get("effort"):
+        lvl = L.get("level_" + str(r["effort"]).lower(), _esc(r["effort"]))
+        tags.append(f'<span class="reco__tag reco__tag--effort"><b>{L["effort_label"]}</b>{lvl}</span>')
+    meta = f'<div class="reco__meta">{"".join(tags)}</div>' if tags else ""
+    rationale = f'<p class="reco__rationale">{_esc(r.get("rationale", ""))}</p>' if r.get("rationale") else ""
+    kpi = f'<p class="reco__kpi"><b>{L["reco_kpi"]}</b>{_esc(r["kpi"])}</p>' if r.get("kpi") else ""
+    fals = f'<p class="reco__falsifier"><b>{L["reco_falsifier"]}</b>{_esc(r["falsifier"])}</p>' if r.get("falsifier") else ""
+    return f"""
+        <li class="reco reco--rich avoid-break">
+          <span class="reco__num">{i + 1}</span>
+          <div class="reco__body">
+            <p class="reco__action">{_esc(r.get("action", ""))}</p>
+            {rationale}{meta}{kpi}{fals}
+          </div>
+        </li>"""
+
+
+def _recommendations_section_html(recommendations: list, L: dict) -> str:
+    reco_items = "".join(_reco_card_html(r, i, L) for i, r in enumerate(recommendations))
+    return f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["recos_title"]}</h2>
+      <p class="section-sub">{L["recos_sub"]}</p>
+      <ol class="recos">{reco_items}</ol>
+    </section>
+    """ if recommendations else ""
+
+
+def _priority_matrix_section_html(recommendations: list, L: dict, accent: str) -> str:
+    matrix_svg = _svg_priority_matrix(recommendations, L, accent)
+    return f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["matrix_title"]}</h2>
+      <p class="section-sub">{L["matrix_sub"]}</p>
+      {matrix_svg}
+    </section>
+    """ if matrix_svg else ""
+
+
+def _plan_section_html(recommendations: list, L: dict) -> str:
+    plan_buckets: dict[str, list] = {"now": [], "30d": [], "60_90d": []}
+    for r in recommendations:
+        if isinstance(r, dict):
+            h = str(r.get("horizon", "")).replace("-", "_")
+            if h in plan_buckets:
+                plan_buckets[h].append(r)
+
+    def _plan_items(items: list) -> str:
+        if not items:
+            return '<div class="plan__empty">—</div>'
+        out = []
+        for it in items:
+            owner = it.get("owner_role", "")
+            owner_html = f'<span class="plan__owner">{_esc(owner)}</span>' if owner else ""
+            out.append(f'<div class="plan__item">{_esc(it.get("action", ""))}{owner_html}</div>')
+        return "".join(out)
+
+    plan_cols = "".join(
+        f'<div class="plan__col"><div class="plan__when">{L["horizon_" + k]}</div>{_plan_items(plan_buckets[k])}</div>'
+        for k in ("now", "30d", "60_90d")
+    )
+    return f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["plan_title"]}</h2>
+      <p class="section-sub">{L["plan_sub"]}</p>
+      <div class="plan">{plan_cols}</div>
+    </section>
+    """ if any(plan_buckets.values()) else ""
+
+
 def render_analysis_report_html(
     project,
     analysis,
@@ -667,335 +1002,16 @@ def render_analysis_report_html(
     </section>
     """
 
-    # ── themes ────────────────────────────────────────────────────────────
-    theme_cards = []
-    for i, theme in enumerate(themes):
-        quotes_html = ""
-        for q in theme.get("quotes", []) or []:
-            if isinstance(q, dict):
-                text, who = q.get("text", ""), q.get("participant_display_name", "")
-                ident = q.get("participant_identifier", "")
-                prompt = q.get("question_text", "")
-            else:
-                text, who, ident, prompt = str(q), "", "", ""
-            attribution = " · ".join(x for x in [_esc(ident), _esc(who)] if x)
-            prompt_html = f'<div class="quote__prompt">{L["quote_prompt"]}: “{_esc(prompt)}”</div>' if prompt else ""
-            # Only flag when verification explicitly failed. Absent `verified`
-            # (legacy reports / fixtures generated before quote-checking) shows
-            # no marker so we never imply a clean quote is suspect.
-            unverified_html = (
-                f'<div class="quote__unverified">{L["quote_unverified"]}</div>'
-                if isinstance(q, dict) and q.get("verified") is False
-                else ""
-            )
-            quotes_html += f"""
-            <blockquote class="quote avoid-break">
-              <p>“{_esc(text)}”</p>
-              <footer>— {attribution or L["anonymous"]}</footer>
-              {prompt_html}
-              {unverified_html}
-            </blockquote>"""
-
-        disconfirm = theme.get("disconfirming_evidence", "")
-        disconfirm_html = f"""
-            <div class="callout callout--warn avoid-break">
-              <div class="callout__title">{L["disconfirming"]}</div>
-              <p>{_esc(disconfirm)}</p>
-            </div>""" if disconfirm else ""
-
-        rnote = theme.get("researcher_note", "")
-        rnote_html = f"""
-            <div class="callout callout--note avoid-break">
-              <div class="callout__title">{L["researcher_note"]}</div>
-              <p>{_esc(rnote)}</p>
-            </div>""" if rnote else ""
-
-        annot = annot_by_theme.get(theme.get("title", ""))
-        annot_html = ""
-        if annot:
-            annot_label = L.get(f"annot_{annot.status}", _esc(annot.status))
-            note = f' — {_esc(annot.researcher_note)}' if annot.researcher_note else ""
-            annot_html = f'<div class="annot annot--{_esc(annot.status)}">{annot_label}{note}</div>'
-
-        theme_cards.append(f"""
-        <article class="theme">
-          <div class="theme__head avoid-break">
-            <span class="theme__num">{i + 1:02d}</span>
-            <h3 class="theme__title">{_esc(theme.get("title", ""))}</h3>
-            {_freq_meter(theme.get("frequency", ""), L)}
-          </div>
-          {annot_html}
-          <p class="theme__summary">{_esc(theme.get("summary", ""))}</p>
-          {quotes_html}
-          {disconfirm_html}
-          {rnote_html}
-        </article>""")
-
-    themes_section = f"""
-    <section class="page-break">
-      <h2 class="section-title">{L["themes_title"]}</h2>
-      <p class="section-sub">{L["themes_sub"]}</p>
-      {"".join(theme_cards)}
-    </section>
-    """ if themes else ""
-
-    # ── evidence map ──────────────────────────────────────────────────────
-    evidence_section = ""
-    if themes and completed:
-        head_cells = "".join(
-            '<th title="{}">{}</th>'.format(_esc(name), pid)
-            for pid, name, _ in roster
-        )
-        off_dot = '<span class="dot dot--off"></span>'
-        body_rows = ""
-        for i, theme in enumerate(themes):
-            on_dot = '<span class="dot dot--on"></span>'
-            quoted = {
-                q.get("participant_display_name", "")
-                for q in (theme.get("quotes", []) or [])
-                if isinstance(q, dict)
-            }
-            cells = "".join(
-                "<td>{}</td>".format(on_dot if (p.display_name or "") in quoted else off_dot)
-                for _, _, p in roster
-            )
-            title_cell = _esc(theme.get("title", ""))
-            body_rows += '<tr><td class="ev__theme">{}</td>{}</tr>'.format(title_cell, cells)
-        legend = " · ".join(
-            "<strong>{}</strong> {}".format(pid, _esc(name))
-            for pid, name, _ in roster
-        )
-        evidence_section = f"""
-    <section class="avoid-break">
-      <h2 class="section-title">{L["evidence_map"]}</h2>
-      <p class="section-sub">{L["evidence_map_sub"]}</p>
-      <table class="ev">
-        <thead><tr><th class="ev__theme">{L["theme_col"]}</th>{head_cells}</tr></thead>
-        <tbody>{body_rows}</tbody>
-      </table>
-      <p class="ev__legend">{legend}</p>
-    </section>
-    """
-
-    # ── personas ──────────────────────────────────────────────────────────
-    # Grounded archetypes. Rendered only when the model produced them (it is
-    # instructed to return [] at small N / no clustering) — an empty list omits
-    # the whole section, exactly like tensions/JTBD.
-    def _persona_list(persona: dict, key: str, label: str) -> str:
-        items = [x for x in (persona.get(key) or []) if x]
-        if not items:
-            return ""
-        lis = "".join(f"<li>{_esc(x)}</li>" for x in items)
-        return f'<div class="persona__list"><h5>{label}</h5><ul>{lis}</ul></div>'
-
-    def _persona_html(p: dict) -> str:
-        seg = p.get("segment") or ""
-        seg_html = f'<div class="persona__seg">{_esc(seg)}</div>' if seg else ""
-        pills = "".join(
-            f'<span class="persona__pill">{_esc(x)}</span>'
-            for x in (p.get("grounded_in") or []) if x
-        )
-        from_html = (
-            f'<div class="persona__from"><span class="persona__from-label">'
-            f'{L["persona_built_from"]}</span>{pills}</div>' if pills else ""
-        )
-        goals = _persona_list(p, "goals", L["persona_goals"])
-        frus = _persona_list(p, "frustrations", L["persona_frustrations"])
-        behav = _persona_list(p, "behaviours", L["persona_behaviours"])
-        job = (
-            f'<p class="persona__job"><b>{L["persona_job"]}</b> {_esc(p.get("primary_job", ""))}</p>'
-            if p.get("primary_job") else ""
-        )
-        aq = p.get("anchor_quote")
-        aq_html = ""
-        if isinstance(aq, dict) and aq.get("text"):
-            unv = (
-                f'<div class="quote__unverified">{L["quote_unverified"]}</div>'
-                if aq.get("verified") is False else ""
-            )
-            who = _esc(aq.get("participant_identifier", ""))
-            aq_html = (
-                f'<blockquote class="quote avoid-break"><p>“{_esc(aq["text"])}”</p>'
-                f'<footer>— {who or L["anonymous"]}</footer>{unv}</blockquote>'
-            )
-        return f"""
-        <article class="persona avoid-break">
-          <h3 class="persona__name">{_esc(p.get("name", ""))}</h3>
-          {seg_html}{from_html}
-          <p class="persona__oneliner">{_esc(p.get("one_liner", ""))}</p>
-          {goals}{frus}{behav}{job}{aq_html}
-        </article>"""
-
-    personas_section = f"""
-    <section>
-      <h2 class="section-title">{L["personas_title"]}</h2>
-      <p class="section-sub">{L["personas_sub"]}</p>
-      <div class="persona-grid">{"".join(_persona_html(p) for p in personas if isinstance(p, dict))}</div>
-    </section>
-    """ if personas else ""
-
-    # ── journey / emotion map ─────────────────────────────────────────────
-    # Only for experiential studies: the model sets applicable=false + stages=[]
-    # for attitudinal work, and we need ≥2 stages to draw an arc.
-    journey_stages = [s for s in (journey.get("stages") or []) if isinstance(s, dict)] \
-        if isinstance(journey, dict) else []
-    journey_applicable = bool(journey.get("applicable")) if isinstance(journey, dict) else False
-    journey_section = ""
-    if journey_applicable and len(journey_stages) >= 2:
-        j_svg = _svg_journey_map(journey, L, _accent("qual"))
-        rows = ""
-        for s in journey_stages:
-            q = s.get("quote") if isinstance(s.get("quote"), dict) else {}
-            qtext = (q or {}).get("text", "")
-            unv = (
-                f' <span class="quote__unverified">{L["quote_unverified"]}</span>'
-                if isinstance(q, dict) and q.get("verified") is False else ""
-            )
-            try:
-                emo_str = f"{int(round(float(s.get('emotion', 0)))):+d}"
-            except (TypeError, ValueError):
-                emo_str = "0"
-            qcell = f'“{_esc(qtext)}”{unv}' if qtext else "—"
-            rows += (
-                f'<tr><td class="journey__stage">{_esc(s.get("name", ""))}</td>'
-                f'<td>{_esc(s.get("goal", ""))}</td>'
-                f'<td class="journey__emo">{emo_str}</td>'
-                f'<td>{qcell}</td>'
-                f'<td class="journey__pain">{_esc(s.get("pain", "")) or "—"}</td>'
-                f'<td>{_esc(s.get("opportunity", "")) or "—"}</td></tr>'
-            )
-        jlabel = _esc(journey.get("label", ""))
-        jlabel_html = f'<p class="journey__label">{jlabel}</p>' if jlabel else ""
-        journey_section = f"""
-    <section class="avoid-break">
-      <h2 class="section-title">{L["journey_title"]}</h2>
-      <p class="section-sub">{L["journey_sub"]}</p>
-      {jlabel_html}
-      {j_svg}
-      <table class="journey__table">
-        <thead><tr>
-          <th>{L["journey_stage"]}</th><th>{L["journey_goal"]}</th><th>{L["journey_emotion"]}</th>
-          <th>{L["journey_quote_col"]}</th><th>{L["journey_pain"]}</th><th>{L["journey_opportunity"]}</th>
-        </tr></thead>
-        <tbody>{rows}</tbody>
-      </table>
-    </section>
-    """
-
-    # ── JTBD ──────────────────────────────────────────────────────────────
-    jtbd_cards = "".join(f"""
-        <article class="jtbd avoid-break">
-          <p class="jtbd__job">{_esc(j.get("job", ""))}</p>
-          <p class="jtbd__insight"><strong>{L["insight"]}:</strong> {_esc(j.get("insight", ""))}</p>
-          {_freq_meter(j.get("frequency", ""), L)}
-        </article>""" for j in jtbds)
-    jtbd_section = f"""
-    <section>
-      <h2 class="section-title">{L["jtbd_title"]}</h2>
-      <p class="section-sub">{L["jtbd_sub"]}</p>
-      <div class="jtbd-grid">{jtbd_cards}</div>
-    </section>
-    """ if jtbds else ""
-
-    # ── tensions ──────────────────────────────────────────────────────────
-    tension_cards = "".join(f"""
-        <article class="tension avoid-break">
-          <h3 class="tension__label">{_esc(t.get("tension", ""))}</h3>
-          <p>{_esc(t.get("detail", ""))}</p>
-        </article>""" for t in tensions)
-    tensions_section = f"""
-    <section>
-      <h2 class="section-title">{L["tensions_title"]}</h2>
-      <p class="section-sub">{L["tensions_sub"]}</p>
-      {tension_cards}
-    </section>
-    """ if tensions else ""
-
-    # ── recommendations ───────────────────────────────────────────────────
-    # Dual-shape: object recommendations (action/owner/horizon/impact/effort/kpi/
-    # falsifier) render as rich cards; legacy string recommendations still render
-    # as a plain numbered line so old analyses don't break.
-    def _reco_html(r, i: int) -> str:
-        if not isinstance(r, dict):
-            return (
-                f'<li class="reco avoid-break"><span class="reco__num">{i + 1}</span>'
-                f'<p>{_esc(r)}</p></li>'
-            )
-        horizon = L.get("horizon_" + str(r.get("horizon", "")).replace("-", "_"), "")
-        tags = []
-        if r.get("owner_role"):
-            tags.append(f'<span class="reco__tag"><b>{L["reco_owner"]}</b>{_esc(r["owner_role"])}</span>')
-        if horizon:
-            tags.append(f'<span class="reco__tag"><b>{L["reco_horizon"]}</b>{horizon}</span>')
-        if r.get("impact"):
-            lvl = L.get("level_" + str(r["impact"]).lower(), _esc(r["impact"]))
-            tags.append(f'<span class="reco__tag reco__tag--impact"><b>{L["impact_label"]}</b>{lvl}</span>')
-        if r.get("effort"):
-            lvl = L.get("level_" + str(r["effort"]).lower(), _esc(r["effort"]))
-            tags.append(f'<span class="reco__tag reco__tag--effort"><b>{L["effort_label"]}</b>{lvl}</span>')
-        meta = f'<div class="reco__meta">{"".join(tags)}</div>' if tags else ""
-        rationale = f'<p class="reco__rationale">{_esc(r.get("rationale", ""))}</p>' if r.get("rationale") else ""
-        kpi = f'<p class="reco__kpi"><b>{L["reco_kpi"]}</b>{_esc(r["kpi"])}</p>' if r.get("kpi") else ""
-        fals = f'<p class="reco__falsifier"><b>{L["reco_falsifier"]}</b>{_esc(r["falsifier"])}</p>' if r.get("falsifier") else ""
-        return f"""
-        <li class="reco reco--rich avoid-break">
-          <span class="reco__num">{i + 1}</span>
-          <div class="reco__body">
-            <p class="reco__action">{_esc(r.get("action", ""))}</p>
-            {rationale}{meta}{kpi}{fals}
-          </div>
-        </li>"""
-
-    reco_items = "".join(_reco_html(r, i) for i, r in enumerate(recommendations))
-    recos_section = f"""
-    <section class="avoid-break">
-      <h2 class="section-title">{L["recos_title"]}</h2>
-      <p class="section-sub">{L["recos_sub"]}</p>
-      <ol class="recos">{reco_items}</ol>
-    </section>
-    """ if recommendations else ""
-
-    # ── priority matrix (impact × effort) ─────────────────────────────────
-    matrix_svg = _svg_priority_matrix(recommendations, L, _accent("qual"))
-    matrix_section = f"""
-    <section class="avoid-break">
-      <h2 class="section-title">{L["matrix_title"]}</h2>
-      <p class="section-sub">{L["matrix_sub"]}</p>
-      {matrix_svg}
-    </section>
-    """ if matrix_svg else ""
-
-    # ── 30-60-90 activation plan ──────────────────────────────────────────
-    # Deterministic grouping of the same object recommendations by horizon.
-    # "later" and legacy string recs carry no horizon → excluded from the roadmap.
-    plan_buckets: dict[str, list] = {"now": [], "30d": [], "60_90d": []}
-    for r in recommendations:
-        if isinstance(r, dict):
-            h = str(r.get("horizon", "")).replace("-", "_")
-            if h in plan_buckets:
-                plan_buckets[h].append(r)
-
-    def _plan_items(items: list) -> str:
-        if not items:
-            return '<div class="plan__empty">—</div>'
-        out = []
-        for it in items:
-            owner = it.get("owner_role", "")
-            owner_html = f'<span class="plan__owner">{_esc(owner)}</span>' if owner else ""
-            out.append(f'<div class="plan__item">{_esc(it.get("action", ""))}{owner_html}</div>')
-        return "".join(out)
-
-    plan_cols = "".join(
-        f'<div class="plan__col"><div class="plan__when">{L["horizon_" + k]}</div>{_plan_items(plan_buckets[k])}</div>'
-        for k in ("now", "30d", "60_90d")
-    )
-    plan_section = f"""
-    <section class="avoid-break">
-      <h2 class="section-title">{L["plan_title"]}</h2>
-      <p class="section-sub">{L["plan_sub"]}</p>
-      <div class="plan">{plan_cols}</div>
-    </section>
-    """ if any(plan_buckets.values()) else ""
+    # ── qualitative sections (shared verbatim with the Decision report) ───
+    themes_section = _themes_section_html(themes, roster, annot_by_theme, L)
+    evidence_section = _evidence_map_html(themes, roster, L)
+    personas_section = _personas_section_html(personas, L)
+    journey_section = _journey_section_html(journey, L, _accent("qual"))
+    jtbd_section = _jtbd_section_html(jtbds, L)
+    tensions_section = _tensions_section_html(tensions, L)
+    recos_section = _recommendations_section_html(recommendations, L)
+    matrix_section = _priority_matrix_section_html(recommendations, L, _accent("qual"))
+    plan_section = _plan_section_html(recommendations, L)
 
     # ── methodology contract ──────────────────────────────────────────────
     contract_items = "".join(f"<li>{item}</li>" for item in L["contract_items"])
@@ -2127,6 +2143,283 @@ def _theme_validation_row(snapshot, L: dict) -> str:
         f'<div class="validation-row"><span class="lbl">{L["validation_label"]}</span>'
         f'{bar}<span class="num">{_esc(text)}</span></div>'
     )
+
+
+# ── Decision report (approach B): qual sections + survey + integration ──────
+# Composes the SAME qualitative exhibits (from a ProjectAnalysis, via the shared
+# _*_section_html helpers) with the survey charts and a light integration layer,
+# so the combined document is a strict superset of the qualitative and survey
+# reports. Bordeaux identity (the flagship). Chrome reuses _STUDY_STRINGS with a
+# small decision-specific overlay; qual sections use _STRINGS; survey figures use
+# _SURVEY_STRINGS.
+_DECISION_STRINGS = {
+    "en": {
+        "doc_type": "Decision report",
+        "survey_title": "Survey evidence",
+        "survey_sub": "What the numbers confirm — or complicate — in the interviews.",
+        "joint_title": "Where the numbers meet the voices",
+        "joint_sub": "Each qualitative theme, checked against the survey signal.",
+        "joint_theme": "Theme", "joint_signal": "Survey signal",
+        "joint_conf": "Confidence", "joint_counter": "What weakens it",
+        "gaps_title": "What we still can't answer",
+        "footer": "Generated with QualiPulse — the decision report: interviews, survey, and the call they point to.",
+    },
+    "fr": {
+        "doc_type": "Rapport de décision",
+        "survey_title": "Signal quantitatif",
+        "survey_sub": "Ce que les chiffres confirment — ou compliquent — dans les entretiens.",
+        "joint_title": "Quand les chiffres rejoignent les voix",
+        "joint_sub": "Chaque thème qualitatif, confronté au signal du sondage.",
+        "joint_theme": "Thème", "joint_signal": "Signal du sondage",
+        "joint_conf": "Confiance", "joint_counter": "Ce qui l'affaiblit",
+        "gaps_title": "Ce qu'on ne peut pas encore trancher",
+        "footer": "Généré avec QualiPulse — le rapport de décision : entretiens, sondage et la décision qu'ils éclairent.",
+    },
+}
+
+_DECISION_EXTRA_CSS = """
+.decision-verdict { background: var(--accent-tint); border-left: 3px solid var(--accent);
+  padding: 18px 22px; max-width: 680px; margin-bottom: 6px; }
+.decision-verdict .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent); }
+.decision-verdict p { font-family: var(--serif); font-size: 1.3rem; line-height: 1.45;
+  font-weight: 500; margin-top: 6px; }
+.q-block { margin: 20px 0 24px; break-inside: avoid; }
+.chart-title { font-family: var(--serif); font-size: 1.02rem; font-weight: 600; margin-bottom: 8px; }
+.chart-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
+.fig-takeaway { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+.samples { margin: 8px 0 0; padding-left: 16px; }
+.samples .quote { border: 0; padding: 2px 0; margin: 4px 0; }
+.joint { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.joint th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-2); border-bottom: 1.5px solid var(--rule-strong);
+  padding: 0 10px 6px 0; }
+.joint td { border-bottom: 1px solid var(--rule); padding: 8px 10px 8px 0; vertical-align: top; }
+.joint__counter { color: var(--copper); }
+.gaps-list { margin: 6px 0 0; padding: 0; list-style: none; }
+.gaps-list li { border-left: 3px solid var(--amber); background: var(--amber-tint);
+  padding: 8px 14px; margin: 6px 0; font-size: 13px; }
+.idx-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 8px 0 20px; }
+.idx-table th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-2); border-bottom: 1.5px solid var(--rule-strong);
+  padding: 0 14px 6px 0; }
+.idx-table td { border-bottom: 1px solid var(--rule); padding: 8px 14px 8px 0; }
+"""
+
+
+def render_decision_report_html(
+    study,
+    project_analysis,
+    dashboards: list,
+    integration: dict | None = None,
+    participants: list | None = None,
+    turn_counts: dict | None = None,
+    company_name: str = "",
+    include_toolbar: bool = True,
+) -> str:
+    """Superset "Decision report": qual exhibits (from ProjectAnalysis) + survey
+    charts (from dashboards) + integration (verdict / joint display / gaps).
+
+    ``project_analysis`` — the interview ProjectAnalysis (its .report supplies
+    themes/personas/journey/activated-recs); may be None (survey-only study).
+    ``dashboards`` — SurveyDashboardPayload list (survey charts).
+    ``integration`` — {verdict, confidence, joint_display[], gaps[]} from the
+    integration pass (Phase 3); optional — the qual + survey layers stand alone.
+    """
+    participants = participants or []
+    turn_counts = turn_counts or {}
+    integration = integration or {}
+
+    company_lang = getattr(getattr(study, "company", None), "preferred_language", None)
+    lang = "fr" if (company_lang or "en").lower().startswith("fr") else "en"
+    Lq = _STRINGS[lang]                                   # qual section labels
+    Ls = {**_STUDY_STRINGS[lang], **_DECISION_STRINGS[lang]}  # chrome
+    Lf = _SURVEY_STRINGS[lang]                            # survey-figure labels
+
+    qual = json.loads(project_analysis.report) if (project_analysis and project_analysis.report) else {}
+    themes = qual.get("themes", []) or []
+    personas = qual.get("personas", []) or []
+    journey = qual.get("journey") or {}
+    jtbds = qual.get("jobs_to_be_done", []) or []
+    tensions = qual.get("tensions", []) or []
+    recommendations = qual.get("recommendations", []) or []
+
+    completed = [p for p in participants if p.status == "completed"]
+    completed.sort(key=lambda p: (p.completed_at or p.started_at or datetime.min))
+    roster = [("P{}".format(i + 1), (p.display_name or "{} {}".format(Lq["anonymous"], i + 1)), p)
+              for i, p in enumerate(completed)]
+
+    accent = _accent("mixed")
+    n_responses = sum(getattr(d, "n_completed", 0) for d in dashboards)
+    n_interviews = len(completed)
+    generated = _fmt_date(getattr(project_analysis, "generated_at", None), lang)
+
+    # ── header ────────────────────────────────────────────────────────────
+    header = f"""
+    <header class="cover">
+      <div class="cover__brand">
+        <span class="cover__logo">QualiPulse</span>
+        <span class="cover__doctype">{Ls["doc_type"]}</span>
+      </div>
+      <h1 class="cover__title">{_esc(study.name)}</h1>
+      <div class="cover__meta">
+        <span class="chip chip--strong">{n_responses} {Ls["responses"]}</span>
+        <span class="chip chip--strong">{n_interviews} {Ls["interviews"]}</span>
+        <span class="chip chip--ghost">{Ls["generated"]} {generated}</span>
+      </div>
+    </header>
+    """
+
+    # ── verdict (integration) ─────────────────────────────────────────────
+    verdict = integration.get("verdict")
+    verdict_html = ""
+    if verdict:
+        conf = integration.get("confidence")
+        chip = _study_confidence_chip(conf, Ls) if conf else ""
+        verdict_html = f"""
+    <section class="avoid-break">
+      <div class="decision-verdict">
+        <span class="lbl">{Ls["verdict_label"]}</span> {chip}
+        <p>{_esc(verdict)}</p>
+      </div>
+    </section>
+    """
+
+    # ── qualitative sections (shared helpers; bordeaux SVGs) ──────────────
+    themes_section = _themes_section_html(themes, roster, {}, Lq)
+    evidence_section = _evidence_map_html(themes, roster, Lq)
+    personas_section = _personas_section_html(personas, Lq)
+    journey_section = _journey_section_html(journey, Lq, accent)
+    jtbd_section = _jtbd_section_html(jtbds, Lq)
+    tensions_section = _tensions_section_html(tensions, Lq)
+    recos_section = _recommendations_section_html(recommendations, Lq)
+    matrix_section = _priority_matrix_section_html(recommendations, Lq, accent)
+    plan_section = _plan_section_html(recommendations, Lq)
+
+    # ── survey evidence (charts) ──────────────────────────────────────────
+    figures = "".join(
+        _survey_question_figure(q, Lf, lang, accent)
+        for dash in dashboards for q in dash.questions
+        if getattr(q, "n_answered", 0)
+    )
+    survey_section = f"""
+    <section>
+      <h2 class="section-title">{Ls["survey_title"]}</h2>
+      <p class="section-sub">{Ls["survey_sub"]}</p>
+      {figures}
+    </section>
+    """ if figures else ""
+
+    # ── joint display (integration): theme × survey signal ────────────────
+    jd = integration.get("joint_display") or []
+    joint_section = ""
+    if jd:
+        rows = "".join(
+            f'<tr><td>{_esc(x.get("theme_title", ""))}</td>'
+            f'<td>{_esc(x.get("survey_signal", "") or "—")}</td>'
+            f'<td>{_study_confidence_chip(x.get("confidence", ""), Ls) if x.get("confidence") else "—"}</td>'
+            f'<td class="joint__counter">{_esc(x.get("counter_evidence", "") or "—")}</td></tr>'
+            for x in jd
+        )
+        joint_section = f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{Ls["joint_title"]}</h2>
+      <p class="section-sub">{Ls["joint_sub"]}</p>
+      <table class="joint">
+        <thead><tr><th>{Ls["joint_theme"]}</th><th>{Ls["joint_signal"]}</th>
+          <th>{Ls["joint_conf"]}</th><th>{Ls["joint_counter"]}</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </section>
+    """
+
+    # ── gaps (integration) ────────────────────────────────────────────────
+    gaps = [g for g in (integration.get("gaps") or []) if g]
+    gaps_section = ""
+    if gaps:
+        lis = "".join(f"<li>{_esc(g)}</li>" for g in gaps)
+        gaps_section = f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{Ls["gaps_title"]}</h2>
+      <ul class="gaps-list">{lis}</ul>
+    </section>
+    """
+
+    # ── methodology + evidence index ──────────────────────────────────────
+    contract_items = "".join(f"<li>{item}</li>" for item in Ls["contract_items"])
+    contract = f'<div class="contract avoid-break"><h4>{Ls["contract_title"]}</h4><ul>{contract_items}</ul></div>'
+
+    survey_rows = "".join(
+        f'<tr><td>{_esc(getattr(d, "name", ""))}</td><td>{_esc(getattr(d, "status", ""))}</td>'
+        f'<td>{len(d.questions)}</td><td>{getattr(d, "n_completed", 0)}</td></tr>'
+        for d in dashboards
+    )
+    survey_index = f"""
+      <h3 class="eyebrow">{Ls["idx_surveys"]}</h3>
+      <table class="idx-table"><thead><tr>
+        <th>{Ls["col_instrument"]}</th><th>{Ls["col_status"]}</th>
+        <th>{Ls["col_questions"]}</th><th>{Ls["col_completed"]}</th></tr></thead>
+      <tbody>{survey_rows}</tbody></table>
+    """ if dashboards else ""
+
+    part_rows = "".join(
+        f'<tr><td>{pid}</td><td>{_esc(name)}</td><td>{_esc(p.profession) or "—"}</td>'
+        f'<td>{_esc(p.country) or "—"}</td><td>{turn_counts.get(p.id, "—")}</td></tr>'
+        for pid, name, p in roster
+    )
+    part_index = f"""
+      <h3 class="eyebrow">{Ls["idx_interviews"]}</h3>
+      <table class="idx-table"><thead><tr>
+        <th>{Ls["col_id"]}</th><th>{Ls["col_name"]}</th><th>{Ls["col_profession"]}</th>
+        <th>{Ls["col_country"]}</th><th>{Ls["col_turns"]}</th></tr></thead>
+      <tbody>{part_rows}</tbody></table>
+    """ if roster else ""
+
+    methodology = f"""
+    <section class="page-break">
+      <h2 class="section-title">{Ls["sec_methodology"]}</h2>
+      {contract}
+      {survey_index}
+      {part_index}
+    </section>
+    """
+
+    toolbar = f'<div class="toolbar"><button onclick="window.print()">{Ls["print_btn"]}</button></div>' if include_toolbar else ""
+    title = f"{study.name} — {Ls['doc_type']}"
+    return f"""<!doctype html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{_esc(title)}</title>
+<style>{_ANALYSIS_CSS + _palette_css("mixed") + _DECISION_EXTRA_CSS}</style>
+</head>
+<body>
+{toolbar}
+<div class="sheet">
+{header}
+{verdict_html}
+{themes_section}
+{evidence_section}
+{personas_section}
+{journey_section}
+{jtbd_section}
+{tensions_section}
+{survey_section}
+{joint_section}
+{recos_section}
+{matrix_section}
+{plan_section}
+{gaps_section}
+{methodology}
+<footer class="doc-footer">
+  <span><strong>QualiPulse</strong> · {_esc(company_name)}</span>
+  <span>{Ls["footer"]}</span>
+</footer>
+</div>
+</body>
+</html>"""
 
 
 def render_study_report_html(

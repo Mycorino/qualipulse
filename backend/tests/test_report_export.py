@@ -376,3 +376,78 @@ def test_report_export_new_sections_french(client, auth_headers, db_session, pro
     assert "Parcours d'expérience" in body
     assert "Plan d'activation" in body
     assert "Responsable" in body  # reco owner label localised
+
+
+# ── Decision report: a strict superset of the qualitative + survey reports ──
+
+from types import SimpleNamespace as _NS  # noqa: E402
+from app.services.report_export import render_decision_report_html  # noqa: E402
+
+
+def _fake_dashboard():
+    q1 = _NS(type="mc_single", n_answered=48, mean=None, prompt="Why did you last cancel?",
+             takeaway="Price is the #1 trigger.",
+             breakdown={"choices": [
+                 {"choice_id": "a", "label": "Price increase", "count": 22, "percentage": 46.0, "ci_low": 32, "ci_high": 60},
+                 {"choice_id": "b", "label": "Finished a show", "count": 14, "percentage": 29.0, "ci_low": 17, "ci_high": 44}]})
+    q2 = _NS(type="likert", n_answered=40, mean=3.8, prompt="How likely to return?", takeaway=None,
+             breakdown={"histogram": [{"bucket": str(b), "count": c} for b, c in enumerate([3, 5, 10, 14, 8], 1)]})
+    return _NS(name="Streaming pulse", status="closed", n_completed=48, questions=[q1, q2])
+
+
+def _decision_fixture(lang="en"):
+    qual = _make_rich_report()  # themes, personas, journey, object recs
+    turn = _NS(turn_index=0, question_text="Q", response_transcript="I always check the tracking page twice a day", tts_audio_url=None)
+    parts = [
+        _NS(id=f"p{i}", status="completed", display_name=n, profession="PM", age_range="30-44",
+            country="UK", quality_label="strong", quality_score=0.9,
+            completed_at=datetime(2026, 7, i + 1), started_at=datetime(2026, 7, i + 1), turns=[turn])
+        for i, n in enumerate(["Alice M.", "Ben K."])
+    ]
+    pa = _NS(report=json.dumps(qual), generated_at=datetime(2026, 7, 10), version=2)
+    study = _NS(name="Why subscribers churn", company=_NS(preferred_language=lang, name="Acme"))
+    integration = {
+        "verdict": "Ship the pause feature and simplify cancellation.",
+        "confidence": "supported",
+        "joint_display": [{"theme_title": "Trust is earned at delivery",
+                           "survey_signal": "46% cancelled on a price increase (n=48)",
+                           "confidence": "supported", "counter_evidence": "Heavy users unaffected."}],
+        "gaps": ["No active-subscriber contrast group."],
+    }
+    return study, pa, [_fake_dashboard()], integration, parts
+
+
+def test_decision_report_is_superset():
+    study, pa, dashboards, integration, parts = _decision_fixture("en")
+    html = render_decision_report_html(study, pa, dashboards, integration, parts, {"p0": 7, "p1": 6}, company_name="Acme")
+    # qualitative exhibits (from ProjectAnalysis)
+    assert "Personas" in html and "persona__name" in html
+    assert "<polyline" in html          # journey emotion arc
+    assert "Priority matrix" in html and "<circle" in html
+    assert "Activation plan" in html
+    assert "Owner" in html              # activated recommendations
+    # survey layer
+    assert "Survey evidence" in html and "chart-title" in html and "<rect" in html
+    # integration layer (neither single report has these)
+    assert "decision-verdict" in html and "Ship the pause feature" in html
+    assert 'class="joint"' in html and "46% cancelled" in html
+    assert "gaps-list" in html and "contrast group" in html
+
+
+def test_decision_report_survey_only_degrades():
+    # No ProjectAnalysis (survey-only study) → still renders survey + verdict/gaps,
+    # just omits the qual-only exhibits. Still >= the standalone survey report.
+    study, _, dashboards, integration, parts = _decision_fixture("en")
+    html = render_decision_report_html(study, None, dashboards, integration, [], {}, company_name="Acme")
+    assert "Survey evidence" in html and "chart-title" in html
+    assert "Ship the pause feature" in html   # verdict still present
+    assert "The Anxious Reorderer" not in html  # no qual data → persona omitted, no crash
+    assert "Built from" not in html
+
+
+def test_decision_report_french_chrome():
+    study, pa, dashboards, integration, parts = _decision_fixture("fr")
+    html = render_decision_report_html(study, pa, dashboards, integration, parts, {}, company_name="Acme")
+    assert "Rapport de décision" in html
+    assert "Signal quantitatif" in html
+    assert "Quand les chiffres rejoignent les voix" in html
