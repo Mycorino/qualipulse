@@ -1482,6 +1482,133 @@ def _quanti_report(lang: str) -> dict:
     }
 
 
+def _decision_integration(lang: str) -> dict:
+    """Hand-authored ``decision_v1`` integration layer for the demo Study.
+
+    This is what a real "generate analysis" now produces (approach B): the
+    interview themes come from the refined ``ProjectAnalysis`` (``_v2_report``),
+    the survey charts from the seeded dashboards, and THIS layer keys each survey
+    signal to a qualitative theme + states the verdict and the open gaps. So the
+    demo's ``report.html`` renders the canonical Decision-report superset on
+    first login, not the legacy Quantified-Themes document.
+
+    The survey-signal strings are reused verbatim from :func:`_quanti_report`, so
+    there's a single source of truth for the demo's survey numbers and the joint
+    display can never drift from the charts above it. ``theme_title`` values are
+    copied verbatim from ``_v2_report`` so the joint display lines up with the
+    interview themes the reader just read.
+    """
+    q = _quanti_report(lang)
+    # [NPS/recommendation gap, value-tracks-usage, anchor service, churn trigger]
+    sig = [(t.get("survey_signal") or {}).get("summary", "") for t in q["themes"]]
+
+    if lang == "fr":
+        return {
+            "schema": "decision_v1",
+            "verdict": (
+                "Investir d'abord sur l'expérience de rupture de stock "
+                "(validation des substitutions à l'avance) plutôt que sur le "
+                "prix : c'est la friction la plus citée chez les détractrices, "
+                "le premier motif d'abandon dans les réponses libres, et le "
+                "seul levier corroboré par les deux méthodes. Réserve : le coût "
+                "de switch n'est pas encore chiffré — le sondage de suivi doit "
+                "précéder tout investissement lourd."
+            ),
+            "confidence": "supported",
+            "joint_display": [
+                {
+                    "theme_title": "Le coût de switch invisible verrouille la fidélité",
+                    "survey_signal": sig[2],
+                    "confidence": "supported",
+                    "counter_evidence": (
+                        "Les occasionnelles n'ont pas d'enseigne d'ancrage — "
+                        "l'ancrage est peut-être la conséquence de la régularité, "
+                        "pas sa cause."
+                    ),
+                },
+                {
+                    "theme_title": "Les ruptures de stock érodent la confiance plus que les frais",
+                    "survey_signal": sig[0],
+                    "confidence": "supported",
+                    "counter_evidence": (
+                        "Une cliente sur quatre (profil petits paniers) se dit "
+                        "indifférente aux ruptures et ne regarde que le total."
+                    ),
+                },
+                {
+                    "theme_title": "La sensibilité prix dépend du profil, pas du service",
+                    "survey_signal": sig[1],
+                    "confidence": "directional",
+                    "counter_evidence": (
+                        "Le questionnaire ne distingue pas « je paie trop cher » "
+                        "de « je n'utilise pas assez » — l'écart peut refléter la "
+                        "fréquence d'usage."
+                    ),
+                },
+            ],
+            "gaps": [
+                "Le coût de switch (temps de reconstruction des listes et de "
+                "l'historique) n'est pas encore chiffré — impossible de fixer un "
+                "seuil de bascule.",
+                "Le questionnaire et les entretiens couvrent la même population "
+                "mais pas la même fenêtre temporelle.",
+                "Aucune donnée sur l'efficacité réelle d'une validation des "
+                "substitutions — à tester avant tout déploiement.",
+            ],
+        }
+
+    return {
+        "schema": "decision_v1",
+        "verdict": (
+            "Ship a pause state before touching price: a planned, show-driven "
+            "cancellation is the dominant churn trigger in the open responses, "
+            "the recommendation gap between light and heavy streamers is the "
+            "clearest quantitative signal, and it's the one lever both methods "
+            "corroborate. Caveat: the cost of re-acquiring a lapsed subscriber "
+            "isn't yet quantified — the follow-up survey should precede any "
+            "heavy build."
+        ),
+        "confidence": "supported",
+        "joint_display": [
+            {
+                "theme_title": "Subscribers want a pause state, not a binary on/off",
+                "survey_signal": sig[3],
+                "confidence": "supported",
+                "counter_evidence": (
+                    "The survey can't tell a genuine pause-seeker from someone "
+                    "who would have churned anyway — intent isn't behaviour."
+                ),
+            },
+            {
+                "theme_title": "Cancellation friction is a re-acquisition tax",
+                "survey_signal": sig[0],
+                "confidence": "supported",
+                "counter_evidence": (
+                    "One in four light streamers is indifferent to friction and "
+                    "only watches the monthly total — a pure-price segment exists."
+                ),
+            },
+            {
+                "theme_title": "Loyalty lives at the catalogue, not at the brand",
+                "survey_signal": sig[2],
+                "confidence": "directional",
+                "counter_evidence": (
+                    "Light streamers have no anchor service — anchoring may be a "
+                    "consequence of heavy use, not a cause of loyalty."
+                ),
+            },
+        ],
+        "gaps": [
+            "The cost of re-acquiring a lapsed subscriber vs. the cost of a "
+            "pause save-offer is unmeasured — we can't price the trade-off yet.",
+            "Survey and interviews cover the same population but not the same "
+            "time window.",
+            "No evidence on how well a pause state actually retains — needs an "
+            "A/B before any heavy build.",
+        ],
+    }
+
+
 def _seed_demo_survey(
     db: Session, study: Study, company_id: str, lang: str, now: datetime
 ) -> Survey:
@@ -1853,7 +1980,10 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             study_id=demo_study.id,
             version=1,
             status="ready",
-            report=json.dumps(_quanti_report(lang)),
+            # decision_v1: the canonical Decision-report superset. report.html
+            # composes the qual themes from the ProjectAnalysis above + the
+            # survey charts + this integration layer (verdict/joint display/gaps).
+            report=json.dumps(_decision_integration(lang)),
             generated_at=now - timedelta(hours=6),
             created_at=now - timedelta(hours=6),
         )

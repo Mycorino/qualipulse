@@ -14,7 +14,6 @@ from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.models.study import StudyAnalysis
 from app.models.survey import Survey, SurveyQuestion, SurveyResponse
-from app.schemas.study import QuantifiedThemeReport
 from app.services.demo_seeder import (
     DEMO_PROJECT_NAME,
     DEMO_PROJECT_NAME_FR,
@@ -331,7 +330,7 @@ class TestDemoStudyIsHybrid:
         assert len(responses) == 44
         assert all(r.completed_at is not None for r in responses)
 
-    def test_seed_creates_quantified_themes_report(self, db_session):
+    def test_seed_creates_decision_report(self, db_session):
         company = _make_company(db_session)
         project = seed_demo_project(db_session, company.id)
 
@@ -345,41 +344,50 @@ class TestDemoStudyIsHybrid:
         assert analysis.status == "ready"
         assert analysis.generated_at is not None
 
-        # Report must validate against the public schema.
-        report = QuantifiedThemeReport.model_validate_json(analysis.report)
-        assert len(report.themes) == 4
-        assert report.generated_with_survey_count == 1
-        assert report.generated_with_interview_count == 4
+        # The demo now ships the canonical Decision report (approach B): a
+        # decision_v1 integration layer that report.html composes with the
+        # interview themes (from the ProjectAnalysis) and the survey charts.
+        report = json.loads(analysis.report)
+        assert report["schema"] == "decision_v1"
 
-        # The demo must showcase the full rigor furniture — verdict, gaps,
-        # per-theme counter-evidence, falsifiable success tests — so first
+        # The demo must showcase the full rigor furniture — a verdict, open
+        # gaps, and per-row survey signal + counter-evidence — so first
         # impressions match what real generations produce.
-        assert report.verdict
-        assert report.gaps
-        for theme in report.themes:
-            assert theme.counter_evidence
-            assert theme.recommendation.success_test
+        assert report["verdict"]
+        assert report["gaps"]
+        jd = report["joint_display"]
+        assert len(jd) == 3
+        for row in jd:
+            assert row["theme_title"]
+            assert row["survey_signal"]      # keyed to a real seeded survey number
+            assert row["counter_evidence"]
 
-    def _assert_anchor_quotes_verbatim(self, db_session, company):
+    def _assert_joint_display_lines_up_with_qual(self, db_session, company):
+        """Every joint-display theme_title must be copied verbatim from the
+        refined ProjectAnalysis, so the Decision report's integration layer can
+        never drift from the interview themes it sits beside. (The qual anchor
+        quotes themselves are verbatim-checked by
+        test_seed_quotes_are_substrings_of_real_transcripts.)"""
         project = seed_demo_project(db_session, company.id)
-        all_transcripts = "\n".join(
-            t.response_transcript or ""
-            for t in db_session.query(InterviewTurn)
-            .join(Participant)
-            .filter(Participant.project_id == project.id)
-            .all()
-        )
         analysis = (
             db_session.query(StudyAnalysis)
             .filter(StudyAnalysis.study_id == project.study_id)
             .one()
         )
-        report = QuantifiedThemeReport.model_validate_json(analysis.report)
-        for theme in report.themes:
-            ev = theme.interview_evidence
-            assert ev is not None
-            assert ev.anchor_quote in all_transcripts, (
-                f"anchor quote not verbatim: {ev.anchor_quote!r}"
+        report = json.loads(analysis.report)
+        qual = (
+            db_session.query(ProjectAnalysis)
+            .filter(
+                ProjectAnalysis.project_id == project.id,
+                ProjectAnalysis.status == "ready",
+            )
+            .order_by(ProjectAnalysis.version.desc())
+            .first()
+        )
+        qual_titles = {t["title"] for t in json.loads(qual.report)["themes"]}
+        for row in report["joint_display"]:
+            assert row["theme_title"] in qual_titles, (
+                f"joint-display theme not in qual analysis: {row['theme_title']!r}"
             )
 
     def test_demo_survey_responses_do_not_consume_survey_quota(self, db_session):
@@ -399,13 +407,13 @@ class TestDemoStudyIsHybrid:
             f"demo survey leaked into quota: {status.surveys_active}"
         )
 
-    def test_en_report_anchor_quotes_are_real_transcript_substrings(self, db_session):
+    def test_en_joint_display_lines_up_with_qual(self, db_session):
         company = _make_company(db_session, preferred_language="en")
-        self._assert_anchor_quotes_verbatim(db_session, company)
+        self._assert_joint_display_lines_up_with_qual(db_session, company)
 
-    def test_fr_report_anchor_quotes_are_real_transcript_substrings(self, db_session):
+    def test_fr_joint_display_lines_up_with_qual(self, db_session):
         company = _make_company(db_session, preferred_language="fr")
-        self._assert_anchor_quotes_verbatim(db_session, company)
+        self._assert_joint_display_lines_up_with_qual(db_session, company)
 
 
 class TestDemoProjectExcludedFromQuota:
