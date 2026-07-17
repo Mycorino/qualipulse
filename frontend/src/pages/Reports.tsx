@@ -1,11 +1,15 @@
 import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import {
+  ReportCatalogEntry,
+  ReportKind,
   StudySummary,
+  fetchProjectReportHtml,
   fetchStudyReportHtml,
-  getLatestAnalysis,
+  fetchSurveyReportHtml,
+  listReportCatalog,
   listStudies,
 } from "../api/studies";
 import { SynthesisSummary, listSyntheses } from "../api/synthesis";
@@ -19,47 +23,63 @@ import { useToast } from "../components/Toast";
  *
  * This is not a launcher into studies: each row opens the finished report
  * itself (the print-ready HTML the study/analysis produced), the same way
- * decision memos open. Two report families live at the workspace level:
+ * decision memos open. The hub lists every ready report by its **type**, and
+ * each row wears the ink of the document it opens — mirroring the three
+ * palettes in services/report_export.py (_PALETTES):
  *
- *   • Study reports  — the mixed-methods "Decision report" each Study
- *                      produces once its analysis is ready.
- *   • Decision memos — cross-study syntheses (DecisionMemoSection).
+ *   • Decision reports — the mixed-methods superset a study produces (bordeaux)
+ *   • Qualitative findings — the interview-only analysis (green)
+ *   • Survey results — the quantitative survey document (blue)
+ *   • Decision memos — cross-study syntheses (bordeaux; DecisionMemoSection)
  *
- * The page wears the report's own ink. Both families are the mixed/decision
- * family, which the exported documents render in bordeaux on warm paper
- * (services/report_export.py → _PALETTES["mixed"] + _BASE_DOC_CSS). Mirroring
- * those tokens here makes each row read as the document it opens.
+ * A mixed-methods study contributes all three of the first families: its two
+ * single-method component reports plus the Decision report that supersets them,
+ * so the reader can open either the components or the merged board document.
  */
 
-// Mirror of report_export.py _PALETTES["mixed"] + _BASE_DOC_CSS. Keep in sync.
-export const REPORT_INK = {
-  accent: "#7c2434", // bordeaux — the board-document ink
-  tint: "#f8eef0",
-  deep: "#4d1420",
-  paper: "#fcfcfa",
-  ink: "#17201b",
-  ink2: "#4c5852",
-  ink3: "#7a847e",
-  rule: "#dfe5e0",
-} as const;
+// Mirror of report_export.py _PALETTES + _BASE_DOC_CSS neutrals. Keep in sync.
+export interface ReportInk {
+  accent: string;
+  tint: string;
+  deep: string;
+  paper: string;
+  ink: string;
+  ink2: string;
+  ink3: string;
+  rule: string;
+}
 
-/** A report row styled as the document it opens: warm paper, a bordeaux
- *  spine down the left edge, the report rule for its border. */
-export const reportRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-4)",
-  flexWrap: "wrap",
-  textAlign: "left",
-  background: REPORT_INK.paper,
-  border: `1px solid ${REPORT_INK.rule}`,
-  borderLeft: `3px solid ${REPORT_INK.accent}`,
-  borderRadius: "var(--radius-md)",
-  padding: "var(--space-3) var(--space-4)",
-  color: REPORT_INK.ink,
-};
+// Shared warm-paper neutrals (from _BASE_DOC_CSS); only accent/tint/deep vary.
+const PAPER = { paper: "#fcfcfa", ink: "#17201b", ink2: "#4c5852", ink3: "#7a847e", rule: "#dfe5e0" };
 
-function ReportBadge({ label }: { label: string }) {
+const DECISION_INK: ReportInk = { accent: "#7c2434", tint: "#f8eef0", deep: "#4d1420", ...PAPER };
+const QUAL_INK: ReportInk = { accent: "#1d5c3f", tint: "#eef4ef", deep: "#10382a", ...PAPER };
+const SURVEY_INK: ReportInk = { accent: "#1e4a73", tint: "#edf2f8", deep: "#132f4b", ...PAPER };
+
+// Bordeaux is the page's own ink (headings, memos section).
+export const REPORT_INK = DECISION_INK;
+
+/** A report row styled as the document it opens: warm paper, a coloured spine
+ *  down the left edge, the report rule for its border. */
+function rowStyleFor(ink: ReportInk): CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--space-4)",
+    flexWrap: "wrap",
+    textAlign: "left",
+    background: ink.paper,
+    border: `1px solid ${ink.rule}`,
+    borderLeft: `3px solid ${ink.accent}`,
+    borderRadius: "var(--radius-md)",
+    padding: "var(--space-3) var(--space-4)",
+    color: ink.ink,
+  };
+}
+
+export const reportRowStyle = rowStyleFor(DECISION_INK);
+
+function ReportBadge({ label, ink }: { label: string; ink: ReportInk }) {
   return (
     <span
       style={{
@@ -67,8 +87,8 @@ function ReportBadge({ label }: { label: string }) {
         fontWeight: 600,
         letterSpacing: "0.06em",
         textTransform: "uppercase",
-        color: REPORT_INK.accent,
-        background: REPORT_INK.tint,
+        color: ink.accent,
+        background: ink.tint,
         borderRadius: 999,
         padding: "3px 10px",
         whiteSpace: "nowrap",
@@ -79,9 +99,9 @@ function ReportBadge({ label }: { label: string }) {
   );
 }
 
-/** Section eyebrow in the report's bordeaux ink (overrides the app-blue
- *  eyebrow so the whole page reads as one document family). */
-function ReportEyebrow({ children }: { children: React.ReactNode }) {
+/** Section eyebrow in the app-blue default, re-inked to the section's palette
+ *  so each family reads as the document colour it opens. */
+function ReportEyebrow({ children, ink }: { children: React.ReactNode; ink: ReportInk }) {
   return (
     <div
       style={{
@@ -89,7 +109,7 @@ function ReportEyebrow({ children }: { children: React.ReactNode }) {
         fontWeight: 600,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
-        color: REPORT_INK.accent,
+        color: ink.accent,
       }}
     >
       {children}
@@ -97,15 +117,96 @@ function ReportEyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** A group of report rows for one report type, in that type's ink. */
+function ReportSection({
+  ink,
+  eyebrow,
+  title,
+  sub,
+  entries,
+  badge,
+  openLabel,
+  openingLabel,
+  openingId,
+  evidenceLabel,
+  demoBadge,
+  onOpen,
+}: {
+  ink: ReportInk;
+  eyebrow: string;
+  title: string;
+  sub: string;
+  entries: ReportCatalogEntry[];
+  badge: string;
+  openLabel: string;
+  openingLabel: string;
+  openingId: string | null;
+  evidenceLabel: (e: ReportCatalogEntry) => string;
+  demoBadge: string;
+  onOpen: (e: ReportCatalogEntry) => void;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <section className="quanti-showcase__section">
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <ReportEyebrow ink={ink}>{eyebrow}</ReportEyebrow>
+        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, margin: 0, color: ink.ink }}>{title}</h2>
+        <p style={{ color: ink.ink3, fontSize: "var(--text-sm)", margin: "4px 0 0" }}>{sub}</p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+        {entries.map((e) => {
+          const rowId = rowKey(e);
+          const opening = openingId === rowId;
+          return (
+            <button
+              key={rowId}
+              type="button"
+              disabled={opening}
+              onClick={() => onOpen(e)}
+              style={{ ...rowStyleFor(ink), cursor: opening ? "progress" : "pointer" }}
+            >
+              <ReportBadge label={badge} ink={ink} />
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontWeight: 600 }}>
+                  {e.study_name}
+                  {e.is_demo && <span className="hub-demo-badge">{demoBadge}</span>}
+                </div>
+                <div style={{ fontSize: "var(--text-xs)", color: ink.ink3 }}>{evidenceLabel(e)}</div>
+              </div>
+              <span
+                style={{
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 600,
+                  color: ink.accent,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span aria-hidden="true">📄 </span>
+                {opening ? openingLabel : openLabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Stable per-row key/opening-id — the document target within a study. */
+function rowKey(e: ReportCatalogEntry): string {
+  return `${e.kind}:${e.project_id ?? e.survey_id ?? e.analysis_id ?? e.study_id}`;
+}
+
 export default function Reports() {
   const { t } = useTranslation("dashboard");
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
+  const [catalog, setCatalog] = useState<ReportCatalogEntry[] | null>(null);
   const [memos, setMemos] = useState<SynthesisSummary[] | null>(null);
-  // Which study report is currently being fetched (prevents double-open).
+  // Which report row is currently being fetched (prevents double-open).
   const [openingId, setOpeningId] = useState<string | null>(null);
   // ?newMemo=1 (from the workspace NBA / studies sidecar) opens the create
   // modal in DecisionMemoSection via its openSignal prop.
@@ -115,6 +216,9 @@ export default function Reports() {
     listStudies()
       .then(setStudies)
       .catch(() => toast(t("studyList.loadError"), "error"));
+    listReportCatalog()
+      .then(setCatalog)
+      .catch(() => toast(t("reports.openError"), "error"));
   }, [toast, t]);
 
   const refreshMemos = () => {
@@ -143,64 +247,68 @@ export default function Reports() {
     [studies],
   );
 
-  // A report only shows here once it actually exists — this is a library of
-  // generated documents, not a to-do list of studies to open.
-  const studyReports = useMemo(
-    () => activeStudies.filter((s) => s.has_report),
-    [activeStudies],
-  );
+  const byKind = (kind: ReportKind) => (catalog ?? []).filter((e) => e.kind === kind);
+  const decisionReports = useMemo(() => byKind("decision"), [catalog]);
+  const qualReports = useMemo(() => byKind("qualitative"), [catalog]);
+  const surveyReports = useMemo(() => byKind("survey"), [catalog]);
 
   const readyMemoCount = useMemo(
     () => (memos ?? []).filter((m) => m.status === "ready").length,
     [memos],
   );
-  const reportsCount = studyReports.length + readyMemoCount;
+  const reportsCount = (catalog?.length ?? 0) + readyMemoCount;
 
-  // Open the study's finished report document directly in a new tab —
-  // openHtmlDocument claims the tab synchronously (mobile-safe), then the
-  // callback resolves the latest analysis and fetches its report.html.
-  const openStudyReport = async (s: StudySummary) => {
-    setOpeningId(s.id);
+  // Open a report document directly in a new tab — openHtmlDocument claims the
+  // tab synchronously (mobile-safe), then the callback fetches the right
+  // print-ready HTML for the row's report type.
+  const openReport = async (e: ReportCatalogEntry) => {
+    const id = rowKey(e);
+    setOpeningId(id);
     try {
       await openHtmlDocument(async () => {
-        const analysis = await getLatestAnalysis(s.id);
-        if (!analysis || analysis.status !== "ready") {
-          throw new Error("report_not_ready");
+        if (e.kind === "decision" && e.analysis_id) {
+          return fetchStudyReportHtml(e.study_id, e.analysis_id);
         }
-        return fetchStudyReportHtml(s.id, analysis.id);
-      }, `study-report-${s.id.slice(0, 8)}.html`);
+        if (e.kind === "qualitative" && e.project_id) {
+          return fetchProjectReportHtml(e.project_id);
+        }
+        if (e.kind === "survey" && e.survey_id) {
+          return fetchSurveyReportHtml(e.survey_id);
+        }
+        throw new Error("report_not_ready");
+      }, `${e.kind}-report-${e.study_id.slice(0, 8)}.html`);
     } catch {
-      toast(t("reports.studyReports.openError"), "error");
+      toast(t("reports.openError"), "error");
     } finally {
       setOpeningId(null);
     }
   };
 
-  const evidenceLabel = (s: StudySummary) => {
+  const interviewsLabel = (n: number) => t("hub.evidence.interviews", { count: n });
+  const responsesLabel = (n: number) => t("hub.evidence.responses", { count: n });
+  const bothLabel = (e: ReportCatalogEntry) => {
     const parts: string[] = [];
-    if (s.completed_interview_count > 0) {
-      parts.push(t("hub.evidence.interviews", { count: s.completed_interview_count }));
-    }
-    if (s.completed_response_count > 0) {
-      parts.push(t("hub.evidence.responses", { count: s.completed_response_count }));
-    }
+    if (e.interviews > 0) parts.push(interviewsLabel(e.interviews));
+    if (e.responses > 0) parts.push(responsesLabel(e.responses));
     return parts.join(" · ") || "—";
   };
 
-  const hasAnyReport = studyReports.length > 0 || (memos ?? []).length > 0;
+  const hasAnyReport = (catalog?.length ?? 0) > 0 || (memos ?? []).length > 0;
+  const demoBadge = t("hub.demoBadge");
+  const loading = studies === null || catalog === null;
 
   return (
     <HubShell active="reports" studies={studies} memoCount={reportsCount} studyCount={studies?.length}>
       <div className="hub-canvas">
         <header className="hub-head">
           <div className="hub-head__text">
-            <ReportEyebrow>{t("reports.eyebrow")}</ReportEyebrow>
+            <ReportEyebrow ink={REPORT_INK}>{t("reports.eyebrow")}</ReportEyebrow>
             <h1 className="hub-head__title">{t("reports.title")}</h1>
             <p className="hub-head__sub">{t("reports.sub")}</p>
           </div>
         </header>
 
-        {studies === null ? (
+        {loading ? (
           <div className="hub-table-wrap" aria-hidden="true">
             {[0, 1, 2].map((i) => (
               <div key={i} className="hub-skel-row">
@@ -226,68 +334,64 @@ export default function Reports() {
           </div>
         ) : (
           <>
-            {/* ── Study reports ─────────────────────────────────────── */}
-            {studyReports.length > 0 && (
-              <section className="quanti-showcase__section">
-                <div style={{ marginBottom: "var(--space-4)" }}>
-                  <ReportEyebrow>{t("reports.studyReports.eyebrow")}</ReportEyebrow>
-                  <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, margin: 0, color: REPORT_INK.ink }}>
-                    {t("reports.studyReports.title")}
-                  </h2>
-                  <p style={{ color: REPORT_INK.ink3, fontSize: "var(--text-sm)", margin: "4px 0 0" }}>
-                    {t("reports.studyReports.sub")}
-                  </p>
-                </div>
+            {/* ── Decision reports (bordeaux) — the mixed-methods superset ── */}
+            <ReportSection
+              ink={DECISION_INK}
+              eyebrow={t("reports.studyReports.eyebrow")}
+              title={t("reports.studyReports.title")}
+              sub={t("reports.studyReports.sub")}
+              entries={decisionReports}
+              badge={t("reports.studyReports.badge")}
+              openLabel={t("reports.studyReports.open")}
+              openingLabel={t("reports.studyReports.opening")}
+              openingId={openingId}
+              evidenceLabel={bothLabel}
+              demoBadge={demoBadge}
+              onOpen={openReport}
+            />
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                  {studyReports.map((s) => {
-                    const opening = openingId === s.id;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        disabled={opening}
-                        onClick={() => openStudyReport(s)}
-                        style={{ ...reportRowStyle, cursor: opening ? "progress" : "pointer" }}
-                      >
-                        <ReportBadge label={t("reports.studyReports.badge")} />
-                        <div style={{ flex: 1, minWidth: 220 }}>
-                          <div style={{ fontWeight: 600 }}>
-                            {s.name}
-                            {s.is_demo && <span className="hub-demo-badge">{t("hub.demoBadge")}</span>}
-                          </div>
-                          <div style={{ fontSize: "var(--text-xs)", color: REPORT_INK.ink3 }}>
-                            {evidenceLabel(s)}
-                          </div>
-                        </div>
-                        <span
-                          style={{
-                            fontSize: "var(--text-sm)",
-                            fontWeight: 600,
-                            color: REPORT_INK.accent,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          <span aria-hidden="true">📄 </span>
-                          {opening ? t("reports.studyReports.opening") : t("reports.studyReports.open")}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+            {/* ── Qualitative findings (green) — interview-only analysis ──── */}
+            <ReportSection
+              ink={QUAL_INK}
+              eyebrow={t("reports.qualReports.eyebrow")}
+              title={t("reports.qualReports.title")}
+              sub={t("reports.qualReports.sub")}
+              entries={qualReports}
+              badge={t("reports.qualReports.badge")}
+              openLabel={t("reports.qualReports.open")}
+              openingLabel={t("reports.qualReports.opening")}
+              openingId={openingId}
+              evidenceLabel={(e) => interviewsLabel(e.interviews)}
+              demoBadge={demoBadge}
+              onOpen={openReport}
+            />
 
-            {/* ── Decision memos ────────────────────────────────────── */}
+            {/* ── Survey results (blue) — quantitative survey document ───── */}
+            <ReportSection
+              ink={SURVEY_INK}
+              eyebrow={t("reports.surveyReports.eyebrow")}
+              title={t("reports.surveyReports.title")}
+              sub={t("reports.surveyReports.sub")}
+              entries={surveyReports}
+              badge={t("reports.surveyReports.badge")}
+              openLabel={t("reports.surveyReports.open")}
+              openingLabel={t("reports.surveyReports.opening")}
+              openingId={openingId}
+              evidenceLabel={(e) => responsesLabel(e.responses)}
+              demoBadge={demoBadge}
+              onOpen={openReport}
+            />
+
+            {/* ── Decision memos (bordeaux) ─────────────────────────────── */}
             {/* DecisionMemoSection self-guards: renders create + list at ≥2
-                studies, returns null below that. It wears the same report
-                ink (bordeaux spine, warm paper) via the `ink` prop. */}
+                studies, returns null below that. It wears the report's
+                bordeaux ink (spine, warm paper) via the `ink` prop. */}
             <DecisionMemoSection
               studies={activeStudies}
               memos={memos}
               onRefresh={refreshMemos}
               openSignal={memoOpenSignal}
-              ink={{ ...REPORT_INK, rowStyle: reportRowStyle }}
+              ink={{ ...DECISION_INK, rowStyle: reportRowStyle }}
             />
           </>
         )}

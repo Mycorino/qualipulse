@@ -40,6 +40,7 @@ from app.schemas.study import (
     GeneratedValidationSurvey,
     ProjectMini,
     QuantifiedThemeReport,
+    ReportCatalogEntry,
     SoleInstrument,
     StudyAnalysisDetail,
     StudyAnalysisSummary,
@@ -79,6 +80,146 @@ def list_studies(
         .all()
     )
     return [_summary_for(db, s) for s in studies]
+
+
+@router.get("/report-catalog", response_model=list[ReportCatalogEntry])
+def report_catalog(
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> list[ReportCatalogEntry]:
+    """Every ready report document in the workspace, one row per report.
+
+    Powers the Reports hub's by-type sections. Each active study contributes
+    the reports it actually has:
+
+      • qualitative — each interview project with a ready ProjectAnalysis
+      • survey      — each survey with ≥1 completed response
+      • decision    — the latest ready Decision StudyAnalysis (mixed-methods)
+
+    A mixed-methods study therefore lists its two component reports (green
+    qualitative + blue survey) alongside the bordeaux Decision report that
+    supersets them — so the hub shows all three report identities. Declared
+    before ``/{study_id}`` so the literal path segment isn't captured by the
+    study-id path param.
+    """
+    studies = (
+        db.query(Study)
+        .filter(Study.company_id == company.id, Study.archived_at.is_(None))
+        .order_by(Study.created_at.desc())
+        .all()
+    )
+
+    entries: list[ReportCatalogEntry] = []
+    for study in studies:
+        is_demo = any(
+            p.is_demo for p in study.projects if p.archived_at is None
+        )
+
+        # ── qualitative: interview projects with a ready analysis ──────────
+        for project in study.projects:
+            if project.archived_at is not None:
+                continue
+            has_qual = (
+                db.query(ProjectAnalysis.id)
+                .filter(
+                    ProjectAnalysis.project_id == project.id,
+                    ProjectAnalysis.status == "ready",
+                )
+                .first()
+                is not None
+            )
+            if not has_qual:
+                continue
+            n_interviews = (
+                db.query(func.count(Participant.id))
+                .filter(
+                    Participant.project_id == project.id,
+                    Participant.status == "completed",
+                )
+                .scalar()
+                or 0
+            )
+            entries.append(
+                ReportCatalogEntry(
+                    kind="qualitative",
+                    study_id=study.id,
+                    study_name=study.name,
+                    is_demo=is_demo,
+                    project_id=project.id,
+                    interviews=n_interviews,
+                )
+            )
+
+        # ── survey: surveys with at least one completed response ───────────
+        for survey in study.surveys:
+            if survey.archived_at is not None:
+                continue
+            n_responses = (
+                db.query(func.count(SurveyResponse.id))
+                .filter(
+                    SurveyResponse.survey_id == survey.id,
+                    SurveyResponse.completed_at.isnot(None),
+                )
+                .scalar()
+                or 0
+            )
+            if n_responses == 0:
+                continue
+            entries.append(
+                ReportCatalogEntry(
+                    kind="survey",
+                    study_id=study.id,
+                    study_name=study.name,
+                    is_demo=is_demo,
+                    survey_id=survey.id,
+                    responses=n_responses,
+                )
+            )
+
+        # ── decision: latest ready Decision StudyAnalysis ──────────────────
+        decision = (
+            db.query(StudyAnalysis)
+            .filter(
+                StudyAnalysis.study_id == study.id,
+                StudyAnalysis.status == "ready",
+            )
+            .order_by(StudyAnalysis.version.desc())
+            .first()
+        )
+        if decision is not None:
+            n_interviews = (
+                db.query(func.count(Participant.id))
+                .join(Project, Participant.project_id == Project.id)
+                .filter(
+                    Project.study_id == study.id,
+                    Participant.status == "completed",
+                )
+                .scalar()
+                or 0
+            )
+            n_responses = (
+                db.query(func.count(SurveyResponse.id))
+                .join(Survey, SurveyResponse.survey_id == Survey.id)
+                .filter(
+                    Survey.study_id == study.id,
+                    SurveyResponse.completed_at.isnot(None),
+                )
+                .scalar()
+                or 0
+            )
+            entries.append(
+                ReportCatalogEntry(
+                    kind="decision",
+                    study_id=study.id,
+                    study_name=study.name,
+                    is_demo=is_demo,
+                    analysis_id=decision.id,
+                    interviews=n_interviews,
+                    responses=n_responses,
+                )
+            )
+
+    return entries
 
 
 @router.get("/{study_id}", response_model=StudyDetail)

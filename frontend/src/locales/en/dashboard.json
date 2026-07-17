@@ -399,6 +399,23 @@
       "open": "Open report",
       "opening": "Opening…",
       "openError": "Could not open the report."
+    },
+    "openError": "Could not open the report.",
+    "qualReports": {
+      "eyebrow": "Interviews",
+      "title": "Qualitative findings",
+      "sub": "The interview-only analysis for each study — themes, personas, journey, and recommendations.",
+      "badge": "Qualitative",
+      "open": "Open findings",
+      "opening": "Opening…"
+    },
+    "surveyReports": {
+      "eyebrow": "Survey",
+      "title": "Survey results",
+      "sub": "The quantitative results for each survey — charts, segments, and the key numbers.",
+      "badge": "Survey",
+      "open": "Open results",
+      "opening": "Opening…"
     }
   },
   "hub": {
