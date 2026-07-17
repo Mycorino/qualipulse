@@ -585,10 +585,26 @@ The content lives in `backend/app/services/_demo_data_{en,fr}.py` so the
 (exposed in `ProjectResponse` API schema) and are **excluded from the tier
 project-quota count** in `routers/projects.py` so they never block a user
 from creating their first real study. Tests:
-`backend/tests/test_demo_seeder.py` (18 tests — relationship graph, quote-tag
+`backend/tests/test_demo_seeder.py` (relationship graph, quote-tag
 offset integrity, every analysis quote appears verbatim in a real transcript,
 quota exclusion, second-study + memo seeding, memo evidence verbatim EN/FR,
-memo export render).
+memo export render, showcase-backfill round-trip).
+
+**Showcase upgrade (July 2026).** Every demo guide question carries
+`interview_notes` (probing instructions) + `desired_learning`, with
+`researcher_notes` on key questions; the demo survey is an
+**eight-question** instrument (frequency, stack mc_multi, stack-size
+mc_single kept per-respondent consistent with the mc_multi answers, a
+three-item likert battery incl. one `reverse_coded` item, NPS, open
+churn question); demo transcripts show an explicit "no audio in the
+demo" note in the Responses view (`responses.demoNoAudio` i18n key).
+Because seeding is one-shot per company, accounts seeded **before** the
+upgrade are patched by `backend/scripts/backfill_demo_showcase.py`
+(idempotent, `--dry-run` / `--company` flags; fills empty guide notes
+only, upgrades only surveys that still match the exact legacy
+five-question signature, refreshes the flagship `decision_v1`
+StudyAnalysis report from the current fixture). Run it once against
+production after deploy.
 
 ### Email Verification
 - On signup: `EmailVerificationToken` created (24h expiry). Only the verification email is sent, and it greets by **first name** ("Welcome, Marie") rather than company name (falls back to company name if first name is missing).
