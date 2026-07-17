@@ -395,5 +395,17 @@
   },
   "languagePicker": {
     "ariaLabel": "Wählen Sie Ihre Sprache"
+  },
+  "inAppBrowser": {
+    "title": "Bitte im Browser öffnen, um fortzufahren",
+    "bodyNamed": "Dieses Sprachinterview benötigt Mikrofonzugriff, den der In-App-Browser von {{app}} nicht erlaubt. Der Wechsel dauert nur wenige Sekunden.",
+    "body": "Dieses Sprachinterview benötigt Mikrofonzugriff, den dieser In-App-Browser nicht erlaubt. Der Wechsel dauert nur wenige Sekunden.",
+    "step1": "Tippen Sie auf das ⋯-Menü am Bildschirmrand",
+    "step2": "Wählen Sie „Im Browser öffnen“ (Safari oder Chrome)",
+    "openChrome": "In Chrome öffnen",
+    "copyLink": "Interview-Link kopieren",
+    "copied": "Link kopiert — fügen Sie ihn in Ihrem Browser ein",
+    "tryAnyway": "Trotzdem hier versuchen",
+    "note": "Ihr Interview-Link bleibt gültig — durch den Wechsel geht nichts verloren."
   }
 }

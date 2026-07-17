@@ -395,5 +395,17 @@
   },
   "languagePicker": {
     "ariaLabel": "Escolha o seu idioma"
+  },
+  "inAppBrowser": {
+    "title": "Abra o seu navegador para continuar",
+    "bodyNamed": "Esta entrevista por voz precisa de acesso ao microfone, que o navegador integrado do {{app}} não permite. Mudar demora apenas alguns segundos.",
+    "body": "Esta entrevista por voz precisa de acesso ao microfone, que este navegador integrado não permite. Mudar demora apenas alguns segundos.",
+    "step1": "Toque no menu ⋯ no canto do ecrã",
+    "step2": "Escolha “Abrir no navegador” (Safari ou Chrome)",
+    "openChrome": "Abrir no Chrome",
+    "copyLink": "Copiar o link da entrevista",
+    "copied": "Link copiado — cole-o no seu navegador",
+    "tryAnyway": "Tentar aqui mesmo assim",
+    "note": "O seu link de entrevista continua válido — não perde nada ao mudar."
   }
 }
