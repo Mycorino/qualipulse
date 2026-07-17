@@ -662,3 +662,35 @@ class TestDecisionIntegration:
         for needle in ("Decision report", "persona__name", "<polyline",
                        "Priority matrix", "Survey evidence", "decision-verdict", 'class="joint"'):
             assert needle in html, f"missing {needle}"
+
+    def test_decision_report_served_via_report_html(self, client, auth_headers, db_session, registered_company, monkeypatch):
+        """trigger_decision_analysis persists a decision_v1 StudyAnalysis and the
+        report.html dual-path serves the composed superset Decision report."""
+        monkeypatch.setattr("app.config.settings.ANTHROPIC_API_KEY", "")  # force stub
+        from app.models.company import Company
+        from app.models.study import Study
+        from app.services.study_analysis import trigger_decision_analysis
+
+        company = db_session.query(Company).filter(Company.email == registered_company["email"]).first()
+        company.preferred_language = "en"           # pin so EN chrome assertions hold
+        db_session.commit()
+        seed_demo_project(db_session, company.id)
+        db_session.commit()
+        study = db_session.query(Study).filter(Study.company_id == company.id).first()
+
+        analysis = trigger_decision_analysis(db_session, study)
+        assert analysis.status == "ready"
+        integ = json.loads(analysis.report)
+        assert integ["schema"] == "decision_v1" and integ["verdict"]
+
+        resp = client.get(
+            f"/studies/{study.id}/analyses/{analysis.id}/report.html",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.text
+        assert "Decision report" in body            # bordeaux chrome
+        assert integ["verdict"] in body             # integration verdict rendered
+        assert "Survey evidence" in body            # survey layer
+        assert "Built from" in body                 # qual persona card (from ProjectAnalysis)
+        assert "<polyline" in body                  # journey emotion arc

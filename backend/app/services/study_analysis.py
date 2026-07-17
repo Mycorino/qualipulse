@@ -553,6 +553,37 @@ def run_decision_integration(db: Session, study: Study, project_analysis=None) -
     return integ
 
 
+def trigger_decision_analysis(db: Session, study: Study) -> StudyAnalysis:
+    """Generate + persist the Decision report's integration as a StudyAnalysis
+    row (report marked schema:"decision_v1"). The report.html endpoint detects
+    the marker and renders the composed superset; legacy rows fall through to the
+    Quantified-Themes renderer. Mirrors trigger_study_analysis' version/error
+    handling."""
+    last = (
+        db.query(StudyAnalysis)
+        .filter(StudyAnalysis.study_id == study.id)
+        .order_by(StudyAnalysis.version.desc())
+        .first()
+    )
+    analysis = StudyAnalysis(study_id=study.id, version=(last.version + 1) if last else 1, status="generating")
+    db.add(analysis)
+    db.flush()
+    try:
+        pa = _latest_ready_project_analysis(db, study)
+        integ = run_decision_integration(db, study, pa)
+        analysis.report = json.dumps(integ)
+        analysis.inputs_snapshot = json.dumps({"project_analysis_id": getattr(pa, "id", None)})
+        analysis.status = "ready"
+        analysis.generated_at = datetime.now(timezone.utc)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Decision integration failed for study %s", study.id)
+        analysis.status = "failed"
+        analysis.error = str(exc)[:500]
+    db.commit()
+    db.refresh(analysis)
+    return analysis
+
+
 def _stub_report(
     survey_inputs: list[dict],
     transcripts: list[dict],
