@@ -399,6 +399,23 @@
       "open": "Ouvrir le rapport",
       "opening": "Ouverture…",
       "openError": "Impossible d'ouvrir le rapport."
+    },
+    "openError": "Impossible d'ouvrir le rapport.",
+    "qualReports": {
+      "eyebrow": "Entretiens",
+      "title": "Analyse qualitative",
+      "sub": "L'analyse des entretiens de chaque étude — thèmes, personas, parcours et recommandations.",
+      "badge": "Qualitatif",
+      "open": "Ouvrir l'analyse",
+      "opening": "Ouverture…"
+    },
+    "surveyReports": {
+      "eyebrow": "Questionnaire",
+      "title": "Résultats du questionnaire",
+      "sub": "Les résultats quantitatifs de chaque questionnaire — graphiques, segments et chiffres clés.",
+      "badge": "Questionnaire",
+      "open": "Ouvrir les résultats",
+      "opening": "Ouverture…"
     }
   },
   "hub": {

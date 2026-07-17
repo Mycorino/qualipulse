@@ -110,6 +110,33 @@ class StudySummary(BaseModel):
     sole_instrument: SoleInstrument | None = None
 
 
+class ReportCatalogEntry(BaseModel):
+    """One generated report document in the workspace Reports hub.
+
+    The hub lists every ready report by its type — qualitative findings
+    (green), survey results (blue), and the mixed-methods Decision report
+    (bordeaux) — each opening its own standalone print-ready document:
+
+      • qualitative → GET /projects/{project_id}/analysis/report.html
+      • survey      → GET /surveys/{survey_id}/dashboard/report.html
+      • decision    → GET /studies/{study_id}/analyses/{analysis_id}/report.html
+
+    A mixed-methods study contributes all three: the two single-method
+    component reports plus the Decision report that supersets them.
+    """
+
+    kind: Literal["qualitative", "survey", "decision"]
+    study_id: str
+    study_name: str
+    is_demo: bool = False
+    # Exactly one of these is set, per `kind`, and names the document to open.
+    project_id: str | None = None
+    survey_id: str | None = None
+    analysis_id: str | None = None
+    interviews: int = 0
+    responses: int = 0
+
+
 class StudyDetail(BaseModel):
     """Full detail for GET /studies/{id} — drives the Study Overview page."""
 

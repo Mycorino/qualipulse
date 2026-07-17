@@ -703,3 +703,48 @@ class TestDecisionIntegration:
         assert "Survey evidence" in body            # survey layer
         assert "Built from" in body                 # qual persona card (from ProjectAnalysis)
         assert "<polyline" in body                  # journey emotion arc
+
+    def test_report_catalog_lists_all_three_types(
+        self, client, auth_headers, db_session, registered_company
+    ):
+        """The Reports hub catalog surfaces every ready report by type — the
+        seeded demo (mixed flagship + qual-only exit study) yields qualitative
+        (green), survey (blue), AND decision (bordeaux) rows, each opening a
+        ready standalone document."""
+        from app.models.company import Company
+
+        company = (
+            db_session.query(Company)
+            .filter(Company.email == registered_company["email"])
+            .first()
+        )
+        seed_demo_project(db_session, company.id)
+        db_session.commit()
+
+        entries = client.get("/studies/report-catalog", headers=auth_headers).json()
+        kinds = {e["kind"] for e in entries}
+        assert {"qualitative", "survey", "decision"} <= kinds, kinds
+        assert all(e["is_demo"] for e in entries)
+
+        # Every catalog row opens its own ready report document.
+        for e in entries:
+            if e["kind"] == "qualitative":
+                r = client.get(
+                    f"/projects/{e['project_id']}/analysis/report.html",
+                    headers=auth_headers,
+                )
+            elif e["kind"] == "survey":
+                r = client.get(
+                    f"/surveys/{e['survey_id']}/dashboard/report.html",
+                    headers=auth_headers,
+                )
+            else:
+                r = client.get(
+                    f"/studies/{e['study_id']}/analyses/{e['analysis_id']}/report.html",
+                    headers=auth_headers,
+                )
+            assert r.status_code == 200, (e["kind"], r.text[:200])
+
+        # Evidence counts are populated per type.
+        assert any(e["interviews"] > 0 for e in entries if e["kind"] == "qualitative")
+        assert any(e["responses"] > 0 for e in entries if e["kind"] == "survey")

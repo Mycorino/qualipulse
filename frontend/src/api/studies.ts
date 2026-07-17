@@ -196,6 +196,45 @@ export async function fetchStudyReportHtml(
   return data;
 }
 
+/* ── Reports hub catalog: every ready report, by type ─────────────── */
+
+export type ReportKind = "qualitative" | "survey" | "decision";
+
+/** One generated report document — mirrors backend ReportCatalogEntry.
+ *  Exactly one of project_id / survey_id / analysis_id is set, per `kind`. */
+export interface ReportCatalogEntry {
+  kind: ReportKind;
+  study_id: string;
+  study_name: string;
+  is_demo: boolean;
+  project_id: string | null;
+  survey_id: string | null;
+  analysis_id: string | null;
+  interviews: number;
+  responses: number;
+}
+
+export async function listReportCatalog(): Promise<ReportCatalogEntry[]> {
+  const resp = await client.get<ReportCatalogEntry[]>("/studies/report-catalog");
+  return resp.data;
+}
+
+/** Green qualitative findings report for one interview project. */
+export async function fetchProjectReportHtml(projectId: string): Promise<Blob> {
+  const { data } = await client.get(`/projects/${projectId}/analysis/report.html`, {
+    responseType: "blob",
+  });
+  return data;
+}
+
+/** Blue survey results report for one survey. */
+export async function fetchSurveyReportHtml(surveyId: string): Promise<Blob> {
+  const { data } = await client.get(`/surveys/${surveyId}/dashboard/report.html`, {
+    responseType: "blob",
+  });
+  return data;
+}
+
 /* ── Sprint 14: Validation surveys ────────────────────────────── */
 
 export interface GeneratedValidationSurvey {
