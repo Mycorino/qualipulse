@@ -614,3 +614,51 @@ class TestDemoCrossStudySynthesis:
         resp = client.get(f"/synthesis/{memo.id}/report.html", headers=auth_headers)
         assert resp.status_code == 200, resp.text
         assert memo.name.replace("[Demo] ", "") in resp.text or memo.name in resp.text
+
+
+class TestDecisionIntegration:
+    """Phase 3: the integration pass sources qual from the ProjectAnalysis
+    (not transcripts) and produces the verdict/joint-display/gaps layer that,
+    with the reused ProjectAnalysis + dashboards, renders the Decision report
+    superset. Forced onto the deterministic stub so CI makes no API call."""
+
+    def test_integration_stub_covers_themes_and_renders(self, db_session, monkeypatch):
+        monkeypatch.setattr("app.config.settings.ANTHROPIC_API_KEY", "")  # force stub
+        from app.models.study import Study
+        from app.services import report_export as R
+        from app.services.study_analysis import (
+            run_decision_integration,
+            _latest_ready_project_analysis,
+            _build_survey_inputs,
+        )
+        from app.services.survey_analytics import build_dashboard
+        from app.models.survey import Survey as _Survey
+        from app.models.project import Project as _Project
+
+        company = _make_company(db_session)
+        seed_demo_project(db_session, company.id)
+        db_session.commit()
+        study = db_session.query(Study).filter(Study.company_id == company.id).first()
+
+        integ = run_decision_integration(db_session, study)
+        assert integ["schema"] == "decision_v1"
+        assert integ["verdict"]
+        assert integ["confidence"] in ("directional", "supported", "strong")
+        assert integ["gaps"]
+
+        # joint_display must cover exactly the qualitative theme titles.
+        pa = _latest_ready_project_analysis(db_session, study)
+        qual_titles = {t["title"] for t in json.loads(pa.report)["themes"]}
+        jd_titles = {x["theme_title"] for x in integ["joint_display"]}
+        assert jd_titles == qual_titles
+
+        # And the whole thing renders as a superset Decision report.
+        surveys = [s for s in db_session.query(_Survey).filter(_Survey.study_id == study.id).all()
+                   if s.role != "validation"]
+        dashboards = [build_dashboard(db_session, s) for s in surveys]
+        parts = [p for pr in db_session.query(_Project).filter(_Project.study_id == study.id).all()
+                 for p in pr.participants if p.status == "completed"]
+        html = R.render_decision_report_html(study, pa, dashboards, integ, parts, {}, company_name="Co")
+        for needle in ("Decision report", "persona__name", "<polyline",
+                       "Priority matrix", "Survey evidence", "decision-verdict", 'class="joint"'):
+            assert needle in html, f"missing {needle}"
