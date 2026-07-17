@@ -26,7 +26,7 @@ import { CommandPalette } from "./CommandPalette";
 
 interface HubShellProps {
   /** Which rail destination the current page belongs to. */
-  active?: "studies" | "account";
+  active?: "studies" | "reports" | "account";
   /** Optional breadcrumb row rendered at the top of the content area. */
   crumbs?: Crumb[];
   /** Preloaded studies (skips the palette's lazy fetch). */
@@ -96,8 +96,8 @@ export function HubShell({
     }
   }, [studies, fetchedStudies]);
 
-  const goMemos = useCallback(() => {
-    navigate("/studies#decision-memos");
+  const goReports = useCallback(() => {
+    navigate("/reports");
   }, [navigate]);
 
   const initial = me ? personInitials(me) : "?";
@@ -149,9 +149,14 @@ export function HubShell({
             {t("hub.nav.studies")}
             {typeof studyCount === "number" && <span className="hub-rail__count">{studyCount}</span>}
           </button>
-          <button type="button" className="hub-rail__item" onClick={goMemos}>
+          <button
+            type="button"
+            className={`hub-rail__item${active === "reports" ? " hub-rail__item--active" : ""}`}
+            aria-current={active === "reports" ? "page" : undefined}
+            onClick={goReports}
+          >
             <MemoGlyph />
-            {t("hub.nav.memos")}
+            {t("hub.nav.reports")}
             {typeof memoCount === "number" && memoCount > 0 && (
               <span className="hub-rail__count">{memoCount}</span>
             )}
@@ -261,7 +266,7 @@ export function HubShell({
         onClose={() => setPaletteOpen(false)}
         studies={paletteStudies}
         onNewStudy={() => navigate("/studies?new=1")}
-        onMemos={goMemos}
+        onMemos={goReports}
       />
     </div>
   );

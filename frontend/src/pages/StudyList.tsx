@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { StudySummary, listStudies, studyEntryPath } from "../api/studies";
 import { SynthesisSummary, listSyntheses, openSynthesisMemoInNewTab } from "../api/synthesis";
@@ -11,7 +11,6 @@ import {
   getDemoTourPhase,
   isDemoTourArmed,
 } from "../components/DemoTour";
-import { DecisionMemoSection } from "../components/DecisionMemoSection";
 import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
 import { AccountNudges } from "../components/AccountNudges";
@@ -164,10 +163,10 @@ export default function StudyList() {
   // ?new=1 opens the picker directly — used by the demo tour's final CTA.
   const [pickerOpen, setPickerOpen] = useState(() => searchParams.get("new") === "1");
   const [nudges, setNudges] = useState<Nudge[]>([]);
-  // Decision memos live here (not in DecisionMemoSection) because they also
-  // feed the workspace NBA rungs + memo nudges.
+  // Memos are still loaded here — they feed the workspace NBA rungs, memo
+  // nudges, and the sidecar highlight card. Create/list/delete live on
+  // /reports (DecisionMemoSection).
   const [memos, setMemos] = useState<SynthesisSummary[] | null>(null);
-  const [memoOpenSignal, setMemoOpenSignal] = useState(0);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<HubView>(() =>
@@ -175,7 +174,6 @@ export default function StudyList() {
   );
   const { toast } = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
   const announce = useNudgeAnnounce(nudges);
 
   // The shell's palette routes "New study" here as /studies?new=1 — react
@@ -194,16 +192,6 @@ export default function StudyList() {
       );
     }
   }, [searchParams, setSearchParams]);
-
-  // The rail's "Decision memos" item lands on /studies#decision-memos from
-  // any page — scroll once the section has data to render.
-  useEffect(() => {
-    if (location.hash !== "#decision-memos" || studies === null) return;
-    const timer = window.setTimeout(() => {
-      document.getElementById("decision-memos")?.scrollIntoView({ behavior: "smooth" });
-    }, 80);
-    return () => window.clearTimeout(timer);
-  }, [location.hash, studies]);
 
   useEffect(() => {
     listStudies()
@@ -296,16 +284,16 @@ export default function StudyList() {
     localStorage.setItem(HUB_VIEW_KEY, v);
   };
 
-  const scrollToMemos = useCallback(() => {
-    document.getElementById("decision-memos")?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+  // Decision memos now live on the dedicated /reports hub — the create flow
+  // and full list moved there. `?newMemo=1` asks that page to open the
+  // create modal on arrival.
+  const goReports = useCallback(() => navigate("/reports"), [navigate]);
 
   // The copilot's portfolio-triage suggestion — which study needs you.
   const runWorkspaceAction = (a: NextAction) => {
     if (a.actionType === "start_study") setPickerOpen(true);
     else if (a.actionType === "generate_memo" || a.actionType === "refresh_memo") {
-      setMemoOpenSignal((n) => n + 1);
-      scrollToMemos();
+      navigate("/reports?newMemo=1");
     } else if (a.targetId) navigate(`/studies/${a.targetId}`);
   };
 
@@ -740,19 +728,6 @@ export default function StudyList() {
             ) : (
               renderCards()
             )}
-
-            {/* Decision-memo creation only makes sense across 2+ of the
-                researcher's OWN studies — pass real studies/memos so it
-                stays hidden (returns null on <2) until there's real
-                cross-study work, never for the seeded demo. */}
-            {studies !== null && (
-              <DecisionMemoSection
-                studies={realStudies}
-                memos={realMemos}
-                onRefresh={refreshMemos}
-                openSignal={memoOpenSignal}
-              />
-            )}
           </div>
 
           {hasStudies && (
@@ -796,7 +771,7 @@ export default function StudyList() {
                     <button type="button" className="hub-memo__cta" onClick={() => openMemo(sidecarMemo.id)}>
                       {t("hub.memoCard.open")} →
                     </button>
-                    <button type="button" className="hub-memo__all" onClick={scrollToMemos}>
+                    <button type="button" className="hub-memo__all" onClick={goReports}>
                       {t("hub.memoCard.all")}
                     </button>
                   </div>

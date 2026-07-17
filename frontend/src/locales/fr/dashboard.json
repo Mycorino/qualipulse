@@ -386,6 +386,21 @@
     "ineligibleNote_one": "{{count}} étude sans analyse prête ne peut pas encore être incluse.",
     "ineligibleNote_other": "{{count}} études sans analyse prête ne peuvent pas encore être incluses."
   },
+  "reports": {
+    "eyebrow": "Vos livrables",
+    "title": "Rapports",
+    "sub": "Tous vos rapports générés au même endroit — ouvrez chaque document directement.",
+    "emptyAll": "Aucun rapport généré pour l'instant. Lancez l'analyse d'une étude pour produire son rapport : il apparaîtra ici.",
+    "studyReports": {
+      "eyebrow": "Par étude",
+      "title": "Rapports d'étude",
+      "sub": "Le rapport méthodes mixtes que chaque étude produit. Ouvre le document final.",
+      "badge": "Étude",
+      "open": "Ouvrir le rapport",
+      "opening": "Ouverture…",
+      "openError": "Impossible d'ouvrir le rapport."
+    }
+  },
   "hub": {
     "nav": {
       "aria": "Navigation du hub",
@@ -393,6 +408,7 @@
       "search": "Rechercher…",
       "studies": "Études",
       "memos": "Mémos de décision",
+      "reports": "Rapports",
       "account": "Compte",
       "breadcrumbAria": "Fil d'Ariane"
     },

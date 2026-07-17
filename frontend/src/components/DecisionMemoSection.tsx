@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { StudySummary } from "../api/studies";
@@ -26,14 +26,30 @@ import { useToast } from "./Toast";
 
 const POLL_MS = 5000;
 
+/** Report ink tokens (mirrors report_export.py _PALETTES["mixed"]). When
+ *  passed, the memo rows wear the same bordeaux-on-paper identity as the
+ *  documents they open. Absent → the section keeps its neutral app styling. */
+export interface ReportInk {
+  accent: string;
+  tint: string;
+  deep: string;
+  paper: string;
+  ink: string;
+  ink2: string;
+  ink3: string;
+  rule: string;
+  rowStyle: CSSProperties;
+}
+
 interface DecisionMemoSectionProps {
   studies: StudySummary[];
   memos: SynthesisSummary[] | null;
   onRefresh: () => void;
   openSignal?: number;
+  ink?: ReportInk;
 }
 
-export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: DecisionMemoSectionProps) {
+export function DecisionMemoSection({ studies, memos, onRefresh, openSignal, ink }: DecisionMemoSectionProps) {
   const { t, i18n } = useTranslation("dashboard");
   const { toast } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
@@ -122,9 +138,14 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
     <section className="quanti-showcase__section" id="decision-memos">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
         <div>
-          <div className="quanti-showcase__eyebrow">{t("decisionMemos.eyebrow")}</div>
-          <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, margin: 0 }}>{t("decisionMemos.title")}</h2>
-          <p style={{ color: "var(--text-tertiary)", fontSize: "var(--text-sm)", margin: "4px 0 0" }}>{t("decisionMemos.sub")}</p>
+          <div
+            className="quanti-showcase__eyebrow"
+            style={ink ? { color: ink.accent } : undefined}
+          >
+            {t("decisionMemos.eyebrow")}
+          </div>
+          <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, margin: 0, color: ink?.ink }}>{t("decisionMemos.title")}</h2>
+          <p style={{ color: ink?.ink3 ?? "var(--text-tertiary)", fontSize: "var(--text-sm)", margin: "4px 0 0" }}>{t("decisionMemos.sub")}</p>
         </div>
         {/* Creation entry point only once memos exist — on the empty state
             the sidecar memo card (or the NBA chip) is the single CTA, so the
@@ -154,15 +175,17 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
           {memos.map((m) => (
             <div
               key={m.id}
-              style={{
-                display: "flex", alignItems: "center", gap: "var(--space-4)", flexWrap: "wrap",
-                background: "var(--bg-surface)", border: "1px solid var(--border-default)",
-                borderRadius: "var(--radius-md)", padding: "var(--space-3) var(--space-4)",
-              }}
+              style={
+                ink?.rowStyle ?? {
+                  display: "flex", alignItems: "center", gap: "var(--space-4)", flexWrap: "wrap",
+                  background: "var(--bg-surface)", border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-md)", padding: "var(--space-3) var(--space-4)",
+                }
+              }
             >
               <div style={{ flex: 1, minWidth: 220 }}>
                 <div style={{ fontWeight: 600 }}>{m.name}</div>
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }}>
+                <div style={{ fontSize: "var(--text-xs)", color: ink?.ink3 ?? "var(--text-tertiary)" }}>
                   {t("decisionMemos.studyCount", { count: m.study_count })}
                   {m.generated_at ? ` · ${new Date(m.generated_at).toLocaleDateString(i18n.language)}` : ""}
                 </div>
@@ -185,7 +208,12 @@ export function DecisionMemoSection({ studies, memos, onRefresh, openSignal }: D
                 </span>
               )}
               {m.status === "ready" && (
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleOpen(m.id)}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={ink ? { color: ink.accent, fontWeight: 600 } : undefined}
+                  onClick={() => handleOpen(m.id)}
+                >
                   <span aria-hidden="true">📄 </span>
                   {t("decisionMemos.open")}
                 </button>
