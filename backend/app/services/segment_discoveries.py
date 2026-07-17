@@ -58,33 +58,25 @@ _DISCOVERY_STRINGS = {
     "en": {
         "num_title_above": '{seg} scores {delta} points above the overall average on "{q}"',
         "num_title_below": '{seg} scores {delta} points below the overall average on "{q}"',
-        "num_desc": (
-            "{seg} averages {seg_mean} vs {overall_mean} overall "
-            "({n} of {total} respondents; {std}σ standardised). "
-            "Worth interviewing to find out why."
-        ),
+        # Evidence only — the "worth interviewing" argument now lives in the
+        # recommendation layer (segment_recommendation.py), not on every card.
+        "num_desc": "{seg_mean} average in this segment vs {overall_mean} overall ({n} of {total} respondents).",
         "cat_title_more": '{seg} are {lift}× more likely to select "{choice}"',
         "cat_title_less": '{seg} are {lift}× less likely to select "{choice}"',
         "cat_desc": (
-            "{hits} of {n} {seg_lower} ({rate}%) selected this, "
-            "vs {overall_rate}% overall. "
-            "Worth interviewing to understand what drives the gap."
+            "{hits} of {n} in this segment ({rate}%) selected it, "
+            "vs {overall_rate}% overall."
         ),
     },
     "fr": {
         "num_title_above": "{seg} obtient {delta} points au-dessus de la moyenne générale sur « {q} »",
         "num_title_below": "{seg} obtient {delta} points en dessous de la moyenne générale sur « {q} »",
-        "num_desc": (
-            "{seg} obtient en moyenne {seg_mean} contre {overall_mean} au global "
-            "({n} répondants sur {total} ; {std}σ standardisé). "
-            "À creuser en entretien pour comprendre pourquoi."
-        ),
+        "num_desc": "{seg_mean} de moyenne dans ce segment contre {overall_mean} au global ({n} répondants sur {total}).",
         "cat_title_more": "{seg} ont {lift}× plus de chances de choisir « {choice} »",
         "cat_title_less": "{seg} ont {lift}× moins de chances de choisir « {choice} »",
         "cat_desc": (
-            "{hits} {seg_lower} sur {n} ({rate} %) l'ont sélectionné, "
-            "contre {overall_rate} % au global. "
-            "À creuser en entretien pour comprendre l'écart."
+            "{hits} sur {n} dans ce segment ({rate} %) l'ont sélectionné, "
+            "contre {overall_rate} % au global."
         ),
     },
 }
@@ -131,6 +123,11 @@ class Discovery:
     # The metric being compared (always carries forward to the Bridge).
     metric_question_id: str
     metric_question_prompt: str
+    # The segmenting question + the answer that defines the segment — lets
+    # the UI say who these people actually are ("answered 'Just one' to
+    # 'How many services…'") instead of leaving the label unexplained.
+    segment_question_prompt: str
+    segment_choice_label: str
     # Categorical metric extras (None for numeric metrics).
     metric_choice_label: str | None = None
     # Numeric metric extras.
@@ -318,12 +315,12 @@ def _numeric_discovery(
         q=_short_prompt(metric_q.prompt),
     )
     description = L["num_desc"].format(
-        seg=seg_label,
         seg_mean=_fmt_num(seg_mean, lg, 1),
         overall_mean=_fmt_num(overall_mean, lg, 1),
         n=len(seg_values),
-        total=len(response_ids),
-        std=_fmt_num(abs(delta) / overall_sd, lg, 2),
+        # The comparator pool, NOT the segment size — "12 of 12" read as if
+        # the segment were the whole sample.
+        total=len(overall_values),
     )
     return Discovery(
         id=f"d-{metric_q.id}-{seg_q.id}-{seg_choice_id}",
@@ -334,6 +331,8 @@ def _numeric_discovery(
         overall_n=len(overall_values),
         metric_question_id=metric_q.id,
         metric_question_prompt=metric_q.prompt,
+        segment_question_prompt=seg_q.prompt,
+        segment_choice_label=seg_label,
         segment_mean=seg_mean,
         overall_mean=overall_mean,
         mean_delta=delta,
@@ -411,7 +410,6 @@ def _categorical_discoveries(
         description = L["cat_desc"].format(
             hits=segment_hits,
             n=seg_n,
-            seg_lower=seg_label.lower(),
             rate=f"{seg_rate*100:.0f}",
             overall_rate=f"{overall_rate*100:.0f}",
         )
@@ -425,6 +423,8 @@ def _categorical_discoveries(
                 overall_n=total_n,
                 metric_question_id=metric_q.id,
                 metric_question_prompt=metric_q.prompt,
+                segment_question_prompt=seg_q.prompt,
+                segment_choice_label=seg_label,
                 metric_choice_label=metric_choice_label,
                 lift_ratio=lift,
                 ready_filter=[

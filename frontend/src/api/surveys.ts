@@ -372,6 +372,8 @@ export interface SegmentDiscovery {
   overall_n: number;
   metric_question_id: string;
   metric_question_prompt: string;
+  segment_question_prompt: string;
+  segment_choice_label: string;
   metric_choice_label: string | null;
   segment_mean: number | null;
   overall_mean: number | null;
@@ -385,8 +387,33 @@ export interface DiscoveriesPayload {
   discoveries: SegmentDiscovery[];
 }
 
+/** The argued-for "start here" pick rendered as the hero card above the
+ * discovery list. `definition`/`why` are localized server-side; `probes`
+ * are AI-suggested interview questions (empty when the AI fell back). */
+export interface SegmentRecommendation {
+  discovery_id: string;
+  definition: string;
+  why: string;
+  probes: string[];
+  source: "ai" | "fallback";
+}
+
+export interface RecommendationPayload {
+  survey_id: string;
+  recommendation: SegmentRecommendation | null;
+}
+
 export async function getDiscoveries(surveyId: string): Promise<DiscoveriesPayload> {
   const resp = await client.get<DiscoveriesPayload>(`/surveys/${surveyId}/discoveries`);
+  return resp.data;
+}
+
+export async function getSegmentRecommendation(
+  surveyId: string,
+): Promise<RecommendationPayload> {
+  const resp = await client.get<RecommendationPayload>(
+    `/surveys/${surveyId}/discoveries/recommendation`,
+  );
   return resp.data;
 }
 
