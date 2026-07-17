@@ -56,6 +56,10 @@ class TurnResponse(BaseModel):
     # answers go short. Null when no coaching is needed. Frontend renders as a
     # dismissable inline banner above the record button.
     coaching_hint: str | None = None
+    # What Whisper heard in the answer just submitted — powers the "We heard:
+    # …" confirmation flash. Null on the dedupe/skip paths where no fresh
+    # transcription happened.
+    transcript: str | None = None
     # PF-3: marks the warm-up turn (turn_index=0) so the frontend can soften
     # the chrome (no progress count, no skip button) and the engine knows not
     # to count it against the time budget.

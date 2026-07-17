@@ -1008,7 +1008,9 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Processing step messages (Transcribing → Thinking → Preparing next question)
 - [x] 3-minute recording time limit with countdown (last 30s in red, auto-stop)
 - [x] Personalised completion screen (name, answer count, "What happens next?" section)
-- [x] Transcript flash (4s display of transcribed answer after submit)
+- [x] Transcript flash ("We heard: …" dismissable confirmation after submit — `/respond` returns the Whisper `transcript` in `TurnResponse`)
+- [x] In-flight participant coaching: engine detects short-answer runs (2+ answers ≤15 words); Claude returns a contextual `coaching` line in its decision JSON (sanitized, static localized fallback in `_coaching_hint_for`); shown as a dismissable banner only when a run *starts*, max 2×/interview (`MAX_COACHING_HINTS`). Tests: `backend/tests/test_participant_coaching.py`
+- [x] In-app webview interstitial (Instagram/Facebook/TikTok/…): UA + capability detection in `frontend/src/utils/inAppBrowser.ts`, shown before any phase — open-in-browser steps, copy-link, Android Chrome `intent://` escape, "Try here anyway" only when recording APIs are present. QA override: `sessionStorage.qp_force_webview=1`. i18n'd in all 6 participant locales
 - [ ] Participant completion email
 - [ ] Text input fallback (accessibility)
 - [ ] Multi-language support

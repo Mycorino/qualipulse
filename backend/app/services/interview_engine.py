@@ -573,6 +573,10 @@ WHY: generic answer with no behaviour or example.
             f"Prefer a more open, specific follow-up that invites a story or example "
             f"(e.g. 'Walk me through the last time…', 'Tell me about a moment when…') "
             f"instead of moving to the next question.\n"
+            f"ALSO add a \"coaching\" key to your JSON: one short, warm sentence "
+            f"(max ~25 words, in the interview language) shown to the participant as a tip, "
+            f"gently inviting a concrete story or example about the current topic. "
+            f"Never mention answer length, evaluation, or that they are doing anything wrong.\n"
             f"</engagement>\n\n"
         )
 
@@ -650,7 +654,22 @@ WHY: generic answer with no behaviour or example.
     if "question" not in result:
         result["question"] = _fallback_follow_up(language)
 
+    # Optional participant-facing coaching line (only requested via the
+    # engagement block). Sanitize hard: it renders verbatim in the participant
+    # UI, so anything malformed or rambling falls back to the static hint.
+    result["coaching"] = _sanitize_coaching(result.get("coaching"))
+
     return result
+
+
+def _sanitize_coaching(value) -> str | None:
+    """Whitelist a model-produced coaching line for direct participant display."""
+    if not isinstance(value, str):
+        return None
+    value = " ".join(value.split())
+    if not value or len(value) > 240:
+        return None
+    return value
 
 
 # Sentinel used in InterviewTurn.question_index to mark the warm-up turn
@@ -664,6 +683,10 @@ WARMUP_QUESTION_INDEX = -1
 # misses the actual signal of a disengaging participant.
 SHORT_ANSWER_WORDS = 15
 SHORT_ANSWER_RUN = 2  # need this many short answers in a row to flag
+# Participant-facing hints are shown only when a short run *starts* (not on
+# every turn the run continues) and at most this many times per interview —
+# a tip repeated more often reads as nagging and gets banner-blindness.
+MAX_COACHING_HINTS = 2
 
 
 def _detect_short_answers(turns: list) -> dict:
@@ -684,7 +707,7 @@ def _detect_short_answers(turns: list) -> dict:
     """
     answered = [t for t in turns if t.response_transcript and t.response_transcript.strip() and t.response_transcript.strip() != "[Skipped]"]
     if not answered:
-        return {"is_short_run": False, "last_words": None, "run_length": 0}
+        return {"is_short_run": False, "last_words": None, "run_length": 0, "is_run_start": False, "run_starts": 0}
 
     def _wc(t):
         return len((t.response_transcript or "").split())
@@ -696,11 +719,37 @@ def _detect_short_answers(turns: list) -> dict:
             run += 1
         else:
             break
+
+    # Count how many distinct short runs have *started* across the whole
+    # interview (a streak hitting exactly SHORT_ANSWER_RUN). This is what
+    # gates the participant-facing hint: show it when a run starts, skip it
+    # while the run merely continues, and cap total hints per interview.
+    run_starts = 0
+    streak = 0
+    for t in answered:
+        if _wc(t) <= SHORT_ANSWER_WORDS:
+            streak += 1
+            if streak == SHORT_ANSWER_RUN:
+                run_starts += 1
+        else:
+            streak = 0
+
     return {
         "is_short_run": run >= SHORT_ANSWER_RUN,
         "last_words": last_words,
         "run_length": run,
+        "is_run_start": run == SHORT_ANSWER_RUN,
+        "run_starts": run_starts,
     }
+
+
+def _should_show_coaching(state: dict) -> bool:
+    """Participant hint gate: only at the turn a short run starts, capped."""
+    return (
+        bool(state.get("is_short_run"))
+        and bool(state.get("is_run_start"))
+        and state.get("run_starts", 0) <= MAX_COACHING_HINTS
+    )
 
 
 def _coaching_hint_for(state: dict, language: str) -> str | None:
@@ -1356,6 +1405,15 @@ def process_interview_turn(
     db.commit()
     db.refresh(new_turn)
 
+    # PF-3: participant-facing coaching. Prefer Claude's contextual line (it
+    # references the topic at hand), fall back to the static localized hint.
+    # Gated to run starts + a per-interview cap so it never reads as nagging.
+    coaching_hint = None
+    if not is_complete and _should_show_coaching(short_answer_state):
+        coaching_hint = decision.get("coaching") or _coaching_hint_for(
+            short_answer_state, context["language"]
+        )
+
     return {
         "question_text": question_text,
         "tts_audio_url": tts_audio_url,
@@ -1364,7 +1422,7 @@ def process_interview_turn(
         "question_index": new_q_index,
         "elapsed_seconds": int(context["elapsed_minutes"] * 60),
         "total_seconds": context["total_minutes"] * 60,
-        "coaching_hint": _coaching_hint_for(short_answer_state, context["language"]) if not is_complete else None,
+        "coaching_hint": coaching_hint,
         "transcript": transcript,
     }
 

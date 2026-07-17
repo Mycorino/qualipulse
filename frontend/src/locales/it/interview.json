@@ -395,5 +395,17 @@
   },
   "languagePicker": {
     "ariaLabel": "Scelga la sua lingua"
+  },
+  "inAppBrowser": {
+    "title": "Apra il browser per continuare",
+    "bodyNamed": "Questa intervista vocale richiede l'accesso al microfono, che il browser integrato di {{app}} non consente. Cambiare richiede pochi secondi.",
+    "body": "Questa intervista vocale richiede l'accesso al microfono, che questo browser integrato non consente. Cambiare richiede pochi secondi.",
+    "step1": "Tocchi il menu ⋯ nell'angolo dello schermo",
+    "step2": "Scelga “Apri nel browser” (Safari o Chrome)",
+    "openChrome": "Apri in Chrome",
+    "copyLink": "Copia il link dell'intervista",
+    "copied": "Link copiato — lo incolli nel suo browser",
+    "tryAnyway": "Prova comunque qui",
+    "note": "Il link dell'intervista resta valido — non si perde nulla cambiando."
   }
 }

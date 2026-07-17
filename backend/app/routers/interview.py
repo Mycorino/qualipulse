@@ -736,6 +736,7 @@ async def respond_to_question(
                 question_index=last_turn.question_index or 0,
                 elapsed_seconds=0,
                 total_seconds=0,
+                transcript=last_turn.response_transcript,
             )
 
     audio_data = await audio.read()
@@ -782,6 +783,7 @@ async def respond_to_question(
         elapsed_seconds=result.get("elapsed_seconds", 0),
         total_seconds=result.get("total_seconds", 0),
         coaching_hint=result.get("coaching_hint"),
+        transcript=result.get("transcript"),
         is_warmup=False,
     )
 

@@ -395,5 +395,17 @@
   },
   "languagePicker": {
     "ariaLabel": "Choose your language"
+  },
+  "inAppBrowser": {
+    "title": "Open in your browser to continue",
+    "bodyNamed": "This voice interview needs microphone access, which the {{app}} in-app browser doesn't allow. Switching takes a few seconds.",
+    "body": "This voice interview needs microphone access, which this in-app browser doesn't allow. Switching takes a few seconds.",
+    "step1": "Tap the ⋯ menu in the corner of this screen",
+    "step2": "Choose “Open in browser” (Safari or Chrome)",
+    "openChrome": "Open in Chrome",
+    "copyLink": "Copy interview link",
+    "copied": "Link copied — paste it in your browser",
+    "tryAnyway": "Try here anyway",
+    "note": "Your interview link stays valid — nothing is lost by switching."
   }
 }

@@ -27,6 +27,7 @@ import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/Par
 import PanelEnrichment from "../components/PanelEnrichment";
 import { SUPPORTED_LANGUAGES } from "../i18n";
 import { applyParticipantBranding } from "../utils/branding";
+import { detectInAppBrowser, androidChromeIntentUrl } from "../utils/inAppBrowser";
 
 // A tiny valid silent WAV. Playing this from within a user gesture (the
 // "enable microphone" tap) "unlocks" the audio element on iOS Safari, so the
@@ -123,6 +124,10 @@ export default function Interview() {
   // Set when /start is blocked by the workspace billing gate (403). Shows a
   // calm terminal message instead of a scary "Something went wrong" + retry.
   const [studyUnavailableMsg, setStudyUnavailableMsg] = useState<string | null>(null);
+  // In-app webview escape hatch (Instagram/FB/TikTok can't grant the mic).
+  // Bypass is only offered when the recording APIs are actually present.
+  const [webviewBypass, setWebviewBypass] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   // Post-interview panel re-prompt state for participants who declined earlier.
   const [repromptState, setRepromptState] = useState<"idle" | "saving" | "done" | "dismissed">("idle");
   // Inline panel-enrichment ("add more details, get more studies") on the
@@ -1123,6 +1128,90 @@ export default function Interview() {
           >
             ← {t("linkInactive.goBack")}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── In-app browser interstitial ─────────────────────────────────────────
+  // Instagram/Facebook/TikTok webviews don't grant microphone access — the
+  // participant would sail through consent and screening only to dead-end at
+  // the mic step with a misleading "check Safari settings" error. Catch them
+  // here, before they invest anything, and steer them to a real browser.
+  // QA override: sessionStorage.setItem("qp_force_webview", "1").
+  const forceWebview =
+    typeof sessionStorage !== "undefined" && sessionStorage.getItem("qp_force_webview") === "1";
+  const browserEnv = detectInAppBrowser();
+  if ((browserEnv.inApp || !browserEnv.canRecord || forceWebview) && !webviewBypass) {
+    const intentUrl = browserEnv.os === "android" ? androidChromeIntentUrl() : null;
+    const copyInterviewLink = () => {
+      const url = window.location.href;
+      const legacyCopy = () => {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand("copy");
+        } catch {
+          // best effort — the participant can still copy from the URL bar
+        }
+        document.body.removeChild(ta);
+      };
+      // Don't await the async clipboard API: some webviews leave its
+      // permission promise pending forever, which would swallow the feedback.
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(url).catch(legacyCopy);
+      } else {
+        legacyCopy();
+      }
+      setLinkCopied(true);
+    };
+    return (
+      <div className="interview-page">
+        <div className="interview-container mic-test-card">
+          <div className="mic-prompt-icon"><span aria-hidden="true">🧭</span></div>
+          <h2 className="mic-test-title">{t("inAppBrowser.title")}</h2>
+          <p className="mic-test-subtitle">
+            {browserEnv.appName
+              ? t("inAppBrowser.bodyNamed", { app: browserEnv.appName })
+              : t("inAppBrowser.body")}
+          </p>
+          <div className="mic-prompt-steps">
+            <div className="mic-prompt-step">
+              <span className="mic-prompt-num">1</span>
+              <span>{t("inAppBrowser.step1")}</span>
+            </div>
+            <div className="mic-prompt-step">
+              <span className="mic-prompt-num">2</span>
+              <span>{t("inAppBrowser.step2")}</span>
+            </div>
+          </div>
+          {intentUrl && (
+            <a className="btn btn-primary" href={intentUrl} style={{ minHeight: 44 }}>
+              {t("inAppBrowser.openChrome")}
+            </a>
+          )}
+          <button
+            className={intentUrl ? "btn btn-ghost" : "btn btn-primary"}
+            style={{ minHeight: 44, marginTop: 8 }}
+            onClick={copyInterviewLink}
+          >
+            {linkCopied ? t("inAppBrowser.copied") : t("inAppBrowser.copyLink")}
+          </button>
+          {browserEnv.canRecord && (browserEnv.inApp || forceWebview) && (
+            <button
+              className="btn btn-ghost"
+              style={{ marginTop: 12, fontSize: 13, opacity: 0.8 }}
+              onClick={() => setWebviewBypass(true)}
+            >
+              {t("inAppBrowser.tryAnyway")}
+            </button>
+          )}
+          <p className="mic-prompt-note">{t("inAppBrowser.note")}</p>
         </div>
       </div>
     );

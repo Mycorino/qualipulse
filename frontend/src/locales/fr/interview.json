@@ -395,5 +395,17 @@
   },
   "languagePicker": {
     "ariaLabel": "Choisissez votre langue"
+  },
+  "inAppBrowser": {
+    "title": "Ouvrez votre navigateur pour continuer",
+    "bodyNamed": "Cet entretien vocal a besoin du micro, que le navigateur intégré de {{app}} n'autorise pas. Changer ne prend que quelques secondes.",
+    "body": "Cet entretien vocal a besoin du micro, que ce navigateur intégré n'autorise pas. Changer ne prend que quelques secondes.",
+    "step1": "Touchez le menu ⋯ en haut de l'écran",
+    "step2": "Choisissez « Ouvrir dans le navigateur » (Safari ou Chrome)",
+    "openChrome": "Ouvrir dans Chrome",
+    "copyLink": "Copier le lien de l'entretien",
+    "copied": "Lien copié — collez-le dans votre navigateur",
+    "tryAnyway": "Essayer ici quand même",
+    "note": "Votre lien d'entretien reste valable — vous ne perdez rien en changeant."
   }
 }
