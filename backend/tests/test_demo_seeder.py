@@ -484,47 +484,23 @@ class TestDemoProjectExcludedFromQuota:
         assert resp.status_code == 403
 
 
-class TestDemoCrossStudySynthesis:
-    """The demo seeds a second exit-interview study and a ready decision memo
-    across both, so cross-study synthesis is demoable from the first login."""
+class TestDemoSecondStudy:
+    """The demo seeds a second exit-interview study with its own ready
+    qualitative analysis, so a new account lands with two studies — the
+    flagship mixed-methods Decision report plus a qualitative-findings report.
+    (The cross-study decision memo feature was retired; the second study now
+    stands on its own as a qualitative report.)"""
 
-    @staticmethod
-    def _all_transcripts(db_session, company_id: str) -> str:
-        return "\n".join(
-            t.response_transcript or ""
-            for t in db_session.query(InterviewTurn)
-            .join(Participant)
-            .join(Project, Participant.project_id == Project.id)
-            .filter(Project.company_id == company_id)
-            .all()
-        )
-
-    def test_seed_creates_second_study_and_ready_memo(self, db_session):
+    def test_seed_creates_two_studies(self, db_session):
         from app.models.study import Study
-        from app.models.synthesis import CrossStudySynthesis
-        from app.services.demo_seeder import DEMO2_PROJECT_NAME, DEMO_MEMO_NAME
+        from app.services.demo_seeder import DEMO2_PROJECT_NAME
 
         company = _make_company(db_session)
         seed_demo_project(db_session, company.id)
 
         studies = db_session.query(Study).filter(Study.company_id == company.id).all()
         assert len(studies) == 2
-        study_names = {s.name for s in studies}
-        assert DEMO2_PROJECT_NAME in study_names
-
-        memo = (
-            db_session.query(CrossStudySynthesis)
-            .filter(CrossStudySynthesis.company_id == company.id)
-            .one()
-        )
-        assert memo.status == "ready"
-        assert memo.name == DEMO_MEMO_NAME
-        assert set(json.loads(memo.study_ids)) == {s.id for s in studies}
-
-        report = json.loads(memo.report)
-        for finding in report["key_findings"]:
-            for supporting in finding["supporting_studies"]:
-                assert supporting in study_names, f"memo cites unknown study {supporting!r}"
+        assert DEMO2_PROJECT_NAME in {s.name for s in studies}
 
     def test_second_study_projects_are_demo_flagged(self, db_session):
         company = _make_company(db_session)
@@ -560,36 +536,9 @@ class TestDemoCrossStudySynthesis:
             for q in theme["quotes"]:
                 assert q["text"] in transcripts, f"Quote not in transcripts: {q['text']!r}"
 
-    def test_memo_evidence_quotes_are_verbatim(self, db_session):
-        import re
-
-        from app.models.synthesis import CrossStudySynthesis
-
-        company = _make_company(db_session)
-        seed_demo_project(db_session, company.id)
-        memo = (
-            db_session.query(CrossStudySynthesis)
-            .filter(CrossStudySynthesis.company_id == company.id)
-            .one()
-        )
-        transcripts = self._all_transcripts(db_session, company.id)
-        quoted = 0
-        for finding in json.loads(memo.report)["key_findings"]:
-            match = re.search(r'[“"«]\s?(.+?)\s?[”"»]', finding["evidence"])
-            if match is None:
-                # Survey-grounded findings cite released aggregates (means,
-                # counts, NPS) instead of a verbatim — that's legitimate.
-                continue
-            quoted += 1
-            assert match.group(1) in transcripts, f"Memo quote not verbatim: {match.group(1)!r}"
-        # The memo must still walk back to real voices: most findings carry
-        # a verbatim quote.
-        assert quoted >= 3, f"only {quoted} memo findings carry a verbatim quote"
-
-    def test_fr_seed_creates_french_memo_and_studies(self, db_session):
+    def test_fr_seed_creates_two_french_studies(self, db_session):
         from app.models.study import Study
-        from app.models.synthesis import CrossStudySynthesis
-        from app.services.demo_seeder import DEMO2_PROJECT_NAME_FR, DEMO_MEMO_NAME_FR
+        from app.services.demo_seeder import DEMO2_PROJECT_NAME_FR
 
         company = _make_company(db_session, preferred_language="fr")
         seed_demo_project(db_session, company.id)
@@ -599,43 +548,18 @@ class TestDemoCrossStudySynthesis:
         }
         assert DEMO2_PROJECT_NAME_FR in study_names
 
-        memo = (
-            db_session.query(CrossStudySynthesis)
-            .filter(CrossStudySynthesis.company_id == company.id)
-            .one()
-        )
-        assert memo.name == DEMO_MEMO_NAME_FR
-        assert memo.language == "fr"
-        # Evidence quotes verbatim in FR transcripts too (survey-grounded
-        # findings may cite aggregates instead of a verbatim).
-        transcripts = self._all_transcripts(db_session, company.id)
-        import re
-        quoted = 0
-        for finding in json.loads(memo.report)["key_findings"]:
-            match = re.search(r'[“"«]\s?(.+?)\s?[”"»]', finding["evidence"])
-            if match is None:
-                continue
-            quoted += 1
-            assert match.group(1) in transcripts, finding["evidence"]
-        assert quoted >= 3, f"only {quoted} memo findings carry a verbatim quote"
-
-    def test_demo_memo_export_renders(self, client, db_session, registered_company, auth_headers):
+    def test_seed_creates_no_cross_study_memo(self, db_session):
+        """The retired cross-study synthesis is no longer seeded."""
         from app.models.synthesis import CrossStudySynthesis
 
-        company = (
-            db_session.query(Company)
-            .filter(Company.email == registered_company["email"])
-            .first()
-        )
+        company = _make_company(db_session)
         seed_demo_project(db_session, company.id)
-        memo = (
+        memos = (
             db_session.query(CrossStudySynthesis)
             .filter(CrossStudySynthesis.company_id == company.id)
-            .one()
+            .all()
         )
-        resp = client.get(f"/synthesis/{memo.id}/report.html", headers=auth_headers)
-        assert resp.status_code == 200, resp.text
-        assert memo.name.replace("[Demo] ", "") in resp.text or memo.name in resp.text
+        assert memos == []
 
 
 class TestDecisionIntegration:
