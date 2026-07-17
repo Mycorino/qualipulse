@@ -333,14 +333,6 @@
     "collectMore": {
       "label": "Collecter plus d'entretiens ({{count}}/{{min}})",
       "reason": "L'analyse se débloque à {{min}} entretiens terminés."
-    },
-    "generateMemo": {
-      "label": "Générer un mémo de décision",
-      "reason": "{{count}} études sont analysées — synthétisez-les en un verdict exécutif."
-    },
-    "refreshMemo": {
-      "label": "Actualiser votre mémo de décision",
-      "reason": "Une étude du mémo a une analyse plus récente — le mémo ne la reflète plus."
     }
   },
   "nudges": {
@@ -348,43 +340,7 @@
     "dataMilestone": "Vous avez {{count}} entretiens terminés — assez pour lancer l'analyse.",
     "analysisStale": "{{count}} nouveaux entretiens depuis la dernière analyse — pensez à l'actualiser.",
     "qualityFlag": "Un entretien de faible qualité vient d'arriver — à vérifier.",
-    "studyReportReady": "« {{name}} » — le rapport d'analyse est prêt.",
-    "memoReady": "« {{name}} » — votre mémo de décision est prêt.",
-    "memoStale": "« {{name}} » — une étude de ce mémo a une analyse plus récente. Pensez à le régénérer."
-  },
-  "decisionMemos": {
-    "eyebrow": "Synthèse transverse",
-    "title": "Mémos de décision",
-    "sub": "Un mémo exécutif synthétisé à partir de plusieurs études terminées — verdict, preuves convergentes, divergences et zones d'ombre.",
-    "newMemo": "+ Nouveau mémo de décision",
-    "empty": "Aucun mémo pour l'instant. Choisissez au moins deux études analysées pour obtenir une synthèse prête pour la décision.",
-    "loadError": "Impossible de charger vos mémos de décision.",
-    "createdToast": "Génération du mémo lancée — il apparaîtra ci-dessous une fois prêt.",
-    "createError": "Impossible de lancer le mémo. Réessayez.",
-    "notReadyError": "Ces études doivent d'abord avoir une analyse prête : {{studies}}",
-    "openError": "Impossible d'ouvrir le mémo.",
-    "deleteError": "Impossible de supprimer le mémo.",
-    "statusGenerating": "Génération…",
-    "statusFailed": "Échec",
-    "open": "Ouvrir le mémo",
-    "delete": "Supprimer le mémo",
-    "close": "Fermer",
-    "cancel": "Annuler",
-    "create": "Générer le mémo ({{count}} études)",
-    "creating": "Lancement…",
-    "modalTitle": "Nouveau mémo de décision",
-    "modalSub": "Choisissez au moins deux études avec une analyse prête. Le mémo synthétise leurs rapports finaux — jamais les transcriptions brutes.",
-    "studiesLabel": "Études à inclure",
-    "questionLabel": "Décision à éclairer (optionnel)",
-    "questionPlaceholder": "ex. Prioriser la rétention ou l'acquisition au S2 ?",
-    "nameLabel": "Nom du mémo (optionnel)",
-    "namePlaceholder": "ex. Rétention vs acquisition — S2",
-    "studyCount": "{{count}} études",
-    "statusStale": "Obsolète",
-    "staleHint": "Une étude de ce mémo a une analyse plus récente que le mémo. Générez un nouveau mémo pour l'inclure.",
-    "emptyNeedAnalysis": "Un mémo de décision nécessite au moins deux études avec une analyse prête. Lancez d'abord l'analyse de vos études.",
-    "ineligibleNote_one": "{{count}} étude sans analyse prête ne peut pas encore être incluse.",
-    "ineligibleNote_other": "{{count}} études sans analyse prête ne peuvent pas encore être incluses."
+    "studyReportReady": "« {{name}} » — le rapport d'analyse est prêt."
   },
   "reports": {
     "eyebrow": "Vos livrables",
@@ -493,20 +449,6 @@
       "memos_other": "mémos de décision",
       "excludesDemo": "Hors étude de démonstration."
     },
-    "memoCard": {
-      "kicker": "Mémo de décision",
-      "studies_one": "{{count}} étude",
-      "studies_other": "{{count}} études",
-      "open": "Ouvrir le mémo",
-      "all": "Tous les mémos",
-      "generatingTitle": "Synthèse du mémo en cours…",
-      "generatingText": "Claude lit les analyses finales de vos études. Cela prend généralement moins d'une minute.",
-      "ctaText": "Au moins deux études ont une analyse prête. Synthétisez-les en un mémo prêt pour la décision.",
-      "ctaBtn": "Créer un mémo",
-      "needAnalysisText_zero": "Lancez l'analyse d'au moins deux études pour débloquer un mémo de décision transverse.",
-      "needAnalysisText_one": "Une étude a une analyse prête. Analysez-en une deuxième pour débloquer un mémo de décision transverse.",
-      "needAnalysisText_other": "Analysez au moins deux études pour débloquer un mémo de décision transverse."
-    },
     "palette": {
       "aria": "Palette de commandes",
       "placeholder": "Rechercher une étude, lancer une commande…",
@@ -532,24 +474,12 @@
       "clickHint": "Cliquez sur l'étude encadrée pour regarder à l'intérieur",
       "skip": "Non merci, j'explore par moi-même"
     },
-    "memoTour": {
-      "eyebrow": "Visite de la démo · le point d'orgue",
-      "title": "Un mémo de décision transversal",
-      "body": "Quand un espace contient plusieurs études, QualiPulse lit tous leurs résultats et rédige un seul mémo prêt pour la décision — corroborations et contradictions comprises. Cette démo en contient déjà un.",
-      "clickHint": "La carte encadrée est votre mémo de décision",
-      "open": "📄 Ouvrir le rapport",
-      "skip": "Terminer la visite"
-    },
     "plan": {
       "freeTrial": "Essai gratuit",
       "upgrade": "Passer à un plan",
       "manage": "Gérer",
       "manageAria": "Plan et facturation — ouvrir les paramètres du compte"
     },
-    "copilotWelcome": "Dès que vous lancez votre première étude, je serai là pour vous aider à la cadrer et à interpréter les résultats.",
-    "memoExplainer": {
-      "title": "Décidez à partir de plusieurs études",
-      "body": "Un mémo de décision synthétise les résultats de 2 études ou plus en une recommandation claire — corroborations et divergences comprises. Il se débloque une fois que vous avez mené quelques études."
-    }
+    "copilotWelcome": "Dès que vous lancez votre première étude, je serai là pour vous aider à la cadrer et à interpréter les résultats."
   }
 }

@@ -49,7 +49,6 @@ from app.models.interview import (
 from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.models.study import Study, StudyAnalysis
-from app.models.synthesis import CrossStudySynthesis
 from app.models.survey import (
     Survey,
     SurveyLink,
@@ -2131,24 +2130,10 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         )
     )
 
-    # Cross-study synthesis showcase: a sibling exit-interview study plus a
-    # ready decision memo across both, so a new account can experience the
-    # full arc — interviews → per-study analysis → cross-study decision memo —
-    # without running a single real interview.
-    second_study = _seed_second_demo_study(db, company_id, lang, now)
-    db.add(
-        CrossStudySynthesis(
-            company_id=company_id,
-            name=DEMO_MEMO_NAME_FR if lang == "fr" else DEMO_MEMO_NAME,
-            decision_question=DEMO_MEMO_QUESTION_FR if lang == "fr" else DEMO_MEMO_QUESTION,
-            study_ids=json.dumps([demo_study.id, second_study.id]),
-            status="ready",
-            report=json.dumps(_memo_report(lang)),
-            language=lang,
-            generated_at=now - timedelta(hours=2),
-            created_at=now - timedelta(hours=2),
-        )
-    )
+    # A sibling exit-interview study with its own ready qualitative analysis,
+    # so a new account lands with two studies — the flagship mixed-methods
+    # Decision report plus a second qualitative-findings report.
+    _seed_second_demo_study(db, company_id, lang, now)
 
     db.commit()
     db.refresh(project)
@@ -2156,14 +2141,13 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Demo study #2 + cross-study decision memo
+# Demo study #2 — exit interviews (qualitative)
 #
-# A second, leaner demo study (3 exit interviews, one ready analysis) whose
-# real purpose is to make the cross-study synthesis demoable on day one:
-# the seeded CrossStudySynthesis memo cites both studies by name, corroborates
-# them where they agree and surfaces one deliberate conflict. All memo
-# evidence quotes are verbatim substrings of the seeded transcripts — same
-# integrity bar as the per-study analyses.
+# A second, leaner demo study (3 exit interviews, one ready qualitative
+# analysis) so a new account lands with two studies: the flagship mixed-methods
+# Decision report plus this qualitative-findings report. All analysis evidence
+# quotes are verbatim substrings of the seeded transcripts — same integrity bar
+# as the flagship study.
 # ═══════════════════════════════════════════════════════════════════════════
 
 DEMO2_PROJECT_NAME = "[Demo] Why subscribers cancel — exit interviews"
@@ -2280,18 +2264,6 @@ DEMO2_GUIDE_FR: list[dict] = [
         ],
     },
 ]
-
-DEMO_MEMO_NAME = "[Demo] Retention vs acquisition — decision memo"
-DEMO_MEMO_NAME_FR = "[Démo] Fiabilité vs acquisition — mémo de décision"
-
-DEMO_MEMO_QUESTION = (
-    "Should next quarter's roadmap prioritise retention features (pause, "
-    "cancel-flow, win-back) or acquisition content spend?"
-)
-DEMO_MEMO_QUESTION_FR = (
-    "Faut-il investir la prochaine roadmap dans la fiabilité (stocks, "
-    "substitutions, créneaux) ou dans l'acquisition promotionnelle ?"
-)
 
 
 def _study2_report(lang: str) -> dict:
@@ -2507,261 +2479,6 @@ def _study2_report(lang: str) -> dict:
         "confidence_rationale": "N=3 with precise, dated narratives, but all three are churned subscribers — no active-subscriber contrast group.",
         "participant_count": 3,
     }
-
-
-def _memo_report(lang: str) -> dict:
-    """Hand-authored cross-study decision memo. supporting_studies use the
-    exact seeded study names; evidence quotes are verbatim transcript
-    substrings from either study."""
-    if lang == "fr":
-        s1, s2 = DEMO_PROJECT_NAME_FR, DEMO2_PROJECT_NAME_FR
-        return {
-            "decision": DEMO_MEMO_QUESTION_FR,
-            "verdict": (
-                "Investir la roadmap dans la fiabilité. Les deux études convergent "
-                "sur le même mécanisme : la fidélité tient à un actif accumulé "
-                "(listes, historique, habitudes) et se rompt sur un incident "
-                "opérationnel — jamais sur une offre concurrente mieux disante. "
-                "La réserve principale : le segment des petits paniers (personnes "
-                "seules) churne sur les frais, pas sur la fiabilité, et resterait "
-                "mal servi par cet investissement."
-            ),
-            "summary": (
-                "Sept entretiens sur deux études racontent une fidélité par inertie "
-                "d'actifs : les clientes restent parce que tout est configuré, et "
-                "partent quand un incident (rupture massive, substitution ratée) "
-                "brise la confiance sans préavis ni contrôle. La validation des "
-                "substitutions apparaît dans les deux études comme la demande la "
-                "plus concrète et la moins servie du marché."
-            ),
-            "key_findings": [
-                {
-                    "finding": "L'incident opérationnel déclenche le départ ; le prix ne fait que le timer",
-                    "detail": (
-                        "L'étude de sortie date chaque abandon d'un incident précis "
-                        "(ruptures, substitution) ; l'étude d'usage montre que les "
-                        "ruptures érodent la confiance plus que les frais. Le prix "
-                        "n'apparaît comme déclencheur que sur le segment solo."
-                    ),
-                    "supporting_studies": [s1, s2],
-                    "evidence": "« La goutte d'eau, c'est la commande où il manquait huit produits sur trente. » (Entretiens de sortie — Nadia K.)",
-                    "strength": "strong",
-                },
-                {
-                    "finding": "Les listes et l'historique sont l'actif de rétention réel — et la barrière au retour",
-                    "detail": (
-                        "Les deux études indépendamment : le coût de switch invisible "
-                        "verrouille la fidélité (étude d'usage) et retarde le départ "
-                        "de plusieurs mois (étude de sortie). Le même actif, non "
-                        "exportable, empêche ensuite les churnées de revenir."
-                    ),
-                    "supporting_studies": [s1, s2],
-                    "evidence": "« ce qui m'a retenu si longtemps, c'est mes listes. Tout recréer ailleurs, c'est une soirée entière » (Entretiens de sortie — Julien P.)",
-                    "strength": "strong",
-                },
-                {
-                    "finding": "La validation des substitutions est le correctif le plus demandé des deux échantillons",
-                    "detail": (
-                        "Demande explicite et récurrente dans l'étude d'usage, cause "
-                        "racine du churn famille dans l'étude de sortie. C'est une "
-                        "fonctionnalité logicielle, pas un chantier logistique."
-                    ),
-                    "supporting_studies": [s1, s2],
-                    "evidence": "« Me laisser valider les substitutions, tout simplement. » (Entretiens de sortie — Julien P.)",
-                    "strength": "moderate",
-                },
-                {
-                    "finding": "L'écart d'engagement est désormais chiffré : 4,5 points de recommandation",
-                    "detail": (
-                        "Le questionnaire (n=44) met des chiffres sur le schéma "
-                        "des entretiens : les régulières notent leur enseigne "
-                        "9,1 sur 10 en recommandation et 4,2 sur 5 en "
-                        "qualité-prix ; les occasionnelles tombent à 4,6 et "
-                        "2,4 à frais identiques. La moitié à risque de la "
-                        "base est identifiable avant de partir."
-                    ),
-                    "supporting_studies": [s1],
-                    "evidence": "Les occasionnelles notent leur enseigne 4,6 sur 10 en recommandation contre 9,1 pour les régulières — questionnaire de l'étude d'usage, n=44.",
-                    "strength": "moderate",
-                },
-                {
-                    "finding": "Carrefour Drive sert d'ancrage — la régularité et l'ancrage vont ensemble",
-                    "detail": (
-                        "Carrefour Drive apparaît dans 26 paniers sondés sur 44 "
-                        "(59 %) et dans la totalité des paniers des régulières ; "
-                        "aucune occasionnelle ne l'utilise. Le foyer moyen "
-                        "combine 2 enseignes — la fidélité se joue sur "
-                        "l'enseigne d'ancrage, le reste tourne."
-                    ),
-                    "supporting_studies": [s1],
-                    "evidence": "Carrefour Drive apparaît dans 26 des 44 paniers sondés et dans la totalité des paniers des clientes régulières — questionnaire, n=44.",
-                    "strength": "moderate",
-                },
-            ],
-            "conflicts": [
-                {
-                    "topic": "Le rôle du prix",
-                    "detail": (
-                        "L'étude d'usage conclut que la sensibilité prix dépend du "
-                        "profil (Romain compare au centime, Sophie paie la fiabilité) ; "
-                        "l'étude de sortie ne trouve le prix comme déclencheur que "
-                        "chez Marta (petits paniers). Réconciliation la plus plausible : "
-                        "le prix segmente la clientèle mais ne déclenche l'abandon que "
-                        "là où l'actif accumulé est faible."
-                    ),
-                },
-                {
-                    "topic": "La fidélité déclarée survivrait-elle à un incident ?",
-                    "detail": (
-                        "Le questionnaire lit 26 répondantes sur 44 comme des "
-                        "promotrices installées ; mais toutes les clientes de "
-                        "l'étude de sortie étaient d'anciennes régulières. "
-                        "Réconciliation la plus plausible : la recommandation "
-                        "mesure la satisfaction du moment, pas la résilience à "
-                        "l'incident — une promotrice churne aussi quand une "
-                        "commande tourne mal sans préavis."
-                    ),
-                },
-            ],
-            "gaps": [
-                "Aucune cliente encore active et satisfaite dans l'étude de sortie — le contraste churn/rétention repose sur deux échantillons différents.",
-                "Le segment personnes seules / petits paniers n'est représenté que par une participante.",
-                "L'économie du win-back (coût de reconquête vs coût de rétention) n'est chiffrée dans aucune des deux études.",
-            ],
-            "recommendations": [
-                "Livrer la validation des substitutions avant tout investissement promo — demande n°1 des deux études. Serait invalidé si l'usage de la fonctionnalité restait marginal chez les clientes à risque.",
-                "Notifier ruptures et incidents avant le retrait — transforme le déclencheur de churn en simple déception. Serait invalidé si les clientes notifiées churnaient autant.",
-                "Étudier une offre petits paniers avant de conclure que la fiabilité suffit — le segment solo churne sur les frais. Serait invalidé si le churn solo restait stable après un tarif adapté.",
-            ],
-            "confidence": "medium",
-            "confidence_rationale": "Deux études qualitatives convergentes (7 entretiens au total) et un questionnaire de 44 réponses ; confiances individuelles élevée et moyenne, mais aucune donnée longitudinale ne relie l'intention déclarée au churn observé.",
-        }
-
-    s1, s2 = DEMO_PROJECT_NAME, DEMO2_PROJECT_NAME
-    return {
-        "decision": DEMO_MEMO_QUESTION,
-        "verdict": (
-            "Prioritise retention features. Both studies independently surface "
-            "the same mechanism — subscribers are held by accumulated value "
-            "(history, profiles, tuned recommendations) and lost at a mistimed "
-            "price event — and every element of that mechanism is within product "
-            "control, unlike acquisition content whose effect ends with each "
-            "finale. Biggest caveat: the youngest, login-sharing segment attaches "
-            "no value to history, so retention features won't move that cohort."
-        ),
-        "summary": (
-            "Seven interviews across two studies converge: streaming loyalty is "
-            "rented, not owned. Subscribers rotate around shows, stay for "
-            "accumulated history, and churn decisively when a price email lands "
-            "in a low-watch month. All three exits in the cancellation study were "
-            "silent — no save offer, no pause, no goodbye — and a pause state is "
-            "the single most requested missing feature in both samples."
-        ),
-        "key_findings": [
-            {
-                "finding": "A pause state would intercept decisive cancellations",
-                "detail": (
-                    "The usage study surfaced pause as the top unmet need (named "
-                    "or implied by 3 of 4); in the exit study, two of three "
-                    "churned subscribers state unprompted that a freeze would "
-                    "have kept them. The demand exists on both sides of the "
-                    "cancel event."
-                ),
-                "supporting_studies": [s1, s2],
-                "evidence": "\"If they'd let me freeze it for the summer I'd still be a customer.\" (Exit interviews — Fatima B.)",
-                "strength": "strong",
-            },
-            {
-                "finding": "Price emails set the timing of churn, not its cause",
-                "detail": (
-                    "Both studies find price increases to be the dominant trigger "
-                    "— but only when they land in a dead content month. The cause "
-                    "is accumulated low usage; the email merely dates the decision."
-                ),
-                "supporting_studies": [s1, s2],
-                "evidence": "\"The price email landed the same week I finished the only thing I was watching. I cancelled that night.\" (Exit interviews — Daniel O.)",
-                "strength": "strong",
-            },
-            {
-                "finding": "Watch history is the invisible retention asset",
-                "detail": (
-                    "The usage study's most loyal behaviour and the exit study's "
-                    "longest-postponed cancellations share one driver: years of "
-                    "watch history and tuned recommendations that would be lost. "
-                    "The product neither surfaces this value nor preserves it at exit."
-                ),
-                "supporting_studies": [s1, s2],
-                "evidence": "\"I'd been meaning to cancel for months, but my watch history felt like a diary I didn't want to throw away.\" (Exit interviews — Fatima B.)",
-                "strength": "moderate",
-            },
-            {
-                "finding": "The engagement split is now quantified: a 5-point NPS gap",
-                "detail": (
-                    "The five-question survey (n=44) puts numbers on the "
-                    "interview pattern: heavy streamers average 9.1 on the "
-                    "0–10 recommendation scale and 4.2 of 5 on value-for-money; "
-                    "light streamers average 4.1 and 2.4 at identical prices. "
-                    "The at-risk half of the base is identifiable before it "
-                    "churns."
-                ),
-                "supporting_studies": [s1],
-                "evidence": "Light streamers average 4.1 of 10 on recommendation against 9.1 for heavy streamers — usage-study survey, n=44.",
-                "strength": "moderate",
-            },
-            {
-                "finding": "The anchor slot is locked; churn happens in the rotating slot",
-                "detail": (
-                    "Netflix appears in 38 of 44 surveyed household stacks "
-                    "(86%) while the average stack holds two services. The "
-                    "retention battle is over the rotating second slot — "
-                    "which is where every cancellation in the exit study "
-                    "took place."
-                ),
-                "supporting_studies": [s1, s2],
-                "evidence": "Netflix anchors 38 of 44 surveyed households; the observed cancellations all hit the rotating, non-anchor slot.",
-                "strength": "moderate",
-            },
-        ],
-        "conflicts": [
-            {
-                "topic": "Does the catalogue retain?",
-                "detail": (
-                    "The usage study concludes loyalty lives at the catalogue "
-                    "(exclusives, curation); yet in the exit interviews, nobody "
-                    "cites catalogue at the moment of cancelling — only price "
-                    "events and silence. Most plausible reconciliation: catalogue "
-                    "sets the level of willingness to pay, while operational "
-                    "moments (price emails, dead months) set the timing of churn. "
-                    "Both matter, but only the second is being mismanaged."
-                ),
-            },
-            {
-                "topic": "How big is the loyal segment?",
-                "detail": (
-                    "The survey reads 26 of 44 respondents (59%) as heavy, "
-                    "promoter-grade streamers — a majority-loyal base. The "
-                    "interviews, including the exit study, describe even "
-                    "engaged subscribers as rotating renters. Most plausible "
-                    "reconciliation: heavy usage predicts advocacy, not "
-                    "immunity — promoters still cancel when a price email "
-                    "lands in a dead month."
-                ),
-            },
-        ],
-        "gaps": [
-            "No never-subscribers in either sample — acquisition questions are only answered from the subscriber side.",
-            "Single-market pricing context per participant; bundle-heavy telco markets are unrepresented.",
-            "Win-back economics (cost of re-acquiring a silent churner vs cost of a save offer) are unquantified in both studies.",
-        ],
-        "recommendations": [
-            "Ship a pause state (2-3 months, history and profiles frozen) before the next price change. Would be wrong if paused accounts resume at no higher rate than cold win-backs.",
-            "Sequence price increases to land within two weeks of a flagship release, never in dead months. Would be wrong if churn cohorts show no interaction between price emails and trailing watch time.",
-            "Add a save step to the cancel flow (pause proposal or targeted offer) — every observed exit was silent. Would be wrong if save acceptance stays under 5% in an A/B test.",
-        ],
-        "confidence": "medium",
-        "confidence_rationale": "Two converging qualitative studies (7 interviews total) plus a 44-response survey; individual confidences high and medium, but no longitudinal churn data ties stated intent to observed behaviour.",
-    }
-
 
 def _seed_second_demo_study(db: Session, company_id: str, lang: str, now: datetime):
     """Seed the exit-interview sibling study (3 participants, 1 ready analysis).

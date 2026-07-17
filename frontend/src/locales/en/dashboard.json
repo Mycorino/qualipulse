@@ -333,14 +333,6 @@
     "collectMore": {
       "label": "Collect more interviews ({{count}}/{{min}})",
       "reason": "Analysis unlocks at {{min}} completed interviews."
-    },
-    "generateMemo": {
-      "label": "Generate a decision memo",
-      "reason": "{{count}} studies are analysed — synthesise them into one executive verdict."
-    },
-    "refreshMemo": {
-      "label": "Refresh your decision memo",
-      "reason": "A study in the memo has newer analysis — the memo no longer reflects it."
     }
   },
   "nudges": {
@@ -348,43 +340,7 @@
     "dataMilestone": "You've got {{count}} completed interviews — enough to analyse.",
     "analysisStale": "{{count}} new interviews since the last analysis — worth refreshing.",
     "qualityFlag": "A low-quality interview just came in — worth a look.",
-    "studyReportReady": "“{{name}}” — the analysis report is ready.",
-    "memoReady": "“{{name}}” — your decision memo is ready.",
-    "memoStale": "“{{name}}” — a study in this memo has newer analysis. Worth regenerating."
-  },
-  "decisionMemos": {
-    "eyebrow": "Cross-study synthesis",
-    "title": "Decision memos",
-    "sub": "One executive memo synthesised across several completed studies — verdict, converging evidence, conflicts, and gaps.",
-    "newMemo": "+ New decision memo",
-    "empty": "No memos yet. Pick two or more analysed studies and get a decision-ready synthesis.",
-    "loadError": "We couldn't load your decision memos.",
-    "createdToast": "Memo generation started — it appears below when ready.",
-    "createError": "Could not start the memo. Please try again.",
-    "notReadyError": "These studies need a ready analysis first: {{studies}}",
-    "openError": "Could not open the memo.",
-    "deleteError": "Could not delete the memo.",
-    "statusGenerating": "Generating…",
-    "statusFailed": "Failed",
-    "open": "Open memo",
-    "delete": "Delete memo",
-    "close": "Close",
-    "cancel": "Cancel",
-    "create": "Generate memo ({{count}} studies)",
-    "creating": "Starting…",
-    "modalTitle": "New decision memo",
-    "modalSub": "Pick at least two studies with a ready analysis. The memo synthesises their final reports — it never re-reads raw transcripts.",
-    "studiesLabel": "Studies to include",
-    "questionLabel": "Decision to inform (optional)",
-    "questionPlaceholder": "e.g. Should we prioritise retention features over acquisition in H2?",
-    "nameLabel": "Memo name (optional)",
-    "namePlaceholder": "e.g. Retention vs acquisition — H2",
-    "studyCount": "{{count}} studies",
-    "statusStale": "Out of date",
-    "staleHint": "A study in this memo has a newer analysis than the memo. Generate a new memo to include it.",
-    "emptyNeedAnalysis": "A decision memo needs at least two studies with a ready analysis. Run the analysis on your studies first.",
-    "ineligibleNote_one": "{{count}} study without a ready analysis can't be included yet.",
-    "ineligibleNote_other": "{{count}} studies without a ready analysis can't be included yet."
+    "studyReportReady": "“{{name}}” — the analysis report is ready."
   },
   "reports": {
     "eyebrow": "Your outputs",
@@ -493,20 +449,6 @@
       "memos_other": "decision memos",
       "excludesDemo": "Excludes the demo study."
     },
-    "memoCard": {
-      "kicker": "Decision memo",
-      "studies_one": "{{count}} study",
-      "studies_other": "{{count}} studies",
-      "open": "Open memo",
-      "all": "All memos",
-      "generatingTitle": "Synthesising your memo…",
-      "generatingText": "Claude is reading your studies' final analyses. This usually takes under a minute.",
-      "ctaText": "Two or more studies have a ready analysis. Synthesise them into one decision-ready memo.",
-      "ctaBtn": "Create a memo",
-      "needAnalysisText_zero": "Run the analysis on at least two studies to unlock a cross-study decision memo.",
-      "needAnalysisText_one": "One study has a ready analysis. Analyse a second one to unlock a cross-study decision memo.",
-      "needAnalysisText_other": "Analyse at least two studies to unlock a cross-study decision memo."
-    },
     "palette": {
       "aria": "Command palette",
       "placeholder": "Search studies, run a command…",
@@ -532,24 +474,12 @@
       "clickHint": "Click the highlighted study to look inside",
       "skip": "No thanks, I'll explore on my own"
     },
-    "memoTour": {
-      "eyebrow": "Demo tour · the payoff",
-      "title": "One decision memo across studies",
-      "body": "When a workspace holds several studies, QualiPulse reads all their findings and writes a single decision-ready memo — corroboration and conflicts included. This demo already has one.",
-      "clickHint": "The highlighted card is your decision memo",
-      "open": "📄 Open the report",
-      "skip": "Finish tour"
-    },
     "plan": {
       "freeTrial": "Free trial",
       "upgrade": "Upgrade",
       "manage": "Manage",
       "manageAria": "Plan and billing — open account settings"
     },
-    "copilotWelcome": "Once you start your first study, I'll be right here to help you shape it and make sense of the results.",
-    "memoExplainer": {
-      "title": "Decide across studies",
-      "body": "A decision memo synthesises the findings from 2 or more studies into one clear recommendation — corroboration and conflicts included. It unlocks once you've run a couple of studies."
-    }
+    "copilotWelcome": "Once you start your first study, I'll be right here to help you shape it and make sense of the results."
   }
 }
