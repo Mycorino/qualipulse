@@ -819,6 +819,90 @@ def test_discoveries_empty_for_under_used_survey(client, auth_headers):
     assert data["discoveries"] == []
 
 
+def test_discoveries_name_the_segment_question(client, auth_headers):
+    """Cards carry the segmenting question + choice so the UI can say who
+    the segment actually is, and the respondent count is segment-of-total
+    (the old copy rendered 'N of N')."""
+
+    survey, seg_q, metric_q, link = _build_two_question_survey(client, auth_headers)
+    counter = 0
+    for role, score, n in [("pm", 3, 40), ("eng", 9, 40)]:
+        for _ in range(n):
+            counter += 1
+            client.post(
+                f"/r/{link['token']}/responses",
+                json={
+                    "link_token": link["token"],
+                    "email": f"r-{counter}@example.com",
+                    "answers": [
+                        {"question_id": seg_q["id"], "value_choice_ids": [role]},
+                        {"question_id": metric_q["id"], "value_numeric": score},
+                    ],
+                    "is_complete": True,
+                },
+            )
+
+    data = client.get(f"/surveys/{survey['id']}/discoveries", headers=auth_headers).json()
+    assert data["discoveries"]
+    for d in data["discoveries"]:
+        assert d["segment_question_prompt"] == "Your role?"
+        assert d["segment_choice_label"] in ("Product Manager", "Engineer", "Designer")
+        # 40 in the segment out of 80 overall — never "40 of 40".
+        # (Signup defaults to preferred_language=fr, so accept either locale.)
+        if d["mean_delta"] is not None:
+            assert (
+                "40 of 80" in d["description"] or "40 répondants sur 80" in d["description"]
+            ), d["description"]
+
+
+def test_discovery_recommendation_fallback(client, auth_headers):
+    """With no ANTHROPIC_API_KEY the recommendation endpoint still returns
+    the deterministic pick: top-ranked discovery, localized definition +
+    why, empty probes, source=fallback."""
+
+    survey, seg_q, metric_q, link = _build_two_question_survey(client, auth_headers)
+    counter = 0
+    for role, score, n in [("pm", 3, 40), ("eng", 9, 40)]:
+        for _ in range(n):
+            counter += 1
+            client.post(
+                f"/r/{link['token']}/responses",
+                json={
+                    "link_token": link["token"],
+                    "email": f"r-{counter}@example.com",
+                    "answers": [
+                        {"question_id": seg_q["id"], "value_choice_ids": [role]},
+                        {"question_id": metric_q["id"], "value_numeric": score},
+                    ],
+                    "is_complete": True,
+                },
+            )
+
+    discoveries = client.get(
+        f"/surveys/{survey['id']}/discoveries", headers=auth_headers
+    ).json()["discoveries"]
+    resp = client.get(
+        f"/surveys/{survey['id']}/discoveries/recommendation", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    reco = resp.json()["recommendation"]
+    assert reco is not None
+    assert reco["discovery_id"] == discoveries[0]["id"]
+    assert reco["source"] == "fallback"
+    assert "Your role?" in reco["definition"]
+    assert reco["why"]
+    assert reco["probes"] == []
+
+
+def test_discovery_recommendation_none_when_no_discoveries(client, auth_headers):
+    survey, _, _, _ = _build_two_question_survey(client, auth_headers)
+    resp = client.get(
+        f"/surveys/{survey['id']}/discoveries/recommendation", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    assert resp.json()["recommendation"] is None
+
+
 def test_response_only_visible_to_owner_workspace(client, auth_headers, db_session):
     """Auth isolation — a survey created by company A is not listable by B."""
 

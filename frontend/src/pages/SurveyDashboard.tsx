@@ -10,10 +10,12 @@ import {
   SegmentFilter,
   SegmentOperator,
   SegmentPreview,
+  SegmentRecommendation,
   SurveyDashboard,
   fetchSurveyReportHtml,
   getDashboard,
   getDiscoveries,
+  getSegmentRecommendation,
   getSurvey,
   inviteSegment,
   previewSegment,
@@ -61,6 +63,8 @@ export default function SurveyDashboardPage() {
   const [inviting, setInviting] = useState(false);
   // ── Sprint 10: discoveries ─────────────────────────────────────
   const [discoveries, setDiscoveries] = useState<SegmentDiscovery[]>([]);
+  // undefined = still loading (skeleton), null = failed / none.
+  const [recommendation, setRecommendation] = useState<SegmentRecommendation | null | undefined>(undefined);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -78,6 +82,11 @@ export default function SurveyDashboardPage() {
     getDiscoveries(id)
       .then((p) => setDiscoveries(p.discoveries))
       .catch(() => setDiscoveries([]));
+    // Fetched separately so the (possibly Haiku-backed) rationale never
+    // delays the discovery cards themselves.
+    getSegmentRecommendation(id)
+      .then((p) => setRecommendation(p.recommendation))
+      .catch(() => setRecommendation(null));
   }, [id]);
 
   /** Discovery card click → pre-populate the Bridge filter + scroll to it. */
@@ -227,6 +236,7 @@ export default function SurveyDashboardPage() {
             {discoveries.length > 0 && (
               <DiscoveriesSection
                 discoveries={discoveries}
+                recommendation={recommendation}
                 onApply={onApplyDiscovery}
               />
             )}
@@ -467,14 +477,31 @@ function QuestionFilterRow({
    Sprint 10: Discoveries section
    ──────────────────────────────────────────────────────────────────── */
 
+function useConfidenceLabels(): Record<DiscoveryConfidence, string> {
+  const { t } = useTranslation("survey");
+  return {
+    directional: t("dashboard.confidence.directional"),
+    supported: t("dashboard.confidence.supported"),
+    strong: t("dashboard.confidence.strong"),
+  };
+}
+
 function DiscoveriesSection({
   discoveries,
+  recommendation,
   onApply,
 }: {
   discoveries: SegmentDiscovery[];
+  recommendation: SegmentRecommendation | null | undefined;
   onApply: (d: SegmentDiscovery) => void;
 }) {
   const { t } = useTranslation("survey");
+  // The pick is deterministic server-side (top-ranked discovery); if the
+  // recommendation call hasn't landed (or failed) the ranking still tells
+  // us which card leads.
+  const hero =
+    discoveries.find((d) => d.id === recommendation?.discovery_id) ?? discoveries[0];
+  const others = discoveries.filter((d) => d.id !== hero.id);
   return (
     <section
       aria-label={t("dashboard.discoveriesLabel")}
@@ -512,33 +539,70 @@ function DiscoveriesSection({
           {t("dashboard.aiDetects")}
         </span>
       </header>
-      <div className="quanti-showcase__grid-2">
-        {discoveries.map((d) => (
-          <DiscoveryCard key={d.id} discovery={d} onApply={() => onApply(d)} />
-        ))}
-      </div>
+      <RecommendedSegmentCard
+        discovery={hero}
+        recommendation={recommendation}
+        onApply={() => onApply(hero)}
+      />
+      {others.length > 0 && (
+        <div
+          style={{
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-2) var(--space-5)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "var(--text-eyebrow)",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--text-tertiary)",
+              padding: "var(--space-3) 0 var(--space-1)",
+            }}
+          >
+            {t("dashboard.otherSegments", { count: others.length })}
+          </div>
+          {others.map((d) => (
+            <DiscoveryRow key={d.id} discovery={d} onApply={() => onApply(d)} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
-function DiscoveryCard({
+/** The argued-for pick — one hero card that answers "what do I click?". */
+function RecommendedSegmentCard({
   discovery,
+  recommendation,
   onApply,
 }: {
   discovery: SegmentDiscovery;
+  recommendation: SegmentRecommendation | null | undefined;
   onApply: () => void;
 }) {
   const { t } = useTranslation("survey");
-  const confidenceLabel: Record<DiscoveryConfidence, string> = {
-    directional: t("dashboard.confidence.directional"),
-    supported: t("dashboard.confidence.supported"),
-    strong: t("dashboard.confidence.strong"),
-  };
+  const confidenceLabel = useConfidenceLabels();
+  const loading = recommendation === undefined;
+  // Server-localized definition when available; client fallback otherwise.
+  const definition =
+    recommendation?.discovery_id === discovery.id
+      ? recommendation.definition
+      : t("dashboard.whoTheyAreFallback", {
+          choice: discovery.segment_choice_label,
+          question: discovery.segment_question_prompt,
+        });
+  const why = recommendation?.discovery_id === discovery.id ? recommendation.why : null;
+  const probes =
+    recommendation?.discovery_id === discovery.id ? recommendation.probes : [];
   return (
     <article
       style={{
         background: "var(--bg-surface)",
-        border: "1px solid var(--border-default)",
+        border: "1px solid var(--brand-300)",
         borderLeft: "3px solid var(--brand-500)",
         borderRadius: "var(--radius-md)",
         padding: "var(--space-5)",
@@ -547,33 +611,64 @@ function DiscoveryCard({
         gap: "var(--space-3)",
       }}
     >
-      <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-3)" }}>
-        <h3
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+        <span
           style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: "var(--text-lg)",
-            fontWeight: 600,
-            letterSpacing: "-0.015em",
-            lineHeight: 1.3,
-            margin: 0,
-            color: "var(--text-primary)",
+            fontSize: "var(--text-eyebrow)",
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "var(--brand-700)",
           }}
         >
-          {discovery.title}
-        </h3>
+          ★ {t("dashboard.recommendedBadge")}
+        </span>
         <span className={`confidence-pill confidence-pill--${discovery.confidence}`}>
           <span className="confidence-pill__dot" aria-hidden="true" />
           {confidenceLabel[discovery.confidence]}
         </span>
       </header>
-      <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
-        {discovery.description}
-      </p>
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }} className="tabular">
-        {t("dashboard.basedOnQuestion")} "<em>{shortenPrompt(discovery.metric_question_prompt, 70)}</em>"
-        {discovery.metric_choice_label ? <> · {t("dashboard.choice")} <em>{discovery.metric_choice_label}</em></> : null}
+      <h3
+        style={{
+          fontFamily: "var(--font-serif)",
+          fontSize: "var(--text-lg)",
+          fontWeight: 600,
+          letterSpacing: "-0.015em",
+          lineHeight: 1.3,
+          margin: 0,
+          color: "var(--text-primary)",
+        }}
+      >
+        {discovery.title}
+      </h3>
+      <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <strong style={{ color: "var(--text-primary)" }}>{t("dashboard.whoTheyAre")}:</strong>{" "}
+        {definition}
       </div>
-      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)" }} className="tabular">
+        {discovery.description}
+      </div>
+      {loading ? (
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+          {t("dashboard.recoLoading")}
+        </div>
+      ) : why ? (
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+          <strong style={{ color: "var(--text-primary)" }}>{t("dashboard.whyThisSegment")}:</strong>{" "}
+          {why}
+        </div>
+      ) : null}
+      {probes.length > 0 && (
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+          <strong style={{ color: "var(--text-primary)" }}>{t("dashboard.suggestedProbes")}:</strong>
+          <ul style={{ margin: "var(--space-1) 0 0", paddingLeft: "1.2em" }}>
+            {probes.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginTop: "var(--space-1)" }}>
         <button type="button" className="btn btn-primary" onClick={onApply}>
           {t("dashboard.interviewSegment")}
         </button>
@@ -582,9 +677,46 @@ function DiscoveryCard({
   );
 }
 
-function shortenPrompt(prompt: string, max: number): string {
-  if (prompt.length <= max) return prompt;
-  return prompt.slice(0, max - 1).trimEnd() + "…";
+/** Compact one-line entry for the non-recommended segments. */
+function DiscoveryRow({
+  discovery,
+  onApply,
+}: {
+  discovery: SegmentDiscovery;
+  onApply: () => void;
+}) {
+  const { t } = useTranslation("survey");
+  const confidenceLabel = useConfidenceLabels();
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--space-3)",
+        padding: "var(--space-3) 0",
+        borderTop: "1px solid var(--border-default)",
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.35 }}>
+          {discovery.title}
+        </div>
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-tertiary)", marginTop: 2 }}>
+          {discovery.description}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexShrink: 0 }}>
+        <span className={`confidence-pill confidence-pill--${discovery.confidence}`}>
+          <span className="confidence-pill__dot" aria-hidden="true" />
+          {confidenceLabel[discovery.confidence]}
+        </span>
+        <button type="button" className="btn btn-secondary" onClick={onApply}>
+          {t("dashboard.interviewShort")}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function InviteReviewModal({

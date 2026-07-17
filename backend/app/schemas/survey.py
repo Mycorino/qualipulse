@@ -367,6 +367,8 @@ class DiscoverySchema(BaseModel):
     overall_n: int
     metric_question_id: str
     metric_question_prompt: str
+    segment_question_prompt: str
+    segment_choice_label: str
     metric_choice_label: str | None = None
     segment_mean: float | None = None
     overall_mean: float | None = None
@@ -375,9 +377,26 @@ class DiscoverySchema(BaseModel):
     ready_filter: list[ReadyFilterSchema] = Field(default_factory=list)
 
 
+class SegmentRecommendationSchema(BaseModel):
+    """The argued-for 'start here' pick rendered as the hero card above the
+    discovery list. `definition` and `why` are localized server-side;
+    `probes` are AI-suggested interview questions (empty on fallback)."""
+
+    discovery_id: str
+    definition: str
+    why: str
+    probes: list[str] = Field(default_factory=list)
+    source: Literal["ai", "fallback"]
+
+
 class DiscoveriesResponse(BaseModel):
     survey_id: str
     discoveries: list[DiscoverySchema]
+
+
+class RecommendationResponse(BaseModel):
+    survey_id: str
+    recommendation: SegmentRecommendationSchema | None
 
 
 # ── Sprint 13: Question coach (lint) ─────────────────────────────────

@@ -40,6 +40,8 @@ from app.schemas.survey import (
     AnswerSubmission,
     DiscoveriesResponse,
     DiscoverySchema,
+    RecommendationResponse,
+    SegmentRecommendationSchema,
     LintFlagSchema,
     LintRequest,
     LintResponse,
@@ -70,6 +72,7 @@ from app.models.interview import InterviewLink
 from app.models.project import InterviewGuideQuestion, Project
 from app.services.email import send_interview_invite
 from app.services.segment_discoveries import compute_discoveries
+from app.services.segment_recommendation import build_recommendation
 from app.services.report_export import render_survey_dashboard_html
 from app.services.survey_analytics import build_dashboard
 from app.services.survey_segments import (
@@ -595,6 +598,8 @@ def get_discoveries(
                 overall_n=d.overall_n,
                 metric_question_id=d.metric_question_id,
                 metric_question_prompt=d.metric_question_prompt,
+                segment_question_prompt=d.segment_question_prompt,
+                segment_choice_label=d.segment_choice_label,
                 metric_choice_label=d.metric_choice_label,
                 segment_mean=d.segment_mean,
                 overall_mean=d.overall_mean,
@@ -611,6 +616,43 @@ def get_discoveries(
             )
             for d in found
         ],
+    )
+
+
+@router.get(
+    "/{survey_id}/discoveries/recommendation",
+    response_model=RecommendationResponse,
+)
+def get_discovery_recommendation(
+    survey_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> RecommendationResponse:
+    """Return the single argued-for segment to interview first.
+
+    The pick is deterministic (top-ranked discovery); the argument + probes
+    come from Haiku with a localized template fallback, cached in-process.
+    Fetched separately from /discoveries so the AI call never delays the
+    dashboard render.
+    """
+
+    survey = _get_survey_or_404(db, survey_id, company)
+    lang = company.preferred_language or "en"
+    found = compute_discoveries(db, survey, lang=lang)
+    reco = build_recommendation(db, survey, found, lang=lang)
+    return RecommendationResponse(
+        survey_id=survey.id,
+        recommendation=(
+            SegmentRecommendationSchema(
+                discovery_id=reco.discovery_id,
+                definition=reco.definition,
+                why=reco.why,
+                probes=reco.probes,
+                source=reco.source,
+            )
+            if reco
+            else None
+        ),
     )
 
 
