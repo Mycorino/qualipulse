@@ -7,6 +7,14 @@ one-click "Save as PDF"). Localised EN/FR keyed off the project language.
 
 Original data stays canonical: this module only *renders* what the analysis
 pipeline produced — it never paraphrases quotes or re-scores anything.
+
+CSP WARNING: the toolbar button's inline handler MUST stay byte-identical to
+``window.print()``. These documents render under a Content-Security-Policy
+that allowlists exactly that handler by sha256 hash — set in BOTH
+frontend/nginx.conf.template (blob-tab exports inherit the SPA policy) and
+app/main.py (directly-served shared reports). Change the handler text and
+the button silently dies in production until both hashes are recomputed:
+``echo -n '<handler>' | openssl dgst -sha256 -binary | base64``.
 """
 
 import html
