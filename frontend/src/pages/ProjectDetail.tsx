@@ -2826,6 +2826,14 @@ export default function ProjectDetail() {
                       })()}
                     </div>
 
+                    {/* Demo transcripts ship without audio files — say so
+                        instead of silently omitting the players. */}
+                    {project?.is_demo && (
+                      <p className="muted-text" style={{ fontSize: 13, margin: "10px 2px 0" }}>
+                        🎧 {tProject("responses.demoNoAudio")}
+                      </p>
+                    )}
+
                     {/* Two-column: transcript left, tools right */}
                     <div className="transcript-tools-layout">
 
