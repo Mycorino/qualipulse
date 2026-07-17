@@ -2145,6 +2145,283 @@ def _theme_validation_row(snapshot, L: dict) -> str:
     )
 
 
+# ── Decision report (approach B): qual sections + survey + integration ──────
+# Composes the SAME qualitative exhibits (from a ProjectAnalysis, via the shared
+# _*_section_html helpers) with the survey charts and a light integration layer,
+# so the combined document is a strict superset of the qualitative and survey
+# reports. Bordeaux identity (the flagship). Chrome reuses _STUDY_STRINGS with a
+# small decision-specific overlay; qual sections use _STRINGS; survey figures use
+# _SURVEY_STRINGS.
+_DECISION_STRINGS = {
+    "en": {
+        "doc_type": "Decision report",
+        "survey_title": "Survey evidence",
+        "survey_sub": "What the numbers confirm — or complicate — in the interviews.",
+        "joint_title": "Where the numbers meet the voices",
+        "joint_sub": "Each qualitative theme, checked against the survey signal.",
+        "joint_theme": "Theme", "joint_signal": "Survey signal",
+        "joint_conf": "Confidence", "joint_counter": "What weakens it",
+        "gaps_title": "What we still can't answer",
+        "footer": "Generated with QualiPulse — the decision report: interviews, survey, and the call they point to.",
+    },
+    "fr": {
+        "doc_type": "Rapport de décision",
+        "survey_title": "Signal quantitatif",
+        "survey_sub": "Ce que les chiffres confirment — ou compliquent — dans les entretiens.",
+        "joint_title": "Quand les chiffres rejoignent les voix",
+        "joint_sub": "Chaque thème qualitatif, confronté au signal du sondage.",
+        "joint_theme": "Thème", "joint_signal": "Signal du sondage",
+        "joint_conf": "Confiance", "joint_counter": "Ce qui l'affaiblit",
+        "gaps_title": "Ce qu'on ne peut pas encore trancher",
+        "footer": "Généré avec QualiPulse — le rapport de décision : entretiens, sondage et la décision qu'ils éclairent.",
+    },
+}
+
+_DECISION_EXTRA_CSS = """
+.decision-verdict { background: var(--accent-tint); border-left: 3px solid var(--accent);
+  padding: 18px 22px; max-width: 680px; margin-bottom: 6px; }
+.decision-verdict .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent); }
+.decision-verdict p { font-family: var(--serif); font-size: 1.3rem; line-height: 1.45;
+  font-weight: 500; margin-top: 6px; }
+.q-block { margin: 20px 0 24px; break-inside: avoid; }
+.chart-title { font-family: var(--serif); font-size: 1.02rem; font-weight: 600; margin-bottom: 8px; }
+.chart-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
+.fig-takeaway { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+.samples { margin: 8px 0 0; padding-left: 16px; }
+.samples .quote { border: 0; padding: 2px 0; margin: 4px 0; }
+.joint { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.joint th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-2); border-bottom: 1.5px solid var(--rule-strong);
+  padding: 0 10px 6px 0; }
+.joint td { border-bottom: 1px solid var(--rule); padding: 8px 10px 8px 0; vertical-align: top; }
+.joint__counter { color: var(--copper); }
+.gaps-list { margin: 6px 0 0; padding: 0; list-style: none; }
+.gaps-list li { border-left: 3px solid var(--amber); background: var(--amber-tint);
+  padding: 8px 14px; margin: 6px 0; font-size: 13px; }
+.idx-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 8px 0 20px; }
+.idx-table th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-2); border-bottom: 1.5px solid var(--rule-strong);
+  padding: 0 14px 6px 0; }
+.idx-table td { border-bottom: 1px solid var(--rule); padding: 8px 14px 8px 0; }
+"""
+
+
+def render_decision_report_html(
+    study,
+    project_analysis,
+    dashboards: list,
+    integration: dict | None = None,
+    participants: list | None = None,
+    turn_counts: dict | None = None,
+    company_name: str = "",
+    include_toolbar: bool = True,
+) -> str:
+    """Superset "Decision report": qual exhibits (from ProjectAnalysis) + survey
+    charts (from dashboards) + integration (verdict / joint display / gaps).
+
+    ``project_analysis`` — the interview ProjectAnalysis (its .report supplies
+    themes/personas/journey/activated-recs); may be None (survey-only study).
+    ``dashboards`` — SurveyDashboardPayload list (survey charts).
+    ``integration`` — {verdict, confidence, joint_display[], gaps[]} from the
+    integration pass (Phase 3); optional — the qual + survey layers stand alone.
+    """
+    participants = participants or []
+    turn_counts = turn_counts or {}
+    integration = integration or {}
+
+    company_lang = getattr(getattr(study, "company", None), "preferred_language", None)
+    lang = "fr" if (company_lang or "en").lower().startswith("fr") else "en"
+    Lq = _STRINGS[lang]                                   # qual section labels
+    Ls = {**_STUDY_STRINGS[lang], **_DECISION_STRINGS[lang]}  # chrome
+    Lf = _SURVEY_STRINGS[lang]                            # survey-figure labels
+
+    qual = json.loads(project_analysis.report) if (project_analysis and project_analysis.report) else {}
+    themes = qual.get("themes", []) or []
+    personas = qual.get("personas", []) or []
+    journey = qual.get("journey") or {}
+    jtbds = qual.get("jobs_to_be_done", []) or []
+    tensions = qual.get("tensions", []) or []
+    recommendations = qual.get("recommendations", []) or []
+
+    completed = [p for p in participants if p.status == "completed"]
+    completed.sort(key=lambda p: (p.completed_at or p.started_at or datetime.min))
+    roster = [("P{}".format(i + 1), (p.display_name or "{} {}".format(Lq["anonymous"], i + 1)), p)
+              for i, p in enumerate(completed)]
+
+    accent = _accent("mixed")
+    n_responses = sum(getattr(d, "n_completed", 0) for d in dashboards)
+    n_interviews = len(completed)
+    generated = _fmt_date(getattr(project_analysis, "generated_at", None), lang)
+
+    # ── header ────────────────────────────────────────────────────────────
+    header = f"""
+    <header class="cover">
+      <div class="cover__brand">
+        <span class="cover__logo">QualiPulse</span>
+        <span class="cover__doctype">{Ls["doc_type"]}</span>
+      </div>
+      <h1 class="cover__title">{_esc(study.name)}</h1>
+      <div class="cover__meta">
+        <span class="chip chip--strong">{n_responses} {Ls["responses"]}</span>
+        <span class="chip chip--strong">{n_interviews} {Ls["interviews"]}</span>
+        <span class="chip chip--ghost">{Ls["generated"]} {generated}</span>
+      </div>
+    </header>
+    """
+
+    # ── verdict (integration) ─────────────────────────────────────────────
+    verdict = integration.get("verdict")
+    verdict_html = ""
+    if verdict:
+        conf = integration.get("confidence")
+        chip = _study_confidence_chip(conf, Ls) if conf else ""
+        verdict_html = f"""
+    <section class="avoid-break">
+      <div class="decision-verdict">
+        <span class="lbl">{Ls["verdict_label"]}</span> {chip}
+        <p>{_esc(verdict)}</p>
+      </div>
+    </section>
+    """
+
+    # ── qualitative sections (shared helpers; bordeaux SVGs) ──────────────
+    themes_section = _themes_section_html(themes, roster, {}, Lq)
+    evidence_section = _evidence_map_html(themes, roster, Lq)
+    personas_section = _personas_section_html(personas, Lq)
+    journey_section = _journey_section_html(journey, Lq, accent)
+    jtbd_section = _jtbd_section_html(jtbds, Lq)
+    tensions_section = _tensions_section_html(tensions, Lq)
+    recos_section = _recommendations_section_html(recommendations, Lq)
+    matrix_section = _priority_matrix_section_html(recommendations, Lq, accent)
+    plan_section = _plan_section_html(recommendations, Lq)
+
+    # ── survey evidence (charts) ──────────────────────────────────────────
+    figures = "".join(
+        _survey_question_figure(q, Lf, lang, accent)
+        for dash in dashboards for q in dash.questions
+        if getattr(q, "n_answered", 0)
+    )
+    survey_section = f"""
+    <section>
+      <h2 class="section-title">{Ls["survey_title"]}</h2>
+      <p class="section-sub">{Ls["survey_sub"]}</p>
+      {figures}
+    </section>
+    """ if figures else ""
+
+    # ── joint display (integration): theme × survey signal ────────────────
+    jd = integration.get("joint_display") or []
+    joint_section = ""
+    if jd:
+        rows = "".join(
+            f'<tr><td>{_esc(x.get("theme_title", ""))}</td>'
+            f'<td>{_esc(x.get("survey_signal", "") or "—")}</td>'
+            f'<td>{_study_confidence_chip(x.get("confidence", ""), Ls) if x.get("confidence") else "—"}</td>'
+            f'<td class="joint__counter">{_esc(x.get("counter_evidence", "") or "—")}</td></tr>'
+            for x in jd
+        )
+        joint_section = f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{Ls["joint_title"]}</h2>
+      <p class="section-sub">{Ls["joint_sub"]}</p>
+      <table class="joint">
+        <thead><tr><th>{Ls["joint_theme"]}</th><th>{Ls["joint_signal"]}</th>
+          <th>{Ls["joint_conf"]}</th><th>{Ls["joint_counter"]}</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </section>
+    """
+
+    # ── gaps (integration) ────────────────────────────────────────────────
+    gaps = [g for g in (integration.get("gaps") or []) if g]
+    gaps_section = ""
+    if gaps:
+        lis = "".join(f"<li>{_esc(g)}</li>" for g in gaps)
+        gaps_section = f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{Ls["gaps_title"]}</h2>
+      <ul class="gaps-list">{lis}</ul>
+    </section>
+    """
+
+    # ── methodology + evidence index ──────────────────────────────────────
+    contract_items = "".join(f"<li>{item}</li>" for item in Ls["contract_items"])
+    contract = f'<div class="contract avoid-break"><h4>{Ls["contract_title"]}</h4><ul>{contract_items}</ul></div>'
+
+    survey_rows = "".join(
+        f'<tr><td>{_esc(getattr(d, "name", ""))}</td><td>{_esc(getattr(d, "status", ""))}</td>'
+        f'<td>{len(d.questions)}</td><td>{getattr(d, "n_completed", 0)}</td></tr>'
+        for d in dashboards
+    )
+    survey_index = f"""
+      <h3 class="eyebrow">{Ls["idx_surveys"]}</h3>
+      <table class="idx-table"><thead><tr>
+        <th>{Ls["col_instrument"]}</th><th>{Ls["col_status"]}</th>
+        <th>{Ls["col_questions"]}</th><th>{Ls["col_completed"]}</th></tr></thead>
+      <tbody>{survey_rows}</tbody></table>
+    """ if dashboards else ""
+
+    part_rows = "".join(
+        f'<tr><td>{pid}</td><td>{_esc(name)}</td><td>{_esc(p.profession) or "—"}</td>'
+        f'<td>{_esc(p.country) or "—"}</td><td>{turn_counts.get(p.id, "—")}</td></tr>'
+        for pid, name, p in roster
+    )
+    part_index = f"""
+      <h3 class="eyebrow">{Ls["idx_interviews"]}</h3>
+      <table class="idx-table"><thead><tr>
+        <th>{Ls["col_id"]}</th><th>{Ls["col_name"]}</th><th>{Ls["col_profession"]}</th>
+        <th>{Ls["col_country"]}</th><th>{Ls["col_turns"]}</th></tr></thead>
+      <tbody>{part_rows}</tbody></table>
+    """ if roster else ""
+
+    methodology = f"""
+    <section class="page-break">
+      <h2 class="section-title">{Ls["sec_methodology"]}</h2>
+      {contract}
+      {survey_index}
+      {part_index}
+    </section>
+    """
+
+    toolbar = f'<div class="toolbar"><button onclick="window.print()">{Ls["print_btn"]}</button></div>' if include_toolbar else ""
+    title = f"{study.name} — {Ls['doc_type']}"
+    return f"""<!doctype html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{_esc(title)}</title>
+<style>{_ANALYSIS_CSS + _palette_css("mixed") + _DECISION_EXTRA_CSS}</style>
+</head>
+<body>
+{toolbar}
+<div class="sheet">
+{header}
+{verdict_html}
+{themes_section}
+{evidence_section}
+{personas_section}
+{journey_section}
+{jtbd_section}
+{tensions_section}
+{survey_section}
+{joint_section}
+{recos_section}
+{matrix_section}
+{plan_section}
+{gaps_section}
+{methodology}
+<footer class="doc-footer">
+  <span><strong>QualiPulse</strong> · {_esc(company_name)}</span>
+  <span>{Ls["footer"]}</span>
+</footer>
+</div>
+</body>
+</html>"""
+
+
 def render_study_report_html(
     study,
     analysis,
