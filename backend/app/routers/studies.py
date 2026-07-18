@@ -19,8 +19,9 @@ Future sprint hooks (intentionally deferred):
 
 import json
 import re
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -64,22 +65,51 @@ router = APIRouter(prefix="/studies", tags=["studies"])
 
 @router.get("/", response_model=list[StudySummary])
 def list_studies(
+    archived: bool = Query(False, description="Return archived studies instead of active ones"),
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> list[StudySummary]:
     """Workspace-scoped list of Studies + summary counts.
 
     Excludes archived Studies so the Study List page can be the post-
-    login landing for accounts that have ≥1 active Study.
+    login landing for accounts that have ≥1 active Study. Pass
+    ``?archived=true`` for the archived list (restore UI).
     """
 
-    studies = (
-        db.query(Study)
-        .filter(Study.company_id == company.id, Study.archived_at.is_(None))
-        .order_by(Study.created_at.desc())
-        .all()
-    )
+    query = db.query(Study).filter(Study.company_id == company.id)
+    if archived:
+        query = query.filter(Study.archived_at.isnot(None))
+    else:
+        query = query.filter(Study.archived_at.is_(None))
+    studies = query.order_by(Study.created_at.desc()).all()
     return [_summary_for(db, s) for s in studies]
+
+
+@router.patch("/{study_id}/archive", status_code=status.HTTP_200_OK)
+def archive_study(
+    study_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Archive a Study — hides it (and its reports) from every workspace
+    surface without touching the instruments inside. Reversible."""
+
+    study = _get_study_or_404(db, study_id, company)
+    study.archived_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"id": study.id, "archived_at": study.archived_at.isoformat()}
+
+
+@router.patch("/{study_id}/unarchive", status_code=status.HTTP_200_OK)
+def unarchive_study(
+    study_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    study = _get_study_or_404(db, study_id, company)
+    study.archived_at = None
+    db.commit()
+    return {"id": study.id, "archived_at": None}
 
 
 @router.get("/report-catalog", response_model=list[ReportCatalogEntry])

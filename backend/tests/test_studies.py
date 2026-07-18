@@ -363,3 +363,65 @@ def test_progress_reaches_inference_threshold_at_30_responses(
     # Next prompt after threshold = open the dashboard / use the Bridge.
     rec = detail["recommended_action"] or ""
     assert ("dashboard" in rec.lower()) or ("bridge" in rec.lower())
+
+
+# ── Archive / unarchive ───────────────────────────────────────────────
+
+
+def test_archive_hides_study_from_active_list(client, auth_headers):
+    client.post("/surveys/", headers=auth_headers, json={"name": "To archive"})
+    study = client.get("/studies/", headers=auth_headers).json()[0]
+
+    resp = client.patch(f"/studies/{study['id']}/archive", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["archived_at"] is not None
+
+    assert client.get("/studies/", headers=auth_headers).json() == []
+    archived = client.get("/studies/?archived=true", headers=auth_headers).json()
+    assert [s["id"] for s in archived] == [study["id"]]
+    assert archived[0]["archived_at"] is not None
+
+
+def test_unarchive_restores_study(client, auth_headers):
+    client.post("/surveys/", headers=auth_headers, json={"name": "Round trip"})
+    study = client.get("/studies/", headers=auth_headers).json()[0]
+    client.patch(f"/studies/{study['id']}/archive", headers=auth_headers)
+
+    resp = client.patch(f"/studies/{study['id']}/unarchive", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["archived_at"] is None
+
+    active = client.get("/studies/", headers=auth_headers).json()
+    assert [s["id"] for s in active] == [study["id"]]
+    assert client.get("/studies/?archived=true", headers=auth_headers).json() == []
+
+
+def test_archive_requires_ownership(client, auth_headers):
+    """A study id from another workspace 404s — no cross-tenant archive."""
+
+    client.post("/surveys/", headers=auth_headers, json={"name": "Mine"})
+    study = client.get("/studies/", headers=auth_headers).json()[0]
+
+    client.post(
+        "/auth/signup",
+        json={"email": "intruder@example.com", "password": "Passw0rd1", "name": "Intruder"},
+    )
+    login = client.post(
+        "/auth/login",
+        json={"email": "intruder@example.com", "password": "Passw0rd1"},
+    ).json()
+    intruder = {"Authorization": f"Bearer {login['access_token']}"}
+
+    resp = client.patch(f"/studies/{study['id']}/archive", headers=intruder)
+    assert resp.status_code == 404
+    # Still active for the owner.
+    assert len(client.get("/studies/", headers=auth_headers).json()) == 1
+
+
+def test_archived_study_reports_leave_the_catalog(client, auth_headers):
+    survey = _seed_full_study(client, auth_headers)
+    client.post(f"/studies/{survey['study_id']}/analyses", headers=auth_headers)
+    assert len(client.get("/studies/report-catalog", headers=auth_headers).json()) > 0
+
+    client.patch(f"/studies/{survey['study_id']}/archive", headers=auth_headers)
+    assert client.get("/studies/report-catalog", headers=auth_headers).json() == []

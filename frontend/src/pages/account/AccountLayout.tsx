@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import client from "../../api/client";
 import type { CompanyResponse } from "../../api/auth";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
+import { Skeleton, SkeletonCard } from "../../components/Skeleton";
 import { HubShell } from "../../components/HubShell";
 import {
   BillingStatus,
@@ -70,10 +71,28 @@ export default function AccountLayout() {
   }, [load]);
 
   if (loading) {
+    // Mirror the loaded page's skeleton: identity row + tab rail + card grid.
     return (
       <HubShell active="account">
         <div className="dashboard-page">
-          <p className="muted-text">{t("common:loading")}</p>
+          <div style={{ maxWidth: "960px", margin: "0 auto" }} aria-busy="true">
+            <section className="account-identity">
+              <Skeleton width="48px" height="48px" className="skeleton--circle" />
+              <div className="account-identity__text">
+                <Skeleton width="180px" height="20px" />
+                <div style={{ height: 6 }} />
+                <Skeleton width="240px" height="14px" />
+              </div>
+            </section>
+            <Skeleton width="100%" height="38px" />
+            <div className="settings-section" style={{ marginTop: 28 }}>
+              <div className="account-home-grid">
+                {[0, 1, 2, 3].map((i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </HubShell>
     );
@@ -158,7 +177,7 @@ export default function AccountLayout() {
           </div>
           {billing && (
             <Link
-              className={badgeClass}
+              className={`${badgeClass} account-identity__plan`}
               to="/account/billing"
               style={{ textDecoration: "none" }}
               aria-label={t("hubHeader.planBadgeAria", {

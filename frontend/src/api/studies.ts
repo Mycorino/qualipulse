@@ -97,8 +97,20 @@ export interface StudyDetail {
   recommended_action_params: Record<string, number> | null;
 }
 
-export async function listStudies(): Promise<StudySummary[]> {
-  const resp = await client.get<StudySummary[]>("/studies/");
+export async function listStudies(archived = false): Promise<StudySummary[]> {
+  const resp = await client.get<StudySummary[]>("/studies/", {
+    params: archived ? { archived: true } : {},
+  });
+  return resp.data;
+}
+
+export async function archiveStudy(id: string): Promise<{ id: string; archived_at: string }> {
+  const resp = await client.patch<{ id: string; archived_at: string }>(`/studies/${id}/archive`);
+  return resp.data;
+}
+
+export async function unarchiveStudy(id: string): Promise<{ id: string; archived_at: null }> {
+  const resp = await client.patch<{ id: string; archived_at: null }>(`/studies/${id}/unarchive`);
   return resp.data;
 }
 
