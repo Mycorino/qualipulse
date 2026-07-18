@@ -9,7 +9,8 @@
     "usageParticipants": "participants/study",
     "usageTeam": "team seats",
     "usageAi": "AI analysis",
-    "usageExport": "CSV export"
+    "usageExport": "CSV export",
+    "planBadgeAria": "Current plan — open billing"
   },
   "tabs": {
     "profile": "Profile",
@@ -177,7 +178,8 @@
       "body": "Verify your email to secure your account and unlock interview credits.",
       "resend": "Resend verification email",
       "resent": "Verification email sent — check your inbox.",
-      "resendError": "Could not send the email — please try again in a minute."
+      "resendError": "Could not send the email — please try again in a minute.",
+      "memberSince": "Member since {{date}}"
     },
     "planCard": {
       "label": "Plan & credits",
@@ -185,13 +187,19 @@
       "creditsUsed": "{{used}} of {{total}} used",
       "noExpiry": "never expire",
       "upgradeCta": "View plans & upgrade →",
-      "manageCta": "Manage billing →"
+      "manageCta": "Manage billing →",
+      "renews": "renews {{date}}",
+      "breakdown": "{{included}} included + {{extra}} extra"
     },
     "workspaceCard": {
       "label": "Workspace",
       "cta": "Manage members →",
       "seats_one": "team seat",
-      "seats_other": "team seats"
+      "seats_other": "team seats",
+      "seatsUsed_one": "of {{total}} seat used",
+      "seatsUsed_other": "of {{total}} seats used",
+      "soloHint": "Working with a team? Paid plans include multiple seats.",
+      "addSeatsCta": "Add team seats →"
     },
     "slackCard": {
       "label": "Slack notifications",
@@ -201,6 +209,15 @@
       "connectedBody": "Completed-interview alerts are delivered to your channel.",
       "connectCta": "Connect Slack →",
       "manageCta": "Manage →"
+    },
+    "securityCard": {
+      "label": "Security",
+      "enabled": "2FA enabled",
+      "disabled": "2FA off",
+      "body": "Add two-factor authentication to protect your research data.",
+      "enabledBody": "Your account is protected with two-factor authentication.",
+      "enableCta": "Enable 2FA →",
+      "manageCta": "Manage security →"
     }
   },
   "security": {

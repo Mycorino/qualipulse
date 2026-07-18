@@ -480,6 +480,16 @@
       "manage": "Gérer",
       "manageAria": "Plan et facturation — ouvrir les paramètres du compte"
     },
-    "copilotWelcome": "Dès que vous lancez votre première étude, je serai là pour vous aider à la cadrer et à interpréter les résultats."
+    "copilotWelcome": "Dès que vous lancez votre première étude, je serai là pour vous aider à la cadrer et à interpréter les résultats.",
+    "archive": {
+      "action": "Archiver l'étude",
+      "actionNamed": "Archiver {{name}}",
+      "colLabel": "Actions",
+      "toggle": "Archivées ({{count}})",
+      "restore": "Restaurer",
+      "archivedToast": "« {{name}} » archivée",
+      "restoredToast": "« {{name}} » restaurée",
+      "error": "Une erreur est survenue — réessayez."
+    }
   }
 }

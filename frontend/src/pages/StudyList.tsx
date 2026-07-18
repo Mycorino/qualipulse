@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { StudySummary, listStudies, studyEntryPath } from "../api/studies";
+import {
+  StudySummary,
+  archiveStudy,
+  listStudies,
+  studyEntryPath,
+  unarchiveStudy,
+} from "../api/studies";
 import { DEMO_TOUR_DONE_KEY, DemoCallout, armDemoTour } from "../components/DemoTour";
 import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
@@ -161,6 +167,10 @@ export default function StudyList() {
   const [view, setView] = useState<HubView>(() =>
     localStorage.getItem(HUB_VIEW_KEY) === "cards" ? "cards" : "table",
   );
+  // Discreet archive: archived studies load quietly alongside the active
+  // list and live in a collapsed disclosure under the table.
+  const [archived, setArchived] = useState<StudySummary[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const announce = useNudgeAnnounce(nudges);
@@ -186,7 +196,40 @@ export default function StudyList() {
     listStudies()
       .then(setStudies)
       .catch(() => toast(t("studyList.loadError"), "error"));
+    // Best-effort: the archived disclosure simply doesn't render on failure.
+    listStudies(true)
+      .then(setArchived)
+      .catch(() => {});
   }, [toast, t]);
+
+  const byNewest = (a: StudySummary, b: StudySummary) =>
+    b.created_at.localeCompare(a.created_at);
+
+  const handleArchive = async (s: StudySummary) => {
+    try {
+      const res = await archiveStudy(s.id);
+      setStudies((prev) => (prev ?? []).filter((x) => x.id !== s.id));
+      setArchived((prev) =>
+        [...prev, { ...s, archived_at: res.archived_at }].sort(byNewest),
+      );
+      toast(t("hub.archive.archivedToast", { name: s.name }), "success");
+    } catch {
+      toast(t("hub.archive.error"), "error");
+    }
+  };
+
+  const handleRestore = async (s: StudySummary) => {
+    try {
+      await unarchiveStudy(s.id);
+      setArchived((prev) => prev.filter((x) => x.id !== s.id));
+      setStudies((prev) =>
+        [...(prev ?? []), { ...s, archived_at: null }].sort(byNewest),
+      );
+      toast(t("hub.archive.restoredToast", { name: s.name }), "success");
+    } catch {
+      toast(t("hub.archive.error"), "error");
+    }
+  };
 
   // Onboarding hands off here with ?tour=1. The tour never auto-navigates:
   // the researcher gets to see their home first, then a callout points at
@@ -347,6 +390,7 @@ export default function StudyList() {
             <th>{t("hub.table.status")}</th>
             <th>{t("hub.table.evidence")}</th>
             <th className="hub-table__next-col">{t("hub.table.next")}</th>
+            <th className="hub-table__row-actions" aria-label={t("hub.archive.colLabel")} />
           </tr>
         </thead>
         <tbody>
@@ -357,7 +401,9 @@ export default function StudyList() {
               data-tour={s.id === tourStudyId ? "demo-study-row" : undefined}
               onClick={() => openStudy(s)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") openStudy(s);
+                // Only the row itself — Enter on the archive button must
+                // not also navigate into the study.
+                if (e.key === "Enter" && e.target === e.currentTarget) openStudy(s);
               }}
             >
               <td className="hub-table__name">
@@ -379,6 +425,28 @@ export default function StudyList() {
                   {action.kind === "do" ? "✦ " : ""}
                   {t(`studyList.status.${CARD_STATUS_KEY[action.actionType] ?? "inProgress"}`)}
                 </span>
+              </td>
+              <td className="hub-table__row-actions">
+                <button
+                  type="button"
+                  className="hub-row-archive"
+                  title={t("hub.archive.action")}
+                  aria-label={t("hub.archive.actionNamed", { name: s.name })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleArchive(s);
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <rect x="2" y="3" width="12" height="3" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
+                    <path
+                      d="M3.5 6v6a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V6M6.5 9h3"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
               </td>
             </tr>
           ))}
@@ -628,6 +696,54 @@ export default function StudyList() {
               renderTable()
             ) : (
               renderCards()
+            )}
+
+            {archived.length > 0 && (
+              <div className="hub-archived">
+                <button
+                  type="button"
+                  className="hub-archived__toggle"
+                  aria-expanded={showArchived}
+                  onClick={() => setShowArchived((v) => !v)}
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 10 10"
+                    fill="none"
+                    aria-hidden="true"
+                    style={{
+                      transform: showArchived ? "rotate(90deg)" : undefined,
+                      transition: "transform 0.15s",
+                    }}
+                  >
+                    <path
+                      d="M3 1.5 6.5 5 3 8.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {t("hub.archive.toggle", { count: archived.length })}
+                </button>
+                {showArchived && (
+                  <ul className="hub-archived__list">
+                    {archived.map((s) => (
+                      <li key={s.id} className="hub-archived__row">
+                        <span className="hub-archived__name">{s.name}</span>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => handleRestore(s)}
+                        >
+                          {t("hub.archive.restore")}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
 

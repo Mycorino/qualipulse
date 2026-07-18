@@ -9,7 +9,8 @@
     "usageParticipants": "participants/étude",
     "usageTeam": "sièges équipe",
     "usageAi": "analyse IA",
-    "usageExport": "export CSV"
+    "usageExport": "export CSV",
+    "planBadgeAria": "Forfait actuel — ouvrir la facturation"
   },
   "tabs": {
     "profile": "Profil",
@@ -177,7 +178,8 @@
       "body": "Vérifiez votre e-mail pour sécuriser votre compte et débloquer vos crédits d'entretien.",
       "resend": "Renvoyer l'e-mail de vérification",
       "resent": "E-mail de vérification envoyé — vérifiez votre boîte de réception.",
-      "resendError": "Impossible d'envoyer l'e-mail — réessayez dans une minute."
+      "resendError": "Impossible d'envoyer l'e-mail — réessayez dans une minute.",
+      "memberSince": "Membre depuis {{date}}"
     },
     "planCard": {
       "label": "Forfait et crédits",
@@ -185,13 +187,19 @@
       "creditsUsed": "{{used}} sur {{total}} utilisés",
       "noExpiry": "sans expiration",
       "upgradeCta": "Voir les forfaits supérieurs →",
-      "manageCta": "Gérer la facturation →"
+      "manageCta": "Gérer la facturation →",
+      "renews": "renouvellement le {{date}}",
+      "breakdown": "{{included}} inclus + {{extra}} supplémentaires"
     },
     "workspaceCard": {
       "label": "Espace de travail",
       "cta": "Gérer les membres →",
       "seats_one": "siège d'équipe",
-      "seats_other": "sièges d'équipe"
+      "seats_other": "sièges d'équipe",
+      "seatsUsed_one": "sur {{total}} siège utilisé",
+      "seatsUsed_other": "sur {{total}} sièges utilisés",
+      "soloHint": "Vous travaillez en équipe ? Les forfaits payants incluent plusieurs sièges.",
+      "addSeatsCta": "Ajouter des sièges →"
     },
     "slackCard": {
       "label": "Notifications Slack",
@@ -201,6 +209,15 @@
       "connectedBody": "Les alertes de fin d'entretien sont envoyées à votre canal.",
       "connectCta": "Connecter Slack →",
       "manageCta": "Gérer →"
+    },
+    "securityCard": {
+      "label": "Sécurité",
+      "enabled": "2FA activée",
+      "disabled": "2FA désactivée",
+      "body": "Ajoutez la double authentification pour protéger vos données de recherche.",
+      "enabledBody": "Votre compte est protégé par la double authentification.",
+      "enableCta": "Activer la 2FA →",
+      "manageCta": "Gérer la sécurité →"
     }
   },
   "security": {

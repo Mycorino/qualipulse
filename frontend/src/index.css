@@ -3987,6 +3987,7 @@ select.field-input {
   border-radius: 6px;
   display: block;
 }
+.skeleton--circle { border-radius: 50%; flex: none; }
 .skeleton-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -4494,10 +4495,13 @@ select.field-input {
   border-bottom: 2px solid var(--border);
   margin-bottom: 28px;
   /* Phones: the tab row is wider than the viewport — scroll it in place
-     instead of letting it push the whole page sideways. */
+     instead of letting it push the whole page sideways. The cut-off last
+     tab is the scroll affordance — hide the chunky scrollbar itself. */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.settings-tabs::-webkit-scrollbar { display: none; }
 .settings-tab {
   white-space: nowrap;
   flex-shrink: 0;
@@ -4551,8 +4555,39 @@ select.field-input {
   font-size: 16px;
 }
 .account-identity__text { flex: 1; min-width: 0; }
-.account-identity__name { font-size: 20px; font-weight: 700; margin: 0; color: var(--text-primary); }
-.account-identity__email { font-size: 14px; color: var(--text-tertiary); margin: 2px 0 0; }
+.account-identity__name {
+  font-size: 20px;
+  font-weight: var(--weight-bold);
+  margin: 0;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-identity__email {
+  font-size: 14px;
+  color: var(--text-tertiary);
+  margin: 2px 0 0;
+  /* Long addresses truncate instead of wrapping mid-word between the
+     plan badge and the language pill. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The plan badge reuses .eyebrow-tag colours but drops the shouty
+   uppercase so it speaks the same language as the status chips below.
+   (Doubled class beats .eyebrow-tag, which is declared later in the file.) */
+.account-identity__plan.account-identity__plan {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 12px;
+}
+@media (max-width: 480px) {
+  /* Give the identity text the full row; badge + language pill drop to a
+     second line instead of crushing the email. */
+  .account-identity { flex-wrap: wrap; }
+  .account-identity__text { flex-basis: calc(100% - 62px); }
+}
 
 /* ── Account Home: status-card grid ───────────────────────────────────────── */
 .account-home-grid {
@@ -4592,11 +4627,35 @@ select.field-input {
   padding: 2px 8px;
   border-radius: 20px;
 }
-.account-card__status.is-ok { background: #dcfce7; color: #166534; }
-.account-card__status.is-warn { background: #fef3c7; color: #92400e; }
+.account-card__status.is-ok { background: var(--success-bg); color: var(--success-text); }
+.account-card__status.is-warn { background: var(--warning-bg); color: var(--warning-text); }
 .account-card__status.is-neutral { background: var(--bg-sunken); color: var(--text-secondary); }
-.account-card__value { font-size: 15px; color: var(--text-primary); margin: 4px 0 0; }
+.account-card__value {
+  font-size: 15px;
+  color: var(--text-primary);
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.account-card__metric { font-size: var(--text-2xl); font-weight: var(--weight-bold); }
+.account-card__metric-unit { font-size: 14px; color: var(--text-muted); font-weight: var(--weight-normal); }
+.account-card__hint { font-size: var(--text-sm); color: var(--text-muted); margin: 4px 0 0; }
+.account-card__hint--gap { margin: 0 0 10px; }
 .account-card__foot { margin-top: auto; padding-top: 14px; }
+/* Slim credits meter under the plan metric. */
+.account-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  margin-top: 10px;
+  overflow: hidden;
+}
+.account-meter > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand-500);
+  transition: width 0.3s ease;
+}
 
 /* ── Billing / Plans ─────────────────────────────────────────────────────── */
 .billing-current-plan { }
@@ -13976,6 +14035,73 @@ select.field-input {
   font-weight: var(--weight-normal);
   color: var(--text-tertiary);
   margin-top: 2px;
+}
+/* Discreet per-row archive control — appears on row hover/focus only. */
+.hub-table__row-actions {
+  width: 36px;
+  padding-right: 10px !important;
+  text-align: right;
+}
+.hub-row-archive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast), background var(--dur-fast), color var(--dur-fast);
+}
+.hub-table tbody tr:hover .hub-row-archive,
+.hub-table tbody tr:focus-within .hub-row-archive,
+.hub-row-archive:focus-visible {
+  opacity: 1;
+}
+.hub-row-archive:hover {
+  background: var(--bg-sunken);
+  color: var(--text-primary);
+}
+/* Collapsed "Archived (n)" disclosure under the studies list. */
+.hub-archived { margin-top: var(--space-4, 16px); }
+.hub-archived__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 4px 2px;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.hub-archived__toggle:hover { color: var(--text-primary); }
+.hub-archived__list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-surface);
+}
+.hub-archived__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.hub-archived__row:last-child { border-bottom: none; }
+.hub-archived__name {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* Seeded showcase studies — visible in lists, excluded from totals. */
 .hub-demo-badge {

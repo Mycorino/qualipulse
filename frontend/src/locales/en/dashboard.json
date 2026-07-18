@@ -480,6 +480,16 @@
       "manage": "Manage",
       "manageAria": "Plan and billing — open account settings"
     },
-    "copilotWelcome": "Once you start your first study, I'll be right here to help you shape it and make sense of the results."
+    "copilotWelcome": "Once you start your first study, I'll be right here to help you shape it and make sense of the results.",
+    "archive": {
+      "action": "Archive study",
+      "actionNamed": "Archive {{name}}",
+      "colLabel": "Row actions",
+      "toggle": "Archived ({{count}})",
+      "restore": "Restore",
+      "archivedToast": "“{{name}}” archived",
+      "restoredToast": "“{{name}}” restored",
+      "error": "Something went wrong — please try again."
+    }
   }
 }

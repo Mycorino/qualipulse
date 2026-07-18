@@ -13,6 +13,10 @@ export default function LanguageSwitcher({ variant = "light", style }: LanguageS
 
   function toggle() {
     i18n.changeLanguage(next);
+    // Persist locally right away — pages that sync i18n from the stored
+    // profile (e.g. AccountLayout) would otherwise revert the toggle if a
+    // reload lands before the PATCH below does.
+    localStorage.setItem("qp_language", next);
     // Persist to backend if logged in (fire-and-forget, ignore errors)
     const token = localStorage.getItem("token");
     if (token) {
