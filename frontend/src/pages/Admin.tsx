@@ -142,30 +142,6 @@ function TierBadge({ tier }: { tier: string }) {
   );
 }
 
-// ── Trial status ───────────────────────────────────────────────────────────
-
-function trialLabel(
-  trial_ends_at: string | null,
-  t: (key: string, opts?: Record<string, unknown>) => string
-): string {
-  if (!trial_ends_at) return t("users.trialNone");
-  const end = new Date(trial_ends_at);
-  const now = new Date();
-  if (end <= now) return t("users.trialExpired");
-  const days = Math.ceil((end.getTime() - now.getTime()) / 86400000);
-  return t("users.trialDaysLeft", { count: days });
-}
-
-function trialColor(trial_ends_at: string | null): string {
-  if (!trial_ends_at) return "var(--text-muted)";
-  const end = new Date(trial_ends_at);
-  const now = new Date();
-  if (end <= now) return "var(--danger)";
-  const days = Math.ceil((end.getTime() - now.getTime()) / 86400000);
-  if (days <= 3) return "var(--warning)";
-  return "var(--success)";
-}
-
 // ── Stat card ──────────────────────────────────────────────────────────────
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -493,25 +469,6 @@ export default function Admin() {
     }
   }
 
-  async function handleTierChange(user: AdminUser, tier: string) {
-    setActionLoading(`tier-${user.id}`);
-    try {
-      await client().patch(`/admin/users/${user.id}/tier`, { tier });
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === user.id
-            ? { ...u, subscription_tier: tier, subscription_status: "active" }
-            : u
-        )
-      );
-      showSuccess(t("toasts.tierUpdated"));
-    } catch {
-      setError(t("toasts.tierUpdateFailed"));
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
   async function handlePlanChange(user: AdminUser, planId: string) {
     setActionLoading(`plan-${user.id}`);
     try {
@@ -525,25 +482,6 @@ export default function Admin() {
       showSuccess(t("toasts.planUpdated"));
     } catch {
       setError(t("toasts.planUpdateFailed"));
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function handleTrialAction(user: AdminUser, action: string) {
-    setActionLoading(`trial-${user.id}`);
-    try {
-      const res = await client().patch<AdminUser>(`/admin/users/${user.id}/trial`, {
-        action,
-      });
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === user.id ? { ...u, trial_ends_at: res.data.trial_ends_at } : u
-        )
-      );
-      showSuccess(t("toasts.trialUpdated"));
-    } catch {
-      setError(t("toasts.trialUpdateFailed"));
     } finally {
       setActionLoading(null);
     }
@@ -1523,7 +1461,7 @@ export default function Admin() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr 2fr",
+              gridTemplateColumns: "2fr 2fr 1.4fr 0.8fr 1.2fr 1.6fr",
               padding: "10px 16px",
               borderBottom: "1px solid var(--border)",
               background: "var(--bg-sunken)",
@@ -1537,7 +1475,6 @@ export default function Admin() {
             <span>{t("users.colName")}</span>
             <span>{t("users.colEmail")}</span>
             <span>{t("users.colTier")}</span>
-            <span>{t("users.colTrial")}</span>
             <span>{t("users.colProjects")}</span>
             <span>{t("users.colSignedUp")}</span>
             <span>{t("users.colActions")}</span>
@@ -1560,7 +1497,7 @@ export default function Admin() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 1fr 2fr",
+                  gridTemplateColumns: "2fr 2fr 1.4fr 0.8fr 1.2fr 1.6fr",
                   padding: "12px 16px",
                   borderBottom: "1px solid var(--border-subtle)",
                   alignItems: "center",
@@ -1605,17 +1542,6 @@ export default function Admin() {
                   )}
                 </div>
 
-                {/* Trial */}
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: trialColor(user.trial_ends_at),
-                    fontWeight: 500,
-                  }}
-                >
-                  {trialLabel(user.trial_ends_at, t)}
-                </div>
-
                 {/* Projects */}
                 <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
                   {user.project_count}
@@ -1631,28 +1557,6 @@ export default function Admin() {
                   style={{ display: "flex", gap: 6, alignItems: "center" }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Tier selector */}
-                  <select
-                    value={user.subscription_tier}
-                    disabled={actionLoading === `tier-${user.id}`}
-                    title={t("users.tierSelectTitle")}
-                    onChange={(e) => handleTierChange(user, e.target.value)}
-                    style={{
-                      fontSize: 12,
-                      padding: "4px 6px",
-                      borderRadius: "var(--radius-xs)",
-                      border: "1px solid var(--border)",
-                      background: "var(--bg-surface)",
-                      cursor: "pointer",
-                      outline: "none",
-                    }}
-                  >
-                    <option value="solo">{t("users.tierSolo")}</option>
-                    <option value="team">{t("users.tierTeam")}</option>
-                    <option value="lab">{t("users.tierLab")}</option>
-                    <option value="enterprise">{t("users.tierEnterprise")}</option>
-                  </select>
-
                   {/* Plan selector (credits-based — the real subscription) */}
                   <select
                     value={user.plan_is_legacy ? "" : user.plan_id ?? ""}
@@ -1680,38 +1584,6 @@ export default function Admin() {
                     <option value="agency">{t("users.planAgency")}</option>
                     <option value="enterprise">{t("users.planEnterprise")}</option>
                   </select>
-
-                  {/* Trial selector */}
-                  <select
-                    value=""
-                    disabled={actionLoading === `trial-${user.id}`}
-                    onChange={(e) => {
-                      if (e.target.value) handleTrialAction(user, e.target.value);
-                    }}
-                    style={{
-                      fontSize: 12,
-                      padding: "4px 6px",
-                      borderRadius: "var(--radius-xs)",
-                      border: "1px solid var(--border)",
-                      background: "var(--bg-surface)",
-                      cursor: "pointer",
-                      outline: "none",
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    <option value="" disabled>
-                      {t("users.trialOption")}
-                    </option>
-                    <option value="extend_7">{t("users.trialExtend7")}</option>
-                    <option value="extend_14">{t("users.trialExtend14")}</option>
-                    <option value="extend_30">{t("users.trialExtend30")}</option>
-                    <option value="reset">{t("users.trialReset")}</option>
-                    <option value="expire">{t("users.trialExpire")}</option>
-                  </select>
-                  {/* Trial is calendar-based for LEGACY accounts only. New
-                      accounts are credits-based — use "Adjust credits" to
-                      grant/claw back interview credits instead of touching a
-                      trial date that doesn't gate their access. */}
 
                   {/* Delete */}
                   <button
