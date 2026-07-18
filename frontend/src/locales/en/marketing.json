@@ -161,7 +161,7 @@
   "pricing": {
     "eyebrow": "Pricing",
     "title": "Pay per completed interview. Nothing else.",
-    "subtitle": "1 credit = 1 completed interview (up to 15 minutes). Screened-out, abandoned or failed sessions never cost a credit.",
+    "subtitle": "1 credit = 1 completed interview (up to 15 minutes). Screened-out, abandoned or failed sessions never cost a credit. Unlimited studies on every plan.",
     "billingToggleLabel": "Billing interval",
     "billingMonthly": "Monthly",
     "billingAnnual": "Annual",
@@ -179,7 +179,7 @@
       "desc": "Prove it works on a question you actually have.",
       "credits": "3 interviews included, never expire",
       "features": [
-        "1 editor · 1 active study",
+        "1 editor",
         "Full AI analysis & decision memo",
         "No credit card required"
       ],
@@ -190,7 +190,7 @@
         "name": "Exploration",
         "desc": "Solo founders & PMs running a study a month.",
         "features": [
-          "1 editor · 3 active studies",
+          "1 editor",
           "Unused purchased credits roll over",
           "CSV & PDF export, shared reports",
           "Extra interviews €7 each"
@@ -202,7 +202,6 @@
         "desc": "Product squads making research a habit, not an event.",
         "features": [
           "3 editors + unlimited viewers",
-          "Up to 20 active studies",
           "Team workspace & permissions",
           "Extra interviews €6 each"
         ],
@@ -213,7 +212,6 @@
         "desc": "Consultancies running research for clients.",
         "features": [
           "8 editors + unlimited viewers",
-          "Unlimited studies",
           "Client workspaces & custom branding",
           "Extra interviews €5 each"
         ],

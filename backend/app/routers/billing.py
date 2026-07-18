@@ -128,7 +128,6 @@ def list_plans(db: Session = Depends(get_db)):
             "credit_period": p.credit_period,
             "max_editors": p.max_editors,
             "max_viewers": p.max_viewers,
-            "max_active_projects": p.max_active_projects,
             "overage_price_cents": p.overage_price_cents,
             "is_custom": p.is_custom,
             "entitlements": by_plan_id.get(p.id, {}),

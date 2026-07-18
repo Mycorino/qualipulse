@@ -59,7 +59,6 @@ class Plan(Base):
 
     max_editors: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_viewers: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    max_active_projects: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     overage_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     overage_enabled_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

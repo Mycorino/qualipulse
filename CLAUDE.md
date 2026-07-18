@@ -423,13 +423,18 @@ API startup via `BillingService.ensure_plans_seeded`. The credit balance
 lives on `credit_balances`; every credit movement is appended to
 `credit_ledger` (idempotent per participant via a partial unique index).
 
-| Plan | Monthly | Annual | Credits/period | Editors | Active projects | Overage |
-|---|---|---|---|---|---|---|
-| Trial | €0 | — | 3 total (no time expiry) | 1 | 1 | — |
-| Exploration | €89 | €890 | 10 / month | 1 | 3 | €7/credit |
-| Team | €299 | €2,990 | 50 / month | 3 | 20 | €6/credit |
-| Agency | €799 | €7,990 | 150 / month | 8 | unlimited | €5/credit |
-| Enterprise | custom | custom | custom annual | custom | unlimited | per contract |
+| Plan | Monthly | Annual | Credits/period | Editors | Overage |
+|---|---|---|---|---|---|
+| Trial | €0 | — | 3 total (no time expiry) | 1 | — |
+| Exploration | €89 | €890 | 10 / month | 1 | €7/credit |
+| Team | €299 | €2,990 | 50 / month | 3 | €6/credit |
+| Agency | €799 | €7,990 | 150 / month | 8 | €5/credit |
+| Enterprise | custom | custom | custom annual | custom | per contract |
+
+Credits-based plans have **no active-project cap** — studies are unlimited
+on every plan; usage is gated by interview credits alone. The former
+`max_active_projects` column was dropped in Alembic 0055 (it was never
+enforced). Legacy tiers still cap projects via `feature_gates.TIER_LIMITS`.
 
 **1 credit = 1 completed participant interview (≤15 min).** Consumed
 when `participant.status` flips to `"completed"` in
@@ -1131,7 +1136,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id` (str), `slug` (unique, indexed), `title`, `subtitle`, `content` (HTML from TipTap), `excerpt`, `cover_image_url`, `meta_title`, `meta_description`, `og_image_url`, `author_name`, `tags` (JSON text), `status` (draft/published, indexed), `published_at`, `created_at`, `updated_at`
 
 ### Plan (credits-based billing)
-`id` (str PK, eg. `team`, `legacy_starter`), `public_name`, `description`, `is_public`, `is_legacy`, `is_custom`, `monthly_price_cents`, `annual_price_cents`, `currency`, `included_credits`, `credit_period` (`trial_total` | `monthly` | `annual` | `custom` | `legacy_none`), `max_editors`, `max_viewers`, `max_active_projects`, `overage_price_cents`, `overage_enabled_default`, `stripe_monthly_price_id`, `stripe_annual_price_id`, `sort_order`, `created_at`, `updated_at`
+`id` (str PK, eg. `team`, `legacy_starter`), `public_name`, `description`, `is_public`, `is_legacy`, `is_custom`, `monthly_price_cents`, `annual_price_cents`, `currency`, `included_credits`, `credit_period` (`trial_total` | `monthly` | `annual` | `custom` | `legacy_none`), `max_editors`, `max_viewers`, `overage_price_cents`, `overage_enabled_default`, `stripe_monthly_price_id`, `stripe_annual_price_id`, `sort_order`, `created_at`, `updated_at`
 
 ### PlanEntitlement
 `id`, `plan_id` (FK Plan, indexed), `key` (eg. `csv_export`, `custom_branding`, `credit_rollover_days`), `value` (JSON), `created_at`. Unique on `(plan_id, key)`. Catalogue source: `services/billing_plans.py`.

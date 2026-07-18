@@ -33,8 +33,6 @@
   "plan_credits": "{{count}} crédits/mois",
   "plan_editors_one": "{{count}} éditeur",
   "plan_editors_other": "{{count}} éditeurs",
-  "plan_projects_one": "{{count}} projet actif",
-  "plan_projects_other": "{{count}} projets actifs",
   "subscribe_cta": "S'abonner",
   "pack_eyebrow": "Paiement à l'usage",
   "pack_title": "Pack de crédits",
