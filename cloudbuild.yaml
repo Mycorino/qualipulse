@@ -67,11 +67,24 @@ steps:
       - --allow-unauthenticated
       - --port=8080
       - --cpu=1
-      - --memory=512Mi
-      - --min-instances=0
-      - --max-instances=10
+      # 1Gi: concurrent ffmpeg transcodes + audio blobs in /tmp (tmpfs counts
+      # against the memory limit) were OOM territory at 512Mi.
+      - --memory=1Gi
+      # min 1: the cold boot (alembic + seeds + Neon resume) took 15-40s and
+      # hit whichever user arrived first after an idle period.
+      - --min-instances=1
+      - --max-instances=15
       - --timeout=300s
-      - --concurrency=80
+      # concurrency must reflect real capacity or the autoscaler never fires:
+      # sync endpoints hold a threadpool worker for the whole Whisper→Claude→
+      # TTS→ffmpeg chain (5-15s), so at 80 the instance saturated long before
+      # Cloud Run would add another one.
+      - --concurrency=16
+      # CPU stays allocated between requests: analysis / translation / memo
+      # generation run in in-process daemon threads after their 202 returns,
+      # and with throttled CPU they stall (or die at scale-in) silently.
+      - --no-cpu-throttling
+      - --cpu-boost
       - --set-secrets=SECRET_KEY=secret-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,DATABASE_URL=database-url:latest,SENDGRID_API_KEY=sendgrid-api-key:latest,ADMIN_SECRET_KEY=admin-secret-key:latest,R2_ACCOUNT_ID=r2-account-id:latest,R2_ACCESS_KEY_ID=r2-access-key-id:latest,R2_SECRET_ACCESS_KEY=r2-secret-access-key:latest,R2_BUCKET=r2-bucket:latest,R2_PUBLIC_URL=r2-public-url:latest,GOOGLE_CLIENT_ID=google-client-id:latest,GOOGLE_CLIENT_SECRET=google-client-secret:latest,STRIPE_SECRET_KEY=stripe-secret-key:latest,STRIPE_WEBHOOK_SECRET=stripe-webhook-secret:latest
       - --set-env-vars=ENVIRONMENT=production,UPLOAD_DIR=/tmp/uploads,ALLOWED_ORIGINS=https://app.qualipulse.com,APP_BASE_URL=https://app.qualipulse.com,R2_JURISDICTION=eu,GOOGLE_REDIRECT_URI=https://api.qualipulse.com/auth/google/callback,STRIPE_PRICE_EXPLORATION_MONTHLY=price_1Tfn7rFq7Ytp6z9x0NoRqXsf,STRIPE_PRICE_EXPLORATION_ANNUAL=price_1Tfn7sFq7Ytp6z9xOhfKWxND,STRIPE_PRICE_TEAM_MONTHLY=price_1Tfn7tFq7Ytp6z9xskzZKcCZ,STRIPE_PRICE_TEAM_ANNUAL=price_1Tfn7tFq7Ytp6z9xUlT8Lpds,STRIPE_PRICE_AGENCY_MONTHLY=price_1Tfn7uFq7Ytp6z9xpgEhXwjD,STRIPE_PRICE_AGENCY_ANNUAL=price_1Tfn7vFq7Ytp6z9xO4FrrzWe,STRIPE_PRICE_PACK_25=price_1Tfn7wFq7Ytp6z9xVIzEznc3,STRIPE_PRICE_PACK_50=price_1Tfn7xFq7Ytp6z9xYIaKyPtH,STRIPE_PRICE_PACK_100=price_1Tfn7yFq7Ytp6z9xa0qvXhfJ
 

@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 import uuid
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
@@ -61,19 +62,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Resolve + log the Claude model ids (and warn loudly if a configured model
     # is unavailable — catches a retirement at deploy, not via a participant 500).
-    try:
-        from app.services import ai_models
-        ai_models.log_resolved()
-        if settings.ANTHROPIC_API_KEY:
-            import anthropic
-            _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-            for _mid in {ai_models.sonnet(), ai_models.opus(), ai_models.haiku()}:
-                try:
-                    _client.models.retrieve(_mid)
-                except Exception:
-                    logger.error("CONFIGURED CLAUDE MODEL UNAVAILABLE: %s — set MODEL_* env to a valid id", _mid)
-    except Exception:  # pragma: no cover — never block startup on model checks
-        logger.exception("Model resolution/validation failed; continuing")
+    # Runs in a background thread: three sequential Anthropic round trips were
+    # gating every cold start, and the check is log-only.
+    def _validate_models() -> None:
+        try:
+            from app.services import ai_models
+            ai_models.log_resolved()
+            if settings.ANTHROPIC_API_KEY:
+                import anthropic
+                _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+                for _mid in {ai_models.sonnet(), ai_models.opus(), ai_models.haiku()}:
+                    try:
+                        _client.models.retrieve(_mid)
+                    except Exception:
+                        logger.error("CONFIGURED CLAUDE MODEL UNAVAILABLE: %s — set MODEL_* env to a valid id", _mid)
+        except Exception:  # pragma: no cover — never block startup on model checks
+            logger.exception("Model resolution/validation failed; continuing")
+
+    threading.Thread(target=_validate_models, daemon=True, name="model-check").start()
 
     # Panel enrichment: sync the profiling-attribute catalogue (idempotent).
     try:

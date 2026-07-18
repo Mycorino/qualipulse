@@ -22,6 +22,15 @@ else:
     # Recycle connections older than 5 minutes to stay under Neon's idle
     # timeout window proactively rather than reactively.
     engine_kwargs["pool_recycle"] = 300
+    # Cap the per-instance connection budget. Cloud Run runs up to 15 backend
+    # instances and Neon's smaller computes allow ~112 direct connections, so
+    # SQLAlchemy's defaults (5 + 10 overflow = 15/instance, 225 worst case)
+    # can exhaust the database under scale-out. 5 + 5 keeps the worst case at
+    # 150 — still above the direct limit at full scale, so point DATABASE_URL
+    # at Neon's pooled (-pooler / pgbouncer) endpoint before sustained heavy
+    # load. Overflow connections close on return, so bursts recover quickly.
+    engine_kwargs["pool_size"] = 5
+    engine_kwargs["max_overflow"] = 5
 
 engine = create_engine(
     settings.DATABASE_URL,
