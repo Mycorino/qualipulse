@@ -51,7 +51,7 @@ function inferStartStep(me: CompanyResponse): StepId {
     return 1;
   }
   if (me.role && me.company_size) return 3;
-  if (me.name) return 2;
+  if (me.name && me.company_size) return 2;
   return 1;
 }
 
@@ -151,8 +151,8 @@ export default function Welcome() {
       : roleKey
         ? enT(`roles.${roleKey}`)
         : "";
-  const step1Valid = !!companyName.trim();
-  const step2Valid = !!roleResolved && !!teamSize;
+  const step1Valid = !!companyName.trim() && !!teamSize;
+  const step2Valid = !!roleResolved;
 
   // `model` routes to the fast (haiku) or high-quality (sonnet) tier —
   // the caller picks based on whether the user gave a free-text goal.
@@ -181,6 +181,7 @@ export default function Welcome() {
       const next = await saveOnboardingProfile({
         name: companyName.trim(),
         preferred_language: lang,
+        company_size: teamSize,
       });
       setMe(next);
       setStep(2);
@@ -196,7 +197,6 @@ export default function Welcome() {
     try {
       const next = await saveOnboardingProfile({
         role: roleResolved,
-        company_size: teamSize,
       });
       setMe(next);
       // Land on the ask phase — suggestions are NOT fetched yet, so the
@@ -229,6 +229,10 @@ export default function Welcome() {
     }
     setSaving(false);
     setPhase3("themes");
+    // Going back and forward with an unchanged goal keeps the themes already
+    // on screen — regenerating would swap the chips under selections the user
+    // already made (and pay for another model call).
+    if (suggestions && trimmed === goalsUsed) return;
     // Route by input richness: a typed goal → Sonnet (its anchoring on the
     // user's words is exactly the win); skipped → Haiku (fast, and role-only
     // themes don't need Sonnet's reasoning).
@@ -439,7 +443,7 @@ export default function Welcome() {
           </section>
         )}
 
-        {/* ── Step 1: Company name + language ── */}
+        {/* ── Step 1: Company name + language + company size ── */}
         {!done && step === 1 && (
           <section className="welcome-setup__card">
             <h1 className="welcome-setup__title">{t("step_1_title")}</h1>
@@ -462,6 +466,25 @@ export default function Welcome() {
               <LanguageSwitcher />
             </div>
 
+            <div className="welcome-setup__field">
+              <span className="welcome-setup__field-label">{t("field_team_size")}</span>
+              <div className="welcome-setup__chips" role="radiogroup">
+                {TEAM_SIZES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    role="radio"
+                    aria-checked={teamSize === s}
+                    className={`welcome-setup__chip ${teamSize === s ? "welcome-setup__chip--active" : ""}`}
+                    onClick={() => setTeamSize(s)}
+                    disabled={saving}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="welcome-setup__actions">
               <button
                 type="button"
@@ -475,7 +498,7 @@ export default function Welcome() {
           </section>
         )}
 
-        {/* ── Step 2: Role + Company size ── */}
+        {/* ── Step 2: Role ── */}
         {!done && step === 2 && (
           <section className="welcome-setup__card">
             <h1 className="welcome-setup__title">{t("step_2_title")}</h1>
@@ -549,25 +572,6 @@ export default function Welcome() {
               </div>
             )}
 
-            <div className="welcome-setup__field">
-              <span className="welcome-setup__field-label">{t("field_team_size")}</span>
-              <div className="welcome-setup__chips" role="radiogroup">
-                {TEAM_SIZES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    role="radio"
-                    aria-checked={teamSize === s}
-                    className={`welcome-setup__chip ${teamSize === s ? "welcome-setup__chip--active" : ""}`}
-                    onClick={() => setTeamSize(s)}
-                    disabled={saving}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="welcome-setup__actions">
               <button
                 type="button"
@@ -637,7 +641,7 @@ export default function Welcome() {
         {/* ── Step 3b: Themes — confirm/expand the AI's proposal ── */}
         {!done && step === 3 && phase3 === "themes" && (
           <section className="welcome-setup__card">
-            <h1 className="welcome-setup__title">{t("step_3_title")}</h1>
+            <h1 className="welcome-setup__title">{t("step_3b_title")}</h1>
             <p className="welcome-setup__sub">{t("step_3_sub")}</p>
 
             {suggestionsLoading ? (
@@ -651,10 +655,6 @@ export default function Welcome() {
               <>
                 {suggestions && (
                   <div className="welcome-setup__field">
-                    <span className="welcome-setup__field-label">{t("step_3_use_cases_label")}</span>
-                    <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>
-                      {t("step_3_use_cases_hint")}
-                    </p>
                     <div className="welcome-setup__chips">
                       {(Array.isArray(suggestions.use_cases) ? suggestions.use_cases : []).map((uc) => (
                         <button
