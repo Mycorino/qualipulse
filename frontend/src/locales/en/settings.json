@@ -73,8 +73,6 @@
     "planFeatures": {
       "creditsLine": "{{count}} credits/{{unit}}",
       "perMonthUnit": "mo",
-      "projects": "{{count}} projects",
-      "projectsUnlimited": "Unlimited projects",
       "editors_one": "{{count}} editor",
       "editors_other": "{{count}} editors",
       "editorsUnlimited": "Unlimited editors",

@@ -447,11 +447,6 @@ function PlanCard({
           </li>
         )}
         <li>
-          {plan.max_active_projects == null
-            ? t("billing.planFeatures.projectsUnlimited", { defaultValue: "Unlimited projects" })
-            : t("billing.planFeatures.projects", { count: plan.max_active_projects })}
-        </li>
-        <li>
           {plan.max_editors == null
             ? t("billing.planFeatures.editorsUnlimited", { defaultValue: "Unlimited editors" })
             : t("billing.planFeatures.editors", { count: plan.max_editors })}

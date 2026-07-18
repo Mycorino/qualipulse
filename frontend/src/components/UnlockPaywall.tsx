@@ -129,7 +129,6 @@ interface SubPlan {
   currency: string;
   included_credits: number | null;
   max_editors: number | null;
-  max_active_projects: number | null;
 }
 
 type BillingInterval = "monthly" | "annual";
@@ -354,11 +353,6 @@ export function UnlockModal({
                         {t("plan_credits", { count: p.included_credits ?? 0 })}
                       </li>
                       <li>{t("plan_editors", { count: p.max_editors ?? 1 })}</li>
-                      <li>
-                        {t("plan_projects", {
-                          count: p.max_active_projects ?? 0,
-                        })}
-                      </li>
                     </ul>
                     <button
                       type="button"

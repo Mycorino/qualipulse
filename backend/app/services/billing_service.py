@@ -115,7 +115,6 @@ def _plan_from_spec(spec: PlanSpec) -> Plan:
         credit_period=spec.credit_period,
         max_editors=spec.max_editors,
         max_viewers=spec.max_viewers,
-        max_active_projects=spec.max_active_projects,
         overage_price_cents=spec.overage_price_cents,
         overage_enabled_default=spec.overage_enabled_default,
         sort_order=spec.sort_order,
@@ -135,7 +134,6 @@ def _update_plan_from_spec(plan: Plan, spec: PlanSpec) -> None:
     plan.credit_period = spec.credit_period
     plan.max_editors = spec.max_editors
     plan.max_viewers = spec.max_viewers
-    plan.max_active_projects = spec.max_active_projects
     plan.overage_price_cents = spec.overage_price_cents
     plan.overage_enabled_default = spec.overage_enabled_default
     plan.sort_order = spec.sort_order

@@ -33,8 +33,6 @@
   "plan_credits": "{{count}} credits/mo",
   "plan_editors_one": "{{count}} editor",
   "plan_editors_other": "{{count}} editors",
-  "plan_projects_one": "{{count}} active project",
-  "plan_projects_other": "{{count}} active projects",
   "subscribe_cta": "Subscribe",
   "pack_eyebrow": "Pay as you go",
   "pack_title": "Credit pack",

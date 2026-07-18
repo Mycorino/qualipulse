@@ -71,7 +71,6 @@ export interface Plan {
   included_credits: number | null;
   credit_period: string;
   max_editors: number | null;
-  max_active_projects: number | null;
   overage_price_cents: number | null;
   is_custom: boolean;
   entitlements: Record<string, unknown>;
