@@ -62,21 +62,17 @@ from app.services.demo_seeder import (  # noqa: E402
     DEMO_SURVEY_FR,
     DEMO_SURVEY_NAME,
     DEMO_SURVEY_NAME_FR,
-    DEMO2_GUIDE,
-    DEMO2_GUIDE_FR,
-    DEMO2_PROJECT_NAME,
-    DEMO2_PROJECT_NAME_FR,
     _decision_integration,
 )
 
 _FLAGSHIP = {DEMO_PROJECT_NAME, DEMO_PROJECT_NAME_FR}
-_ALL_DEMO_NAMES = _FLAGSHIP | {DEMO2_PROJECT_NAME, DEMO2_PROJECT_NAME_FR}
+_ALL_DEMO_NAMES = _FLAGSHIP
 
 # Exact main-question text → (interview_notes, researcher_notes) from the
-# current fixtures, across both studies and both languages.
+# current fixtures, both languages.
 _NOTES_BY_QUESTION: dict[str, tuple[str, str | None]] = {
     item["q"]: (item.get("notes", ""), item.get("researcher"))
-    for guide in (DEMO_GUIDE, DEMO_GUIDE_FR, DEMO2_GUIDE, DEMO2_GUIDE_FR)
+    for guide in (DEMO_GUIDE, DEMO_GUIDE_FR)
     for section in guide
     for item in section["questions"]
 }

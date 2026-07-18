@@ -40,17 +40,13 @@ from app.models.project import Project  # noqa: E402
 from app.services.demo_seeder import (  # noqa: E402
     DEMO_PROJECT_NAME,
     DEMO_PROJECT_NAME_FR,
-    DEMO2_PROJECT_NAME,
-    DEMO2_PROJECT_NAME_FR,
     _v1_report,
     _v2_report,
-    _study2_report,
 )
 
 _FLAGSHIP = {DEMO_PROJECT_NAME, DEMO_PROJECT_NAME_FR}
-_STUDY2 = {DEMO2_PROJECT_NAME, DEMO2_PROJECT_NAME_FR}
-_FR_NAMES = {DEMO_PROJECT_NAME_FR, DEMO2_PROJECT_NAME_FR}
-_ALL_DEMO_NAMES = _FLAGSHIP | _STUDY2
+_FR_NAMES = {DEMO_PROJECT_NAME_FR}
+_ALL_DEMO_NAMES = _FLAGSHIP
 
 
 def _builder_for(project: Project, analysis: ProjectAnalysis):
@@ -65,9 +61,6 @@ def _builder_for(project: Project, analysis: ProjectAnalysis):
             return _v2_report
         if analysis.version_label == "ai_discovery":
             return _v1_report
-    elif name in _STUDY2:
-        if analysis.version_label == "ai_discovery":
-            return _study2_report
     return None
 
 
