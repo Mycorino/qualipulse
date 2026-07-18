@@ -442,13 +442,13 @@ class TestDemoProjectExcludedFromQuota:
         seed_demo_project(db_session, company.id)
         db_session.expire_all()
 
-        # Confirm both demo projects exist (flagship + exit-interview sibling).
+        # Confirm the demo project exists (the flagship study).
         demo_count = (
             db_session.query(Project)
             .filter(Project.company_id == company.id, Project.is_demo == True)  # noqa: E712
             .count()
         )
-        assert demo_count == 2
+        assert demo_count == 1
 
         # Starter users (no legacy trial) get starter limits = 1 project.
         # The demo project should NOT count against that limit — we should be
@@ -484,69 +484,38 @@ class TestDemoProjectExcludedFromQuota:
         assert resp.status_code == 403
 
 
-class TestDemoSecondStudy:
-    """The demo seeds a second exit-interview study with its own ready
-    qualitative analysis, so a new account lands with two studies — the
-    flagship mixed-methods Decision report plus a qualitative-findings report.
-    (The cross-study decision memo feature was retired; the second study now
-    stands on its own as a qualitative report.)"""
+class TestDemoSingleStudy:
+    """The demo seeds a single flagship mixed-methods study — a new account
+    lands with exactly one demo study (the exit-interview sibling and the
+    retired cross-study decision memo are no longer seeded)."""
 
-    def test_seed_creates_two_studies(self, db_session):
+    def test_seed_creates_one_study(self, db_session):
         from app.models.study import Study
-        from app.services.demo_seeder import DEMO2_PROJECT_NAME
 
         company = _make_company(db_session)
         seed_demo_project(db_session, company.id)
 
         studies = db_session.query(Study).filter(Study.company_id == company.id).all()
-        assert len(studies) == 2
-        assert DEMO2_PROJECT_NAME in {s.name for s in studies}
+        assert len(studies) == 1
+        assert studies[0].name == DEMO_PROJECT_NAME
 
-    def test_second_study_projects_are_demo_flagged(self, db_session):
+    def test_demo_project_is_demo_flagged(self, db_session):
         company = _make_company(db_session)
         seed_demo_project(db_session, company.id)
         projects = db_session.query(Project).filter(Project.company_id == company.id).all()
-        assert len(projects) == 2
+        assert len(projects) == 1
         assert all(p.is_demo for p in projects)
 
-    def test_second_study_analysis_quotes_are_verbatim(self, db_session):
-        from app.services.demo_seeder import DEMO2_PROJECT_NAME
-
-        company = _make_company(db_session)
-        seed_demo_project(db_session, company.id)
-        project2 = (
-            db_session.query(Project)
-            .filter(Project.company_id == company.id, Project.name == DEMO2_PROJECT_NAME)
-            .one()
-        )
-        transcripts = "\n".join(
-            t.response_transcript or ""
-            for t in db_session.query(InterviewTurn)
-            .join(Participant)
-            .filter(Participant.project_id == project2.id)
-            .all()
-        )
-        analysis = (
-            db_session.query(ProjectAnalysis)
-            .filter(ProjectAnalysis.project_id == project2.id)
-            .one()
-        )
-        assert analysis.status == "ready"
-        for theme in json.loads(analysis.report)["themes"]:
-            for q in theme["quotes"]:
-                assert q["text"] in transcripts, f"Quote not in transcripts: {q['text']!r}"
-
-    def test_fr_seed_creates_two_french_studies(self, db_session):
+    def test_fr_seed_creates_one_french_study(self, db_session):
         from app.models.study import Study
-        from app.services.demo_seeder import DEMO2_PROJECT_NAME_FR
+        from app.services.demo_seeder import DEMO_PROJECT_NAME_FR
 
         company = _make_company(db_session, preferred_language="fr")
         seed_demo_project(db_session, company.id)
 
-        study_names = {
-            s.name for s in db_session.query(Study).filter(Study.company_id == company.id).all()
-        }
-        assert DEMO2_PROJECT_NAME_FR in study_names
+        studies = db_session.query(Study).filter(Study.company_id == company.id).all()
+        assert len(studies) == 1
+        assert studies[0].name == DEMO_PROJECT_NAME_FR
 
     def test_seed_creates_no_cross_study_memo(self, db_session):
         """The retired cross-study synthesis is no longer seeded."""
