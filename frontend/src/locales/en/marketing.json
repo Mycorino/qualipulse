@@ -14,8 +14,8 @@
   },
   "hero": {
     "eyebrow": "AI-moderated voice interviews",
-    "title": "The customer interviews you keep postponing. Done by Friday.",
-    "sub": "QualiPulse interviews your users by voice, right in their browser, asking <b>adaptive follow-ups</b> like a trained researcher. You get transcripts, themes, and a <b>decision memo where every claim traces back to a verbatim quote</b>. No scheduling. No moderating. No transcription weekend.",
+    "title": "Your customer interviews, run by an AI voice interviewer. Done by Friday.",
+    "sub": "QualiPulse <b>converses with your participants like a trained researcher</b> — a real spoken exchange that sharpens every answer — then delivers a <b>clear synthesis backed by verbatim quotes</b>. No scheduling, no moderating, no transcription weekend.",
     "cta": "Start free with 3 interviews",
     "secondaryCta": "See the evidence trail",
     "facts": [
@@ -44,45 +44,32 @@
   "problem": {
     "eyebrow": "The problem",
     "title": "Nobody skips research because they don’t care. They skip it because it’s slow.",
-    "subtitle": "By the time a classic interview study is scheduled, moderated, transcribed and synthesised, the decision it was meant to inform has already shipped.",
-    "cards": [
-      {
-        "figure": "3 wks",
-        "title": "Calendar tetris",
-        "desc": "Recruiting, timezone juggling, no-shows, reschedules. Eight interviews means three weeks of logistics before you’ve learned a single thing."
-      },
-      {
-        "figure": "6 hrs",
-        "title": "Per interview, all-in",
-        "desc": "Moderate it, transcribe it, code it, synthesise it. Multiply by every participant. That cost is exactly why “let’s just A/B it” wins the meeting."
-      },
-      {
-        "figure": "Too late",
-        "title": "Insight after the decision",
-        "desc": "Findings that arrive after the roadmap is locked don’t change anything. They become a slide nobody reopens."
-      }
-    ],
-    "kicker": "So teams decide on gut feel, a survey with 4% completion, and the loudest customer in the Slack channel, then call it “being scrappy.”"
+    "subtitle": "Recruiting, scheduling, moderating, transcribing, synthesising: count three weeks and six hours per interview. By the time the study lands, the decision it was meant to inform has often already shipped."
   },
   "how": {
-    "eyebrow": "The fix",
+    "eyebrow": "How it works",
     "title": "Brief it tonight. Read the memo by Friday.",
-    "subtitle": "QualiPulse collapses the whole pipeline into three steps: recruiting logistics, moderating, transcription, and synthesis.",
+    "subtitle": "From objective to synthesis, in four steps.",
     "steps": [
       {
         "num": "Step 1",
-        "title": "Describe the decision",
-        "desc": "Tell the research copilot what you need to decide. It drafts an interview guide with sections, screening questions and follow-up intents. You edit anything."
+        "title": "Define your objective",
+        "desc": "Describe the decision you need to make and what you need to learn. That's the only work we ask of you."
       },
       {
         "num": "Step 2",
-        "title": "Share one link",
-        "desc": "Participants open it in any browser and just talk. The AI listens, probes the interesting bits, and keeps to your time budget. No app, no booking, no moderator."
+        "title": "The AI prepares your study",
+        "desc": "A structured interview guide, screening questions, angles to explore: the copilot drafts everything, you edit anything."
       },
       {
         "num": "Step 3",
-        "title": "Read the decision memo",
-        "desc": "Themes, tensions, jobs-to-be-done and recommendations, each backed by verbatim quotes you can walk back to the exact second."
+        "title": "Participants answer through one link",
+        "desc": "They open it in any browser and just talk. The interview adapts to their answers and keeps to your time budget. No app, no booking, no moderator."
+      },
+      {
+        "num": "Step 4",
+        "title": "Analyse the results",
+        "desc": "Themes, verbatim quotes and recommendations — every claim walks back to the exact quote it came from."
       }
     ],
     "guideLines": [
@@ -95,7 +82,8 @@
     "confHigh": "HIGH",
     "confMed": "MED",
     "memoRow1": "Cancellation is triggered by billing moments, not features",
-    "memoRow2": "“Pause” is the unmet ask in 7 of 12 interviews"
+    "memoRow2": "“Pause” is the unmet ask in 7 of 12 interviews",
+    "objectiveLine": "Understand why subscribers cancel"
   },
   "evidence": {
     "eyebrow": "Why you can trust it",
@@ -133,28 +121,28 @@
     "title": "What a real interview has that a form never will.",
     "items": [
       {
-        "title": "Adaptive follow-ups",
-        "desc": "The AI decides after every answer: probe deeper, move on, or wrap up. It paces itself against your time budget, like a moderator watching the clock."
+        "title": "Hours saved per interview",
+        "desc": "Screening, moderating, transcription and first-pass analysis are all done by the time you open the report."
       },
       {
-        "title": "People say more than they type",
-        "desc": "A spoken answer runs four to six times longer than a text-box answer, with the hedges and half-thoughts where the real insight hides."
+        "title": "Richer data than any questionnaire",
+        "desc": "A spoken answer runs four to six times longer than a typed one, and the AI digs into what stays vague instead of marching through a script."
       },
       {
-        "title": "Screening built in",
-        "desc": "Disqualifying questions run before the interview starts, so you never pay for a participant who wasn’t your audience."
+        "title": "Analysis grounded in evidence",
+        "desc": "Themes, tensions and recommendations are backed by cited verbatims, never a general impression. You annotate; the analysis refines."
       },
       {
-        "title": "Quality scoring per interview",
-        "desc": "Each transcript gets an AI quality assessment, so thin or off-topic sessions are flagged before they pollute your synthesis."
+        "title": "GDPR-compliant",
+        "desc": "Signed DPA, subprocessor list and participant notice available. Your data never trains AI models."
       },
       {
-        "title": "Your codebook, your calls",
-        "desc": "Tag quotes, write memos, dispute themes. Refined analyses fold in your annotations. Iterative, not one-shot."
+        "title": "Data hosted in Europe",
+        "desc": "Databases live in the EU and audio is encrypted at rest. Your research belongs to you and exports whenever you want."
       },
       {
-        "title": "Cross-study decision memos",
-        "desc": "Synthesise up to 8 studies into one executive memo, with conflicts surfaced, not smoothed over."
+        "title": "Available in multiple languages",
+        "desc": "Interviews in English, French, German, Spanish, Portuguese and Italian — and any transcript can be machine-translated as a reading aid."
       }
     ]
   },
@@ -282,5 +270,26 @@
     "contact": "Contact",
     "copy": "© 2026 QualiPulse · GDPR-compliant",
     "interviewLink": "Got an interview link?"
+  },
+  "features": {
+    "eyebrow": "Features",
+    "title": "An autonomous AI interviewer, from interview guide to synthesis.",
+    "items": [
+      {
+        "num": "01",
+        "title": "Fast interviews, zero logistics",
+        "desc": "An autonomous AI interviewer runs every session: no moderator, no scheduling. Share the study through one link and the first responses arrive the same day."
+      },
+      {
+        "num": "02",
+        "title": "Qualitative interviews, out loud",
+        "desc": "The AI drafts your interview guide and screening questions, then converses with each participant like a researcher — a spoken exchange that sharpens every answer, in 6 languages."
+      },
+      {
+        "num": "03",
+        "title": "Actionable, traceable analysis",
+        "desc": "Transcription, synthesis, verbatim quotes and recommendations: every conclusion traces back to the participant's exact words."
+      }
+    ]
   }
 }

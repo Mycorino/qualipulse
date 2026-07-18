@@ -251,6 +251,7 @@ export default function Marketing() {
 
   const problemAnim = useInView();
   const howAnim = useInView(0.12, initialHash === "#how");
+  const featuresAnim = useInView(0.12, initialHash === "#features");
   const evidenceAnim = useInView(0.12, initialHash === "#evidence");
   const diffAnim = useInView();
   const pricingAnim = useInView(0.12, initialHash === "#pricing");
@@ -282,9 +283,9 @@ export default function Marketing() {
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   const heroFacts = t("hero.facts", { returnObjects: true }) as string[];
-  const problemCards = t("problem.cards", { returnObjects: true }) as Array<{ figure: string; title: string; desc: string }>;
   const howSteps = t("how.steps", { returnObjects: true }) as Array<{ num: string; title: string; desc: string }>;
   const guideLines = t("how.guideLines", { returnObjects: true }) as string[];
+  const featureItems = t("features.items", { returnObjects: true }) as Array<{ num: string; title: string; desc: string }>;
   const diffItems = t("diff.items", { returnObjects: true }) as Array<{ title: string; desc: string }>;
   const trialFeatures = t("pricing.trial.features", { returnObjects: true }) as string[];
   const faqs = t("faq.items", { returnObjects: true }) as Array<{ question: string; answer: string }>;
@@ -378,16 +379,6 @@ export default function Marketing() {
             <h2>{t("problem.title")}</h2>
             <p>{t("problem.subtitle")}</p>
           </div>
-          <div className="mkt-cards-3">
-            {problemCards.map((card) => (
-              <div key={card.title} className="mkt-p-card">
-                <div className="mkt-p-figure">{card.figure}</div>
-                <h3>{card.title}</h3>
-                <p>{card.desc}</p>
-              </div>
-            ))}
-          </div>
-          <p className="mkt-problem-kicker">{t("problem.kicker")}</p>
         </div>
       </section>
 
@@ -409,6 +400,14 @@ export default function Marketing() {
               <h3>{howSteps[0]?.title}</h3>
               <p>{howSteps[0]?.desc}</p>
               <div className="mkt-step-visual" aria-hidden="true">
+                <div className="mkt-memo-verdict">{t("how.objectiveLine")}</div>
+              </div>
+            </div>
+            <div className="mkt-step">
+              <span className="mkt-step-num">{howSteps[1]?.num}</span>
+              <h3>{howSteps[1]?.title}</h3>
+              <p>{howSteps[1]?.desc}</p>
+              <div className="mkt-step-visual" aria-hidden="true">
                 {guideLines.map((line, i) => (
                   <div key={line} className={`mkt-guide-line${i === 2 ? " dim" : ""}`}>
                     <span className="mkt-guide-num">{i < 2 ? `1.${i + 1}` : "2.1"}</span>
@@ -418,9 +417,9 @@ export default function Marketing() {
               </div>
             </div>
             <div className="mkt-step">
-              <span className="mkt-step-num">{howSteps[1]?.num}</span>
-              <h3>{howSteps[1]?.title}</h3>
-              <p>{howSteps[1]?.desc}</p>
+              <span className="mkt-step-num">{howSteps[2]?.num}</span>
+              <h3>{howSteps[2]?.title}</h3>
+              <p>{howSteps[2]?.desc}</p>
               <div className="mkt-step-visual" aria-hidden="true">
                 <div className="mkt-link-pill">
                   qualipulse.com/i/x7Kd…
@@ -434,15 +433,38 @@ export default function Marketing() {
               </div>
             </div>
             <div className="mkt-step">
-              <span className="mkt-step-num">{howSteps[2]?.num}</span>
-              <h3>{howSteps[2]?.title}</h3>
-              <p>{howSteps[2]?.desc}</p>
+              <span className="mkt-step-num">{howSteps[3]?.num}</span>
+              <h3>{howSteps[3]?.title}</h3>
+              <p>{howSteps[3]?.desc}</p>
               <div className="mkt-step-visual mkt-memo-mini" aria-hidden="true">
                 <div className="mkt-memo-verdict">{t("how.memoVerdict")}</div>
                 <div className="mkt-memo-row"><span className="mkt-conf">{t("how.confHigh")}</span><span>{t("how.memoRow1")}</span></div>
                 <div className="mkt-memo-row"><span className="mkt-conf">{t("how.confMed")}</span><span>{t("how.memoRow2")}</span></div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Features (the three pillars) ---- */}
+      <section
+        className={`mkt-section${featuresAnim.visible ? " visible" : ""}`}
+        id="features"
+        ref={featuresAnim.ref as React.RefObject<HTMLElement>}
+      >
+        <div className="mkt-wrap">
+          <div className="mkt-section-head">
+            <span className="mkt-eyebrow">{t("features.eyebrow")}</span>
+            <h2>{t("features.title")}</h2>
+          </div>
+          <div className="mkt-cards-3">
+            {featureItems.map((item) => (
+              <div key={item.title} className="mkt-p-card">
+                <div className="mkt-p-figure">{item.num}</div>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -626,7 +648,7 @@ export default function Marketing() {
             </div>
             <div className="mkt-footer-col">
               <h4>{t("footer.productTitle")}</h4>
-              <a href="#how">{t("footer.features")}</a>
+              <a href="#features">{t("footer.features")}</a>
               <a href="#evidence">{t("footer.copilotLink")}</a>
               <a href="#pricing">{t("footer.pricingLink")}</a>
               <Link to="/blog">{t("footer.blog")}</Link>
