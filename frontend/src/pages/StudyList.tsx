@@ -252,9 +252,13 @@ export default function StudyList() {
   const tourRequested = searchParams.get("tour") === "1";
   useEffect(() => {
     if (!tourRequested) return;
+    // ?tour=1 on the studies home only arrives from the onboarding handoff,
+    // so it is authoritative: clear any leftover done flag (a repeat tester's
+    // previous account on this browser) instead of letting it kill the tour
+    // AND the seed-polling below. Welcome.tsx also resets on handoff — this
+    // covers a handoff that reaches us without passing through it.
     if (localStorage.getItem(DEMO_TOUR_DONE_KEY) === "1") {
-      stripTourParam();
-      return;
+      localStorage.removeItem(DEMO_TOUR_DONE_KEY);
     }
     if (studies === null) return; // initial load still in flight
     const demos = studies.filter((s) => s.is_demo && !s.archived_at);
@@ -265,7 +269,10 @@ export default function StudyList() {
       setTourStudyId(flagship.id);
       return;
     }
-    if (tourAttempts >= 8) {
+    // Prod seeding has been observed to take ~20s on a cold Neon connection,
+    // and the Welcome handoff only absorbs ~13s of that — budget ~30s more
+    // here rather than stranding the user on an empty studies home.
+    if (tourAttempts >= 25) {
       stripTourParam();
       return;
     }
