@@ -278,7 +278,11 @@ export default function Signup() {
             placeholder={t("signup.emailPlaceholder")}
             required
             autoComplete="email"
+            aria-describedby="signup-email-hint"
           />
+          <p id="signup-email-hint" style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2, marginBottom: 12 }}>
+            {t("signup.emailHint")}
+          </p>
 
           <label className="field-label" htmlFor="signup-password">{t("signup.passwordLabel")}</label>
           <div style={{ position: "relative" }}>
