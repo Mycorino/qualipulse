@@ -11,6 +11,7 @@ import {
   type OnboardingSuggestions,
 } from "../api/auth";
 import { listStudies } from "../api/studies";
+import { resetDemoTour } from "../components/DemoTour";
 import { setCachedOnboarded } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -269,6 +270,9 @@ export default function Welcome() {
     // poll takes over.
     if (preparing) return;
     setPreparing(true);
+    // A repeat tester on the same browser still carries qp_demo_tour_done
+    // from a previous account — clear it so this onboarding's tour re-fires.
+    resetDemoTour();
     const MAX_ATTEMPTS = 12; // ~13s ceiling
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {

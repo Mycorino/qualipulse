@@ -15,8 +15,10 @@ import { useTranslation } from "react-i18next";
  * Handoff: onboarding lands on /dashboard?tour=1 → StudyList shows the
  * callout and arms sessionStorage (DEMO_TOUR_ARMED_KEY) → the user opens
  * the demo study → ProjectDetail mounts DemoTour. Completion or skip
- * writes DEMO_TOUR_DONE_KEY so it never re-triggers; the demo banner's
- * "Replay tour" (?tour=1 on the project page) overrides the done flag.
+ * writes DEMO_TOUR_DONE_KEY so it never re-triggers mid-usage; the demo
+ * banner's "Replay tour" (?tour=1 on the project page) overrides the done
+ * flag, and a fresh onboarding handoff clears it (resetDemoTour) so a
+ * re-onboarded account on the same browser gets the tour again.
  */
 
 export const DEMO_TOUR_DONE_KEY = "qp_demo_tour_done";
@@ -55,6 +57,19 @@ export function isDemoTourArmed(): boolean {
 /** Complete or dismiss the tour everywhere — it never re-triggers. */
 export function skipDemoTour() {
   localStorage.setItem(DEMO_TOUR_DONE_KEY, "1");
+  sessionStorage.removeItem(DEMO_TOUR_ARMED_KEY);
+  sessionStorage.removeItem(DEMO_TOUR_PHASE_KEY);
+}
+
+/**
+ * A fresh onboarding completion owns the tour state. The done flag is
+ * per-browser, not per-account — a tester who re-onboards with a new account
+ * on the same browser still carries the flag from the previous run, which
+ * used to silently kill both the tour and the seed-polling it gates. Clear
+ * everything so the new account's handoff re-fires from scratch.
+ */
+export function resetDemoTour() {
+  localStorage.removeItem(DEMO_TOUR_DONE_KEY);
   sessionStorage.removeItem(DEMO_TOUR_ARMED_KEY);
   sessionStorage.removeItem(DEMO_TOUR_PHASE_KEY);
 }
