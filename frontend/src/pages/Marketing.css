@@ -383,21 +383,11 @@ html:has(.mkt) {
 }
 .mkt-p-card h3 { font-size: 20px; margin: 16px 0 10px; }
 .mkt-p-card p { color: var(--mk-muted); font-size: 15.5px; }
-.mkt-problem-kicker {
-  margin-top: 44px;
-  max-width: 56em;
-  font-family: var(--mk-serif);
-  font-size: 23px;
-  line-height: 1.5;
-  border-left: 3px solid var(--mk-brand);
-  padding-left: 22px;
-  color: var(--mk-text);
-}
 
 /* ---- How it works ---- */
 .mkt-steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 .mkt-step {
@@ -852,7 +842,6 @@ html:has(.mkt) {
   .mkt-h1 { font-size: 32px; }
   .mkt-section-head h2 { font-size: 29px; }
   .mkt-final h2 { font-size: 31px; }
-  .mkt-problem-kicker { font-size: 19px; }
   .mkt-plans,
   .mkt-diff-grid,
   .mkt-footer-grid { grid-template-columns: 1fr; }

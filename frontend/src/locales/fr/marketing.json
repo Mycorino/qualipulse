@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "QualiPulse · Entretiens utilisateurs exploitables, sans la logistique",
-    "description": "QualiPulse mène vos entretiens utilisateurs à la voix, relance les participants quand une réponse mérite d'être creusée, puis vous livre une synthèse claire appuyée par les verbatims. En quelques heures, pas en quelques semaines. 3 entretiens gratuits, sans carte bancaire."
+    "description": "QualiPulse mène vos entretiens utilisateurs à la voix : une IA autonome dialogue avec chaque participant comme un chercheur et échange pour affiner ses réponses, puis vous livre une synthèse claire appuyée par les verbatims. En quelques heures, pas en quelques semaines. 3 entretiens gratuits, sans carte bancaire."
   },
   "nav": {
     "howItWorks": "Comment ça marche",
@@ -13,9 +13,9 @@
     "toggleMenu": "Ouvrir le menu"
   },
   "hero": {
-    "eyebrow": "Entretiens vocaux, relances intelligentes",
-    "title": "Les entretiens utilisateurs que vous repoussez depuis des semaines ? Terminés d'ici vendredi.",
-    "sub": "QualiPulse mène vos entretiens à la voix et <b>relance les participants</b> quand une réponse mérite d'être creusée, puis vous livre une <b>synthèse claire, appuyée par les verbatims</b>. Sans planification, sans animation, sans week-end de retranscription.",
+    "eyebrow": "Entretiens vocaux menés par une IA",
+    "title": "Vos entretiens utilisateurs, menés à la voix par une IA. Terminés d'ici vendredi.",
+    "sub": "QualiPulse <b>dialogue avec vos participants comme un chercheur</b> : il échange à l'oral pour affiner chaque réponse, puis vous livre une <b>synthèse claire, appuyée par les verbatims</b>. Sans planification, sans modérateur, sans week-end de retranscription.",
     "cta": "Commencer mon essai gratuit",
     "secondaryCta": "Voir un exemple de synthèse",
     "facts": [
@@ -44,45 +44,32 @@
   "problem": {
     "eyebrow": "Le problème",
     "title": "Personne ne saute la recherche par désintérêt. On la saute parce qu'elle prend trop de temps.",
-    "subtitle": "Le temps de recruter, planifier, animer, retranscrire et synthétiser une étude classique, la décision qu'elle devait éclairer est souvent déjà prise.",
-    "cards": [
-      {
-        "figure": "3 semaines",
-        "title": "Le délai habituel",
-        "desc": "Recruter, planifier, conduire les entretiens, retranscrire, analyser… Une étude quali finit souvent par arriver trop tard."
-      },
-      {
-        "figure": "6 h",
-        "title": "Par entretien, avant même l'analyse",
-        "desc": "Entre la préparation, l'échange, la retranscription et les premières notes, chaque participant demande du temps."
-      },
-      {
-        "figure": "Trop tard",
-        "title": "Les enseignements arrivent après la décision",
-        "desc": "Quand les résultats sont prêts, la décision produit est souvent déjà tranchée."
-      }
-    ],
-    "kicker": "Alors on décide à l'instinct, avec un sondage à 4 % de complétion et le client le plus bruyant du Slack, puis on appelle ça « être pragmatique »."
+    "subtitle": "Recruter, planifier, animer, retranscrire, synthétiser : comptez trois semaines et six heures par entretien. Le temps que l'étude arrive, la décision qu'elle devait éclairer est souvent déjà prise."
   },
   "how": {
-    "eyebrow": "La solution",
+    "eyebrow": "Comment ça marche",
     "title": "Lancez votre étude ce soir. Décidez avec des preuves vendredi.",
-    "subtitle": "QualiPulse compresse toute la chaîne en trois étapes : recrutement, animation, retranscription et synthèse.",
+    "subtitle": "De l'objectif à la synthèse, en quatre étapes.",
     "steps": [
       {
         "num": "Étape 1",
-        "title": "Définissez la décision à éclairer",
-        "desc": "Expliquez au copilote ce que vous devez trancher. Il rédige le guide d'entretien : sections, questions de sélection, intentions de relance. Vous ajustez ce que vous voulez."
+        "title": "Définissez votre objectif",
+        "desc": "Décrivez la décision à trancher et ce que vous devez apprendre. C'est le seul travail qu'on vous demande."
       },
       {
         "num": "Étape 2",
-        "title": "Envoyez simplement un lien",
-        "desc": "Les participants l'ouvrent dans n'importe quel navigateur et parlent, tout simplement. L'entretien écoute, creuse ce qui mérite de l'être et tient le temps imparti. Sans appli, sans rendez-vous, sans modérateur."
+        "title": "L'IA prépare votre étude",
+        "desc": "Guide d'entretien structuré, questions de sélection, angles à approfondir : le copilote rédige tout, vous ajustez ce que vous voulez."
       },
       {
         "num": "Étape 3",
-        "title": "Recevez une synthèse exploitable",
-        "desc": "Thèmes, tensions, jobs-to-be-done et recommandations, chacun appuyé par des citations verbatim que vous pouvez remonter à la seconde près."
+        "title": "Les participants répondent via un simple lien",
+        "desc": "Ils l'ouvrent dans n'importe quel navigateur et parlent, tout simplement. L'entretien s'adapte à leurs réponses et tient le temps imparti. Sans appli, sans rendez-vous, sans modérateur."
+      },
+      {
+        "num": "Étape 4",
+        "title": "Analysez les résultats",
+        "desc": "Retrouvez les verbatims, les thèmes clés et les recommandations. Chaque conclusion peut être remontée à la citation exacte."
       }
     ],
     "guideLines": [
@@ -95,7 +82,8 @@
     "confHigh": "ÉLEVÉ",
     "confMed": "MOYEN",
     "memoRow1": "La résiliation se joue à la facturation, pas sur les fonctionnalités",
-    "memoRow2": "« Mettre en pause » est la demande non couverte dans 7 entretiens sur 12"
+    "memoRow2": "« Mettre en pause » est la demande non couverte dans 7 entretiens sur 12",
+    "objectiveLine": "Comprendre pourquoi les abonnés résilient"
   },
   "evidence": {
     "eyebrow": "Traçable, jamais une boîte noire",
@@ -133,28 +121,28 @@
     "title": "Ce qu'un vrai entretien révèle, et qu'un formulaire ne captera jamais.",
     "items": [
       {
-        "title": "Des relances intelligentes",
-        "desc": "L'IA creuse les réponses vagues, demande des exemples et revient sur les points qui méritent d'être clarifiés."
+        "title": "Des heures gagnées par entretien",
+        "desc": "Sélection des profils, animation, retranscription et première analyse : tout est déjà fait quand vous ouvrez le rapport."
       },
       {
-        "title": "Une conversation, pas un questionnaire",
-        "desc": "L'entretien s'adapte au participant au lieu d'enchaîner mécaniquement les questions."
+        "title": "Des données plus riches qu'un questionnaire",
+        "desc": "Une réponse parlée est quatre à six fois plus longue qu'une réponse tapée, et l'IA approfondit ce qui reste vague au lieu d'enchaîner mécaniquement les questions."
       },
       {
-        "title": "À l'oral, on en dit bien plus qu'à l'écrit",
-        "desc": "Une réponse parlée est quatre à six fois plus longue qu'une réponse tapée, avec les hésitations où se cache le vrai enseignement."
+        "title": "Une analyse fondée sur des preuves",
+        "desc": "Thèmes, tensions et recommandations s'appuient sur des verbatims cités, jamais sur une impression générale. Vous annotez, l'analyse s'affine."
       },
       {
-        "title": "Le bon profil, sans y penser",
-        "desc": "Les questions de sélection écartent les participants hors cible avant l'entretien : vous ne payez jamais pour un profil non retenu."
+        "title": "Conforme RGPD",
+        "desc": "DPA signé, liste des sous-traitants et notice participants à disposition. Vos données ne servent jamais à entraîner des modèles d'IA."
       },
       {
-        "title": "Des décisions mieux argumentées",
-        "desc": "Vos recommandations s'appuient sur des verbatims et vos propres annotations, pas sur une impression générale."
+        "title": "Données hébergées en Europe",
+        "desc": "Bases de données dans l'UE, audio chiffré au repos. Vos recherches vous appartiennent et s'exportent quand vous voulez."
       },
       {
-        "title": "Une synthèse prête à partager",
-        "desc": "Thèmes, tensions, citations et recommandations structurés pour nourrir une décision produit, jusqu'à 8 études réunies dans un même mémo."
+        "title": "Disponible en plusieurs langues",
+        "desc": "Entretiens en français, anglais, allemand, espagnol, portugais et italien, et chaque transcription peut être traduite comme aide à la lecture."
       }
     ]
   },
@@ -286,5 +274,26 @@
     "contact": "Contact",
     "copy": "© 2026 QualiPulse · Conforme RGPD",
     "interviewLink": "Vous avez un lien d'entretien ?"
+  },
+  "features": {
+    "eyebrow": "Fonctionnalités",
+    "title": "Un intervieweur IA autonome, du guide d'entretien à la synthèse.",
+    "items": [
+      {
+        "num": "01",
+        "title": "Des entretiens rapides, sans logistique",
+        "desc": "Un intervieweur IA autonome mène chaque entretien : sans modérateur, sans planification. Vous diffusez l'étude via un simple lien et les premières réponses arrivent le jour même."
+      },
+      {
+        "num": "02",
+        "title": "Des entretiens qualitatifs, à l'oral",
+        "desc": "L'IA prépare le guide d'entretien et les questions de sélection, puis dialogue avec chaque participant comme un chercheur : un échange qui affine les réponses, en 6 langues."
+      },
+      {
+        "num": "03",
+        "title": "Des analyses exploitables et traçables",
+        "desc": "Retranscription, synthèse, verbatims et recommandations : chaque conclusion est traçable jusqu'aux mots exacts du participant."
+      }
+    ]
   }
 }
