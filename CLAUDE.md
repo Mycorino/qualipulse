@@ -818,8 +818,8 @@ gcloud builds submit --tag="${REGISTRY}/auto-interview-frontend:${TAG}" ./fronte
 gcloud run deploy auto-interview-api \
   --image="${REGISTRY}/auto-interview-backend:${TAG}" \
   --region=${REGION} --platform=managed --allow-unauthenticated \
-  --port=8080 --cpu=1 --memory=512Mi --min-instances=0 --max-instances=10 \
-  --timeout=300s --concurrency=80 \
+  --port=8080 --cpu=1 --memory=1Gi --min-instances=1 --max-instances=15 \
+  --timeout=300s --concurrency=16 --no-cpu-throttling --cpu-boost \
   --set-secrets="SECRET_KEY=secret-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,DATABASE_URL=database-url:latest,SENDGRID_API_KEY=sendgrid-api-key:latest" \
   --set-env-vars="ENVIRONMENT=production,UPLOAD_DIR=/tmp/uploads,ALLOWED_ORIGINS=https://app.qualipulse.com,APP_BASE_URL=https://app.qualipulse.com"
 
@@ -854,12 +854,20 @@ The backend container uses `start.sh` which handles both fresh and existing data
 | Setting | Backend | Frontend |
 |---|---|---|
 | Service name | `auto-interview-api` | `auto-interview-web` |
-| CPU | 1 | 1 |
-| Memory | 512Mi | 256Mi |
-| Min instances | 0 | 0 |
-| Max instances | 10 | 5 |
+| CPU | 1 (always allocated, startup boost) | 1 |
+| Memory | 1Gi | 256Mi |
+| Min instances | 1 | 0 |
+| Max instances | 15 | 5 |
 | Timeout | 300s (for Claude/TTS) | 60s |
-| Concurrency | 80 | 200 |
+| Concurrency | 16 | 200 |
+
+> Backend tuning rationale: `--no-cpu-throttling` keeps CPU allocated between
+> requests so the in-process daemon threads (analysis, translation, memos,
+> transcript cleanup) actually run after their 202 returns; `min-instances=1`
+> removes the 15-40s cold start the first user after an idle period used to
+> eat; `concurrency=16` reflects real capacity (sync endpoints hold a
+> threadpool worker for the whole Whisper→Claude→TTS chain) so the
+> autoscaler adds instances before saturation instead of after.
 | Port | 8080 | 8080 |
 | CORS | `https://app.qualipulse.com` | — |
 

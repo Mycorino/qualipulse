@@ -42,11 +42,13 @@ gcloud run deploy auto-interview-api \
   --allow-unauthenticated \
   --port=8080 \
   --cpu=1 \
-  --memory=512Mi \
-  --min-instances=0 \
-  --max-instances=10 \
+  --memory=1Gi \
+  --min-instances=1 \
+  --max-instances=15 \
   --timeout=300s \
-  --concurrency=80 \
+  --concurrency=16 \
+  --no-cpu-throttling \
+  --cpu-boost \
   --set-secrets="SECRET_KEY=secret-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,DATABASE_URL=database-url:latest,SENDGRID_API_KEY=sendgrid-api-key:latest" \
   --set-env-vars="ENVIRONMENT=production,UPLOAD_DIR=/tmp/uploads,ALLOWED_ORIGINS=*" \
   --quiet
