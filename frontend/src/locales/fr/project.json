@@ -566,7 +566,8 @@
   "screeningTranslations": {
     "saved": "Traduction enregistrée",
     "saveFailed": "L'enregistrement de la traduction a échoué",
-    "questionLabel": "Question"
+    "questionLabel": "Question",
+    "generating": "Traduction en cours…"
   },
   "brandingFonts": {
     "system": "Moderne (par défaut)",

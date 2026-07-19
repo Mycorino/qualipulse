@@ -483,6 +483,19 @@ export async function regenerateScreeningTranslations(projectId: string): Promis
   await client.post(`/projects/${projectId}/screening/regenerate-translations`);
 }
 
+/** Auto-translate a screening question into one language via Claude (cached
+ *  server-side). Returns the question with its freshly generated translation. */
+export async function generateScreeningTranslation(
+  projectId: string,
+  screeningId: string,
+  lang: string,
+): Promise<ScreeningQuestionResponse> {
+  const { data } = await client.post<ScreeningQuestionResponse>(
+    `/projects/${projectId}/screening/${screeningId}/translations/${lang}/generate`,
+  );
+  return data;
+}
+
 export async function createLink(projectId: string): Promise<InterviewLink> {
   const { data } = await client.post<InterviewLink>(`/projects/${projectId}/links`);
   return data;
