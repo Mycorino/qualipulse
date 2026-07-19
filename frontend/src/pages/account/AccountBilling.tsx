@@ -4,9 +4,19 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import client from "../../api/client";
 import { useToast } from "../../components/Toast";
+import EmbeddedCheckoutModal from "../../components/EmbeddedCheckoutModal";
+import { getBillingConfig } from "../../utils/billingConfig";
 import { useAccount, type Plan } from "./accountContext";
 
 type Interval = "monthly" | "annual";
+
+interface EmbeddedSession {
+  clientSecret: string;
+  publishableKey: string;
+  /** Query param appended to /account/billing on completion — drives the
+      existing success toast + data refresh on reload. */
+  successParam: string;
+}
 
 export default function AccountBilling() {
   const { t, i18n } = useTranslation(["settings", "common"]);
@@ -16,6 +26,7 @@ export default function AccountBilling() {
   const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
   const [upgradingPlanId, setUpgradingPlanId] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
+  const [embedded, setEmbedded] = useState<EmbeddedSession | null>(null);
   // Annual is the default: it's the higher-value commitment and the −17%
   // framing does the persuading. Users who want monthly flip one toggle.
   const [interval, setInterval] = useState<Interval>("annual");
@@ -53,6 +64,10 @@ export default function AccountBilling() {
   const onPaidPlan = Boolean(plan && !plan.is_legacy && !isTrial);
   const conversionMode = !onPaidPlan;
 
+  // The Stripe portal can only open for accounts with a Stripe customer —
+  // admin-provisioned or custom plans have none, so hide the button for them.
+  const canOpenPortal = Boolean(billing?.stripe_customer_id);
+
   const credits = billing?.credits;
   const includedTotal = credits
     ? credits.included_credits + credits.purchased_credits + credits.rollover_credits
@@ -70,6 +85,20 @@ export default function AccountBilling() {
   async function handleBuyPack(packId: string) {
     setBuyingPackId(packId);
     try {
+      const cfg = await getBillingConfig();
+      if (cfg.embedded_checkout && cfg.stripe_publishable_key) {
+        const { data } = await client.post("/billing/checkout/credits", {
+          pack_id: packId,
+          ui_mode: "embedded",
+        });
+        setEmbedded({
+          clientSecret: data.client_secret,
+          publishableKey: cfg.stripe_publishable_key,
+          successParam: "credits=purchased",
+        });
+        setBuyingPackId(null);
+        return;
+      }
       const { data } = await client.post("/billing/checkout/credits", {
         pack_id: packId,
         success_url: window.location.origin + "/account/billing?credits=purchased",
@@ -85,6 +114,21 @@ export default function AccountBilling() {
   async function handleUpgrade(planId: string, billingInterval: Interval) {
     setUpgradingPlanId(planId);
     try {
+      const cfg = await getBillingConfig();
+      if (cfg.embedded_checkout && cfg.stripe_publishable_key) {
+        const { data } = await client.post("/billing/checkout", {
+          plan_id: planId,
+          billing_interval: billingInterval,
+          ui_mode: "embedded",
+        });
+        setEmbedded({
+          clientSecret: data.client_secret,
+          publishableKey: cfg.stripe_publishable_key,
+          successParam: "upgraded=true",
+        });
+        setUpgradingPlanId(null);
+        return;
+      }
       const { data } = await client.post("/billing/checkout", {
         plan_id: planId,
         billing_interval: billingInterval,
@@ -105,7 +149,12 @@ export default function AccountBilling() {
       window.location.href = data.portal_url;
     } catch {
       setPortalBusy(false);
-      checkoutError();
+      toast(
+        t("billing.portalError", {
+          defaultValue: "Could not open the billing portal — please try again or contact support.",
+        }),
+        "error"
+      );
     }
   }
 
@@ -177,7 +226,7 @@ export default function AccountBilling() {
         <h2 className="settings-section-title" style={{ marginBottom: 0 }}>
           {t("billing.usageThisPeriod", { defaultValue: "Usage this period" })}
         </h2>
-        {onPaidPlan && (
+        {onPaidPlan && canOpenPortal && (
           <button className="btn btn-ghost btn-sm" onClick={handleManageBilling} disabled={portalBusy}>
             {portalBusy ? t("common:loading", { defaultValue: "Loading…" }) : t("billing.manageBilling")}
           </button>
@@ -338,7 +387,7 @@ export default function AccountBilling() {
             <span>{billing.limits.team_members === -1 ? t("common:unlimited") : billing.limits.team_members}</span>
           </div>
         </div>
-        {billing.tier !== "starter" && billing.tier !== "free" && billing.tier !== "solo" && (
+        {canOpenPortal && billing.tier !== "starter" && billing.tier !== "free" && billing.tier !== "solo" && (
           <button className="btn btn-ghost btn-sm" onClick={handleManageBilling} disabled={portalBusy} style={{ marginTop: 16 }}>
             {portalBusy ? t("common:loading", { defaultValue: "Loading…" }) : t("billing.manageBilling")}
           </button>
@@ -350,6 +399,19 @@ export default function AccountBilling() {
   // Conversion mode → plans first. Paid mode → usage + packs first, then plans.
   return (
     <div className="settings-section" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {embedded && (
+        <EmbeddedCheckoutModal
+          publishableKey={embedded.publishableKey}
+          clientSecret={embedded.clientSecret}
+          onClose={() => setEmbedded(null)}
+          onComplete={() => {
+            // Reload with the same query param the hosted flow used —
+            // reuses the success toast + refetches billing data.
+            window.location.href =
+              window.location.origin + "/account/billing?" + embedded.successParam;
+          }}
+        />
+      )}
       {conversionMode ? (
         <>
           {planChooser}

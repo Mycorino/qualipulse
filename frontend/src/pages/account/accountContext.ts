@@ -12,6 +12,9 @@ export interface BillingStatus {
   tier: string;
   tier_name: string;
   status: string;
+  // Present when the workspace has a Stripe customer — the billing portal
+  // can only open for these accounts.
+  stripe_customer_id?: string | null;
   limits: {
     max_projects: number;
     max_participants_per_project: number;

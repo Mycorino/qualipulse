@@ -58,6 +58,10 @@ class Settings(BaseSettings):
 
     # Stripe (billing)
     STRIPE_SECRET_KEY: str = ""
+    # Publishable key — served to the frontend via GET /billing/config to
+    # enable in-app Embedded Checkout. Leave blank to fall back to the
+    # hosted checkout.stripe.com redirect flow.
+    STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     # Legacy tier price IDs (kept so existing subscriptions still resolve).
     STRIPE_PRICE_STARTER: str = ""

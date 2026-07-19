@@ -53,13 +53,19 @@ class CheckoutRequest(BaseModel):
     """Either a legacy tier id (`"team"`, `"lab"`) or a new plan id
     (`"exploration"`, `"team"`, `"agency"`). For new plans pass
     ``billing_interval`` (`"monthly"` | `"annual"`); for legacy tiers it's
-    ignored."""
+    ignored.
+
+    ``ui_mode="embedded"`` returns a ``client_secret`` for Stripe Embedded
+    Checkout (rendered in-app, no redirect) instead of a ``checkout_url``;
+    ``success_url`` / ``cancel_url`` are only required for the hosted mode.
+    """
 
     tier: str | None = None  # legacy alias
     plan_id: str | None = None  # preferred field name
     billing_interval: str = "monthly"
-    success_url: str
-    cancel_url: str
+    ui_mode: str = "hosted"  # "hosted" | "embedded"
+    success_url: str | None = None
+    cancel_url: str | None = None
 
     def resolve_plan_id(self) -> str:
         return self.plan_id or self.tier or ""
@@ -91,7 +97,49 @@ def _validate_redirect_url(url: str, field: str) -> str:
     return url
 
 
+def _resolve_checkout_ui_mode(
+    ui_mode: str, success_url: str | None, cancel_url: str | None
+) -> tuple[str, dict]:
+    """Validate ui_mode + redirect URLs; return (mode, session kwargs).
+
+    Hosted mode needs validated success/cancel URLs. Embedded mode renders
+    in-app and never redirects — completion is handled client-side via the
+    onComplete callback, fulfilment stays webhook-driven.
+    """
+    mode = ui_mode.lower()
+    if mode not in ("hosted", "embedded"):
+        raise HTTPException(status_code=400, detail="ui_mode must be hosted or embedded")
+    if mode == "embedded":
+        return mode, {"ui_mode": "embedded", "redirect_on_completion": "never"}
+    if not success_url or not cancel_url:
+        raise HTTPException(
+            status_code=400,
+            detail="success_url and cancel_url are required for hosted checkout",
+        )
+    return mode, {
+        "success_url": _validate_redirect_url(success_url, "success_url"),
+        "cancel_url": _validate_redirect_url(cancel_url, "cancel_url"),
+    }
+
+
 # ── Public plan catalogue ─────────────────────────────────────────────────────
+
+
+@router.get("/config")
+def billing_config():
+    """Frontend billing capabilities.
+
+    ``embedded_checkout`` is true when both Stripe keys are configured —
+    the frontend then requests ``ui_mode="embedded"`` sessions and mounts
+    Stripe's iframe in-app; otherwise it falls back to the hosted redirect.
+    The publishable key is public by design (it ships in every Stripe
+    integration's client bundle).
+    """
+    publishable = settings.STRIPE_PUBLISHABLE_KEY
+    return {
+        "stripe_publishable_key": publishable or None,
+        "embedded_checkout": bool(publishable and settings.STRIPE_SECRET_KEY),
+    }
 
 
 @router.get("/plans")
@@ -327,8 +375,9 @@ def create_checkout_session(
 
     # Validate BEFORE the try: these raise 400s that the blanket
     # `except Exception` below would otherwise remap to a misleading 500.
-    success_url = _validate_redirect_url(body.success_url, "success_url")
-    cancel_url = _validate_redirect_url(body.cancel_url, "cancel_url")
+    ui_mode, mode_kwargs = _resolve_checkout_ui_mode(
+        body.ui_mode, body.success_url, body.cancel_url
+    )
 
     try:
         import stripe  # type: ignore
@@ -351,18 +400,19 @@ def create_checkout_session(
             payment_method_types=["card"],
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=success_url,
-            cancel_url=cancel_url,
             # Billing address is required for B2B invoicing + VAT
             # determination; Stripe stores it on the customer/invoice.
             billing_address_collection="required",
             metadata=attribution,
             subscription_data={"metadata": attribution},
+            **mode_kwargs,
         )
         if settings.STRIPE_AUTOMATIC_TAX:
             session_kwargs["automatic_tax"] = {"enabled": True}
             session_kwargs["tax_id_collection"] = {"enabled": True}
         session = stripe.checkout.Session.create(**session_kwargs)
+        if ui_mode == "embedded":
+            return {"client_secret": session.client_secret, "session_id": session.id}
         return {"checkout_url": session.url}
     except ImportError:
         raise HTTPException(status_code=503, detail="Stripe library not installed")
@@ -422,8 +472,9 @@ def list_credit_packs():
 
 class CreditPackCheckoutRequest(BaseModel):
     pack_id: str = Field(..., description="One of pack_25 | pack_50 | pack_100")
-    success_url: str
-    cancel_url: str
+    ui_mode: str = "hosted"  # "hosted" | "embedded"
+    success_url: str | None = None
+    cancel_url: str | None = None
 
 
 @router.post("/checkout/credits")
@@ -450,8 +501,9 @@ def create_credit_pack_checkout(
 
     # Validate BEFORE the try — same reason as the subscription checkout:
     # these 400s must not be remapped to 500 by the blanket except below.
-    success_url = _validate_redirect_url(body.success_url, "success_url")
-    cancel_url = _validate_redirect_url(body.cancel_url, "cancel_url")
+    ui_mode, mode_kwargs = _resolve_checkout_ui_mode(
+        body.ui_mode, body.success_url, body.cancel_url
+    )
 
     try:
         import stripe  # type: ignore
@@ -468,14 +520,13 @@ def create_credit_pack_checkout(
             payment_method_types=["card"],
             mode="payment",  # one-time, not subscription
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=success_url,
-            cancel_url=cancel_url,
             billing_address_collection="required",
             metadata=pack_metadata,
             # Copy the workspace metadata onto the PaymentIntent (Stripe
             # propagates it to the charge) so a later charge.refunded
             # webhook can resolve the workspace without an API lookup.
             payment_intent_data={"metadata": pack_metadata},
+            **mode_kwargs,
         )
         if settings.STRIPE_AUTOMATIC_TAX:
             session_kwargs["automatic_tax"] = {"enabled": True}
@@ -483,6 +534,8 @@ def create_credit_pack_checkout(
             # tax_id_collection in payment mode requires a Customer object.
             session_kwargs["customer_creation"] = "always"
         session = stripe.checkout.Session.create(**session_kwargs)
+        if ui_mode == "embedded":
+            return {"client_secret": session.client_secret, "session_id": session.id}
         return {"checkout_url": session.url}
     except ImportError:
         raise HTTPException(status_code=503, detail="Stripe library not installed")
