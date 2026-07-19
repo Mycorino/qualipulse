@@ -88,7 +88,7 @@
   "progress_step": "Step {{step}} / 3",
   "handoff_kicker": "Workspace ready",
   "handoff_title": "Your workspace is set up.",
-  "handoff_sub": "A complete example study is waiting inside — real transcripts and their analysis — so you can see how it works before running your own.",
+  "handoff_sub": "A complete example study is waiting inside — ten interviews, a 44-response survey and their mixed-methods report — so you can see the whole arc before running your own.",
   "handoff_note": "The example takes a few seconds to finish preparing — it may still be settling when you arrive.",
   "handoff_preparing": "Finalizing your demo study — preparing everything for you…",
   "handoff_memo_kicker": "Analysis report",

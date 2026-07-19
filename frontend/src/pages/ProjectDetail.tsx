@@ -3208,8 +3208,13 @@ export default function ProjectDetail() {
                   ⚠ {tAnalysis("staleWarning", { count: analysis.completed_count - analysis.participant_count })}
                 </div>
               )}
-              {/* One-time coachmark: surfaces the v1→v2 iteration loop */}
-              {analysis.status === "ready" && analysis.report && !coachmarkDismissed && (
+              {/* One-time coachmark: surfaces the v1→v2 iteration loop.
+                  Only while the latest version is still the AI discovery pass —
+                  "This is v1, click Refine for v2" over an already-refined v2
+                  reads as a contradiction (the seeded demo ships with v2). */}
+              {analysis.status === "ready" && analysis.report &&
+                analysis.version_label !== "researcher_refined" &&
+                !coachmarkDismissed && (
                 <div className="coachmark" role="status">
                   <span className="coachmark__icon" aria-hidden="true">💡</span>
                   <div>

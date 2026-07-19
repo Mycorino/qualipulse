@@ -295,6 +295,7 @@ const KNOWN_ACTION_KEYS = [
   "invite_interviews",
   "collect_more_interviews",
   "generate_report",
+  "open_report",
 ] as const;
 
 function OverviewTab({
@@ -349,6 +350,7 @@ function OverviewTab({
         goToTab("instruments");
         return;
       case "generate_report":
+      case "open_report":
         goToTab("report");
         return;
     }

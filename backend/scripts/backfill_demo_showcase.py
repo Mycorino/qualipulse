@@ -77,11 +77,24 @@ _NOTES_BY_QUESTION: dict[str, tuple[str, str | None]] = {
     for item in section["questions"]
 }
 
-# The legacy five-question instrument, by (type, key-order). Anything else is
-# not the shape this script knows how to upgrade.
+# The two historical instrument shapes this script knows how to upgrade to
+# the current ten-question fixture: the original five-question survey and the
+# July-2026 showcase eight-question survey. Anything else is left alone.
 _LEGACY_KEYS = ["freq", "services", "value", "nps", "churn"]
 _LEGACY_TYPES = ["mc_single", "mc_multi", "likert", "nps", "open_text"]
-_NEW_KEYS = ["stack_size", "price_rise", "browse"]
+_SHOWCASE_KEYS = [
+    "freq", "services", "stack_size", "value", "price_rise", "browse",
+    "nps", "churn",
+]
+_SHOWCASE_TYPES = [
+    "mc_single", "mc_multi", "mc_single", "likert", "likert", "likert",
+    "nps", "open_text",
+]
+# Current layout (must match the DEMO_SURVEY_* question order).
+_CURRENT_SORT = {
+    "freq": 0, "services": 1, "stack_size": 2, "value": 3, "price_rise": 4,
+    "browse": 5, "satisfaction": 6, "nps": 7, "churn": 8, "must_keep": 9,
+}
 _HEAVY_COHORT_COUNT = 26
 _SEEDED_RESPONSE_COUNT = 44
 
@@ -125,13 +138,16 @@ def _upgrade_survey(db, survey: Survey, cfg: dict, dry_run: bool) -> bool:
         .order_by(SurveyQuestion.sort_order)
         .all()
     )
-    if [q.type for q in questions] != _LEGACY_TYPES:
-        return False  # already upgraded, or not a shape we recognise
+    signature = [q.type for q in questions]
+    if signature == _LEGACY_TYPES:
+        existing_keys = _LEGACY_KEYS
+    elif signature == _SHOWCASE_TYPES:
+        existing_keys = _SHOWCASE_KEYS
+    else:
+        return False  # already current, or not a shape we recognise
 
     plan_by_key = _survey_plan_by_key(cfg)
-    # New layout: freq 0, services 1, stack_size 2, value 3, price_rise 4,
-    # browse 5, nps 6, churn 7.
-    new_sort = {"freq": 0, "services": 1, "value": 3, "nps": 6, "churn": 7}
+    missing_keys = [k for k in _CURRENT_SORT if k not in existing_keys]
     responses = (
         db.query(SurveyResponse)
         .filter(SurveyResponse.survey_id == survey.id)
@@ -148,18 +164,18 @@ def _upgrade_survey(db, survey: Survey, cfg: dict, dry_run: bool) -> bool:
     if dry_run:
         return True
 
-    for legacy_key, question in zip(_LEGACY_KEYS, questions):
-        question.sort_order = new_sort[legacy_key]
+    for key, question in zip(existing_keys, questions):
+        question.sort_order = _CURRENT_SORT[key]
 
     inserted: dict[str, SurveyQuestion] = {}
-    for i, key in enumerate(_NEW_KEYS):
+    for key in missing_keys:
         q_plan = plan_by_key[key]
         question = SurveyQuestion(
             survey_id=survey.id,
-            sort_order={"stack_size": 2, "price_rise": 4, "browse": 5}[key],
+            sort_order=_CURRENT_SORT[key],
             type=q_plan["type"],
             prompt=q_plan["prompt"],
-            is_required=True,
+            is_required=q_plan["type"] not in ("open_text", "short_text"),
             config=json.dumps(q_plan.get("config") or {}),
         )
         db.add(question)
@@ -172,9 +188,13 @@ def _upgrade_survey(db, survey: Survey, cfg: dict, dry_run: bool) -> bool:
         for i, response in enumerate(responses[:_SEEDED_RESPONSE_COUNT]):
             cohort = cfg["cohorts"][0 if i < _HEAVY_COHORT_COUNT else 1]
             j = i if i < _HEAVY_COHORT_COUNT else i - _HEAVY_COHORT_COUNT
-            for key in _NEW_KEYS:
-                plan = cohort["answers"][key]
+            for key in missing_keys:
+                plan = cohort["answers"].get(key)
+                if not plan:
+                    continue
                 value = plan[j % len(plan)]
+                if value is None:
+                    continue  # respondent skipped this optional question
                 answer = SurveyResponseAnswer(
                     response_id=response.id,
                     question_id=inserted[key].id,
@@ -182,21 +202,36 @@ def _upgrade_survey(db, survey: Survey, cfg: dict, dry_run: bool) -> bool:
                 )
                 if inserted[key].type == "mc_single":
                     answer.value_choice_ids = json.dumps([value])
-                else:  # likert
+                elif inserted[key].type == "mc_multi":
+                    answer.value_choice_ids = json.dumps(list(value))
+                elif inserted[key].type in ("likert", "nps"):
                     answer.value_numeric = float(value)
+                else:  # open_text / short_text
+                    answer.value_text = value
                 db.add(answer)
     return True
 
 
+# Accounts seeded before the "sondage éclair" rename carry the old FR survey
+# name — match it too so they keep getting backfilled.
+_LEGACY_SURVEY_NAME_FR = "Courses en ligne — pouls rapide"
+
+
 def _backfill_surveys(db, dry_run: bool, company_id: str | None) -> int:
     q = db.query(Survey).filter(
-        Survey.name.in_([DEMO_SURVEY_NAME, DEMO_SURVEY_NAME_FR])
+        Survey.name.in_(
+            [DEMO_SURVEY_NAME, DEMO_SURVEY_NAME_FR, _LEGACY_SURVEY_NAME_FR]
+        )
     )
     if company_id:
         q = q.filter(Survey.company_id == company_id)
     upgraded = 0
     for survey in q.all():
-        cfg = DEMO_SURVEY_FR if survey.name == DEMO_SURVEY_NAME_FR else DEMO_SURVEY_EN
+        cfg = (
+            DEMO_SURVEY_FR
+            if survey.name in (DEMO_SURVEY_NAME_FR, _LEGACY_SURVEY_NAME_FR)
+            else DEMO_SURVEY_EN
+        )
         if _upgrade_survey(db, survey, cfg, dry_run):
             upgraded += 1
     return upgraded

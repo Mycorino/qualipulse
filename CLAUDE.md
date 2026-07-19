@@ -555,17 +555,20 @@ HBO Max, Apple TV+). FR companies get a **courses alimentaires en ligne**
 study named `[Démo] Courses alimentaires en ligne — habitudes & freins`
 (Carrefour Drive, Picard, Leclerc Drive, Coop@home, Amazon Fresh).
 
-- **Four mono-language interviews** with a realistic quality spread (1 low /
-  1 good / 2 strong) and varied demographics. EN: Priya R. (UK), Marcus T.
-  (US), Jen H. (Canada), Alex K. (Australia). FR: Camille D. (France),
-  Romain B. (France), Léa M. (Belgique), Sophie L. (Suisse). Each has 7–9
-  turns mixing main questions and adaptive follow-ups.
+- **Ten mono-language interviews** with a realistic quality spread (4 strong /
+  4 good / 2 low) and varied demographics. EN: Priya R. (UK), Marcus T. (US),
+  Jen H. (Canada), Alex K. (Australia), Dana W. (US), Tom O. (Ireland),
+  Yuki N. (US), Sam B. (UK), Grace A. (Canada), Victor M. (US). FR:
+  Camille D., Nadia T., Julien P., Fatou D., Élodie R. (France), Romain B.
+  (France), Léa M. + Marc V. (Belgique), Sophie L. + Anaïs G. (Suisse).
+  Each has 6–8 turns mixing main questions and adaptive follow-ups.
 - **Setup content** — 3 main guide questions across 3 sections (Discovery /
   Experience / Loyalty for EN; Découverte / Expérience / Confiance et retour
   for FR), 1 screening question with a disqualifying option, 1 active
   interview link, 25-minute target duration
-- **Coding** — 3 manual codes (Trust signal / Friction / Price concern)
-  and 4 tagged quotes with real character offsets computed via `.find()`
+- **Coding** — 3 manual codes, localized per language (EN: Trust signal /
+  Friction / Price concern; FR: Signal de confiance / Friction / Sensibilité
+  prix) and 6 tagged quotes with real character offsets computed via `.find()`
 - **Analysis** — 2 versions: `ai_discovery` v1 (with `share_token`) and
   `researcher_refined` v2 parented to v1. 2 annotations (`confirmed`,
   `needs_evidence`) on v2 themes. All analysis quotes are verbatim
@@ -594,19 +597,29 @@ showcase-backfill round-trip).
 
 **Showcase upgrade (July 2026).** Every demo guide question carries
 `interview_notes` (probing instructions) + `desired_learning`, with
-`researcher_notes` on key questions; the demo survey is an
-**eight-question** instrument (frequency, stack mc_multi, stack-size
-mc_single kept per-respondent consistent with the mc_multi answers, a
-three-item likert battery incl. one `reverse_coded` item, NPS, open
-churn question); demo transcripts show an explicit "no audio in the
-demo" note in the Responses view (`responses.demoNoAudio` i18n key).
-Because seeding is one-shot per company, accounts seeded **before** the
-upgrade are patched by `backend/scripts/backfill_demo_showcase.py`
-(idempotent, `--dry-run` / `--company` flags; fills empty guide notes
-only, upgrades only surveys that still match the exact legacy
-five-question signature, refreshes the flagship `decision_v1`
-StudyAnalysis report from the current fixture). Run it once against
-production after deploy.
+`researcher_notes` on key questions; the demo survey is a **ten-question**
+instrument that exercises **every question type the product supports**
+(frequency mc_single, stack mc_multi, stack-size mc_single kept
+per-respondent consistent with the mc_multi answers, a three-item 5-point
+likert battery incl. one `reverse_coded` item, a **7-point** satisfaction
+likert, NPS, open_text churn question, and a short_text forced-choice
+"keep one"); demo transcripts show an explicit "no audio in the demo"
+note in the Responses view (`responses.demoNoAudio` i18n key). The
+cohort answer plans are cycled deterministically and every statistic the
+hand-authored reports quote is reproduced exactly by the analytics layer
+(`_survey_signals` in `demo_seeder.py` is the single source of truth —
+re-derive its figures if you touch a plan). The seeder assigns
+client-side UUIDs and avoids per-row flushes so the ~800-row seed stays
+fast against remote Postgres. Because seeding is one-shot per company,
+accounts seeded **before** an upgrade are patched by
+`backend/scripts/backfill_demo_showcase.py` (idempotent, `--dry-run` /
+`--company` flags; fills empty guide notes only, upgrades surveys that
+match the legacy five-question OR the showcase eight-question signature
+to the current ten-question shape with seeded answers, refreshes the
+flagship `decision_v1` StudyAnalysis report from the current fixture).
+It does **not** retro-add interviews 5–10 to accounts seeded with the
+four-interview demo — only new signups get the ten-interview cast. Run
+it once against production after deploy.
 
 ### Email Verification
 - On signup: `EmailVerificationToken` created (24h expiry). Only the verification email is sent, and it greets by **first name** ("Welcome, Marie") rather than company name (falls back to company name if first name is missing).
@@ -981,7 +994,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Terms of Service + Privacy Policy pages, plus launch legal pack (`LegalDocument.tsx`): DPA, subprocessors, participant interview notice, AI use policy, and data retention policy. Marketing footer links all legal docs; participant consent screen links `/participant-notice` by default.
 - [x] SendGrid email integration (domain-authenticated, branded HTML templates)
 - [x] Getting-started checklist on empty dashboard
-- [x] Auto-seeded showcase demo project on onboarding completion — mono-language by `preferred_language` (EN = streaming-services study, FR = online-grocery study, both using real consumer brands). 4 participants in the company's language with a realistic quality spread (1 low / 1 good / 2 strong), 7–9 turns each, 3 guide questions, 3 codes, 4 tagged quotes, 2 analysis versions with annotations, 3 memos. `is_demo=True` exposed in API, never counts against tier quota. Demo CTA banner prompts first real project creation. Idempotent via `Company.demo_seeded_at`.
+- [x] Auto-seeded showcase demo project on onboarding completion — mono-language by `preferred_language` (EN = streaming-services study, FR = online-grocery study, both using real consumer brands). 10 participants in the company's language with a realistic quality spread (4 strong / 4 good / 2 low), 6–8 turns each, 3 guide questions, 3 codes, 4 tagged quotes, 2 analysis versions with annotations, 3 memos. `is_demo=True` exposed in API, never counts against tier quota. Demo CTA banner prompts first real project creation. Idempotent via `Company.demo_seeded_at`.
 - [x] Trial banner on dashboard (visible to solo/free users with active trial)
 - [x] Email verification banner (yellow) when unverified
 - [x] Admin panel (user management, tier changes, trial management, user deletion)

@@ -557,6 +557,17 @@ def _recommended_action(
     text is kept as a fallback for older clients.
     """
 
+    if progress.report_ready_placeholder:
+        # A ready report outranks every collection rung — recommending
+        # "conduct N more interviews" under an all-green checklist (the
+        # seeded demo study, or any study whose researcher generated a
+        # report early) reads as a contradiction.
+        return (
+            "open_report",
+            {},
+            "Your mixed-methods report is ready — open it to see what the data says.",
+        )
+
     if not surveys:
         return (
             "create_survey",

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
@@ -85,20 +86,23 @@ DEMO_RESEARCH_OBJECTIVE_FR = (
 
 DEMO_RESEARCH_CONTEXT = (
     "This is a demo project that QualiPulse seeded automatically so you can "
-    "explore the platform with realistic data. It contains four completed "
+    "explore the platform with realistic data. It contains ten completed "
     "interviews about how people choose between video streaming services, "
-    "a finished AI analysis with two versions, a researcher codebook, "
-    "tagged quotes, and project memos. Feel free to edit anything, archive "
-    "it, or delete it whenever you're ready to run your own study — it never "
-    "counts against your project quota."
+    "a 44-respondent survey using every question type, a mixed-methods "
+    "Decision report, a finished AI analysis with two versions, a "
+    "researcher codebook, tagged quotes, and project memos. Feel free to "
+    "edit anything, archive it, or delete it whenever you're ready to run "
+    "your own study — it never counts against your project quota."
 )
 DEMO_RESEARCH_CONTEXT_FR = (
     "Ceci est un projet de démo que QualiPulse a créé automatiquement pour "
     "que vous puissiez explorer la plateforme avec des données réalistes. "
-    "Il contient quatre entretiens sur les habitudes de courses alimentaires "
-    "en ligne, une analyse IA avec deux versions, un codebook chercheur, "
-    "des verbatims taggués et des mémos. Modifiez, archivez ou supprimez "
-    "quand vous voulez — ce projet ne compte pas dans votre quota."
+    "Il contient dix entretiens sur les habitudes de courses alimentaires "
+    "en ligne, un sondage de 44 répondants utilisant tous les types de "
+    "questions, un rapport de décision mixte, une analyse IA avec deux "
+    "versions, un codebook chercheur, des verbatims taggés et des mémos. "
+    "Modifiez, archivez ou supprimez quand vous voulez — ce projet ne "
+    "compte pas dans votre quota."
 )
 
 DEMO_WELCOME_MESSAGE = (
@@ -261,26 +265,41 @@ DEMO_SCREENING_QUESTION_FR = {
 }
 
 
-DEMO_CODES = [
+# The researcher codebook is user-visible content — localized like the rest
+# of the seed (an EN codebook inside an otherwise fully-French demo was the
+# one EN leak in the FR path).
+DEMO_CODES_EN = [
     {"name": "Trust signal", "color": "#16a34a"},
     {"name": "Friction", "color": "#dc2626"},
     {"name": "Price concern", "color": "#f59e0b"},
 ]
 
+DEMO_CODES_FR = [
+    {"name": "Signal de confiance", "color": "#16a34a"},
+    {"name": "Friction", "color": "#dc2626"},
+    {"name": "Sensibilité prix", "color": "#f59e0b"},
+]
+
 
 # Per-language tag plans: list of (notable_quote_index, code_name).
+# All three codes are exercised in both languages so the codebook panel
+# showcases a worked example, not a half-used one.
 DEMO_TAG_PLAN_EN: list[tuple[int, str]] = [
     (0, "Trust signal"),    # Priya — "let me have a pause button" (retention idea)
     (1, "Friction"),        # Priya — dark patterns on cancellation
     (2, "Trust signal"),    # Marcus — exclusive content as loyalty driver
     (3, "Trust signal"),    # Alex — service with a point of view (curation)
+    (6, "Friction"),        # Tom — six screens and two guilt trips to cancel NOW
+    (10, "Price concern"),  # Victor — price-increase email puts the service on trial
 ]
 
 DEMO_TAG_PLAN_FR: list[tuple[int, str]] = [
-    (0, "Friction"),        # Camille — coût caché du switch
-    (1, "Friction"),        # Camille — ruptures, "ils ont jamais tout"
-    (2, "Price concern"),   # Romain — Leclerc moins cher du marché
-    (3, "Trust signal"),    # Sophie — fiabilité de Coop
+    (0, "Friction"),            # Camille — coût caché du switch
+    (1, "Friction"),            # Camille — ruptures, "ils ont jamais tout"
+    (2, "Sensibilité prix"),    # Romain — Leclerc moins cher du marché
+    (3, "Signal de confiance"), # Sophie — fiabilité de Coop
+    (7, "Friction"),            # Fatou — rupture sur le lait du petit
+    (9, "Sensibilité prix"),    # Marc — septante euros + frais de livraison
 ]
 
 
@@ -322,71 +341,76 @@ def _v1_report(lang: str) -> dict:
 
         return {
             "summary": (
-                "Sur quatre entretiens menés en France, en Belgique et en Suisse, "
+                "Sur dix entretiens menés en France, en Belgique et en Suisse, "
                 "un schéma clair se dessine : la fidélité aux services de courses "
                 "alimentaires en ligne tient moins au prix qu'à un coût de switch "
                 "invisible (historique, listes, panier type) et à la fiabilité "
                 "perçue. La friction la plus citée est la rupture de stock, qui "
-                "érode la confiance plus que les frais de service. Les utilisatrices "
-                "les plus engagées formulent des demandes de fonctionnalités très "
+                "érode la confiance plus que les frais de service. Les profils "
+                "les plus engagés formulent des demandes de fonctionnalités très "
                 "concrètes (validation de substitutions, notifications proactives) "
-                "qui restent largement non couvertes par les enseignes."
+                "qui restent largement non couvertes par les enseignes. Un "
+                "contre-profil existe : les petits paniers (Julien) n'ont rien à "
+                "reconstruire et basculent à cinq pour cent d'écart de prix."
             ),
             "themes": [
                 {
                     "title": "Le coût de switch invisible verrouille la fidélité",
                     "summary": (
-                        "Trois participantes sur quatre décrivent leur fidélité à "
+                        "Sept participants sur dix décrivent leur fidélité à "
                         "un service comme un effet d'inertie lié à l'historique "
                         "stocké : panier type, listes, marques préférées. Changer "
                         "d'enseigne, ce serait reconstruire des semaines de "
-                        "configuration. Ce coût n'est pas tarifé, ne sort pas dans "
-                        "les enquêtes prix, mais il pèse plus que les écarts de "
-                        "tarif sur la décision."
+                        "configuration — « repartir de zéro », dit Élodie. Ce "
+                        "coût n'est pas tarifé, ne sort pas dans les enquêtes "
+                        "prix, mais il pèse plus que les écarts de tarif sur la "
+                        "décision. Il disparaît chez les petits paniers, qui "
+                        "n'ont rien à reconstruire."
                     ),
-                    "quotes": [q(0), q(3)],
-                    "frequency": "3 utilisatrices sur 4",
+                    "quotes": [q(0), q(11), q(5)],
+                    "frequency": "7 participants sur 10",
                 },
                 {
                     "title": "Les ruptures de stock érodent la confiance plus que les frais",
                     "summary": (
                         "La frustration la plus citée n'est pas le prix de la "
                         "livraison ou du service mais le sentiment que les Drives "
-                        "sont sous-stockés : 'ils ont jamais tout'. Les "
-                        "utilisatrices encaissent un détour en magasin et "
-                        "commencent à comparer les enseignes. Une fonctionnalité "
-                        "de validation des substitutions à l'avance résoudrait "
-                        "presque entièrement le problème mais aucune enseigne "
-                        "ne la propose."
+                        "sont sous-stockés : 'ils ont jamais tout'. Sur un produit "
+                        "sensible (le lait infantile de Fatou), la rupture n'est "
+                        "plus un désagrément mais une rupture de confiance. Une "
+                        "fonctionnalité de validation des substitutions à "
+                        "l'avance résoudrait presque entièrement le problème "
+                        "mais aucune enseigne ne la propose."
                     ),
-                    "quotes": [q(1)],
-                    "frequency": "2 utilisatrices sur 4",
+                    "quotes": [q(1), q(4), q(7)],
+                    "frequency": "6 participants sur 10",
                 },
                 {
                     "title": "La sensibilité prix dépend du profil, pas du service",
                     "summary": (
                         "Romain (famille de cinq) compare au centime près et "
-                        "reste chez Leclerc parce que c'est le moins cher. "
-                        "Sophie (Genève, profession libérale) ne regarde pas "
-                        "le prix et paie volontiers la fiabilité. Camille "
-                        "(active urbaine) déclare ne pas avoir comparé. Les "
+                        "reste chez Leclerc parce que c'est le moins cher ; "
+                        "Julien changerait d'enseigne pour cinq pour cent "
+                        "d'écart ; Fatou surveille le total à l'euro près. À "
+                        "l'autre extrême, Sophie et Anaïs (Genève) paient "
+                        "volontiers la fiabilité et la qualité du frais. Les "
                         "enseignes qui se positionnent uniquement sur le prix "
                         "captent un segment, pas le marché."
                     ),
-                    "quotes": [q(2)],
-                    "frequency": "2 utilisatrices sur 4",
+                    "quotes": [q(2), q(6), q(8)],
+                    "frequency": "5 participants sur 10",
                 },
             ],
             "jobs_to_be_done": [
                 {
                     "job": "Quand je commande mes courses chaque semaine, je veux gagner du temps sans sacrifier la qualité, pour rendre du temps aux activités qui comptent vraiment.",
                     "insight": "Le gain de temps est la motivation racine, jamais le prix. Les services qui font perdre du temps (ruptures, retards) sont punis plus fort que ceux qui sont chers.",
-                    "frequency": "4 utilisatrices sur 4",
+                    "frequency": "9 participants sur 10",
                 },
                 {
                     "job": "Quand je change quelque chose dans ma vie (enfants, déménagement), je veux que mon service de courses s'adapte sans que je doive tout reconfigurer.",
-                    "insight": "Le moment du changement de vie est aussi le moment où les utilisatrices changent de service. C'est là que la concurrence peut gagner ou perdre.",
-                    "frequency": "2 utilisatrices sur 4",
+                    "insight": "Le moment du changement de vie est aussi le moment où l'on change de service. C'est là que la concurrence peut gagner ou perdre.",
+                    "frequency": "4 participants sur 10",
                 },
             ],
             "tensions": [
@@ -453,7 +477,7 @@ def _v1_report(lang: str) -> dict:
             "personas": [
                 {
                     "name": "La Fidèle par inertie",
-                    "grounded_in": ["Camille D.", "Sophie L."],
+                    "grounded_in": ["Camille D.", "Nadia T.", "Élodie R."],
                     "one_liner": "Reste par coût de switch et fiabilité, pas par prix.",
                     "segment": "Actives urbaines, usage installé",
                     "goals": ["Gagner du temps sans tout reconfigurer"],
@@ -464,14 +488,25 @@ def _v1_report(lang: str) -> dict:
                 },
                 {
                     "name": "L'Optimiseur familial",
-                    "grounded_in": ["Romain B.", "Léa M."],
+                    "grounded_in": ["Romain B.", "Julien P.", "Fatou D."],
                     "one_liner": "Compare au centime et choisit l'enseigne la moins chère.",
-                    "segment": "Budgets serrés (famille nombreuse, étudiante)",
+                    "segment": "Budgets serrés, paniers surveillés",
                     "goals": ["Minimiser le coût du panier"],
-                    "frustrations": ["Écarts de prix entre enseignes"],
+                    "frustrations": ["Écarts de prix entre enseignes", "Frais de livraison"],
                     "behaviours": ["Compare les prix avant de commander"],
                     "primary_job": "Nourrir le foyer au meilleur prix.",
                     "anchor_quote": {"text": q(2)["text"], "participant_identifier": "Romain B."},
+                },
+                {
+                    "name": "L'Exigeante de la fiabilité",
+                    "grounded_in": ["Sophie L.", "Élodie R.", "Anaïs G."],
+                    "one_liner": "Paie plus cher sans hésiter tant que le créneau et la qualité tiennent.",
+                    "segment": "Organisation millimétrée, qualité d'abord",
+                    "goals": ["Un créneau qui ne saute jamais", "Du frais qui tient la semaine"],
+                    "frustrations": ["Créneaux annulés", "Frais choisi n'importe comment"],
+                    "behaviours": ["Reste des années chez l'enseigne qui livre à l'heure"],
+                    "primary_job": "Pouvoir bâtir la semaine sur une livraison fiable.",
+                    "anchor_quote": {"text": q(3)["text"], "participant_identifier": "Sophie L."},
                 },
             ],
             "journey": {
@@ -482,7 +517,7 @@ def _v1_report(lang: str) -> dict:
                      "quote": {"text": "", "participant_identifier": ""},
                      "pain": "", "opportunity": "Onboarding simple"},
                     {"name": "Routine", "goal": "Installer son panier type", "emotion": 2,
-                     "quote": {"text": "", "participant_identifier": ""},
+                     "quote": {"text": q(11)["text"], "participant_identifier": "Élodie R."},
                      "pain": "", "opportunity": "Portabilité de l'historique"},
                     {"name": "Rupture", "goal": "Recevoir la commande complète", "emotion": -2,
                      "quote": {"text": q(1)["text"], "participant_identifier": "Camille D."},
@@ -496,7 +531,7 @@ def _v1_report(lang: str) -> dict:
                 ],
             },
             "confidence": "high",
-            "participant_count": 4,
+            "participant_count": 10,
         }
 
     # English (streaming) report
@@ -509,30 +544,34 @@ def _v1_report(lang: str) -> dict:
 
     return {
         "summary": (
-            "Across four interviews in the UK, US, Canada, and Australia, a "
-            "consistent pattern emerges: streaming subscribers behave less "
-            "like loyal customers and more like rotating renters. Loyalty is "
-            "driven by exclusive content and recommendation quality, not by "
-            "brand affinity. The biggest unmet need is a 'pause' state "
-            "between active and cancelled — every participant either named "
-            "or implied it. Cancellation friction is widely noticed and "
-            "actively damages re-acquisition. Price increases are the single "
-            "most common trigger for churn re-evaluation."
+            "Across ten interviews in the UK, Ireland, the US, Canada, and "
+            "Australia, a consistent pattern emerges: streaming subscribers "
+            "behave less like loyal customers and more like rotating "
+            "renters. Loyalty is driven by exclusive content and "
+            "recommendation quality, not by brand affinity. The biggest "
+            "unmet need is a 'pause' state between active and cancelled — "
+            "seven of ten participants named or implied it, from Dana's "
+            "school-calendar Disney+ cycle to Yuki's explicit 'pause "
+            "instead of cancel'. Cancellation friction is widely noticed "
+            "and actively damages re-acquisition. Price increases are the "
+            "single most common trigger for churn re-evaluation."
         ),
         "themes": [
             {
                 "title": "Subscribers want a pause state, not a binary on/off",
                 "summary": (
-                    "Three of four participants described cycling in and out "
-                    "of services around specific shows. The current "
-                    "subscribe/cancel binary makes leaving feel like a "
-                    "bigger decision than it is, which paradoxically "
+                    "Seven of ten participants described cycling in and out "
+                    "of services around specific shows or seasons. The "
+                    "current subscribe/cancel binary makes leaving feel "
+                    "like a bigger decision than it is, which paradoxically "
                     "increases churn because users cancel decisively rather "
                     "than going dormant. A pause feature was named "
-                    "explicitly by one participant and implied by two more."
+                    "explicitly by two participants (Priya, Yuki) and the "
+                    "behaviour it would serve — seasonal or show-driven "
+                    "cycling — was described by five more."
                 ),
-                "quotes": [q(0)],
-                "frequency": "3 of 4 participants",
+                "quotes": [q(0), q(5), q(4)],
+                "frequency": "7 of 10 participants",
             },
             {
                 "title": "Cancellation friction is a re-acquisition tax",
@@ -542,35 +581,40 @@ def _v1_report(lang: str) -> dict:
                     "— it just makes them less likely to come back later. "
                     "This is a particularly costly trade-off given the "
                     "cyclical subscribe-cancel-resubscribe behaviour the "
-                    "data reveals."
+                    "data reveals: Victor's 'starting from scratch like a "
+                    "stranger' captures how re-signup friction compounds "
+                    "the original cancellation friction."
                 ),
-                "quotes": [q(1)],
-                "frequency": "2 of 4 participants",
+                "quotes": [q(1), q(6), q(7)],
+                "frequency": "5 of 10 participants",
             },
             {
                 "title": "Loyalty lives at the catalogue, not at the brand",
                 "summary": (
                     "Subscribers stay for either exclusive content (NFL "
-                    "Sunday Ticket, Marvel/Star Wars, HBO catalogue) or for "
-                    "a service that has a clear editorial point of view "
-                    "(Netflix's deep recommendation history, Criterion's "
-                    "curation). Generic catalogues blur together and lose "
-                    "the moment the headliner show ends."
+                    "Sunday Ticket, Premier League football, Marvel/Star "
+                    "Wars) or for a service that has a clear editorial "
+                    "point of view (Netflix's deep recommendation history, "
+                    "Criterion's curation). Generic catalogues blur "
+                    "together and lose the moment the headliner show ends "
+                    "— Grace's forty minutes of scrolling that ends in a "
+                    "rewatch is what an undifferentiated catalogue feels "
+                    "like from the inside."
                 ),
-                "quotes": [q(2), q(3)],
-                "frequency": "3 of 4 participants",
+                "quotes": [q(2), q(3), q(8), q(9)],
+                "frequency": "6 of 10 participants",
             },
         ],
         "jobs_to_be_done": [
             {
                 "job": "When I want to watch a specific show, I want to subscribe quickly, watch, and leave without feeling guilty, so I can match my spending to my actual viewing.",
                 "insight": "Show-driven subscribers are the modal pattern, not the exception. Services that fight this behaviour with retention friction lose them as future returnees.",
-                "frequency": "3 of 4 participants",
+                "frequency": "7 of 10 participants",
             },
             {
                 "job": "When a service raises my price, I want a moment to evaluate whether it's still worth it, so I don't keep paying out of inertia for something I don't use.",
                 "insight": "Price-increase emails are the single most common cancellation trigger — even when the service is still worth what users are paying. Timing the increase right after a flagship release lands could meaningfully reduce churn.",
-                "frequency": "3 of 4 participants",
+                "frequency": "6 of 10 participants",
             },
         ],
         "tensions": [
@@ -601,7 +645,7 @@ def _v1_report(lang: str) -> dict:
         "recommendations": [
             _rec(
                 "Ship a real pause feature (2–3 months, watchlist preserved).",
-                "The most-requested unmet need — three of four cycle in and out around shows.",
+                "The most-requested unmet need — seven of ten cycle in and out around shows.",
                 "Product", "60_90d", "high", "high",
                 "Reactivation rate of paused vs. cancelled accounts.",
                 "Wrong if paused users churn at the same rate as cancelled ones.",
@@ -638,7 +682,7 @@ def _v1_report(lang: str) -> dict:
         "personas": [
             {
                 "name": "The Rotating Renter",
-                "grounded_in": ["Priya R.", "Marcus T."],
+                "grounded_in": ["Priya R.", "Marcus T.", "Dana W.", "Grace A."],
                 "one_liner": "Subscribes for a specific show, then leaves — wants to pause, not cancel.",
                 "segment": "Show-driven subscribers",
                 "goals": ["Match spending to actual viewing"],
@@ -649,7 +693,7 @@ def _v1_report(lang: str) -> dict:
             },
             {
                 "name": "The Editorial Loyalist",
-                "grounded_in": ["Alex K.", "Marcus T."],
+                "grounded_in": ["Alex K.", "Marcus T.", "Yuki N."],
                 "one_liner": "Stays for a clear point of view or exclusive content, not a generic catalogue.",
                 "segment": "Taste- and exclusivity-driven",
                 "goals": ["A service with a distinct identity"],
@@ -657,6 +701,17 @@ def _v1_report(lang: str) -> dict:
                 "behaviours": ["Leaves when the headliner ends"],
                 "primary_job": "Find things worth watching that nobody else has.",
                 "anchor_quote": {"text": q(3)["text"], "participant_identifier": "Alex K."},
+            },
+            {
+                "name": "The Bill Auditor",
+                "grounded_in": ["Victor M.", "Tom O.", "Sam B."],
+                "one_liner": "Tolerates the stack until a price-increase email forces a reckoning.",
+                "segment": "Household budget owners",
+                "goals": ["Keep the total bill defensible"],
+                "frustrations": ["Creeping price increases", "Managing many logins"],
+                "behaviours": ["Re-evaluates everything when one price moves"],
+                "primary_job": "Pay for what the household actually watches, nothing more.",
+                "anchor_quote": {"text": q(10)["text"], "participant_identifier": "Victor M."},
             },
         ],
         "journey": {
@@ -670,7 +725,7 @@ def _v1_report(lang: str) -> dict:
                  "quote": {"text": "", "participant_identifier": ""},
                  "pain": "", "opportunity": ""},
                 {"name": "Price nudge", "goal": "Decide if it's still worth it", "emotion": -1,
-                 "quote": {"text": "", "participant_identifier": ""},
+                 "quote": {"text": q(10)["text"], "participant_identifier": "Victor M."},
                  "pain": "Price-increase email", "opportunity": "Time increases to releases"},
                 {"name": "Cancel", "goal": "Leave cleanly", "emotion": -2,
                  "quote": {"text": q(1)["text"], "participant_identifier": "Priya R."},
@@ -681,7 +736,7 @@ def _v1_report(lang: str) -> dict:
             ],
         },
         "confidence": "high",
-        "participant_count": 4,
+        "participant_count": 10,
     }
 
 
@@ -693,7 +748,7 @@ def _v2_report(lang: str) -> dict:
             "est confirmé comme le moteur principal de fidélité — c'est l'angle "
             "qui mérite le plus d'investissement produit. La friction des "
             "ruptures de stock est très actionnable et devrait être la priorité "
-            "court terme : trois utilisatrices sur quatre l'ont mentionnée et "
+            "court terme : six participants sur dix l'ont mentionnée et "
             "une fonctionnalité simple (validation des substitutions) résoudrait "
             "le problème. Le thème de la sensibilité prix mérite plus de données "
             "— il est segmenté de façon nette par profil et il faudrait des "
@@ -704,7 +759,7 @@ def _v2_report(lang: str) -> dict:
         base["summary"] = (
             "Refined after researcher review. The pause-state finding is the "
             "strongest retention insight in the dataset and is named or "
-            "implied by three of four participants — ship it. The "
+            "implied by seven of ten participants — ship it. The "
             "cancellation-friction theme is confirmed and immediately "
             "actionable. The catalogue-vs-curation theme is high-confidence "
             "for the smaller services but needs more evidence before we "
@@ -720,12 +775,12 @@ DEMO_ANNOTATIONS_EN = [
         "theme_title": "Subscribers want a pause state, not a binary on/off",
         "status": "confirmed",
         "researcher_note": (
-            "Confirmed across three of four interviews. Priya named it "
-            "explicitly, Marcus implied it (subscribing-then-cancelling "
-            "around specific shows), Alex described the same cycle. This "
-            "is the strongest retention idea in the dataset — worth "
-            "prototyping with the product team before the next planning "
-            "round."
+            "Confirmed across seven of ten interviews. Priya and Yuki named "
+            "it explicitly; Marcus, Alex, Dana, Grace and Victor all "
+            "described the subscribe-cancel-resubscribe cycle it would "
+            "solve. This is the strongest retention idea in the dataset — "
+            "worth prototyping with the product team before the next "
+            "planning round."
         ),
     },
     {
@@ -746,23 +801,24 @@ DEMO_ANNOTATIONS_FR = [
         "theme_title": "Le coût de switch invisible verrouille la fidélité",
         "status": "confirmed",
         "researcher_note": (
-            "Confirmé sur trois entretiens sur quatre. Camille et Sophie "
-            "le formulent presque mot pour mot, Romain l'implique. C'est "
-            "la mécanique de rétention la plus puissante du dataset et "
-            "celle qu'on a le moins activée côté produit. À tester avec "
-            "l'équipe produit avant la prochaine roadmap."
+            "Confirmé sur sept entretiens sur dix. Camille, Nadia et "
+            "Élodie le formulent presque mot pour mot ; Romain, Sophie, "
+            "Fatou et Anaïs l'impliquent. C'est la mécanique de rétention la plus "
+            "puissante du dataset et celle qu'on a le moins activée côté "
+            "produit. À tester avec l'équipe produit avant la prochaine "
+            "roadmap."
         ),
     },
     {
         "theme_title": "La sensibilité prix dépend du profil, pas du service",
         "status": "needs_evidence",
         "researcher_note": (
-            "Schéma de segmentation clair mais basé sur seulement quatre "
-            "personnes. Il faudrait 3-4 entretiens supplémentaires sur "
-            "des segments à plus faible revenu avant d'en faire une "
-            "recommandation forte. Le profil étudiant (Léa) n'utilise "
-            "pas le service donc ne nous renseigne pas vraiment sur ce "
-            "segment."
+            "Schéma de segmentation net — cinq entretiens sur dix — mais "
+            "concentré sur des profils qui commandent déjà. Il faudrait "
+            "3-4 entretiens supplémentaires sur des segments à plus "
+            "faible revenu avant d'en faire une recommandation forte. Le "
+            "profil non-utilisateur (Léa) ne nous renseigne pas vraiment "
+            "sur ce segment."
         ),
     },
 ]
@@ -774,22 +830,23 @@ DEMO_MEMOS_EN = [
         "linked_key": None,
         "content": (
             "First pass through the streaming-services data. The pause-state "
-            "finding is the strongest signal — three of four participants "
-            "either explicitly asked for it (Priya) or described the "
-            "behaviour it would solve (Marcus, Alex). Worth flagging to "
-            "product before the next quarterly planning round."
+            "finding is the strongest signal — seven of ten participants "
+            "either explicitly asked for it (Priya, Yuki) or described the "
+            "behaviour it would solve (Marcus, Alex, Dana, Grace, Victor). "
+            "Worth flagging to product before the next quarterly planning "
+            "round."
         ),
     },
     {
         "type": "theme_note",
         "linked_key": "Cancellation friction is a re-acquisition tax",
         "content": (
-            "Priya's quote about Hulu specifically — 'I'm more reluctant to "
-            "resubscribe to specifically because I remember how annoying "
-            "leaving was' — is the most quotable line on this theme. The "
-            "behavioural insight is that the friction tax falls on "
-            "re-acquisition, not on retention. Worth modelling lifetime "
-            "value with and without simplified cancellation."
+            "Priya's line about NOW — 'I'm more reluctant to resubscribe "
+            "[...] because I remember how annoying leaving was' — is the "
+            "most quotable on this theme, and Tom describes the same "
+            "hesitation. The behavioural insight is that the friction tax "
+            "falls on re-acquisition, not on retention. Worth modelling "
+            "lifetime value with and without simplified cancellation."
         ),
     },
     {
@@ -812,8 +869,8 @@ DEMO_MEMOS_FR = [
         "linked_key": None,
         "content": (
             "Premier passage sur les données courses en ligne. Le coût de "
-            "switch invisible est le signal le plus net : trois "
-            "utilisatrices sur quatre le décrivent presque dans les mêmes "
+            "switch invisible est le signal le plus net : sept "
+            "participants sur dix le décrivent presque dans les mêmes "
             "termes, et c'est probablement le levier de rétention le moins "
             "exploité par les enseignes. À sortir lors du prochain comité "
             "produit."
@@ -846,35 +903,44 @@ DEMO_MEMOS_FR = [
 ]
 
 
-# ── Hybrid demo: a sibling survey + Quantified Themes report ────────────────
+# ── Hybrid demo: a full quantitative survey + Decision report ───────────────
 #
-# The demo Study ships with an interview track *and* a quick-pulse survey, so
-# a new user lands on a genuine mixed-methods Study — the instrument-mix badge
-# reads "Hybrid" and the Report tab has a real Quantified Themes report — not
-# an interview-only project. The survey content is mono-language like the rest
-# of the seed. The Quantified Themes report is hand-authored (same approach as
-# the ProjectAnalysis reports above) so seeding never makes an AI call.
+# The demo Study ships with an interview track *and* a survey, so a new user
+# lands on a genuine mixed-methods Study — the instrument-mix badge reads
+# "Hybrid" and the Report tab has a real Decision report — not an
+# interview-only project. The survey content is mono-language like the rest
+# of the seed, and the instrument deliberately exercises EVERY question type
+# the product supports (mc_single, mc_multi, likert 5-pt, likert 7-pt with a
+# reverse-coded item, nps, open_text, short_text) so the demo doubles as a
+# showcase of the survey builder. All report copy is hand-authored (same
+# approach as the ProjectAnalysis reports above) so seeding never makes an
+# AI call.
 
 DEMO_SURVEY_NAME = "Streaming habits — quick pulse"
-DEMO_SURVEY_NAME_FR = "Courses en ligne — pouls rapide"
+DEMO_SURVEY_NAME_FR = "Courses en ligne — sondage éclair"
 
-# Per-language survey plan — a real stat questionnaire, not a two-question
-# pulse: frequency (mc_single), current stack (mc_multi), stack size
-# (mc_single), a three-item likert battery (value-for-money, price-rise
-# tolerance, and a reverse-coded friction item), recommendation (NPS 0–10)
-# and an open churn-trigger question.
+# Per-language survey plan — a ten-question instrument that uses every
+# question type the product supports: frequency (mc_single), current stack
+# (mc_multi), stack size (mc_single), a three-item 5-point likert battery
+# (value-for-money, price-rise tolerance, and a reverse-coded friction item),
+# a 7-point satisfaction likert, recommendation (NPS 0–10), an open
+# churn-trigger question (open_text) and a forced-choice "keep one"
+# (short_text).
 #
 # `questions` defines the instrument; `cohorts` defines who answers what.
 # Each cohort carries a per-question answer plan that is cycled over the
 # cohort's `count` responses (None = respondent skipped the question). The
 # `services` and `stack_size` plans share a cycle length so each simulated
 # respondent's stack count matches their stated stack size. The
-# distributions are chosen so the hand-authored Quantified Themes report
-# quotes numbers the analytics layer actually reproduces:
-#   EN — heavy NPS mean 9.1 / light 4.1; value 4.2 vs 2.4; price-rise
-#        cancel-intent 2.2 vs 4.4; Netflix in 38/44.
-#   FR — régulières NPS 9,1 / occasionnelles 4,6 ; qualité-prix 4,2 vs 2,4 ;
-#        intention d'arrêt sur hausse 2,2 vs 4,4 ; Carrefour Drive dans 26/44.
+# distributions are chosen so the hand-authored survey signals in
+# `_survey_signals` quote numbers the analytics layer actually reproduces
+# (as rendered, one decimal):
+#   EN — heavy NPS mean 9.2 / light 4.1; value 4.2 vs 2.4; price-rise
+#        cancel-intent 2.2 vs 4.4; satisfaction 6.2 vs 3.2; Netflix in
+#        38/44 stacks and 17/26 "keep one" answers.
+#   FR — régulières NPS 9,2 / occasionnelles 4,6 ; qualité-prix 4,2 vs 2,4 ;
+#        intention d'arrêt sur hausse 2,2 vs 4,4 ; satisfaction 6,2 vs 3,2 ;
+#        Carrefour Drive dans 26/44 paniers et 10/26 réponses « à garder ».
 DEMO_SURVEY_EN = {
     "name": DEMO_SURVEY_NAME,
     "questions": [
@@ -928,6 +994,12 @@ DEMO_SURVEY_EN = {
                        "reverse_coded": True},
         },
         {
+            "key": "satisfaction", "type": "likert",
+            "prompt": "Overall, how satisfied are you with your main streaming service?",
+            "config": {"scale": 7, "anchors": ["Very dissatisfied", "Very satisfied"],
+                       "reverse_coded": False},
+        },
+        {
             "key": "nps", "type": "nps",
             "prompt": "How likely are you to recommend your main streaming service to a friend?",
             "config": {},
@@ -936,6 +1008,11 @@ DEMO_SURVEY_EN = {
             "key": "churn", "type": "open_text",
             "prompt": "What would make you cancel your main service tomorrow?",
             "config": {"max_chars": 500, "ai_cluster": False},
+        },
+        {
+            "key": "must_keep", "type": "short_text",
+            "prompt": "If you could only keep one streaming service, which one would it be?",
+            "config": {"max_chars": 60},
         },
     ],
     "cohorts": [
@@ -955,6 +1032,7 @@ DEMO_SURVEY_EN = {
                 "value": [5, 4, 4, 5, 4, 3],
                 "price_rise": [2, 3, 2, 1, 3, 2],
                 "browse": [2, 3, 2, 4, 2],
+                "satisfaction": [6, 7, 6, 5, 7, 6],
                 "nps": [9, 10, 8, 9, 10, 9, 8, 10],
                 # Full-length plan (one slot per respondent) so every open
                 # answer in the sample is unique — no cycled duplicates.
@@ -976,6 +1054,15 @@ DEMO_SURVEY_EN = {
                     "Honestly, not much — it's the default in our house.",
                     None, None, None,
                 ],
+                # Full-length like `churn` — a short_text answer is optional,
+                # so the skips (None) keep the sample believable.
+                "must_keep": [
+                    "Netflix", None, "Netflix", "Disney+", None, "Netflix",
+                    "HBO Max", None, "Netflix", None, "Netflix", "Disney+",
+                    None, "Netflix", None, "Prime Video", "Netflix", None,
+                    "Netflix", "Disney+", None, "Netflix", None, "Netflix",
+                    "HBO Max", None,
+                ],
             },
         },
         {
@@ -987,6 +1074,7 @@ DEMO_SURVEY_EN = {
                 "value": [2, 3, 2, 3, 2],
                 "price_rise": [5, 4, 5, 4, 4],
                 "browse": [4, 4, 5, 3, 4],
+                "satisfaction": [3, 4, 2, 4, 3],
                 "nps": [4, 3, 5, 2, 6, 4, 5, 4],
                 "churn": [
                     "Honestly I only keep it for one show — the day it ends, I cancel.",
@@ -1007,6 +1095,12 @@ DEMO_SURVEY_EN = {
                     None,
                     "A month with nothing new in my genres.",
                     None,
+                ],
+                "must_keep": [
+                    "Netflix", None, "Prime Video", "Netflix", None,
+                    "Netflix", None, "Prime Video", None, "Netflix", None,
+                    "Netflix", "Prime Video", None, "Netflix", None, None,
+                    "Netflix",
                 ],
             },
         },
@@ -1065,6 +1159,12 @@ DEMO_SURVEY_FR = {
                        "reverse_coded": True},
         },
         {
+            "key": "satisfaction", "type": "likert",
+            "prompt": "Globalement, quelle est votre satisfaction vis-à-vis de votre enseigne principale ?",
+            "config": {"scale": 7, "anchors": ["Très insatisfait·e", "Très satisfait·e"],
+                       "reverse_coded": False},
+        },
+        {
             "key": "nps", "type": "nps",
             "prompt": "Quelle est la probabilité que vous recommandiez votre enseigne principale ?",
             "config": {},
@@ -1073,6 +1173,11 @@ DEMO_SURVEY_FR = {
             "key": "churn", "type": "open_text",
             "prompt": "Qu'est-ce qui vous ferait abandonner les courses en ligne demain ?",
             "config": {"max_chars": 500, "ai_cluster": False},
+        },
+        {
+            "key": "must_keep", "type": "short_text",
+            "prompt": "Si vous ne deviez garder qu'une seule enseigne de courses en ligne, laquelle ?",
+            "config": {"max_chars": 60},
         },
     ],
     "cohorts": [
@@ -1092,6 +1197,7 @@ DEMO_SURVEY_FR = {
                 "value": [5, 4, 4, 5, 4, 3],
                 "price_rise": [2, 3, 2, 1, 3, 2],
                 "browse": [3, 2, 4, 3, 2],
+                "satisfaction": [6, 7, 6, 5, 7, 6],
                 "nps": [9, 10, 8, 9, 10, 9, 8, 10],
                 # Full-length plan (one slot per respondent) so every open
                 # answer in the sample is unique — no cycled duplicates.
@@ -1113,6 +1219,16 @@ DEMO_SURVEY_FR = {
                     "Franchement pas grand-chose, c'est devenu notre routine du mercredi.",
                     None, None, None,
                 ],
+                # Full-length comme `churn` — réponse facultative, les None
+                # gardent l'échantillon crédible.
+                "must_keep": [
+                    "Carrefour Drive", None, "Carrefour Drive", "Picard", None,
+                    "Carrefour Drive", "Leclerc Drive", None, "Carrefour Drive",
+                    None, "Carrefour Drive", "Picard", None, "Carrefour Drive",
+                    None, "Carrefour Drive", "Amazon Fresh", None,
+                    "Carrefour Drive", "Picard", None, "Carrefour Drive", None,
+                    "Carrefour Drive", "Leclerc Drive", None,
+                ],
             },
         },
         {
@@ -1124,6 +1240,7 @@ DEMO_SURVEY_FR = {
                 "value": [2, 3, 2, 3, 2],
                 "price_rise": [5, 4, 5, 4, 4],
                 "browse": [4, 5, 4, 3, 5],
+                "satisfaction": [3, 4, 2, 4, 3],
                 "nps": [5, 4, 6, 4, 5, 4, 6, 3],
                 "churn": [
                     "Les frais de livraison — dès que ça dépasse le prix du bus, j'y vais moi-même.",
@@ -1145,477 +1262,77 @@ DEMO_SURVEY_FR = {
                     "Un abonnement obligatoire me ferait fuir tout de suite.",
                     None,
                 ],
+                "must_keep": [
+                    "Leclerc Drive", None, "Amazon Fresh", "Leclerc Drive",
+                    None, "Leclerc Drive", None, "Amazon Fresh", None,
+                    "Leclerc Drive", None, "Leclerc Drive", "Coop@home", None,
+                    "Leclerc Drive", None, None, "Leclerc Drive",
+                ],
             },
         },
     ],
 }
 
 
-def _quanti_report(lang: str) -> dict:
-    """Hand-authored Quantified Themes report for the demo Study.
+def _survey_signals(lang: str) -> list[str]:
+    """The four hand-authored survey-signal summaries the Decision report keys
+    to qualitative themes.
 
-    Matches the QuantifiedThemeReport schema (app/schemas/study.py). Anchor
-    quotes are pulled verbatim from NOTABLE_QUOTES so they survive the
-    interview-evidence verification the real analysis service applies.
+    Order: [0] recommendation gap, [1] value-tracks-usage, [2] anchor service,
+    [3] open churn triggers. Every number is reproduced exactly by the
+    analytics layer from the seeded cohort plans above — if you change a plan,
+    re-derive these figures (means shown as the analytics layer rounds them,
+    one decimal).
     """
     if lang == "fr":
-        notable = NOTABLE_QUOTES_FR
-        return {
-            "executive_summary": (
-                "Un questionnaire en huit questions (n=44) et quatre "
-                "entretiens approfondis convergent : la fidélité aux "
-                "enseignes de courses en ligne tient à un coût de switch "
-                "invisible, pas au prix. Les clientes régulières notent leur "
-                "enseigne 9,1 sur 10 en recommandation et 4,2 sur 5 en "
-                "rapport qualité-prix ; les occasionnelles tombent à 4,6 et "
-                "2,4. Carrefour Drive sert d'enseigne d'ancrage (26 paniers "
-                "sur 44) et les ruptures de stock sont la friction qui fait "
-                "basculer les notes — les réponses libres annoncent un "
-                "abandon opérationnel, pas tarifaire."
+        return [
+            (
+                "Les occasionnelles notent leur enseigne 4,6 sur l'échelle de "
+                "recommandation 0–10 contre 9,2 pour les régulières — un écart "
+                "de plus de quatre points sur la même question (n=44)."
             ),
-            "verdict": (
-                "Investir d'abord sur l'expérience de rupture de stock "
-                "(validation des substitutions à l'avance) plutôt que sur le "
-                "prix : c'est la friction la plus citée chez les détractrices, "
-                "le premier motif d'abandon dans les réponses libres, et le "
-                "seul levier corroboré par les deux méthodes. Réserve : le "
-                "coût de switch n'est pas encore chiffré — le sondage de "
-                "suivi doit précéder tout investissement lourd."
+            (
+                "L'accord qualité-prix suit la fréquence d'usage : 4,2 sur 5 "
+                "chez les régulières contre 2,4 chez les occasionnelles — "
+                "l'item de satisfaction en 7 points dessine le même écart "
+                "(6,2 contre 3,2)."
             ),
-            "themes": [
-                {
-                    "title": "Les clientes occasionnelles recommandent deux fois moins leur enseigne",
-                    "survey_signal": {
-                        "summary": (
-                            "Les clientes occasionnelles donnent une note de "
-                            "recommandation moyenne de 4,6, contre 9,1 pour "
-                            "les clientes régulières — un écart de 4,5 points "
-                            "sur la même échelle."
-                        ),
-                        "n": 18,
-                        "percentage": None,
-                        "segment_label": "Clientes occasionnelles",
-                        "segment_over_index": None,
-                    },
-                    "interview_evidence": {
-                        "x_of_y": "3 sur 4",
-                        "interview_count": 3,
-                        "anchor_quote": notable[1]["text"],
-                        "segments_mentioned": [],
-                    },
-                    "counter_evidence": (
-                        "Une participante sur quatre (profil petits paniers) "
-                        "se dit indifférente aux ruptures et ne regarde que "
-                        "le total — un segment purement prix existe, mais "
-                        "reste minoritaire dans les deux sources."
-                    ),
-                    "recommendation": {
-                        "kind": "product",
-                        "action": (
-                            "Proposer une validation des substitutions à "
-                            "l'avance pour désamorcer la friction des "
-                            "ruptures de stock."
-                        ),
-                        "rationale": (
-                            "La rupture de stock est la friction la plus "
-                            "citée en entretien et le meilleur candidat pour "
-                            "remonter la note des clientes occasionnelles."
-                        ),
-                        "success_test": (
-                            "La note de recommandation des clientes "
-                            "occasionnelles dépasse 6/10 à la vague "
-                            "suivante, à tarification constante."
-                        ),
-                    },
-                    "confidence": "supported",
-                },
-                {
-                    "title": "Le rapport qualité-prix perçu suit l'usage, pas les tarifs",
-                    "survey_signal": {
-                        "summary": (
-                            "À l'affirmation « le service vaut ce qu'il me "
-                            "coûte », les régulières répondent 4,2 sur 5 en "
-                            "moyenne, les occasionnelles 2,4 — alors que les "
-                            "deux groupes paient les mêmes frais. Sur « "
-                            "j'arrêterais si les frais augmentaient encore », "
-                            "l'écart se répète : 4,4 sur 5 chez les "
-                            "occasionnelles contre 2,2 chez les régulières."
-                        ),
-                        "n": 44,
-                        "percentage": None,
-                        "segment_label": None,
-                        "segment_over_index": None,
-                    },
-                    "interview_evidence": {
-                        "x_of_y": "2 sur 4",
-                        "interview_count": 2,
-                        "anchor_quote": notable[2]["text"],
-                        "segments_mentioned": [],
-                    },
-                    "counter_evidence": (
-                        "Le questionnaire ne distingue pas « je paie trop "
-                        "cher » de « je n'utilise pas assez » — l'écart peut "
-                        "refléter la fréquence d'usage plutôt qu'un jugement "
-                        "sur les tarifs."
-                    ),
-                    "recommendation": {
-                        "kind": "marketing",
-                        "action": (
-                            "Cibler les occasionnelles avec la valeur d'usage "
-                            "(créneaux fiables, listes, gain de temps) plutôt "
-                            "qu'avec des promotions prix."
-                        ),
-                        "rationale": (
-                            "Le déficit de valeur perçue vient de l'usage, "
-                            "pas du tarif — une promo ne le comble pas."
-                        ),
-                        "success_test": (
-                            "La note qualité-prix des occasionnelles remonte "
-                            "au-dessus de 3/5 après une campagne usage, sans "
-                            "baisse de prix."
-                        ),
-                    },
-                    "confidence": "supported",
-                },
-                {
-                    "title": "Une enseigne d'ancrage, des compléments qui tournent",
-                    "survey_signal": {
-                        "summary": (
-                            "Carrefour Drive apparaît dans 26 paniers sur 44 "
-                            "(59 %) et dans la totalité des paniers des "
-                            "régulières ; le foyer moyen combine 2 enseignes."
-                        ),
-                        "n": 44,
-                        "percentage": 59.1,
-                        "segment_label": None,
-                        "segment_over_index": None,
-                    },
-                    "interview_evidence": {
-                        "x_of_y": "3 sur 4",
-                        "interview_count": 3,
-                        "anchor_quote": notable[0]["text"],
-                        "segments_mentioned": [],
-                    },
-                    "counter_evidence": (
-                        "Les occasionnelles n'ont pas d'enseigne d'ancrage "
-                        "(Leclerc et Amazon Fresh se partagent leurs paniers) "
-                        "— l'ancrage est peut-être la conséquence de la "
-                        "régularité, pas sa cause."
-                    ),
-                    "recommendation": {
-                        "kind": "product",
-                        "action": (
-                            "Rendre l'historique et les listes portables pour "
-                            "attaquer l'ancrage des enseignes concurrentes — "
-                            "et défendre le sien par la fiabilité."
-                        ),
-                        "rationale": (
-                            "L'ancrage tient aux actifs accumulés ; celui qui "
-                            "abaisse la barrière d'import capte les foyers "
-                            "multi-enseignes."
-                        ),
-                        "success_test": (
-                            "Les foyers qui importent une liste concurrente "
-                            "passent au moins 2 commandes dans le mois qui "
-                            "suit."
-                        ),
-                    },
-                    "confidence": "supported",
-                },
-                {
-                    "title": "L'abandon annoncé est opérationnel, pas tarifaire",
-                    "survey_signal": {
-                        "summary": (
-                            "Dans les réponses libres « qu'est-ce qui vous "
-                            "ferait abandonner ? », ruptures, substitutions "
-                            "imposées et créneaux dominent chez les "
-                            "régulières ; les frais n'arrivent en tête que "
-                            "chez les occasionnelles."
-                        ),
-                        "n": 18,
-                        "percentage": None,
-                        "segment_label": "Réponses libres",
-                        "segment_over_index": None,
-                    },
-                    "interview_evidence": {
-                        "x_of_y": "2 sur 4",
-                        "interview_count": 2,
-                        "anchor_quote": notable[3]["text"],
-                        "segments_mentioned": [],
-                    },
-                    "counter_evidence": (
-                        "Les réponses libres sont peu nombreuses (18) et "
-                        "déclaratives — un motif d'abandon déclaré n'est pas "
-                        "un abandon observé."
-                    ),
-                    "recommendation": {
-                        "kind": "next_research",
-                        "action": (
-                            "Croiser ces motifs déclarés avec une étude de "
-                            "sortie auprès de clientes réellement parties."
-                        ),
-                        "rationale": (
-                            "Seule la comparaison déclaré/observé dira si la "
-                            "fiabilité est bien le levier anti-churn n°1."
-                        ),
-                        "success_test": (
-                            "L'étude de sortie retrouve les ruptures et "
-                            "substitutions comme déclencheur majoritaire des "
-                            "départs réels."
-                        ),
-                    },
-                    "confidence": "directional",
-                },
-            ],
-            "gaps": [
-                "Le poids économique du coût de switch est décrit par les "
-                "participantes mais jamais chiffré.",
-                "L'échantillon ne contient que des clientes actives — les "
-                "défections réelles ne sont connues que par ouï-dire "
-                "(biais de survivance).",
-                "Les sous-groupes (26 régulières, 18 occasionnelles) sont "
-                "sous le seuil n=30 : leurs écarts sont rapportés en "
-                "moyennes, jamais en pourcentages.",
-            ],
-            "methodology_note": (
-                "Questionnaire : 8 questions (fréquence, enseignes, nombre "
-                "d'enseignes, batterie Likert qualité-prix / tolérance à la "
-                "hausse / fiabilité perçue (item inversé), recommandation, "
-                "question ouverte), 44 réponses "
-                "complètes recueillies sur 7 jours. Entretiens : 4 complétés. "
-                "Conformément au contrat méthodologique, les pourcentages ne "
-                "sont affichés qu'à n≥30 ; les sous-groupes en deçà sont "
-                "rapportés en moyennes et effectifs. La confiance reflète "
-                "l'accord entre le signal du questionnaire et les entretiens."
+            (
+                "Carrefour Drive apparaît dans 26 des 44 paniers (59 %) et "
+                "reste l'enseigne que 10 répondantes sur 26 garderaient s'il "
+                "ne fallait en garder qu'une."
             ),
-            "generated_with_survey_count": 1,
-            "generated_with_response_count": 44,
-            "generated_with_interview_count": 4,
-        }
+            (
+                "Dans les réponses libres « qu'est-ce qui vous ferait "
+                "abandonner ? » (18 réponses sur 44), les ruptures de stock et "
+                "les substitutions imposées dominent chez les régulières ; les "
+                "frais ne mènent que chez les occasionnelles."
+            ),
+        ]
+    return [
+        (
+            "Light streamers score their main service 4.1 on the 0–10 "
+            "recommendation scale against 9.2 for heavy streamers — a "
+            "five-point split on the same question (n=44)."
+        ),
+        (
+            "Catalogue-value agreement follows usage: 4.2 out of 5 among "
+            "heavy streamers vs 2.4 among light — and the 7-point "
+            "satisfaction item shows the same shape (6.2 vs 3.2)."
+        ),
+        (
+            "Netflix appears in 38 of 44 household stacks (86%) and is the "
+            "one service 17 of 26 respondents would keep if forced to choose "
+            "just one."
+        ),
+        (
+            "In the open \u201cwhat would make you cancel?\u201d answers (18 of 44 "
+            "answered), finishing a show and planned resubscription dominate "
+            "among light streamers; price alone leads only when paired with a "
+            "dead catalogue month."
+        ),
+    ]
 
-    notable = NOTABLE_QUOTES_EN
-    return {
-        "executive_summary": (
-            "An eight-question survey (n=44) and four in-depth interviews "
-            "point the same direction: streaming loyalty is thin, "
-            "concentrated, and rented by the show. Heavy streamers rate "
-            "their main service 9.1 on the 0–10 recommendation scale and "
-            "4.2 of 5 on value-for-money; light streamers drop to 4.1 and "
-            "2.4. Netflix anchors 38 of 44 household stacks (86%), the rest "
-            "of the stack rotates, and the open answers describe planned, "
-            "show-driven cancellation rather than dissatisfaction. The "
-            "clearest product opening is a pause state between subscribed "
-            "and cancelled."
-        ),
-        "verdict": (
-            "Build the pause state before touching catalogue spend: it is "
-            "the only intervention corroborated by both methods, it matches "
-            "the planned churn the open answers describe, and it converts "
-            "decisive light-streamer churn into dormancy. Caveat: which "
-            "exclusives actually drive heavy-streamer renewal is not yet "
-            "sized — run the follow-up survey before committing catalogue "
-            "budget."
-        ),
-        "themes": [
-            {
-                "title": "Light streamers are far less likely to recommend their main service",
-                "survey_signal": {
-                    "summary": (
-                        "Light streamers gave their main service an average "
-                        "recommendation score of 4.1, against 9.1 for heavy "
-                        "streamers — a 5-point split on the same scale."
-                    ),
-                    "n": 18,
-                    "percentage": None,
-                    "segment_label": "Light streamers",
-                    "segment_over_index": None,
-                },
-                "interview_evidence": {
-                    "x_of_y": "3 of 4",
-                    "interview_count": 3,
-                    "anchor_quote": notable[0]["text"],
-                    "segments_mentioned": [],
-                },
-                "counter_evidence": (
-                    "One interviewee in four keeps a single year-round "
-                    "subscription and never rotates — a loyal-by-inertia "
-                    "profile a pause state would not move."
-                ),
-                "recommendation": {
-                    "kind": "product",
-                    "action": (
-                        "Build a pause state so light streamers can stay "
-                        "subscribed between the shows they come back for."
-                    ),
-                    "rationale": (
-                        "Light streamers churn decisively because the only "
-                        "exit is a full cancel; a dormant tier converts a "
-                        "lost subscriber into a paused one."
-                    ),
-                    "success_test": (
-                        "Light streamers offered a pause option show a "
-                        "measurably lower full-cancel rate over the next "
-                        "quarter."
-                    ),
-                },
-                "confidence": "supported",
-            },
-            {
-                "title": "Perceived value tracks usage, not price",
-                "survey_signal": {
-                    "summary": (
-                        "On “the catalogue is worth what I pay”, heavy "
-                        "streamers average 4.2 of 5; light streamers 2.4 — "
-                        "both groups pay the same prices. The gap repeats on "
-                        "“I would cancel if the price rose again this year”: "
-                        "light streamers average 4.4 of 5 agreement, heavy "
-                        "streamers 2.2."
-                    ),
-                    "n": 44,
-                    "percentage": None,
-                    "segment_label": None,
-                    "segment_over_index": None,
-                },
-                "interview_evidence": {
-                    "x_of_y": "3 of 4",
-                    "interview_count": 3,
-                    "anchor_quote": notable[2]["text"],
-                    "segments_mentioned": [],
-                },
-                "counter_evidence": (
-                    "The survey cannot separate “too expensive” from “I "
-                    "barely use it” — the value gap may be a usage gap "
-                    "wearing price language."
-                ),
-                "recommendation": {
-                    "kind": "marketing",
-                    "action": (
-                        "Time price changes and win-back offers to high-watch "
-                        "months instead of discounting flatly — the value "
-                        "deficit is usage-driven, not price-driven."
-                    ),
-                    "rationale": (
-                        "A discount cannot fix a value score that collapses "
-                        "when usage does; timing can."
-                    ),
-                    "success_test": (
-                        "Price changes sequenced after flagship releases show "
-                        "measurably lower cancellation than mid-lull changes."
-                    ),
-                },
-                "confidence": "supported",
-            },
-            {
-                "title": "Households anchor on one service; the rest of the stack rotates",
-                "survey_signal": {
-                    "summary": (
-                        "Netflix appears in 38 of 44 household stacks (86%) "
-                        "and in every heavy-streamer stack; the average "
-                        "household holds 2 paid services."
-                    ),
-                    "n": 44,
-                    "percentage": 86.4,
-                    "segment_label": None,
-                    "segment_over_index": None,
-                },
-                "interview_evidence": {
-                    "x_of_y": "3 of 4",
-                    "interview_count": 3,
-                    "anchor_quote": notable[3]["text"],
-                    "segments_mentioned": [],
-                },
-                "counter_evidence": (
-                    "Anchor status may be an artefact of catalogue size "
-                    "rather than loyalty — no interviewee described choosing "
-                    "the anchor; they inherited it."
-                ),
-                "recommendation": {
-                    "kind": "product",
-                    "action": (
-                        "Compete for the rotating second slot, not the "
-                        "anchor slot: make joining-for-one-show and leaving "
-                        "gracefully a first-class flow."
-                    ),
-                    "rationale": (
-                        "The anchor slot is locked; the second slot turns "
-                        "over constantly and rewards the service that "
-                        "welcomes returners."
-                    ),
-                    "success_test": (
-                        "Resubscription rate among lapsed subscribers rises "
-                        "measurably after simplifying the return flow."
-                    ),
-                },
-                "confidence": "supported",
-            },
-            {
-                "title": "Stated cancellation is planned and show-driven, not dissatisfied",
-                "survey_signal": {
-                    "summary": (
-                        "In the open “what would make you cancel?” answers, "
-                        "finishing a show and planned resubscription dominate "
-                        "among light streamers; price alone leads only when "
-                        "paired with a dead catalogue month."
-                    ),
-                    "n": 18,
-                    "percentage": None,
-                    "segment_label": "Open answers",
-                    "segment_over_index": None,
-                },
-                "interview_evidence": {
-                    "x_of_y": "2 of 4",
-                    "interview_count": 2,
-                    "anchor_quote": notable[1]["text"],
-                    "segments_mentioned": [],
-                },
-                "counter_evidence": (
-                    "Only 18 respondents answered the open question, and "
-                    "stated churn intent is not observed churn."
-                ),
-                "recommendation": {
-                    "kind": "next_research",
-                    "action": (
-                        "Run exit interviews with actually-churned "
-                        "subscribers to test whether real cancellations "
-                        "follow the planned, show-driven pattern."
-                    ),
-                    "rationale": (
-                        "Only a stated-vs-observed comparison can confirm "
-                        "the churn mechanics before product bets on them."
-                    ),
-                    "success_test": (
-                        "Exit interviews date most real cancellations to a "
-                        "show ending or a mistimed price event, not to "
-                        "service dissatisfaction."
-                    ),
-                },
-                "confidence": "directional",
-            },
-        ],
-        "gaps": [
-            "Which exclusive titles drive renewal is suggested by the "
-            "interviews but not sized.",
-            "The sample contains only current subscribers — churned users' "
-            "cancellation triggers are known only second-hand "
-            "(survivorship bias).",
-            "Cohort cuts (26 heavy, 18 light) sit below the n=30 threshold: "
-            "their gaps are reported as averages, never as percentages.",
-        ],
-        "methodology_note": (
-            "Survey: 8 questions (frequency, current stack, stack size, a "
-            "likert battery covering value-for-money, price-rise tolerance "
-            "and a reverse-coded discovery-friction item, recommendation, "
-            "open churn trigger), 44 completed responses "
-            "fielded over 7 days. Interviews: 4 completed, 7–9 turns each. "
-            "Per the methodology contract, percentages are shown only at "
-            "n≥30; cohort cuts below that threshold are reported as averages "
-            "and counts. Confidence reflects agreement between the survey "
-            "signal and the interview evidence."
-        ),
-        "generated_with_survey_count": 1,
-        "generated_with_response_count": 44,
-        "generated_with_interview_count": 4,
-    }
 
 
 def _decision_integration(lang: str) -> dict:
@@ -1628,15 +1345,14 @@ def _decision_integration(lang: str) -> dict:
     demo's ``report.html`` renders the canonical Decision-report superset on
     first login, not the legacy Quantified-Themes document.
 
-    The survey-signal strings are reused verbatim from :func:`_quanti_report`, so
-    there's a single source of truth for the demo's survey numbers and the joint
-    display can never drift from the charts above it. ``theme_title`` values are
-    copied verbatim from ``_v2_report`` so the joint display lines up with the
+    The survey-signal strings come from :func:`_survey_signals`, the single
+    source of truth for the demo's survey numbers, so the joint display can
+    never drift from the charts above it. ``theme_title`` values are copied
+    verbatim from ``_v2_report`` so the joint display lines up with the
     interview themes the reader just read.
     """
-    q = _quanti_report(lang)
     # [NPS/recommendation gap, value-tracks-usage, anchor service, churn trigger]
-    sig = [(t.get("survey_signal") or {}).get("summary", "") for t in q["themes"]]
+    sig = _survey_signals(lang)
 
     if lang == "fr":
         return {
@@ -1657,9 +1373,9 @@ def _decision_integration(lang: str) -> dict:
                     "survey_signal": sig[2],
                     "confidence": "supported",
                     "counter_evidence": (
-                        "Les occasionnelles n'ont pas d'enseigne d'ancrage — "
-                        "l'ancrage est peut-être la conséquence de la régularité, "
-                        "pas sa cause."
+                        "Leclerc Drive ancre déjà 12 des 18 paniers "
+                        "occasionnels — l'ancrage peut refléter l'offre locale "
+                        "autant qu'une fidélité construite."
                     ),
                 },
                 {
@@ -1667,8 +1383,9 @@ def _decision_integration(lang: str) -> dict:
                     "survey_signal": sig[0],
                     "confidence": "supported",
                     "counter_evidence": (
-                        "Une cliente sur quatre (profil petits paniers) se dit "
-                        "indifférente aux ruptures et ne regarde que le total."
+                        "Un entretien sur dix (profil petit panier) relativise : "
+                        "quand la commande fait quinze produits, il n'y a rien à "
+                        "reconstruire et une rupture se rattrape en magasin."
                     ),
                 },
                 {
@@ -1720,8 +1437,9 @@ def _decision_integration(lang: str) -> dict:
                 "survey_signal": sig[0],
                 "confidence": "supported",
                 "counter_evidence": (
-                    "One in four light streamers is indifferent to friction and "
-                    "only watches the monthly total — a pure-price segment exists."
+                    "Two of ten interviewees barely track their subscriptions "
+                    "at all (“my card just gets charged”) — friction may be "
+                    "invisible to the least engaged segment."
                 ),
             },
             {
@@ -1729,8 +1447,9 @@ def _decision_integration(lang: str) -> dict:
                 "survey_signal": sig[2],
                 "confidence": "directional",
                 "counter_evidence": (
-                    "Light streamers have no anchor service — anchoring may be a "
-                    "consequence of heavy use, not a cause of loyalty."
+                    "Netflix anchors 12 of 18 light-streamer stacks too — "
+                    "anchoring may reflect market ubiquity rather than earned "
+                    "loyalty."
                 ),
             },
         ],
@@ -1755,6 +1474,7 @@ def _seed_demo_survey(
     fielding_end = now - timedelta(days=2)
 
     survey = Survey(
+        id=str(uuid.uuid4()),
         study_id=study.id,
         company_id=company_id,
         name=cfg["name"],
@@ -1765,11 +1485,11 @@ def _seed_demo_survey(
         created_at=now - timedelta(days=10),
     )
     db.add(survey)
-    db.flush()
 
     question_by_key: dict[str, SurveyQuestion] = {}
     for i, q_plan in enumerate(cfg["questions"]):
         question = SurveyQuestion(
+            id=str(uuid.uuid4()),
             survey_id=survey.id,
             sort_order=i,
             type=q_plan["type"],
@@ -1779,9 +1499,9 @@ def _seed_demo_survey(
         )
         db.add(question)
         question_by_key[q_plan["key"]] = question
-    db.flush()
 
     link = SurveyLink(
+        id=str(uuid.uuid4()),
         survey_id=survey.id,
         token=secrets.token_urlsafe(32),
         is_active=True,
@@ -1789,7 +1509,6 @@ def _seed_demo_survey(
         created_at=now - timedelta(days=10),
     )
     db.add(link)
-    db.flush()
 
     n = 0
     for cohort in cfg["cohorts"]:
@@ -1797,7 +1516,11 @@ def _seed_demo_survey(
         for i in range(cohort["count"]):
             n += 1
             started = fielding_start + timedelta(hours=n * 3)
+            # Client-side id so answers can reference the response without a
+            # per-row flush — with 44 responses the round-trips to a remote
+            # Postgres were the bulk of prod seeding time.
             response = SurveyResponse(
+                id=str(uuid.uuid4()),
                 survey_id=survey.id,
                 company_id=company_id,
                 link_id=link.id,
@@ -1805,7 +1528,6 @@ def _seed_demo_survey(
                 completed_at=started + timedelta(minutes=4),
             )
             db.add(response)
-            db.flush()
             for key, question in question_by_key.items():
                 plan = answers.get(key)
                 if not plan:
@@ -1868,7 +1590,11 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         tag_plan = DEMO_TAG_PLAN_FR
         annotations = DEMO_ANNOTATIONS_FR
         memos = DEMO_MEMOS_FR
-        quality_keys = ["camille", "romain", "lea", "sophie"]
+        demo_codes = DEMO_CODES_FR
+        quality_keys = [
+            "camille", "romain", "lea", "sophie",
+            "nadia", "julien", "fatou", "marc", "elodie", "anais",
+        ]
         researcher_context = (
             "Revue de la v1 avec l'équipe. Coût de switch = l'asset à "
             "défendre. La friction des ruptures de stock est le fix immédiat. "
@@ -1887,7 +1613,11 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         tag_plan = DEMO_TAG_PLAN_EN
         annotations = DEMO_ANNOTATIONS_EN
         memos = DEMO_MEMOS_EN
-        quality_keys = ["priya", "marcus", "jen", "alex"]
+        demo_codes = DEMO_CODES_EN
+        quality_keys = [
+            "priya", "marcus", "jen", "alex",
+            "dana", "tom", "yuki", "sam", "grace", "victor",
+        ]
         researcher_context = (
             "Reviewed v1 with the team. Pause-state is the headline retention "
             "insight — protect it. Cancellation friction is the immediate fix. "
@@ -1954,8 +1684,9 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
 
     # Manual codes
     code_by_name: dict[str, ManualCode] = {}
-    for idx, c in enumerate(DEMO_CODES):
+    for idx, c in enumerate(demo_codes):
         code = ManualCode(
+            id=str(uuid.uuid4()),
             project_id=project.id,
             name=c["name"],
             color=c["color"],
@@ -1963,7 +1694,6 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         )
         db.add(code)
         code_by_name[c["name"]] = code
-    db.flush()
 
     # Helper to add a participant and their turns.
     def add_participant(
@@ -1975,7 +1705,10 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         started = now - timedelta(days=days_ago)
         completed_at = started + timedelta(minutes=22)
         q = quality or {}
+        # Client-side ids for the participant and turns so the whole cast can
+        # be inserted without per-participant flushes (see the survey seeder).
         participant = Participant(
+            id=str(uuid.uuid4()),
             link_id=link.id,
             project_id=project.id,
             display_name=data["display_name"],
@@ -1996,12 +1729,12 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             short_answer_pct=q.get("short_answer_pct"),
         )
         db.add(participant)
-        db.flush()
 
         turns: list[InterviewTurn] = []
         for t_idx, turn in enumerate(data["turns"]):
             q_idx_zero_based = max(0, int(turn.get("question_index", 1)) - 1)
             interview_turn = InterviewTurn(
+                id=str(uuid.uuid4()),
                 participant_id=participant.id,
                 turn_index=t_idx,
                 question_index=q_idx_zero_based,
@@ -2015,15 +1748,17 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             )
             db.add(interview_turn)
             turns.append(interview_turn)
-        db.flush()
         return participant, turns
 
     seeded_participants: list[tuple[Participant, list[InterviewTurn]]] = []
     for i, p_data in enumerate(participants_data):
         q_key = quality_keys[i] if i < len(quality_keys) else None
+        # Ten interviews spread across the fieldwork window (9 → 2.25 days
+        # ago) — every participant completes BEFORE the analyses below are
+        # "generated", so the version history stays chronologically honest.
         result = add_participant(
             p_data,
-            days_ago=8 - i * 2,
+            days_ago=9 - i * 0.75,
             edit_first_turn=(i == 0),
             quality=quality_map.get(q_key) if q_key else None,
         )
@@ -2054,17 +1789,18 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
             )
         )
 
-    # Analysis v1 — ai_discovery
+    # Analysis v1 — ai_discovery. Generated after the last interview
+    # (2.25 days ago) so the version history postdates all the data it cites.
     v1 = ProjectAnalysis(
         project_id=project.id,
         version=1,
         version_label="ai_discovery",
         status="ready",
-        participant_count=4,
+        participant_count=10,
         report=json.dumps(_v1_report(lang)),
         share_token=secrets.token_urlsafe(32),
-        generated_at=now - timedelta(days=3),
-        created_at=now - timedelta(days=3),
+        generated_at=now - timedelta(days=1.5),
+        created_at=now - timedelta(days=1.5),
     )
     db.add(v1)
     db.flush()
@@ -2075,12 +1811,12 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         version=2,
         version_label="researcher_refined",
         status="ready",
-        participant_count=4,
+        participant_count=10,
         report=json.dumps(_v2_report(lang)),
         parent_version_id=v1.id,
         researcher_context=researcher_context,
-        generated_at=now - timedelta(days=1),
-        created_at=now - timedelta(days=1),
+        generated_at=now - timedelta(days=0.75),
+        created_at=now - timedelta(days=0.75),
     )
     db.add(v2)
     db.flush()
