@@ -84,9 +84,6 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
       const a = audioRef.current;
       if (!a) return;
       if (a.paused) {
-        if (currentlyPlaying && currentlyPlaying !== a) {
-          currentlyPlaying.pause();
-        }
         a.play().catch(() => setErrored(true));
       } else {
         a.pause();
@@ -218,7 +215,14 @@ export const AudioClip = forwardRef<HTMLAudioElement | null, AudioClipProps>(
           src={src}
           preload="metadata"
           onPlay={(e) => {
-            currentlyPlaying = e.currentTarget as HTMLAudioElement;
+            const a = e.currentTarget as HTMLAudioElement;
+            // Single-playback guarantee: whatever started this clip (play
+            // button, segment-click seek, keyboard), pause any other clip
+            // that was already playing so we never overlap two audios.
+            if (currentlyPlaying && currentlyPlaying !== a) {
+              currentlyPlaying.pause();
+            }
+            currentlyPlaying = a;
             setPlaying(true);
           }}
           onPause={(e) => {

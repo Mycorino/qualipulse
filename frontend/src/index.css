@@ -4067,15 +4067,24 @@ select.field-input {
   .wizard-card { padding: 20px 16px; }
   .wizard-main { padding: 16px 12px; }
 
-  /* Responses tab */
+  /* Responses tab — on mobile the two panes stack and the whole page
+     scrolls; drop the fixed-height/overflow frame the desktop layout uses. */
   .responses-layout {
     grid-template-columns: 1fr !important;
+    height: auto !important;
+    overflow: visible !important;
   }
   .responses-list-col {
     position: static !important;
+    height: auto !important;
     max-height: none !important;
+    overflow: visible !important;
     border-right: none !important;
     border-bottom: 1px solid var(--border-subtle);
+  }
+  .responses-transcript-col {
+    height: auto !important;
+    overflow: visible !important;
   }
   .participant-row {
     flex-direction: column;
@@ -5496,23 +5505,27 @@ select.field-input {
 
 /* ── Two-column transcript layout ───────────────────────────────────────────── */
 /* Responses tab needs full width — break out of .detail-main max-width */
+/* The responses view is a self-contained two-pane scroll region: the list
+   and transcript columns each scroll independently and fill the space below
+   the sticky header (56px) + tabs (44px). Kill the default .detail-main
+   padding entirely — any vertical padding here isn't subtracted from the
+   column heights below, so it pushes the scroll region's bottom past the
+   viewport and the last turns become unreachable. */
 .detail-main:has(.responses-layout) {
   max-width: none;
-  padding-left: 0;
-  padding-right: 0;
+  padding: 0;
 }
 .responses-layout {
   display: grid;
   grid-template-columns: 300px 1fr;
   gap: 0;
-  min-height: calc(100vh - 56px - 44px);
-  align-items: start;
+  height: calc(100dvh - 56px - 44px);
+  align-items: stretch;
+  overflow: hidden;
 }
 .responses-list-col {
   border-right: 1px solid var(--border-subtle);
-  position: sticky;
-  top: 0;
-  max-height: calc(100vh - 100px);
+  height: 100%;
   overflow-y: auto;
   padding: var(--space-4);
 }
@@ -5520,7 +5533,7 @@ select.field-input {
   padding: var(--space-6);
   min-width: 0;
   overflow-y: auto;
-  max-height: calc(100vh - 100px);
+  height: 100%;
 }
 /* .transcript-header removed — replaced by .participant-card */
 
