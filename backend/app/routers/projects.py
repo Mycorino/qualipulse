@@ -780,8 +780,47 @@ def regenerate_screening_translations(
         sq.translations = None
     db.commit()
     from app.services.screening_translation import schedule_screening_translation
-    schedule_screening_translation(project.id)
+    schedule_screening_translation(project.id, include_screening=True)
     return {"status": "regenerating"}
+
+
+@router.post(
+    "/{project_id}/screening/{screening_id}/translations/{lang}/generate",
+    response_model=ScreeningQuestionResponse,
+)
+def generate_screening_translation(
+    project_id: str,
+    screening_id: str,
+    lang: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> ScreeningQuestionResponse:
+    """Synchronously auto-translate this project's screening questions into
+    `lang` via Claude (cached on the row; no-op if already present or lang is
+    the source), then return this question with its fresh translation. Powers
+    the Setup-tab editor's on-select autofill. Best-effort — on a model failure
+    the translation is simply absent and the editor falls back to canonical
+    text, which the researcher can then fill by hand."""
+    project = _get_project_or_404(project_id, company.id, db)
+    sq = (
+        db.query(ScreeningQuestion)
+        .filter(ScreeningQuestion.id == screening_id, ScreeningQuestion.project_id == project.id)
+        .first()
+    )
+    if sq is None:
+        raise HTTPException(status_code=404, detail="Screening question not found")
+
+    from app.services.screening_translation import ensure_screening_language
+    ensure_screening_language(project, lang, db)
+    db.refresh(sq)
+    return ScreeningQuestionResponse(
+        id=sq.id,
+        question=sq.question,
+        options=sq.options_list,
+        disqualifying_options=sq.disqualifying_options_list,
+        sort_order=sq.sort_order,
+        translations=sq.translations_dict,
+    )
 
 
 @router.patch("/{project_id}/questions/{question_id}", response_model=QuestionResponse)

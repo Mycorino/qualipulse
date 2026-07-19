@@ -29,18 +29,25 @@ _LANG_NAMES = {
 }
 
 
-def schedule_screening_translation(project_id: str) -> None:
+def schedule_screening_translation(project_id: str, include_screening: bool = False) -> None:
     """Spawn a daemon thread (fresh DB session) to translate a project's
-    participant-facing copy (study name + screening questions) into all
-    supported languages. Fire-and-forget — never blocks the request; a
-    container shutdown won't hang on it."""
+    participant-facing copy into the supported languages. Fire-and-forget —
+    never blocks the request; a container shutdown won't hang on it.
+
+    Study name + research context always translate eagerly (shown on the
+    interview landing before any lazy trigger). Screening questions are only
+    included when `include_screening=True` (the explicit 'Regenerate' action):
+    on ordinary edits we skip them and let the interview endpoint translate the
+    chosen language on-demand (`ensure_screening_language`), so we never pay to
+    localize screening into languages no participant ever picks."""
     def _run() -> None:
         from app.database import SessionLocal
         db = SessionLocal()
         try:
             translate_project_name(project_id, db)
             translate_project_research_context(project_id, db)
-            translate_project_screening(project_id, db)
+            if include_screening:
+                translate_project_screening(project_id, db)
         finally:
             db.close()
     threading.Thread(target=_run, daemon=True, name=f"screen-i18n-{project_id[:8]}").start()

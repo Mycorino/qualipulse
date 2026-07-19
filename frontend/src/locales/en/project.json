@@ -566,7 +566,8 @@
   "screeningTranslations": {
     "saved": "Translation saved",
     "saveFailed": "Failed to save translation",
-    "questionLabel": "Question"
+    "questionLabel": "Question",
+    "generating": "Translating…"
   },
   "brandingFonts": {
     "system": "Modern (default)",

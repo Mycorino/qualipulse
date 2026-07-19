@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "../i18n";
-import { patchScreeningTranslation, ScreeningQuestionResponse } from "../api/projects";
+import {
+  generateScreeningTranslation,
+  patchScreeningTranslation,
+  ScreeningQuestionResponse,
+} from "../api/projects";
 import { useToast } from "./Toast";
 
 /**
@@ -37,12 +41,46 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
     screening.options.map((o, i) => tr?.options?.[i] ?? o)
   );
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  function applyTranslation(l: string, source: ScreeningQuestionResponse) {
+    const t = source.translations?.[l];
+    setQuestion(t?.question ?? source.question);
+    setOptions(source.options.map((o, i) => t?.options?.[i] ?? o));
+  }
+
+  // Auto-fill a language's fields via Claude the first time it's selected and
+  // no translation is cached yet. Cheap and lazy — a language nobody opens is
+  // never translated. On failure the canonical text stays editable.
+  async function autofill(next: string) {
+    if (generating) return;
+    setGenerating(true);
+    try {
+      const fresh = await generateScreeningTranslation(projectId, screening.id, next);
+      applyTranslation(next, fresh);
+      onSaved(); // persist ✓ state + cache sibling questions translated in the same call
+    } catch {
+      applyTranslation(next, screening); // fall back to canonical, let the user type
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   function switchLang(next: string) {
     setLang(next);
-    const t = screening.translations?.[next];
-    setQuestion(t?.question ?? screening.question);
-    setOptions(screening.options.map((o, i) => t?.options?.[i] ?? o));
+    if (screening.translations?.[next]) {
+      applyTranslation(next, screening);
+    } else {
+      void autofill(next);
+    }
+  }
+
+  function toggleOpen() {
+    setOpen((v) => {
+      const opening = !v;
+      if (opening && !screening.translations?.[lang]) void autofill(lang);
+      return opening;
+    });
   }
 
   async function save() {
@@ -60,7 +98,7 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
 
   return (
     <div className="screening-tr">
-      <button className="screening-tr__toggle" onClick={() => setOpen((v) => !v)}>
+      <button className="screening-tr__toggle" onClick={toggleOpen}>
         {open ? "▾" : "▸"} 🌐 Translations
       </button>
       {open && (
@@ -71,14 +109,23 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
                 key={l}
                 className={`screening-tr__lang${l === lang ? " active" : ""}`}
                 onClick={() => switchLang(l)}
+                disabled={generating}
               >
                 {NATIVE[l] ?? l}
                 {screening.translations?.[l] ? " ✓" : ""}
               </button>
             ))}
           </div>
+          {generating && (
+            <p className="screening-tr__generating">✨ {t("screeningTranslations.generating")}</p>
+          )}
           <label className="field-label">{t("screeningTranslations.questionLabel")}</label>
-          <input className="field-input" value={question} onChange={(e) => setQuestion(e.target.value)} />
+          <input
+            className="field-input"
+            value={question}
+            disabled={generating}
+            onChange={(e) => setQuestion(e.target.value)}
+          />
           <label className="field-label" style={{ marginTop: 8 }}>Options</label>
           {screening.options.map((canonical, i) => (
             <div key={i} className="screening-tr__opt">
@@ -86,11 +133,17 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
               <input
                 className="field-input"
                 value={options[i] ?? ""}
+                disabled={generating}
                 onChange={(e) => setOptions((prev) => prev.map((o, oi) => (oi === i ? e.target.value : o)))}
               />
             </div>
           ))}
-          <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} disabled={saving} onClick={save}>
+          <button
+            className="btn btn-primary btn-sm"
+            style={{ marginTop: 10 }}
+            disabled={saving || generating}
+            onClick={save}
+          >
             {saving ? "Saving…" : `Save ${NATIVE[lang] ?? lang}`}
           </button>
         </div>
