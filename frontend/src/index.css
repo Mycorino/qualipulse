@@ -4940,6 +4940,7 @@ select.field-input {
   animation: fadeInUp 0.3s ease;
   width: 100%;
 }
+.transcript-flash--fading { opacity: 0; transition: opacity 1s ease; }
 .transcript-flash-label { font-weight: 600; flex-shrink: 0; }
 .transcript-flash-text { font-style: italic; }
 @keyframes fadeInUp {
