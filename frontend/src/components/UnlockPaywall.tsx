@@ -16,6 +16,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import client from "../api/client";
+import { getBillingConfig } from "../utils/billingConfig";
+import EmbeddedCheckoutModal from "./EmbeddedCheckoutModal";
 import { useToast } from "./Toast";
 
 /** Plan/interval the user picked on the marketing pricing page (stashed by
@@ -148,6 +150,7 @@ export function UnlockModal({
     preference.interval ?? "annual",
   );
   const [working, setWorking] = useState<string | null>(null);
+  const [embedded, setEmbedded] = useState<{ clientSecret: string; publishableKey: string } | null>(null);
   const creditsMode = mode === "credits";
 
   // Load the available credit packs when the modal opens — only in
@@ -198,6 +201,16 @@ export function UnlockModal({
   ) => {
     setWorking(`plan:${planId}`);
     try {
+      const cfg = await getBillingConfig();
+      if (cfg.embedded_checkout && cfg.stripe_publishable_key) {
+        const { data } = await client.post<{ client_secret: string }>(
+          "/billing/checkout",
+          { plan_id: planId, billing_interval: interval, ui_mode: "embedded" },
+        );
+        setEmbedded({ clientSecret: data.client_secret, publishableKey: cfg.stripe_publishable_key });
+        setWorking(null);
+        return;
+      }
       const { data } = await client.post<{ checkout_url: string }>(
         "/billing/checkout",
         { plan_id: planId, billing_interval: interval, ...redirectUrls },
@@ -216,6 +229,16 @@ export function UnlockModal({
   const handlePack = async (packId: string) => {
     setWorking(`pack:${packId}`);
     try {
+      const cfg = await getBillingConfig();
+      if (cfg.embedded_checkout && cfg.stripe_publishable_key) {
+        const { data } = await client.post<{ client_secret: string }>(
+          "/billing/checkout/credits",
+          { pack_id: packId, ui_mode: "embedded" },
+        );
+        setEmbedded({ clientSecret: data.client_secret, publishableKey: cfg.stripe_publishable_key });
+        setWorking(null);
+        return;
+      }
       const { data } = await client.post<{ checkout_url: string }>(
         "/billing/checkout/credits",
         { pack_id: packId, ...redirectUrls },
@@ -253,6 +276,21 @@ export function UnlockModal({
       subPlans.find((p) => (p.included_credits ?? 0) >= lockedCount) ||
       subPlans[subPlans.length - 1]
     )?.id;
+
+  // In-app Stripe checkout replaces the paywall content while active —
+  // completion reloads with the same ?checkout=success the hosted flow used.
+  if (embedded) {
+    return (
+      <EmbeddedCheckoutModal
+        publishableKey={embedded.publishableKey}
+        clientSecret={embedded.clientSecret}
+        onClose={() => setEmbedded(null)}
+        onComplete={() => {
+          window.location.href = `${here}?checkout=success`;
+        }}
+      />
+    );
+  }
 
   return (
     <div

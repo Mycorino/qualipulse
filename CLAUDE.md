@@ -321,6 +321,9 @@ EMAIL_FROM=noreply@qualipulse.com
 
 # Stripe (optional — billing disabled without these)
 STRIPE_SECRET_KEY=
+# Publishable key — enables in-app Embedded Checkout (served to the frontend
+# via GET /billing/config). Blank = hosted checkout.stripe.com redirect.
+STRIPE_PUBLISHABLE_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_STARTER=
 STRIPE_PRICE_PRO=
