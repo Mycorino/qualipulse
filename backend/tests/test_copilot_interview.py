@@ -238,15 +238,15 @@ class TestResultsCopilotReads:
     def test_progress_snapshot_counts_completed_and_quality(self, db_session):
         project = self._seed(db_session)
         snap = _progress_snapshot(project)
-        assert snap["completed_interviews"] == 4
+        assert snap["completed_interviews"] == 10
         assert snap["in_progress"] == 0
-        assert sum(snap["quality_spread"].values()) == 4
+        assert snap["quality_spread"] == {"strong": 4, "good": 4, "low": 2}
         assert snap["has_analysis"] is True
 
     def test_interviews_index_lists_completed_without_transcripts(self, db_session):
         project = self._seed(db_session)
         index = _interviews_index(project)
-        assert len(index) == 4
+        assert len(index) == 10
         for entry in index:
             assert entry["id"]
             assert entry["name"]

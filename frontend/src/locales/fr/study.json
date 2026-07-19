@@ -152,7 +152,8 @@
         "invite_interviews": "Invitez les répondants les plus pertinents à des entretiens IA depuis les résultats du questionnaire.",
         "collect_more_interviews_one": "Réalisez encore {{count}} entretien avant de générer le rapport de l'étude.",
         "collect_more_interviews_other": "Réalisez encore {{count}} entretiens avant de générer le rapport de l'étude.",
-        "generate_report": "Générez le rapport de l'étude pour croiser les chiffres du questionnaire et les verbatims d'entretiens."
+        "generate_report": "Générez le rapport de l'étude pour croiser les chiffres du questionnaire et les verbatims d'entretiens.",
+        "open_report": "Votre rapport mixte est prêt — ouvrez-le pour voir ce que disent les données."
       }
     },
     "checklist": {

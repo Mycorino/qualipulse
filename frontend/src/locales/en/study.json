@@ -152,7 +152,8 @@
         "invite_interviews": "Invite high-signal respondents to AI interviews from the survey results.",
         "collect_more_interviews_one": "Conduct {{count}} more interview before generating the study report.",
         "collect_more_interviews_other": "Conduct {{count}} more interviews before generating the study report.",
-        "generate_report": "Generate the study report to combine survey numbers and interview evidence."
+        "generate_report": "Generate the study report to combine survey numbers and interview evidence.",
+        "open_report": "Your mixed-methods report is ready — open it to see what the data says."
       }
     },
     "checklist": {

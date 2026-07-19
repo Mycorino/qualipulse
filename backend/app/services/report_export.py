@@ -226,6 +226,14 @@ def _esc(value) -> str:
     return html.escape(str(value)) if value else ""
 
 
+def _quote_marks(lang: str) -> tuple[str, str]:
+    """Language-appropriate marks for rendered verbatims: « … » in French,
+    curly double quotes in English (EN reports used to leak guillemets)."""
+    if lang == "fr":
+        return ("«&nbsp;", "&nbsp;»")
+    return ("“", "”")
+
+
 def _fmt_date(dt: datetime | None, lang: str) -> str:
     if not dt:
         return "—"
@@ -2621,9 +2629,10 @@ def render_study_report_html(
                 if segments
                 else ""
             )
+            qo, qc = _quote_marks(lang)
             cols.append(
                 f'<div class="evidence-col"><h4>{_esc(L["interview_evidence"].format(x=ev.get("x_of_y", "")))}</h4>'
-                f'<blockquote><p>«&nbsp;{_esc(ev["anchor_quote"])}&nbsp;»</p>{seg_line}</blockquote></div>'
+                f'<blockquote><p>{qo}{_esc(ev["anchor_quote"])}{qc}</p>{seg_line}</blockquote></div>'
             )
 
         counter_html = ""
@@ -2933,8 +2942,9 @@ def _survey_question_figure(q, L: dict, lang: str, accent: str = "#1e4a73") -> s
         breakdown = q.breakdown or {}
         total = breakdown.get("total_texts", q.n_answered)
         samples = (breakdown.get("sample") or [])[:12]
+        qo, qc = _quote_marks(lang)
         items = "".join(
-            f'<li class="quote"><p>«&nbsp;{_esc(s)}&nbsp;»</p></li>'
+            f'<li class="quote"><p>{qo}{_esc(s)}{qc}</p></li>'
             for s in samples
             if s
         )

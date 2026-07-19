@@ -89,27 +89,32 @@ class TestDemoSeeder:
         )
         assert len(codes) == 3
 
-        # 4 participants: all completed (2 FR + 2 EN)
+        # 10 participants, all completed, mono-language (EN company → EN cast)
         participants = (
             db_session.query(Participant)
             .filter(Participant.project_id == project.id)
             .all()
         )
-        assert len(participants) == 4
-        assert sum(1 for p in participants if p.status == "completed") == 4
+        assert len(participants) == 10
+        assert sum(1 for p in participants if p.status == "completed") == 10
 
-        # Demographics: at least two distinct countries among the 4 EN participants
+        # Realistic quality spread across the ten interviews
+        labels = sorted(p.quality_label for p in participants)
+        assert labels.count("low") == 2
+        assert labels.count("strong") == 4
+
+        # Demographics: several distinct countries among the 10 EN participants
         countries = {p.country for p in participants}
-        assert len(countries) >= 2
+        assert len(countries) >= 4
 
-        # Interview turns (4 turns per participant × 4 = 16 minimum)
+        # Interview turns (6+ turns per participant × 10 = 60 minimum)
         turns = (
             db_session.query(InterviewTurn)
             .join(Participant)
             .filter(Participant.project_id == project.id)
             .all()
         )
-        assert len(turns) >= 16
+        assert len(turns) >= 60
 
         # At least one turn is flagged as manually edited
         edited = [t for t in turns if t.manually_edited]
@@ -255,7 +260,7 @@ class TestDemoSeeder:
             strengths = json.loads(p.quality_strengths)
             assert isinstance(strengths, list) and len(strengths) > 0
             issues = json.loads(p.quality_issues)
-            assert isinstance(issues, list)  # can be empty (Emma)
+            assert isinstance(issues, list)  # can be empty (strong participants)
 
     def test_seed_quality_in_researcher_language(self, db_session):
         """FR company should get quality summaries in French."""
@@ -328,12 +333,18 @@ class TestDemoStudyIsHybrid:
         )
         assert [q.type for q in questions] == [
             "mc_single", "mc_multi", "mc_single",
-            "likert", "likert", "likert",
-            "nps", "open_text",
+            "likert", "likert", "likert", "likert",
+            "nps", "open_text", "short_text",
         ]
         # One battery item is reverse-coded — the demo should showcase it.
         likert_configs = [json.loads(q.config) for q in questions if q.type == "likert"]
         assert any(c.get("reverse_coded") for c in likert_configs)
+        # The instrument exercises every question type the product supports…
+        assert {q.type for q in questions} == {
+            "mc_single", "mc_multi", "likert", "nps", "open_text", "short_text"
+        }
+        # …including both likert scales (the satisfaction item is 7-point).
+        assert sorted(c.get("scale", 5) for c in likert_configs) == [5, 5, 5, 7]
 
         # 44 completed responses → above the n>=30 inference threshold.
         responses = (
@@ -615,7 +626,7 @@ class TestDecisionIntegration:
         self, client, auth_headers, db_session, registered_company
     ):
         """The Reports hub catalog surfaces every ready report by type — the
-        seeded demo (mixed flagship + qual-only exit study) yields qualitative
+        seeded demo (a single hybrid flagship study) yields qualitative
         (green), survey (blue), AND decision (bordeaux) rows, each opening a
         ready standalone document."""
         from app.models.company import Company
@@ -688,7 +699,9 @@ class TestDemoShowcaseBackfill:
         new_ids = []
         keep_order = []
         for q in questions:
-            if q.sort_order in (2, 4, 5):  # stack_size / price_rise / browse
+            # stack_size / price_rise / browse / satisfaction / must_keep —
+            # everything the legacy five-question instrument didn't have.
+            if q.sort_order in (2, 4, 5, 6, 9):
                 new_ids.append(q.id)
             else:
                 keep_order.append(q)
@@ -751,17 +764,30 @@ class TestDemoShowcaseBackfill:
         )
         assert [q.type for q in questions] == [
             "mc_single", "mc_multi", "mc_single",
-            "likert", "likert", "likert",
-            "nps", "open_text",
+            "likert", "likert", "likert", "likert",
+            "nps", "open_text", "short_text",
         ]
-        # …and every seeded response answered the three new questions.
-        new_ids = [q.id for q in questions if q.sort_order in (2, 4, 5)]
+        # …and the seeded responses answered the newly inserted questions
+        # (every non-None slot in the cohort plans; optional questions may
+        # be skipped).
+        from app.services.demo_seeder import DEMO_SURVEY_EN
+
+        new_keys = ["stack_size", "price_rise", "browse", "satisfaction", "must_keep"]
+        expected = 0
+        for cohort in DEMO_SURVEY_EN["cohorts"]:
+            for key in new_keys:
+                plan = cohort["answers"][key]
+                expected += sum(
+                    1 for i in range(cohort["count"]) if plan[i % len(plan)] is not None
+                )
+        new_sorts = (2, 4, 5, 6, 9)
+        new_ids = [q.id for q in questions if q.sort_order in new_sorts]
         answers = (
             db_session.query(SurveyResponseAnswer)
             .filter(SurveyResponseAnswer.question_id.in_(new_ids))
             .count()
         )
-        assert answers == 44 * 3
+        assert answers == expected
 
         # Decision report matches the current fixture again.
         analysis = (
