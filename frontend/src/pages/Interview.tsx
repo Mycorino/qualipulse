@@ -213,6 +213,7 @@ export default function Interview() {
   const [screeningRetryCount, setScreeningRetryCount] = useState(0);
   const [transcriptDismissed, setTranscriptDismissed] = useState(false);
   const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+  const [transcriptFading, setTranscriptFading] = useState(false);
   const [skipBtnReady, setSkipBtnReady] = useState(false);
   const skipBtnTimerRef = useRef<number | null>(null);
   const beepFiredRef = useRef(false);
@@ -226,6 +227,20 @@ export default function Interview() {
   const collectedRef = useRef<QuestionnaireResult | null>(null);
   const { isRecording, error: recError, startRecording, stopRecording } =
     useAudioRecorder();
+
+  // Auto-dismiss the "We heard" flash so the previous answer doesn't linger
+  // under the next question: start fading at 6.5s, gone at 7.5s. Paused while
+  // the participant has expanded it to read the full transcript.
+  useEffect(() => {
+    if (!showTranscript || !lastTranscript || transcriptDismissed || transcriptExpanded) return;
+    const fadeTimer = window.setTimeout(() => setTranscriptFading(true), 6500);
+    const hideTimer = window.setTimeout(() => setTranscriptDismissed(true), 7500);
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(hideTimer);
+      setTranscriptFading(false);
+    };
+  }, [showTranscript, lastTranscript, transcriptDismissed, transcriptExpanded]);
 
   // ── Session / URL handling on load ──────────────────────────────────────
 
@@ -935,6 +950,7 @@ export default function Interview() {
           setShowTranscript(true);
           setTranscriptDismissed(false);
           setTranscriptExpanded(false);
+          setTranscriptFading(false);
         }
         // PF-3: surface the engine's coaching hint (or clear it if Claude
         // decided the participant is back on track). Stays dismissed if the
@@ -2046,7 +2062,7 @@ export default function Interview() {
               ? lastTranscript.slice(0, TRUNCATE).trimEnd() + "…"
               : lastTranscript;
             return (
-              <div className="transcript-flash">
+              <div className={`transcript-flash${transcriptFading ? " transcript-flash--fading" : ""}`}>
                 <span className="transcript-flash-label">{t("interview.transcript")}</span>
                 <span className="transcript-flash-text">"{display}"</span>
                 {isLong && (
@@ -2132,7 +2148,10 @@ export default function Interview() {
               <>
                 <button
                   className={`record-btn ${ttsPlaying ? "record-btn--waiting" : ttsEnded ? "record-btn--ready" : ""}`}
-                  onClick={ttsPlaying ? undefined : startRecording}
+                  onClick={ttsPlaying ? undefined : () => {
+                    setTranscriptDismissed(true);
+                    startRecording();
+                  }}
                   disabled={ttsPlaying}
                   title={ttsPlaying ? t("interview.waitForQuestion") : t("interview.tapToRecord")}
                   aria-label={ttsPlaying ? t("interview.waitForQuestion") : t("interview.tapToRecord")}
