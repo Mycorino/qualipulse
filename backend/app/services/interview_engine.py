@@ -42,6 +42,15 @@ Voice & stance:
 the last time", "what was happening when".
 - Single concept per question. No double-barrelled questions, no preambles longer than one sentence.
 
+Continuity (critical — the participant hears every turn):
+- The greeting belongs to the OPENING question only. You have already greeted them. NEVER open a later \
+turn with a fresh welcome ("thanks for being here", "merci d'être là", "to start / pour commencer"). \
+You are mid-conversation — continue it.
+- NEVER ask a question that has already been asked. Read the conversation so far and the coverage list: \
+any guide topic already covered is done. Do not re-ask it, even reworded.
+- When you move to the next guide question, move to the SPECIFIC next uncovered one named in the coverage \
+block — never loop back to an earlier topic.
+
 Decision rules (you MUST output one of three actions):
 
 1. follow_up — ask a probing question that stays on the current topic. Choose this when ANY of:
@@ -376,6 +385,37 @@ def get_interview_context(
     asked_indices = {t.question_index for t in turns if t.question_index is not None}
     current_question_index = max(asked_indices) if asked_indices else 0
 
+    # Coverage map — turns store the GLOBAL ordinal (position in the flattened
+    # guide) in question_index, but the guide the model reads is numbered
+    # per-section, so the model can't tell where it is. Spell it out: which
+    # guide questions are already covered (never re-ask) and the single next
+    # uncovered one to advance to. This prevents the model re-greeting +
+    # re-asking the opening question.
+    covered_global = sorted(
+        i for i in asked_indices if i is not None and 0 <= i < total_questions
+    )
+    covered_lines = [
+        f"  ✓ Guide question {i + 1}: {guide_questions[i].main_question}"
+        for i in covered_global
+    ]
+    next_global = current_question_index + 1
+    if next_global < total_questions:
+        next_line = (
+            f"  → Guide question {next_global + 1}: "
+            f"{guide_questions[next_global].main_question}"
+        )
+    else:
+        next_line = "  (all guide questions have been asked — no next question remains)"
+    coverage_block = (
+        "<coverage>\n"
+        "Already asked — NEVER ask any of these again (not even reworded), and "
+        "do NOT re-open with a greeting:\n"
+        + ("\n".join(covered_lines) if covered_lines else "  (none yet)")
+        + "\n\nWhen you choose next_question, the ONLY topic to move to is:\n"
+        + next_line
+        + "\n</coverage>"
+    )
+
     # all_questions_done is True only when the last guide question has been both
     # asked AND has a participant response (i.e. it's been answered, not just reached).
     last_index = total_questions - 1
@@ -404,6 +444,7 @@ def get_interview_context(
     return {
         "conversation_history": _build_conversation_history(turns),
         "interview_guide": _build_interview_guide_str(project),
+        "coverage_block": coverage_block,
         "elapsed_minutes": elapsed,
         "current_question_index": current_question_index,
         "total_minutes": project.interview_duration_minutes,
@@ -427,6 +468,7 @@ def decide_next_action(
     total_minutes: int,
     all_questions_done: bool,
     total_questions: int = 0,
+    coverage_block: str = "",
     research_objective: str | None = None,
     language: str | None = None,
     short_answer_state: dict | None = None,
@@ -452,16 +494,30 @@ def decide_next_action(
     questions_answered = current_question_index + 1  # 1-based count of questions reached
     remaining_minutes = max(0.0, total_minutes - elapsed_minutes)
 
-    # ── Pacing budget ──────────────────────────────────────────────────────
-    # How far ahead/behind are we relative to an even spread of questions?
+    # ── Pacing budget (adaptive) ───────────────────────────────────────────
+    # Two views of pace:
+    #   • pace_delta — how many questions ahead/behind an even time-spread we
+    #     are, in question units. Drives the "behind" guards and stays
+    #     consistent with the server-side pace guard further down.
+    #   • adaptive minutes-per-question — the REMAINING time divided across the
+    #     REMAINING guide questions (current one included). Reaching a question
+    #     early leaves each remaining question a bigger slice than the
+    #     even-spread baseline; that surplus should be spent going deeper HERE,
+    #     not racing ahead. Otherwise the interview burns through its guide and
+    #     strands the final question with a big block of leftover time it can
+    #     only fill with follow-ups (it can't advance, and the close gate holds
+    #     until 80% of the time is used).
     if total_questions > 0 and total_minutes > 0:
-        minutes_per_question = total_minutes / total_questions
-        expected_q_index = elapsed_minutes / minutes_per_question
+        baseline_minutes_per_question = total_minutes / total_questions
+        expected_q_index = elapsed_minutes / baseline_minutes_per_question
         pace_delta = current_question_index - expected_q_index  # positive = ahead
         questions_remaining = max(0, total_questions - current_question_index - 1)
-        slack_minutes = remaining_minutes - (questions_remaining * minutes_per_question)
+        adaptive_minutes_per_question = remaining_minutes / (questions_remaining + 1)
+        pace_ratio = adaptive_minutes_per_question / baseline_minutes_per_question
+        slack_minutes = remaining_minutes - (questions_remaining * baseline_minutes_per_question)
     else:
         pace_delta = 0.0
+        pace_ratio = 1.0
         slack_minutes = remaining_minutes
 
     if pace_delta < -1.5:
@@ -476,10 +532,16 @@ def decide_next_action(
             "Only ask a follow-up if the participant's answer was genuinely too brief or unclear. "
             "Otherwise move to the next main question now."
         )
-    elif pace_delta > 1.0:
+    elif pace_ratio >= 1.25:
+        # Comfortably ahead: each remaining question can afford well above its
+        # even-spread share. Prefer depth on the current topic rather than
+        # advancing, so the surplus is spent across topics instead of pooling
+        # on the last question at the end.
         pacing_instruction = (
-            "PACING: You are ahead of schedule — you have time to explore. "
-            "Feel free to ask a follow-up question if it would surface deeper insight."
+            "PACING: You are ahead of schedule — each remaining question has extra time. "
+            "PREFER to stay on the current question and probe deeper (a concrete example, "
+            "the story behind the answer, the emotion underneath) rather than advancing. "
+            "Only move to the next main question once this topic is genuinely exhausted."
         )
     else:
         fu_word = "may" if slack_minutes > 0 else "should not"
@@ -549,6 +611,7 @@ WHY: generic answer with no behaviour or example.
         f"{objective_block}"
         f"{participant_block}"
         f"<guide>\n{interview_guide_str}\n</guide>\n\n"
+        f"{coverage_block + chr(10) + chr(10) if coverage_block else ''}"
         f"<conversation>\n{conversation_history}\n</conversation>\n\n"
         f"<state>\n"
         f"- Questions reached: {questions_answered} of {total_questions}\n"
@@ -1124,6 +1187,7 @@ def process_interview_turn(
         total_minutes=context["total_minutes"],
         all_questions_done=context["all_questions_done"],
         total_questions=context["total_questions"],
+        coverage_block=context.get("coverage_block", ""),
         research_objective=_proj.research_objective,
         language=context["language"],
         short_answer_state=short_answer_state,

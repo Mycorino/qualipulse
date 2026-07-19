@@ -14,6 +14,30 @@ logger = logging.getLogger(__name__)
 
 _FILLERS = {"yes", "no", "ok", "okay", "sure", "yep", "nope", "yeah", "nah", "uh", "um"}
 
+# Per-label fallback summary, used only when the model returns a blank summary.
+# Persisting a non-empty summary keeps the "summary set ⇔ assessment complete"
+# invariant that both the re-run guard and the frontend panel rely on.
+_FALLBACK_SUMMARY: dict[str, dict[str, str]] = {
+    "en": {
+        "low": "Automated review: limited depth — mostly short or evasive answers.",
+        "fair": "Automated review: some substance but heavy on generics.",
+        "good": "Automated review: usable evidence with at least one concrete example.",
+        "strong": "Automated review: rich, specific answers with concrete examples.",
+    },
+    "fr": {
+        "low": "Évaluation automatique : profondeur limitée — réponses courtes ou évasives.",
+        "fair": "Évaluation automatique : un peu de matière mais beaucoup de généralités.",
+        "good": "Évaluation automatique : témoignage exploitable, au moins un exemple concret.",
+        "strong": "Évaluation automatique : réponses riches et précises, exemples concrets.",
+    },
+}
+
+
+def _fallback_summary(label: str, language: str) -> str:
+    lang = (language or "en").lower()
+    table = _FALLBACK_SUMMARY.get(lang, _FALLBACK_SUMMARY["en"])
+    return table.get(label, table["fair"])
+
 
 def _score_turns(turns) -> tuple[float | None, str | None]:
     responses = [
@@ -76,8 +100,10 @@ def run_ai_quality_assessment(
     This function is designed to be fire-and-forget: it catches all exceptions
     internally and never raises, so it can be called safely from any context.
 
-    If the participant already has a quality_summary, the function returns
-    immediately (assessments are never re-run).
+    If the participant already has a non-empty quality_summary, the function
+    returns immediately (assessments are never re-run). A blank summary is
+    treated as "not yet assessed" so a degenerate result can't lock the
+    participant into a permanent half-assessed state.
     """
     try:
         _run_ai_quality_assessment_inner(participant_id, db, language)
@@ -102,8 +128,12 @@ def _run_ai_quality_assessment_inner(
     if participant is None:
         return
 
-    # Already assessed — never re-run
-    if participant.quality_summary is not None:
+    # Already assessed — never re-run. Guard on a *non-empty* summary: an
+    # empty string used to satisfy the old `is not None` check and lock the
+    # participant into a permanent "assessment in progress" state (the header
+    # badge reads quality_label, the panel reads quality_summary — a blank
+    # summary lit the badge while the panel spun forever).
+    if participant.quality_summary:
         return
 
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
@@ -211,9 +241,18 @@ Return ONLY a JSON object — no markdown fences, no preamble:
     result = json.loads(raw)
 
     # Persist all 7 fields
+    label = result.get("quality_label", "fair")
+    # Never persist a blank summary — it would relight the "in progress" panel
+    # while the badge (which reads quality_label) shows a rating. Fall back to
+    # the first strength, then a label-derived line, so the assessment is
+    # always internally consistent.
+    summary = (result.get("summary") or "").strip()
+    if not summary:
+        strengths = [s for s in (result.get("strengths") or []) if s and s.strip()]
+        summary = strengths[0].strip() if strengths else _fallback_summary(label, language)
     participant.quality_score = float(result.get("quality_score", 0))
-    participant.quality_label = result.get("quality_label", "fair")
-    participant.quality_summary = result.get("summary", "")
+    participant.quality_label = label
+    participant.quality_summary = summary
     participant.quality_strengths = json.dumps(result.get("strengths", []))
     participant.quality_issues = json.dumps(result.get("issues", []))
     participant.avg_response_words = round(avg_words, 1)

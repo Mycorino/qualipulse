@@ -432,6 +432,7 @@
     "assessing": "Assessing…",
     "hide": "Hide",
     "qualityPending": "Quality assessment is running — refresh in a moment.",
+    "qualityNoSummary": "Assessment complete — no written summary was generated.",
     "wordsPerAnswer": "~{{count}} words/answer",
     "shortAnswerPct": "{{pct}}% short answers",
     "strengths": "Strengths",

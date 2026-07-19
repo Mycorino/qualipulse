@@ -3048,14 +3048,22 @@ export default function ProjectDetail() {
 
                     {/* ── Right: Tools sidebar ── */}
                     <div className="transcript-sidebar">
-                      {/* Quality Assessment panel */}
-                      {selectedParticipant.quality_summary ? (
+                      {/* Quality Assessment panel — treat the assessment as
+                          done once a quality_label exists (that's what the
+                          header badge reads). Keying the pending state off
+                          quality_summary alone let a blank summary spin
+                          "in progress" forever while the badge showed a rating. */}
+                      {(selectedParticipant.quality_summary || selectedParticipant.quality_label) ? (
                         <details className="sidebar-panel" open>
                           <summary className="sidebar-panel__header">
                             <span className="sidebar-panel__title">{tProject("responses.qualityAssessment")}</span>
                           </summary>
                           <div className="sidebar-panel__body">
-                            <p className="sidebar-panel__summary">{selectedParticipant.quality_summary}</p>
+                            {selectedParticipant.quality_summary ? (
+                              <p className="sidebar-panel__summary">{selectedParticipant.quality_summary}</p>
+                            ) : (
+                              <p className="sidebar-panel__summary sidebar-panel__pending">{tProject("responses.qualityNoSummary")}</p>
+                            )}
                             {selectedParticipant.avg_response_words != null && (
                               <div className="sidebar-panel__stats">
                                 <div className="sidebar-panel__stat">
