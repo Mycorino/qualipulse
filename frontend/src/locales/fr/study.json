@@ -23,7 +23,7 @@
       "noAnalysisYet": "Pas encore d'analyse",
       "surveyResponses_one": "{{count}} réponse",
       "surveyResponses_other": "{{count}} réponses",
-      "memosLabel": "Mémos de décision — synthèse de 2 études analysées ou plus (accueil Études)"
+      "memosLabel": "Mémos de décision, synthèse de 2 études analysées ou plus (accueil Études)"
     },
     "toast": {
       "surveyCreateFailed": "Impossible de créer le questionnaire",
@@ -59,11 +59,11 @@
       "inProgress": "{{count}} en cours",
       "links_one": "{{count}} lien",
       "links_other": "{{count}} liens",
-      "empty": "Aucune série d'entretiens pour l'instant. Ajoutez une série d'entretiens pour échanger en profondeur avec les répondants — ou utilisez le Screener Bridge depuis le tableau de bord d'un questionnaire pour en créer une automatiquement à partir d'un segment filtré.",
+      "empty": "Aucune série d'entretiens pour l'instant. Ajoutez une série d'entretiens pour échanger en profondeur avec les répondants, ou utilisez le Screener Bridge depuis le tableau de bord d'un questionnaire pour en créer une automatiquement à partir d'un segment filtré.",
       "addRound": "+ Ajouter une série d'entretiens"
     },
     "participants": {
-      "intro": "L'identité du participant est la clé de jointure entre les instruments — la même personne à travers les réponses au questionnaire et les transcriptions d'entretiens.",
+      "intro": "L'identité du participant est la clé de jointure entre les instruments, la même personne à travers les réponses au questionnaire et les transcriptions d'entretiens.",
       "surveyCompleters": "Questionnaires terminés",
       "interviewCompleters": "Entretiens terminés",
       "inferenceThreshold": "Seuil d'inférence",
@@ -71,16 +71,16 @@
     },
     "report": {
       "loading": "Chargement…",
-      "scopeNote": "Couvre toute l'étude — chiffres du questionnaire et verbatims d'entretiens réunis dans un seul rapport. Chaque série d'entretiens dispose aussi de sa propre analyse dans son onglet Analyse.",
+      "scopeNote": "Couvre toute l'étude, chiffres du questionnaire et verbatims d'entretiens réunis dans un seul rapport. Chaque série d'entretiens dispose aussi de sa propre analyse dans son onglet Analyse.",
       "generateHeadline": "Générer le rapport de thèmes quantifiés",
-      "generateBody": "Combine les agrégats du questionnaire avec les transcriptions d'entretiens en thèmes qui associent ce que les gens ont dit à la fréquence à laquelle ils l'ont dit. Chaque thème s'accompagne d'une prochaine étape recommandée et d'une pastille de confiance — le même contrat méthodologique utilisé partout ailleurs dans l'espace de travail.",
-      "lowResponseWarning_one": "⚠ Vous avez {{count}} réponse au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
-      "lowResponseWarning_other": "⚠ Vous avez {{count}} réponses au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs » — recueillez plus de réponses pour des preuves plus solides.",
+      "generateBody": "Combine les agrégats du questionnaire avec les transcriptions d'entretiens en thèmes qui associent ce que les gens ont dit à la fréquence à laquelle ils l'ont dit. Chaque thème s'accompagne d'une prochaine étape recommandée et d'une pastille de confiance, le même contrat méthodologique utilisé partout ailleurs dans l'espace de travail.",
+      "lowResponseWarning_one": "⚠ Vous avez {{count}} réponse au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs », recueillez plus de réponses pour des preuves plus solides.",
+      "lowResponseWarning_other": "⚠ Vous avez {{count}} réponses au questionnaire. Les thèmes en dessous de n=30 seront marqués « indicatifs », recueillez plus de réponses pour des preuves plus solides.",
       "generating": "Génération… (≈10 s)",
       "generate": "Générer le rapport",
       "versionEyebrow": "Thèmes quantifiés · v{{version}}",
       "generatedAt": "Généré le {{date}}",
-      "generatedAtUnknown": "Généré le —",
+      "generatedAtUnknown": "Date de génération inconnue",
       "exportPdf": "Ouvrir le rapport complet (PDF)",
       "exportPdfTitle": "Ouvrir le rapport complet prêt à imprimer dans un nouvel onglet",
       "exportPdfLoading": "Préparation…",
@@ -103,13 +103,13 @@
       "metaSeparator": " · ",
       "verdict": "Verdict",
       "gaps": "Ce que nous ne savons pas encore",
-      "embedFailed": "L'aperçu du rapport n'a pas pu être chargé — utilisez « Ouvrir le rapport complet (PDF) » pour l'ouvrir dans un onglet.",
+      "embedFailed": "L'aperçu du rapport n'a pas pu être chargé, utilisez « Ouvrir le rapport complet (PDF) » pour l'ouvrir dans un onglet.",
       "embedTitle": "Rapport d'étude méthodes mixtes"
     },
     "validationBanner": {
       "title": "Validation des thèmes · {{status}}",
       "progress": "{{completed}} répondants sur {{total}} ont terminé",
-      "draftSuffix": " — le questionnaire est à l'état de brouillon, partagez-le pour commencer la collecte",
+      "draftSuffix": ", le questionnaire est à l'état de brouillon, partagez-le pour commencer la collecte",
       "editPublish": "Modifier + publier →",
       "openSurvey": "Ouvrir le questionnaire →"
     },
@@ -146,14 +146,14 @@
         "create_survey": "Créez un questionnaire de sélection pour commencer à collecter des réponses.",
         "publish_survey": "Publiez votre questionnaire pour commencer à collecter des réponses.",
         "share_survey_link": "Partagez le lien du questionnaire pour recueillir les premières réponses.",
-        "collect_more_responses_one": "Continuez la collecte — encore {{count}} réponse avant le seuil d'inférence.",
-        "collect_more_responses_other": "Continuez la collecte — encore {{count}} réponses avant le seuil d'inférence.",
+        "collect_more_responses_one": "Continuez la collecte, encore {{count}} réponse avant le seuil d'inférence.",
+        "collect_more_responses_other": "Continuez la collecte, encore {{count}} réponses avant le seuil d'inférence.",
         "open_dashboard_invite": "Ouvrez les résultats du questionnaire pour filtrer les répondants et les inviter à des entretiens IA.",
         "invite_interviews": "Invitez les répondants les plus pertinents à des entretiens IA depuis les résultats du questionnaire.",
         "collect_more_interviews_one": "Réalisez encore {{count}} entretien avant de générer le rapport de l'étude.",
         "collect_more_interviews_other": "Réalisez encore {{count}} entretiens avant de générer le rapport de l'étude.",
         "generate_report": "Générez le rapport de l'étude pour croiser les chiffres du questionnaire et les verbatims d'entretiens.",
-        "open_report": "Votre rapport mixte est prêt — ouvrez-le pour voir ce que disent les données."
+        "open_report": "Votre rapport mixte est prêt, ouvrez-le pour voir ce que disent les données."
       }
     },
     "checklist": {
@@ -164,7 +164,7 @@
       "responsesCollected": "Réponses recueillies",
       "completed": "{{count}} terminés",
       "inferenceThreshold": "Seuil d'inférence atteint",
-      "segmentCutsAllowed": "n≥30 — découpages par segment autorisés",
+      "segmentCutsAllowed": "n≥30, découpages par segment autorisés",
       "moreResponsesNeeded": "{{count}} réponses supplémentaires nécessaires",
       "interviewsCompleted": "Entretiens terminés",
       "mixedMethodsReport": "Rapport méthodes mixtes",
@@ -183,8 +183,8 @@
     },
     "tour": {
       "eyebrow": "Visite de la démo",
-      "instrumentsTab_title": "Vous êtes dans l'espace de l'étude",
-      "instrumentsTab_body": "Une étude peut réunir plusieurs instruments — ici, un sondage et une série d'entretiens.",
+      "instrumentsTab_title": "Une étude regroupe vos instruments",
+      "instrumentsTab_body": "Une étude peut réunir plusieurs instruments, ici, un sondage et une série d'entretiens.",
       "instrumentsTab_clickHint": "Cliquez sur l'onglet Instruments",
       "interviewRound_title": "La série d'entretiens",
       "interviewRound_body": "Elle rassemble les conversations menées par l'IA : guide, transcriptions et analyse.",
@@ -216,7 +216,7 @@
     "themeHeader": "Thème",
     "columnN": "n={{count}}",
     "smallNTitle": "Segment trop petit pour l'inférence (n={{columnN}} < {{minN}}). Seul le décompte est affiché.",
-    "empty": "—"
+    "empty": "-"
   },
   "prioritization": {
     "ariaLabel": "Recommandations positionnées selon l'impact et la faisabilité",
@@ -237,14 +237,14 @@
   },
   "verbatim": {
     "audioLabel": "Audio du verbatim",
-    "audioLabelNamed": "Audio du verbatim — {{name}}"
+    "audioLabelNamed": "Audio du verbatim, {{name}}"
   },
   "reportScroll": {
     "tocLabel": "Table des matières du rapport"
   },
   "methodology": {
     "ariaLabel": "Méthodologie de l'étude",
-    "smallNWarning": "⚠ Échantillon insuffisant pour l'inférence — n={{n}} (min {{minN}})"
+    "smallNWarning": "⚠ Échantillon insuffisant pour l'inférence, n={{n}} (min {{minN}})"
   },
   "compareChips": {
     "ariaLabel": "Filtrer par segment",

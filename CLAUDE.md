@@ -58,6 +58,32 @@ A SaaS platform that lets companies create AI-driven voice interviews. Researche
 - **TTS:** OpenAI TTS (`tts-1`, voice: `alloy`)
 - **Infra:** GCP Cloud Run (auto-scaling), Neon PostgreSQL, Cloudflare R2 (audio storage)
 
+## Copy Conventions
+
+**No em dashes (`—`) — or any "double dash" — in user-facing copy.** The em
+dash reads as an AI tell and is banned from all product copy: the i18n locale
+files under `frontend/src/locales/**/*.json`, marketing/blog copy, and email
+templates. This also covers the visually-similar en dash (`–`) and the literal
+double hyphen (`--`) in prose.
+
+Rewrite instead of transliterating:
+- `word — word` → a comma (`word, word`) in the common case, or a colon where
+  the dash introduces/explains something. Pick whichever reads naturally; don't
+  mechanically swap the glyph.
+- A standalone `—` used as an empty-cell / "none" placeholder → a single
+  hyphen `-` (or better, real words like "None").
+- A leading `— hint` label separator → drop the dash entirely.
+
+**Scope carve-outs (leave these alone):** a single hyphen in compound words
+(`follow-up`, `mixed-methods`) is fine — it is not a dash. Do **not** strip
+`--` from code: CLI flags (`--dry-run`), SQL, and shell examples in comments
+are legitimate. The ban is about *prose the user reads*, not code.
+
+When editing an AI system prompt that shapes a user-facing deliverable
+(analysis reports, interview questions, decision memos), add an explicit
+"never use em dashes; use commas or colons" instruction so the model doesn't
+reintroduce them downstream.
+
 ## Repository Layout
 ```
 auto-interview/

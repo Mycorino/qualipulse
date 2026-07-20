@@ -23,7 +23,7 @@
       "noAnalysisYet": "No analysis yet",
       "surveyResponses_one": "{{count}} response",
       "surveyResponses_other": "{{count}} responses",
-      "memosLabel": "Decision memos — synthesize 2+ analysed studies (Studies home)"
+      "memosLabel": "Decision memos, synthesize 2+ analysed studies (Studies home)"
     },
     "toast": {
       "surveyCreateFailed": "Could not create the survey",
@@ -59,11 +59,11 @@
       "inProgress": "{{count}} in progress",
       "links_one": "{{count}} link",
       "links_other": "{{count}} links",
-      "empty": "No interview track yet. Add an interview round to talk to respondents in depth — or use the Screener Bridge from a survey dashboard to auto-create one from a filtered segment.",
+      "empty": "No interview track yet. Add an interview round to talk to respondents in depth, or use the Screener Bridge from a survey dashboard to auto-create one from a filtered segment.",
       "addRound": "+ Add interview round"
     },
     "participants": {
-      "intro": "Participant identity is the join key across instruments — the same person across survey answers and interview transcripts.",
+      "intro": "Participant identity is the join key across instruments, the same person across survey answers and interview transcripts.",
       "surveyCompleters": "Survey completers",
       "interviewCompleters": "Interview completers",
       "inferenceThreshold": "Inference threshold",
@@ -71,16 +71,16 @@
     },
     "report": {
       "loading": "Loading…",
-      "scopeNote": "Covers the whole study — survey numbers and interview evidence in one report. Each interview round also has its own analysis in its Analysis tab.",
+      "scopeNote": "Covers the whole study, survey numbers and interview evidence in one report. Each interview round also has its own analysis in its Analysis tab.",
       "generateHeadline": "Generate the Quantified Themes report",
-      "generateBody": "Combines survey aggregates with interview transcripts into themes that pair what people said with how often they said it. Each theme carries a recommended next step and a confidence pill — the same methodology contract used everywhere else in the workspace.",
-      "lowResponseWarning_one": "⚠ You have {{count}} survey response. Themes below n=30 will be marked \"directional\" — collect more responses for stronger evidence.",
-      "lowResponseWarning_other": "⚠ You have {{count}} survey responses. Themes below n=30 will be marked \"directional\" — collect more responses for stronger evidence.",
+      "generateBody": "Combines survey aggregates with interview transcripts into themes that pair what people said with how often they said it. Each theme carries a recommended next step and a confidence pill, the same methodology contract used everywhere else in the workspace.",
+      "lowResponseWarning_one": "⚠ You have {{count}} survey response. Themes below n=30 will be marked \"directional\", collect more responses for stronger evidence.",
+      "lowResponseWarning_other": "⚠ You have {{count}} survey responses. Themes below n=30 will be marked \"directional\", collect more responses for stronger evidence.",
       "generating": "Generating… (≈10s)",
       "generate": "Generate report",
       "versionEyebrow": "Quantified Themes · v{{version}}",
       "generatedAt": "Generated {{date}}",
-      "generatedAtUnknown": "Generated —",
+      "generatedAtUnknown": "Generation date unknown",
       "exportPdf": "Open full report (PDF)",
       "exportPdfTitle": "Open the full print-ready report in a new tab",
       "exportPdfLoading": "Preparing…",
@@ -103,13 +103,13 @@
       "metaSeparator": " · ",
       "verdict": "Verdict",
       "gaps": "What we don't know yet",
-      "embedFailed": "The report preview could not be loaded — use “Open full report (PDF)” to open it in a new tab.",
+      "embedFailed": "The report preview could not be loaded, use “Open full report (PDF)” to open it in a new tab.",
       "embedTitle": "Mixed-methods study report"
     },
     "validationBanner": {
       "title": "Theme validation · {{status}}",
       "progress": "{{completed}} of {{total}} respondents completed",
-      "draftSuffix": " — survey is in draft, share it to start collecting",
+      "draftSuffix": ", survey is in draft, share it to start collecting",
       "editPublish": "Edit + publish →",
       "openSurvey": "Open survey →"
     },
@@ -146,14 +146,14 @@
         "create_survey": "Create a screener survey to start collecting responses.",
         "publish_survey": "Publish your survey to start collecting responses.",
         "share_survey_link": "Share your survey link to collect the first responses.",
-        "collect_more_responses_one": "Keep collecting — {{count}} more response until inference-grade thresholds.",
-        "collect_more_responses_other": "Keep collecting — {{count}} more responses until inference-grade thresholds.",
+        "collect_more_responses_one": "Keep collecting, {{count}} more response until inference-grade thresholds.",
+        "collect_more_responses_other": "Keep collecting, {{count}} more responses until inference-grade thresholds.",
         "open_dashboard_invite": "Open the survey results to filter respondents and invite them to AI interviews.",
         "invite_interviews": "Invite high-signal respondents to AI interviews from the survey results.",
         "collect_more_interviews_one": "Conduct {{count}} more interview before generating the study report.",
         "collect_more_interviews_other": "Conduct {{count}} more interviews before generating the study report.",
         "generate_report": "Generate the study report to combine survey numbers and interview evidence.",
-        "open_report": "Your mixed-methods report is ready — open it to see what the data says."
+        "open_report": "Your mixed-methods report is ready, open it to see what the data says."
       }
     },
     "checklist": {
@@ -164,7 +164,7 @@
       "responsesCollected": "Responses collected",
       "completed": "{{count}} completed",
       "inferenceThreshold": "Inference threshold reached",
-      "segmentCutsAllowed": "n≥30 — segment cuts allowed",
+      "segmentCutsAllowed": "n≥30, segment cuts allowed",
       "moreResponsesNeeded": "{{count}} more responses needed",
       "interviewsCompleted": "Interviews completed",
       "mixedMethodsReport": "Mixed-methods report",
@@ -183,11 +183,11 @@
     },
     "tour": {
       "eyebrow": "Demo tour",
-      "instrumentsTab_title": "You're in the study workspace",
-      "instrumentsTab_body": "A study can hold several instruments — this demo pairs a survey with an interview round. Open the Instruments tab to see them.",
+      "instrumentsTab_title": "A study groups your instruments",
+      "instrumentsTab_body": "A study can hold several instruments, here, a survey and an interview round.",
       "instrumentsTab_clickHint": "Click the Instruments tab",
       "interviewRound_title": "The interview round",
-      "interviewRound_body": "The interview round is where the AI-led conversations live — the guide, the transcripts and the analysis. Open it to look around.",
+      "interviewRound_body": "It gathers the AI-led conversations: guide, transcripts and analysis.",
       "interviewRound_clickHint": "Click the interview round",
       "skip": "Skip tour"
     }
@@ -216,7 +216,7 @@
     "themeHeader": "Theme",
     "columnN": "n={{count}}",
     "smallNTitle": "Segment too small for inference (n={{columnN}} < {{minN}}). Showing count instead.",
-    "empty": "—"
+    "empty": "-"
   },
   "prioritization": {
     "ariaLabel": "Recommendations plotted by impact and feasibility",
@@ -237,14 +237,14 @@
   },
   "verbatim": {
     "audioLabel": "Verbatim audio",
-    "audioLabelNamed": "Verbatim audio — {{name}}"
+    "audioLabelNamed": "Verbatim audio, {{name}}"
   },
   "reportScroll": {
     "tocLabel": "Report table of contents"
   },
   "methodology": {
     "ariaLabel": "Study methodology",
-    "smallNWarning": "⚠ Insufficient sample for inference — n={{n}} (min {{minN}})"
+    "smallNWarning": "⚠ Insufficient sample for inference, n={{n}} (min {{minN}})"
   },
   "compareChips": {
     "ariaLabel": "Filter by segment",

@@ -15,7 +15,7 @@
   "hero": {
     "eyebrow": "AI-moderated voice interviews",
     "title": "Your customer interviews, run by an AI voice interviewer. Done by Friday.",
-    "sub": "QualiPulse <b>converses with your participants like a trained researcher</b> — a real spoken exchange that sharpens every answer — then delivers a <b>clear synthesis backed by verbatim quotes</b>. No scheduling, no moderating, no transcription weekend.",
+    "sub": "QualiPulse <b>converses with your participants like a trained researcher</b>, a real spoken exchange that sharpens every answer, then delivers a <b>clear synthesis backed by verbatim quotes</b>. No scheduling, no moderating, no transcription weekend.",
     "cta": "Start free with 3 interviews",
     "secondaryCta": "See the evidence trail",
     "facts": [
@@ -69,7 +69,7 @@
       {
         "num": "Step 4",
         "title": "Analyse the results",
-        "desc": "Themes, verbatim quotes and recommendations — every claim walks back to the exact quote it came from."
+        "desc": "Themes, verbatim quotes and recommendations, every claim walks back to the exact quote it came from."
       }
     ],
     "guideLines": [
@@ -142,7 +142,7 @@
       },
       {
         "title": "Available in multiple languages",
-        "desc": "Interviews in English, French, German, Spanish, Portuguese and Italian — and any transcript can be machine-translated as a reading aid."
+        "desc": "Interviews in English, French, German, Spanish, Portuguese and Italian, and any transcript can be machine-translated as a reading aid."
       }
     ]
   },
@@ -283,7 +283,7 @@
       {
         "num": "02",
         "title": "Qualitative interviews, out loud",
-        "desc": "The AI drafts your interview guide and screening questions, then converses with each participant like a researcher — a spoken exchange that sharpens every answer, in 6 languages."
+        "desc": "The AI drafts your interview guide and screening questions, then converses with each participant like a researcher, a spoken exchange that sharpens every answer, in 6 languages."
       },
       {
         "num": "03",

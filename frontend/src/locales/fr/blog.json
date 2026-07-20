@@ -1,8 +1,8 @@
 {
   "list": {
-    "metaTitle": "Blog — QualiPulse",
+    "metaTitle": "Blog, QualiPulse",
     "metaDescription": "Conseils et analyses sur la recherche qualitative, les entretiens assistés par IA et la découverte produit, par l'équipe QualiPulse.",
-    "ogTitle": "Blog — QualiPulse",
+    "ogTitle": "Blog, QualiPulse",
     "ogDescription": "Conseils et analyses sur la recherche qualitative, les entretiens assistés par IA et la découverte produit.",
     "heroTitle": "Le blog QualiPulse",
     "heroSubtitle": "Des guides concrets pour mener votre recherche qualitative, conduire des entretiens assistés par IA et transformer la voix de vos utilisateurs en décisions produit.",
@@ -16,7 +16,7 @@
     "pageOf": "Page {{page}} sur {{totalPages}}"
   },
   "post": {
-    "metaTitle": "{{title}} — Blog QualiPulse",
+    "metaTitle": "{{title}}, Blog QualiPulse",
     "loading": "Chargement…",
     "notFoundTitle": "Article introuvable",
     "backToBlog": "Retour au blog",

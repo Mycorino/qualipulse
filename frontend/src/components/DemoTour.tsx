@@ -207,9 +207,19 @@ interface DemoTourProps {
   currentTab: TourTab;
   goToTab: (tab: TourTab) => void;
   onExit: () => void;
+  /** Finale: open the print/PDF-ready findings report (new tab). Tour stays open. */
+  onOpenReport: () => void;
+  /** Finale: end the tour and return to the Studies home. */
+  onGoToDashboard: () => void;
 }
 
-export default function DemoTour({ currentTab, goToTab, onExit }: DemoTourProps) {
+export default function DemoTour({
+  currentTab,
+  goToTab,
+  onExit,
+  onOpenReport,
+  onGoToDashboard,
+}: DemoTourProps) {
   const { t } = useTranslation("project");
   const [stepIndex, setStepIndex] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -220,6 +230,11 @@ export default function DemoTour({ currentTab, goToTab, onExit }: DemoTourProps)
     skipDemoTour();
     onExit();
   }, [onExit]);
+
+  const backToDashboard = useCallback(() => {
+    skipDemoTour();
+    onGoToDashboard();
+  }, [onGoToDashboard]);
 
   // The tour always starts on Overview (relevant for banner replays from
   // another tab). A fresh interview-round run is always the "study" phase —
@@ -323,14 +338,23 @@ export default function DemoTour({ currentTab, goToTab, onExit }: DemoTourProps)
         {step.clickTab && <p className="demo-tour__click-hint">☝︎ {t("tour.clickHint")}</p>}
         <div className="demo-tour__actions">
           {isFinale ? (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              data-tour-primary
-              onClick={finish}
-            >
-              {t("tour.finale_cta_explore")}
-            </button>
+            <>
+              <button
+                type="button"
+                className="demo-tour__skip"
+                onClick={backToDashboard}
+              >
+                {t("tour.finale_cta_dashboard")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                data-tour-primary
+                onClick={onOpenReport}
+              >
+                {t("tour.finale_cta_report")}
+              </button>
+            </>
           ) : (
             <>
               <button type="button" className="demo-tour__skip" onClick={finish}>
