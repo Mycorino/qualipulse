@@ -1809,6 +1809,8 @@ export default function ProjectDetail() {
               sp.delete("tour");
               setSearchParams(sp, { replace: true });
             }}
+            onOpenReport={handleExportReport}
+            onGoToDashboard={() => navigate("/dashboard")}
           />
         )}
 

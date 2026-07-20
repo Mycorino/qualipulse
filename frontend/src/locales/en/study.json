@@ -183,11 +183,11 @@
     },
     "tour": {
       "eyebrow": "Demo tour",
-      "instrumentsTab_title": "You're in the study workspace",
-      "instrumentsTab_body": "A study can hold several instruments — this demo pairs a survey with an interview round. Open the Instruments tab to see them.",
+      "instrumentsTab_title": "A study groups your instruments",
+      "instrumentsTab_body": "A study can hold several instruments — here, a survey and an interview round.",
       "instrumentsTab_clickHint": "Click the Instruments tab",
       "interviewRound_title": "The interview round",
-      "interviewRound_body": "The interview round is where the AI-led conversations live — the guide, the transcripts and the analysis. Open it to look around.",
+      "interviewRound_body": "It gathers the AI-led conversations: guide, transcripts and analysis.",
       "interviewRound_clickHint": "Click the interview round",
       "skip": "Skip tour"
     }

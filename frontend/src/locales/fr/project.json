@@ -229,9 +229,9 @@
     "analysisReport_title": "Des thèmes appuyés par des preuves",
     "analysisReport_body": "L'IA synthétise thèmes, tensions et recommandations — chaque affirmation cite des verbatims traçables jusqu'à la transcription.",
     "finale_title": "Voilà une étude, de bout en bout",
-    "finale_body": "Guide → entretiens → transcriptions → analyse. Le vrai point d'orgue est transversal : le mémo de décision inter-études.",
-    "finale_cta_create": "Créer votre propre étude",
-    "finale_cta_explore": "Continuer à explorer la démo"
+    "finale_body": "Guide → entretiens → transcriptions → analyse.",
+    "finale_cta_report": "Ouvrir le rapport",
+    "finale_cta_dashboard": "Retour au tableau de bord"
   },
   "switcher": {
     "active": "Actif",

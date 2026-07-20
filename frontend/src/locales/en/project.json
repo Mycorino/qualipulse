@@ -229,9 +229,9 @@
     "analysisReport_title": "Themes backed by evidence",
     "analysisReport_body": "The AI synthesises themes, tensions and recommendations across interviews — every claim cites verbatim quotes you can trace back to a transcript. Scroll through to see the full report.",
     "finale_title": "That's one study, end to end",
-    "finale_body": "Guide → interviews → transcripts → analysis. But the real payoff comes across studies — let me show you the cross-study decision memo.",
-    "finale_cta_create": "Create your own study",
-    "finale_cta_explore": "Keep exploring the demo"
+    "finale_body": "Guide → interviews → transcripts → analysis.",
+    "finale_cta_report": "Open the report",
+    "finale_cta_dashboard": "Back to dashboard"
   },
   "switcher": {
     "active": "Active",
@@ -564,6 +564,9 @@
     "annotDisputed": "Disputed"
   },
   "screeningTranslations": {
+    "toggle": "Translations",
+    "regenerateAll": "Regenerate all translations",
+    "optionsLabel": "Options",
     "saved": "Translation saved",
     "saveFailed": "Failed to save translation",
     "questionLabel": "Question",
