@@ -1,9 +1,9 @@
 {
   "skip": "Passer pour le moment",
-  "verify_banner": "Pensez à vérifier votre adresse email quand vous avez un moment — le lien vous attend dans votre boîte de réception.",
+  "verify_banner": "Pensez à vérifier votre adresse email quand vous avez un moment, le lien vous attend dans votre boîte de réception.",
   "verify_resend": "Renvoyer",
-  "greeting": "Bonjour {{firstName}} — je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planification et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager — et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : qu'avez-vous le plus besoin d'apprendre sur vos utilisateurs en ce moment ?",
-  "greeting_post_wizard": "Bienvenue, {{firstName}} — c'est noté. Vous êtes {{role}}, avec pour priorité {{useCase}}.\n\nMaintenant, rédigeons votre première étude. Quelle décision repose sur cette recherche ?",
+  "greeting": "Bonjour {{firstName}}, je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planification et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager, et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : qu'avez-vous le plus besoin d'apprendre sur vos utilisateurs en ce moment ?",
+  "greeting_post_wizard": "Bienvenue, {{firstName}}, c'est noté. Vous êtes {{role}}, avec pour priorité {{useCase}}.\n\nMaintenant, rédigeons votre première étude. Quelle décision repose sur cette recherche ?",
   "goal_suggestions_label": "Ou choisissez un point de départ :",
   "goal_suggestions": [
     "Pourquoi les utilisateurs en essai abandonnent",
@@ -29,7 +29,7 @@
     "company": "Entreprise",
     "name": "Vous",
     "business_summary_label": "Activité",
-    "empty_hint": "Je compléterai au fil de la conversation — votre rôle, ce que vous cherchez à apprendre, et auprès de qui."
+    "empty_hint": "Je compléterai au fil de la conversation, votre rôle, ce que vous cherchez à apprendre, et auprès de qui."
   },
   "input_placeholder": "Dites au Copilot ce que vous voulez apprendre…",
   "send": "Envoyer",
@@ -51,7 +51,7 @@
   "plan": {
     "eyebrow": "Votre plan de recherche",
     "accept_cta": "Accepter ce plan et lancer l'étape 1",
-    "hint": "L'étape 1 devient votre première étude maintenant — les suivantes attendent votre feu vert.",
+    "hint": "L'étape 1 devient votre première étude maintenant, les suivantes attendent votre feu vert.",
     "meta_participants": "{{count}} participants",
     "meta_duration_one": "{{count}} semaine",
     "meta_duration_other": "{{count}} semaines",
@@ -73,20 +73,20 @@
   },
   "done": {
     "eyebrow": "Votre étude est prête",
-    "sub": "Choisissez la prochaine étape — la plupart des équipes commencent par tester leur propre entretien pour entendre l'IA en action.",
+    "sub": "Choisissez la prochaine étape, la plupart des équipes commencent par tester leur propre entretien pour entendre l'IA en action.",
     "memory_label": "Voici ce que je retiendrai de votre recherche",
     "memory_fallback": "J'en apprendrai davantage sur votre recherche au fil de notre collaboration.",
     "cta_take_interview": "Passer votre propre entretien",
-    "cta_take_interview_hint": "90 secondes — écoutez le Copilot poser ses questions et s'adapter",
+    "cta_take_interview_hint": "90 secondes, écoutez le Copilot poser ses questions et s'adapter",
     "cta_copy_link": "Copier le lien à partager",
     "cta_open_study": "Ouvrir votre étude →",
-    "plan_hint": "Les équipes comme la vôtre démarrent souvent avec <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression — franchissez le pas quand QualiPulse aura fait ses preuves.",
+    "plan_hint": "Les équipes comme la vôtre démarrent souvent avec <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression, franchissez le pas quand QualiPulse aura fait ses preuves.",
     "cta_upgrade": "Passer à {{plan}} →"
   },
   "verify_modal": {
     "eyebrow": "Un petit détail",
     "title": "Souhaitez-vous un récapitulatif de cette conversation par email ?",
-    "body": "Nous vous enverrons aussi un email dès que votre première réponse arrivera — pas besoin de revenir vérifier. Confirmez votre adresse et c'est réglé.",
+    "body": "Nous vous enverrons aussi un email dès que votre première réponse arrivera, pas besoin de revenir vérifier. Confirmez votre adresse et c'est réglé.",
     "accept": "Oui, envoyer le lien de vérification",
     "dismiss": "Plus tard"
   },
@@ -94,8 +94,8 @@
     "close": "Fermer",
     "eyebrow": "Étude exemple",
     "title": "Voici ce que vous verrez à la fin",
-    "body": "Pas seulement un guide — une lecture synthétisée de ce que 25 participants vous ont dit, regroupée en thèmes avec des verbatims à citer dans un deck. Rédigée à partir d'une conversation de 2 minutes.",
-    "cta": "Compris — rédigeons la mienne",
+    "body": "Pas seulement un guide, une lecture synthétisée de ce que 25 participants vous ont dit, regroupée en thèmes avec des verbatims à citer dans un deck. Rédigée à partir d'une conversation de 2 minutes.",
+    "cta": "Compris, rédigeons la mienne",
     "tabs_aria": "Sections de l'étude exemple",
     "tab_synthesis": "Synthèse",
     "tab_quotes": "Verbatims",
@@ -172,7 +172,7 @@
         "themes": [
           {
             "title": "Les références projets battent les brochures",
-            "finding": "18 architectes sur 25 ont dit qu'un exemple bâti près de leur site comptait plus que toute fiche technique — mais seulement 2 ont trouvé ça facile à dénicher.",
+            "finding": "18 architectes sur 25 ont dit qu'un exemple bâti près de leur site comptait plus que toute fiche technique, mais seulement 2 ont trouvé ça facile à dénicher.",
             "quote": "Si je ne trouve pas un projet comme le mien où ça a déjà été installé, je passe. Je ne suis pas là pour tester un produit sur un client.",
             "speaker": "Anne, architecte, cabinet mid-size"
           },
@@ -185,7 +185,7 @@
           {
             "title": "Le service conformité du client a un droit de veto",
             "finding": "Les architectes pré-filtrent sur les certifications parce que le service juridique tuera la spec en fin de course s'il en manque une. Ils contournent les produits qui semblent risqués.",
-            "quote": "J'ai appris à mes dépens — choisi le meilleur produit, la conformité l'a sorti au quatrième mois. Maintenant je trie par certification d'abord.",
+            "quote": "J'ai appris à mes dépens, choisi le meilleur produit, la conformité l'a sorti au quatrième mois. Maintenant je trie par certification d'abord.",
             "speaker": "Sophie, architecte, marchés publics"
           }
         ],
@@ -206,7 +206,7 @@
           },
           {
             "speaker": "Sophie, architecte",
-            "text": "J'ai appris à mes dépens — choisi le meilleur produit, la conformité l'a sorti au quatrième mois. Maintenant je trie par certification d'abord.",
+            "text": "J'ai appris à mes dépens, choisi le meilleur produit, la conformité l'a sorti au quatrième mois. Maintenant je trie par certification d'abord.",
             "highlight": "je trie par certification d'abord",
             "code": "Pré-filtrage conformité",
             "codeColor": "#10b981"
@@ -233,13 +233,13 @@
           },
           {
             "title": "Création de compte = fermeture d'onglet",
-            "finding": "La création de compte forcée au checkout a fait fermer l'onglet à 9 sur 25 — la moitié a dit « je reviendrai plus tard », personne n'est revenu.",
+            "finding": "La création de compte forcée au checkout a fait fermer l'onglet à 9 sur 25, la moitié a dit « je reviendrai plus tard », personne n'est revenu.",
             "quote": "Pourquoi je dois créer un compte pour acheter un t-shirt ? Je viens dépenser de l'argent, pas m'engager dans une relation.",
             "speaker": "Tom, acheteur occasionnel"
           },
           {
             "title": "La confiance s'effondre sans moyens de paiement familiers",
-            "finding": "Les acheteurs attendent Apple Pay / PayPal comme sortie de secours quand la marque leur est inconnue. Sans eux, la marque paraît louche — ce n'est pas un simple inconfort.",
+            "finding": "Les acheteurs attendent Apple Pay / PayPal comme sortie de secours quand la marque leur est inconnue. Sans eux, la marque paraît louche, ce n'est pas un simple inconfort.",
             "quote": "Je ne les connaissais pas. S'ils ne prennent pas PayPal je me dis que ma CB part on ne sait où.",
             "speaker": "Camille, premier achat après une pub sur les réseaux sociaux"
           }
@@ -277,9 +277,9 @@
     "modal_eyebrow": "Aperçu participant",
     "modal_title": "Voici ce que vos participants verront",
     "modal_title_reveal": "Et voici ce que vous verrez après leur passage",
-    "modal_body": "Nous allons vous poser une question rapide — exactement comme vos participants. Environ 30 secondes.",
+    "modal_body": "Nous allons vous poser une question rapide, exactement comme vos participants. Environ 30 secondes.",
     "modal_body_reveal": "Les vrais entretiens passent par la transcription, le surlignage automatique et le tagging. Imaginez 30 de ces réponses analysées ensemble.",
-    "question": "Bonjour {{firstName}} — petite question : parlez-moi du meilleur onboarding que vous avez vécu récemment. Qu'est-ce qui l'a rendu marquant ?",
+    "question": "Bonjour {{firstName}}, petite question : parlez-moi du meilleur onboarding que vous avez vécu récemment. Qu'est-ce qui l'a rendu marquant ?",
     "tap_to_speak": "Touchez pour parler",
     "tap_to_stop": "Touchez quand vous avez terminé",
     "start_recording": "Commencer l'enregistrement",
@@ -287,30 +287,30 @@
     "requesting_mic": "Demande d'accès au micro…",
     "transcribing": "Transcription de votre réponse…",
     "try_again": "Réessayer",
-    "skip_to_example": "Passer — montrez-moi l'exemple",
-    "reveal_cta": "Compris — rédigeons mon étude →",
+    "skip_to_example": "Passer, montrez-moi l'exemple",
+    "reveal_cta": "Compris, rédigeons mon étude →",
     "auto_continue": "Compris, et le plan ?",
     "your_answer": "Votre réponse",
-    "reveal_caption": "Les vraies études font émerger des dizaines de ces moments — les codes regroupent automatiquement les passages similaires entre participants.",
+    "reveal_caption": "Les vraies études font émerger des dizaines de ces moments, les codes regroupent automatiquement les passages similaires entre participants.",
     "close": "Fermer",
     "error_mic_denied": "Accès au micro refusé. Vous pouvez voir l'exemple ci-dessous.",
-    "error_generic": "Transcription impossible — réessayez ou passez à l'exemple.",
+    "error_generic": "Transcription impossible, réessayez ou passez à l'exemple.",
     "canned_transcript": "Ce qui m'a marqué c'est qu'ils m'ont littéralement guidé pour configurer mon premier projet en moins de deux minutes. J'ai eu le sentiment de savoir ce que je faisais tout de suite, pas d'être testé sur ma capacité à comprendre.",
     "canned_highlight": "guidé pour configurer mon premier projet en moins de deux minutes",
     "canned_code": "Moment de premier succès"
   },
-  "chat_error": "Désolé — je n'ai pas réussi à répondre. Merci de réessayer.",
+  "chat_error": "Désolé, je n'ai pas réussi à répondre. Merci de réessayer.",
   "toast": {
     "resend_success": "Email de vérification envoyé.",
     "resend_error": "Impossible de renvoyer pour l'instant.",
-    "verify_sent": "Envoyé — vérifiez votre boîte de réception pour activer les emails récapitulatifs.",
+    "verify_sent": "Envoyé, vérifiez votre boîte de réception pour activer les emails récapitulatifs.",
     "link_copied": "Lien d'entretien copié dans le presse-papiers.",
-    "link_copy_failed": "Copie impossible — ouvrez votre étude pour récupérer le lien.",
-    "no_link": "Le lien n'a pas pu être créé — ouvrez votre étude pour en configurer un.",
+    "link_copy_failed": "Copie impossible, ouvrez votre étude pour récupérer le lien.",
+    "no_link": "Le lien n'a pas pu être créé, ouvrez votre étude pour en configurer un.",
     "no_link_short": "Ouvrez votre étude pour configurer un lien d'entretien.",
-    "study_setup_failed": "Impossible de préparer votre étude — merci de réessayer.",
-    "skip_failed": "Une erreur est survenue — merci de réessayer.",
-    "website_unreadable": "Impossible de lire ce site — essayez une autre URL.",
-    "upgrade_failed": "Impossible de démarrer le paiement — vous pourrez passer à une formule supérieure à tout moment depuis la page Facturation."
+    "study_setup_failed": "Impossible de préparer votre étude, merci de réessayer.",
+    "skip_failed": "Une erreur est survenue, merci de réessayer.",
+    "website_unreadable": "Impossible de lire ce site, essayez une autre URL.",
+    "upgrade_failed": "Impossible de démarrer le paiement, vous pourrez passer à une formule supérieure à tout moment depuis la page Facturation."
   }
 }

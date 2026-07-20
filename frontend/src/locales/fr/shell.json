@@ -1,6 +1,6 @@
 {
   "topBar": {
-    "homeAriaLabel": "Accueil — vos études",
+    "homeAriaLabel": "Accueil, vos études",
     "breadcrumbAriaLabel": "Fil d'Ariane"
   },
   "dashboardShell": {
@@ -47,7 +47,7 @@
     "loading": "Chargement…",
     "thanksTitle": "Merci pour votre réponse.",
     "thanksBody": "Vos réponses ont bien été enregistrées. Vous pouvez fermer cet onglet.",
-    "anonymousNote": "Ce questionnaire est anonyme — vos réponses ne sont pas associées à votre identité.",
+    "anonymousNote": "Ce questionnaire est anonyme, vos réponses ne sont pas associées à votre identité.",
     "emailLabel": "E-mail (facultatif)",
     "emailPlaceholder": "vous@exemple.com",
     "emailHelp": "Nous permet de retrouver votre réponse si vous revenez, et au chercheur de vous proposer un entretien de suivi. Votre adresse n'est jamais partagée en dehors de cette étude.",

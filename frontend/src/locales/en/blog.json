@@ -1,8 +1,8 @@
 {
   "list": {
-    "metaTitle": "Blog — QualiPulse",
+    "metaTitle": "Blog, QualiPulse",
     "metaDescription": "Insights on qualitative research, AI-driven interviews, and product discovery from the QualiPulse team.",
-    "ogTitle": "Blog — QualiPulse",
+    "ogTitle": "Blog, QualiPulse",
     "ogDescription": "Insights on qualitative research, AI-driven interviews, and product discovery.",
     "heroTitle": "The QualiPulse Blog",
     "heroSubtitle": "Practical guides on qualitative research, AI-assisted interviews, and turning user conversations into product decisions.",
@@ -16,7 +16,7 @@
     "pageOf": "Page {{page}} of {{totalPages}}"
   },
   "post": {
-    "metaTitle": "{{title}} — QualiPulse Blog",
+    "metaTitle": "{{title}}, QualiPulse Blog",
     "loading": "Loading…",
     "notFoundTitle": "Post not found",
     "backToBlog": "Back to blog",

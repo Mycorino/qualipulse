@@ -3,7 +3,7 @@
     "hero": {
       "eyebrow": "Design system · Sprint 1",
       "title": "The editorial voice for mixed-methods research",
-      "subtitle": "Three primitives for the quanti surface — a ChartCard that enforces a takeaway-above-chart discipline, a VerbatimCard that pairs verbatim quotes with optional audio, and a MethodologyBox that anchors every report in credible sample notation."
+      "subtitle": "Three primitives for the quanti surface, a ChartCard that enforces a takeaway-above-chart discipline, a VerbatimCard that pairs verbatim quotes with optional audio, and a MethodologyBox that anchors every report in credible sample notation."
     },
     "methodology": {
       "meta": "Required at the top of every shared report. Expanded variant in the appendix.",
@@ -29,7 +29,7 @@
       },
       "designers": {
         "eyebrow": "Segment · Designers",
-        "takeaway": "Designers' satisfaction skews high — but the sample is too small to claim significance.",
+        "takeaway": "Designers' satisfaction skews high, but the sample is too small to claim significance.",
         "counts": {
           "verySatisfied": "Very satisfied",
           "satisfied": "Satisfied",
@@ -39,7 +39,7 @@
       },
       "multipleChoice": {
         "eyebrow": "Multiple choice · Q5",
-        "takeaway": "Pricing clarity tops the request list — twice as often as feature gaps.",
+        "takeaway": "Pricing clarity tops the request list, twice as often as feature gaps.",
         "bars": {
           "pricingClarity": "Pricing clarity",
           "fasterOnboarding": "Faster onboarding",
@@ -50,29 +50,29 @@
       }
     },
     "verbatim": {
-      "meta": "Pull-quote with optional audio playback. Defaults to segment-only attribution (privacy-first) — names appear only when participants have consented to identification.",
-      "q1": "I almost cancelled last week. The pricing page never explained what 'team' actually meant — I was paying for seats I didn't need.",
+      "meta": "Pull-quote with optional audio playback. Defaults to segment-only attribution (privacy-first), names appear only when participants have consented to identification.",
+      "q1": "I almost cancelled last week. The pricing page never explained what 'team' actually meant, I was paying for seats I didn't need.",
       "q2": "The interview format felt unusually natural. I forgot it was an AI after the second question.",
       "q3": "What I want is fewer tools, not more features. Every new dashboard is another tab I'll never open.",
       "q4": "Honestly? I just need it to be fast. Everything else is negotiable."
     },
     "statHero": {
-      "meta": "The page-unit pattern for \"stat + voice\" pairings — 60/40 stat-left, verbatim-right. One stat per hero. The waveform inside the verbatim is the signature interaction.",
+      "meta": "The page-unit pattern for \"stat + voice\" pairings, 60/40 stat-left, verbatim-right. One stat per hero. The waveform inside the verbatim is the signature interaction.",
       "onboarding": {
         "eyebrow": "Onboarding · Q2",
         "description": "of new users abandon onboarding before reaching the third step.",
         "meta": "n=247 · 95% CI ±5.4pp · Apr 14 – May 02, 2026",
-        "quote": "I almost cancelled last week. The pricing page never explained what 'team' actually meant — I was paying for seats I didn't need."
+        "quote": "I almost cancelled last week. The pricing page never explained what 'team' actually meant, I was paying for seats I didn't need."
       },
       "recommendation": {
         "eyebrow": "Recommendation · Q7",
-        "description": "Net Promoter Score across all completed responses — promoters outweigh detractors but a vocal segment is forming.",
+        "description": "Net Promoter Score across all completed responses, promoters outweigh detractors but a vocal segment is forming.",
         "meta": "n=247 · 47% promoters · 22% detractors",
-        "quote": "Honestly, I'd recommend it tomorrow if the analysis took half as long. Right now it's a 7 — could be a 9."
+        "quote": "Honestly, I'd recommend it tomorrow if the analysis took half as long. Right now it's a 7, could be a 9."
       }
     },
     "audioClip": {
-      "title": "AudioClip — waveform variant",
+      "title": "AudioClip, waveform variant",
       "metaPart1": "Procedural waveform tinted with the viz palette. Filled bars track playback; the shape is deterministic per",
       "metaPart2": "so each clip looks distinct without real audio decoding. Real Web Audio decoding is a follow-up.",
       "demo1": "Waveform demo 1",
@@ -112,10 +112,10 @@
       "items": {
         "summary": "Summary",
         "segments": "Segments",
-        "nps": "Q1 — Net promoter",
-        "onboarding": "Q2 — Onboarding friction",
-        "pricing": "Q3 — Pricing clarity",
-        "features": "Q4 — Feature priorities",
+        "nps": "Q1, Net promoter",
+        "onboarding": "Q2, Onboarding friction",
+        "pricing": "Q3, Pricing clarity",
+        "features": "Q4, Feature priorities",
         "responses": "All responses"
       },
       "strip": {
@@ -171,7 +171,7 @@
       }
     },
     "surveyEditor": {
-      "meta": "The question-being-built editor surface. Type-specific configs live inside a shared shell. Real-time prompt guardrails flag double-barreled questions and leading wording as the user types — try writing \"How satisfied are you with the speed and reliability?\" or \"Do you love our product?\" to see them fire.",
+      "meta": "The question-being-built editor surface. Type-specific configs live inside a shared shell. Real-time prompt guardrails flag double-barreled questions and leading wording as the user types, try writing \"How satisfied are you with the speed and reliability?\" or \"Do you love our product?\" to see them fire.",
       "prompts": {
         "likert": "How satisfied are you with the speed and reliability of the analysis pipeline?",
         "multiChoice": "Which of the following would most improve your workflow?",
@@ -180,26 +180,26 @@
       }
     },
     "screenerBridge": {
-      "meta": "The wedge — survey-to-interview conversion. Filtered survey respondents get invited to a 10-minute AI voice interview in one click. Credit cost is shown upfront; credits are only charged when an interview actually completes.",
-      "detractors": "\"Detractors who use mobile daily\" — Role: PM, Region: NA, NPS ≤ 6",
-      "promoters": "\"Promoters at 500+ employee companies\" — NPS ≥ 9, Company size ≥ 500"
+      "meta": "The wedge, survey-to-interview conversion. Filtered survey respondents get invited to a 10-minute AI voice interview in one click. Credit cost is shown upfront; credits are only charged when an interview actually completes.",
+      "detractors": "\"Detractors who use mobile daily\", Role: PM, Region: NA, NPS ≤ 6",
+      "promoters": "\"Promoters at 500+ employee companies\", NPS ≥ 9, Company size ≥ 500"
     },
     "findingCard": {
       "meta": "The MBB action-title page unit for the mixed-methods report. Action-title in serif (thesis-style, never \"Theme: X\"), evidence row, \"So what\" implication line, confidence pill, and sample note. Three layout variants by composition.",
       "f03": {
         "index": "Finding 03 of 07",
-        "actionTitle": "Trust gaps cost us 30% of new users — driven by checkout, not pricing.",
-        "context": "Detractors who churned in their first month consistently flagged the checkout flow as opaque — even when their stated objection was price. The pricing page tested clean; the checkout did not.",
-        "evidenceEyebrow": "Likert · Q3 — Checkout clarity",
+        "actionTitle": "Trust gaps cost us 30% of new users, driven by checkout, not pricing.",
+        "context": "Detractors who churned in their first month consistently flagged the checkout flow as opaque, even when their stated objection was price. The pricing page tested clean; the checkout did not.",
+        "evidenceEyebrow": "Likert · Q3, Checkout clarity",
         "evidenceTakeaway": "Detractors rate checkout 3× more confusing than promoters, and 2× more confusing than pricing.",
-        "verbatim1": "The pricing page made sense. The checkout asked for things I didn't expect — that's where I bailed.",
+        "verbatim1": "The pricing page made sense. The checkout asked for things I didn't expect, that's where I bailed.",
         "verbatim2": "I genuinely thought I was being charged twice. The line items don't match what's on the pricing page.",
         "implication": "Reorder the checkout to mirror the pricing page line-by-line. The pricing copy is the trust-builder; the checkout currently undoes that work in 30 seconds.",
         "sampleNote": "n=247 survey · 18 follow-up interviews · 4 segments"
       },
       "f04": {
         "index": "Finding 04 of 07",
-        "actionTitle": "Promoters cite the AI synthesis as their reason to renew — not the interview tool.",
+        "actionTitle": "Promoters cite the AI synthesis as their reason to renew, not the interview tool.",
         "evidenceEyebrow": "Multiple choice · Q5",
         "evidenceTakeaway": "The AI report is the most-cited renewal reason, twice as often as the interview tool itself.",
         "bars": {
@@ -214,9 +214,9 @@
       },
       "f05": {
         "index": "Finding 05 of 07",
-        "actionTitle": "Designers may be a separate ICP entirely — but the sample is too thin to commit.",
+        "actionTitle": "Designers may be a separate ICP entirely, but the sample is too thin to commit.",
         "evidenceEyebrow": "Segment · Designers",
-        "evidenceTakeaway": "Designers' top use case looks distinct from PMs and Researchers — but at n=12 we can't confirm.",
+        "evidenceTakeaway": "Designers' top use case looks distinct from PMs and Researchers, but at n=12 we can't confirm.",
         "counts": {
           "conceptTesting": "Concept testing",
           "brandPerception": "Brand perception",
@@ -229,7 +229,7 @@
       }
     },
     "segment2x2": {
-      "meta": "The MECE-forcing page unit. Cell tints scale with volume share so the eye lands on the heaviest quadrant first. One quote per cell, never two — discipline on the page.",
+      "meta": "The MECE-forcing page unit. Cell tints scale with volume share so the eye lands on the heaviest quadrant first. One quote per cell, never two, discipline on the page.",
       "xAxisLabel": "Solution sophistication →",
       "yAxisLabel": "Need intensity →",
       "q1": {
@@ -250,7 +250,7 @@
       }
     },
     "crossTab": {
-      "meta": "Theme × segment table with sequential-tint conditional formatting. Cells below n=30 display counts (not percentages) with a hatched background — small-n honesty baked in.",
+      "meta": "Theme × segment table with sequential-tint conditional formatting. Cells below n=30 display counts (not percentages) with a hatched background, small-n honesty baked in.",
       "columns": {
         "pms": "PMs",
         "researchers": "Researchers",
@@ -267,7 +267,7 @@
       },
       "note": "Designer column shows counts because n=12 falls below the inference threshold (n≥30). Themes are AI-clustered from open-text responses; cells show the % of that segment that mentioned the theme."
     },
-    "footer": "Sprint 1 + 2 + 3 + 4 — design-system extension for the quanti work track. 13 new components: ChartCard, VerbatimCard, MethodologyBox, StatHero, CompareChips, DashboardShell, DashboardStrip, QuestionTypeCard, SurveyQuestionEditor, ScreenerBridge, FindingCard, Segment2x2, CrossTabTable, plus a waveform variant on the existing AudioClip primitive. Sprint 5 next: report scrollytelling layout + print stylesheet + PrioritizationMatrix.",
+    "footer": "Sprint 1 + 2 + 3 + 4, design-system extension for the quanti work track. 13 new components: ChartCard, VerbatimCard, MethodologyBox, StatHero, CompareChips, DashboardShell, DashboardStrip, QuestionTypeCard, SurveyQuestionEditor, ScreenerBridge, FindingCard, Segment2x2, CrossTabTable, plus a waveform variant on the existing AudioClip primitive. Sprint 5 next: report scrollytelling layout + print stylesheet + PrioritizationMatrix.",
     "charts": {
       "likert": {
         "stronglyDisagree": "Strongly disagree",
@@ -293,8 +293,8 @@
   "reportDemo": {
     "cover": {
       "eyebrow": "Mixed-methods report · Q2 2026",
-      "title": "Why new users churn — pricing, trust, and the checkout cliff.",
-      "lede": "A study of 247 first-month users combining a structured survey with 18 follow-up interviews — to size the churn drivers we suspected and surface the ones we didn't.",
+      "title": "Why new users churn, pricing, trust, and the checkout cliff.",
+      "lede": "A study of 247 first-month users combining a structured survey with 18 follow-up interviews, to size the churn drivers we suspected and surface the ones we didn't.",
       "sampleLabel": "Sample",
       "sampleValue": "n=247 + 18 interviews",
       "fieldWindowLabel": "Field window",
@@ -306,8 +306,8 @@
       "methodology": "Methodology",
       "executiveSummary": "Executive summary",
       "headlineMetric": "Headline metric",
-      "finding03": "Finding 03 — Checkout cliff",
-      "finding04": "Finding 04 — AI as the renewal driver",
+      "finding03": "Finding 03, Checkout cliff",
+      "finding04": "Finding 04, AI as the renewal driver",
       "segmentLandscape": "Segment landscape",
       "themesBySegment": "Themes by segment",
       "whatToDoNext": "What to do next"
@@ -330,20 +330,20 @@
       "note": "Weighted to match B2B SaaS PM / researcher composition by company size and region. Unweighted counts shown alongside weighted percentages throughout. Segment splits below n=30 are reported as counts only."
     },
     "executiveSummary": {
-      "headline": "Three things — checkout fixes the trust gap, the AI report drives renewal, designers may be a separate ICP.",
+      "headline": "Three things, checkout fixes the trust gap, the AI report drives renewal, designers may be a separate ICP.",
       "subheadline": "If we ship one change before EOQ, it's the checkout. The other two are signals to act on, not commitments.",
       "thought1": {
-        "thesis": "Trust gaps cost 30% of new users — and the cause is the checkout, not the pricing page.",
+        "thesis": "Trust gaps cost 30% of new users, and the cause is the checkout, not the pricing page.",
         "elaboration": "Detractors who churned consistently flagged the checkout as opaque, even when their stated objection was price. The pricing page tested clean across all segments; the checkout did not. Reordering the line items to mirror pricing recovers an estimated 18-22% of first-month churn.",
         "findingRef": "Finding 03"
       },
       "thought2": {
-        "thesis": "Promoters renew because of the AI synthesis report — not because of the interview tool.",
+        "thesis": "Promoters renew because of the AI synthesis report, not because of the interview tool.",
         "elaboration": "When asked what they'd cancel last, promoters named the report 2× more often than the interview surface. Lead the marketing site with the report; the interviews are plumbing that gets paid for via the analysis.",
         "findingRef": "Finding 04"
       },
       "thought3": {
-        "thesis": "Designers may be a separate ICP — but the sample is too thin to commit.",
+        "thesis": "Designers may be a separate ICP, but the sample is too thin to commit.",
         "elaboration": "Designers (n=12) reported a different primary use case (concept testing, not customer research). The signal is interesting but not yet bankable; we recommend a 30-respondent designer-only survey before any product work.",
         "findingRef": "Finding 05"
       },
@@ -353,22 +353,22 @@
       "eyebrow": "Onboarding · Q2",
       "description": "of new users abandon the onboarding flow before reaching the third step.",
       "meta": "n=247 · 95% CI ±5.4pp",
-      "quote": "I almost cancelled last week. The pricing page never explained what 'team' actually meant — I was paying for seats I didn't need."
+      "quote": "I almost cancelled last week. The pricing page never explained what 'team' actually meant, I was paying for seats I didn't need."
     },
     "finding03": {
       "index": "Finding 03 of 07",
-      "actionTitle": "Trust gaps cost us 30% of new users — driven by checkout, not pricing.",
-      "context": "Detractors who churned in their first month consistently flagged the checkout as opaque — even when their stated objection was price. The pricing page tested clean; the checkout did not.",
-      "evidenceEyebrow": "Likert · Q3 — Checkout clarity",
+      "actionTitle": "Trust gaps cost us 30% of new users, driven by checkout, not pricing.",
+      "context": "Detractors who churned in their first month consistently flagged the checkout as opaque, even when their stated objection was price. The pricing page tested clean; the checkout did not.",
+      "evidenceEyebrow": "Likert · Q3, Checkout clarity",
       "evidenceTakeaway": "Detractors rate checkout 3× more confusing than promoters.",
-      "verbatim1": "The pricing page made sense. The checkout asked for things I didn't expect — that's where I bailed.",
+      "verbatim1": "The pricing page made sense. The checkout asked for things I didn't expect, that's where I bailed.",
       "verbatim2": "I genuinely thought I was being charged twice. The line items don't match what's on the pricing page.",
       "implication": "Reorder the checkout to mirror the pricing page line-by-line. The pricing copy is the trust-builder; the checkout currently undoes that work in 30 seconds.",
       "sampleNote": "n=247 survey · 18 follow-up interviews · 4 segments"
     },
     "finding04": {
       "index": "Finding 04 of 07",
-      "actionTitle": "Promoters cite the AI synthesis as their reason to renew — not the interview tool.",
+      "actionTitle": "Promoters cite the AI synthesis as their reason to renew, not the interview tool.",
       "evidenceEyebrow": "Multiple choice · Q5",
       "evidenceTakeaway": "The AI report is the most-cited renewal reason, twice as often as the interview tool itself.",
       "bars": {

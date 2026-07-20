@@ -1,9 +1,9 @@
 {
   "skip": "Skip for now",
-  "verify_banner": "Verify your email when you get a moment — check your inbox.",
+  "verify_banner": "Verify your email when you get a moment, check your inbox.",
   "verify_resend": "Resend",
-  "greeting": "Hi {{firstName}} — I'm your Research Copilot. I help you run interviews and surveys without the scheduling-and-analysis grind.\n\nIn about two minutes we'll have a real study ready to share — and I'll start learning what your research looks like so I can be more useful next time.\n\nTo start: what's the one thing you most need to learn about your users right now?",
-  "greeting_post_wizard": "Welcome, {{firstName}} — got it. You're a {{role}} focused on {{useCase}}.\n\nNow let's draft your first study. What's the one decision riding on this research?",
+  "greeting": "Hi {{firstName}}, I'm your Research Copilot. I help you run interviews and surveys without the scheduling-and-analysis grind.\n\nIn about two minutes we'll have a real study ready to share, and I'll start learning what your research looks like so I can be more useful next time.\n\nTo start: what's the one thing you most need to learn about your users right now?",
+  "greeting_post_wizard": "Welcome, {{firstName}}, got it. You're a {{role}} focused on {{useCase}}.\n\nNow let's draft your first study. What's the one decision riding on this research?",
   "goal_suggestions_label": "Or pick one to start:",
   "goal_suggestions": [
     "Why trial users churn",
@@ -29,7 +29,7 @@
     "company": "Company",
     "name": "You",
     "business_summary_label": "Business",
-    "empty_hint": "I'll fill this in as we chat — your role, what you'll use it for, who you're trying to learn about."
+    "empty_hint": "I'll fill this in as we chat, your role, what you'll use it for, who you're trying to learn about."
   },
   "input_placeholder": "Tell the copilot what you want to learn…",
   "send": "Send",
@@ -51,7 +51,7 @@
   "plan": {
     "eyebrow": "Your research plan",
     "accept_cta": "Accept this plan & draft step 1",
-    "hint": "Step 1 becomes your first study now — later steps wait for your go-ahead.",
+    "hint": "Step 1 becomes your first study now, later steps wait for your go-ahead.",
     "meta_participants": "{{count}} participants",
     "meta_duration_one": "{{count}} week",
     "meta_duration_other": "{{count}} weeks",
@@ -73,20 +73,20 @@
   },
   "done": {
     "eyebrow": "Your study is ready",
-    "sub": "Pick what to do next — most teams test-drive their own interview first so they hear the AI in action.",
+    "sub": "Pick what to do next, most teams test-drive their own interview first so they hear the AI in action.",
     "memory_label": "Here's what I'll remember about your research",
     "memory_fallback": "I'll learn more about your research as we work together.",
     "cta_take_interview": "Take your own interview",
-    "cta_take_interview_hint": "90 seconds — hear the Copilot ask + adapt",
+    "cta_take_interview_hint": "90 seconds, hear the Copilot ask + adapt",
     "cta_copy_link": "Copy shareable link",
     "cta_open_study": "Open your study →",
-    "plan_hint": "Teams like yours usually start on <strong>{{planName}}</strong> ({{monthly}}/mo). No pressure — pick it up when QualiPulse is earning its keep.",
+    "plan_hint": "Teams like yours usually start on <strong>{{planName}}</strong> ({{monthly}}/mo). No pressure, pick it up when QualiPulse is earning its keep.",
     "cta_upgrade": "Upgrade to {{plan}} →"
   },
   "verify_modal": {
     "eyebrow": "One small thing",
     "title": "Want a recap of this conversation by email?",
-    "body": "We'll also email you when your first response comes in — so you don't have to keep checking. Verify your email and you're set.",
+    "body": "We'll also email you when your first response comes in, so you don't have to keep checking. Verify your email and you're set.",
     "accept": "Yes, send the verify link",
     "dismiss": "Not now"
   },
@@ -94,8 +94,8 @@
     "close": "Close",
     "eyebrow": "Sample study",
     "title": "Here's what you'll see at the end",
-    "body": "Not just a guide — a synthesised read of what 25 participants told you, grouped into themes with verbatims you can quote in a deck. Drafted from a 2-minute conversation.",
-    "cta": "Got it — let's draft mine",
+    "body": "Not just a guide, a synthesised read of what 25 participants told you, grouped into themes with verbatims you can quote in a deck. Drafted from a 2-minute conversation.",
+    "cta": "Got it, let's draft mine",
     "tabs_aria": "Sample study sections",
     "tab_synthesis": "Synthesis",
     "tab_quotes": "Quotes",
@@ -172,7 +172,7 @@
         "themes": [
           {
             "title": "Reference projects beat brochures every time",
-            "finding": "18 of 25 architects said a built example near their site weighed more than any technical sheet — but only 2 said brands made finding one easy.",
+            "finding": "18 of 25 architects said a built example near their site weighed more than any technical sheet, but only 2 said brands made finding one easy.",
             "quote": "If I can't find a project like mine where it's already been installed, I move on. I'm not the first person to test it on a client.",
             "speaker": "Anne, architect, mid-sized firm"
           },
@@ -185,7 +185,7 @@
           {
             "title": "The client's compliance officer has veto power",
             "finding": "Architects pre-filter for certifications because the legal/compliance team will kill the spec late if missing. They route around products that look risky.",
-            "quote": "I learned the hard way — picked the better product, compliance threw it out at month four. Now I sort by certification first.",
+            "quote": "I learned the hard way, picked the better product, compliance threw it out at month four. Now I sort by certification first.",
             "speaker": "Sophie, architect, public-sector work"
           }
         ],
@@ -206,7 +206,7 @@
           },
           {
             "speaker": "Sophie, architect",
-            "text": "I learned the hard way — picked the better product, compliance threw it out at month four. Now I sort by certification first.",
+            "text": "I learned the hard way, picked the better product, compliance threw it out at month four. Now I sort by certification first.",
             "highlight": "Now I sort by certification first",
             "code": "Compliance pre-filter",
             "codeColor": "#10b981"
@@ -233,7 +233,7 @@
           },
           {
             "title": "Account creation = exit",
-            "finding": "Forced account creation at checkout closed the tab for 9 of 25 — half explicitly said \"I'll come back later,\" and none did.",
+            "finding": "Forced account creation at checkout closed the tab for 9 of 25, half explicitly said \"I'll come back later,\" and none did.",
             "quote": "Why do I need an account to buy a t-shirt? I came to spend money, not to sign up for a relationship.",
             "speaker": "Tom, occasional buyer"
           },
@@ -277,9 +277,9 @@
     "modal_eyebrow": "Participant preview",
     "modal_title": "Here's what your participants will see",
     "modal_title_reveal": "And here's what you'll see when they're done",
-    "modal_body": "We'll ask you one quick question — the same way your participants will be asked theirs. About 30 seconds.",
+    "modal_body": "We'll ask you one quick question, the same way your participants will be asked theirs. About 30 seconds.",
     "modal_body_reveal": "Real interviews go through transcription, automatic highlighting, and tagging. Imagine seeing 30 of these analysed together.",
-    "question": "Hi {{firstName}} — quick question: tell me about the best onboarding experience you had recently, and what made it stand out?",
+    "question": "Hi {{firstName}}, quick question: tell me about the best onboarding experience you had recently, and what made it stand out?",
     "tap_to_speak": "Tap to speak",
     "tap_to_stop": "Tap when done",
     "start_recording": "Start recording your answer",
@@ -287,30 +287,30 @@
     "requesting_mic": "Asking for microphone access…",
     "transcribing": "Transcribing your answer…",
     "try_again": "Try again",
-    "skip_to_example": "Skip — just show me the example",
-    "reveal_cta": "Got it — let's draft my study →",
+    "skip_to_example": "Skip, just show me the example",
+    "reveal_cta": "Got it, let's draft my study →",
     "auto_continue": "Got it, what's the plan?",
     "your_answer": "Your answer",
-    "reveal_caption": "Real studies surface dozens of these — the codes group similar moments across participants automatically.",
+    "reveal_caption": "Real studies surface dozens of these, the codes group similar moments across participants automatically.",
     "close": "Close",
     "error_mic_denied": "Microphone access was denied. You can still see the example below.",
-    "error_generic": "Couldn't transcribe — try again or skip to the example.",
+    "error_generic": "Couldn't transcribe, try again or skip to the example.",
     "canned_transcript": "What stood out was that they literally walked me through setting up my first project in under two minutes. I felt like I knew what I was doing right away, not like I was being tested on whether I could figure it out.",
     "canned_highlight": "walked me through setting up my first project in under two minutes",
     "canned_code": "First-success moment"
   },
-  "chat_error": "Sorry — I couldn't respond just now. Please try again.",
+  "chat_error": "Sorry, I couldn't respond just now. Please try again.",
   "toast": {
     "resend_success": "Verification email sent.",
     "resend_error": "Couldn't resend right now.",
-    "verify_sent": "Sent — check your inbox to verify and unlock email recaps.",
+    "verify_sent": "Sent, check your inbox to verify and unlock email recaps.",
     "link_copied": "Interview link copied to your clipboard.",
-    "link_copy_failed": "Couldn't copy — open your study to grab the link.",
-    "no_link": "Link couldn't be created — open your study to set one up.",
+    "link_copy_failed": "Couldn't copy, open your study to grab the link.",
+    "no_link": "Link couldn't be created, open your study to set one up.",
     "no_link_short": "Open your study to set up an interview link.",
-    "study_setup_failed": "Couldn't set up your study — please try again.",
-    "skip_failed": "Something went wrong — please try again.",
-    "website_unreadable": "Couldn't read that site — try a different URL.",
-    "upgrade_failed": "Couldn't start checkout — you can upgrade anytime from Billing."
+    "study_setup_failed": "Couldn't set up your study, please try again.",
+    "skip_failed": "Something went wrong, please try again.",
+    "website_unreadable": "Couldn't read that site, try a different URL.",
+    "upgrade_failed": "Couldn't start checkout, you can upgrade anytime from Billing."
   }
 }

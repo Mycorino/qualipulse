@@ -7,7 +7,7 @@
     "welcomeBack": "Welcome back",
     "welcomeBackName": "Welcome back, {{name}}",
     "firstStudy": "Ready to run your first study?",
-    "firstStudySubtitle": "Set up an AI-led interview in a few minutes — share a link, listen back to what people said.",
+    "firstStudySubtitle": "Set up an AI-led interview in a few minutes, share a link, listen back to what people said.",
     "contextLine": "{{projects}} project · {{completed}} completed interview",
     "contextLine_other": "{{projects}} projects · {{completed}} completed interviews",
     "pillProjects": "project",
@@ -66,8 +66,8 @@
     "noResponses": "No responses yet",
     "analysisReady": "Analysis ready",
     "analysing": "Analysing…",
-    "nudgeAnalyse": "✦ Ready to analyse — you have {{count}} completed interviews",
-    "nudgeAnalyse_one": "✦ Ready to analyse — you have {{count}} completed interview",
+    "nudgeAnalyse": "✦ Ready to analyse, you have {{count}} completed interviews",
+    "nudgeAnalyse_one": "✦ Ready to analyse, you have {{count}} completed interview",
     "nudgeStale": "⏸ No new responses in {{count}} days",
     "nudgeStale_one": "⏸ No new responses in {{count}} day",
     "lastActivity": "Last response {{date}}",
@@ -105,10 +105,10 @@
     "loadError": "We couldn't load your studies. Please refresh.",
     "eyebrow": "Research workspace",
     "title": "Your studies",
-    "subtitle": "A Study is one research effort. It can be a survey, an interview round, or both — the instrument mix is shown on each card. Quanti, quali, hybrid: one home for all of it.",
+    "subtitle": "A Study is one research effort. It can be a survey, an interview round, or both, the instrument mix is shown on each card. Quanti, quali, hybrid: one home for all of it.",
     "newStudy": "+ New study",
     "loading": "Loading…",
-    "emptyText": "No studies yet. Start one — survey, interviews, or both. A Study forms around your first instrument and shows up here.",
+    "emptyText": "No studies yet. Start one, survey, interviews, or both. A Study forms around your first instrument and shows up here.",
     "copilotEyebrow": "✦ Research Copilot",
     "copilotMission": "help you start your first study",
     "dismissUpdate": "Dismiss update",
@@ -135,7 +135,7 @@
     "close": "Close",
     "eyebrow": "New study",
     "title": "What do you want to learn?",
-    "sub": "Phrase what you want to learn — it becomes your study's name. You can always add the other method later; the choice just decides what you build first.",
+    "sub": "Phrase what you want to learn, it becomes your study's name. You can always add the other method later; the choice just decides what you build first.",
     "nameLabel": "Your research question",
     "namePlaceholder": "e.g. Why new users churn",
     "recommended": "Recommended",
@@ -146,14 +146,14 @@
       "surveyBlurb": "Start broad. Collect structured responses, see the patterns, size the problem.",
       "interviewTitle": "Talk to people in depth",
       "interviewBlurb": "Go deep. AI-moderated voice interviews that adapt to each participant.",
-      "bothTitle": "Both — start broad, then go deep",
+      "bothTitle": "Both, start broad, then go deep",
       "bothBlurb": "Survey first, then interview the most interesting segments. The full mixed-methods loop."
     }
   },
   "copilot": {
     "nextEyebrow": "Next",
     "fab": "✦ Ask AI",
-    "openWithUpdates": "Open the Research Copilot — new updates",
+    "openWithUpdates": "Open the Research Copilot, new updates",
     "open": "Open the Research Copilot",
     "ariaPanel": "Research Copilot",
     "title": "✦ Research Copilot",
@@ -163,7 +163,7 @@
     "suggestedNextStep": "✦ Suggested next step",
     "emptyLead": "I can draft questions, fix methodology issues, and shape your study. Tell me what you want to learn.",
     "workspace": {
-      "introLead": "Hi! Research here means talking to real people — through a survey, AI-moderated interviews, or both — to learn what they actually think before you decide. It all starts with a study. Ready to set up your first one? I'll guide you through it.",
+      "introLead": "Hi! Research here means talking to real people, through a survey, AI-moderated interviews, or both, to learn what they actually think before you decide. It all starts with a study. Ready to set up your first one? I'll guide you through it.",
       "createFirst": "Create my first study"
     },
     "thinking": "Thinking…",
@@ -173,9 +173,9 @@
     "freeReplyPlaceholder": "Type your own answer…",
     "replyEyebrow": "Choose an answer",
     "replyOr": "or write your own",
-    "continueAfterAccept": "Looks good — let's move to the next step.",
+    "continueAfterAccept": "Looks good, let's move to the next step.",
     "unavailable": "The copilot is unavailable right now",
-    "errorReply": "Sorry — I couldn't respond. Please try again.",
+    "errorReply": "Sorry, I couldn't respond. Please try again.",
     "applyError": "Couldn't apply that change",
     "helpMePrefix": "Help me: {{label}}",
     "starters": {
@@ -184,12 +184,12 @@
       "nextQuestion": "Suggest the next question"
     },
     "proposal": {
-      "addQuestion": "Add — {{type}}",
-      "addGuideQuestion": "Add — Interview question",
+      "addQuestion": "Add, {{type}}",
+      "addGuideQuestion": "Add, Interview question",
       "editQuestion": "Edit question",
       "updateThisQuestion": "Update this question",
       "setObjective": "Set the research objective",
-      "editSettings": "Update — Interview settings",
+      "editSettings": "Update, Interview settings",
       "settingsDuration": "{{n}} min interviews",
       "settingsSample": "Aim for {{n}} interviews",
       "settingsWarmupOn": "Warm-up question on",
@@ -200,7 +200,7 @@
       "settingsBrandColor": "Color {{color}}",
       "settingsBrandFont": "Font: {{font}}",
       "settingsResearcherName": "Shown as {{name}}",
-      "addScreening": "Add — Screening question",
+      "addScreening": "Add, Screening question",
       "runAnalysis": "Run AI analysis",
       "runAnalysisBody": "Synthesise themes, JTBDs, and tensions from the interviews",
       "refineAnalysis": "Refine the analysis",
@@ -224,7 +224,7 @@
     },
     "stop": "Stop",
     "retry": "Retry",
-    "errorInline": "This reply didn't finish — you can retry.",
+    "errorInline": "This reply didn't finish, you can retry.",
     "missions": {
       "overview": "Keep this round moving.",
       "setup": "Get this interview guide ready to collect.",
@@ -235,15 +235,15 @@
   "nba": {
     "draftGuide": {
       "label": "Draft your interview guide",
-      "reason": "This round has no questions yet — the copilot can draft a full guide."
+      "reason": "This round has no questions yet, the copilot can draft a full guide."
     },
     "createLink": {
       "label": "Create an interview link",
-      "reason": "Your guide is ready — you need a link before anyone can take part."
+      "reason": "Your guide is ready, you need a link before anyone can take part."
     },
     "shareLink": {
       "label": "Share your interview link",
-      "reason": "The round is live but no one has started — share the link to collect responses."
+      "reason": "The round is live but no one has started, share the link to collect responses."
     },
     "runAnalysis": {
       "label": "Run the analysis",
@@ -257,16 +257,16 @@
     },
     "reviewThemes": {
       "label": "Review the themes",
-      "reason": "Your analysis is ready — confirm or challenge each theme to sharpen it."
+      "reason": "Your analysis is ready, confirm or challenge each theme to sharpen it."
     },
     "refineAnalysis": {
       "label": "Refine the analysis",
-      "reason": "You've annotated themes — refine for a sharper v2 that takes them into account."
+      "reason": "You've annotated themes, refine for a sharper v2 that takes them into account."
     },
     "waitResponses": {
       "label": "Waiting on first responses",
-      "reason_one": "{{count}} interview in progress — nothing to do until it finishes.",
-      "reason_other": "{{count}} interviews in progress — nothing to do until they finish."
+      "reason_one": "{{count}} interview in progress, nothing to do until it finishes.",
+      "reason_other": "{{count}} interviews in progress, nothing to do until they finish."
     },
     "projectDone": {
       "label": "This round is in good shape",
@@ -274,20 +274,20 @@
     },
     "addSurveyQuestions": {
       "label": "Add survey questions",
-      "reason": "This survey is empty — the copilot can draft a question set."
+      "reason": "This survey is empty, the copilot can draft a question set."
     },
     "publishSurvey": {
       "label": "Publish the survey",
-      "reason": "Your questions are ready — publish to start collecting responses."
+      "reason": "Your questions are ready, publish to start collecting responses."
     },
     "shareSurvey": {
       "label": "Share the survey",
-      "reason": "{{count}}/{{min}} responses — share the link to reach a reliable sample."
+      "reason": "{{count}}/{{min}} responses, share the link to reach a reliable sample."
     },
     "generateReport": {
       "label": "Generate the report",
-      "reason_one": "{{count}} response is in — synthesise it into findings.",
-      "reason_other": "{{count}} responses are in — synthesise them into findings."
+      "reason_one": "{{count}} response is in, synthesise it into findings.",
+      "reason_other": "{{count}} responses are in, synthesise them into findings."
     },
     "refreshReport": {
       "label": "Refresh the report",
@@ -300,11 +300,11 @@
     },
     "startFirstStudy": {
       "label": "Start your first study",
-      "reason": "A study is one research effort — a survey, an interview round, or both."
+      "reason": "A study is one research effort, a survey, an interview round, or both."
     },
     "studyDone": {
       "label": "“{{name}}” is in good shape",
-      "reason": "This study has a report — nothing needs you right now."
+      "reason": "This study has a report, nothing needs you right now."
     },
     "setUpStudy": {
       "label": "Set up “{{name}}”",
@@ -312,23 +312,23 @@
     },
     "analyzeStudy": {
       "label": "Analyse “{{name}}”",
-      "reason": "Enough data is in — synthesise it into findings."
+      "reason": "Enough data is in, synthesise it into findings."
     },
     "collectStudy": {
       "label": "“{{name}}” is collecting",
-      "reason": "Responses are still coming in — share the links to reach a sample."
+      "reason": "Responses are still coming in, share the links to reach a sample."
     },
     "workspaceDone": {
       "label": "Your studies are all moving",
-      "reason": "Every study has a report — nothing needs you right now."
+      "reason": "Every study has a report, nothing needs you right now."
     },
     "analysisGenerating": {
       "label": "Analysis running…",
-      "reason": "The AI synthesis is being generated — check back in a minute."
+      "reason": "The AI synthesis is being generated, check back in a minute."
     },
     "retryAnalysis": {
       "label": "Retry the analysis",
-      "reason": "The last analysis run failed — run it again."
+      "reason": "The last analysis run failed, run it again."
     },
     "collectMore": {
       "label": "Collect more interviews ({{count}}/{{min}})",
@@ -337,15 +337,15 @@
   },
   "nudges": {
     "analysisReady": "Your analysis is ready to review.",
-    "dataMilestone": "You've got {{count}} completed interviews — enough to analyse.",
-    "analysisStale": "{{count}} new interviews since the last analysis — worth refreshing.",
-    "qualityFlag": "A low-quality interview just came in — worth a look.",
-    "studyReportReady": "“{{name}}” — the analysis report is ready."
+    "dataMilestone": "You've got {{count}} completed interviews, enough to analyse.",
+    "analysisStale": "{{count}} new interviews since the last analysis, worth refreshing.",
+    "qualityFlag": "A low-quality interview just came in, worth a look.",
+    "studyReportReady": "“{{name}}”, the analysis report is ready."
   },
   "reports": {
     "eyebrow": "Your outputs",
     "title": "Reports",
-    "sub": "Every generated report in one place — open any document directly.",
+    "sub": "Every generated report in one place, open any document directly.",
     "emptyAll": "No reports generated yet. Run the analysis on a study to produce its report, and it will appear here.",
     "studyReports": {
       "eyebrow": "Per study",
@@ -360,7 +360,7 @@
     "qualReports": {
       "eyebrow": "Interviews",
       "title": "Qualitative findings",
-      "sub": "The interview-only analysis for each study — themes, personas, journey, and recommendations.",
+      "sub": "The interview-only analysis for each study, themes, personas, journey, and recommendations.",
       "badge": "Qualitative",
       "open": "Open findings",
       "opening": "Opening…"
@@ -368,7 +368,7 @@
     "surveyReports": {
       "eyebrow": "Survey",
       "title": "Survey results",
-      "sub": "The quantitative results for each survey — charts, segments, and the key numbers.",
+      "sub": "The quantitative results for each survey, charts, segments, and the key numbers.",
       "badge": "Survey",
       "open": "Open results",
       "opening": "Opening…"
@@ -396,10 +396,10 @@
       "interviews_other": "{{count}} completed interviews",
       "responses_one": "{{count}} survey response",
       "responses_other": "{{count}} survey responses",
-      "quiet": "All quiet — your studies are set up and waiting."
+      "quiet": "All quiet, your studies are set up and waiting."
     },
     "firstRun": {
-      "sub": "You don't have a study yet — let's create your first one."
+      "sub": "You don't have a study yet, let's create your first one."
     },
     "filters": {
       "all": "All",
@@ -470,7 +470,7 @@
     "tour": {
       "eyebrow": "Start here",
       "title": "We set up a demo study for you",
-      "body": "A complete, real example — interviews already answered, transcribed and analysed — so you can see how everything works before running your own. Take your time; when you're curious, open it.",
+      "body": "A complete, real example, interviews already answered, transcribed and analysed, so you can see how everything works before running your own. Take your time; when you're curious, open it.",
       "clickHint": "Click the highlighted study to look inside",
       "skip": "No thanks, I'll explore on my own"
     },
@@ -478,7 +478,7 @@
       "freeTrial": "Free trial",
       "upgrade": "Upgrade",
       "manage": "Manage",
-      "manageAria": "Plan and billing — open account settings"
+      "manageAria": "Plan and billing, open account settings"
     },
     "copilotWelcome": "Once you start your first study, I'll be right here to help you shape it and make sense of the results.",
     "archive": {
@@ -489,7 +489,7 @@
       "restore": "Restore",
       "archivedToast": "“{{name}}” archived",
       "restoredToast": "“{{name}}” restored",
-      "error": "Something went wrong — please try again."
+      "error": "Something went wrong, please try again."
     }
   }
 }

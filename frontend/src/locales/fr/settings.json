@@ -10,7 +10,7 @@
     "usageTeam": "sièges équipe",
     "usageAi": "analyse IA",
     "usageExport": "export CSV",
-    "planBadgeAria": "Forfait actuel — ouvrir la facturation"
+    "planBadgeAria": "Forfait actuel, ouvrir la facturation"
   },
   "tabs": {
     "profile": "Profil",
@@ -32,7 +32,7 @@
     "newPasswordPlaceholder": "Au moins 8 caractères",
     "updatePassword": "Mettre à jour le mot de passe",
     "passwordUpdated": "✓ Mot de passe mis à jour",
-    "saveError": "Impossible d'enregistrer — veuillez réessayer.",
+    "saveError": "Impossible d'enregistrer, veuillez réessayer.",
     "passwordError": "Nous n'avons pas pu mettre à jour votre mot de passe. Vérifiez votre mot de passe actuel et réessayez.",
     "languageTitle": "Langue",
     "languageWarning": "Seuls les menus et les nouveaux contenus seront traduits. Vos études existantes, guides d'entretien et rapports d'analyse ne seront pas retraduits."
@@ -57,17 +57,17 @@
       "csvExport": "Export CSV",
       "teamMembers": "Membres de l'équipe",
       "included": "✓ Inclus",
-      "upgrade": "— Passez à une offre supérieure pour débloquer"
+      "upgrade": "Passez à une offre supérieure pour débloquer"
     },
     "freeTrial": "Essai gratuit",
     "trialCreditsHint": "Vos crédits d'entretien gratuits n'expirent pas. Aucune carte bancaire requise.",
     "usageThisPeriod": "Utilisation cette période",
-    "creditsPurchased": "Paiement reçu — vos crédits apparaîtront dans un instant.",
+    "creditsPurchased": "Paiement reçu, vos crédits apparaîtront dans un instant.",
     "upgradeSuccess": "Vous êtes passé·e à l'offre supérieure. Bienvenue à bord !",
-    "checkoutError": "Impossible d'ouvrir le paiement — réessayez ou contactez le support.",
-    "portalError": "Impossible d'ouvrir le portail de facturation — réessayez ou contactez le support.",
+    "checkoutError": "Impossible d'ouvrir le paiement, réessayez ou contactez le support.",
+    "portalError": "Impossible d'ouvrir le portail de facturation, réessayez ou contactez le support.",
     "embeddedLoading": "Chargement du paiement sécurisé…",
-    "embeddedFailed": "Impossible de charger le formulaire de paiement — fermez et réessayez.",
+    "embeddedFailed": "Impossible de charger le formulaire de paiement, fermez et réessayez.",
     "creditsRemaining": "Crédits restants",
     "creditsUsed": "Crédits utilisés",
     "overageCredits": "Dépassement",
@@ -159,7 +159,7 @@
       "testing": "Envoi…",
       "saved": "✓ Webhook Slack enregistré.",
       "cleared": "Notifications Slack désactivées.",
-      "testSent": "✓ Message test envoyé — vérifiez votre canal Slack.",
+      "testSent": "✓ Message test envoyé, vérifiez votre canal Slack.",
       "testFailed": "Nous n'avons pas pu joindre Slack. Vérifiez l'URL et réessayez.",
       "saveError": "Nous n'avons pas pu enregistrer votre webhook. Veuillez réessayer."
     }
@@ -180,8 +180,8 @@
       "unverified": "Non vérifié",
       "body": "Vérifiez votre e-mail pour sécuriser votre compte et débloquer vos crédits d'entretien.",
       "resend": "Renvoyer l'e-mail de vérification",
-      "resent": "E-mail de vérification envoyé — vérifiez votre boîte de réception.",
-      "resendError": "Impossible d'envoyer l'e-mail — réessayez dans une minute.",
+      "resent": "E-mail de vérification envoyé, vérifiez votre boîte de réception.",
+      "resendError": "Impossible d'envoyer l'e-mail, réessayez dans une minute.",
       "memberSince": "Membre depuis {{date}}"
     },
     "planCard": {
@@ -226,7 +226,7 @@
   "security": {
     "twoFactor": {
       "title": "Authentification à deux facteurs",
-      "description": "Ajoutez une seconde étape à la connexion avec un code d'une application d'authentification (Google Authenticator, 1Password, Authy…). Fortement recommandé — vos données de recherche restent protégées même si votre mot de passe fuite.",
+      "description": "Ajoutez une seconde étape à la connexion avec un code d'une application d'authentification (Google Authenticator, 1Password, Authy…). Fortement recommandé, vos données de recherche restent protégées même si votre mot de passe fuite.",
       "enableCta": "Activer l'authentification à deux facteurs",
       "disableCta": "Désactiver l'authentification à deux facteurs",
       "enabledStatus": "L'authentification à deux facteurs est active",

@@ -1,6 +1,6 @@
 {
   "topBar": {
-    "homeAriaLabel": "Home — your studies",
+    "homeAriaLabel": "Home, your studies",
     "breadcrumbAriaLabel": "Breadcrumb"
   },
   "dashboardShell": {
@@ -47,7 +47,7 @@
     "loading": "Loading…",
     "thanksTitle": "Thanks for your response.",
     "thanksBody": "Your answers have been recorded. You can close this tab.",
-    "anonymousNote": "This survey is anonymous — your responses are not linked to your identity.",
+    "anonymousNote": "This survey is anonymous, your responses are not linked to your identity.",
     "emailLabel": "Email (optional)",
     "emailPlaceholder": "you@example.com",
     "emailHelp": "Lets us link your response if you come back, and lets the researcher invite you to a follow-up interview. Never shared outside this study.",

@@ -7,7 +7,7 @@
     "surveyNotFound": "Survey not found",
     "loadQuestionsFailed": "Failed to load questions",
     "addQuestionFailed": "Could not add question",
-    "saveFailed": "Save failed — your edit didn't stick",
+    "saveFailed": "Save failed, your edit didn't stick",
     "removeQuestionFailed": "Could not remove question",
     "reorderFailed": "Reorder didn't save",
     "surveyLive": "Survey is live",
@@ -35,7 +35,7 @@
     "publishFirstHint": "Publish first to create a sharable link.",
     "typePicker": {
       "title": "Add a question",
-      "subtitle": "Pick a type — you can change config after."
+      "subtitle": "Pick a type, you can change config after."
     },
     "typeLabels": {
       "likert": "Likert · 5-point",
@@ -59,7 +59,7 @@
     "coach": {
       "title": "Question coach",
       "checking": "Checking…",
-      "advisory": "Advisory only — apply at your discretion",
+      "advisory": "Advisory only, apply at your discretion",
       "scanning": "Looking for double-barreled phrasing, leading wording, and bias patterns…",
       "suggestedReplacement": "Suggested replacement",
       "applyRewrite": "Apply this rewrite",
@@ -86,7 +86,7 @@
         },
         "unbalanced_scale": {
           "label": "Likert scale is unbalanced",
-          "detail": "This scale length is unusual. 5- and 7-point scales are the validated defaults — unbalanced or non-standard scales bias responses."
+          "detail": "This scale length is unusual. 5- and 7-point scales are the validated defaults, unbalanced or non-standard scales bias responses."
         }
       }
     },
@@ -117,10 +117,10 @@
     "title": "Your surveys",
     "subtitlePrefix": "Build a screener, share a link, or validate themes from a finished interview round. Each survey lives inside a ",
     "subtitleStudy": "Study",
-    "subtitleSuffix": " — the workspace that joins survey answers, interviews, and reports for the same research effort.",
+    "subtitleSuffix": ", the workspace that joins survey answers, interviews, and reports for the same research effort.",
     "viewAllStudies": "View all studies →",
     "templatesTitle": "Start from a template",
-    "templatesMeta": "Pre-built surveys to test the flow end-to-end. The questions are editable after creation — change anything, then publish to start collecting responses.",
+    "templatesMeta": "Pre-built surveys to test the flow end-to-end. The questions are editable after creation, change anything, then publish to start collecting responses.",
     "questionCount": "{{count}} questions",
     "creating": "Creating…",
     "useTemplate": "Use this template →",
@@ -138,7 +138,7 @@
     "exportPdfTitle": "Open the print-ready survey results report",
     "exportPdfLoading": "Preparing…",
     "exportReportFailed": "Could not export the report",
-    "savedSegmentsInfo": "Saved segments ship in Sprint 10 — for now, click 'Invite to AI interview'.",
+    "savedSegmentsInfo": "Saved segments ship in Sprint 10, for now, click 'Invite to AI interview'.",
     "invitesFailed": "Invites failed to send",
     "invitesSent_one": "{{count}} invite sent",
     "invitesSent_other": "{{count}} invites sent",
@@ -184,7 +184,7 @@
     "choice": "choice:",
     "interviewSegment": "Interview this segment →",
     "interviewShort": "Interview →",
-    "recommendedBadge": "Recommended — start here",
+    "recommendedBadge": "Recommended, start here",
     "whoTheyAre": "Who they are",
     "whoTheyAreFallback": "People who answered \"{{choice}}\" to \"{{question}}\"",
     "whyThisSegment": "Why interview them first",
@@ -274,7 +274,7 @@
       "labelNeutral": "NEUTRAL",
       "labelAgree": "AGREE",
       "labelStrongAgree": "STRONGLY AGREE",
-      "note": "Anchors are paired across the scale. You can rephrase each label, but the count of positive and negative options always stays equal — unbalanced scales bias responses toward the majority side."
+      "note": "Anchors are paired across the scale. You can rephrase each label, but the count of positive and negative options always stays equal, unbalanced scales bias responses toward the majority side."
     },
     "multiChoice": {
       "options": "Options",
@@ -284,7 +284,7 @@
       "optionIntegrations": "Better integrations",
       "optionAiFeatures": "More AI features",
       "optionOther": "Other",
-      "anchored": "Anchored — won't be randomized",
+      "anchored": "Anchored, won't be randomized",
       "anchorThis": "Anchor this option",
       "anchor": "Anchor",
       "addOption": "+ Add option"
@@ -298,7 +298,7 @@
       "responseSettings": "Response settings",
       "maxLength": "Max length",
       "characters": "characters",
-      "note": "Open text responses are AI-clustered into themes in the dashboard — a max length under 500 characters keeps clustering quality high."
+      "note": "Open text responses are AI-clustered into themes in the dashboard, a max length under 500 characters keeps clustering quality high."
     }
   },
   "screenerBridge": {
@@ -306,10 +306,10 @@
     "matchesHeadline_one": "respondent matches your filter",
     "matchesHeadline_other": "respondents match your filter",
     "willConsumePrefix": "Will consume up to",
-    "creditsSuffix_one": "credit — credits are only charged when an interview completes.",
-    "creditsSuffix_other": "credits — credits are only charged when an interview completes.",
+    "creditsSuffix_one": "credit, credits are only charged when an interview completes.",
+    "creditsSuffix_other": "credits, credits are only charged when an interview completes.",
     "available": "You have {{n}} available.",
-    "insufficient": "⚠ Your filter exceeds your available credits. We'll invite the first {{n}} respondents and queue the rest — or top up to invite everyone.",
+    "insufficient": "⚠ Your filter exceeds your available credits. We'll invite the first {{n}} respondents and queue the rest, or top up to invite everyone.",
     "inviteToInterview": "Invite to AI interview →",
     "saveSegment": "Save segment"
   },

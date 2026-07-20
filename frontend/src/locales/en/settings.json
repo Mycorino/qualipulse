@@ -10,7 +10,7 @@
     "usageTeam": "team seats",
     "usageAi": "AI analysis",
     "usageExport": "CSV export",
-    "planBadgeAria": "Current plan — open billing"
+    "planBadgeAria": "Current plan, open billing"
   },
   "tabs": {
     "profile": "Profile",
@@ -32,7 +32,7 @@
     "newPasswordPlaceholder": "At least 8 characters",
     "updatePassword": "Update password",
     "passwordUpdated": "✓ Password updated",
-    "saveError": "Could not save — please try again.",
+    "saveError": "Could not save, please try again.",
     "passwordError": "We couldn't update your password. Check your current password and try again.",
     "languageTitle": "Language",
     "languageWarning": "Changing language updates menus and new content only. Existing studies, interview guides, and analysis reports will not be retranslated."
@@ -57,17 +57,17 @@
       "csvExport": "CSV export",
       "teamMembers": "Team members",
       "included": "✓ Included",
-      "upgrade": "— Upgrade to unlock"
+      "upgrade": "Upgrade to unlock"
     },
     "freeTrial": "Free trial",
     "trialCreditsHint": "Your free interview credits don't expire. No credit card required.",
     "usageThisPeriod": "Usage this period",
-    "creditsPurchased": "Payment received — your credits will appear in a moment.",
+    "creditsPurchased": "Payment received, your credits will appear in a moment.",
     "upgradeSuccess": "Your plan has been upgraded. Welcome aboard!",
-    "checkoutError": "Could not open checkout — please try again or contact support.",
-    "portalError": "Could not open the billing portal — please try again or contact support.",
+    "checkoutError": "Could not open checkout, please try again or contact support.",
+    "portalError": "Could not open the billing portal, please try again or contact support.",
     "embeddedLoading": "Loading secure checkout…",
-    "embeddedFailed": "Could not load the payment form — please close and try again.",
+    "embeddedFailed": "Could not load the payment form, please close and try again.",
     "creditsRemaining": "Credits remaining",
     "creditsUsed": "Credits used",
     "overageCredits": "Overage",
@@ -159,7 +159,7 @@
       "testing": "Sending…",
       "saved": "✓ Slack webhook saved.",
       "cleared": "Slack notifications disabled.",
-      "testSent": "✓ Test message sent — check your Slack channel.",
+      "testSent": "✓ Test message sent, check your Slack channel.",
       "testFailed": "We couldn't reach Slack. Double-check the URL and try again.",
       "saveError": "We couldn't save your webhook URL. Please try again."
     }
@@ -180,8 +180,8 @@
       "unverified": "Not verified",
       "body": "Verify your email to secure your account and unlock interview credits.",
       "resend": "Resend verification email",
-      "resent": "Verification email sent — check your inbox.",
-      "resendError": "Could not send the email — please try again in a minute.",
+      "resent": "Verification email sent, check your inbox.",
+      "resendError": "Could not send the email, please try again in a minute.",
       "memberSince": "Member since {{date}}"
     },
     "planCard": {
@@ -226,7 +226,7 @@
   "security": {
     "twoFactor": {
       "title": "Two-factor authentication",
-      "description": "Add a second step at sign-in with a code from an authenticator app (Google Authenticator, 1Password, Authy…). Strongly recommended — it protects your research data even if your password leaks.",
+      "description": "Add a second step at sign-in with a code from an authenticator app (Google Authenticator, 1Password, Authy…). Strongly recommended, it protects your research data even if your password leaks.",
       "enableCta": "Enable two-factor authentication",
       "disableCta": "Disable two-factor authentication",
       "enabledStatus": "Two-factor authentication is on",

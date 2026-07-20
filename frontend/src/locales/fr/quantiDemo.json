@@ -3,7 +3,7 @@
     "hero": {
       "eyebrow": "Design system · Sprint 1",
       "title": "La voix éditoriale de la recherche mixte",
-      "subtitle": "Trois primitives pour la surface quanti — une ChartCard qui impose la discipline « résultat avant graphique », une VerbatimCard qui associe les citations à un extrait audio optionnel, et une MethodologyBox qui ancre chaque rapport dans une notation d'échantillon crédible."
+      "subtitle": "Trois primitives pour la surface quanti, une ChartCard qui impose la discipline « résultat avant graphique », une VerbatimCard qui associe les citations à un extrait audio optionnel, et une MethodologyBox qui ancre chaque rapport dans une notation d'échantillon crédible."
     },
     "methodology": {
       "meta": "Obligatoire en tête de chaque rapport partagé. Variante détaillée en annexe.",
@@ -47,7 +47,7 @@
       },
       "designers": {
         "eyebrow": "Segment · Designers",
-        "takeaway": "La satisfaction des designers penche vers le haut — mais l'échantillon est trop petit pour conclure.",
+        "takeaway": "La satisfaction des designers penche vers le haut, mais l'échantillon est trop petit pour conclure.",
         "counts": {
           "verySatisfied": "Très satisfaits",
           "satisfied": "Satisfaits",
@@ -57,7 +57,7 @@
       },
       "multipleChoice": {
         "eyebrow": "Choix multiple · Q5",
-        "takeaway": "La clarté tarifaire arrive en tête des demandes — deux fois plus souvent que les manques de fonctionnalités.",
+        "takeaway": "La clarté tarifaire arrive en tête des demandes, deux fois plus souvent que les manques de fonctionnalités.",
         "bars": {
           "pricingClarity": "Clarté tarifaire",
           "fasterOnboarding": "Intégration plus rapide",
@@ -68,29 +68,29 @@
       }
     },
     "verbatim": {
-      "meta": "Citation mise en avant avec lecture audio optionnelle. Par défaut, attribution au segment seul (priorité à la confidentialité) — les noms n'apparaissent que si les participants ont consenti à être identifiés.",
-      "q1": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin.",
+      "meta": "Citation mise en avant avec lecture audio optionnelle. Par défaut, attribution au segment seul (priorité à la confidentialité), les noms n'apparaissent que si les participants ont consenti à être identifiés.",
+      "q1": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire, je payais des sièges dont je n'avais pas besoin.",
       "q2": "Le format d'entretien semblait étonnamment naturel. J'ai oublié que c'était une IA dès la deuxième question.",
       "q3": "Ce que je veux, c'est moins d'outils, pas plus de fonctionnalités. Chaque nouveau tableau de bord est un onglet de plus que je n'ouvrirai jamais.",
       "q4": "Honnêtement ? J'ai juste besoin que ce soit rapide. Tout le reste est négociable."
     },
     "statHero": {
-      "meta": "Le motif de page pour les associations « chiffre + voix » — 60/40, chiffre à gauche, citation à droite. Un seul chiffre par bloc. La forme d'onde dans la citation est l'interaction signature.",
+      "meta": "Le motif de page pour les associations « chiffre + voix », 60/40, chiffre à gauche, citation à droite. Un seul chiffre par bloc. La forme d'onde dans la citation est l'interaction signature.",
       "onboarding": {
         "eyebrow": "Intégration · Q2",
         "description": "des nouveaux utilisateurs abandonnent l'intégration avant d'atteindre la troisième étape.",
         "meta": "n=247 · IC 95 % ±5,4 pts · 14 avr. – 02 mai 2026",
-        "quote": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin."
+        "quote": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire, je payais des sièges dont je n'avais pas besoin."
       },
       "recommendation": {
         "eyebrow": "Recommandation · Q7",
-        "description": "Net Promoter Score sur l'ensemble des réponses complètes — les promoteurs l'emportent sur les détracteurs, mais un segment virulent se forme.",
+        "description": "Net Promoter Score sur l'ensemble des réponses complètes, les promoteurs l'emportent sur les détracteurs, mais un segment virulent se forme.",
         "meta": "n=247 · 47 % promoteurs · 22 % détracteurs",
-        "quote": "Franchement, je le recommanderais dès demain si l'analyse prenait deux fois moins de temps. Pour l'instant c'est un 7 — ça pourrait être un 9."
+        "quote": "Franchement, je le recommanderais dès demain si l'analyse prenait deux fois moins de temps. Pour l'instant c'est un 7, ça pourrait être un 9."
       }
     },
     "audioClip": {
-      "title": "AudioClip — variante forme d'onde",
+      "title": "AudioClip, variante forme d'onde",
       "metaPart1": "Forme d'onde procédurale teintée avec la palette de visualisation. Les barres pleines suivent la lecture ; la forme est déterministe par",
       "metaPart2": ", si bien que chaque extrait paraît distinct sans décodage audio réel. Le vrai décodage Web Audio viendra plus tard.",
       "demo1": "Démo forme d'onde 1",
@@ -130,10 +130,10 @@
       "items": {
         "summary": "Résumé",
         "segments": "Segments",
-        "nps": "Q1 — Net promoter",
-        "onboarding": "Q2 — Frictions d'intégration",
-        "pricing": "Q3 — Clarté tarifaire",
-        "features": "Q4 — Priorités fonctionnelles",
+        "nps": "Q1, Net promoter",
+        "onboarding": "Q2, Frictions d'intégration",
+        "pricing": "Q3, Clarté tarifaire",
+        "features": "Q4, Priorités fonctionnelles",
         "responses": "Toutes les réponses"
       },
       "strip": {
@@ -201,7 +201,7 @@
       }
     },
     "surveyEditor": {
-      "meta": "La surface d'édition de la question en cours de construction. Les configurations propres à chaque type vivent dans une coquille partagée. Des garde-fous en temps réel signalent les questions doubles et les formulations orientées au fil de la saisie — essayez d'écrire « Êtes-vous satisfait de la vitesse et de la fiabilité ? » ou « Adorez-vous notre produit ? » pour les voir se déclencher.",
+      "meta": "La surface d'édition de la question en cours de construction. Les configurations propres à chaque type vivent dans une coquille partagée. Des garde-fous en temps réel signalent les questions doubles et les formulations orientées au fil de la saisie, essayez d'écrire « Êtes-vous satisfait de la vitesse et de la fiabilité ? » ou « Adorez-vous notre produit ? » pour les voir se déclencher.",
       "prompts": {
         "likert": "Êtes-vous satisfait de la vitesse et de la fiabilité du pipeline d'analyse ?",
         "multiChoice": "Lequel des éléments suivants améliorerait le plus votre flux de travail ?",
@@ -210,26 +210,26 @@
       }
     },
     "screenerBridge": {
-      "meta": "Le levier — conversion questionnaire vers entretien. Les répondants filtrés du questionnaire sont invités en un clic à un entretien vocal IA de 10 minutes. Le coût en crédits est affiché d'emblée ; les crédits ne sont débités que lorsqu'un entretien aboutit réellement.",
-      "detractors": "« Détracteurs utilisant le mobile au quotidien » — Rôle : PM, Région : Amérique du Nord, NPS ≤ 6",
-      "promoters": "« Promoteurs dans des entreprises de 500+ employés » — NPS ≥ 9, Taille d'entreprise ≥ 500"
+      "meta": "Le levier, conversion questionnaire vers entretien. Les répondants filtrés du questionnaire sont invités en un clic à un entretien vocal IA de 10 minutes. Le coût en crédits est affiché d'emblée ; les crédits ne sont débités que lorsqu'un entretien aboutit réellement.",
+      "detractors": "« Détracteurs utilisant le mobile au quotidien », Rôle : PM, Région : Amérique du Nord, NPS ≤ 6",
+      "promoters": "« Promoteurs dans des entreprises de 500+ employés », NPS ≥ 9, Taille d'entreprise ≥ 500"
     },
     "findingCard": {
       "meta": "Le motif de page « titre-action » façon MBB pour le rapport mixte. Titre d'action en serif (style thèse, jamais « Thème : X »), ligne de preuves, ligne d'implication « Et alors ? », pastille de confiance et note d'échantillon. Trois variantes de mise en page selon la composition.",
       "f03": {
         "index": "Résultat 03 sur 07",
-        "actionTitle": "Les déficits de confiance nous coûtent 30 % des nouveaux utilisateurs — à cause du paiement, pas des tarifs.",
-        "context": "Les détracteurs partis durant leur premier mois ont systématiquement pointé le tunnel de paiement comme opaque — même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc ; le paiement, non.",
-        "evidenceEyebrow": "Likert · Q3 — Clarté du paiement",
+        "actionTitle": "Les déficits de confiance nous coûtent 30 % des nouveaux utilisateurs, à cause du paiement, pas des tarifs.",
+        "context": "Les détracteurs partis durant leur premier mois ont systématiquement pointé le tunnel de paiement comme opaque, même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc ; le paiement, non.",
+        "evidenceEyebrow": "Likert · Q3, Clarté du paiement",
         "evidenceTakeaway": "Les détracteurs jugent le paiement 3× plus confus que les promoteurs, et 2× plus confus que les tarifs.",
-        "verbatim1": "La page tarifs avait du sens. Le paiement m'a demandé des choses auxquelles je ne m'attendais pas — c'est là que j'ai abandonné.",
+        "verbatim1": "La page tarifs avait du sens. Le paiement m'a demandé des choses auxquelles je ne m'attendais pas, c'est là que j'ai abandonné.",
         "verbatim2": "J'ai vraiment cru qu'on me facturait deux fois. Les lignes ne correspondent pas à ce qui est sur la page tarifs.",
         "implication": "Réorganiser le paiement pour qu'il reflète la page tarifs ligne par ligne. Le texte tarifaire instaure la confiance ; le paiement défait ce travail en 30 secondes.",
         "sampleNote": "n=247 questionnaire · 18 entretiens de suivi · 4 segments"
       },
       "f04": {
         "index": "Résultat 04 sur 07",
-        "actionTitle": "Les promoteurs citent la synthèse IA comme leur raison de renouveler — pas l'outil d'entretien.",
+        "actionTitle": "Les promoteurs citent la synthèse IA comme leur raison de renouveler, pas l'outil d'entretien.",
         "evidenceEyebrow": "Choix multiple · Q5",
         "evidenceTakeaway": "Le rapport IA est la raison de renouvellement la plus citée, deux fois plus souvent que l'outil d'entretien lui-même.",
         "bars": {
@@ -244,9 +244,9 @@
       },
       "f05": {
         "index": "Résultat 05 sur 07",
-        "actionTitle": "Les designers pourraient constituer un ICP à part entière — mais l'échantillon est trop mince pour s'engager.",
+        "actionTitle": "Les designers pourraient constituer un ICP à part entière, mais l'échantillon est trop mince pour s'engager.",
         "evidenceEyebrow": "Segment · Designers",
-        "evidenceTakeaway": "Le principal cas d'usage des designers semble distinct de celui des PM et des chercheurs — mais à n=12, impossible de le confirmer.",
+        "evidenceTakeaway": "Le principal cas d'usage des designers semble distinct de celui des PM et des chercheurs, mais à n=12, impossible de le confirmer.",
         "counts": {
           "conceptTesting": "Test de concept",
           "brandPerception": "Perception de marque",
@@ -259,7 +259,7 @@
       }
     },
     "segment2x2": {
-      "meta": "Le motif de page qui force le MECE. Les teintes des cellules varient selon la part de volume, pour que l'œil se pose d'abord sur le quadrant le plus lourd. Une citation par cellule, jamais deux — la discipline sur la page.",
+      "meta": "Le motif de page qui force le MECE. Les teintes des cellules varient selon la part de volume, pour que l'œil se pose d'abord sur le quadrant le plus lourd. Une citation par cellule, jamais deux, la discipline sur la page.",
       "xAxisLabel": "Sophistication de la solution →",
       "yAxisLabel": "Intensité du besoin →",
       "q1": {
@@ -280,7 +280,7 @@
       }
     },
     "crossTab": {
-      "meta": "Tableau thème × segment avec mise en forme conditionnelle en teintes séquentielles. Les cellules sous n=30 affichent des effectifs (pas des pourcentages) sur fond hachuré — l'honnêteté des petits effectifs est intégrée d'emblée.",
+      "meta": "Tableau thème × segment avec mise en forme conditionnelle en teintes séquentielles. Les cellules sous n=30 affichent des effectifs (pas des pourcentages) sur fond hachuré, l'honnêteté des petits effectifs est intégrée d'emblée.",
       "columns": {
         "pms": "PM",
         "researchers": "Chercheurs",
@@ -297,7 +297,7 @@
       },
       "note": "La colonne Designers affiche des effectifs car n=12 est sous le seuil d'inférence (n≥30). Les thèmes sont regroupés par IA à partir des réponses en texte libre ; les cellules montrent le % du segment ayant mentionné le thème."
     },
-    "footer": "Sprint 1 + 2 + 3 + 4 — extension du design system pour le chantier quanti. 13 nouveaux composants : ChartCard, VerbatimCard, MethodologyBox, StatHero, CompareChips, DashboardShell, DashboardStrip, QuestionTypeCard, SurveyQuestionEditor, ScreenerBridge, FindingCard, Segment2x2, CrossTabTable, ainsi qu'une variante forme d'onde sur la primitive AudioClip existante. Sprint 5 ensuite : mise en page scrollytelling du rapport + feuille de style d'impression + PrioritizationMatrix.",
+    "footer": "Sprint 1 + 2 + 3 + 4, extension du design system pour le chantier quanti. 13 nouveaux composants : ChartCard, VerbatimCard, MethodologyBox, StatHero, CompareChips, DashboardShell, DashboardStrip, QuestionTypeCard, SurveyQuestionEditor, ScreenerBridge, FindingCard, Segment2x2, CrossTabTable, ainsi qu'une variante forme d'onde sur la primitive AudioClip existante. Sprint 5 ensuite : mise en page scrollytelling du rapport + feuille de style d'impression + PrioritizationMatrix.",
     "charts": {
       "likert": {
         "stronglyDisagree": "Pas du tout d'accord",
@@ -323,8 +323,8 @@
   "reportDemo": {
     "cover": {
       "eyebrow": "Rapport méthodes mixtes · T2 2026",
-      "title": "Pourquoi les nouveaux utilisateurs partent — tarifs, confiance et la falaise du paiement.",
-      "lede": "Une étude auprès de 247 utilisateurs de leur premier mois, combinant un questionnaire structuré à 18 entretiens de suivi — pour quantifier les facteurs d'attrition que nous soupçonnions et révéler ceux que nous ignorions.",
+      "title": "Pourquoi les nouveaux utilisateurs partent, tarifs, confiance et la falaise du paiement.",
+      "lede": "Une étude auprès de 247 utilisateurs de leur premier mois, combinant un questionnaire structuré à 18 entretiens de suivi, pour quantifier les facteurs d'attrition que nous soupçonnions et révéler ceux que nous ignorions.",
       "sampleLabel": "Échantillon",
       "sampleValue": "n=247 + 18 entretiens",
       "fieldWindowLabel": "Période de terrain",
@@ -336,8 +336,8 @@
       "methodology": "Méthodologie",
       "executiveSummary": "Résumé",
       "headlineMetric": "Chiffre clé",
-      "finding03": "Résultat 03 — La falaise du paiement",
-      "finding04": "Résultat 04 — L'IA, moteur de renouvellement",
+      "finding03": "Résultat 03, La falaise du paiement",
+      "finding04": "Résultat 04, L'IA, moteur de renouvellement",
       "segmentLandscape": "Paysage des segments",
       "themesBySegment": "Thèmes par segment",
       "whatToDoNext": "Que faire ensuite"
@@ -378,20 +378,20 @@
       "note": "Pondéré pour refléter la composition PM / chercheurs du SaaS B2B par taille d'entreprise et région. Les effectifs bruts sont affichés à côté des pourcentages pondérés tout au long du rapport. Les segments sous n=30 sont rapportés en effectifs seuls."
     },
     "executiveSummary": {
-      "headline": "Trois choses — le paiement comble le déficit de confiance, le rapport IA porte le renouvellement, les designers sont peut-être un ICP à part.",
+      "headline": "Trois choses, le paiement comble le déficit de confiance, le rapport IA porte le renouvellement, les designers sont peut-être un ICP à part.",
       "subheadline": "Si nous livrons un seul changement avant la fin du trimestre, c'est le paiement. Les deux autres sont des signaux sur lesquels agir, pas des engagements.",
       "thought1": {
-        "thesis": "Les déficits de confiance coûtent 30 % des nouveaux utilisateurs — et la cause est le paiement, pas la page tarifs.",
+        "thesis": "Les déficits de confiance coûtent 30 % des nouveaux utilisateurs, et la cause est le paiement, pas la page tarifs.",
         "elaboration": "Les détracteurs partis ont systématiquement pointé le paiement comme opaque, même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc sur tous les segments ; le paiement, non. Réordonner les lignes pour refléter les tarifs permettrait de récupérer environ 18 à 22 % de l'attrition du premier mois.",
         "findingRef": "Résultat 03"
       },
       "thought2": {
-        "thesis": "Les promoteurs renouvellent à cause du rapport de synthèse IA — pas à cause de l'outil d'entretien.",
+        "thesis": "Les promoteurs renouvellent à cause du rapport de synthèse IA, pas à cause de l'outil d'entretien.",
         "elaboration": "Quand on leur demande ce qu'ils résilieraient en dernier, les promoteurs citent le rapport 2× plus souvent que la surface d'entretien. Mettons le rapport en avant sur le site marketing ; les entretiens sont la tuyauterie, payée via l'analyse.",
         "findingRef": "Résultat 04"
       },
       "thought3": {
-        "thesis": "Les designers sont peut-être un ICP à part — mais l'échantillon est trop mince pour s'engager.",
+        "thesis": "Les designers sont peut-être un ICP à part, mais l'échantillon est trop mince pour s'engager.",
         "elaboration": "Les designers (n=12) déclarent un cas d'usage principal différent (test de concept, pas recherche client). Le signal est intéressant mais pas encore exploitable ; nous recommandons un questionnaire de 30 répondants designers avant tout travail produit.",
         "findingRef": "Résultat 05"
       },
@@ -405,22 +405,22 @@
       "eyebrow": "Intégration · Q2",
       "description": "des nouveaux utilisateurs abandonnent le parcours d'intégration avant d'atteindre la troisième étape.",
       "meta": "n=247 · IC 95 % ±5,4 pts",
-      "quote": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire — je payais des sièges dont je n'avais pas besoin."
+      "quote": "J'ai failli résilier la semaine dernière. La page tarifs n'a jamais expliqué ce que « équipe » voulait vraiment dire, je payais des sièges dont je n'avais pas besoin."
     },
     "finding03": {
       "index": "Résultat 03 sur 07",
-      "actionTitle": "Les déficits de confiance nous coûtent 30 % des nouveaux utilisateurs — à cause du paiement, pas des tarifs.",
-      "context": "Les détracteurs partis durant leur premier mois ont systématiquement pointé le paiement comme opaque — même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc ; le paiement, non.",
-      "evidenceEyebrow": "Likert · Q3 — Clarté du paiement",
+      "actionTitle": "Les déficits de confiance nous coûtent 30 % des nouveaux utilisateurs, à cause du paiement, pas des tarifs.",
+      "context": "Les détracteurs partis durant leur premier mois ont systématiquement pointé le paiement comme opaque, même lorsque leur objection déclarée portait sur le prix. La page tarifs a passé le test sans accroc ; le paiement, non.",
+      "evidenceEyebrow": "Likert · Q3, Clarté du paiement",
       "evidenceTakeaway": "Les détracteurs jugent le paiement 3× plus confus que les promoteurs.",
-      "verbatim1": "La page tarifs avait du sens. Le paiement m'a demandé des choses auxquelles je ne m'attendais pas — c'est là que j'ai abandonné.",
+      "verbatim1": "La page tarifs avait du sens. Le paiement m'a demandé des choses auxquelles je ne m'attendais pas, c'est là que j'ai abandonné.",
       "verbatim2": "J'ai vraiment cru qu'on me facturait deux fois. Les lignes ne correspondent pas à ce qui est sur la page tarifs.",
       "implication": "Réorganiser le paiement pour qu'il reflète la page tarifs ligne par ligne. Le texte tarifaire instaure la confiance ; le paiement défait ce travail en 30 secondes.",
       "sampleNote": "n=247 questionnaire · 18 entretiens de suivi · 4 segments"
     },
     "finding04": {
       "index": "Résultat 04 sur 07",
-      "actionTitle": "Les promoteurs citent la synthèse IA comme leur raison de renouveler — pas l'outil d'entretien.",
+      "actionTitle": "Les promoteurs citent la synthèse IA comme leur raison de renouveler, pas l'outil d'entretien.",
       "evidenceEyebrow": "Choix multiple · Q5",
       "evidenceTakeaway": "Le rapport IA est la raison de renouvellement la plus citée, deux fois plus souvent que l'outil d'entretien lui-même.",
       "bars": {
