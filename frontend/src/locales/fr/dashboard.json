@@ -469,10 +469,10 @@
     "demoBadge": "Démo",
     "tour": {
       "eyebrow": "Commencez ici",
-      "title": "Nous avons préparé une étude de démonstration",
-      "body": "Un exemple réel et complet — des entretiens déjà menés, transcrits et analysés — pour voir comment tout fonctionne avant de lancer la vôtre. Prenez votre temps ; quand vous êtes curieux, ouvrez-la.",
-      "clickHint": "Cliquez sur l'étude encadrée pour regarder à l'intérieur",
-      "skip": "Non merci, j'explore par moi-même"
+      "title": "Ouvrez notre exemple d'étude",
+      "body": "Une étude complète, déjà menée et analysée à explorer.",
+      "clickHint": "Cliquez sur l'étude mise en avant",
+      "skip": "Non merci, j'explore seul"
     },
     "plan": {
       "freeTrial": "Essai gratuit",
