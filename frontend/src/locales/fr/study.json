@@ -184,10 +184,10 @@
     "tour": {
       "eyebrow": "Visite de la démo",
       "instrumentsTab_title": "Vous êtes dans l'espace de l'étude",
-      "instrumentsTab_body": "Une étude peut contenir plusieurs instruments — cette démo associe un sondage et une série d'entretiens. Ouvrez l'onglet Instruments pour les voir.",
+      "instrumentsTab_body": "Une étude peut réunir plusieurs instruments — ici, un sondage et une série d'entretiens.",
       "instrumentsTab_clickHint": "Cliquez sur l'onglet Instruments",
       "interviewRound_title": "La série d'entretiens",
-      "interviewRound_body": "La série d'entretiens rassemble les conversations menées par l'IA — le guide, les transcriptions et l'analyse. Ouvrez-la pour explorer.",
+      "interviewRound_body": "Elle rassemble les conversations menées par l'IA : guide, transcriptions et analyse.",
       "interviewRound_clickHint": "Cliquez sur la série d'entretiens",
       "skip": "Passer la visite"
     }

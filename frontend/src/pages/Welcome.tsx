@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -98,6 +98,11 @@ export default function Welcome() {
   // What goals_freeform the current `suggestions` were generated from —
   // gates the "Refine" button so it only lights up on real changes.
   const [goalsUsed, setGoalsUsed] = useState("");
+  // The exact trimmed goal the on-screen themes were generated from
+  // (null = never generated). A ref, not state, so the global keydown
+  // handler — whose effect deps don't include `suggestions` — always
+  // reads the freshest value and can't regenerate on a stale closure.
+  const generatedFromRef = useRef<string | null>(null);
 
   useEffect(() => {
     getMe()
@@ -137,6 +142,7 @@ export default function Welcome() {
           if (hadGoals || hadCases) {
             setPhase3("themes");
             // Sonnet only pays off when there's a goal to anchor on.
+            generatedFromRef.current = (data.goals_freeform || "").trim();
             fetchSuggestions(hadGoals ? "sonnet" : "haiku");
           }
         }
@@ -230,10 +236,13 @@ export default function Welcome() {
     }
     setSaving(false);
     setPhase3("themes");
-    // Going back and forward with an unchanged goal keeps the themes already
-    // on screen — regenerating would swap the chips under selections the user
-    // already made (and pay for another model call).
-    if (suggestions && trimmed === goalsUsed) return;
+    // Only regenerate when the goal that produced the current themes actually
+    // changed. Keyed off a ref (not `suggestions`/`goalsUsed`) so pressing
+    // Return — whose handler closes over a possibly-stale `suggestions` — can't
+    // slip past this and swap the chips under the user's selections (or pay for
+    // another model call) when nothing changed.
+    if (generatedFromRef.current === trimmed) return;
+    generatedFromRef.current = trimmed;
     // Route by input richness: a typed goal → Sonnet (its anchoring on the
     // user's words is exactly the win); skipped → Haiku (fast, and role-only
     // themes don't need Sonnet's reasoning).
