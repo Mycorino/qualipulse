@@ -99,7 +99,7 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
   return (
     <div className="screening-tr">
       <button className="screening-tr__toggle" onClick={toggleOpen}>
-        {open ? "▾" : "▸"} 🌐 Translations
+        {open ? "▾" : "▸"} 🌐 {t("screeningTranslations.toggle")}
       </button>
       {open && (
         <div className="screening-tr__body">
@@ -126,7 +126,7 @@ export default function ScreeningTranslationsEditor({ projectId, screening, sour
             disabled={generating}
             onChange={(e) => setQuestion(e.target.value)}
           />
-          <label className="field-label" style={{ marginTop: 8 }}>Options</label>
+          <label className="field-label" style={{ marginTop: 8 }}>{t("screeningTranslations.optionsLabel")}</label>
           {screening.options.map((canonical, i) => (
             <div key={i} className="screening-tr__opt">
               <span className="screening-tr__canonical">{canonical}</span>

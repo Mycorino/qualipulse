@@ -2281,7 +2281,7 @@ export default function ProjectDetail() {
                         } catch { toast(tProject("toasts.translationsRegenerateFailed"), "error"); }
                       }}
                     >
-                      🌐 Regenerate all translations
+                      🌐 {tProject("screeningTranslations.regenerateAll")}
                     </button>
                   </div>
                 )
