@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, File, status
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -839,18 +839,38 @@ def start_interview_session(
     )
 
 
+# Accessibility text fallback: max length for a typed answer. Generous enough
+# for a long verbal-style response, tight enough to keep Claude prompts sane.
+MAX_TEXT_ANSWER_CHARS = 5000
+
+
 @router.post("/{token}/{participant_id}/respond", response_model=TurnResponse)
 @limiter.limit("30/minute")
 async def respond_to_question(
     request: Request,
     token: str,
     participant_id: str,
-    audio: UploadFile = File(...),
+    audio: UploadFile | None = File(None),
+    text: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    """Accept an audio response from the participant, process it, and return the next question."""
+    """Accept a participant response, process it, and return the next question.
+
+    Exactly one of `audio` (recorded answer, the default path) or `text`
+    (typed answer, the accessibility fallback for participants without a
+    working microphone) must be provided.
+    """
     link = _get_active_link_or_404(token, db)
     participant = _get_participant_or_404(participant_id, link, db)
+
+    if (audio is None) == (text is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "audio_or_text_required",
+                "message": "Provide exactly one of audio or text.",
+            },
+        )
 
     # Spend ceiling (2x grace for in-flight sessions) — checked before any
     # STT/Claude/TTS work is done.
@@ -878,32 +898,65 @@ async def respond_to_question(
                 transcript=last_turn.response_transcript,
             )
 
-    audio_data = await audio.read()
-    ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
+    if text is not None:
+        # Accessibility text fallback — no STT, no transcode, no audio upload.
+        # The typed answer flows into the engine exactly like a Whisper
+        # transcript; the turn's audio_recording_url stays NULL.
+        typed = text.strip()
+        if not typed:
+            # Mirror the EmptyTranscriptError response shape so the frontend
+            # handles a blank typed answer identically to silent audio.
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "empty_transcript",
+                    "message": "Your answer is empty. Please write a response and try again.",
+                },
+            )
+        if len(typed) > MAX_TEXT_ANSWER_CHARS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "text_too_long",
+                    "message": f"Answers are limited to {MAX_TEXT_ANSWER_CHARS} characters.",
+                },
+            )
+        try:
+            result = process_interview_turn(
+                participant_id, None, None, db, transcript_override=typed
+            )
+        except EmptyTranscriptError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"code": "empty_transcript", "message": str(e)},
+            )
+    else:
+        audio_data = await audio.read()
+        ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
 
-    # Normalise to MP3 for cross-browser playback. Participant browsers record
-    # webm/opus (Chrome/Firefox/Android), which Safari/iOS cannot decode — so a
-    # researcher reviewing on a Mac would see "Audio unavailable". MP3 plays
-    # everywhere and Whisper transcribes it fine. On any transcode failure
-    # (e.g. ffmpeg missing in local dev) we fall back to the original bytes.
-    if needs_transcode(ext):
-        mp3_data = transcode_to_mp3(audio_data, ext)
-        if mp3_data:
-            audio_data = mp3_data
-            ext = ".mp3"
+        # Normalise to MP3 for cross-browser playback. Participant browsers record
+        # webm/opus (Chrome/Firefox/Android), which Safari/iOS cannot decode — so a
+        # researcher reviewing on a Mac would see "Audio unavailable". MP3 plays
+        # everywhere and Whisper transcribes it fine. On any transcode failure
+        # (e.g. ffmpeg missing in local dev) we fall back to the original bytes.
+        if needs_transcode(ext):
+            mp3_data = transcode_to_mp3(audio_data, ext)
+            if mp3_data:
+                audio_data = mp3_data
+                ext = ".mp3"
 
-    audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
-    audio_url = upload_audio(audio_data, audio_key)
+        audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
+        audio_url = upload_audio(audio_data, audio_key)
 
-    try:
-        result = process_interview_turn(participant_id, audio_key, audio_url, db)
-    except EmptyTranscriptError as e:
-        # 422 so the frontend can distinguish "bad audio, please retry" from
-        # 5xx transport failures. The frontend preserves the blob for re-submit.
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"code": "empty_transcript", "message": str(e)},
-        )
+        try:
+            result = process_interview_turn(participant_id, audio_key, audio_url, db)
+        except EmptyTranscriptError as e:
+            # 422 so the frontend can distinguish "bad audio, please retry" from
+            # 5xx transport failures. The frontend preserves the blob for re-submit.
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"code": "empty_transcript", "message": str(e)},
+            )
 
     # On completion, kick off an async ASR sense-check pass (Haiku) that fixes
     # obvious STT errors (proper nouns, domain terms) using study context. The

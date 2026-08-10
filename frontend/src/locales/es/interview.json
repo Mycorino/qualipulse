@@ -304,6 +304,15 @@
     "muteAudio": "Silenciar",
     "unmuteAudio": "Quitar silencio",
     "skipQuestion": "Omitir esta pregunta",
+    "textAnswer": {
+      "toggle": "¿No puedes usar el micrófono? Escribe tu respuesta",
+      "label": "Escribe tu respuesta",
+      "placeholder": "Escribe tu respuesta aquí…",
+      "submit": "Enviar respuesta",
+      "switchToVoice": "Usar el micrófono",
+      "micErrorCta": "Responder por escrito",
+      "emptyError": "Escribe una respuesta antes de enviar."
+    },
     "processing": {
       "transcribing": "🎙️ Transcribiendo tu respuesta…",
       "thinking": "💭 Pensando…",

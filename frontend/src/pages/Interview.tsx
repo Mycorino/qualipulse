@@ -182,6 +182,13 @@ export default function Interview() {
   // Recording UX
   const lastBlobRef = useRef<Blob | null>(null);
   const [pendingBlob, setPendingBlob] = useState<Blob | null>(null);
+  // Accessibility text fallback: participants without a working microphone
+  // can type their answer instead. `textMode` swaps the record controls for a
+  // textarea; the typed value stays in state until a submit succeeds, so a
+  // transport failure retries the same answer (the lastBlobRef equivalent).
+  const [textMode, setTextMode] = useState(false);
+  const [typedAnswer, setTypedAnswer] = useState("");
+  const MAX_TYPED_ANSWER_CHARS = 5000;
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [ttsEnded, setTtsEnded] = useState(true);
   const [processingStep, setProcessingStep] = useState(0);
@@ -946,20 +953,37 @@ export default function Interview() {
 
   async function handleSubmitPending() {
     if (!pendingBlob) return;
-    setProcessing(true);
-    setProcessingStep(0);
-    setShowTranscript(false);
-    setLastTranscript(null);
     const blob = pendingBlob;
     setPendingBlob(null);
+    await submitAnswer(blob);
+  }
+
+  async function handleSubmitTyped() {
+    const value = typedAnswer.trim();
+    if (!value) return;
+    await submitAnswer(value);
+  }
+
+  /** Shared submit pipeline for both recorded (Blob) and typed (string)
+   *  answers — same processing steps, transcript flash, dedupe and retry
+   *  semantics on both paths. */
+  async function submitAnswer(payload: Blob | string) {
+    const isTyped = typeof payload === "string";
+    setProcessing(true);
+    // Typed answers skip STT, so jump straight to the "thinking" step.
+    setProcessingStep(isTyped ? 1 : 0);
+    setShowTranscript(false);
+    setLastTranscript(null);
+    setError("");
 
     const stepInterval = setInterval(() => {
       setProcessingStep((s) => Math.min(s + 1, 3));
     }, 3000);
 
     try {
-      const res = await submitAudio(token!, participantId, blob);
+      const res = await submitAudio(token!, participantId, payload);
       clearInterval(stepInterval);
+      if (isTyped) setTypedAnswer("");
       if (res.is_complete) {
         clearSession();
         setPhase("complete");
@@ -1007,13 +1031,22 @@ export default function Interview() {
       const status = errWithResp?.response?.status;
       const code = errWithResp?.response?.data?.detail?.code;
       if (status === 422 && code === "empty_transcript") {
-        setPendingBlob(null);
-        lastBlobRef.current = null;
-        setError(t("interview.emptyTranscript", {
-          defaultValue: "We didn't catch that — please record again in a quieter spot.",
-        }));
+        if (isTyped) {
+          setError(t("interview.textAnswer.emptyError", {
+            defaultValue: "Please write an answer before sending.",
+          }));
+        } else {
+          setPendingBlob(null);
+          lastBlobRef.current = null;
+          setError(t("interview.emptyTranscript", {
+            defaultValue: "We didn't catch that — please record again in a quieter spot.",
+          }));
+        }
       } else {
-        setPendingBlob(lastBlobRef.current);
+        // Typed answers stay in the textarea (only cleared on success), so a
+        // retry is just pressing Send again — the blob path restores from
+        // lastBlobRef for the same reason.
+        if (!isTyped) setPendingBlob(lastBlobRef.current);
         const isNetwork = !(err as { response?: unknown })?.response;
         if (isNetwork) {
           setError(t("interview.networkError", { defaultValue: "Connection lost — please check your internet and tap Submit to retry." }));
@@ -2040,7 +2073,7 @@ export default function Interview() {
             </div>
           )}
           {error && <div className="error-banner" role="alert">{error}</div>}
-          {recError === "PERMISSION_DENIED" ? (
+          {recError === "PERMISSION_DENIED" && !textMode ? (
             <div className="mic-permission-error">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="1" y1="1" x2="23" y2="23" />
@@ -2077,11 +2110,27 @@ export default function Interview() {
                   </p>
                 );
               })()}
-              <button className="btn btn-primary" onClick={() => window.location.reload()}>
+              {/* Accessibility fallback — anyone landing on this error is
+                  exactly who the typed-answer path exists for. */}
+              <button
+                className="btn btn-primary"
+                style={{ minHeight: 44 }}
+                onClick={() => {
+                  setTextMode(true);
+                  setError("");
+                }}
+              >
+                {t("interview.textAnswer.micErrorCta")}
+              </button>
+              <button
+                className="btn btn-ghost"
+                style={{ minHeight: 44, marginTop: 8 }}
+                onClick={() => window.location.reload()}
+              >
                 {t("micTest.refresh")}
               </button>
             </div>
-          ) : recError ? (
+          ) : recError && !textMode ? (
             <div className="error-banner" role="alert">
               {["MIC_GENERIC", "MIC_NOT_FOUND", "MIC_IN_USE", "MIC_CONSTRAINTS"].includes(recError)
                 ? t(`micError.${recError}`)
@@ -2158,6 +2207,81 @@ export default function Interview() {
                     ↺ {t("interview.reRecord")}
                   </button>
                 </div>
+              </div>
+            ) : textMode ? (
+              <div
+                className="text-answer-area"
+                style={{ width: "100%", maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 10, textAlign: "left" }}
+              >
+                <label htmlFor="typed-answer-input" className="record-label" style={{ textAlign: "left", margin: 0 }}>
+                  {t("interview.textAnswer.label")}
+                </label>
+                <textarea
+                  id="typed-answer-input"
+                  value={typedAnswer}
+                  onChange={(e) => setTypedAnswer(e.target.value)}
+                  maxLength={MAX_TYPED_ANSWER_CHARS}
+                  rows={5}
+                  placeholder={t("interview.textAnswer.placeholder")}
+                  aria-label={t("interview.textAnswer.label")}
+                  style={{
+                    width: "100%",
+                    minHeight: 120,
+                    resize: "vertical",
+                    padding: 12,
+                    fontSize: 15,
+                    lineHeight: 1.5,
+                    fontFamily: "inherit",
+                    borderRadius: 10,
+                    border: "1px solid var(--border-subtle, #d1d5db)",
+                    color: "var(--text-primary)",
+                    background: "var(--bg-primary, #fff)",
+                  }}
+                />
+                <button
+                  className="btn btn-primary"
+                  style={{ minHeight: 44 }}
+                  onClick={handleSubmitTyped}
+                  disabled={!typedAnswer.trim() || ttsPlaying}
+                  title={ttsPlaying ? t("interview.waitForQuestion") : undefined}
+                  aria-label={t("interview.textAnswer.submit")}
+                >
+                  {t("interview.textAnswer.submit")} →
+                </button>
+                {ttsPlaying && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: 12 }}
+                    onClick={() => {
+                      if (audioRef.current) {
+                        audioRef.current.pause();
+                        audioRef.current.currentTime = 0;
+                      }
+                      setTtsPlaying(false);
+                      setTtsEnded(true);
+                    }}
+                  >
+                    {t("interview.skipAudio", { defaultValue: "Skip audio — I'm ready" })}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="text-answer-toggle"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "10px 0",
+                    minHeight: 44,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    color: "var(--text-secondary)",
+                    textDecoration: "underline",
+                  }}
+                  onClick={() => setTextMode(false)}
+                >
+                  {t("interview.textAnswer.switchToVoice")}
+                </button>
               </div>
             ) : isRecording ? (
               <>
@@ -2238,6 +2362,31 @@ export default function Interview() {
               </>
             )}
           </div>
+
+          {!processing && !isRecording && !pendingBlob && !textMode && (
+            <button
+              type="button"
+              className="text-answer-toggle"
+              style={{
+                display: "block",
+                margin: "4px auto 0",
+                background: "none",
+                border: "none",
+                padding: "10px 8px",
+                minHeight: 44,
+                cursor: "pointer",
+                fontSize: 13,
+                color: "var(--text-secondary)",
+                textDecoration: "underline",
+              }}
+              onClick={() => {
+                setTextMode(true);
+                setError("");
+              }}
+            >
+              {t("interview.textAnswer.toggle")}
+            </button>
+          )}
 
           {!processing && !isRecording && !pendingBlob && (
             <button

@@ -304,6 +304,15 @@
     "muteAudio": "Stumm",
     "unmuteAudio": "Ton ein",
     "skipQuestion": "Diese Frage überspringen",
+    "textAnswer": {
+      "toggle": "Mikrofon funktioniert nicht? Tippen Sie Ihre Antwort ein",
+      "label": "Antwort eingeben",
+      "placeholder": "Schreiben Sie Ihre Antwort hier…",
+      "submit": "Antwort senden",
+      "switchToVoice": "Stattdessen das Mikrofon verwenden",
+      "micErrorCta": "Antworten stattdessen eintippen",
+      "emptyError": "Bitte schreiben Sie eine Antwort, bevor Sie senden."
+    },
     "processing": {
       "transcribing": "🎙️ Ihre Antwort wird transkribiert…",
       "thinking": "💭 Denkt nach…",

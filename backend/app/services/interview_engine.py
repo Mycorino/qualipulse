@@ -1049,7 +1049,11 @@ def start_interview(participant_id: str, db: Session) -> dict:
 
 
 def process_interview_turn(
-    participant_id: str, audio_path: str, audio_url: str, db: Session
+    participant_id: str,
+    audio_path: str | None,
+    audio_url: str | None,
+    db: Session,
+    transcript_override: str | None = None,
 ) -> dict:
     """Process a participant's audio response and generate the next question.
 
@@ -1058,12 +1062,37 @@ def process_interview_turn(
     audio_path is the storage key (for STT download); audio_url is the public
     playback URL persisted on the turn so researchers can replay the recording.
 
+    transcript_override is the accessibility text fallback: when set, the
+    participant typed their answer instead of recording it. STT is skipped
+    entirely, the text is treated exactly like a Whisper result, and both
+    audio_path / audio_url are expected to be None (the turn's
+    audio_recording_url stays NULL).
+
     Returns dict with: question_text, tts_audio_url, is_complete
     """
-    # 1. Transcribe the participant's audio
-    audio_data = download_audio(audio_path)
-    filename = os.path.basename(audio_path)
-    transcript, audio_duration, segments = transcribe_audio(audio_data, filename)
+    if transcript_override is not None:
+        # Typed answer — no audio to download or transcribe. The router has
+        # already validated non-empty, length-capped text.
+        transcript = transcript_override
+        audio_duration = 0.0
+        segments = None
+    else:
+        # 1. Transcribe the participant's audio. Hint Whisper with the
+        # interview language (participant choice, else project language):
+        # the hint measurably lowers WER on non-English speech and stops
+        # short answers being misdetected as another language.
+        _p = db.query(Participant).filter(Participant.id == participant_id).first()
+        stt_language = None
+        if _p is not None:
+            stt_language = (
+                getattr(_p, "preferred_language", None)
+                or getattr(_p.project, "language", None)
+            )
+        audio_data = download_audio(audio_path)
+        filename = os.path.basename(audio_path)
+        transcript, audio_duration, segments = transcribe_audio(
+            audio_data, filename, language=stt_language
+        )
 
     # 1a. Guard: Whisper sometimes returns an empty or whitespace-only string
     # for silent/inaudible clips. Saving that and passing it to Claude produces
@@ -1097,7 +1126,9 @@ def process_interview_turn(
         "amara.org",
     )
     _lower_transcript = transcript.strip().lower()
-    if any(p in _lower_transcript for p in _HALLUCINATION_PHRASES):
+    if transcript_override is None and any(
+        p in _lower_transcript for p in _HALLUCINATION_PHRASES
+    ):
         raise EmptyTranscriptError(
             "No speech detected in the recording. Please try again in a quieter environment."
         )
@@ -1123,11 +1154,13 @@ def process_interview_turn(
     _company_id = _proj.company_id
     _project_id = _proj.id
 
-    # Log STT usage now that we have project/company context
-    log_stt_usage(
-        db, audio_duration,
-        company_id=_company_id, project_id=_project_id, participant_id=participant_id,
-    )
+    # Log STT usage now that we have project/company context (typed answers
+    # never touched Whisper, so there is nothing to log)
+    if transcript_override is None:
+        log_stt_usage(
+            db, audio_duration,
+            company_id=_company_id, project_id=_project_id, participant_id=participant_id,
+        )
 
     # PF-3: warm-up handoff. If the turn the participant just answered was the
     # warm-up (question_index = -1), short-circuit Claude entirely and play
