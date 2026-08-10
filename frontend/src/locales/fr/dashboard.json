@@ -45,6 +45,11 @@
     "cta": "Acheter des crédits",
     "dismissAria": "Fermer la bannière de crédits"
   },
+  "dunningBanner": {
+    "title": "Votre dernier paiement a échoué",
+    "desc": "Nous n'avons pas pu encaisser votre dernier paiement. Vos entretiens risquent d'être interrompus tant que votre carte bancaire n'est pas mise à jour.",
+    "cta": "Mettre à jour la carte bancaire"
+  },
   "gettingStarted": {
     "welcome": "Bienvenue, {{name}} ! Configurons votre première étude.",
     "subtitle": "Trois étapes pour lancer votre premier entretien piloté par l'IA.",

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
+    get_editable_project_or_404 as _get_editable_project_or_404,
     get_current_company,
     get_db,
 )
@@ -63,7 +64,7 @@ def create_code(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     # sort_order = next available
     max_order = (
         db.query(ManualCode)
@@ -95,7 +96,7 @@ def rename_code(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     code = (
         db.query(ManualCode)
         .filter(ManualCode.id == code_id, ManualCode.project_id == project_id)
@@ -119,7 +120,7 @@ def delete_code(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     code = (
         db.query(ManualCode)
         .filter(ManualCode.id == code_id, ManualCode.project_id == project_id)
@@ -210,7 +211,7 @@ def create_tag(
     company: Company = Depends(get_current_company),
 ):
     """Tag a quote in an interview turn."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     turn = db.query(InterviewTurn).filter(InterviewTurn.id == turn_id).first()
     if turn is None:
@@ -264,7 +265,7 @@ def delete_tag(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     tag = db.query(QuoteTag).filter(QuoteTag.id == tag_id).first()
     if tag is None:
         raise HTTPException(status_code=404, detail="Tag not found")
@@ -311,7 +312,7 @@ def promote_theme_to_code(
     list of quotes that couldn't be matched to any turn so the UI can
     surface them for manual placement.
     """
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     # 1. Find the analysis and theme.
     analysis = (

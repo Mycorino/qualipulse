@@ -6,9 +6,16 @@ from app.services._clients import call_openai_with_retries
 
 
 def transcribe_audio(
-    audio_data: bytes, filename: str = "recording.webm"
+    audio_data: bytes,
+    filename: str = "recording.webm",
+    language: str | None = None,
 ) -> tuple[str, float, list[dict]]:
     """Transcribe audio bytes using OpenAI Whisper.
+
+    ``language`` is an ISO-639-1 hint (e.g. "fr") from the project's
+    interview language. Passing it measurably lowers Whisper's error rate
+    on non-English speech and prevents code-switching misdetection on
+    short answers; omit/None keeps Whisper's auto-detect.
 
     Returns (transcript_text, duration_seconds, segments).
     Each segment is a dict with keys: start (float seconds), end (float
@@ -19,11 +26,17 @@ def transcribe_audio(
     """
     client = openai.OpenAI(api_key=settings.OPENAI_API_KEY, timeout=httpx.Timeout(60.0))
 
+    kwargs: dict = {}
+    lang = (language or "").strip().lower()[:2]
+    if lang:
+        kwargs["language"] = lang
+
     transcript = call_openai_with_retries(
         lambda: client.audio.transcriptions.create(
             model="whisper-1",
             file=(filename, audio_data),
             response_format="verbose_json",
+            **kwargs,
         ),
         label="whisper transcribe",
     )

@@ -3,9 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { getMe, resendVerification } from "../api/auth";
+import { isBillingPastDue } from "../api/billing";
 
 /**
- * AccountNudges — the trial + email-verification banners.
+ * AccountNudges — the payment-failure, trial and email-verification banners.
  *
  * Sprint 17 folds the dashboard into the Studies list. The trial banner
  * and verification nudge were furniture on the old project-grid
@@ -23,11 +24,15 @@ export function AccountNudges() {
   const [trialDismissed, setTrialDismissed] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
+  const [pastDue, setPastDue] = useState(false);
 
   useEffect(() => {
     getMe()
       .then(setMe)
       .catch(() => setMe(null));
+    isBillingPastDue()
+      .then(setPastDue)
+      .catch(() => setPastDue(false));
   }, []);
 
   if (!me) return null;
@@ -119,6 +124,32 @@ export function AccountNudges() {
     );
   })();
 
+  // Payment failure (dunning). Non-dismissable on purpose, like the
+  // out-of-credits state: it stays until the payment method is fixed.
+  const dunningBanner = pastDue ? (
+    <div className="gs-dunning-banner" role="alert" style={{ marginBottom: 16 }}>
+      <span
+        aria-hidden="true"
+        style={{ display: "inline-flex", alignItems: "center", color: "var(--warning-text)" }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      </span>
+      <div style={{ flex: 1 }}>
+        <strong>{t("dashboard:dunningBanner.title")}</strong>
+        <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.5 }}>
+          {t("dashboard:dunningBanner.desc")}
+        </div>
+      </div>
+      <button
+        className="btn btn-primary btn-sm"
+        onClick={() => navigate("/account/billing")}
+        style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+      >
+        {t("dashboard:dunningBanner.cta")}
+      </button>
+    </div>
+  ) : null;
+
   const verifyBanner =
     !me.email_verified ? (
       <div className="gs-verify-banner" style={{ marginBottom: 16 }}>
@@ -138,9 +169,10 @@ export function AccountNudges() {
       </div>
     ) : null;
 
-  if (!trialBanner && !verifyBanner) return null;
+  if (!dunningBanner && !trialBanner && !verifyBanner) return null;
   return (
     <>
+      {dunningBanner}
       {verifyBanner}
       {trialBanner}
     </>

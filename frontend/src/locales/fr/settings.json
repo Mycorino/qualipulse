@@ -100,7 +100,12 @@
     "billedAnnually": "{{price}} € facturés par an",
     "billedMonthly": "facturé au mois",
     "reassurance": "Résiliable à tout moment · Les crédits achetés et reportés n'expirent jamais · Paiement sécurisé via Stripe",
-    "packsSecondaryTitle": "Vous préférez payer à l'usage ?"
+    "packsSecondaryTitle": "Vous préférez payer à l'usage ?",
+    "dunning": {
+      "title": "Votre dernier paiement a échoué",
+      "desc": "Nous n'avons pas pu encaisser votre dernier paiement. Tant que la situation n'est pas régularisée, vos entretiens risquent d'être interrompus.",
+      "updateCta": "Mettre à jour la carte bancaire"
+    }
   },
   "language": {
     "title": "Langue",

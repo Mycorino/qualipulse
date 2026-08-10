@@ -100,7 +100,12 @@
     "billedAnnually": "€{{price}} billed annually",
     "billedMonthly": "billed monthly",
     "reassurance": "Cancel anytime · Purchased & rolled-over credits never expire · Secure checkout via Stripe",
-    "packsSecondaryTitle": "Prefer to pay as you go?"
+    "packsSecondaryTitle": "Prefer to pay as you go?",
+    "dunning": {
+      "title": "Your last payment failed",
+      "desc": "We could not collect your last payment. Until it is fixed, your interviews may be interrupted.",
+      "updateCta": "Update payment method"
+    }
   },
   "language": {
     "title": "Language",

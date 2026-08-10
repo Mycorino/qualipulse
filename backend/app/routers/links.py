@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
+    get_editable_project_or_404 as _get_editable_project_or_404,
     get_current_company,
     require_verified_company,
     get_db,
@@ -28,7 +29,7 @@ def create_link(
     db: Session = Depends(get_db),
     company: Company = Depends(require_verified_company),
 ) -> LinkResponse:
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     _BASE58 = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
     token = "".join(secrets.choice(_BASE58) for _ in range(43))
@@ -89,14 +90,8 @@ def update_link(
     if link is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link not found")
 
-    # Verify ownership
-    project = (
-        db.query(Project)
-        .filter(Project.id == link.project_id, Project.company_id == company.id)
-        .first()
-    )
-    if project is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link not found")
+    # Workspace access + edit-role check (owner/admin/editor; viewers 403).
+    _get_editable_project_or_404(link.project_id, company.id, db)
 
     if body is None or (
         body.is_active is None

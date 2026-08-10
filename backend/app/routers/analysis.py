@@ -15,6 +15,7 @@ from app.config import settings
 from app.database import SessionLocal
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
+    get_editable_project_or_404 as _get_editable_project_or_404,
     get_current_company,
     get_db,
 )
@@ -54,7 +55,7 @@ def trigger_analysis(
     company: Company = Depends(get_current_company),
 ):
     """Kick off (or re-run) AI synthesis. Optionally filter participants by an attribute."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     # V4 paywall — AI synthesis is one of the premium product features.
     # Free workspaces can tag / memo on their 3 visible transcripts;
@@ -522,7 +523,7 @@ def upsert_theme_annotation(
     company: Company = Depends(get_current_company),
 ):
     """Upsert a theme annotation for a given analysis. Creates if not exists, updates if exists."""
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
 
     # Validate the analysis belongs to this project
     analysis = db.query(ProjectAnalysis).filter(
@@ -583,7 +584,7 @@ def delete_theme_annotation(
     company: Company = Depends(get_current_company),
 ):
     """Delete a theme annotation."""
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
 
     annotation = db.query(AnalysisThemeAnnotation).filter(
         AnalysisThemeAnnotation.id == annotation_id,
@@ -651,7 +652,7 @@ def save_researcher_context(
     company: Company = Depends(get_current_company),
 ):
     """Save researcher context to a specific analysis version."""
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
 
     analysis = (
         db.query(ProjectAnalysis)
@@ -677,7 +678,7 @@ def trigger_refined_analysis(
     company: Company = Depends(get_current_company),
 ):
     """Create a refined analysis based on researcher annotations and context from the latest ready version."""
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
 
     # Check for existing generating analysis
     generating = (
@@ -812,7 +813,7 @@ def create_share_link(
 ):
     """Generate (or return existing) a public share token for the latest ready analysis."""
     import secrets
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     analysis = (
         db.query(ProjectAnalysis)
         .filter(ProjectAnalysis.project_id == project_id, ProjectAnalysis.status == "ready")
@@ -834,7 +835,7 @@ def revoke_share_link(
     company: Company = Depends(get_current_company),
 ):
     """Revoke the public share link for the latest analysis."""
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     analysis = (
         db.query(ProjectAnalysis)
         .filter(ProjectAnalysis.project_id == project_id, ProjectAnalysis.status == "ready")
