@@ -267,6 +267,14 @@ export function recommendationText(r: Recommendation): string {
   return typeof r === "string" ? r : r?.action ?? "";
 }
 
+export interface CodebookStat {
+  code: string;
+  color: string;
+  tag_count: number;
+  participant_count: number;
+  participants_total: number;
+}
+
 export interface AnalysisReport {
   summary: string;
   themes: AnalysisTheme[];
@@ -276,6 +284,8 @@ export interface AnalysisReport {
   confidence: string;
   confidence_rationale?: string;
   participant_count: number;
+  /** Deterministic per-code tag counts, computed server-side in Python. */
+  codebook_stats?: CodebookStat[];
 }
 export interface AnalysisResponse {
   status: "none" | "generating" | "ready" | "failed";

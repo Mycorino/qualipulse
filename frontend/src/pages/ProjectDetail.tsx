@@ -3893,6 +3893,26 @@ export default function ProjectDetail() {
 
                         <div className="analysis-deep__main">
 
+                    {/* Codebook signals — deterministic counts from the
+                        researcher's own tags, computed server-side. */}
+                    {(r.codebook_stats?.length ?? 0) > 0 && (
+                      <div className="analysis-block" id="analysis-codebook-signals">
+                        <h3>{tAnalysis("codebookSignals")}</h3>
+                        <p className="analysis-codebook-signals__hint">{tAnalysis("codebookSignalsHint")}</p>
+                        <div className="analysis-codebook-signals">
+                          {r.codebook_stats!.map((s) => (
+                            <span key={s.code} className="analysis-codebook-signal" style={{ borderColor: s.color }}>
+                              <span className="analysis-codebook-signal__dot" style={{ background: s.color }} />
+                              <strong>{s.code}</strong>
+                              <span className="analysis-codebook-signal__count">
+                                {tAnalysis("codebookSignalCount", { participants: s.participant_count, total: s.participants_total, quotes: s.tag_count })}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Themes */}
                     {r.themes.length > 0 && (
                       <div className="analysis-block" id="analysis-themes">
