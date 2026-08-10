@@ -163,7 +163,10 @@ def _run_ai_quality_assessment_inner(
     if language and language.lower() != "en":
         lang_names = {"fr": "French", "es": "Spanish", "de": "German", "it": "Italian", "pt": "Portuguese"}
         lang_name = lang_names.get(language.lower(), language)
-        language_instruction = f"\n\nIMPORTANT: Respond entirely in {lang_name}."
+        language_instruction = (
+            f"\n\nIMPORTANT: Respond entirely in {lang_name}, except \"notable_quotes\" "
+            "which must stay verbatim in the participant's original language."
+        )
 
     prompt = f"""<role>
 You are a sceptical research-ops reviewer auditing whether THIS participant's transcript \
@@ -201,6 +204,18 @@ cite at least one specific moment in the transcript that justifies it.
 - Short responses (<10 words): {short_pct:.0f}%
 </stats>
 
+<digest>
+Besides the quality audit, produce a researcher-facing digest of WHAT this participant said:
+- "key_takeaways": 3-5 short bullets capturing the participant's main points, behaviours, and
+  motivations. Substance only (what they said), not quality commentary (how well they said it).
+  Each bullet is one sentence, concrete, and grounded in the transcript.
+- "notable_quotes": up to 3 short VERBATIM quotes (each under 200 characters) worth citing in a
+  report. Copy them character-for-character from the participant's answers in their original
+  language, never translate or paraphrase them, and never quote the interviewer. If nothing is
+  quotable, return an empty list.
+Never use em dashes in the takeaways or the summary; use commas or colons instead.
+</digest>
+
 <output_format>
 Return ONLY a JSON object — no markdown fences, no preamble:
 {{
@@ -208,7 +223,9 @@ Return ONLY a JSON object — no markdown fences, no preamble:
   "quality_label": "low" | "fair" | "good" | "strong",
   "summary": "<2-3 sentences. Cite at least one specific moment from the transcript that drove the score.>",
   "strengths": ["<concrete strength tied to a moment>", "..."],
-  "issues": ["<concrete issue tied to a moment>", "..."]
+  "issues": ["<concrete issue tied to a moment>", "..."],
+  "key_takeaways": ["<what the participant said, one sentence>", "..."],
+  "notable_quotes": ["<verbatim participant quote>", "..."]
 }}
 </output_format>{language_instruction}"""
 
@@ -216,7 +233,7 @@ Return ONLY a JSON object — no markdown fences, no preamble:
 
     response = client.messages.create(
         model=ai_models.sonnet(),
-        max_tokens=512,
+        max_tokens=1024,
         **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
         messages=[{"role": "user", "content": prompt}],
     )
@@ -250,11 +267,25 @@ Return ONLY a JSON object — no markdown fences, no preamble:
     if not summary:
         strengths = [s for s in (result.get("strengths") or []) if s and s.strip()]
         summary = strengths[0].strip() if strengths else _fallback_summary(label, language)
+    # Digest: keep only quotes that are actually verbatim (whitespace-tolerant
+    # containment against the raw transcripts) so the report-citable list never
+    # carries a paraphrase.
+    all_answers = " ".join((t.response_transcript or "") for t in responses)
+    normalized_answers = " ".join(all_answers.split())
+    takeaways = [s.strip() for s in (result.get("key_takeaways") or []) if s and s.strip()]
+    quotes = [
+        q.strip()
+        for q in (result.get("notable_quotes") or [])
+        if q and q.strip() and " ".join(q.split()).strip('"“” ') in normalized_answers
+    ]
+
     participant.quality_score = float(result.get("quality_score", 0))
     participant.quality_label = label
     participant.quality_summary = summary
     participant.quality_strengths = json.dumps(result.get("strengths", []))
     participant.quality_issues = json.dumps(result.get("issues", []))
+    participant.key_takeaways = json.dumps(takeaways)
+    participant.notable_quotes = json.dumps(quotes)
     participant.avg_response_words = round(avg_words, 1)
     participant.short_answer_pct = round(short_pct, 1)
     db.commit()

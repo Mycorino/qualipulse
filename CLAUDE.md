@@ -1009,6 +1009,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Project memos (general, theme/JTBD/tension-linked) with full CRUD
 - [x] Segment heatmap (profession / age_range / country vs themes)
 - [x] AI quality assessment per participant (Claude-scored, structured result)
+- [x] Interview digest per participant: the auto-run completion-time quality pass also returns `key_takeaways` (3-5 substance bullets) + `notable_quotes` (up to 3 verbatim quotes, whitespace-tolerant containment check against raw transcripts drops paraphrases). Shown as a "Key takeaways" panel atop the transcript sidebar. Old participants backfill via the existing "AI assessment" button (it clears the summary to force a re-run). Alembic 0057. Tests: `backend/tests/test_quality_digest.py`.
 - [x] Export CSV (participants + all transcript turns, streaming response)
 - [x] Account & billing settings page (Profile tab + Plan & Billing tab)
 - [x] Subscription tier model with **enforced** feature gates (solo/team/lab/enterprise)
@@ -1129,7 +1130,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `project_id`, `token` (unique, urlsafe), `is_active`, `created_at`
 
 ### Participant
-`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `started_at`, `completed_at`
+`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `quality_summary`, `quality_strengths`, `quality_issues`, `key_takeaways` (JSON list), `notable_quotes` (JSON list, verbatim), `started_at`, `completed_at`
 
 ### InterviewTurn
 `id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `translated_response`, `translated_question`, `translation_language`, `translation_source_language`, `cleaned_response`, `cleaned_at`, `created_at`

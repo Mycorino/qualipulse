@@ -152,6 +152,8 @@ export interface ParticipantResponse {
   quality_summary?: string | null;
   quality_strengths?: string[] | null;
   quality_issues?: string[] | null;
+  key_takeaways?: string[] | null;
+  notable_quotes?: string[] | null;
   avg_response_words?: number | null;
   short_answer_pct?: number | null;
   /** V4 paywall — true when this participant's transcript body is

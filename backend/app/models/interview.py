@@ -75,6 +75,11 @@ class Participant(Base):
     quality_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     quality_strengths: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
     quality_issues: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
+    # Interview digest — filled by the same auto-run Claude pass as the quality
+    # assessment so a researcher opening a fresh transcript gets an instant
+    # read without triggering the project-level analysis.
+    key_takeaways: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
+    notable_quotes: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list (verbatim)
     avg_response_words: Mapped[float | None] = mapped_column(Float, nullable=True)
     short_answer_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
 

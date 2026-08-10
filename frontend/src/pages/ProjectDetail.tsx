@@ -3164,6 +3164,36 @@ export default function ProjectDetail() {
 
                     {/* ── Right: Tools sidebar ── */}
                     <div className="transcript-sidebar">
+                      {/* Interview digest — what the participant said, filled by
+                          the same auto-run pass as the quality assessment. */}
+                      {((selectedParticipant.key_takeaways?.length ?? 0) > 0 ||
+                        (selectedParticipant.notable_quotes?.length ?? 0) > 0) && (
+                        <details className="sidebar-panel" open>
+                          <summary className="sidebar-panel__header">
+                            <span className="sidebar-panel__title">{tProject("responses.keyTakeaways")}</span>
+                          </summary>
+                          <div className="sidebar-panel__body">
+                            {(selectedParticipant.key_takeaways?.length ?? 0) > 0 && (
+                              <div className="sidebar-panel__list">
+                                <ul>
+                                  {selectedParticipant.key_takeaways!.map((s, i) => (
+                                    <li key={i}>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {(selectedParticipant.notable_quotes?.length ?? 0) > 0 && (
+                              <div className="sidebar-panel__list">
+                                <h4 className="sidebar-panel__list-title">{tProject("responses.notableQuotes")}</h4>
+                                {selectedParticipant.notable_quotes!.map((q, i) => (
+                                  <blockquote key={i} className="sidebar-panel__quote">{q}</blockquote>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      )}
+
                       {/* Quality Assessment panel — treat the assessment as
                           done once a quality_label exists (that's what the
                           header badge reads). Keying the pending state off

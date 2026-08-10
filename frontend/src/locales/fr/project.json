@@ -441,6 +441,8 @@
     "hide": "Masquer",
     "qualityPending": "L'évaluation qualité est en cours, actualisez dans un instant.",
     "qualityNoSummary": "Évaluation terminée, aucun résumé écrit n'a été généré.",
+    "keyTakeaways": "Points clés",
+    "notableQuotes": "Citations marquantes",
     "wordsPerAnswer": "~{{count}} mots/réponse",
     "shortAnswerPct": "{{pct}}% de réponses courtes",
     "strengths": "Points forts",
