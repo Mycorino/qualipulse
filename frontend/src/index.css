@@ -1615,6 +1615,39 @@ select.field-input {
   max-width: 360px;
 }
 
+/* Per-link participant cap */
+.link-cap-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.link-cap-pill {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.link-cap-pill:hover {
+  border-color: var(--brand-400);
+  color: var(--brand-800);
+}
+
+.link-cap-input {
+  width: 88px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
 /* Guide */
 .system-prompt-preview {
   font-family: "Menlo", "Monaco", "Courier New", monospace;

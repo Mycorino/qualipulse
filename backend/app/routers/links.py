@@ -10,9 +10,9 @@ from app.dependencies import (
     get_db,
 )
 from app.models.company import Company
-from app.models.interview import InterviewLink
+from app.models.interview import InterviewLink, Participant
 from app.models.project import Project
-from app.schemas.interview import LinkResponse
+from app.schemas.interview import LinkResponse, LinkUpdateRequest
 from app.services.analytics import emit_event
 
 router = APIRouter(tags=["links"])
@@ -54,7 +54,7 @@ def create_link(
         is_first_link_on_project=existing_links == 1,
     )
 
-    return _link_to_response(link)
+    return _link_to_response(link, db)
 
 
 @router.get(
@@ -74,15 +74,17 @@ def list_links(
         .order_by(InterviewLink.created_at.desc())
         .all()
     )
-    return [_link_to_response(link) for link in links]
+    return [_link_to_response(link, db) for link in links]
 
 
 @router.patch("/links/{link_id}", response_model=LinkResponse)
-def toggle_link(
+def update_link(
     link_id: str,
+    body: LinkUpdateRequest | None = None,
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> LinkResponse:
+    """Update a link. A bodyless PATCH flips ``is_active`` (legacy toggle)."""
     link = db.query(InterviewLink).filter(InterviewLink.id == link_id).first()
     if link is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link not found")
@@ -96,11 +98,39 @@ def toggle_link(
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link not found")
 
-    link.is_active = not link.is_active
+    if body is None or (
+        body.is_active is None
+        and body.max_participants is None
+        and not body.clear_max_participants
+    ):
+        link.is_active = not link.is_active
+    else:
+        if body.is_active is not None:
+            link.is_active = body.is_active
+        if body.clear_max_participants:
+            link.max_participants = None
+        elif body.max_participants is not None:
+            # Refuse a cap already behind the participants admitted so far —
+            # it would read as "0 remaining" and silently close a live link.
+            admitted = _participant_count(link, db)
+            if body.max_participants < admitted:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "cap_below_current",
+                        "message": (
+                            f"This link already has {admitted} participants. "
+                            f"Set a limit of at least {admitted}, or deactivate the link."
+                        ),
+                        "current": admitted,
+                    },
+                )
+            link.max_participants = body.max_participants
+
     db.commit()
     db.refresh(link)
 
-    return _link_to_response(link)
+    return _link_to_response(link, db)
 
 
 # ---------------------------------------------------------------------------
@@ -109,11 +139,21 @@ def toggle_link(
 
 
 
-def _link_to_response(link: InterviewLink) -> LinkResponse:
+def _participant_count(link: InterviewLink, db: Session) -> int:
+    return (
+        db.query(Participant)
+        .filter(Participant.link_id == link.id)
+        .count()
+    )
+
+
+def _link_to_response(link: InterviewLink, db: Session | None = None) -> LinkResponse:
     return LinkResponse(
         id=link.id,
         token=link.token,
         url=f"/interview/{link.token}",
         is_active=link.is_active,
+        max_participants=link.max_participants,
+        participant_count=_participant_count(link, db) if db is not None else 0,
         created_at=link.created_at,
     )

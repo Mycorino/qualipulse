@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LinkCreate(BaseModel):
@@ -12,9 +12,27 @@ class LinkResponse(BaseModel):
     token: str
     url: str
     is_active: bool
+    # Optional ceiling on participants admitted through this link (None =
+    # uncapped), plus the live count so the UI can show "12 / 50 used".
+    max_participants: int | None = None
+    participant_count: int = 0
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class LinkUpdateRequest(BaseModel):
+    """Partial update for a link. Omitted fields are left untouched.
+
+    ``max_participants`` is tri-state: absent = unchanged, ``null`` = remove
+    the cap, an integer = set it.
+    """
+
+    is_active: bool | None = None
+    max_participants: int | None = Field(default=None, ge=1, le=10000)
+    # Distinguishes "max_participants omitted" from "explicitly set to null",
+    # which Pydantic alone can't express on a plain optional field.
+    clear_max_participants: bool = False
 
 
 class StartInterviewRequest(BaseModel):

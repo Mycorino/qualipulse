@@ -20,6 +20,12 @@ class InterviewLink(Base):
         String(64), unique=True, index=True, nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Optional ceiling on how many participants this link may admit. Protects a
+    # shared link that leaks (forwarded, posted publicly) from draining the
+    # workspace's interview credits: once the cap is reached the link stops
+    # admitting new participants but in-progress interviews still finish.
+    # None = uncapped (the historical behaviour).
+    max_participants: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )

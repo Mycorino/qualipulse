@@ -126,6 +126,10 @@ export interface InterviewLink {
   project_id: string;
   token: string;
   is_active: boolean;
+  /** Participant ceiling for this link; null = uncapped. */
+  max_participants: number | null;
+  /** Participants admitted through this link so far. */
+  participant_count: number;
   created_at: string;
 }
 
@@ -508,6 +512,20 @@ export async function getLinks(projectId: string): Promise<InterviewLink[]> {
 
 export async function toggleLink(linkId: string): Promise<InterviewLink> {
   const { data } = await client.patch<InterviewLink>(`/links/${linkId}`);
+  return data;
+}
+
+/** Set or remove the per-link participant cap. Pass null to remove it. */
+export async function setLinkCap(
+  linkId: string,
+  maxParticipants: number | null,
+): Promise<InterviewLink> {
+  const { data } = await client.patch<InterviewLink>(
+    `/links/${linkId}`,
+    maxParticipants === null
+      ? { clear_max_participants: true }
+      : { max_participants: maxParticipants },
+  );
   return data;
 }
 

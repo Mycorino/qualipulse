@@ -407,5 +407,13 @@
     "copied": "Lien copié, collez-le dans votre navigateur",
     "tryAnyway": "Essayer ici quand même",
     "note": "Votre lien d'entretien reste valable, vous ne perdez rien en changeant."
+  },
+  "linkFull": {
+    "title": "Ce lien d'entretien est complet",
+    "body": "Ce lien a atteint le nombre de participants prévu par le chercheur. Si vous avez été invité, contactez-le pour obtenir un nouveau lien."
+  },
+  "alreadyCompleted": {
+    "title": "Vous avez déjà terminé cet entretien",
+    "body": "Cette adresse e-mail a déjà terminé cet entretien. Merci, vous n'avez rien d'autre à faire."
   }
 }

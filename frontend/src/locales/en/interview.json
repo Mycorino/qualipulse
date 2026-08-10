@@ -407,5 +407,13 @@
     "copied": "Link copied, paste it in your browser",
     "tryAnyway": "Try here anyway",
     "note": "Your interview link stays valid, nothing is lost by switching."
+  },
+  "linkFull": {
+    "title": "This interview link is full",
+    "body": "This link has reached the number of participants the researcher planned for. If you were invited, please get in touch with them for a new link."
+  },
+  "alreadyCompleted": {
+    "title": "You have already completed this interview",
+    "body": "Our records show this email address already finished this interview. Thank you, there is nothing more to do."
   }
 }
