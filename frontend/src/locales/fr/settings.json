@@ -254,6 +254,16 @@
       "description": "Déconnecte ce compte de tous les appareils et navigateurs, y compris celui-ci. Utilisez cette option si vous pensez qu'un appareil que vous avez utilisé n'est plus sûr.",
       "cta": "Se déconnecter de tous les appareils",
       "confirm": "Cela vous déconnecte partout, y compris ici. Continuer ?"
+    },
+    "deleteAccount": {
+      "title": "Supprimer le compte",
+      "description": "Supprime définitivement votre compte avec toutes ses études, entretiens, transcriptions et enregistrements. Cette action est irréversible.",
+      "cta": "Supprimer mon compte",
+      "confirmLabel": "Saisissez votre mot de passe pour confirmer",
+      "oauthHint": "Connecté avec Google et sans mot de passe ? Saisissez DELETE à la place.",
+      "finalConfirm": "Cette action efface définitivement votre compte et toutes ses données. Continuer ?",
+      "confirmCta": "Supprimer définitivement le compte",
+      "genericError": "La suppression du compte a échoué. Vérifiez votre mot de passe et réessayez."
     }
   },
   "loadErrorTitle": "Impossible de charger les paramètres du compte",

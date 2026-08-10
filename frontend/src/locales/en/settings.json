@@ -254,6 +254,16 @@
       "description": "Sign out of every device and browser where this account is logged in, including this one. Use this if you think a device you used is no longer safe.",
       "cta": "Sign out of all devices",
       "confirm": "This signs you out everywhere, including here. Continue?"
+    },
+    "deleteAccount": {
+      "title": "Delete account",
+      "description": "Permanently delete your account with all its studies, interviews, transcripts and recordings. This cannot be undone.",
+      "cta": "Delete my account",
+      "confirmLabel": "Enter your password to confirm",
+      "oauthHint": "Signed in with Google and have no password? Type DELETE instead.",
+      "finalConfirm": "This permanently erases your account and all its data. Continue?",
+      "confirmCta": "Permanently delete account",
+      "genericError": "Account deletion failed. Check your password and try again."
     }
   },
   "loadErrorTitle": "Unable to load account settings",

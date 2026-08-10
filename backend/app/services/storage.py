@@ -5,12 +5,15 @@ R2_PUBLIC_URL in .env to enable R2. When those vars are absent the service
 falls back to local disk (UPLOAD_DIR).
 """
 
+import logging
 import os
 
 import boto3
 from botocore.config import Config
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _r2_enabled() -> bool:
@@ -103,6 +106,42 @@ def storage_key_from_url(url: str) -> str | None:
     if "/audio/" in url:
         return url.split("/audio/", 1)[1]
     return None
+
+
+def delete_audio(key: str) -> bool:
+    """Best-effort deletion of a stored audio object by its storage key.
+
+    Returns True when the delete call succeeded (R2's delete_object is
+    idempotent; a local missing file counts as failure=False). Never raises:
+    GDPR cascades must not abort because one blob is already gone.
+    """
+    if not key:
+        return False
+    try:
+        if _r2_enabled():
+            _r2_client().delete_object(Bucket=settings.R2_BUCKET, Key=key)
+            return True
+        upload_root = os.path.realpath(settings.UPLOAD_DIR)
+        abs_path = os.path.realpath(os.path.join(upload_root, key))
+        # Path-traversal protection: refuse anything resolving outside UPLOAD_DIR.
+        if abs_path != upload_root and not abs_path.startswith(upload_root + os.sep):
+            logger.warning("delete_audio refused key outside UPLOAD_DIR: %r", key)
+            return False
+        if os.path.isfile(abs_path):
+            os.remove(abs_path)
+            return True
+        return False
+    except Exception:
+        logger.warning("delete_audio failed for key=%r", key, exc_info=True)
+        return False
+
+
+def delete_audio_by_url(url: str) -> bool:
+    """Best-effort deletion by the persisted playback URL (see delete_audio)."""
+    key = storage_key_from_url(url) if url else None
+    if not key:
+        return False
+    return delete_audio(key)
 
 
 def download_audio(key: str) -> bytes:

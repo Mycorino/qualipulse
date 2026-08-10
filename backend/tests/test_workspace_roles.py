@@ -105,6 +105,28 @@ def test_viewer_cannot_trigger_analysis(client, workspace, db_session):
     assert resp.json()["detail"]["code"] == "viewer_read_only"
 
 
+def test_viewer_cannot_delete_project(client, workspace):
+    pid = workspace["project"].id
+    resp = client.delete(f"/projects/{pid}", headers=_headers(workspace["viewer"]))
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["code"] == "viewer_read_only"
+    # Still there.
+    read = client.get(f"/projects/{pid}", headers=_headers(workspace["viewer"]))
+    assert read.status_code == 200
+
+
+def test_viewer_cannot_update_or_archive_project(client, workspace):
+    pid = workspace["project"].id
+    upd = client.put(
+        f"/projects/{pid}",
+        json={"name": "Renamed", "questions": []},
+        headers=_headers(workspace["viewer"]),
+    )
+    assert upd.status_code == 403
+    arch = client.patch(f"/projects/{pid}/archive", headers=_headers(workspace["viewer"]))
+    assert arch.status_code == 403
+
+
 def test_owner_unaffected(client, workspace):
     pid = workspace["project"].id
     write = client.post(

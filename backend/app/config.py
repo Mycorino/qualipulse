@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_AUDIO_SIZE_MB: int = 50
     MAX_TEXT_LENGTH: int = 10000
+    # Audio retention: participant audio files (recordings + TTS) are purged
+    # for interviews completed more than this many days ago when the
+    # /admin/retention/run endpoint is hit. 0 = retention purge disabled.
+    # Transcripts are always kept — the retention policy covers audio only.
+    RETENTION_AUDIO_DAYS: int = 0
 
     # CORS — comma-separated origins, e.g. "https://app.yoursite.com,https://yoursite.com"
     ALLOWED_ORIGINS: str = "*"

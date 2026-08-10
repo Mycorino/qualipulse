@@ -32,6 +32,8 @@ from app.models.memo import ProjectMemo
 from app.models.panel import PanelAnswer, PanelProfile, ParticipantMagicToken
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.models.usage import AIUsageLog
+from app.services.deletion import delete_company_data
+from app.services.storage import delete_audio_by_url
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -489,92 +491,79 @@ def delete_user(
         datetime.utcnow().isoformat(),
     )
 
-    project_ids = [
-        row[0]
-        for row in db.query(Project.id).filter(Project.company_id == company_id).all()
-    ]
-
-    if project_ids:
-        participant_ids = [
-            row[0]
-            for row in db.query(Participant.id)
-            .filter(Participant.project_id.in_(project_ids))
-            .all()
-        ]
-
-        if participant_ids:
-            turn_ids = [
-                row[0]
-                for row in db.query(InterviewTurn.id)
-                .filter(InterviewTurn.participant_id.in_(participant_ids))
-                .all()
-            ]
-            if turn_ids:
-                db.execute(sql_delete(QuoteTag).where(QuoteTag.turn_id.in_(turn_ids)))
-            db.execute(
-                sql_delete(InterviewTurn).where(
-                    InterviewTurn.participant_id.in_(participant_ids)
-                )
-            )
-
-        db.execute(
-            sql_delete(Participant).where(Participant.project_id.in_(project_ids))
-        )
-
-        analysis_ids = [
-            row[0]
-            for row in db.query(ProjectAnalysis.id)
-            .filter(ProjectAnalysis.project_id.in_(project_ids))
-            .all()
-        ]
-        if analysis_ids:
-            db.execute(
-                sql_delete(AnalysisThemeAnnotation).where(
-                    AnalysisThemeAnnotation.analysis_id.in_(analysis_ids)
-                )
-            )
-
-        db.execute(
-            sql_delete(ProjectAnalysis).where(
-                ProjectAnalysis.project_id.in_(project_ids)
-            )
-        )
-        db.execute(
-            sql_delete(ManualCode).where(ManualCode.project_id.in_(project_ids))
-        )
-        db.execute(
-            sql_delete(ProjectMemo).where(ProjectMemo.project_id.in_(project_ids))
-        )
-        db.execute(
-            sql_delete(InterviewGuideQuestion).where(
-                InterviewGuideQuestion.project_id.in_(project_ids)
-            )
-        )
-        db.execute(
-            sql_delete(ScreeningQuestion).where(
-                ScreeningQuestion.project_id.in_(project_ids)
-            )
-        )
-        db.execute(
-            sql_delete(InterviewLink).where(InterviewLink.project_id.in_(project_ids))
-        )
-        db.execute(sql_delete(Project).where(Project.company_id == company_id))
-
-    db.execute(
-        sql_delete(EmailVerificationToken).where(
-            EmailVerificationToken.company_id == company_id
-        )
-    )
-    db.execute(
-        sql_delete(PasswordResetToken).where(
-            PasswordResetToken.company_id == company_id
-        )
-    )
-    db.execute(sql_delete(Company).where(Company.id == company_id))
-    db.commit()
+    delete_company_data(db, company, delete_files=True)
 
     _record_audit(db, admin_id, "user_delete", None, email_snapshot,
                   {"name": name_snapshot, "company_id": company_id})
+
+
+# ── Audio retention purge ────────────────────────────────────────────────────
+
+@router.post("/retention/run")
+@limiter.limit("10/minute")
+def run_retention_purge(
+    request: Request,
+    dry_run: bool = Query(default=False),
+    days: Optional[int] = Query(default=None, ge=1),
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin),
+) -> dict:
+    """Purge participant audio (recordings + TTS clips) for interviews
+    completed more than N days ago. Transcripts are kept — the retention
+    policy covers audio only. N defaults to settings.RETENTION_AUDIO_DAYS
+    (0 = disabled); ``?days=`` overrides. ``?dry_run=true`` only counts.
+    """
+    effective_days = days if days is not None else settings.RETENTION_AUDIO_DAYS
+    if effective_days <= 0:
+        return {
+            "enabled": False,
+            "days": effective_days,
+            "dry_run": dry_run,
+            "participants": 0,
+            "turns": 0,
+            "files_deleted": 0,
+        }
+
+    cutoff = datetime.utcnow() - timedelta(days=effective_days)
+    turns = (
+        db.query(InterviewTurn)
+        .join(Participant, InterviewTurn.participant_id == Participant.id)
+        .filter(
+            Participant.status == "completed",
+            Participant.completed_at.isnot(None),
+            Participant.completed_at < cutoff,
+            (InterviewTurn.audio_recording_url.isnot(None))
+            | (InterviewTurn.tts_audio_url.isnot(None)),
+        )
+        .all()
+    )
+
+    participant_ids = {t.participant_id for t in turns}
+    files_deleted = 0
+    if not dry_run:
+        for turn in turns:
+            if turn.audio_recording_url:
+                if delete_audio_by_url(turn.audio_recording_url):
+                    files_deleted += 1
+                turn.audio_recording_url = None
+            if turn.tts_audio_url:
+                if delete_audio_by_url(turn.tts_audio_url):
+                    files_deleted += 1
+                turn.tts_audio_url = None
+        db.commit()
+        logger.info(
+            "RETENTION_AUDIO_PURGE: admin=%s days=%d participants=%d turns=%d files=%d",
+            admin_id, effective_days, len(participant_ids), len(turns), files_deleted,
+        )
+
+    return {
+        "enabled": True,
+        "days": effective_days,
+        "dry_run": dry_run,
+        "participants": len(participant_ids),
+        "turns": len(turns),
+        "files_deleted": files_deleted,
+    }
 
 
 # ── Consumer / panelist deletion ─────────────────────────────────────────────

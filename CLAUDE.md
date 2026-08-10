@@ -1050,11 +1050,14 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Auth page logo clickable (links to `/`), signup password toggle keyboard-accessible
 - [x] Memo timestamps displayed (relative time) in project detail
 - [x] Light-only color scheme (no dark mode)
-- [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented)
+- [x] Team collaboration: invitations + accept flow (`routers/team.py`, `AccountWorkspace.tsx`, `AcceptInvitation.tsx`), roles enforced — viewers are read-only on every mutating project route via `get_editable_project_or_404` (403 `viewer_read_only`); owner/admin/editor can modify. Tests: `test_workspace_roles.py`.
+- [x] Dunning UX: `past_due` triggers a non-dismissable banner on the Studies home + a prominent banner with "Update payment method" (Stripe portal) on `/account/billing`. Only shows when a `stripe_customer_id` exists.
+- [x] Abuse/cost protection: per-workspace daily AI-spend ceiling on the public interview loop (`INTERVIEW_DAILY_COST_LIMIT_USD`, default $50; blocks `/start` at 1x, `/respond` at 2x grace), mirroring the copilot's `COPILOT_DAILY_COST_LIMIT_USD`.
+- [x] Client-side error reporting: SPA window.onerror/unhandledrejection → `POST /telemetry/client-error` (rate-limited, capped payload) → backend ERROR log → Sentry/Cloud Logging. No frontend SDK (VITE_ vars are baked at build; the pipeline injects no DSN).
+- [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented — dead columns; `/billing` reads them as 0)
 - [ ] Email invitation sending (template exists, no send endpoint)
-- [ ] Multi-language TTS voices (language field exists on projects)
+- [ ] Multi-language TTS voices (single `alloy` voice; language handled via prompts + Whisper hint)
 - [ ] Dashboard-level analytics across projects
-- [ ] Team collaboration (multi-user, invitations, roles, audit trail)
 
 ### Participant Side
 - [x] Consent screen (decline → thank-you, no record created)
@@ -1079,9 +1082,9 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Transcript flash ("We heard: …" dismissable confirmation after submit — `/respond` returns the Whisper `transcript` in `TurnResponse`)
 - [x] In-flight participant coaching: engine detects short-answer runs (2+ answers ≤15 words); Claude returns a contextual `coaching` line in its decision JSON (sanitized, static localized fallback in `_coaching_hint_for`); shown as a dismissable banner only when a run *starts*, max 2×/interview (`MAX_COACHING_HINTS`). Tests: `backend/tests/test_participant_coaching.py`
 - [x] In-app webview interstitial (Instagram/Facebook/TikTok/…): UA + capability detection in `frontend/src/utils/inAppBrowser.ts`, shown before any phase — open-in-browser steps, copy-link, Android Chrome `intent://` escape, "Try here anyway" only when recording APIs are present. QA override: `sessionStorage.qp_force_webview=1`. i18n'd in all 6 participant locales
-- [ ] Participant completion email
-- [ ] Text input fallback (accessibility)
-- [ ] Multi-language support
+- [x] Participant completion email (10 languages, sent on completion when the participant left an email)
+- [x] Text input fallback (accessibility): `/respond` accepts `text` instead of `audio` (exactly one required; empty text mirrors the silent-audio 422). Interview UI has a "type your answer instead" toggle and the mic-permission-denied panel leads with it. i18n in all 6 participant locales.
+- [x] Multi-language interviews (en/fr/de/es/it/pt participant UI; engine prompts in 10 languages; Whisper receives the interview language as a hint). TTS voice remains `alloy` for all languages.
 
 ### Infrastructure & DevOps
 - [x] Docker: backend + frontend Dockerfiles, docker-compose.yml with PostgreSQL
@@ -1096,7 +1099,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Sentry integration (optional, configurable via SENTRY_DSN)
 - [x] Alembic migrations (9 versions)
 - [x] SendGrid email delivery (domain-authenticated, 6 email templates)
-- [ ] GDPR tooling (data export, participant deletion)
+- [x] GDPR deletion tooling (single cascade implementation in `services/deletion.py`): researcher-facing `DELETE /projects/{id}` (full study cascade + audio files) and `DELETE /projects/{id}/participants/{pid}`; self-serve `POST /auth/delete-account` (password-confirmed; OAuth-only accounts type DELETE); admin `POST /admin/retention/run` purges participant audio N days after completion (`RETENTION_AUDIO_DAYS`, 0=off, `?dry_run=true`; transcripts kept). CreditLedger/UsageEvent/AIUsageLog audit rows are retained (pseudonymous ids, nulled where FKs say SET NULL). UI: participant delete in Responses, "Delete study permanently" (typed confirmation), Danger zone in Account → Security. Tests: `test_gdpr_deletion.py`.
 - [ ] Prometheus metrics / APM dashboards
 - [ ] Automated DB backups (Neon handles this for production)
 
@@ -1227,6 +1230,7 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | PATCH | `/auth/onboarding` | Yes | Intermediate onboarding save (profile fields) |
 | POST | `/auth/onboarding` | Yes | Complete onboarding (sets `onboarding_completed = true`) |
 | POST | `/auth/newsletter` | No | Newsletter subscription (5/min) |
+| POST | `/auth/delete-account` | Yes (3/min) | GDPR self-serve deletion: password confirm (or literal `DELETE` for OAuth-only accounts), full workspace cascade, 204 |
 
 ### Projects (`/projects`)
 | Method | Path | Auth | Gate | Description |
@@ -1239,6 +1243,10 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | PATCH | `/projects/{id}/archive` | Yes | — | Archive project |
 | PATCH | `/projects/{id}/unarchive` | Yes | — | Unarchive project |
 | PATCH | `/projects/{id}/questions/{qid}` | Yes | — | Edit question metadata |
+| DELETE | `/projects/{id}` | Yes (editor+) | — | Permanently delete project + all data + audio files |
+| DELETE | `/projects/{id}/participants/{pid}` | Yes (editor+) | — | Delete one participant (turns, tags, audio) |
+
+> **Role enforcement:** every mutating project-scoped route (projects, links, analysis, codes/tags, memos, transcripts, quality, deletes) goes through `get_editable_project_or_404` — workspace viewers get 403 `viewer_read_only`; reads stay on `get_accessible_project_or_404`.
 
 ### Links (`/projects/{id}/links`)
 | Method | Path | Auth | Gate | Description |
@@ -1253,10 +1261,10 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | GET | `/interview/{token}` | 60/min | Validate link, get project info |
 | GET | `/interview/{token}/screening-questions` | 60/min | Get screening questions |
 | POST | `/interview/{token}/screen` | 30/min | Check disqualification |
-| GET | `/interview/{token}/resume?email=` | 60/min | Check for in-progress interview |
+| POST | `/interview/{token}/resume` | 60/min | Check for in-progress interview. **Requires the magic-link `session_token`** whose email matches — a bare email match no longer returns a participant_id (hijack fix) |
 | GET | `/interview/{token}/{pid}/resume-summary` | — | Covered topics + elapsed time |
 | POST | `/interview/{token}/start` | 30/min | Create participant + first question |
-| POST | `/interview/{token}/{pid}/respond` | 30/min | Submit audio, get next question |
+| POST | `/interview/{token}/{pid}/respond` | 30/min | Submit audio OR typed `text` (exactly one), get next question. Gated by the daily spend ceiling (2x grace in-flight) |
 | POST | `/interview/{token}/{pid}/skip` | — | Skip current question |
 | GET | `/interview/{token}/{pid}/status` | — | Interview status |
 
@@ -1367,6 +1375,7 @@ All copilot POST endpoints return **SSE** (`text/event-stream`) — events `stat
 | GET | `/admin/costs` | X-Admin-Key | Platform-wide AI cost report |
 | GET | `/admin/costs/company/{company_id}` | X-Admin-Key | Per-company cost breakdown |
 | POST | `/admin/scheduled-emails/run` | X-Admin-Key | Run the lifecycle-email cron pass (Day-1, Day-7, Day-12). Supports `?dry_run=true`. Idempotent via `email_send_log` unique constraint. Hit hourly by Cloud Scheduler. Returns per-event sent/skipped counts. |
+| POST | `/admin/retention/run` | X-Admin-Key | Purge participant audio for interviews completed > `RETENTION_AUDIO_DAYS` days ago (0=disabled). `?dry_run=true`, `?days=` override. Transcripts kept; URLs nulled after file deletion. |
 
 ### Lifecycle emails — scheduling
 The Wave 3B endpoint `/admin/scheduled-emails/run` is designed to be hit hourly by an external cron (Cloud Run scales to zero, no persistent worker). To wire it up:

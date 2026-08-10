@@ -159,6 +159,13 @@ export async function logoutAllSessions(): Promise<void> {
   await client.post("/auth/logout-all");
 }
 
+export async function deleteAccount(password?: string, confirm?: string): Promise<void> {
+  await client.post("/auth/delete-account", {
+    password: password || null,
+    confirm: confirm || null,
+  });
+}
+
 export async function getGoogleAuthorizeUrl(
   next: string = "/dashboard",
   lang: string = ""

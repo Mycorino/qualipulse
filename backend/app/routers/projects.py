@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
+    get_editable_project_or_404 as _get_editable_project_or_404,
     get_current_company,
     require_verified_company,
     get_db,
@@ -44,6 +46,8 @@ from app.services.study_provisioning import study_for_new_project
 from app.services.workspace import accessible_workspace_ids, can_edit, get_member_role
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+logger = logging.getLogger(__name__)
 
 
 def _enforce_project_limit(db: Session, company: Company, current_count: int) -> None:
@@ -393,7 +397,7 @@ def update_project(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> ProjectResponse:
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     # Editing participant-facing free text invalidates its cached translations.
     if (project.name or "").strip() != (body.name or "").strip():
@@ -538,7 +542,7 @@ def patch_project_settings(
     company: Company = Depends(get_current_company),
 ) -> ProjectResponse:
     """Update individual project settings (e.g. panel_collection_enabled)."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
     if body.name is not None and body.name.strip():
         project.name = body.name.strip()
     if body.panel_collection_enabled is not None:
@@ -579,7 +583,7 @@ async def upload_branding_logo(
     Stored in R2 in production (absolute public URL) or under UPLOAD_DIR in
     local dev (served via /files). Same validation as the blog image upload.
     """
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
     ext = IMAGE_EXTENSIONS.get(file.content_type or "")
     if not ext:
         raise HTTPException(
@@ -606,7 +610,7 @@ def archive_project(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> dict:
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
     project.archived_at = datetime.now(timezone.utc)
     db.commit()
     return {"id": project.id, "archived_at": project.archived_at.isoformat()}
@@ -618,10 +622,32 @@ def unarchive_project(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ) -> dict:
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
     project.archived_at = None
     db.commit()
     return {"id": project.id, "archived_at": None}
+
+
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> None:
+    """Permanently delete a study and all its data (GDPR erasure).
+
+    Cascades interviews, transcripts, tags, analyses, memos, guide and
+    screening questions, links, and stored audio files. Demo projects can be
+    deleted too. The parent Study row survives (surveys may live under it).
+    """
+    from app.services.deletion import delete_project_data
+
+    project = _get_editable_project_or_404(project_id, company.id, db)
+    logger.warning(
+        "PROJECT_DELETION: project_id=%s name=%r company_id=%s",
+        project.id, project.name, company.id,
+    )
+    delete_project_data(db, project, delete_files=True)
 
 
 @router.post(
@@ -638,7 +664,7 @@ def add_guide_question(
     """Add one interview-guide question. Section/question indices are
     derived from the section title — a new title starts a new section.
     Powers the Research Copilot's accept flow (and granular Setup edits)."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     live = [q for q in project.guide_questions if q.deprecated_at is None]
     require_question_limit(company, len(live) + 1)
@@ -689,7 +715,7 @@ def add_screening_question(
     """Add one screening question. Disqualifying options are kept to the
     subset that actually appears in `options`. Powers the Research
     Copilot's accept flow for proposed screeners (and granular edits)."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     options = [o.strip() for o in body.options if o and o.strip()]
     disqualifying = [d for d in body.disqualifying_options if d in options]
@@ -733,7 +759,7 @@ def patch_screening_translation(
 ) -> ScreeningQuestionResponse:
     """Researcher edit of one language's localized screening text. Options are
     aligned by index to the canonical options; extra/short arrays are clamped."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
     sq = (
         db.query(ScreeningQuestion)
         .filter(ScreeningQuestion.id == screening_id, ScreeningQuestion.project_id == project.id)
@@ -774,7 +800,7 @@ def regenerate_screening_translations(
 ) -> dict:
     """Re-run auto-translation for all of a project's screening questions
     (background). Used by the 'Regenerate' action in the Setup tab."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
     # Clear existing translations so the background job regenerates fresh.
     for sq in project.screening_questions:
         sq.translations = None
@@ -801,7 +827,7 @@ def generate_screening_translation(
     the Setup-tab editor's on-select autofill. Best-effort — on a model failure
     the translation is simply absent and the editor falls back to canonical
     text, which the researcher can then fill by hand."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
     sq = (
         db.query(ScreeningQuestion)
         .filter(ScreeningQuestion.id == screening_id, ScreeningQuestion.project_id == project.id)
@@ -832,7 +858,7 @@ def patch_question(
     company: Company = Depends(get_current_company),
 ) -> QuestionResponse:
     """Update researcher_notes and/or deprecated_at for a guide question."""
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     question = (
         db.query(InterviewGuideQuestion)

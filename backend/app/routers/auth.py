@@ -1125,6 +1125,48 @@ def change_password(
     }
 
 
+class DeleteAccountRequest(BaseModel):
+    password: Optional[str] = None
+    confirm: Optional[str] = None
+
+
+@router.post("/delete-account", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("3/minute")
+def delete_account(
+    request: Request,
+    body: DeleteAccountRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+) -> None:
+    """Self-serve GDPR account deletion — erases the company and all its data.
+
+    Password accounts must supply the correct current password; OAuth-only
+    accounts (no password hash) must send confirm == "DELETE" instead.
+    """
+    from app.services.deletion import delete_company_data
+
+    if company.password_hash:
+        if not body.password or not verify_password(body.password, company.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Password is incorrect",
+            )
+    else:
+        if body.confirm != "DELETE":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Type "DELETE" to confirm account deletion',
+            )
+
+    logger.warning(
+        "ACCOUNT_SELF_DELETION: company_id=%s email=%s name=%s timestamp=%s",
+        company.id, company.email, company.name,
+        datetime.now(timezone.utc).isoformat(),
+    )
+    summary = delete_company_data(db, company, delete_files=True)
+    logger.warning("ACCOUNT_SELF_DELETION_DONE: %s", summary)
+
+
 # ── Two-factor authentication (TOTP) ──────────────────────────────────
 
 

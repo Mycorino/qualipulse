@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
+    get_editable_project_or_404 as _get_editable_project_or_404,
     get_current_company,
     get_db,
 )
@@ -397,7 +398,7 @@ def ai_quality_assessment(
     """
     from app.services.quality import run_ai_quality_assessment
 
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     participant = (
         db.query(Participant)
@@ -434,6 +435,43 @@ def ai_quality_assessment(
         "avg_response_words": participant.avg_response_words,
         "short_answer_pct": participant.short_answer_pct,
     }
+
+
+@router.delete(
+    "/{project_id}/participants/{participant_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_participant(
+    project_id: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> None:
+    """Permanently delete one participant's interview data (GDPR erasure).
+
+    Removes the transcript turns, quote tags, and stored audio files, then
+    the participant row itself. Billing ledger rows keep only the
+    pseudonymous participant id (financial audit trail, retained on purpose).
+    """
+    import logging
+
+    from app.services.deletion import delete_participant_data
+
+    project = _get_editable_project_or_404(project_id, company.id, db)
+
+    participant = (
+        db.query(Participant)
+        .filter(Participant.id == participant_id, Participant.project_id == project.id)
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    logging.getLogger(__name__).warning(
+        "PARTICIPANT_DELETION: participant_id=%s project_id=%s company_id=%s",
+        participant.id, project.id, company.id,
+    )
+    delete_participant_data(db, participant, delete_files=True)
 
 
 # ---------------------------------------------------------------------------

@@ -529,6 +529,10 @@ export async function setLinkCap(
   return data;
 }
 
+export async function deleteParticipant(projectId: string, participantId: string): Promise<void> {
+  await client.delete(`/projects/${projectId}/participants/${participantId}`);
+}
+
 export async function getParticipants(projectId: string): Promise<ParticipantResponse[]> {
   const { data } = await client.get<ParticipantResponse[]>(`/projects/${projectId}/participants`);
   return data;
