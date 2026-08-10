@@ -27,6 +27,30 @@ export async function getCreditUsage(): Promise<CreditUsage | null> {
   }
 }
 
+/**
+ * Dunning check: true when the workspace has a Stripe subscription whose
+ * last payment failed (status "past_due", set by the Stripe webhook).
+ * Legacy/trial accounts without Stripe state always return false, so the
+ * global banner never shows for them.
+ */
+export async function isBillingPastDue(): Promise<boolean> {
+  try {
+    const { data } = await client.get<{
+      status?: string;
+      stripe_customer_id?: string | null;
+      plan?: { subscription_status?: string; is_legacy?: boolean } | null;
+    }>("/billing/status");
+    if (!data?.stripe_customer_id) return false;
+    // Credit-native accounts carry the truth on plan.subscription_status;
+    // legacy Stripe accounts on the top-level company status.
+    const subStatus =
+      data.plan && !data.plan.is_legacy ? data.plan.subscription_status : data.status;
+    return subStatus === "past_due";
+  } catch {
+    return false;
+  }
+}
+
 /** Canonical plan-display block emitted by GET /billing/status. */
 export interface PlanDisplay {
   plan_name: string;

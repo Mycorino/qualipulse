@@ -45,6 +45,11 @@
     "cta": "Buy credits",
     "dismissAria": "Dismiss credits banner"
   },
+  "dunningBanner": {
+    "title": "Your last payment failed",
+    "desc": "We could not collect your last payment. Interviews may be interrupted until your payment method is updated.",
+    "cta": "Update payment method"
+  },
   "gettingStarted": {
     "welcome": "Welcome, {{name}}! Let's set up your first study.",
     "subtitle": "Three steps to run your first AI-led interview.",

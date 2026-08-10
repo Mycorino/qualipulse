@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
+    get_editable_project_or_404 as _get_editable_project_or_404,
     get_current_company,
     get_db,
 )
@@ -22,6 +23,30 @@ from app.schemas.interview import (
 )
 
 router = APIRouter(prefix="/projects", tags=["export"])
+
+
+def _require_csv_export(db: Session, company: Company) -> None:
+    """Dual-track CSV-export gate.
+
+    Legacy tiers read the ``export_csv`` TierLimits flag; credits-based
+    plans read the ``csv_export`` plan entitlement (the two tracks use
+    different key names, so ``workspace_has_feature`` can't cover both).
+    """
+    from app.services import billing_service
+    from app.services.feature_gates import require_feature
+
+    sub = billing_service.get_current_subscription(db, company.id)
+    plan = billing_service.get_plan(db, sub.plan_id) if sub else None
+    if plan is None or plan.is_legacy:
+        require_feature(company, "export_csv")
+    elif not billing_service.get_entitlements(db, company.id).get("csv_export", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "csv_export_not_included",
+                "message": "CSV export is not included in your current plan.",
+            },
+        )
 
 
 # Filler words/phrases that indicate disengaged or low-quality responses
@@ -283,6 +308,7 @@ def export_transcripts_csv(
 ):
     """Export all interview transcripts for a project as a CSV download."""
     project = _get_project_or_404(project_id, company.id, db)
+    _require_csv_export(db, company)
 
     participants = (
         db.query(Participant)
@@ -372,7 +398,7 @@ def ai_quality_assessment(
     """
     from app.services.quality import run_ai_quality_assessment
 
-    project = _get_project_or_404(project_id, company.id, db)
+    project = _get_editable_project_or_404(project_id, company.id, db)
 
     participant = (
         db.query(Participant)
@@ -409,6 +435,43 @@ def ai_quality_assessment(
         "avg_response_words": participant.avg_response_words,
         "short_answer_pct": participant.short_answer_pct,
     }
+
+
+@router.delete(
+    "/{project_id}/participants/{participant_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_participant(
+    project_id: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> None:
+    """Permanently delete one participant's interview data (GDPR erasure).
+
+    Removes the transcript turns, quote tags, and stored audio files, then
+    the participant row itself. Billing ledger rows keep only the
+    pseudonymous participant id (financial audit trail, retained on purpose).
+    """
+    import logging
+
+    from app.services.deletion import delete_participant_data
+
+    project = _get_editable_project_or_404(project_id, company.id, db)
+
+    participant = (
+        db.query(Participant)
+        .filter(Participant.id == participant_id, Participant.project_id == project.id)
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(status_code=404, detail="Participant not found")
+
+    logging.getLogger(__name__).warning(
+        "PARTICIPANT_DELETION: participant_id=%s project_id=%s company_id=%s",
+        participant.id, project.id, company.id,
+    )
+    delete_participant_data(db, participant, delete_files=True)
 
 
 # ---------------------------------------------------------------------------

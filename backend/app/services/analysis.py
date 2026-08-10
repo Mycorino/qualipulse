@@ -636,7 +636,7 @@ def run_analysis(
     all_completed = [p for p in project.participants if p.status == "completed" and p.turns]
     completed = _filter_participants(all_completed, filter_by, filter_values)
 
-    # Create a new versioned analysis row (keep last 3 per project)
+    # Create a new versioned analysis row (keep last 5 per project)
     last = (
         db.query(ProjectAnalysis)
         .filter(ProjectAnalysis.project_id == project_id)
@@ -657,14 +657,33 @@ def run_analysis(
         analysis.filters = None
     db.commit()
 
-    # Prune: keep only the 5 most recent versions
+    # Prune: keep the 5 most recent versions, but NEVER delete a version
+    # that is still load-bearing: shared via a live public link
+    # (share_token), annotated by the researcher, or the parent of a kept
+    # version (lineage). Silent destruction of a shared report is worse
+    # than a few extra rows.
+    from app.models.interview import AnalysisThemeAnnotation
+
     all_versions = (
         db.query(ProjectAnalysis)
         .filter(ProjectAnalysis.project_id == project_id)
         .order_by(ProjectAnalysis.version.desc())
         .all()
     )
+    kept_parent_ids = {
+        a.parent_version_id for a in all_versions[:5] if a.parent_version_id
+    }
     for old in all_versions[5:]:
+        if old.share_token or old.id in kept_parent_ids:
+            continue
+        has_annotations = (
+            db.query(AnalysisThemeAnnotation.id)
+            .filter(AnalysisThemeAnnotation.analysis_id == old.id)
+            .first()
+            is not None
+        )
+        if has_annotations:
+            continue
         db.delete(old)
     db.commit()
 

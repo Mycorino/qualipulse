@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import session_scope
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
+    get_editable_project_or_404 as _get_editable_project_or_404,
     get_current_company,
     get_db,
 )
@@ -38,7 +39,7 @@ def update_turn_transcript(
     company: Company = Depends(get_current_company),
 ):
     """Update the transcript for a specific interview turn."""
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
 
     participant = (
         db.query(Participant)
@@ -94,7 +95,7 @@ def translate_transcript(
     Returns 202 immediately; translation runs in a background thread and
     cached translations appear on the next transcript GET.
     """
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
 
     participant = (
         db.query(Participant)
@@ -133,7 +134,7 @@ def clean_transcript(
     before the feature shipped). Returns 202; corrections appear on the next
     transcript GET in `cleaned_response`.
     """
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
 
     participant = (
         db.query(Participant)

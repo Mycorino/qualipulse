@@ -234,10 +234,17 @@ def get_entitlements(db: Session, workspace_id: str) -> dict[str, Any]:
     return {row.key: row.value for row in rows}
 
 
-def get_active_balance(db: Session, workspace_id: str) -> CreditBalance | None:
-    """Return the credit_balance row covering 'now', or the most recent one."""
+def get_active_balance(
+    db: Session, workspace_id: str, *, for_update: bool = False
+) -> CreditBalance | None:
+    """Return the credit_balance row covering 'now', or the most recent one.
+
+    ``for_update=True`` takes a row lock (SELECT ... FOR UPDATE) so
+    concurrent consumers serialise on the balance instead of losing
+    read-modify-write updates. No-op on SQLite (dialect ignores it).
+    """
     now = _utcnow()
-    bal = (
+    q = (
         db.query(CreditBalance)
         .filter(
             CreditBalance.workspace_id == workspace_id,
@@ -245,17 +252,21 @@ def get_active_balance(db: Session, workspace_id: str) -> CreditBalance | None:
             CreditBalance.period_end > now,
         )
         .order_by(CreditBalance.period_start.desc())
-        .first()
     )
+    if for_update:
+        q = q.with_for_update()
+    bal = q.first()
     if bal is not None:
         return bal
     # No current period — return the latest if any (e.g. expired trial).
-    return (
+    q = (
         db.query(CreditBalance)
         .filter(CreditBalance.workspace_id == workspace_id)
         .order_by(CreditBalance.period_end.desc())
-        .first()
     )
+    if for_update:
+        q = q.with_for_update()
+    return q.first()
 
 
 # ── Quota check (interview start) ────────────────────────────────────────────
@@ -389,7 +400,7 @@ def consume_interview_credit(
     if existing is not None:
         return None
 
-    balance = get_active_balance(db, workspace_id)
+    balance = get_active_balance(db, workspace_id, for_update=True)
     if balance is None:
         # Shouldn't happen on credit plans — we always grant a balance at
         # checkout. Log loudly and bail.
@@ -557,10 +568,14 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
     Behaviour matrix:
 
     - **No existing subscription** → create a trial sub + balance.
-    - **Existing legacy_* sub from the startup backfill** → replace its
+    - **Existing FREE legacy_starter sub from the startup backfill** (no
+      Stripe subscription id, company not active/past_due) → replace its
       plan + status with trial and create the credit balance. The legacy
       row is updated in place rather than deleted so any inbound Stripe
       webhook with the old subscription id still resolves.
+    - **Existing paying legacy sub** (legacy_team / legacy_lab, or any
+      legacy row with Stripe state) → no-op. We never downgrade a paying
+      customer, even on an onboarding replay.
     - **Existing paid sub** (anything not legacy_*, not trial) → no-op.
       We never downgrade a paying customer.
     - **Existing trial sub** → no-op (idempotent for replayed signups).
@@ -575,6 +590,18 @@ def bootstrap_trial_subscription(db: Session, company: Company) -> WorkspaceSubs
         return existing  # already trialing, nothing to do
     if existing is not None and not existing.plan_id.startswith("legacy_"):
         # Paid or enterprise — never downgrade.
+        return None
+    if existing is not None and (
+        existing.plan_id != "legacy_starter"
+        or existing.stripe_subscription_id
+        or company.stripe_subscription_id
+    ):
+        # legacy_team / legacy_lab are PAYING plans, and even a
+        # legacy_starter row with live Stripe state means money is (or was)
+        # changing hands. Replaying onboarding must never downgrade them
+        # to a 3-credit trial — only a free legacy starter converts.
+        # (Company.subscription_status can't be the signal here: it
+        # defaults to "active" for every account, paid or not.)
         return None
 
     # The trial is NOT time-based — its 3 credits never expire by calendar.

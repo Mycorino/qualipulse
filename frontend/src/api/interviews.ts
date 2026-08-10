@@ -171,17 +171,27 @@ export async function submitScreening(token: string, answers: Record<string, str
 
 const MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024;
 
+/**
+ * Submit a participant answer. Accepts either a recorded audio Blob (the
+ * default voice path) or a typed string (accessibility fallback for
+ * participants without a working microphone) — the backend requires exactly
+ * one of the two.
+ */
 export async function submitAudio(
   token: string,
   participantId: string,
-  audioBlob: Blob
+  answer: Blob | string
 ): Promise<SubmitAudioResponse> {
-  if (audioBlob.size > MAX_AUDIO_UPLOAD_BYTES) {
-    throw new Error("Recording is too large. Please try a shorter response.");
-  }
   const form = new FormData();
-  const ext = audioBlob.type.includes("mp4") ? "mp4" : audioBlob.type.includes("ogg") ? "ogg" : "webm";
-  form.append("audio", audioBlob, `recording.${ext}`);
+  if (typeof answer === "string") {
+    form.append("text", answer);
+  } else {
+    if (answer.size > MAX_AUDIO_UPLOAD_BYTES) {
+      throw new Error("Recording is too large. Please try a shorter response.");
+    }
+    const ext = answer.type.includes("mp4") ? "mp4" : answer.type.includes("ogg") ? "ogg" : "webm";
+    form.append("audio", answer, `recording.${ext}`);
+  }
   const { data } = await client.post<SubmitAudioResponse>(
     `/interview/${token}/${participantId}/respond`,
     form,
@@ -190,8 +200,15 @@ export async function submitAudio(
   return data;
 }
 
-export async function checkResume(token: string, email: string): Promise<ResumeCheck> {
-  const { data } = await client.post<ResumeCheck>(`/interview/${token}/resume`, { email });
+export async function checkResume(
+  token: string,
+  email: string,
+  sessionToken?: string | null
+): Promise<ResumeCheck> {
+  const { data } = await client.post<ResumeCheck>(`/interview/${token}/resume`, {
+    email,
+    session_token: sessionToken || undefined,
+  });
   return data;
 }
 

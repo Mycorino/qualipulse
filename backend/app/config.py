@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_AUDIO_SIZE_MB: int = 50
     MAX_TEXT_LENGTH: int = 10000
+    # Audio retention: participant audio files (recordings + TTS) are purged
+    # for interviews completed more than this many days ago when the
+    # /admin/retention/run endpoint is hit. 0 = retention purge disabled.
+    # Transcripts are always kept — the retention policy covers audio only.
+    RETENTION_AUDIO_DAYS: int = 0
 
     # CORS — comma-separated origins, e.g. "https://app.yoursite.com,https://yoursite.com"
     ALLOWED_ORIGINS: str = "*"
@@ -125,6 +130,12 @@ class Settings(BaseSettings):
     # Per-workspace daily spend ceiling for copilot turns (USD, summed from
     # AIUsageLog). 0 disables the gate.
     COPILOT_DAILY_COST_LIMIT_USD: float = 25.0
+
+    # Per-workspace daily spend ceiling for the public participant interview
+    # loop (STT + Claude + TTS, summed from AIUsageLog). New interview starts
+    # are blocked at the limit; in-flight interviews get a 2x grace ceiling
+    # so a real participant mid-session isn't cut off. 0 disables the gate.
+    INTERVIEW_DAILY_COST_LIMIT_USD: float = 50.0
 
     @property
     def allowed_origins_list(self) -> list[str]:

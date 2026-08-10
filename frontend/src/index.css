@@ -4706,6 +4706,26 @@ select.field-input {
 }
 
 /* ── Billing / Plans ─────────────────────────────────────────────────────── */
+/* Payment-failure (dunning) banners: the global workspace nudge
+   (.gs-dunning-banner, next to the verify/trial banners) and the
+   prominent card leading /account/billing (.billing-dunning-banner). */
+.gs-dunning-banner,
+.billing-dunning-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+}
+.gs-dunning-banner { margin-bottom: 12px; }
+.gs-dunning-banner strong,
+.billing-dunning-banner strong { color: var(--warning-text-strong); }
+.billing-dunning-banner p { color: var(--warning-text); }
+
 .billing-current-plan { }
 .plan-badge {
   display: inline-block;

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import (
     get_accessible_project_or_404 as _get_project_or_404,
+    get_editable_project_or_404 as _get_editable_project_or_404,
     get_current_company,
     get_db,
 )
@@ -50,7 +51,7 @@ def create_memo(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     memo = ProjectMemo(
         project_id=project_id,
         type=body.type,
@@ -71,7 +72,7 @@ def update_memo(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     memo = (
         db.query(ProjectMemo)
         .filter(ProjectMemo.id == memo_id, ProjectMemo.project_id == project_id)
@@ -93,7 +94,7 @@ def delete_memo(
     db: Session = Depends(get_db),
     company: Company = Depends(get_current_company),
 ):
-    _get_project_or_404(project_id, company.id, db)
+    _get_editable_project_or_404(project_id, company.id, db)
     memo = (
         db.query(ProjectMemo)
         .filter(ProjectMemo.id == memo_id, ProjectMemo.project_id == project_id)

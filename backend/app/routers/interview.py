@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, File, status
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -34,6 +34,55 @@ from app.services.transcode import needs_transcode, transcode_to_mp3
 from app.services.verification import generate_magic_token, verify_magic_token
 
 logger = logging.getLogger("auto_interview")
+
+# Operations that make up the participant interview loop's AI spend.
+_INTERVIEW_COST_OPERATIONS = ("interview_turn", "interview_warmup", "stt", "tts")
+
+
+def _check_interview_budget(
+    db: Session, company_id: str, *, in_flight: bool = False
+) -> None:
+    """Per-workspace daily AI-spend ceiling for the public interview loop.
+
+    /respond chains Whisper + Claude + TTS on an unauthenticated endpoint;
+    the 30/min rate limit alone still permits hundreds of dollars a day
+    from one leaked link. Mirrors the copilot budget gate. In-flight turns
+    get a 2x grace ceiling so a real participant mid-session isn't cut
+    off the moment the workspace crosses the line.
+    """
+    limit = settings.INTERVIEW_DAILY_COST_LIMIT_USD
+    if limit <= 0:
+        return
+    ceiling = limit * 2 if in_flight else limit
+    from app.models.usage import AIUsageLog
+
+    day_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    spent = (
+        db.query(func.coalesce(func.sum(AIUsageLog.cost_usd), 0.0))
+        .filter(
+            AIUsageLog.company_id == company_id,
+            AIUsageLog.operation.in_(_INTERVIEW_COST_OPERATIONS),
+            AIUsageLog.created_at >= day_start,
+        )
+        .scalar()
+        or 0.0
+    )
+    if spent >= ceiling:
+        logger.warning(
+            "Interview daily budget reached (company=%s spent=$%.2f ceiling=$%.2f in_flight=%s)",
+            company_id, spent, ceiling, in_flight,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "interview_daily_limit_reached",
+                "message": (
+                    "This study has reached its daily interview capacity. "
+                    "Please come back tomorrow, or contact the researcher "
+                    "who shared this link."
+                ),
+            },
+        )
 
 
 def _sync_panel_consent_to_participant(participant: Participant, db: Session) -> None:
@@ -107,6 +156,10 @@ class ScreenRequest(BaseModel):
 
 class ResumeCheckRequest(BaseModel):
     email: str
+    # Magic-link session JWT proving the caller actually controls this
+    # email. Required — without it, knowing someone's email + the public
+    # link token would be enough to hijack their in-progress interview.
+    session_token: str | None = None
 
 
 class VerificationRequest(BaseModel):
@@ -515,8 +568,29 @@ def check_resume_by_email(
     body: ResumeCheckRequest,
     db: Session = Depends(get_db),
 ):
-    """Check if an in-progress interview exists for this email address."""
+    """Check if an in-progress interview exists for this email address.
+
+    Requires a magic-link session token proving possession of the email:
+    the participant_id this endpoint returns grants access to the live
+    interview session (/respond, /resume-summary), so handing it out on a
+    bare email match would let anyone who knows a participant's email
+    hijack their in-progress interview and read prior answers.
+    """
     link = _get_active_link_or_404(token, db)
+
+    session_payload = (
+        _decode_session_token(body.session_token) if body.session_token else None
+    )
+    if (
+        session_payload is None
+        or session_payload.get("link_token") != token
+        or (session_payload.get("email") or "").strip().lower()
+        != (body.email or "").strip().lower()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email verification is required to resume an interview.",
+        )
     email = body.email
     participant = (
         db.query(Participant)
@@ -705,6 +779,7 @@ def start_interview_session(
     from app.services.billing_service import can_start_interview
     project = db.query(ProjectModel).filter(ProjectModel.id == link.project_id).first()
     if project and project.company:
+        _check_interview_budget(db, project.company_id)
         decision = can_start_interview(db, project.company_id)
         if not decision.allowed:
             # Log the real reason so blocked studies are diagnosable — the
@@ -764,18 +839,42 @@ def start_interview_session(
     )
 
 
+# Accessibility text fallback: max length for a typed answer. Generous enough
+# for a long verbal-style response, tight enough to keep Claude prompts sane.
+MAX_TEXT_ANSWER_CHARS = 5000
+
+
 @router.post("/{token}/{participant_id}/respond", response_model=TurnResponse)
 @limiter.limit("30/minute")
 async def respond_to_question(
     request: Request,
     token: str,
     participant_id: str,
-    audio: UploadFile = File(...),
+    audio: UploadFile | None = File(None),
+    text: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    """Accept an audio response from the participant, process it, and return the next question."""
+    """Accept a participant response, process it, and return the next question.
+
+    Exactly one of `audio` (recorded answer, the default path) or `text`
+    (typed answer, the accessibility fallback for participants without a
+    working microphone) must be provided.
+    """
     link = _get_active_link_or_404(token, db)
     participant = _get_participant_or_404(participant_id, link, db)
+
+    if (audio is None) == (text is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "audio_or_text_required",
+                "message": "Provide exactly one of audio or text.",
+            },
+        )
+
+    # Spend ceiling (2x grace for in-flight sessions) — checked before any
+    # STT/Claude/TTS work is done.
+    _check_interview_budget(db, link.project.company_id, in_flight=True)
 
     if participant.status == "completed":
         raise HTTPException(
@@ -799,32 +898,65 @@ async def respond_to_question(
                 transcript=last_turn.response_transcript,
             )
 
-    audio_data = await audio.read()
-    ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
+    if text is not None:
+        # Accessibility text fallback — no STT, no transcode, no audio upload.
+        # The typed answer flows into the engine exactly like a Whisper
+        # transcript; the turn's audio_recording_url stays NULL.
+        typed = text.strip()
+        if not typed:
+            # Mirror the EmptyTranscriptError response shape so the frontend
+            # handles a blank typed answer identically to silent audio.
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "empty_transcript",
+                    "message": "Your answer is empty. Please write a response and try again.",
+                },
+            )
+        if len(typed) > MAX_TEXT_ANSWER_CHARS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "text_too_long",
+                    "message": f"Answers are limited to {MAX_TEXT_ANSWER_CHARS} characters.",
+                },
+            )
+        try:
+            result = process_interview_turn(
+                participant_id, None, None, db, transcript_override=typed
+            )
+        except EmptyTranscriptError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"code": "empty_transcript", "message": str(e)},
+            )
+    else:
+        audio_data = await audio.read()
+        ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
 
-    # Normalise to MP3 for cross-browser playback. Participant browsers record
-    # webm/opus (Chrome/Firefox/Android), which Safari/iOS cannot decode — so a
-    # researcher reviewing on a Mac would see "Audio unavailable". MP3 plays
-    # everywhere and Whisper transcribes it fine. On any transcode failure
-    # (e.g. ffmpeg missing in local dev) we fall back to the original bytes.
-    if needs_transcode(ext):
-        mp3_data = transcode_to_mp3(audio_data, ext)
-        if mp3_data:
-            audio_data = mp3_data
-            ext = ".mp3"
+        # Normalise to MP3 for cross-browser playback. Participant browsers record
+        # webm/opus (Chrome/Firefox/Android), which Safari/iOS cannot decode — so a
+        # researcher reviewing on a Mac would see "Audio unavailable". MP3 plays
+        # everywhere and Whisper transcribes it fine. On any transcode failure
+        # (e.g. ffmpeg missing in local dev) we fall back to the original bytes.
+        if needs_transcode(ext):
+            mp3_data = transcode_to_mp3(audio_data, ext)
+            if mp3_data:
+                audio_data = mp3_data
+                ext = ".mp3"
 
-    audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
-    audio_url = upload_audio(audio_data, audio_key)
+        audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
+        audio_url = upload_audio(audio_data, audio_key)
 
-    try:
-        result = process_interview_turn(participant_id, audio_key, audio_url, db)
-    except EmptyTranscriptError as e:
-        # 422 so the frontend can distinguish "bad audio, please retry" from
-        # 5xx transport failures. The frontend preserves the blob for re-submit.
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"code": "empty_transcript", "message": str(e)},
-        )
+        try:
+            result = process_interview_turn(participant_id, audio_key, audio_url, db)
+        except EmptyTranscriptError as e:
+            # 422 so the frontend can distinguish "bad audio, please retry" from
+            # 5xx transport failures. The frontend preserves the blob for re-submit.
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"code": "empty_transcript", "message": str(e)},
+            )
 
     # On completion, kick off an async ASR sense-check pass (Haiku) that fixes
     # obvious STT errors (proper nouns, domain terms) using study context. The

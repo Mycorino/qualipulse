@@ -6,6 +6,7 @@ import {
   enableTwoFactor,
   disableTwoFactor,
   logoutAllSessions,
+  deleteAccount,
 } from "../../api/auth";
 import { useAuth } from "../../hooks/useAuth";
 import { getErrorMessage } from "../../utils/errorMessages";
@@ -33,6 +34,12 @@ export default function AccountSecurity() {
   const [twoFaBusy, setTwoFaBusy] = useState(false);
 
   const [logoutAllBusy, setLogoutAllBusy] = useState(false);
+
+  // ── Account deletion (danger zone) ──
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deleteConfirmValue, setDeleteConfirmValue] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -107,6 +114,23 @@ export default function AccountSecurity() {
       setTwoFaError(getErrorMessage(err, t("security.twoFactor.invalidCode")));
     } finally {
       setTwoFaBusy(false);
+    }
+  }
+
+  async function handleDeleteAccount(e: React.FormEvent) {
+    e.preventDefault();
+    setDeleteError("");
+    if (!deleteConfirmValue) return;
+    if (!window.confirm(t("security.deleteAccount.finalConfirm"))) return;
+    setDeleteBusy(true);
+    try {
+      // Password accounts verify the password; Google-only accounts type
+      // DELETE instead — the backend checks whichever applies.
+      await deleteAccount(deleteConfirmValue, deleteConfirmValue);
+      logout();
+    } catch (err: unknown) {
+      setDeleteError(getErrorMessage(err, t("security.deleteAccount.genericError")));
+      setDeleteBusy(false);
     }
   }
 
@@ -278,6 +302,50 @@ export default function AccountSecurity() {
         <button className="btn btn-secondary" type="button" disabled={logoutAllBusy} onClick={handleLogoutAll}>
           {t("security.logoutAll.cta")}
         </button>
+      </div>
+
+      <div className="settings-card" style={{ borderColor: "var(--danger, #b91c1c)" }}>
+        <h2 className="settings-section-title" style={{ color: "var(--danger, #b91c1c)" }}>
+          {t("security.deleteAccount.title")}
+        </h2>
+        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginTop: 0 }}>
+          {t("security.deleteAccount.description")}
+        </p>
+        {!showDeleteAccount ? (
+          <button className="btn btn-danger-text" type="button" onClick={() => setShowDeleteAccount(true)}>
+            {t("security.deleteAccount.cta")}
+          </button>
+        ) : (
+          <form className="auth-form" style={{ maxWidth: 400 }} onSubmit={handleDeleteAccount}>
+            <div>
+              <label className="field-label">{t("security.deleteAccount.confirmLabel")}</label>
+              <input
+                type="password"
+                className="field-input"
+                value={deleteConfirmValue}
+                onChange={(e) => setDeleteConfirmValue(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 6 }}>
+                {t("security.deleteAccount.oauthHint")}
+              </p>
+            </div>
+            {deleteError && <p className="error-text">{deleteError}</p>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-danger-text" type="submit" disabled={deleteBusy || !deleteConfirmValue}>
+                {t("security.deleteAccount.confirmCta")}
+              </button>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => { setShowDeleteAccount(false); setDeleteConfirmValue(""); setDeleteError(""); }}
+              >
+                {t("common:cancel")}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

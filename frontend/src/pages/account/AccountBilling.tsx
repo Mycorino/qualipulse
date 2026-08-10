@@ -68,6 +68,13 @@ export default function AccountBilling() {
   // admin-provisioned or custom plans have none, so hide the button for them.
   const canOpenPortal = Boolean(billing?.stripe_customer_id);
 
+  // Dunning: the Stripe webhook flips the subscription to past_due when a
+  // renewal charge fails. Only meaningful for accounts with Stripe state —
+  // legacy/trial accounts without a customer never see this.
+  const subscriptionStatus =
+    plan && !plan.is_legacy ? plan.subscription_status : billing?.status;
+  const isPastDue = canOpenPortal && subscriptionStatus === "past_due";
+
   const credits = billing?.credits;
   const includedTotal = credits
     ? credits.included_credits + credits.purchased_credits + credits.rollover_credits
@@ -157,6 +164,37 @@ export default function AccountBilling() {
       );
     }
   }
+
+  // ── Payment-failure (dunning) banner. Leads the page when past_due. ─────────
+  const dunningBanner = isPastDue && (
+    <div className="billing-dunning-banner" role="alert">
+      <span
+        aria-hidden="true"
+        style={{ display: "inline-flex", alignItems: "center", color: "var(--warning-text)", flexShrink: 0 }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      </span>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <strong>{t("billing.dunning.title", { defaultValue: "Your last payment failed" })}</strong>
+        <p style={{ margin: "4px 0 0", fontSize: 13, lineHeight: 1.5 }}>
+          {t("billing.dunning.desc", {
+            defaultValue:
+              "We could not collect your last payment. Until it is fixed, your interviews may be interrupted.",
+          })}
+        </p>
+      </div>
+      <button
+        className="btn btn-primary btn-sm"
+        onClick={handleManageBilling}
+        disabled={portalBusy}
+        style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+      >
+        {portalBusy
+          ? t("common:loading", { defaultValue: "Loading…" })
+          : t("billing.dunning.updateCta", { defaultValue: "Update payment method" })}
+      </button>
+    </div>
+  );
 
   // ── Plan chooser (the hero for conversion, "change plan" for paid) ──────────
   const planChooser = (
@@ -412,6 +450,7 @@ export default function AccountBilling() {
           }}
         />
       )}
+      {dunningBanner}
       {conversionMode ? (
         <>
           {planChooser}

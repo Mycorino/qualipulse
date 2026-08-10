@@ -304,6 +304,15 @@
     "muteAudio": "Couper le son",
     "unmuteAudio": "Rétablir le son",
     "skipQuestion": "Passer cette question",
+    "textAnswer": {
+      "toggle": "Impossible d'utiliser votre micro ? Écrivez votre réponse",
+      "label": "Écrivez votre réponse",
+      "placeholder": "Écrivez votre réponse ici…",
+      "submit": "Envoyer ma réponse",
+      "switchToVoice": "Utiliser le micro",
+      "micErrorCta": "Répondre par écrit",
+      "emptyError": "Veuillez écrire une réponse avant d'envoyer."
+    },
     "processing": {
       "transcribing": "🎙️ Transcription de votre réponse…",
       "thinking": "💭 Analyse en cours…",

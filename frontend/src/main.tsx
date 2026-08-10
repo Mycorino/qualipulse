@@ -6,6 +6,9 @@ import "./index.css";
 import "./i18n"; // initialise i18next before rendering
 import i18n from "./i18n";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { installErrorReporting } from "./utils/errorReporting";
+
+installErrorReporting();
 
 // Sync HTML lang attribute with i18n language (WCAG / SEO)
 function syncLang(lng: string) {

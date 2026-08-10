@@ -52,6 +52,37 @@ def get_accessible_project_or_404(project_id: str, company_id: str, db: Session)
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
 
+def require_workspace_edit(db: Session, workspace_company_id: str, member_company_id: str) -> None:
+    """403 unless the caller can edit content in this workspace.
+
+    Owners / admins / editors pass; viewers (and non-members, though those
+    are already filtered by the 404 accessor) are read-only.
+    """
+    from app.services.workspace import can_edit, get_member_role
+
+    role = get_member_role(db, workspace_company_id, member_company_id)
+    if not can_edit(role):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "viewer_read_only",
+                "message": "Viewers have read-only access to this workspace.",
+            },
+        )
+
+
+def get_editable_project_or_404(project_id: str, company_id: str, db: Session):
+    """Access check + edit check in one call, for mutating project routes.
+
+    Same 404 semantics as ``get_accessible_project_or_404``; additionally
+    raises 403 ``viewer_read_only`` when the caller's workspace role can't
+    modify content.
+    """
+    project = get_accessible_project_or_404(project_id, company_id, db)
+    require_workspace_edit(db, project.company_id, company_id)
+    return project
+
+
 def get_current_company(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),

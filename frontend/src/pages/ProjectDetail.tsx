@@ -19,6 +19,8 @@ import {
   updateProject,
   exportCSV,
   archiveProject,
+  deleteProject,
+  deleteParticipant,
   getAnalysis,
   triggerAnalysis,
   updateTurn,
@@ -933,6 +935,41 @@ export default function ProjectDetail() {
     }
   }
 
+  async function handleDeleteProject() {
+    const expected = project?.name ?? "";
+    const typed = window.prompt(
+      tProject("confirms.deleteProjectPrompt", { name: expected })
+    );
+    if (typed === null) return;
+    if (typed.trim() !== expected) {
+      toast(tProject("toasts.projectDeleteNameMismatch"), "error");
+      return;
+    }
+    try {
+      await deleteProject(id!);
+      toast(tProject("toasts.projectDeleted"), "success");
+      navigate("/dashboard");
+    } catch {
+      toast(tProject("toasts.projectDeleteFailed"), "error");
+    }
+  }
+
+  async function handleDeleteParticipant() {
+    if (!selectedParticipant) return;
+    if (!confirm(tProject("confirms.deleteParticipant"))) return;
+    try {
+      await deleteParticipant(id!, selectedParticipant.id);
+      toast(tProject("toasts.participantDeleted"), "success");
+      setTranscript(null);
+      setSelectedParticipant(null);
+      setSelectionInfo(null);
+      const fresh = await getParticipants(id!);
+      setParticipants(fresh);
+    } catch {
+      toast(tProject("toasts.participantDeleteFailed"), "error");
+    }
+  }
+
   // ── P1: Transcript editing ─────────────────────────────────────────────────
 
   function startEditTurn(turn: TranscriptTurn) {
@@ -1734,6 +1771,7 @@ export default function ProjectDetail() {
           {/* Desktop: inline actions */}
           <button className="btn btn-ghost btn-sm detail-header-actions__inline" onClick={handleExportCSV}>{tProject("responses.exportCSV")}</button>
           <button className="btn btn-ghost btn-sm detail-header-actions__inline" onClick={handleArchive}>{tProject("detail.archiveProject")}</button>
+          <button className="btn btn-ghost btn-sm detail-header-actions__inline" style={{ color: "var(--danger, #b91c1c)" }} onClick={handleDeleteProject}>{tProject("detail.deleteProject")}</button>
           {/* Mobile: overflow menu (<768px) */}
           <div className="overflow-menu detail-header-actions__overflow" ref={headerMenuRef}>
             <button
@@ -1752,6 +1790,9 @@ export default function ProjectDetail() {
                 </button>
                 <button role="menuitem" className="overflow-menu__item" onClick={() => { setHeaderMenuOpen(false); handleArchive(); }}>
                   {tProject("detail.archiveProject")}
+                </button>
+                <button role="menuitem" className="overflow-menu__item" style={{ color: "var(--danger, #b91c1c)" }} onClick={() => { setHeaderMenuOpen(false); handleDeleteProject(); }}>
+                  {tProject("detail.deleteProject")}
                 </button>
               </div>
             )}
@@ -2822,6 +2863,15 @@ export default function ProjectDetail() {
                         >
                           ← {tProject("responses.backToParticipants")}
                         </button>
+                        {!project?.is_demo && (
+                          <button
+                            className="btn btn-ghost btn-xs"
+                            style={{ color: "var(--danger, #b91c1c)", marginLeft: "auto", marginRight: 8 }}
+                            onClick={handleDeleteParticipant}
+                          >
+                            {tProject("responses.deleteParticipant")}
+                          </button>
+                        )}
                         <button className="participant-card__close" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }} aria-label={tProject("responses.close")}>✕</button>
                       </div>
                       <div className="participant-card__body">
