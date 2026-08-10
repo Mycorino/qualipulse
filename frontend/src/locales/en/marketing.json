@@ -156,6 +156,7 @@
     "billingAnnualSave": "−17%",
     "recommended": "Most teams pick this",
     "perMonth": " /mo",
+    "vatNoteLong": "No VAT is added at checkout: QualiPulse operates under the French small-business VAT exemption (article 293 B of the CGI), so the price you see is the price you pay.",
     "billedAnnuallyAs": "Billed €{{amount}} per year",
     "creditsPerMonth": "interviews / month",
     "surveyResponsesPerMonth": "survey responses / month",

@@ -596,6 +596,7 @@ export default function Marketing() {
             })}
           </div>
           <p className="mkt-credit-note">
+            {t("pricing.vatNoteLong")}{" "}
             {t("pricing.creditNote")}{" "}
             {t("pricing.enterprise")}{" "}
             <a href="mailto:hello@qualipulse.com">{t("pricing.enterpriseCta")}</a>
