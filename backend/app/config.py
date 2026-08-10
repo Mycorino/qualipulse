@@ -126,6 +126,12 @@ class Settings(BaseSettings):
     # AIUsageLog). 0 disables the gate.
     COPILOT_DAILY_COST_LIMIT_USD: float = 25.0
 
+    # Per-workspace daily spend ceiling for the public participant interview
+    # loop (STT + Claude + TTS, summed from AIUsageLog). New interview starts
+    # are blocked at the limit; in-flight interviews get a 2x grace ceiling
+    # so a real participant mid-session isn't cut off. 0 disables the gate.
+    INTERVIEW_DAILY_COST_LIMIT_USD: float = 50.0
+
     @property
     def allowed_origins_list(self) -> list[str]:
         if self.ALLOWED_ORIGINS == "*":

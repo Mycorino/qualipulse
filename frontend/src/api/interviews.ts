@@ -190,8 +190,15 @@ export async function submitAudio(
   return data;
 }
 
-export async function checkResume(token: string, email: string): Promise<ResumeCheck> {
-  const { data } = await client.post<ResumeCheck>(`/interview/${token}/resume`, { email });
+export async function checkResume(
+  token: string,
+  email: string,
+  sessionToken?: string | null
+): Promise<ResumeCheck> {
+  const { data } = await client.post<ResumeCheck>(`/interview/${token}/resume`, {
+    email,
+    session_token: sessionToken || undefined,
+  });
   return data;
 }
 

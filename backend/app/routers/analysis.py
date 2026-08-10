@@ -85,6 +85,23 @@ def trigger_analysis(
             },
         )
 
+    # Double-trigger guard — one generation at a time per project (same
+    # contract as /analysis/refine). Without it a double-click spawns two
+    # background threads racing on the same version counter.
+    generating = (
+        db.query(ProjectAnalysis)
+        .filter(
+            ProjectAnalysis.project_id == project_id,
+            ProjectAnalysis.status == "generating",
+        )
+        .first()
+    )
+    if generating:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An analysis is already being generated.",
+        )
+
     filter_by = body.filter_by if body else None
     filter_values = body.filter_values if body else []
 

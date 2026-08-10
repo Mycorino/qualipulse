@@ -649,7 +649,7 @@ export default function Interview() {
     try {
       // Check for email-based resume
       if (email.trim()) {
-        const resume = await checkResume(token, email.trim());
+        const resume = await checkResume(token, email.trim(), sessionToken);
         if (resume.found && resume.participant_id) {
           setResumeCheck(resume);
           setLoadingResumeSummary(true);

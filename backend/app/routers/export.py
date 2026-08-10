@@ -24,6 +24,30 @@ from app.schemas.interview import (
 router = APIRouter(prefix="/projects", tags=["export"])
 
 
+def _require_csv_export(db: Session, company: Company) -> None:
+    """Dual-track CSV-export gate.
+
+    Legacy tiers read the ``export_csv`` TierLimits flag; credits-based
+    plans read the ``csv_export`` plan entitlement (the two tracks use
+    different key names, so ``workspace_has_feature`` can't cover both).
+    """
+    from app.services import billing_service
+    from app.services.feature_gates import require_feature
+
+    sub = billing_service.get_current_subscription(db, company.id)
+    plan = billing_service.get_plan(db, sub.plan_id) if sub else None
+    if plan is None or plan.is_legacy:
+        require_feature(company, "export_csv")
+    elif not billing_service.get_entitlements(db, company.id).get("csv_export", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "csv_export_not_included",
+                "message": "CSV export is not included in your current plan.",
+            },
+        )
+
+
 # Filler words/phrases that indicate disengaged or low-quality responses
 _FILLERS = {
     "yes", "no", "maybe", "ok", "okay", "sure", "fine", "idk",
@@ -283,6 +307,7 @@ def export_transcripts_csv(
 ):
     """Export all interview transcripts for a project as a CSV download."""
     project = _get_project_or_404(project_id, company.id, db)
+    _require_csv_export(db, company)
 
     participants = (
         db.query(Participant)
