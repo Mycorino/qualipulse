@@ -288,7 +288,13 @@
     "creditGateBelowMin": "À noter : {{credits}} est en dessous de ~5, le minimum pour des résultats fiables, mieux vaut ajouter des crédits.",
     "creditGateLower": "Fixer l'objectif à {{credits}} et continuer",
     "creditGateLowered": "Objectif fixé à {{credits}}, vous pouvez générer le lien.",
-    "creditGateUpgrade": "Obtenir plus de crédits"
+    "creditGateUpgrade": "Obtenir plus de crédits",
+    "capSet": "Définir une limite de participants",
+    "capUsage": "{{used}} / {{max}} participants",
+    "capSave": "Enregistrer la limite",
+    "capNoLimit": "Sans limite",
+    "capAriaLabel": "Nombre maximum de participants pour ce lien",
+    "capInvalid": "Saisissez un nombre entier supérieur ou égal à 1, ou laissez vide pour ne pas fixer de limite."
   },
   "setup": {
     "brandingTitle": "Image de marque & identité",

@@ -407,5 +407,13 @@
     "copied": "Link kopiert, fügen Sie ihn in Ihrem Browser ein",
     "tryAnyway": "Trotzdem hier versuchen",
     "note": "Ihr Interview-Link bleibt gültig, durch den Wechsel geht nichts verloren."
+  },
+  "linkFull": {
+    "title": "Dieser Interview-Link ist voll",
+    "body": "Dieser Link hat die vom Forschenden geplante Teilnehmerzahl erreicht. Wenn Sie eingeladen wurden, bitten Sie um einen neuen Link."
+  },
+  "alreadyCompleted": {
+    "title": "Sie haben dieses Interview bereits abgeschlossen",
+    "body": "Diese E-Mail-Adresse hat dieses Interview bereits abgeschlossen. Vielen Dank, es ist nichts weiter zu tun."
   }
 }

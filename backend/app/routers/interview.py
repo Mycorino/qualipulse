@@ -624,6 +624,79 @@ def start_interview_session(
                 detail="Session token does not match this interview link",
             )
 
+    # Use email from session token if we have one. Otherwise fall back to
+    # whatever the participant typed in the landing form (or nothing).
+    verified_email: str | None = None
+    email_was_verified = False
+    if session_payload is not None:
+        verified_email = session_payload.get("email")
+        email_was_verified = True
+    elif body and getattr(body, "email", None):
+        verified_email = body.email
+    # Normalise so the same person matches across projects and against their
+    # PanelProfile row (whose lookups are also case-insensitive).
+    verified_email = verified_email.strip().lower() if verified_email else None
+
+    # Duplicate guard — one interview per email per link. The client checks
+    # /resume before starting, but that check is skippable (direct API call,
+    # a second browser, a race between two tabs), and every duplicate that
+    # reaches completion burns a credit and pollutes the analysis with the
+    # same voice twice. Enforce it server-side too.
+    if verified_email:
+        existing = (
+            db.query(Participant)
+            .filter(
+                Participant.link_id == link.id,
+                func.lower(Participant.email) == verified_email,
+            )
+            .order_by(Participant.started_at.desc())
+            .first()
+        )
+        if existing is not None and existing.status == "completed":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "already_completed",
+                    "message": "This email has already completed the interview.",
+                },
+            )
+        if existing is not None:
+            # An in-progress interview already exists: hand it back instead of
+            # creating a second one. The frontend resumes into it rather than
+            # showing an error, so a participant who reopened the link in a new
+            # browser simply continues where they left off.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "resume_available",
+                    "participant_id": existing.id,
+                    "message": "An interview is already in progress for this email.",
+                },
+            )
+
+    # Per-link participant cap. Distinct from the workspace credit gate below:
+    # this bounds a single link's exposure so a leaked or over-shared link
+    # can't drain the whole balance. In-progress participants count, so a
+    # burst of simultaneous starts can't overshoot the cap.
+    if link.max_participants is not None:
+        admitted = (
+            db.query(Participant)
+            .filter(Participant.link_id == link.id)
+            .count()
+        )
+        if admitted >= link.max_participants:
+            logger.info(
+                "interview start blocked: link=%s at participant cap %s",
+                link.id, link.max_participants,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "link_full",
+                    "message": "This interview link has reached its participant limit.",
+                },
+            )
+
     # Enforce participant limit for this project. The new BillingService
     # handles legacy plans by deferring back to the existing
     # ``require_participant_limit`` gate (``is_legacy=True``); for credits-
@@ -657,19 +730,6 @@ def start_interview_session(
                 Participant.status == "completed",
             ).count()
             require_participant_limit(project.company, project, current_count)
-
-    # Use email from session token if we have one. Otherwise fall back to
-    # whatever the participant typed in the landing form (or nothing).
-    verified_email: str | None = None
-    email_was_verified = False
-    if session_payload is not None:
-        verified_email = session_payload.get("email")
-        email_was_verified = True
-    elif body and getattr(body, "email", None):
-        verified_email = body.email
-    # Normalise so the same person matches across projects and against their
-    # PanelProfile row (whose lookups are also case-insensitive).
-    verified_email = verified_email.strip().lower() if verified_email else None
 
     # Validate the participant's chosen interview language against the
     # supported set; ignore anything else so a junk value can't reach the

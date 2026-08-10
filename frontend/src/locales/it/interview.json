@@ -407,5 +407,13 @@
     "copied": "Link copiato, lo incolli nel suo browser",
     "tryAnyway": "Prova comunque qui",
     "note": "Il link dell'intervista resta valido, non si perde nulla cambiando."
+  },
+  "linkFull": {
+    "title": "Questo link all'intervista è al completo",
+    "body": "Questo link ha raggiunto il numero di partecipanti previsto dal ricercatore. Se hai ricevuto un invito, contattalo per avere un nuovo link."
+  },
+  "alreadyCompleted": {
+    "title": "Hai già completato questa intervista",
+    "body": "Questo indirizzo e-mail ha già completato questa intervista. Grazie, non c'è altro da fare."
   }
 }

@@ -407,5 +407,13 @@
     "copied": "Link copiado, cole-o no seu navegador",
     "tryAnyway": "Tentar aqui mesmo assim",
     "note": "O seu link de entrevista continua válido, não perde nada ao mudar."
+  },
+  "linkFull": {
+    "title": "Esta ligação de entrevista está completa",
+    "body": "Esta ligação atingiu o número de participantes previsto pelo investigador. Se foi convidado, contacte-o para obter uma nova ligação."
+  },
+  "alreadyCompleted": {
+    "title": "Já concluiu esta entrevista",
+    "body": "Este endereço de e-mail já concluiu esta entrevista. Obrigado, não há mais nada a fazer."
   }
 }

@@ -45,6 +45,8 @@ type Phase =
   | "screening"
   | "disqualified"
   | "study_unavailable"
+  | "link_full"
+  | "already_completed"
   | "interview"
   | "complete";
 
@@ -803,7 +805,12 @@ export default function Interview() {
       // The workspace billing gate returns 403 {code: "study_unavailable"} —
       // e.g. the researcher hasn't verified their email, or the study is out
       // of credits. Show a calm terminal message, not a retryable error.
-      const e = err as { response?: { status?: number; data?: { detail?: { code?: string; message?: string } } } };
+      const e = err as {
+        response?: {
+          status?: number;
+          data?: { detail?: { code?: string; message?: string; participant_id?: string } };
+        };
+      };
       const detail = e?.response?.data?.detail;
       if (e?.response?.status === 403 && detail?.code === "study_unavailable") {
         // Always use the localized copy — the backend `message` is a fixed
@@ -811,6 +818,31 @@ export default function Interview() {
         setStudyUnavailableMsg(t("studyUnavailable.body"));
         setPhase("study_unavailable");
         return;
+      }
+      // The link hit its participant limit. Terminal, not retryable.
+      if (e?.response?.status === 403 && detail?.code === "link_full") {
+        setPhase("link_full");
+        return;
+      }
+      // This email already finished the interview on this link.
+      if (e?.response?.status === 409 && detail?.code === "already_completed") {
+        setPhase("already_completed");
+        return;
+      }
+      // An interview for this email is already open (second device, second
+      // tab, or a /resume check that got skipped). Offer to continue it
+      // rather than silently starting a duplicate.
+      if (e?.response?.status === 409 && detail?.code === "resume_available") {
+        const resume = await checkResume(token, email.trim());
+        if (resume.found && resume.participant_id) {
+          setResumeCheck(resume);
+          setLoadingResumeSummary(true);
+          try {
+            setResumeSummary(await getResumeSummary(token, resume.participant_id));
+          } catch { /* summary optional */ }
+          finally { setLoadingResumeSummary(false); }
+          return;
+        }
       }
       throw err;
     }
@@ -1759,6 +1791,23 @@ export default function Interview() {
           <p className="interview-complete-text">
             {studyUnavailableMsg || t("studyUnavailable.body")}
           </p>
+          <p className="muted-text" style={{ marginTop: 24 }}>{t("studyUnavailable.close")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Link at capacity / already completed ─────────────────────────────────
+  // Both are terminal states for this participant: no retry, no CTA.
+
+  if (phase === "link_full" || phase === "already_completed") {
+    const key = phase === "link_full" ? "linkFull" : "alreadyCompleted";
+    return (
+      <div className="interview-page">
+        <div className="interview-container interview-complete">
+          <div className="complete-icon"><span aria-hidden="true">🙏</span></div>
+          <h1 className="interview-complete-title">{t(`${key}.title`)}</h1>
+          <p className="interview-complete-text">{t(`${key}.body`)}</p>
           <p className="muted-text" style={{ marginTop: 24 }}>{t("studyUnavailable.close")}</p>
         </div>
       </div>

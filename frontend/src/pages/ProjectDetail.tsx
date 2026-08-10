@@ -15,6 +15,7 @@ import {
   getParticipants,
   createLink,
   toggleLink,
+  setLinkCap,
   updateProject,
   exportCSV,
   archiveProject,
@@ -127,6 +128,10 @@ export default function ProjectDetail() {
   const [selectedParticipant, setSelectedParticipant] = useState<ParticipantResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  // Per-link participant cap editor: which link is being edited, and the draft
+  // value (kept as a string so the input can be transiently empty).
+  const [capEditLinkId, setCapEditLinkId] = useState<string | null>(null);
+  const [capDraft, setCapDraft] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisPolling, setAnalysisPolling] = useState(false);
   const analysisPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -747,6 +752,24 @@ export default function ProjectDetail() {
       setLinks((prev) => prev.map((l) => (l.id === linkId ? updated : l)));
     } catch {
       toast(tProject("toasts.linkUpdateFailed"), "error");
+    }
+  }
+
+  async function handleSaveCap(linkId: string) {
+    const raw = capDraft.trim();
+    const value = raw === "" ? null : Number(raw);
+    if (value !== null && (!Number.isInteger(value) || value < 1)) {
+      toast(tProject("overview.capInvalid"), "error");
+      return;
+    }
+    try {
+      const updated = await setLinkCap(linkId, value);
+      setLinks((prev) => prev.map((l) => (l.id === linkId ? updated : l)));
+      setCapEditLinkId(null);
+    } catch (err) {
+      // The backend refuses a cap below the participants already admitted and
+      // says how many there are — surface that instead of a generic failure.
+      toast(getErrorMessage(err, tProject("toasts.linkUpdateFailed")), "error");
     }
   }
 
@@ -2061,6 +2084,47 @@ export default function ProjectDetail() {
                           {l.is_active ? tProject("overview.linkActive") : tProject("overview.linkInactive")}
                         </span>
                         <code className="link-url" title={interviewUrl(l.token)}>{interviewUrl(l.token)}</code>
+                        <span className="link-cap-summary">
+                          {capEditLinkId === l.id ? (
+                            <>
+                              <input
+                                type="number"
+                                min={1}
+                                className="link-cap-input"
+                                value={capDraft}
+                                autoFocus
+                                aria-label={tProject("overview.capAriaLabel")}
+                                placeholder={tProject("overview.capNoLimit")}
+                                onChange={(e) => setCapDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleSaveCap(l.id);
+                                  if (e.key === "Escape") setCapEditLinkId(null);
+                                }}
+                              />
+                              <button className="btn btn-ghost btn-sm" onClick={() => handleSaveCap(l.id)}>
+                                {tProject("overview.capSave")}
+                              </button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => setCapEditLinkId(null)}>
+                                {tCommon("cancel")}
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className="link-cap-pill"
+                              onClick={() => {
+                                setCapEditLinkId(l.id);
+                                setCapDraft(l.max_participants ? String(l.max_participants) : "");
+                              }}
+                            >
+                              {l.max_participants
+                                ? tProject("overview.capUsage", {
+                                    used: l.participant_count,
+                                    max: l.max_participants,
+                                  })
+                                : tProject("overview.capSet")}
+                            </button>
+                          )}
+                        </span>
                       </div>
                       <div className="link-row-actions">
                         {l.is_active && (

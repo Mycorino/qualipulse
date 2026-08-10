@@ -288,7 +288,13 @@
     "creditGateBelowMin": "Heads up: {{credits}} is below ~5, the minimum for reliable findings, topping up is the better call.",
     "creditGateLower": "Set target to {{credits}} & continue",
     "creditGateLowered": "Target set to {{credits}}, you can generate the link now.",
-    "creditGateUpgrade": "Get more credits"
+    "creditGateUpgrade": "Get more credits",
+    "capSet": "Set a participant limit",
+    "capUsage": "{{used}} / {{max}} participants",
+    "capSave": "Save limit",
+    "capNoLimit": "No limit",
+    "capAriaLabel": "Maximum participants for this link",
+    "capInvalid": "Enter a whole number of 1 or more, or leave it empty for no limit."
   },
   "setup": {
     "brandingTitle": "Branding & identity",
