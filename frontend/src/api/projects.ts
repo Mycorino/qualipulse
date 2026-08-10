@@ -644,6 +644,63 @@ export async function deleteTag(projectId: string, tagId: string): Promise<void>
   await client.delete(`/projects/${projectId}/tags/${tagId}`);
 }
 
+// ── AI tag suggestions ──────────────────────────────────────────────────────
+
+export interface TagSuggestion {
+  id: string;
+  participant_id: string;
+  turn_id: string;
+  manual_code_id: string | null;
+  code_name: string | null;
+  code_color: string | null;
+  proposed_code_name: string | null;
+  rationale: string | null;
+  selected_text: string;
+  start_index: number;
+  end_index: number;
+  status: string;
+  created_at: string;
+}
+
+export interface SuggestedCode {
+  name: string;
+  description: string;
+  color: string;
+}
+
+export async function suggestTags(projectId: string, participantId: string): Promise<TagSuggestion[]> {
+  const { data } = await client.post<{ suggestions: TagSuggestion[] }>(
+    `/projects/${projectId}/participants/${participantId}/suggest-tags`
+  );
+  return data.suggestions;
+}
+
+export async function getTagSuggestions(projectId: string, participantId: string): Promise<TagSuggestion[]> {
+  const { data } = await client.get<{ suggestions: TagSuggestion[] }>(
+    `/projects/${projectId}/participants/${participantId}/tag-suggestions`
+  );
+  return data.suggestions;
+}
+
+export async function acceptTagSuggestion(
+  projectId: string,
+  suggestionId: string
+): Promise<{ tag: QuoteTag; code: ManualCode }> {
+  const { data } = await client.post<{ tag: QuoteTag; code: ManualCode }>(
+    `/projects/${projectId}/tag-suggestions/${suggestionId}/accept`
+  );
+  return data;
+}
+
+export async function rejectTagSuggestion(projectId: string, suggestionId: string): Promise<void> {
+  await client.post(`/projects/${projectId}/tag-suggestions/${suggestionId}/reject`);
+}
+
+export async function suggestCodes(projectId: string): Promise<SuggestedCode[]> {
+  const { data } = await client.post<{ codes: SuggestedCode[] }>(`/projects/${projectId}/codes/suggest`);
+  return data.codes;
+}
+
 // ── Memos API ───────────────────────────────────────────────────────────────
 
 export async function getMemos(projectId: string): Promise<ProjectMemo[]> {
