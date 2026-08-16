@@ -11,6 +11,32 @@ export interface CreditUsage {
   period_end: string | null;
 }
 
+export interface Invoice {
+  id: string;
+  number: string | null;
+  created: string;
+  amount_paid: number;
+  currency: string;
+  status: string | null;
+  hosted_invoice_url: string | null;
+  invoice_pdf: string | null;
+}
+
+/**
+ * Past invoices for the workspace, newest first.
+ *
+ * Empty for accounts with no Stripe customer yet (the endpoint returns
+ * `[]` rather than erroring), so the caller only has to handle "none".
+ */
+export async function getInvoices(): Promise<Invoice[]> {
+  try {
+    const { data } = await client.get<Invoice[]>("/billing/invoices");
+    return data;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Current-period credit balance for the workspace.
  *

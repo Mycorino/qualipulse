@@ -78,6 +78,14 @@ function TermsContentEN() {
         law. We reserve the right to change pricing with 30 days' advance notice.
       </p>
       <p>
+        Prices are stated in euros and no VAT is added at checkout. QualiPulse currently
+        benefits from the French small-business VAT exemption (article 293 B of the CGI), so
+        invoices are issued without VAT and carry the corresponding statutory mention. Should
+        our VAT status change, VAT will be applied to later invoices, with the advance notice
+        set out above for pricing changes. The Service is offered to businesses and
+        professionals, not to consumers.
+      </p>
+      <p>
         If payment fails, we may suspend access to paid features after a grace period. Your
         data will be retained for at least 30 days after suspension to allow you to export it.
       </p>
@@ -211,6 +219,15 @@ function TermsContentFR() {
         sont factur{"\u00e9"}es mensuellement ou annuellement selon le choix effectu{"\u00e9"} lors de la souscription.
         Tous les frais sont non remboursables, sauf disposition l{"\u00e9"}gale contraire. Nous nous
         r{"\u00e9"}servons le droit de modifier les tarifs moyennant un pr{"\u00e9"}avis de 30 jours.
+      </p>
+      <p>
+        Les prix sont indiqu{"\u00e9"}s en euros et aucune TVA n{"\u2019"}est ajout{"\u00e9"}e lors du paiement.
+        QualiPulse b{"\u00e9"}n{"\u00e9"}ficie actuellement de la franchise en base de TVA (article 293 B du
+        CGI). Les factures sont donc {"\u00e9"}mises sans TVA et portent la mention l{"\u00e9"}gale
+        correspondante. Si notre situation au regard de la TVA change, la TVA sera appliqu{"\u00e9"}e
+        aux factures ult{"\u00e9"}rieures, avec le pr{"\u00e9"}avis pr{"\u00e9"}vu ci-dessus pour les changements de
+        tarifs. Le Service est destin{"\u00e9"} aux entreprises et aux professionnels, et non aux
+        consommateurs.
       </p>
       <p>
         En cas d{"\u2019"}{"\u00e9"}chec de paiement, nous pourrons suspendre l{"\u2019"}acc{"\u00e8"}s aux fonctionnalit{"\u00e9"}s payantes

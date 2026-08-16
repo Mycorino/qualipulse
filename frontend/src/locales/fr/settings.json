@@ -105,6 +105,13 @@
       "title": "Votre dernier paiement a échoué",
       "desc": "Nous n'avons pas pu encaisser votre dernier paiement. Tant que la situation n'est pas régularisée, vos entretiens risquent d'être interrompus.",
       "updateCta": "Mettre à jour la carte bancaire"
+    },
+    "invoices": {
+      "title": "Factures",
+      "number": "Facture",
+      "date": "Date",
+      "amount": "Montant",
+      "download": "PDF"
     }
   },
   "language": {

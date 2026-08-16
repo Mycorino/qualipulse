@@ -4762,6 +4762,26 @@ select.field-input {
   color: var(--text-primary);
 }
 .billing-limit-row:last-child { border-bottom: none; }
+.billing-invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.billing-invoice-table th {
+  text-align: left;
+  padding: 8px 12px 8px 0;
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+.billing-invoice-table td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--bg-sunken);
+  white-space: nowrap;
+}
+.billing-invoice-table tr:last-child td { border-bottom: none; }
 .plans-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

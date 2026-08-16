@@ -156,6 +156,7 @@
     "billingAnnualSave": "−17 %",
     "recommended": "Le choix des équipes",
     "perMonth": " /mois",
+    "vatNoteLong": "Aucune TVA n'est ajoutée au paiement. TVA non applicable, article 293 B du CGI : le prix affiché est le prix payé.",
     "billedAnnuallyAs": "Facturé {{amount}} € par an",
     "creditsPerMonth": "entretiens / mois",
     "surveyResponsesPerMonth": "réponses de sondage / mois",

@@ -6,6 +6,7 @@ import client from "../../api/client";
 import { useToast } from "../../components/Toast";
 import EmbeddedCheckoutModal from "../../components/EmbeddedCheckoutModal";
 import { getBillingConfig } from "../../utils/billingConfig";
+import { getInvoices, type Invoice } from "../../api/billing";
 import { useAccount, type Plan } from "./accountContext";
 
 type Interval = "monthly" | "annual";
@@ -26,10 +27,28 @@ export default function AccountBilling() {
   const [buyingPackId, setBuyingPackId] = useState<string | null>(null);
   const [upgradingPlanId, setUpgradingPlanId] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [embedded, setEmbedded] = useState<EmbeddedSession | null>(null);
   // Annual is the default: it's the higher-value commitment and the −17%
   // framing does the persuading. Users who want monthly flip one toggle.
   const [interval, setInterval] = useState<Interval>("annual");
+
+  // Invoices come straight from Stripe. Skipped entirely for workspaces
+  // with no Stripe customer: there is nothing to list and the request
+  // would just round-trip for an empty array.
+  useEffect(() => {
+    let cancelled = false;
+    if (!billing?.stripe_customer_id) {
+      setInvoices([]);
+      return;
+    }
+    getInvoices().then((rows) => {
+      if (!cancelled) setInvoices(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [billing?.stripe_customer_id]);
 
   // Returning from Stripe Checkout — confirm the outcome, then clean the URL
   // so a refresh doesn't repeat the toast.
@@ -384,6 +403,57 @@ export default function AccountBilling() {
     </details>
   );
 
+  // ── Invoices: read-through to Stripe, hidden until there's one to show. ────
+  const invoicesCard = invoices.length > 0 && (
+    <div className="settings-card">
+      <h2 className="settings-section-title">
+        {t("billing.invoices.title", { defaultValue: "Invoices" })}
+      </h2>
+      <div style={{ overflowX: "auto" }}>
+        <table className="billing-invoice-table">
+          <thead>
+            <tr>
+              <th>{t("billing.invoices.number", { defaultValue: "Invoice" })}</th>
+              <th>{t("billing.invoices.date", { defaultValue: "Date" })}</th>
+              <th>{t("billing.invoices.amount", { defaultValue: "Amount" })}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((inv) => (
+              <tr key={inv.id}>
+                <td>{inv.number ?? inv.id}</td>
+                <td>
+                  {inv.created
+                    ? new Date(inv.created).toLocaleDateString(i18n.language)
+                    : "-"}
+                </td>
+                <td>
+                  {(inv.amount_paid / 100).toLocaleString(i18n.language, {
+                    style: "currency",
+                    currency: inv.currency,
+                  })}
+                </td>
+                <td>
+                  {inv.invoice_pdf && (
+                    <a
+                      href={inv.invoice_pdf}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-ghost btn-sm"
+                    >
+                      {t("billing.invoices.download", { defaultValue: "PDF" })}
+                    </a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   // ── Legacy-tier fallback: limits table for accounts with no credit plan. ────
   const legacyCard = billing && (!plan || plan.is_legacy) && (
     <div className="settings-card">
@@ -457,11 +527,13 @@ export default function AccountBilling() {
           {usageCard}
           {packsCard}
           {legacyCard}
+          {invoicesCard}
         </>
       ) : (
         <>
           {usageCard}
           {packsCard}
+          {invoicesCard}
           {planChooser}
         </>
       )}

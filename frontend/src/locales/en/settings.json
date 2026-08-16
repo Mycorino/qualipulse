@@ -105,6 +105,13 @@
       "title": "Your last payment failed",
       "desc": "We could not collect your last payment. Until it is fixed, your interviews may be interrupted.",
       "updateCta": "Update payment method"
+    },
+    "invoices": {
+      "title": "Invoices",
+      "number": "Invoice",
+      "date": "Date",
+      "amount": "Amount",
+      "download": "PDF"
     }
   },
   "language": {
