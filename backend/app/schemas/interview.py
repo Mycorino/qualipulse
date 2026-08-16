@@ -104,6 +104,8 @@ class ParticipantResponse(BaseModel):
     quality_summary: str | None = None
     quality_strengths: list[str] | None = None
     quality_issues: list[str] | None = None
+    key_takeaways: list[str] | None = None
+    notable_quotes: list[str] | None = None
     avg_response_words: float | None = None
     short_answer_pct: float | None = None
     # V4 paywall — True when this participant's transcript is locked

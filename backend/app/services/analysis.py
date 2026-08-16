@@ -94,6 +94,107 @@ def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict
     return "\n\n".join(blocks), participant_map
 
 
+_CODEBOOK_QUOTE_SAMPLE = 4  # sample quotes per code fed to the prompt
+_CODEBOOK_MAX_CODES = 12
+
+
+def _codebook_stats(db: Session, project_id: str, participants: list[Participant]) -> list[dict]:
+    """Deterministic per-code stats over the included participants' tags.
+
+    Counts are computed in Python, never by the model, so the report's
+    codebook figures are always exact. Only codes with at least one tag
+    among the included participants appear. Sorted by tag count desc.
+    """
+    from app.models.coding import ManualCode, QuoteTag
+    from app.models.interview import InterviewTurn
+
+    participant_ids = [p.id for p in participants]
+    if not participant_ids:
+        return []
+
+    rows = (
+        db.query(QuoteTag, InterviewTurn.participant_id)
+        .join(InterviewTurn, QuoteTag.turn_id == InterviewTurn.id)
+        .filter(InterviewTurn.participant_id.in_(participant_ids))
+        .all()
+    )
+    if not rows:
+        return []
+
+    codes = {
+        c.id: c
+        for c in db.query(ManualCode).filter(ManualCode.project_id == project_id).all()
+    }
+    by_code: dict[str, dict] = {}
+    names_by_id = {p.id: (p.display_name or "Participant") for p in participants}
+    for tag, pid in rows:
+        code = codes.get(tag.manual_code_id)
+        if code is None:
+            continue
+        entry = by_code.setdefault(
+            code.id,
+            {
+                "code": code.name,
+                "color": code.color,
+                "tag_count": 0,
+                "participant_ids": set(),
+                "quotes": [],
+            },
+        )
+        entry["tag_count"] += 1
+        entry["participant_ids"].add(pid)
+        if len(entry["quotes"]) < _CODEBOOK_QUOTE_SAMPLE:
+            entry["quotes"].append(
+                {"text": tag.selected_text[:240], "participant": names_by_id.get(pid, "Participant")}
+            )
+
+    stats = []
+    for entry in by_code.values():
+        stats.append(
+            {
+                "code": entry["code"],
+                "color": entry["color"],
+                "tag_count": entry["tag_count"],
+                "participant_count": len(entry["participant_ids"]),
+                "participants_total": len(participants),
+                "quotes": entry["quotes"],
+            }
+        )
+    stats.sort(key=lambda s: s["tag_count"], reverse=True)
+    return stats[:_CODEBOOK_MAX_CODES]
+
+
+def _build_codebook_block(stats: list[dict]) -> str:
+    """Render researcher-verified codebook evidence for the synthesis prompt.
+
+    An accepted tag is the strongest grounding signal we have: a human
+    researcher looked at a specific quote and named the evidence category it
+    belongs to. The block instructs the model to engage with these
+    categories rather than synthesise past them.
+    """
+    if not stats:
+        return ""
+    lines = [
+        "RESEARCHER CODEBOOK EVIDENCE (quotes the researcher manually tagged "
+        "while reading transcripts — researcher-verified signals, the "
+        "strongest evidence tier available):"
+    ]
+    for s in stats:
+        lines.append(
+            f"- {s['code']}: tagged in {s['participant_count']}/{s['participants_total']} "
+            f"interviews ({s['tag_count']} quotes). Samples:"
+        )
+        for q in s["quotes"]:
+            lines.append(f"    \"{q['text']}\" ({q['participant']})")
+    lines.append(
+        "Your themes must engage with these categories: where a code's evidence "
+        "supports a theme, cite it; if your synthesis contradicts a heavily "
+        "tagged category, justify the disagreement explicitly. Do not merely "
+        "rename the codes as themes without adding analytical value."
+    )
+    return "\n".join(lines) + "\n\n"
+
+
 def _normalize_for_match(text: str) -> str:
     """Lenient normalisation for verbatim-quote matching.
 
@@ -705,18 +806,24 @@ def run_analysis(
         if filter_by and filter_values:
             filter_note = f"NOTE: This analysis covers only participants filtered by {filter_by} = {', '.join(filter_values)}.\n\n"
 
+        # Researcher-verified evidence: tags the researcher placed (or accepted
+        # from AI suggestions), restricted to the participants in this run so
+        # segment-filtered analyses only see their own segment's tags.
+        codebook_stats = _codebook_stats(db, project_id, completed)
+        codebook_block = _build_codebook_block(codebook_stats)
+
         lang = getattr(company, "preferred_language", None) or "en"
         lang_instruction = _lang_instruction(lang)
 
         # Static blocks first (rules + schema + examples) → cached prefix.
-        # Dynamic blocks last (context, objective, filters, transcripts).
+        # Dynamic blocks last (context, objective, filters, codebook, transcripts).
         prompt = (
             f"{_ANALYSIS_RULES_BLOCK}\n\n"
             f"{_ANALYSIS_SCHEMA_BLOCK}\n\n"
             f"<task>\nSynthesize the interviews below into a research report. "
             f"Apply the rules above without exception. Confidence MUST be calibrated to N "
             f"(N={len(completed)} here).{lang_instruction}\n</task>\n\n"
-            f"{context_block}{objective_block}{filter_note}"
+            f"{context_block}{objective_block}{filter_note}{codebook_block}"
             f"<transcripts count=\"{len(completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
             f"Return the JSON object now. participant_count must be {len(completed)}."
         )
@@ -735,6 +842,13 @@ def run_analysis(
                 "analysis quote verification: %d/%d verbatim (project=%s)",
                 v_count, v_total, project_id,
             )
+
+        # Deterministic, Python-computed codebook figures ride along in the
+        # report so the UI never quotes a model-invented count.
+        if codebook_stats:
+            report_obj["codebook_stats"] = [
+                {k: v for k, v in s.items() if k != "quotes"} for s in codebook_stats
+            ]
 
         analysis.report = json.dumps(report_obj)
         analysis.status = "ready"
@@ -881,6 +995,12 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
 
         transcripts_block, _ = _build_transcripts_block(all_completed)
 
+        # Same researcher-verified codebook evidence as the v1 run — by the
+        # refine stage the researcher has usually tagged more, so this block
+        # matters even more here.
+        codebook_stats = _codebook_stats(db, project_id, all_completed)
+        codebook_block = _build_codebook_block(codebook_stats)
+
         lang = getattr(company, "preferred_language", None) or "en"
         lang_instruction = _lang_instruction(lang)
 
@@ -903,7 +1023,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
             f"named participants in frequency, disconfirming evidence, object-shaped falsifiable "
             f"recommendations, personas grounded in ≥2 named participants, journey only when the "
             f"experience is temporal) still apply without exception.{lang_instruction}\n</task>\n\n"
-            f"{context_block}{objective_block}{annotations_block}\n"
+            f"{context_block}{objective_block}{annotations_block}\n{codebook_block}"
             f"<transcripts count=\"{len(all_completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
             f"Return the JSON object now. participant_count must be {len(all_completed)}."
         )
@@ -921,6 +1041,11 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
                 "refined analysis quote verification: %d/%d verbatim (project=%s)",
                 v_count, v_total, project_id,
             )
+
+        if codebook_stats:
+            report_obj["codebook_stats"] = [
+                {k: v for k, v in s.items() if k != "quotes"} for s in codebook_stats
+            ]
 
         new_analysis.report = json.dumps(report_obj)
         new_analysis.status = "ready"

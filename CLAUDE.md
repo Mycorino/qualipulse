@@ -1009,6 +1009,9 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Project memos (general, theme/JTBD/tension-linked) with full CRUD
 - [x] Segment heatmap (profession / age_range / country vs themes)
 - [x] AI quality assessment per participant (Claude-scored, structured result)
+- [x] Interview digest per participant: the auto-run completion-time quality pass also returns `key_takeaways` (3-5 substance bullets) + `notable_quotes` (up to 3 verbatim quotes, whitespace-tolerant containment check against raw transcripts drops paraphrases). Shown as a "Key takeaways" panel atop the transcript sidebar. Old participants backfill via the existing "AI assessment" button (it clears the summary to force a re-run). Alembic 0057. Tests: `backend/tests/test_quality_digest.py`.
+- [x] Codebook evidence feeds project-level analysis (`_codebook_stats` + `_build_codebook_block` in `services/analysis.py`): both `run_analysis` and `run_refined_analysis` prepend a "RESEARCHER CODEBOOK EVIDENCE" block (per-code participant/quote counts + up to 4 sample quotes, capped at 12 codes) instructing the model to engage with researcher-verified categories, cite them where they support themes, and justify disagreement with heavily tagged categories. Segment-filtered runs only see the included participants' tags. Deterministic Python-computed counts ride along in the report JSON as `codebook_stats` (never model-generated) and render as a "Codebook signals" pill strip atop the Analysis Deep dive AND as a section in the exported/shared findings report HTML (`_codebook_section_html` in `services/report_export.py`, between Study design and Key themes). Tests: `backend/tests/test_analysis_codebook.py`, codebook cases in `test_report_export.py`.
+- [x] AI-suggested tags + starter codebook (`services/tag_suggestions.py`): suggestion-only, the codebook is never mutated without an explicit accept. **Hybrid per-interview pass** (auto-runs on interview completion from the same background thread as the quality assessment, but ONLY when the project already has ≥1 code, so codebook-less studies see zero AI-proposed-code noise; also on-demand via the "✨ Suggest tags" button in the transcript codebook panel, `POST /projects/{id}/participants/{pid}/suggest-tags`, sync Sonnet call): deductive core applies existing codes; bounded inductive margin proposes ≤2 new codes (each needs verbatim quotes; dupes vs existing code names filtered before the cap). Quotes resolve to exact offsets in the raw `response_transcript` via `.find()` (tries the model's turn_index first, then all turns); paraphrases and unknown code names are dropped server-side. Suggestions persist as `TagSuggestion` rows (pending/accepted/rejected; re-run replaces pending, keeps reviewed history; overlap with an existing same-code QuoteTag is skipped). Accept (`POST .../tag-suggestions/{sid}/accept`) creates the QuoteTag (`created_by="ai_suggested"`) and materialises the proposed ManualCode (case-insensitive reuse); reject keeps history. UI: dashed pills with ✓/× under each turn. **Starter codebook** (`POST /projects/{id}/codes/suggest`, "✨ Suggest codes" button shown when the codebook is empty): 4-6 cross-cutting evidence codes from objective/decision/audience/guide (prompt forbids restating guide questions/sections), returned as proposals only; checkbox modal creates the selected ones via the normal codes API. Both ops log usage as `tag_suggest` / `codebook_suggest`. Alembic 0058. Tests: `backend/tests/test_tag_suggestions.py`.
 - [x] Export CSV (participants + all transcript turns, streaming response)
 - [x] Account & billing settings page (Profile tab + Plan & Billing tab)
 - [x] Subscription tier model with **enforced** feature gates (solo/team/lab/enterprise)
@@ -1129,7 +1132,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `project_id`, `token` (unique, urlsafe), `is_active`, `created_at`
 
 ### Participant
-`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `started_at`, `completed_at`
+`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `quality_summary`, `quality_strengths`, `quality_issues`, `key_takeaways` (JSON list), `notable_quotes` (JSON list, verbatim), `started_at`, `completed_at`
 
 ### InterviewTurn
 `id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `translated_response`, `translated_question`, `translation_language`, `translation_source_language`, `cleaned_response`, `cleaned_at`, `created_at`
@@ -1148,6 +1151,9 @@ gcloud builds list --region=europe-west1 --limit=5
 
 ### QuoteTag
 `id`, `turn_id`, `code_id`, `selected_text`, `start_index`, `end_index`, `tagged_from_translation`, `created_by`, `created_at`
+
+### TagSuggestion
+`id`, `participant_id` (FK, indexed), `turn_id` (FK), `manual_code_id` (FK, nullable — set for deductive suggestions), `proposed_code_name` (nullable — set for proposed new codes), `rationale`, `selected_text`, `start_index`, `end_index` (offsets against raw `response_transcript`), `status` (pending/accepted/rejected), `created_at`. Alembic 0058.
 
 ### ProjectMemo
 `id`, `project_id`, `type` (general/theme_note/tension_note/jtbd_note), `linked_key`, `content`, `created_by`, `created_at`, `updated_at`

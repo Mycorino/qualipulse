@@ -5793,6 +5793,19 @@ select.field-input {
   margin: 0;
   font-size: 12px;
 }
+.sidebar-panel__quote {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--brand-300, var(--brand-500));
+  background: var(--bg-sunken);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+.sidebar-panel__quote:last-child {
+  margin-bottom: 0;
+}
 .sidebar-panel__empty {
   color: var(--text-tertiary);
   font-size: 12px;
@@ -5899,6 +5912,61 @@ select.field-input {
   line-height: 1;
   opacity: 0.6;
   transition: opacity 0.1s;
+}
+.analysis-codebook-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.analysis-codebook-signals__hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0 0 10px;
+}
+.analysis-codebook-signal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--bg-surface, #fff);
+}
+.analysis-codebook-signal__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.analysis-codebook-signal__count {
+  color: var(--text-tertiary);
+}
+.tag-pill--suggested {
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+}
+.tag-pill--suggested .tag-pill-remove,
+.tag-pill--suggested .tag-pill-action {
+  display: inline-flex;
+}
+.tag-pill-action {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--success-text, #16a34a);
+  padding: 0 0 0 5px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.1s;
+}
+.tag-pill-action:hover {
+  opacity: 1;
 }
 .tag-pill-remove:hover {
   opacity: 1;

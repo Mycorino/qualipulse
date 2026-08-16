@@ -32,6 +32,13 @@ import {
   getTags,
   createTag,
   deleteTag,
+  suggestTags,
+  getTagSuggestions,
+  acceptTagSuggestion,
+  rejectTagSuggestion,
+  suggestCodes,
+  TagSuggestion,
+  SuggestedCode,
   getMemos,
   createMemo,
   updateMemo,
@@ -262,6 +269,14 @@ export default function ProjectDetail() {
   const [creatingCode, setCreatingCode] = useState(false);
   const [renamingCodeId, setRenamingCodeId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
+
+  // ── AI tag + codebook suggestions ──────────────────────────────────────────
+  const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
+  const [suggestingTags, setSuggestingTags] = useState(false);
+  const [suggestedCodes, setSuggestedCodes] = useState<SuggestedCode[] | null>(null);
+  const [suggestedCodesChecked, setSuggestedCodesChecked] = useState<Record<string, boolean>>({});
+  const [suggestingCodes, setSuggestingCodes] = useState(false);
+  const [addingSuggestedCodes, setAddingSuggestedCodes] = useState(false);
 
   // ── P5: Guide annotation + inline editing ──────────────────────────────────
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -803,7 +818,9 @@ export default function ProjectDetail() {
     setTranscript(null);
     setEditingTurnId(null);
     setSelectionInfo(null);
+    setTagSuggestions([]);
     setTranscriptViewMode("original");
+    getTagSuggestions(id!, p.id).then(setTagSuggestions).catch(() => {});
     if (highlight) setHighlightTarget(highlight);
     else setHighlightTarget(null);
     try {
@@ -861,6 +878,78 @@ export default function ProjectDetail() {
     handleViewTranscript(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, loading, participants, selectedParticipant]);
+
+  async function handleSuggestTags() {
+    if (!selectedParticipant || suggestingTags) return;
+    setSuggestingTags(true);
+    try {
+      const fresh = await suggestTags(id!, selectedParticipant.id);
+      setTagSuggestions(fresh);
+      if (fresh.length === 0) toast(tProject("responses.noTagSuggestions"), "info");
+    } catch (err) {
+      toast(getErrorMessage(err, tProject("responses.suggestTagsFailed")), "error");
+    } finally {
+      setSuggestingTags(false);
+    }
+  }
+
+  async function handleAcceptSuggestion(s: TagSuggestion) {
+    try {
+      const { tag, code } = await acceptTagSuggestion(id!, s.id);
+      setTagSuggestions((prev) => prev.filter((x) => x.id !== s.id));
+      setTags((prev) => [...prev, tag]);
+      // A proposed new code materialises on accept — reflect it in the codebook.
+      setCodes((prev) => (prev.some((c) => c.id === code.id) ? prev.map((c) => (c.id === code.id ? code : c)) : [...prev, code]));
+    } catch (err) {
+      toast(getErrorMessage(err, tProject("responses.suggestTagsFailed")), "error");
+    }
+  }
+
+  async function handleRejectSuggestion(s: TagSuggestion) {
+    setTagSuggestions((prev) => prev.filter((x) => x.id !== s.id));
+    try {
+      await rejectTagSuggestion(id!, s.id);
+    } catch {
+      // Rejection is best-effort; a failed call just leaves the row pending
+      // server-side and it reappears on next load.
+    }
+  }
+
+  async function handleSuggestCodes() {
+    if (suggestingCodes) return;
+    setSuggestingCodes(true);
+    try {
+      const proposals = await suggestCodes(id!);
+      setSuggestedCodes(proposals);
+      setSuggestedCodesChecked(Object.fromEntries(proposals.map((c) => [c.name, true])));
+    } catch (err) {
+      toast(getErrorMessage(err, tProject("responses.suggestCodesFailed")), "error");
+    } finally {
+      setSuggestingCodes(false);
+    }
+  }
+
+  async function handleAddSuggestedCodes() {
+    if (!suggestedCodes || addingSuggestedCodes) return;
+    const selected = suggestedCodes.filter((c) => suggestedCodesChecked[c.name]);
+    if (selected.length === 0) {
+      setSuggestedCodes(null);
+      return;
+    }
+    setAddingSuggestedCodes(true);
+    try {
+      for (const c of selected) {
+        const created = await createCode(id!, c.name, c.color);
+        setCodes((prev) => [...prev, created]);
+      }
+      setSuggestedCodes(null);
+      toast(tProject("responses.suggestedCodesAdded", { count: selected.length }), "success");
+    } catch (err) {
+      toast(getErrorMessage(err, tProject("responses.suggestCodesFailed")), "error");
+    } finally {
+      setAddingSuggestedCodes(false);
+    }
+  }
 
   async function handleToggleTranslation() {
     if (!selectedParticipant || !transcript) return;
@@ -3155,6 +3244,42 @@ export default function ProjectDetail() {
                                   ))}
                                 </div>
                               )}
+                              {(() => {
+                                const turnSuggestions = tagSuggestions.filter((s) => s.turn_id === t.id);
+                                if (turnSuggestions.length === 0) return null;
+                                return (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                                    {turnSuggestions.map((s) => {
+                                      const color = s.code_color || "var(--brand-500)";
+                                      const label = s.code_name || s.proposed_code_name || "";
+                                      return (
+                                        <span
+                                          key={s.id}
+                                          className="tag-pill tag-pill--suggested"
+                                          style={{ border: `1px dashed ${color}` }}
+                                          title={`"${s.selected_text}"${s.rationale ? ` (${s.rationale})` : ""}`}
+                                        >
+                                          {s.proposed_code_name
+                                            ? tProject("responses.suggestedNewCode", { name: label })
+                                            : label}
+                                          <button
+                                            className="tag-pill-action"
+                                            onClick={(e) => { e.stopPropagation(); handleAcceptSuggestion(s); }}
+                                            aria-label={`${tProject("responses.acceptSuggestion")} ${label}`}
+                                            title={tProject("responses.acceptSuggestion")}
+                                          >✓</button>
+                                          <button
+                                            className="tag-pill-remove"
+                                            onClick={(e) => { e.stopPropagation(); handleRejectSuggestion(s); }}
+                                            aria-label={`${tProject("responses.rejectSuggestion")} ${label}`}
+                                            title={tProject("responses.rejectSuggestion")}
+                                          >×</button>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           );
                         })}
@@ -3164,6 +3289,36 @@ export default function ProjectDetail() {
 
                     {/* ── Right: Tools sidebar ── */}
                     <div className="transcript-sidebar">
+                      {/* Interview digest — what the participant said, filled by
+                          the same auto-run pass as the quality assessment. */}
+                      {((selectedParticipant.key_takeaways?.length ?? 0) > 0 ||
+                        (selectedParticipant.notable_quotes?.length ?? 0) > 0) && (
+                        <details className="sidebar-panel" open>
+                          <summary className="sidebar-panel__header">
+                            <span className="sidebar-panel__title">{tProject("responses.keyTakeaways")}</span>
+                          </summary>
+                          <div className="sidebar-panel__body">
+                            {(selectedParticipant.key_takeaways?.length ?? 0) > 0 && (
+                              <div className="sidebar-panel__list">
+                                <ul>
+                                  {selectedParticipant.key_takeaways!.map((s, i) => (
+                                    <li key={i}>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {(selectedParticipant.notable_quotes?.length ?? 0) > 0 && (
+                              <div className="sidebar-panel__list">
+                                <h4 className="sidebar-panel__list-title">{tProject("responses.notableQuotes")}</h4>
+                                {selectedParticipant.notable_quotes!.map((q, i) => (
+                                  <blockquote key={i} className="sidebar-panel__quote">{q}</blockquote>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      )}
+
                       {/* Quality Assessment panel — treat the assessment as
                           done once a quality_label exists (that's what the
                           header badge reads). Keying the pending state off
@@ -3244,6 +3399,25 @@ export default function ProjectDetail() {
                             lineHeight: 1.5,
                           }}>
                             {tProject("responses.codebookHowTo", { defaultValue: "How to tag: highlight any part of a transcript → pick a code from the popup. Codes you create here appear in every participant's transcript." })}
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={handleSuggestTags}
+                              disabled={suggestingTags || selectedParticipant.status !== "completed"}
+                              title={tProject("responses.suggestTagsHint")}
+                            >
+                              {suggestingTags ? tProject("responses.suggestingTags") : `✨ ${tProject("responses.suggestTags")}`}
+                            </button>
+                            {codes.length === 0 && (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={handleSuggestCodes}
+                                disabled={suggestingCodes}
+                              >
+                                {suggestingCodes ? tProject("responses.suggestingCodes") : `✨ ${tProject("responses.suggestCodes")}`}
+                              </button>
+                            )}
                           </div>
                           {codes.length === 0 ? (
                             <p className="sidebar-panel__empty">{tProject("responses.noCodes")}</p>
@@ -3719,6 +3893,26 @@ export default function ProjectDetail() {
 
                         <div className="analysis-deep__main">
 
+                    {/* Codebook signals — deterministic counts from the
+                        researcher's own tags, computed server-side. */}
+                    {(r.codebook_stats?.length ?? 0) > 0 && (
+                      <div className="analysis-block" id="analysis-codebook-signals">
+                        <h3>{tAnalysis("codebookSignals")}</h3>
+                        <p className="analysis-codebook-signals__hint">{tAnalysis("codebookSignalsHint")}</p>
+                        <div className="analysis-codebook-signals">
+                          {r.codebook_stats!.map((s) => (
+                            <span key={s.code} className="analysis-codebook-signal" style={{ borderColor: s.color }}>
+                              <span className="analysis-codebook-signal__dot" style={{ background: s.color }} />
+                              <strong>{s.code}</strong>
+                              <span className="analysis-codebook-signal__count">
+                                {tAnalysis("codebookSignalCount", { participants: s.participant_count, total: s.participants_total, quotes: s.tag_count })}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Themes */}
                     {r.themes.length > 0 && (
                       <div className="analysis-block" id="analysis-themes">
@@ -4052,6 +4246,58 @@ export default function ProjectDetail() {
           </div>
         )}
       </main>
+
+      {/* ── AI starter-codebook proposal modal ─────────────────────────── */}
+      {suggestedCodes && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="suggested-codes-title"
+          onClick={() => setSuggestedCodes(null)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <button className="modal-close" onClick={() => setSuggestedCodes(null)} aria-label={tProject("a11y.close")}>×</button>
+            <h3 id="suggested-codes-title" style={{ marginTop: 0 }}>{tProject("responses.suggestedCodesTitle")}</h3>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>{tProject("responses.suggestedCodesIntro")}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "12px 0" }}>
+              {suggestedCodes.map((c) => (
+                <label key={c.name} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={!!suggestedCodesChecked[c.name]}
+                    onChange={(e) => setSuggestedCodesChecked((prev) => ({ ...prev, [c.name]: e.target.checked }))}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, display: "inline-block" }} />
+                      {c.name}
+                    </span>
+                    {c.description && (
+                      <span style={{ display: "block", fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.4 }}>{c.description}</span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setSuggestedCodes(null)}>
+                {tProject("responses.suggestedCodesCancel")}
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleAddSuggestedCodes}
+                disabled={addingSuggestedCodes || suggestedCodes.every((c) => !suggestedCodesChecked[c.name])}
+              >
+                {addingSuggestedCodes
+                  ? tProject("responses.suggestedCodesAdding")
+                  : tProject("responses.suggestedCodesAdd", { count: suggestedCodes.filter((c) => suggestedCodesChecked[c.name]).length })}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Welcome / first-participant modal ─────────────────────────── */}
       {welcomeOpen && (() => {

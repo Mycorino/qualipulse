@@ -1493,6 +1493,23 @@ def process_interview_turn(
                             if company and company.preferred_language:
                                 lang = company.preferred_language
                         run_ai_quality_assessment(_pid, assess_db, language=lang)
+                        # Auto-suggest tags only when the researcher already
+                        # has a codebook: with zero codes the pass could only
+                        # propose new codes per interview, which reads as
+                        # noise. Codebook-less studies use the manual button
+                        # (or "Suggest codes") instead.
+                        from app.models.coding import ManualCode
+                        from app.services.tag_suggestions import (
+                            suggest_tags_for_participant,
+                        )
+                        has_codes = (
+                            assess_db.query(ManualCode)
+                            .filter(ManualCode.project_id == _proj_id)
+                            .first()
+                            is not None
+                        )
+                        if has_codes:
+                            suggest_tags_for_participant(_pid, assess_db, language=lang)
                 except Exception:
                     pass
             _threading.Thread(target=_assess, daemon=True).start()
@@ -1620,6 +1637,23 @@ def skip_question(participant_id: str, db) -> dict:
                             if company and company.preferred_language:
                                 lang = company.preferred_language
                         run_ai_quality_assessment(_pid, assess_db, language=lang)
+                        # Auto-suggest tags only when the researcher already
+                        # has a codebook: with zero codes the pass could only
+                        # propose new codes per interview, which reads as
+                        # noise. Codebook-less studies use the manual button
+                        # (or "Suggest codes") instead.
+                        from app.models.coding import ManualCode
+                        from app.services.tag_suggestions import (
+                            suggest_tags_for_participant,
+                        )
+                        has_codes = (
+                            assess_db.query(ManualCode)
+                            .filter(ManualCode.project_id == _proj_id)
+                            .first()
+                            is not None
+                        )
+                        if has_codes:
+                            suggest_tags_for_participant(_pid, assess_db, language=lang)
                 except Exception:
                     pass
             _threading.Thread(target=_assess_skip, daemon=True).start()

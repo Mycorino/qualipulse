@@ -13,7 +13,7 @@ from app.dependencies import (
     get_db,
 )
 from app.models.company import Company
-from app.models.coding import ManualCode, QuoteTag
+from app.models.coding import ManualCode, QuoteTag, TagSuggestion
 from app.models.interview import InterviewTurn, Participant, ProjectAnalysis
 
 router = APIRouter(prefix="/projects", tags=["coding"])
@@ -466,6 +466,248 @@ def promote_theme_to_code(
         "tags_created": created_tags,
         "unmatched_quotes": unmatched,
     }
+
+
+# ── AI suggestions: tags + starter codebook ────────────────────────────────
+#
+# Suggestion-only surface: the codebook is never mutated without an explicit
+# accept. See services/tag_suggestions.py for the coding rules.
+
+
+def _suggestion_to_dict(s: TagSuggestion, db: Session) -> dict:
+    code = None
+    if s.manual_code_id:
+        code = db.query(ManualCode).filter(ManualCode.id == s.manual_code_id).first()
+    return {
+        "id": s.id,
+        "participant_id": s.participant_id,
+        "turn_id": s.turn_id,
+        "manual_code_id": s.manual_code_id,
+        "code_name": code.name if code else None,
+        "code_color": code.color if code else None,
+        "proposed_code_name": s.proposed_code_name,
+        "rationale": s.rationale,
+        "selected_text": s.selected_text,
+        "start_index": s.start_index,
+        "end_index": s.end_index,
+        "status": s.status,
+        "created_at": s.created_at.isoformat(),
+    }
+
+
+def _get_project_participant_or_404(
+    project_id: str, participant_id: str, db: Session
+) -> Participant:
+    participant = (
+        db.query(Participant)
+        .filter(Participant.id == participant_id, Participant.project_id == project_id)
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    return participant
+
+
+@router.post("/{project_id}/participants/{participant_id}/suggest-tags")
+def suggest_tags(
+    project_id: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Run the hybrid AI coding pass over one interview (sync, a few seconds)."""
+    from app.services.tag_suggestions import suggest_tags_for_participant
+
+    _get_editable_project_or_404(project_id, company.id, db)
+    participant = _get_project_participant_or_404(project_id, participant_id, db)
+    if not any(t.response_transcript for t in participant.turns):
+        raise HTTPException(status_code=400, detail="No responses to code")
+
+    lang = company.preferred_language or "en"
+    suggestions = suggest_tags_for_participant(participant_id, db, language=lang)
+    return {"suggestions": [_suggestion_to_dict(s, db) for s in suggestions]}
+
+
+@router.get("/{project_id}/participants/{participant_id}/tag-suggestions")
+def list_tag_suggestions(
+    project_id: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    _get_project_or_404(project_id, company.id, db)
+    _get_project_participant_or_404(project_id, participant_id, db)
+    suggestions = (
+        db.query(TagSuggestion)
+        .filter(
+            TagSuggestion.participant_id == participant_id,
+            TagSuggestion.status == "pending",
+        )
+        .order_by(TagSuggestion.created_at)
+        .all()
+    )
+    return {"suggestions": [_suggestion_to_dict(s, db) for s in suggestions]}
+
+
+def _get_suggestion_or_404(
+    project_id: str, suggestion_id: str, db: Session
+) -> TagSuggestion:
+    suggestion = (
+        db.query(TagSuggestion).filter(TagSuggestion.id == suggestion_id).first()
+    )
+    if suggestion is None:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    participant = (
+        db.query(Participant)
+        .filter(
+            Participant.id == suggestion.participant_id,
+            Participant.project_id == project_id,
+        )
+        .first()
+    )
+    if participant is None:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    return suggestion
+
+
+@router.post("/{project_id}/tag-suggestions/{suggestion_id}/accept")
+def accept_tag_suggestion(
+    project_id: str,
+    suggestion_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Accept: materialise the suggestion as a QuoteTag (creating the proposed
+    ManualCode first when needed; reused case-insensitively so accepting two
+    quotes of the same proposed code never duplicates it)."""
+    _get_editable_project_or_404(project_id, company.id, db)
+    suggestion = _get_suggestion_or_404(project_id, suggestion_id, db)
+    if suggestion.status != "pending":
+        raise HTTPException(status_code=409, detail="Suggestion already reviewed")
+
+    code = None
+    if suggestion.manual_code_id:
+        code = (
+            db.query(ManualCode)
+            .filter(
+                ManualCode.id == suggestion.manual_code_id,
+                ManualCode.project_id == project_id,
+            )
+            .first()
+        )
+        if code is None:
+            raise HTTPException(status_code=404, detail="Code not found")
+    else:
+        name = (suggestion.proposed_code_name or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Suggestion has no code")
+        code = next(
+            (
+                c
+                for c in db.query(ManualCode)
+                .filter(ManualCode.project_id == project_id)
+                .all()
+                if c.name.strip().lower() == name.lower()
+            ),
+            None,
+        )
+        if code is None:
+            used_colors = {
+                c.color
+                for c in db.query(ManualCode)
+                .filter(ManualCode.project_id == project_id)
+                .all()
+            }
+            code = ManualCode(
+                project_id=project_id,
+                name=name,
+                color=next(
+                    (c for c in PRESET_COLORS if c not in used_colors), PRESET_COLORS[0]
+                ),
+                sort_order=db.query(ManualCode)
+                .filter(ManualCode.project_id == project_id)
+                .count(),
+            )
+            db.add(code)
+            db.flush()
+
+    duplicate = (
+        db.query(QuoteTag)
+        .filter(
+            QuoteTag.turn_id == suggestion.turn_id,
+            QuoteTag.manual_code_id == code.id,
+            QuoteTag.start_index == suggestion.start_index,
+            QuoteTag.end_index == suggestion.end_index,
+        )
+        .first()
+    )
+    if duplicate is not None:
+        tag = duplicate
+    else:
+        tag = QuoteTag(
+            turn_id=suggestion.turn_id,
+            manual_code_id=code.id,
+            selected_text=suggestion.selected_text,
+            start_index=suggestion.start_index,
+            end_index=suggestion.end_index,
+            created_by="ai_suggested",
+        )
+        db.add(tag)
+
+    suggestion.status = "accepted"
+    db.commit()
+    db.refresh(tag)
+
+    return {
+        "tag": {
+            "id": tag.id,
+            "turn_id": tag.turn_id,
+            "manual_code_id": tag.manual_code_id,
+            "code_name": code.name,
+            "code_color": code.color,
+            "selected_text": tag.selected_text,
+            "start_index": tag.start_index,
+            "end_index": tag.end_index,
+            "tagged_from_translation": tag.tagged_from_translation,
+            "created_at": tag.created_at.isoformat(),
+        },
+        "code": _code_to_dict(code, db),
+    }
+
+
+@router.post("/{project_id}/tag-suggestions/{suggestion_id}/reject")
+def reject_tag_suggestion(
+    project_id: str,
+    suggestion_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    _get_editable_project_or_404(project_id, company.id, db)
+    suggestion = _get_suggestion_or_404(project_id, suggestion_id, db)
+    if suggestion.status != "pending":
+        raise HTTPException(status_code=409, detail="Suggestion already reviewed")
+    suggestion.status = "rejected"
+    db.commit()
+    return {"status": "rejected"}
+
+
+@router.post("/{project_id}/codes/suggest")
+def suggest_codes(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Propose a starter codebook from the study scope. Persists nothing."""
+    from app.services.tag_suggestions import suggest_starter_codes
+
+    project = _get_editable_project_or_404(project_id, company.id, db)
+    lang = company.preferred_language or "en"
+    proposals = suggest_starter_codes(project, db, language=lang)
+    if not proposals:
+        raise HTTPException(
+            status_code=502, detail="Could not generate code suggestions"
+        )
+    return {"codes": proposals}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
