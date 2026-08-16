@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class LinkCreate(BaseModel):
@@ -33,6 +33,20 @@ class LinkUpdateRequest(BaseModel):
     # Distinguishes "max_participants omitted" from "explicitly set to null",
     # which Pydantic alone can't express on a plain optional field.
     clear_max_participants: bool = False
+
+
+class LinkInviteRequest(BaseModel):
+    """Batch of participant emails to invite through an interview link."""
+
+    emails: list[EmailStr] = Field(min_length=1, max_length=20)
+    # Shown in the email body ("X has invited you..."). Defaults to the
+    # project's researcher_name, then the company name.
+    sender_name: str | None = Field(default=None, max_length=120)
+
+
+class LinkInviteResponse(BaseModel):
+    sent: int
+    failed: list[str]
 
 
 class StartInterviewRequest(BaseModel):

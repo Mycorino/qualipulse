@@ -517,6 +517,24 @@ export async function createLink(projectId: string): Promise<InterviewLink> {
   return data;
 }
 
+export interface LinkInviteResult {
+  sent: number;
+  failed: string[];
+}
+
+/** Email interview invitations for one link (max 20 recipients per call). */
+export async function sendLinkInvites(
+  projectId: string,
+  linkId: string,
+  emails: string[],
+): Promise<LinkInviteResult> {
+  const { data } = await client.post<LinkInviteResult>(
+    `/projects/${projectId}/links/${linkId}/invites`,
+    { emails },
+  );
+  return data;
+}
+
 export async function getLinks(projectId: string): Promise<InterviewLink[]> {
   const { data } = await client.get<InterviewLink[]>(`/projects/${projectId}/links`);
   return data;

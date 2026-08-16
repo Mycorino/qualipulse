@@ -13,8 +13,15 @@ from app.dependencies import (
 from app.models.company import Company
 from app.models.interview import InterviewLink, Participant
 from app.models.project import Project
-from app.schemas.interview import LinkResponse, LinkUpdateRequest
+from app.config import settings
+from app.schemas.interview import (
+    LinkInviteRequest,
+    LinkInviteResponse,
+    LinkResponse,
+    LinkUpdateRequest,
+)
 from app.services.analytics import emit_event
+from app.services.email import send_interview_invite
 
 router = APIRouter(tags=["links"])
 
@@ -76,6 +83,63 @@ def list_links(
         .all()
     )
     return [_link_to_response(link, db) for link in links]
+
+
+@router.post(
+    "/projects/{project_id}/links/{link_id}/invites",
+    response_model=LinkInviteResponse,
+)
+def send_link_invites(
+    project_id: str,
+    link_id: str,
+    payload: LinkInviteRequest,
+    db: Session = Depends(get_db),
+    company: Company = Depends(require_verified_company),
+) -> LinkInviteResponse:
+    """Email interview invitations for one link (max 20 recipients per call).
+
+    The email is written in the project's language, since it goes to a
+    participant, not the researcher.
+    """
+    project = _get_editable_project_or_404(project_id, company.id, db)
+    link = (
+        db.query(InterviewLink)
+        .filter(InterviewLink.id == link_id, InterviewLink.project_id == project.id)
+        .first()
+    )
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="link_not_found")
+    if not link.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="link_inactive")
+
+    interview_url = f"{settings.APP_BASE_URL}/i/{link.token}"
+    sender_name = (payload.sender_name or project.researcher_name or company.name or "").strip() or company.name
+
+    sent = 0
+    failed: list[str] = []
+    # dict.fromkeys preserves order while deduping repeated addresses.
+    for email_addr in dict.fromkeys(str(e).strip().lower() for e in payload.emails):
+        ok = send_interview_invite(
+            to=email_addr,
+            project_name=project.name,
+            interview_url=interview_url,
+            sender_name=sender_name,
+            lang=project.language or "en",
+        )
+        if ok:
+            sent += 1
+        else:
+            failed.append(email_addr)
+
+    emit_event(
+        "invites_sent",
+        company=company,
+        project_id=str(project.id),
+        link_id=str(link.id),
+        sent=sent,
+        failed=len(failed),
+    )
+    return LinkInviteResponse(sent=sent, failed=failed)
 
 
 @router.patch("/links/{link_id}", response_model=LinkResponse)

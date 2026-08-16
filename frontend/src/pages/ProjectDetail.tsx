@@ -14,6 +14,7 @@ import {
   getLinks,
   getParticipants,
   createLink,
+  sendLinkInvites,
   toggleLink,
   setLinkCap,
   updateProject,
@@ -143,6 +144,10 @@ export default function ProjectDetail() {
   const [selectedParticipant, setSelectedParticipant] = useState<ParticipantResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  // Per-link email-invite panel (null = closed)
+  const [inviteLinkId, setInviteLinkId] = useState<string | null>(null);
+  const [inviteText, setInviteText] = useState("");
+  const [inviteSending, setInviteSending] = useState(false);
   // Per-link participant cap editor: which link is being edited, and the draft
   // value (kept as a string so the input can be transiently empty).
   const [capEditLinkId, setCapEditLinkId] = useState<string | null>(null);
@@ -799,6 +804,39 @@ export default function ProjectDetail() {
 
   function interviewUrl(token: string) {
     return `${window.location.origin}/i/${token}`;
+  }
+
+  async function handleSendInvites(linkId: string) {
+    const emails = inviteText
+      .split(/[\s,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (emails.length === 0) return;
+    const invalid = emails.filter((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+    if (invalid.length > 0) {
+      toast(tProject("overview.inviteInvalid", { emails: invalid.join(", ") }), "error");
+      return;
+    }
+    if (emails.length > 20) {
+      toast(tProject("overview.inviteTooMany"), "error");
+      return;
+    }
+    setInviteSending(true);
+    try {
+      const res = await sendLinkInvites(id!, linkId, emails);
+      if (res.failed.length > 0) {
+        toast(tProject("overview.inviteFailed", { emails: res.failed.join(", ") }), "error");
+      }
+      if (res.sent > 0) {
+        toast(tProject("overview.inviteSent", { count: res.sent }), "success");
+      }
+      setInviteText("");
+      setInviteLinkId(null);
+    } catch (err) {
+      toast(getErrorMessage(err, tProject("overview.inviteFailedGeneric")), "error");
+    } finally {
+      setInviteSending(false);
+    }
   }
 
   async function copyLink(token: string) {
@@ -2267,6 +2305,18 @@ export default function ProjectDetail() {
                             {copiedToken === l.token ? `✓ ${tProject("overview.linkCopied")}` : tProject("overview.copyLink")}
                           </button>
                         )}
+                        {l.is_active && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            aria-expanded={inviteLinkId === l.id}
+                            onClick={() => {
+                              setInviteLinkId(inviteLinkId === l.id ? null : l.id);
+                              setInviteText("");
+                            }}
+                          >
+                            {tProject("overview.inviteEmails")}
+                          </button>
+                        )}
                         <button
                           className={`btn btn-sm ${l.is_active ? "btn-ghost" : "btn-secondary"}`}
                           onClick={() => handleToggleLink(l.id)}
@@ -2274,6 +2324,34 @@ export default function ProjectDetail() {
                           {l.is_active ? tProject("overview.deactivateLink") : tProject("overview.activateLink")}
                         </button>
                       </div>
+                      {inviteLinkId === l.id && (
+                        <div className="link-invite-panel">
+                          <label htmlFor={`invite-emails-${l.id}`} className="link-invite-label">
+                            {tProject("overview.invitePanelHint")}
+                          </label>
+                          <textarea
+                            id={`invite-emails-${l.id}`}
+                            className="link-invite-textarea"
+                            rows={3}
+                            value={inviteText}
+                            autoFocus
+                            placeholder={tProject("overview.invitePlaceholder")}
+                            onChange={(e) => setInviteText(e.target.value)}
+                          />
+                          <div className="link-invite-actions">
+                            <button
+                              className="btn btn-primary btn-sm"
+                              disabled={inviteSending || inviteText.trim() === ""}
+                              onClick={() => handleSendInvites(l.id)}
+                            >
+                              {inviteSending ? tProject("overview.inviteSending") : tProject("overview.inviteSend")}
+                            </button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setInviteLinkId(null)}>
+                              {tCommon("cancel")}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
