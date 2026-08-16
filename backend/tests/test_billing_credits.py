@@ -185,6 +185,108 @@ class TestCanStartInterviewCredits:
         assert result.overage_will_apply is True
 
 
+class TestCanceledSubscriptionAccess:
+    """Cancelling must not claw back credits the customer already paid for.
+
+    Two promises are on the line: the pricing page says purchased packs
+    never expire, and an annual customer has paid for a full year up front.
+    """
+
+    def _canceled_sub(self, db_session, *, period_end_delta: timedelta):
+        c = _make_company(db_session)
+        sub = bootstrap_trial_subscription(db_session, c)
+        sub.plan_id = "team"
+        sub.status = "canceled"
+        sub.current_period_end = datetime.utcnow() + period_end_delta
+        db_session.commit()
+        return c, sub
+
+    def test_annual_customer_keeps_the_period_they_paid_for(self, db_session):
+        # Cancelled in month two of a year: the remaining included credits
+        # are already paid for and must stay spendable until period end.
+        ensure_plans_seeded(db_session)
+        c, _ = self._canceled_sub(db_session, period_end_delta=timedelta(days=300))
+        bal = get_active_balance(db_session, c.id)
+        bal.included_credits = 50
+        bal.used_credits = 10
+        db_session.commit()
+
+        result = can_start_interview(db_session, c.id)
+        assert result.allowed is True
+        assert result.reason == "ok"
+        assert result.available_credits == 40  # 50 included - 10 used
+
+    def test_purchased_credits_outlive_the_period(self, db_session):
+        # Period is over, but prepaid packs are advertised as never expiring.
+        ensure_plans_seeded(db_session)
+        c, _ = self._canceled_sub(db_session, period_end_delta=timedelta(days=-5))
+        bal = get_active_balance(db_session, c.id)
+        bal.included_credits = 50
+        bal.purchased_credits = 25
+        bal.used_credits = 50  # exactly drained the included grant
+        db_session.commit()
+
+        result = can_start_interview(db_session, c.id)
+        assert result.allowed is True
+        assert result.available_credits == 25
+
+    def test_usage_beyond_included_eats_into_purchased(self, db_session):
+        ensure_plans_seeded(db_session)
+        c, _ = self._canceled_sub(db_session, period_end_delta=timedelta(days=-5))
+        bal = get_active_balance(db_session, c.id)
+        bal.included_credits = 10
+        bal.purchased_credits = 25
+        bal.used_credits = 18  # 10 included + 8 from the purchased bucket
+        db_session.commit()
+
+        result = can_start_interview(db_session, c.id)
+        assert result.allowed is True
+        assert result.available_credits == 17
+
+    def test_expired_period_with_no_purchased_blocks(self, db_session):
+        ensure_plans_seeded(db_session)
+        c, _ = self._canceled_sub(db_session, period_end_delta=timedelta(days=-5))
+        bal = get_active_balance(db_session, c.id)
+        bal.included_credits = 50
+        bal.used_credits = 0
+        db_session.commit()
+
+        result = can_start_interview(db_session, c.id)
+        assert result.allowed is False
+        # Not past_due: there is no failed payment to retry.
+        assert result.reason == "subscription_canceled"
+
+    def test_unpaid_keeps_only_purchased(self, db_session):
+        # An unpaid subscription never paid for its period, so the included
+        # grant does not survive even if the period hasn't elapsed.
+        ensure_plans_seeded(db_session)
+        c, sub = self._canceled_sub(db_session, period_end_delta=timedelta(days=300))
+        sub.status = "unpaid"
+        bal = get_active_balance(db_session, c.id)
+        bal.included_credits = 50
+        bal.purchased_credits = 4
+        db_session.commit()
+
+        result = can_start_interview(db_session, c.id)
+        assert result.allowed is True
+        assert result.available_credits == 4
+
+    def test_unpaid_with_nothing_purchased_still_blocks_as_past_due(self, db_session):
+        ensure_plans_seeded(db_session)
+        c, sub = self._canceled_sub(db_session, period_end_delta=timedelta(days=300))
+        sub.status = "unpaid"
+        bal = get_active_balance(db_session, c.id)
+        bal.included_credits = 50
+        bal.purchased_credits = 0
+        bal.rollover_credits = 0
+        bal.used_credits = 3  # drains the trial grant
+        db_session.commit()
+
+        result = can_start_interview(db_session, c.id)
+        assert result.allowed is False
+        assert result.reason == "past_due"
+
+
 class TestConsumeIdempotency:
     def test_first_consume_decrements_balance(self, db_session):
         ensure_plans_seeded(db_session)

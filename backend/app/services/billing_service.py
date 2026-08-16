@@ -72,7 +72,9 @@ class CanStartResult:
     """Outcome of a pre-interview quota check."""
 
     allowed: bool
-    reason: str  # 'ok' | 'no_subscription' | 'quota_exceeded' | 'past_due' | 'email_not_verified'
+    # 'ok' | 'no_subscription' | 'quota_exceeded' | 'past_due'
+    # | 'subscription_canceled' | 'email_not_verified'
+    reason: str
     plan_id: str | None = None
     available_credits: int | None = None
     overage_will_apply: bool = False
@@ -321,7 +323,42 @@ def can_start_interview(db: Session, workspace_id: str) -> CanStartResult:
     # long as they want.
 
     if sub.status in ("canceled", "unpaid"):
-        return CanStartResult(allowed=False, reason="past_due", plan_id=plan.id)
+        # Ending a subscription must not claw back what was already paid for.
+        # Two things survive a cancellation:
+        #   1. the remainder of a period that was billed. An annual customer
+        #      who cancels in month two keeps the other ten months, included
+        #      credits and all. (Stripe's portal default is cancel-at-period-
+        #      end, which keeps the subscription 'active' until then and never
+        #      reaches this branch; this covers immediate cancellations.)
+        #   2. purchased + rolled-over credits, which we advertise as never
+        #      expiring, so they outlive the subscription entirely.
+        # An 'unpaid' subscription never paid for its period, so only the
+        # never-expiring buckets survive there.
+        cancel_balance = get_active_balance(db, workspace_id)
+        still_in_paid_period = (
+            sub.status == "canceled"
+            and sub.current_period_end is not None
+            and sub.current_period_end > _utcnow()
+        )
+        if still_in_paid_period:
+            spendable = cancel_balance.available if cancel_balance else 0
+        else:
+            spendable = cancel_balance.non_expiring_available if cancel_balance else 0
+        if spendable > 0:
+            return CanStartResult(
+                allowed=True,
+                reason="ok",
+                plan_id=plan.id,
+                available_credits=spendable,
+            )
+        # Distinct from past_due: there is no failed payment to retry here,
+        # so the log line shouldn't say there is.
+        return CanStartResult(
+            allowed=False,
+            reason="subscription_canceled" if sub.status == "canceled" else "past_due",
+            plan_id=plan.id,
+            available_credits=0,
+        )
 
     balance = get_active_balance(db, workspace_id)
     available = balance.available if balance else 0

@@ -178,6 +178,24 @@ class CreditBalance(Base):
             - (self.used_credits or 0)
         )
 
+    @property
+    def non_expiring_available(self) -> int:
+        """Credits that outlive the subscription: purchased + rollover.
+
+        We advertise prepaid packs and rolled-over credits as never
+        expiring, so they must stay spendable after a subscription ends,
+        while the period's *included* grant does not.
+
+        Consumption is attributed included -> rollover -> purchased, so
+        usage only starts eating these buckets once the included grant is
+        exhausted; anything beyond that is what has actually been spent
+        from them.
+        """
+        included = self.included_credits or 0
+        carried = (self.purchased_credits or 0) + (self.rollover_credits or 0)
+        spent_beyond_included = max(0, (self.used_credits or 0) - included)
+        return max(0, carried - spent_beyond_included)
+
 
 class CreditLedger(Base):
     """Append-only audit trail of every credit movement.
