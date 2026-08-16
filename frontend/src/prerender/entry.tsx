@@ -10,7 +10,6 @@ import Signup from "../pages/Signup";
 import Terms from "../pages/Terms";
 import Privacy from "../pages/Privacy";
 import LegalDocument from "../pages/LegalDocument";
-import Blog from "../pages/Blog";
 
 /**
  * Build-time prerender entry (see scripts/prerender.mjs).
@@ -34,7 +33,9 @@ const ROUTES: Record<string, ComponentType> = {
   "/participant-notice": LegalDocument,
   "/ai-use-policy": LegalDocument,
   "/retention-policy": LegalDocument,
-  "/blog": Blog,
+  // /blog and /blog/:slug are NOT prerendered here: nginx proxies direct hits
+  // to the backend's server-rendered pages (services/blog_render.py), which
+  // can include per-post content and meta that a build-time snapshot cannot.
 };
 
 export const PRERENDER_PATHS = Object.keys(ROUTES);
