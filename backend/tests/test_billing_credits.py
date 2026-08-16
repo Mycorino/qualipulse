@@ -35,6 +35,7 @@ from app.services.billing_service import (
     get_active_balance,
     get_current_subscription,
     get_entitlements,
+    grant_period_credits,
 )
 
 
@@ -285,6 +286,83 @@ class TestCanceledSubscriptionAccess:
         result = can_start_interview(db_session, c.id)
         assert result.allowed is False
         assert result.reason == "past_due"
+
+
+class TestMidPeriodPlanChange:
+    """Stripe keeps the same period bounds when a subscription switches
+    price, so the grant's idempotency key still matches. An upgrade must
+    still deliver the new allowance, or the customer pays the prorated
+    difference and gets nothing until the period rolls.
+    """
+
+    def _subscribed(self, db_session, plan_id: str, *, included: int):
+        c = _make_company(db_session)
+        sub = bootstrap_trial_subscription(db_session, c)
+        sub.plan_id = plan_id
+        sub.current_period_start = datetime.utcnow() - timedelta(days=5)
+        sub.current_period_end = datetime.utcnow() + timedelta(days=25)
+        db_session.commit()
+        bal = grant_period_credits(db_session, sub, source="test")
+        assert bal is not None
+        assert bal.included_credits == included
+        return c, sub, bal
+
+    def test_upgrade_tops_up_the_current_period(self, db_session):
+        ensure_plans_seeded(db_session)
+        c, sub, _ = self._subscribed(db_session, "exploration", included=10)
+
+        # Customer upgrades mid-period; Stripe leaves the period bounds alone.
+        sub.plan_id = "team"
+        db_session.commit()
+        bal = grant_period_credits(db_session, sub, source="stripe_webhook")
+
+        assert bal.included_credits == 50
+        assert bal.available == 50
+
+    def test_upgrade_top_up_is_idempotent(self, db_session):
+        ensure_plans_seeded(db_session)
+        _, sub, _ = self._subscribed(db_session, "exploration", included=10)
+        sub.plan_id = "team"
+        db_session.commit()
+
+        grant_period_credits(db_session, sub, source="stripe_webhook")
+        bal = grant_period_credits(db_session, sub, source="stripe_webhook")
+
+        assert bal.included_credits == 50  # not 90
+        grants = [
+            row
+            for row in db_session.query(CreditLedger)
+            .filter(CreditLedger.workspace_id == sub.workspace_id)
+            .all()
+            if row.source == "plan_change"
+        ]
+        assert len(grants) == 1
+        assert grants[0].credits_delta == 40
+
+    def test_downgrade_keeps_the_allowance_already_paid_for(self, db_session):
+        ensure_plans_seeded(db_session)
+        _, sub, _ = self._subscribed(db_session, "team", included=50)
+
+        sub.plan_id = "exploration"
+        db_session.commit()
+        bal = grant_period_credits(db_session, sub, source="stripe_webhook")
+
+        # Not reduced to 10: the period was paid for at the Team rate.
+        assert bal.included_credits == 50
+
+    def test_upgrade_preserves_usage_already_recorded(self, db_session):
+        ensure_plans_seeded(db_session)
+        _, sub, bal = self._subscribed(db_session, "exploration", included=10)
+        bal.used_credits = 7
+        db_session.commit()
+
+        sub.plan_id = "team"
+        db_session.commit()
+        bal = grant_period_credits(db_session, sub, source="stripe_webhook")
+
+        assert bal.included_credits == 50
+        assert bal.used_credits == 7
+        assert bal.available == 43
 
 
 class TestUsageWarningPortalLink:

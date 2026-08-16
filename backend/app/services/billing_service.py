@@ -934,7 +934,43 @@ def grant_period_credits(
         .first()
     )
     if existing is not None:
-        return existing  # webhook replay — never double-grant
+        # Two different things land here. A webhook replay, where nothing
+        # should change. And a mid-period plan change: Stripe keeps the
+        # same period bounds when a subscription switches price, so the
+        # idempotency key still matches even though the plan's allowance
+        # just changed. Without the top-up below, an upgrade charges the
+        # customer a prorated difference immediately and leaves them on
+        # the old allowance until the period rolls, which on an annual
+        # plan can be most of a year.
+        #
+        # Only ever raise the grant. A downgrade's larger allowance was
+        # already paid for, so it stands until the period ends and the
+        # smaller one applies from the next grant. Comparing against the
+        # balance keeps this idempotent: once topped up, the amounts match
+        # and a replay is a no-op.
+        shortfall = (plan.included_credits or 0) - (existing.included_credits or 0)
+        if shortfall > 0:
+            existing.included_credits = (existing.included_credits or 0) + shortfall
+            existing.updated_at = _utcnow()
+            db.add(
+                CreditLedger(
+                    id=str(uuid.uuid4()),
+                    workspace_id=subscription.workspace_id,
+                    balance_id=existing.id,
+                    event_type=EVT_GRANT_INCLUDED,
+                    credits_delta=shortfall,
+                    balance_after=existing.available,
+                    source="plan_change",
+                    event_metadata={
+                        "plan_id": plan.id,
+                        "reason": "mid_period_plan_upgrade",
+                        "stripe_subscription_id": subscription.stripe_subscription_id,
+                    },
+                )
+            )
+            db.commit()
+            db.refresh(existing)
+        return existing
 
     # Find the most recent prior balance for this workspace. We use
     # ``period_end <= new period_start`` so an exact-touch period chain
