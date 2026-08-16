@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run prerender",
+    "prerender": "vite build --ssr src/prerender/entry.tsx --outDir dist-ssr --emptyOutDir --logLevel warn && node scripts/prerender.mjs",
     "preview": "vite preview",
     "check:i18n": "node scripts/check-i18n.mjs"
   },

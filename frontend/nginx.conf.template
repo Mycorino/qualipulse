@@ -3,7 +3,15 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # SPA fallback
+    # Prerendered marketing home (scripts/prerender.mjs). dist/index.html
+    # stays the empty SPA shell used as fallback for app routes, so
+    # authenticated pages never flash marketing content.
+    location = / {
+        try_files /home.html /index.html;
+    }
+
+    # SPA fallback. Prerendered public routes (terms/, privacy/, blog/, ...)
+    # are picked up as static $uri/index.html before the shell fallback.
     location / {
         try_files $uri $uri/ /index.html;
     }
