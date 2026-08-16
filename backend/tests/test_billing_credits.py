@@ -287,6 +287,66 @@ class TestCanceledSubscriptionAccess:
         assert result.reason == "past_due"
 
 
+class TestUsageWarningPortalLink:
+    """The Stripe portal login page only works for existing customers.
+
+    Showing it to a trial workspace sends them to a form that accepts their
+    email and then mails nothing, so the link has to be gated.
+    """
+
+    def _fire_warning(self, db_session, monkeypatch, *, stripe_customer_id, portal_setting):
+        from app.services import billing_service as bs
+
+        ensure_plans_seeded(db_session)
+        c = _make_company(db_session)
+        c.stripe_customer_id = stripe_customer_id
+        bootstrap_trial_subscription(db_session, c)
+        bal = get_active_balance(db_session, c.id)
+        bal.included_credits = 10
+        bal.used_credits = 8  # 80% threshold
+        db_session.commit()
+
+        monkeypatch.setattr(bs.settings, "STRIPE_PORTAL_LOGIN_URL", portal_setting)
+        captured: dict = {}
+
+        import app.services.email as email_mod
+
+        def _fake_send(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        monkeypatch.setattr(email_mod, "send_usage_warning", _fake_send)
+        bs._maybe_send_usage_warning(db_session, c.id, bal)
+        return captured
+
+    def test_link_included_for_stripe_customers(self, db_session, monkeypatch):
+        captured = self._fire_warning(
+            db_session,
+            monkeypatch,
+            stripe_customer_id="cus_123",
+            portal_setting="https://billing.stripe.com/p/login/test",
+        )
+        assert captured["portal_url"] == "https://billing.stripe.com/p/login/test"
+
+    def test_link_omitted_without_stripe_customer(self, db_session, monkeypatch):
+        captured = self._fire_warning(
+            db_session,
+            monkeypatch,
+            stripe_customer_id=None,
+            portal_setting="https://billing.stripe.com/p/login/test",
+        )
+        assert captured["portal_url"] is None
+
+    def test_link_omitted_when_unconfigured(self, db_session, monkeypatch):
+        captured = self._fire_warning(
+            db_session,
+            monkeypatch,
+            stripe_customer_id="cus_123",
+            portal_setting="",
+        )
+        assert captured["portal_url"] is None
+
+
 class TestConsumeIdempotency:
     def test_first_consume_decrements_balance(self, db_session):
         ensure_plans_seeded(db_session)
