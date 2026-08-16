@@ -504,12 +504,14 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "heading": "You've used {percent}% of this month's credits",
             "body": "You've used <strong>{used} of {total}</strong> interview credits in your current period (ends {period_end}). Plan ahead so a great study doesn't run out of room.",
             "cta": "Manage billing",
+            "portal": "Or manage your subscription directly",
         },
         "fr": {
             "subject": "{percent} % de vos crédits QualiPulse utilisés",
             "heading": "Vous avez utilisé {percent} % de vos crédits du mois",
             "body": "Vous avez utilisé <strong>{used} sur {total}</strong> crédits d'entretien sur la période en cours (jusqu'au {period_end}). Anticipez pour qu'une étude qui décolle ne soit pas bloquée.",
             "cta": "Gérer la facturation",
+            "portal": "Ou gérez votre abonnement directement",
         },
     },
     "usage_warning_100": {
@@ -518,12 +520,14 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "heading": "Out of interview credits",
             "body": "You've used all <strong>{total}</strong> credits in your current period. New participants won't be able to start interviews until you upgrade or buy a credit pack.",
             "cta": "Buy more credits",
+            "portal": "Or manage your subscription directly",
         },
         "fr": {
             "subject": "Vos crédits QualiPulse sont épuisés",
             "heading": "Plus de crédits d'entretien",
             "body": "Vous avez utilisé l'ensemble des <strong>{total}</strong> crédits sur la période en cours. Les nouveaux participants ne pourront pas démarrer d'entretien tant que vous n'aurez pas mis à niveau votre plan ou acheté un pack.",
             "cta": "Acheter des crédits",
+            "portal": "Ou gérez votre abonnement directement",
         },
     },
 }
@@ -985,21 +989,35 @@ def send_usage_warning(
     period_end: str,
     billing_url: str,
     lang: str = "en",
+    portal_url: str | None = None,
 ) -> bool:
     """Send the 80% or 100% credit-usage warning email.
 
     ``percent`` selects the template (any value < 100 → ``usage_warning_80``,
     100+ → ``usage_warning_100``). ``period_end`` should already be a
     locale-friendly date string (the caller formats it).
+
+    ``portal_url`` is the Stripe Customer Portal login page. Pass it only
+    for workspaces that actually have a Stripe customer: for anyone else
+    Stripe accepts the email and sends nothing, which reads as broken.
     """
     lang = _normalise_lang(lang)
     template_key = "usage_warning_100" if percent >= 100 else "usage_warning_80"
+    portal_block = ""
+    if portal_url:
+        portal_block = f"""
+      <p style="text-align:center;color:#94a3b8;font-size:0.85rem;margin:0 0 8px;">
+        {_c(template_key, lang, "portal")}:
+        <a href="{portal_url}" style="color:#4f46e5;text-decoration:underline;">{portal_url}</a>
+      </p>
+    """
     content = f"""
       <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c(template_key, lang, "heading", percent=percent, used=used, total=total, period_end=period_end)}</h2>
       <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c(template_key, lang, "body", percent=percent, used=used, total=total, period_end=period_end)}</p>
       <div style="text-align:center;margin:24px 0;">
         <a href="{billing_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c(template_key, lang, "cta")}</a>
       </div>
+      {portal_block}
     """
     return send_email(
         to=to,

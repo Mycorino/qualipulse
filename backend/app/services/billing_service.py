@@ -560,6 +560,15 @@ def _maybe_send_usage_warning(db: Session, workspace_id: str, balance: CreditBal
     else:
         period_end_str = ""
     billing_url = f"{settings.APP_BASE_URL.rstrip('/')}/account?tab=billing"
+    # The Stripe portal login page only recognises existing customers.
+    # Offering it to a trial workspace would send them to a form that
+    # accepts their email and then mails nothing, so gate it on having
+    # a Stripe customer at all.
+    portal_url = (
+        settings.STRIPE_PORTAL_LOGIN_URL
+        if (settings.STRIPE_PORTAL_LOGIN_URL and company.stripe_customer_id)
+        else None
+    )
 
     try:
         from app.services.email import send_usage_warning
@@ -571,6 +580,7 @@ def _maybe_send_usage_warning(db: Session, workspace_id: str, balance: CreditBal
             period_end=period_end_str,
             billing_url=billing_url,
             lang=lang,
+            portal_url=portal_url,
         )
     except Exception:
         logger.exception("send_usage_warning failed for %s", company.email)

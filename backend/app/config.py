@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     # Stripe dashboard, otherwise Checkout session creation 400s. When on,
     # Checkout computes VAT automatically and collects business VAT IDs.
     STRIPE_AUTOMATIC_TAX: bool = False
+    # Stripe Customer Portal login page (Settings -> Billing -> Customer
+    # portal -> login link). A permanent URL where a customer types their
+    # email and Stripe mails them a link into their own portal. Used in
+    # billing emails, where we can't authenticate the reader. Blank hides
+    # the link. Only ever shown to workspaces that have a Stripe customer:
+    # for anyone else Stripe silently sends nothing, which reads as a bug.
+    STRIPE_PORTAL_LOGIN_URL: str = ""
 
     # Google OAuth (Sign in with Google). Leave blank to disable —
     # /auth/google/login returns 503 when unconfigured. The redirect URI
