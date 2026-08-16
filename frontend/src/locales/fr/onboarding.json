@@ -2,7 +2,7 @@
   "skip": "Passer pour le moment",
   "verify_banner": "Pensez à vérifier votre adresse email quand vous avez un moment, le lien vous attend dans votre boîte de réception.",
   "verify_resend": "Renvoyer",
-  "greeting": "Bonjour {{firstName}}, je suis votre Research Copilot. Je vous aide à mener des entretiens et des sondages sans la corvée de planification et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager, et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : qu'avez-vous le plus besoin d'apprendre sur vos utilisateurs en ce moment ?",
+  "greeting": "Bonjour {{firstName}}, je suis votre Copilote de recherche. Je vous aide à mener des entretiens et des sondages sans la corvée de planification et d'analyse.\n\nEn deux minutes environ, nous aurons une étude prête à partager, et je commencerai à apprendre à quoi ressemble votre recherche pour vous être plus utile la prochaine fois.\n\nPour commencer : qu'avez-vous le plus besoin d'apprendre sur vos utilisateurs en ce moment ?",
   "greeting_post_wizard": "Bienvenue, {{firstName}}, c'est noté. Vous êtes {{role}}, avec pour priorité {{useCase}}.\n\nMaintenant, rédigeons votre première étude. Quelle décision repose sur cette recherche ?",
   "goal_suggestions_label": "Ou choisissez un point de départ :",
   "goal_suggestions": [
@@ -31,7 +31,7 @@
     "business_summary_label": "Activité",
     "empty_hint": "Je compléterai au fil de la conversation, votre rôle, ce que vous cherchez à apprendre, et auprès de qui."
   },
-  "input_placeholder": "Dites au Copilot ce que vous voulez apprendre…",
+  "input_placeholder": "Dites au copilote ce que vous voulez apprendre…",
   "send": "Envoyer",
   "thinking_fallback": "Rédaction…",
   "setting_up": "Préparation de votre étude…",
@@ -77,7 +77,7 @@
     "memory_label": "Voici ce que je retiendrai de votre recherche",
     "memory_fallback": "J'en apprendrai davantage sur votre recherche au fil de notre collaboration.",
     "cta_take_interview": "Passer votre propre entretien",
-    "cta_take_interview_hint": "90 secondes, écoutez le Copilot poser ses questions et s'adapter",
+    "cta_take_interview_hint": "90 secondes, écoutez le copilote poser ses questions et s'adapter",
     "cta_copy_link": "Copier le lien à partager",
     "cta_open_study": "Ouvrir votre étude →",
     "plan_hint": "Les équipes comme la vôtre démarrent souvent avec <strong>{{planName}}</strong> ({{monthly}}/mois). Aucune pression, franchissez le pas quand QualiPulse aura fait ses preuves.",
@@ -116,14 +116,14 @@
         },
         "themes": [
           {
-            "title": "« Je ne savais pas qui interviewer »",
+            "title": "« Je ne savais pas qui interviewer »",
             "finding": "12 sur 25 ont calé avant de lancer car ils n'avaient pas de participants. Ils s'attendaient à ce que l'outil les trouve pour eux.",
             "quote": "Je pensais qu'il y aurait un panel à qui je pouvais juste l'envoyer. Quand j'ai compris qu'il fallait amener ma propre liste, j'ai fermé l'onglet.",
             "speaker": "Maya, PM dans une SaaS de 40 personnes"
           },
           {
             "title": "La première étude semblait à fort enjeu",
-            "finding": "Les utilisateurs en essai décrivaient la première étude comme « leur seule chance ». Ils sur-éditaient le guide et ne l'envoyaient jamais.",
+            "finding": "Les utilisateurs en essai décrivaient la première étude comme « leur seule chance ». Ils sur-éditaient le guide et ne l'envoyaient jamais.",
             "quote": "J'ai réécrit ces cinq questions sept fois. J'étais sûr que j'allais faire perdre du temps aux participants.",
             "speaker": "Jonas, fondateur, fintech B2B"
           },
@@ -227,14 +227,14 @@
         "themes": [
           {
             "title": "C'est la surprise des frais de port qui tue, pas leur montant",
-            "finding": "14 sur 25 ont abandonné non pas parce que les frais étaient élevés, mais parce qu'ils n'apparaissaient qu'à l'étape finale. Même 4,99 € passaient pour un piège quand ils apparaissaient si tard.",
+            "finding": "14 sur 25 ont abandonné non pas parce que les frais étaient élevés, mais parce qu'ils n'apparaissaient qu'à l'étape finale. Même 4,99 € passaient pour un piège quand ils apparaissaient si tard.",
             "quote": "C'était pas les cinq euros. C'est que j'avais passé dix minutes à choisir et ils me l'avaient caché tout du long.",
             "speaker": "Élise, jeune active, achats en ligne mensuels"
           },
           {
             "title": "Création de compte = fermeture d'onglet",
-            "finding": "La création de compte forcée au checkout a fait fermer l'onglet à 9 sur 25, la moitié a dit « je reviendrai plus tard », personne n'est revenu.",
-            "quote": "Pourquoi je dois créer un compte pour acheter un t-shirt ? Je viens dépenser de l'argent, pas m'engager dans une relation.",
+            "finding": "La création de compte forcée au checkout a fait fermer l'onglet à 9 sur 25, la moitié a dit « je reviendrai plus tard », personne n'est revenu.",
+            "quote": "Pourquoi je dois créer un compte pour acheter un t-shirt ? Je viens dépenser de l'argent, pas m'engager dans une relation.",
             "speaker": "Tom, acheteur occasionnel"
           },
           {
@@ -254,7 +254,7 @@
           },
           {
             "speaker": "Tom, acheteur",
-            "text": "Pourquoi je dois créer un compte pour acheter un t-shirt ? Je viens dépenser de l'argent, pas m'engager dans une relation.",
+            "text": "Pourquoi je dois créer un compte pour acheter un t-shirt ? Je viens dépenser de l'argent, pas m'engager dans une relation.",
             "highlight": "pas m'engager dans une relation",
             "code": "Friction compte forcé",
             "codeColor": "#0ea5e9"
@@ -263,7 +263,7 @@
             "speaker": "Camille, premier achat",
             "text": "Je ne les connaissais pas. S'ils ne prennent pas PayPal je me dis que ma CB part on ne sait où.",
             "highlight": "ma CB part on ne sait où",
-            "code": "Signal confiance : paiement",
+            "code": "Signal confiance : paiement",
             "codeColor": "#10b981"
           }
         ]

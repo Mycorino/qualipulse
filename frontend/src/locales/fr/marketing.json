@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "QualiPulse · Entretiens utilisateurs exploitables, sans la logistique",
-    "description": "QualiPulse mène vos entretiens utilisateurs à la voix : une IA autonome dialogue avec chaque participant comme un chercheur et échange pour affiner ses réponses, puis vous livre une synthèse claire appuyée par les verbatims. En quelques heures, pas en quelques semaines. 3 entretiens gratuits, sans carte bancaire."
+    "description": "QualiPulse mène vos entretiens utilisateurs à la voix : une IA autonome dialogue avec chaque participant comme un chercheur et échange pour affiner ses réponses, puis vous livre une synthèse claire appuyée par les verbatims. En quelques heures, pas en quelques semaines. 3 entretiens gratuits, sans carte bancaire."
   },
   "nav": {
     "howItWorks": "Comment ça marche",
@@ -103,7 +103,7 @@
         "title": "« Pause » est la fonctionnalité manquante",
         "time": "14:02",
         "sub": "Les participants ne voulaient pas partir. Ils voulaient arrêter de payer pendant les mois creux, sans perdre leur historique.",
-        "meta": "PRIYA R. · RÉSILIÉ EN MARS",
+        "meta": "PRIYA R. · RÉSILIÉE EN MARS",
         "quote": "« <m>Si j'avais pu le geler pour l'été, je serais encore cliente.</m> Au lieu de ça, c'était payer ou supprimer, alors… j'ai supprimé. »"
       },
       {
@@ -156,7 +156,7 @@
     "billingAnnualSave": "−17 %",
     "recommended": "Le choix des équipes",
     "perMonth": " /mois",
-    "vatNoteLong": "Aucune TVA n'est ajoutée au paiement. TVA non applicable, article 293 B du CGI : le prix affiché est le prix payé.",
+    "vatNoteLong": "Aucune TVA n'est ajoutée au paiement. TVA non applicable, article 293 B du CGI : le prix affiché est le prix payé.",
     "billedAnnuallyAs": "Facturé {{amount}} € par an",
     "creditsPerMonth": "entretiens / mois",
     "surveyResponsesPerMonth": "réponses de sondage / mois",
@@ -222,7 +222,7 @@
       },
       {
         "question": "Qu'est-ce qui est décompté, exactement ?",
-        "answer": "Uniquement un entretien terminé, jusqu'à 15 minutes. Un participant écarté à la sélection, qui abandonne en cours de route ou bloqué par un souci technique n'est jamais décompté. Ce risque est pour nous, pas pour vous."
+        "answer": "Uniquement un entretien terminé, jusqu'à 15 minutes. Un participant écarté à la sélection, qui abandonne en cours de route ou qui est bloqué par un souci technique n'est jamais décompté. Ce risque est pour nous, pas pour vous."
       },
       {
         "question": "Puis-je relire les verbatims ?",
@@ -233,8 +233,8 @@
         "answer": "Pour la recherche exploratoire et évaluative, il s'en approche vraiment : il n'oriente jamais le témoin, ne fatigue pas au 9e entretien et relance à partir de ce que le participant vient de dire. Pour les sujets très sensibles, un humain reste préférable. L'idée honnête : un entretien mené par l'IA vaut mieux que le sondage que vous alliez envoyer à la place."
       },
       {
-        "question": "Quelles langues sont prises en charge ?",
-        "answer": "Vos entretiens se déroulent dans la langue de votre étude : français, anglais, allemand, espagnol, portugais et italien sont disponibles aujourd'hui, et nous en ajoutons régulièrement. L'espace chercheur est proposé en français et en anglais, et chaque transcription peut être traduite automatiquement comme aide à la lecture, l'original restant toujours la source de vérité."
+        "question": "Quelles langues sont prises en charge ?",
+        "answer": "Vos entretiens se déroulent dans la langue de votre étude : français, anglais, allemand, espagnol, portugais et italien sont disponibles aujourd'hui, et nous en ajoutons régulièrement. L'espace chercheur est proposé en français et en anglais, et chaque transcription peut être traduite automatiquement comme aide à la lecture, l'original restant toujours la source de vérité."
       },
       {
         "question": "Les données sont-elles hébergées en Europe ?",
