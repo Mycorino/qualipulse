@@ -58,6 +58,9 @@ _STRINGS = {
         "analysis_lineage": "Analysis version",
         "lineage_refined": "v{v} — refined by the researcher from v{p}",
         "lineage_ai": "v{v} — AI discovery synthesis",
+        "codebook_title": "Codebook signals",
+        "codebook_sub": "Exact counts from the quotes the researcher tagged while reading transcripts. These researcher-verified categories grounded the synthesis.",
+        "codebook_count": "{p}/{total} interviews · {q} quotes",
         "themes_title": "Key themes",
         "themes_sub": "Every theme is supported by verbatim quotes from at least two participants. Frequency reflects how widely it appeared across the sample.",
         "freq_all": "Heard from all participants",
@@ -153,6 +156,9 @@ _STRINGS = {
         "analysis_lineage": "Version d'analyse",
         "lineage_refined": "v{v} — affinée par le chercheur à partir de la v{p}",
         "lineage_ai": "v{v} — synthèse de découverte IA",
+        "codebook_title": "Signaux de la grille de codage",
+        "codebook_sub": "Comptages exacts issus des citations annotées par le chercheur pendant la lecture des transcriptions. Ces catégories vérifiées ont servi d'ancrage à la synthèse.",
+        "codebook_count": "{p}/{total} entretiens · {q} citations",
         "themes_title": "Thèmes clés",
         "themes_sub": "Chaque thème s'appuie sur des citations verbatim d'au moins deux participants. La fréquence reflète sa présence dans l'échantillon.",
         "freq_all": "Entendu chez tous les participants",
@@ -532,6 +538,13 @@ _ANALYSIS_CSS = _BASE_DOC_CSS + """
 .journey__stage { font-weight: 600; }
 .journey__emo { font-variant-numeric: tabular-nums; font-weight: 600; text-align: center; }
 .journey__pain { color: var(--copper); }
+
+/* codebook signals */
+.codebook-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.codebook-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+  border: 1px solid; border-radius: 999px; font-size: 12px; background: #fff; }
+.codebook-pill__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.codebook-pill__count { color: var(--ink-3); }
 """
 
 
@@ -541,6 +554,33 @@ _ANALYSIS_CSS = _BASE_DOC_CSS + """
 # plan) from a ProjectAnalysis without duplicating the markup. Each returns the
 # section HTML, or "" when its data is empty. `accent` params let the Decision
 # report re-ink the SVGs bordeaux while the qual report stays green.
+
+def _codebook_section_html(stats: list, L: dict) -> str:
+    """Researcher codebook signals — deterministic counts, styled as pills."""
+    if not stats:
+        return ""
+    pills = ""
+    for s in stats:
+        color = _esc(s.get("color") or "#6366f1")
+        count = L["codebook_count"].format(
+            p=s.get("participant_count", 0),
+            total=s.get("participants_total", 0),
+            q=s.get("tag_count", 0),
+        )
+        pills += f"""
+        <span class="codebook-pill" style="border-color:{color}">
+          <span class="codebook-pill__dot" style="background:{color}"></span>
+          <strong>{_esc(s.get("code", ""))}</strong>
+          <span class="codebook-pill__count">{count}</span>
+        </span>"""
+    return f"""
+    <section class="avoid-break">
+      <h2 class="section-title">{L["codebook_title"]}</h2>
+      <p class="section-sub">{L["codebook_sub"]}</p>
+      <div class="codebook-pills">{pills}</div>
+    </section>
+    """
+
 
 def _themes_section_html(themes: list, roster: list, annot_by_theme: dict, L: dict) -> str:
     theme_cards = []
@@ -1019,6 +1059,7 @@ def render_analysis_report_html(
     """
 
     # ── qualitative sections (shared verbatim with the Decision report) ───
+    codebook_section = _codebook_section_html(report.get("codebook_stats", []) or [], L)
     themes_section = _themes_section_html(themes, roster, annot_by_theme, L)
     evidence_section = _evidence_map_html(themes, roster, L)
     personas_section = _personas_section_html(personas, L)
@@ -1082,6 +1123,7 @@ def render_analysis_report_html(
 {exec_summary}
 {glance}
 {design}
+{codebook_section}
 {themes_section}
 {evidence_section}
 {personas_section}

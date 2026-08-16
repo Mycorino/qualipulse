@@ -310,6 +310,30 @@ def test_report_export_object_recommendations(client, auth_headers, db_session, 
     assert "Activation plan" in body and "30 days" in body
 
 
+def test_report_export_codebook_signals(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    report = _make_rich_report()
+    report["codebook_stats"] = [
+        {"code": "Friction", "color": "#f59e0b", "tag_count": 5,
+         "participant_count": 3, "participants_total": 4},
+    ]
+    analysis.report = json.dumps(report)
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+
+    assert "Codebook signals" in body
+    assert "Friction" in body
+    assert "3/4 interviews" in body and "5 quotes" in body
+
+
+def test_report_export_codebook_omitted_when_absent(client, auth_headers, db_session, project_with_analysis):
+    project, analysis = project_with_analysis
+    analysis.report = json.dumps(_make_rich_report())
+    db_session.commit()
+    body = client.get(f"/projects/{project.id}/analysis/report.html", headers=auth_headers).text
+    assert "Codebook signals" not in body
+
+
 def test_report_export_personas(client, auth_headers, db_session, project_with_analysis):
     project, analysis = project_with_analysis
     analysis.report = json.dumps(_make_rich_report())
