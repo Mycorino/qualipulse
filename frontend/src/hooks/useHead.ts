@@ -33,7 +33,18 @@ function identitySelector(tag: "meta" | "link", attrs: Record<string, string>): 
   return null;
 }
 
+/**
+ * Build-time prerender collector. `scripts/prerender.mjs` renders public
+ * routes with react-dom/server, where effects never run — so useHead pushes
+ * its spec here during the render pass instead. Always undefined in the
+ * browser; the SSR entry sets it around each renderToString call.
+ */
+export type HeadCollector = HeadSpec[];
+
 export function useHead(spec: HeadSpec): void {
+  const collector = (globalThis as { __qpHeadCollector__?: HeadCollector }).__qpHeadCollector__;
+  if (collector) collector.push(spec);
+
   const serialized = JSON.stringify(spec);
 
   useEffect(() => {

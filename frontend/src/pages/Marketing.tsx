@@ -234,12 +234,24 @@ export default function Marketing() {
       operatingSystem: "Web",
       description: t("meta.description"),
       url: "https://app.qualipulse.com",
-      offers: {
-        "@type": "Offer",
-        price: "0",
-        priceCurrency: "EUR",
-        description: "3 free completed interviews, no credit card required",
-      },
+      // Real plan catalogue so crawlers and AI search see actual prices.
+      // Prices come from MARKETING_PLANS (kept in sync with billing_plans.py).
+      offers: [
+        {
+          "@type": "Offer",
+          name: t("pricing.trial.name"),
+          price: "0",
+          priceCurrency: "EUR",
+          description: t("pricing.trial.desc"),
+        },
+        ...MARKETING_PLANS.map((p) => ({
+          "@type": "Offer",
+          name: t(`pricing.plans.${p.id}.name`),
+          price: String(p.monthlyEur),
+          priceCurrency: "EUR",
+          description: t(`pricing.plans.${p.id}.desc`),
+        })),
+      ],
     },
   });
 

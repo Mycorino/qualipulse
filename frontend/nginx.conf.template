@@ -3,9 +3,38 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # SPA fallback
+    # Prerendered marketing home (scripts/prerender.mjs). dist/index.html
+    # stays the empty SPA shell used as fallback for app routes, so
+    # authenticated pages never flash marketing content.
+    location = / {
+        try_files /home.html /index.html;
+    }
+
+    # SPA fallback. Prerendered public routes (terms/, privacy/, ...) are
+    # picked up as static $uri/index.html before the shell fallback.
     location / {
         try_files $uri $uri/ /index.html;
+    }
+
+    # Blog: server-rendered by the backend so crawlers and link unfurlers get
+    # full HTML + per-post meta without JavaScript. rewrite + variable-free
+    # proxy_pass (a variable in proxy_pass would require a runtime resolver).
+    # In-app SPA navigation to these URLs never hits nginx.
+    location = /blog {
+        rewrite ^ /blog/pages break;
+        proxy_pass ${BACKEND_URL};
+        proxy_set_header Host ${BACKEND_HOST};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location ~ ^/blog/[A-Za-z0-9-]+$ {
+        rewrite ^/blog/(.*)$ /blog/pages/$1 break;
+        proxy_pass ${BACKEND_URL};
+        proxy_set_header Host ${BACKEND_HOST};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # Proxy API calls to backend Cloud Run service

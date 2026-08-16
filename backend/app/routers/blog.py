@@ -6,10 +6,13 @@ from typing import Optional
 
 import bleach
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.dependencies import get_db
+from app.services.blog_render import render_blog_listing_html, render_blog_post_html
 from app.limiter import limiter
 from app.models.blog import BlogPost
 from app.routers.admin import require_admin
@@ -185,6 +188,42 @@ def get_published_post(slug: str, db: Session = Depends(get_db)):
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     return serialize_post(post)
+
+
+# ── Server-rendered pages (crawlers + direct hits) ───────────────────────────
+# The frontend nginx proxies GET /blog and /blog/{slug} here so non-JS
+# clients (search engines, AI search, social scrapers) get full HTML with
+# per-post meta and Article JSON-LD. Distinct /blog/pages* paths avoid any
+# route ambiguity with the /blog/posts* JSON API.
+
+@router.get("/blog/pages", response_class=HTMLResponse)
+def blog_listing_page(db: Session = Depends(get_db)) -> HTMLResponse:
+    posts = (
+        db.query(BlogPost)
+        .filter(BlogPost.status == "published")
+        .order_by(BlogPost.published_at.desc())
+        .limit(100)
+        .all()
+    )
+    return HTMLResponse(render_blog_listing_html(posts, settings.APP_BASE_URL))
+
+
+@router.get("/blog/pages/{slug}", response_class=HTMLResponse)
+def blog_post_page(slug: str, db: Session = Depends(get_db)) -> HTMLResponse:
+    post = (
+        db.query(BlogPost)
+        .filter(BlogPost.slug == slug, BlogPost.status == "published")
+        .first()
+    )
+    if not post:
+        return HTMLResponse(
+            '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
+            "<title>Article introuvable · QualiPulse</title></head><body>"
+            '<p>Article introuvable. <a href="/blog">Retour au blog</a></p>'
+            "</body></html>",
+            status_code=404,
+        )
+    return HTMLResponse(render_blog_post_html(post, settings.APP_BASE_URL))
 
 
 # ── Admin endpoints ──────────────────────────────────────────────────────────
