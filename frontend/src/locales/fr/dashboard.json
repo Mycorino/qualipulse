@@ -268,6 +268,10 @@
       "label": "Affiner l'analyse",
       "reason": "Vous avez annoté des thèmes, affinez pour une v2 plus précise qui en tient compte."
     },
+    "collectToTarget": {
+      "label": "Continuer à recruter",
+      "reason": "{{count}} entretiens sur {{target}} visés. Partagez le lien pour compléter la collecte."
+    },
     "waitResponses": {
       "label": "En attente des premières réponses",
       "reason_one": "{{count}} entretien en cours, rien à faire avant qu'il se termine.",

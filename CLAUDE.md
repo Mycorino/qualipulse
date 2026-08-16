@@ -581,7 +581,9 @@ Seeding is **mono-language** — driven entirely by `Company.preferred_language`
 the topic. EN companies get a **streaming services** study named
 `[Demo] How people choose streaming services` (Netflix, Disney+, Prime Video,
 HBO Max, Apple TV+). FR companies get a **courses alimentaires en ligne**
-study named `[Démo] Courses alimentaires en ligne — habitudes & freins`
+study named `[Démo] Courses alimentaires en ligne : habitudes & freins`
+(pre-August-2026 accounts have the older em-dash title; the showcase
+backfill renames them)
 (Carrefour Drive, Picard, Leclerc Drive, Coop@home, Amazon Fresh).
 
 - **Ten mono-language interviews** with a realistic quality spread (4 strong /

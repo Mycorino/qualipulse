@@ -800,7 +800,46 @@ class TestDemoShowcaseBackfill:
 
         # Idempotent: a second run finds nothing to do.
         again = backfill_run(dry_run=False, company_id=company.id, db=db_session)
-        assert again == {"guide_questions": 0, "surveys": 0, "reports": 0}
+        assert again == {
+            "guide_questions": 0,
+            "surveys": 0,
+            "reports": 0,
+            "project_meta": 0,
+        }
+
+    def test_backfill_patches_legacy_project_meta(self, db_session):
+        """Legacy em-dash FR title is renamed; missing target + researcher
+        identity are filled; already-current projects are left alone."""
+        from app.services.demo_seeder import (
+            DEMO_PROJECT_NAME_FR,
+            DEMO_RESEARCHER_NAME_FR,
+            LEGACY_DEMO_PROJECT_NAME_FR,
+        )
+        from scripts.backfill_demo_showcase import run as backfill_run
+
+        company = _make_company(db_session, preferred_language="fr")
+        seed_demo_project(db_session, company.id)
+        db_session.commit()
+
+        project = (
+            db_session.query(Project).filter(Project.company_id == company.id).one()
+        )
+        # Simulate a pre-August-2026 seed.
+        project.name = LEGACY_DEMO_PROJECT_NAME_FR
+        project.target_participants = None
+        project.researcher_name = None
+        db_session.commit()
+
+        result = backfill_run(dry_run=False, company_id=company.id, db=db_session)
+        assert result["project_meta"] == 1
+        db_session.refresh(project)
+        assert project.name == DEMO_PROJECT_NAME_FR
+        assert project.target_participants == 10
+        assert project.researcher_name == DEMO_RESEARCHER_NAME_FR
+
+        # Second run: nothing left to patch.
+        again = backfill_run(dry_run=False, company_id=company.id, db=db_session)
+        assert again["project_meta"] == 0
 
     def test_backfill_dry_run_writes_nothing(self, db_session):
         from scripts.backfill_demo_showcase import run as backfill_run
