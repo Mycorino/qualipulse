@@ -1,9 +1,24 @@
 import { useState, useEffect, FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
-import { useAuth } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
+
+// The affiliate session is deliberately kept out of the researcher auth
+// storage ("token" / useAuth) so signing in to the affiliate portal never
+// clobbers a logged-in researcher session in the same browser.
+const AFFILIATE_TOKEN_KEY = "qp_affiliate_token";
+
+function getAffiliateToken(): string | null {
+  return localStorage.getItem(AFFILIATE_TOKEN_KEY);
+}
+
+// The program pays in euros; format per UI locale.
+function fmtEur(amount: number, locale: string): string {
+  return locale.startsWith("fr")
+    ? `${amount.toFixed(2).replace(".", ",")} €`
+    : `€${amount.toFixed(2)}`;
+}
 
 interface AffiliateStats {
   id: string;
@@ -40,7 +55,7 @@ interface Payout {
 // ── Apply View ─────────────────────────────────────────────────────────────
 
 function AffiliateApply() {
-  const { t } = useTranslation("affiliate");
+  const { t, i18n } = useTranslation("affiliate");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -76,6 +91,7 @@ function AffiliateApply() {
         code,
         website: website.trim() || null,
         how_they_found_us: howTheyFoundUs.trim() || null,
+        preferred_language: i18n.language,
       });
 
       setSubmitted(true);
@@ -210,11 +226,30 @@ function AffiliateApply() {
 function AffiliateLogin() {
   const { t } = useTranslation("affiliate");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { saveToken } = useAuth();
+  const [linkSent, setLinkSent] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const magicToken = searchParams.get("token");
+
+  // Arriving from the emailed magic link: exchange the token for a session.
+  useEffect(() => {
+    if (!magicToken) return;
+    setVerifying(true);
+    axios
+      .post("/api/affiliates/login/verify", { token: magicToken })
+      .then((res) => {
+        localStorage.setItem(AFFILIATE_TOKEN_KEY, res.data.access_token);
+        navigate("/affiliate/dashboard", { replace: true });
+      })
+      .catch((err: unknown) => {
+        setError(getErrorMessage(err, t("login.failedVerify")));
+        setVerifying(false);
+        setSearchParams({}, { replace: true });
+      });
+  }, [magicToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -222,18 +257,40 @@ function AffiliateLogin() {
     setLoading(true);
 
     try {
-      const res = await axios.post("/api/affiliates/login", {
+      await axios.post("/api/affiliates/login-request", {
         email: email.toLowerCase().trim(),
-        code: code.toLowerCase().trim(),
       });
-
-      saveToken(res.data.access_token, undefined);
-      navigate("/affiliate/dashboard");
+      setLinkSent(true);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, t("login.failedLogin")));
+      setError(getErrorMessage(err, t("login.failedRequest")));
     } finally {
       setLoading(false);
     }
+  }
+
+  if (verifying) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <p className="auth-subtitle">{t("login.verifying")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (linkSent) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card" style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>📬</div>
+          <h1 className="auth-title">{t("login.linkSentTitle")}</h1>
+          <p className="auth-subtitle">{t("login.linkSentSubtitle", { email: email.toLowerCase().trim() })}</p>
+          <p style={{ marginTop: "16px", fontSize: "13px", color: "var(--text-secondary)" }}>
+            {t("login.linkSentHint")}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -257,25 +314,13 @@ function AffiliateLogin() {
             aria-label={t("login.emailLabel")}
           />
 
-          <label className="field-label">{t("login.codeLabel")}</label>
-          <input
-            type="text"
-            className="field-input"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder={t("apply.codePlaceholder")}
-            required
-            disabled={loading}
-            aria-label={t("login.codeLabel")}
-          />
-
           <button
             type="submit"
             className="btn btn-primary"
             style={{ width: "100%", marginTop: "16px" }}
             disabled={loading}
           >
-            {loading ? t("login.signingIn") : t("login.signIn")}
+            {loading ? t("login.sendingLink") : t("login.sendLink")}
           </button>
         </form>
 
@@ -300,13 +345,18 @@ function AffiliateDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const { token } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchData();
   }, []);
 
   async function fetchData() {
+    const token = getAffiliateToken();
+    if (!token) {
+      navigate("/affiliate/login", { replace: true });
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -320,6 +370,11 @@ function AffiliateDashboard() {
       setReferrals(referralsRes.data.referrals);
       setPayouts(payoutsRes?.data.payouts ?? []);
     } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        localStorage.removeItem(AFFILIATE_TOKEN_KEY);
+        navigate("/affiliate/login", { replace: true });
+        return;
+      }
       setError(getErrorMessage(err, t("dashboard.failedDashboard")));
     } finally {
       setLoading(false);
@@ -416,11 +471,11 @@ function AffiliateDashboard() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "24px" }}>
           <StatCard label={t("dashboard.statsSignups")} value={stats.signups} />
           <StatCard label={t("dashboard.statsConversions")} value={stats.conversions} />
-          <StatCard label={t("dashboard.statsTotalEarned")} value={`$${stats.total_earned.toFixed(2)}`} />
-          <StatCard label={t("dashboard.statsPaidOut")} value={`$${stats.total_paid.toFixed(2)}`} />
+          <StatCard label={t("dashboard.statsTotalEarned")} value={fmtEur(stats.total_earned, locale)} />
+          <StatCard label={t("dashboard.statsPaidOut")} value={fmtEur(stats.total_paid, locale)} />
           <StatCard
             label={t("dashboard.statsPending")}
-            value={`$${stats.pending_earnings.toFixed(2)}`}
+            value={fmtEur(stats.pending_earnings, locale)}
             highlight={stats.pending_earnings >= stats.payout_threshold}
           />
         </div>
@@ -436,12 +491,12 @@ function AffiliateDashboard() {
           }}
         >
           <p style={{ fontSize: "13px", color: "var(--text-primary)" }}>
-            <strong>{t("dashboard.payoutThresholdLabel")}:</strong> ${stats.payout_threshold.toFixed(2)}
+            <strong>{t("dashboard.payoutThresholdLabel")}:</strong> {fmtEur(stats.payout_threshold, locale)}
             <br />
             <strong>{t("dashboard.payoutStatusLabel")}:</strong>{" "}
             {stats.pending_earnings >= stats.payout_threshold
               ? t("dashboard.payoutReady")
-              : t("dashboard.payoutUntil", { amount: (stats.payout_threshold - stats.pending_earnings).toFixed(2) })}
+              : t("dashboard.payoutUntil", { amount: fmtEur(stats.payout_threshold - stats.pending_earnings, locale) })}
             <br />
             <strong>{t("dashboard.payoutRequestLabel")}:</strong>{" "}
             <a href="mailto:affiliates@qualipulse.com" style={{ color: "var(--primary)" }}>
@@ -467,7 +522,7 @@ function AffiliateDashboard() {
             <li>{t("dashboard.howItWorks1")}</li>
             <li>{t("dashboard.howItWorks2")}</li>
             <li>{t("dashboard.howItWorks3", { commission: stats.commission_pct })}</li>
-            <li>{t("dashboard.howItWorks4", { threshold: stats.payout_threshold.toFixed(2) })}</li>
+            <li>{t("dashboard.howItWorks4", { threshold: fmtEur(stats.payout_threshold, locale) })}</li>
           </ol>
         </div>
 
@@ -527,7 +582,7 @@ function AffiliateDashboard() {
                         </span>
                       </td>
                       <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: 600 }}>
-                        {ref.commission_amount ? `$${ref.commission_amount.toFixed(2)}` : "—"}
+                        {ref.commission_amount ? fmtEur(ref.commission_amount, locale) : "-"}
                       </td>
                       <td style={{ padding: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>
                         {new Date(ref.signed_up_at).toLocaleDateString(locale)}
@@ -580,10 +635,10 @@ function AffiliateDashboard() {
                         {new Date(p.paid_at).toLocaleDateString(locale)}
                       </td>
                       <td style={{ padding: "12px", textAlign: "right", fontSize: "13px", fontWeight: 600 }}>
-                        ${p.amount.toFixed(2)}
+                        {fmtEur(p.amount, locale)}
                       </td>
                       <td style={{ padding: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>
-                        {p.notes || "—"}
+                        {p.notes || "-"}
                       </td>
                     </tr>
                   ))}

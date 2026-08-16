@@ -6,6 +6,7 @@ import { signup, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import { checkoutUrlForSelectedPlan } from "../utils/planCheckout";
+import { getStoredRefCode } from "../utils/referral";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
@@ -43,7 +44,7 @@ export default function Signup() {
     setError("");
     setGoogleLoading(true);
     try {
-      const url = await getGoogleAuthorizeUrl("/welcome", i18n.language);
+      const url = await getGoogleAuthorizeUrl("/welcome", i18n.language, refCode ?? "");
       window.location.href = url;
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("login.googleError")));
@@ -57,7 +58,9 @@ export default function Signup() {
   // Plan chosen on landing page (?plan=exploration|team|agency, ?interval=monthly|annual)
   const selectedPlan = searchParams.get("plan") ?? undefined;
   const selectedInterval = searchParams.get("interval") ?? undefined;
-  const refCode = searchParams.get("ref") ?? undefined;
+  // URL param wins; otherwise fall back to the code captured when the visitor
+  // first landed on the marketing page (60-day attribution window).
+  const refCode = searchParams.get("ref") ?? getStoredRefCode();
 
   // Stash the pricing-page choice so later checkout surfaces (paywall,
   // billing) can preselect it. localStorage survives the Google OAuth

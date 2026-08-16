@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import secrets
 import threading
 from datetime import datetime, timedelta, timezone
@@ -199,17 +200,7 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
         # Try to get from query params
         ref_code = request.query_params.get("ref") if hasattr(request, "query_params") else None
 
-    if ref_code:
-        affiliate = db.query(Affiliate).filter(Affiliate.code == ref_code.lower()).first()
-        if affiliate and affiliate.status == "active":
-            # Create affiliate referral
-            referral = AffiliateReferral(
-                affiliate_id=affiliate.id,
-                referred_company_id=company.id,
-            )
-            db.add(referral)
-            db.commit()
-            logger.info("Affiliate referral tracked: %s -> %s", affiliate.code, company.email)
+    _track_referral_signup(db, company, ref_code)
 
     # Create email verification token
     verification_token = EmailVerificationToken(
@@ -1396,6 +1387,35 @@ def _google_configured() -> bool:
     )
 
 
+def _track_referral_signup(db: Session, company: Company, ref_code: str | None) -> None:
+    """Attribute a fresh signup to an active affiliate (idempotent, best-effort).
+
+    Guards: unknown/inactive codes are ignored; an affiliate can't refer
+    themselves; a company is only ever attributed once.
+    """
+    if not ref_code:
+        return
+    code = ref_code.strip().lower()
+    if not code:
+        return
+    affiliate = db.query(Affiliate).filter(Affiliate.code == code).first()
+    if not affiliate or affiliate.status != "active":
+        return
+    if affiliate.email.lower() == company.email.lower():
+        logger.info("Ignoring self-referral attempt: %s", affiliate.code)
+        return
+    existing = (
+        db.query(AffiliateReferral)
+        .filter(AffiliateReferral.referred_company_id == company.id)
+        .first()
+    )
+    if existing:
+        return
+    db.add(AffiliateReferral(affiliate_id=affiliate.id, referred_company_id=company.id))
+    db.commit()
+    logger.info("Affiliate referral tracked: %s -> %s", affiliate.code, company.email)
+
+
 def _encode_oauth_state(payload: dict) -> str:
     """Sign the OAuth state blob with SECRET_KEY (CSRF + redirect carrier)."""
     to_encode = {
@@ -1421,6 +1441,7 @@ def google_login(
     request: Request,
     next: str = "/dashboard",
     lang: str = "",
+    ref: str = "",
 ):
     """Return the Google authorization URL the frontend should redirect to."""
     if not _google_configured():
@@ -1433,8 +1454,13 @@ def google_login(
     # off-site through the state parameter.
     safe_next = next if next.startswith("/") and not next.startswith("//") else "/dashboard"
     safe_lang = lang.strip().lower()[:2] if lang else ""
+    # Affiliate ref survives the OAuth round-trip inside the signed state
+    # (query params are lost across Google's redirect).
+    safe_ref = ref.strip().lower()
+    if not re.fullmatch(r"[a-z0-9_-]{3,50}", safe_ref):
+        safe_ref = ""
 
-    state = _encode_oauth_state({"next": safe_next, "lang": safe_lang})
+    state = _encode_oauth_state({"next": safe_next, "lang": safe_lang, "ref": safe_ref})
 
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -1566,6 +1592,7 @@ def google_callback(
         db.commit()
         db.refresh(company)
         logger.info("New Google signup: %s", company.email)
+        _track_referral_signup(db, company, state_payload.get("ref") or None)
     else:
         # Link Google to existing account (idempotent) and trust Google's
         # verified flag to mark the email as verified if it wasn't already.

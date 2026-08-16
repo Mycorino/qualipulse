@@ -5,6 +5,7 @@ import { getMe } from "./api/auth";
 import i18n from "./i18n";
 import { ToastProvider } from "./components/Toast";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import { captureRefFromUrl } from "./utils/referral";
 // Eager-load the hot path: marketing, login, signup, interview, and dashboard
 // are what 99% of users see first and we don't want a chunk fetch on first
 // paint. Everything else is lazy so the main bundle shrinks from ~1.2MB to
@@ -152,6 +153,12 @@ function HomeRoute() {
 }
 
 export default function App() {
+  // Affiliate links land on any public page (/?ref=code); stash the code so
+  // it survives navigation to /signup and the Google OAuth round-trip.
+  useEffect(() => {
+    captureRefFromUrl();
+  }, []);
+
   return (
     <ToastProvider>
     <ImpersonationBanner />

@@ -136,6 +136,33 @@ def create_2fa_pending_token(company_id: str) -> str:
     )
 
 
+def create_affiliate_magic_token(affiliate_id: str) -> str:
+    """Short-lived emailed login token for the affiliate portal.
+
+    Stateless by design (no DB row): 30-minute expiry and a dedicated
+    "affiliate_magic" type that the session-token path never accepts.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    return jwt.encode(
+        {"sub": f"affiliate:{affiliate_id}", "exp": expire, "type": "affiliate_magic"},
+        settings.SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
+def decode_affiliate_magic_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "affiliate_magic":
+            raise JWTError("wrong type")
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired sign-in link. Request a new one.",
+        )
+
+
 def decode_2fa_pending_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])

@@ -659,6 +659,7 @@ export default function Marketing() {
               <Link to="/login">{t("footer.login")}</Link>
               <Link to="/signup">{t("footer.signup")}</Link>
               <Link to="/participants">{t("footer.becomeParticipant")}</Link>
+              <Link to="/affiliate">{t("footer.affiliate")}</Link>
               <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>
             </div>
             <div className="mkt-footer-col">

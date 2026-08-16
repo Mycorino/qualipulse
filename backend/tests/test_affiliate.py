@@ -1,12 +1,14 @@
 """
-Affiliate program tests: apply/login, affiliate dashboard endpoints,
-admin management (approve/reject, commission, payouts) and audit logging.
+Affiliate program tests: apply, magic-link login, affiliate dashboard
+endpoints, admin management (approve/reject, commission, payouts), audit
+logging, referral attribution, and conversion idempotency.
 """
 import pytest
 
 from app.config import settings
 from app.models.admin_audit import AdminAuditLog
-from app.models.affiliate import Affiliate
+from app.models.affiliate import Affiliate, AffiliateReferral
+from app.services.auth import create_affiliate_magic_token
 
 ADMIN_KEY = "test-admin-secret-key"
 ADMIN_IDENTITY = "test-admin"
@@ -33,13 +35,14 @@ def _legacy_admin_headers() -> dict:
     return {"X-Admin-Key": ADMIN_KEY}
 
 
-def _apply(client, email="jane@example.com", code="jane-doe"):
+def _apply(client, email="jane@example.com", code="jane-doe", **extra):
     resp = client.post("/affiliates/apply", json={
         "name": "Jane Doe",
         "email": email,
         "code": code,
         "website": "https://jane.example.com",
         "how_they_found_us": "Twitter",
+        **extra,
     })
     assert resp.status_code == 201, resp.text
     return resp.json()["affiliate_id"]
@@ -55,18 +58,25 @@ def _approve(client, affiliate_id):
     return resp.json()
 
 
-def _affiliate_login(client, email="jane@example.com", code="jane-doe"):
-    resp = client.post("/affiliates/login", json={"email": email, "code": code})
+def _affiliate_login(client, affiliate_id):
+    """Sign in the way a real affiliate does: verify an emailed magic token."""
+    magic = create_affiliate_magic_token(affiliate_id)
+    resp = client.post("/affiliates/login/verify", json={"token": magic})
     assert resp.status_code == 200, resp.text
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 class TestApplyAndLogin:
 
-    def test_apply_then_login_requires_approval(self, client):
-        _apply(client)
-        resp = client.post("/affiliates/login", json={"email": "jane@example.com", "code": "jane-doe"})
-        assert resp.status_code == 403
+    def test_apply_captures_language(self, client, db_session):
+        _apply(client, preferred_language="fr")
+        aff = db_session.query(Affiliate).first()
+        assert aff.preferred_language == "fr"
+
+    def test_apply_unknown_language_falls_back_to_en(self, client, db_session):
+        _apply(client, preferred_language="zz")
+        aff = db_session.query(Affiliate).first()
+        assert aff.preferred_language == "en"
 
     def test_duplicate_email_rejected(self, client):
         _apply(client)
@@ -78,10 +88,105 @@ class TestApplyAndLogin:
     def test_login_after_approval(self, client):
         aff_id = _apply(client)
         _approve(client, aff_id)
-        headers = _affiliate_login(client)
+        headers = _affiliate_login(client, aff_id)
         me = client.get("/affiliates/me", headers=headers)
         assert me.status_code == 200
         assert me.json()["status"] == "active"
+
+
+class TestMagicLinkLogin:
+
+    def test_old_code_login_removed(self, client):
+        # The referral code is public (it's in every shared link) so it must
+        # never work as a credential.
+        resp = client.post("/affiliates/login", json={"email": "jane@example.com", "code": "jane-doe"})
+        assert resp.status_code in (404, 405)
+
+    def test_login_request_always_200(self, client):
+        aff_id = _apply(client)
+        _approve(client, aff_id)
+        # Unknown email leaks nothing: same 200 + same body as a real one
+        unknown = client.post("/affiliates/login-request", json={"email": "nobody@example.com"})
+        known = client.post("/affiliates/login-request", json={"email": "jane@example.com"})
+        assert unknown.status_code == known.status_code == 200
+        assert unknown.json() == known.json()
+
+    def test_verify_garbage_token_401(self, client):
+        resp = client.post("/affiliates/login/verify", json={"token": "not-a-token"})
+        assert resp.status_code == 401
+
+    def test_verify_pending_affiliate_401(self, client):
+        aff_id = _apply(client)  # still pending
+        magic = create_affiliate_magic_token(aff_id)
+        resp = client.post("/affiliates/login/verify", json={"token": magic})
+        assert resp.status_code == 401
+
+    def test_magic_token_rejected_as_session_token(self, client):
+        # The 30-min emailed token must not work as a dashboard bearer token.
+        aff_id = _apply(client)
+        _approve(client, aff_id)
+        magic = create_affiliate_magic_token(aff_id)
+        me = client.get("/affiliates/me", headers={"Authorization": f"Bearer {magic}"})
+        assert me.status_code == 401
+
+
+class TestReferralAttribution:
+
+    def test_signup_with_ref_code_creates_referral(self, client, db_session):
+        aff_id = _apply(client)
+        _approve(client, aff_id)
+        resp = client.post(
+            "/auth/signup",
+            json={"name": "Acme", "email": "buyer@example.com", "password": "Secure123!", "ref_code": "jane-doe"},
+        )
+        assert resp.status_code == 201
+        referral = db_session.query(AffiliateReferral).first()
+        assert referral is not None
+        assert referral.affiliate_id == aff_id
+        assert referral.status == "signed_up"
+
+    def test_pending_affiliate_code_ignored(self, client, db_session):
+        _apply(client)  # not approved
+        client.post(
+            "/auth/signup",
+            json={"name": "Acme", "email": "buyer@example.com", "password": "Secure123!", "ref_code": "jane-doe"},
+        )
+        assert db_session.query(AffiliateReferral).count() == 0
+
+    def test_self_referral_ignored(self, client, db_session):
+        aff_id = _apply(client)
+        _approve(client, aff_id)
+        client.post(
+            "/auth/signup",
+            json={"name": "Jane Co", "email": "jane@example.com", "password": "Secure123!", "ref_code": "jane-doe"},
+        )
+        assert db_session.query(AffiliateReferral).count() == 0
+
+
+class TestConversionTracking:
+    STRIPE_SUB = {"items": {"data": [{"price": {"unit_amount_decimal": "8900"}}]}}
+
+    def test_conversion_credits_commission_once(self, client, db_session):
+        from app.models.company import Company
+        from app.routers.billing import _track_affiliate_conversion
+
+        aff_id = _apply(client)
+        _approve(client, aff_id)
+        client.post(
+            "/auth/signup",
+            json={"name": "Acme", "email": "buyer@example.com", "password": "Secure123!", "ref_code": "jane-doe"},
+        )
+        company = db_session.query(Company).filter(Company.email == "buyer@example.com").first()
+
+        _track_affiliate_conversion(db_session, company.id, self.STRIPE_SUB)
+        # Replay (cancel + resubscribe, or a replayed webhook) must not double-pay
+        _track_affiliate_conversion(db_session, company.id, self.STRIPE_SUB)
+
+        affiliate = db_session.query(Affiliate).filter(Affiliate.id == aff_id).first()
+        referral = db_session.query(AffiliateReferral).first()
+        assert referral.status == "converted"
+        assert referral.commission_amount == pytest.approx(17.8)  # 20% of €89
+        assert affiliate.total_earned == pytest.approx(17.8)
 
 
 class TestAdminAuth:
@@ -182,6 +287,7 @@ class TestPayouts:
         )
         assert resp.status_code == 400
         assert "exceeds pending earnings" in resp.json()["detail"]
+        assert "€" in resp.json()["detail"]
 
     def test_payout_nonpositive_rejected(self, client):
         aff_id = _apply(client)
@@ -217,7 +323,7 @@ class TestPayouts:
         assert history.json()["payouts"][0]["notes"] == "PayPal ref 1"
 
         # Affiliate-facing payout history
-        headers = _affiliate_login(client)
+        headers = _affiliate_login(client, aff_id)
         mine = client.get("/affiliates/me/payouts", headers=headers)
         assert mine.status_code == 200
         assert mine.json()["total"] == 1

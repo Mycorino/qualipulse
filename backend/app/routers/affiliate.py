@@ -16,7 +16,12 @@ from app.limiter import limiter
 from app.models.admin_audit import AdminAuditLog
 from app.models.company import Company
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
-from app.services.auth import create_access_token
+from app.services.auth import (
+    create_access_token,
+    create_affiliate_magic_token,
+    decode_affiliate_magic_token,
+)
+from app.services import email as email_service
 
 logger = logging.getLogger("auto_interview.affiliate")
 router = APIRouter(prefix="/affiliates", tags=["affiliates"])
@@ -31,6 +36,7 @@ class AffiliateApplyRequest(BaseModel):
     code: str
     website: str | None = None
     how_they_found_us: str | None = Field(default=None, max_length=1000)
+    preferred_language: str | None = Field(default=None, max_length=5)
 
     @field_validator("website")
     @classmethod
@@ -40,9 +46,12 @@ class AffiliateApplyRequest(BaseModel):
         return v
 
 
-class AffiliateLoginRequest(BaseModel):
+class AffiliateLoginLinkRequest(BaseModel):
     email: EmailStr
-    code: str
+
+
+class AffiliateMagicVerifyRequest(BaseModel):
+    token: str
 
 
 class TokenResponse(BaseModel):
@@ -255,6 +264,7 @@ def apply_for_affiliate(
         )
 
     # Create affiliate with pending status
+    lang = (body.preferred_language or "en").strip().lower()[:2]
     affiliate = Affiliate(
         name=body.name.strip(),
         email=body.email.lower(),
@@ -262,10 +272,18 @@ def apply_for_affiliate(
         website=body.website.strip() if body.website else None,
         how_they_found_us=body.how_they_found_us.strip() if body.how_they_found_us else None,
         status="pending",
+        preferred_language=lang if lang in ("en", "fr") else "en",
     )
     db.add(affiliate)
     db.commit()
     db.refresh(affiliate)
+
+    try:
+        email_service.send_affiliate_application_received(
+            to=affiliate.email, name=affiliate.name, lang=affiliate.preferred_language,
+        )
+    except Exception:
+        logger.exception("Failed to send affiliate application-received email")
 
     logger.info("New affiliate application: %s (%s)", affiliate.email, code)
     return {
@@ -274,31 +292,56 @@ def apply_for_affiliate(
     }
 
 
-@router.post("/login", response_model=TokenResponse)
-@limiter.limit("10/minute")
-def affiliate_login(
+@router.post("/login-request")
+@limiter.limit("5/minute")
+def affiliate_login_request(
     request: Request,
-    body: AffiliateLoginRequest,
+    body: AffiliateLoginLinkRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Email a short-lived magic sign-in link.
+
+    The old email+code login was removed: the code is public (it's in every
+    shared referral link), so it can never act as a credential. Always
+    returns 200 so the endpoint doesn't leak which emails have accounts.
+    """
+    affiliate = db.query(Affiliate).filter(Affiliate.email == body.email.lower()).first()
+    if affiliate and affiliate.status == "active":
+        token = create_affiliate_magic_token(affiliate.id)
+        magic_url = f"{settings.APP_BASE_URL}/affiliate/login?token={token}"
+        try:
+            email_service.send_affiliate_magic_link(
+                to=affiliate.email,
+                magic_url=magic_url,
+                expiry_minutes=30,
+                lang=affiliate.preferred_language,
+            )
+        except Exception:
+            logger.exception("Failed to send affiliate magic-link email")
+    return {"message": "If this email has an active affiliate account, a sign-in link is on its way."}
+
+
+@router.post("/login/verify", response_model=TokenResponse)
+@limiter.limit("10/minute")
+def affiliate_login_verify(
+    request: Request,
+    body: AffiliateMagicVerifyRequest,
     db: Session = Depends(get_db),
 ) -> TokenResponse:
-    """Affiliate login: email + code."""
-    affiliate = db.query(Affiliate).filter(
-        Affiliate.email == body.email.lower(),
-        Affiliate.code == _validate_affiliate_code(body.code),
-    ).first()
-
-    if not affiliate:
+    """Exchange an emailed magic token for a 24h dashboard session."""
+    payload = decode_affiliate_magic_token(body.token)
+    sub = payload.get("sub") or ""
+    if not re.fullmatch(r"affiliate:[0-9a-f-]{36}", sub):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or affiliate code.",
+            detail="Invalid sign-in link.",
         )
-
-    if affiliate.status != "active":
+    affiliate = db.query(Affiliate).filter(Affiliate.id == sub[len("affiliate:"):]).first()
+    if not affiliate or affiliate.status != "active":
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Your affiliate account is {affiliate.status}. Contact support.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This affiliate account is not active.",
         )
-
     logger.info("Affiliate login: %s", affiliate.email)
     return TokenResponse(
         access_token=create_access_token({"sub": f"affiliate:{affiliate.id}"})
@@ -500,6 +543,26 @@ def update_affiliate(
     db.commit()
     db.refresh(affiliate)
 
+    if body.status == "active":
+        try:
+            email_service.send_affiliate_approved(
+                to=affiliate.email,
+                name=affiliate.name,
+                referral_link=f"{settings.APP_BASE_URL}/?ref={affiliate.code}",
+                dashboard_url=f"{settings.APP_BASE_URL}/affiliate/login",
+                commission_pct=affiliate.commission_pct,
+                lang=affiliate.preferred_language,
+            )
+        except Exception:
+            logger.exception("Failed to send affiliate approval email")
+    elif body.status == "rejected":
+        try:
+            email_service.send_affiliate_rejected(
+                to=affiliate.email, name=affiliate.name, lang=affiliate.preferred_language,
+            )
+        except Exception:
+            logger.exception("Failed to send affiliate rejection email")
+
     logger.info("Updated affiliate %s: status=%s, commission_pct=%s", affiliate_id, body.status, body.commission_pct)
     signups, conversions = _referral_counts(db, [affiliate.id]).get(affiliate.id, (0, 0))
     return {
@@ -525,7 +588,7 @@ def record_payout(
     if body.amount > pending + 1e-9:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Payout of ${body.amount:.2f} exceeds pending earnings of ${pending:.2f}.",
+            detail=f"Payout of €{body.amount:.2f} exceeds pending earnings of €{pending:.2f}.",
         )
 
     payout = AffiliatePayout(
@@ -543,7 +606,18 @@ def record_payout(
     db.commit()
     db.refresh(payout)
 
-    logger.info("Recorded payout for affiliate %s: $%.2f", affiliate_id, body.amount)
+    try:
+        email_service.send_affiliate_payout(
+            to=affiliate.email,
+            name=affiliate.name,
+            amount_eur=body.amount,
+            dashboard_url=f"{settings.APP_BASE_URL}/affiliate/login",
+            lang=affiliate.preferred_language,
+        )
+    except Exception:
+        logger.exception("Failed to send affiliate payout email")
+
+    logger.info("Recorded payout for affiliate %s: €%.2f", affiliate_id, body.amount)
     return {
         "message": "Payout recorded",
         "payout_id": payout.id,

@@ -168,10 +168,11 @@ export async function deleteAccount(password?: string, confirm?: string): Promis
 
 export async function getGoogleAuthorizeUrl(
   next: string = "/dashboard",
-  lang: string = ""
+  lang: string = "",
+  ref: string = ""
 ): Promise<string> {
   const { data } = await client.get<{ authorize_url: string }>("/auth/google/login", {
-    params: { next, lang },
+    params: { next, lang, ref: ref || undefined },
   });
   return data.authorize_url;
 }

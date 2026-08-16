@@ -5,6 +5,7 @@ import { useHead } from "../hooks/useHead";
 import { login, loginWith2FA, getMe, getGoogleAuthorizeUrl } from "../api/auth";
 import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
+import { getStoredRefCode } from "../utils/referral";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function Login() {
@@ -30,7 +31,9 @@ export default function Login() {
     setError("");
     setGoogleLoading(true);
     try {
-      const url = await getGoogleAuthorizeUrl("/dashboard", i18n.language);
+      // Google can create a brand-new account from the login page too, so the
+      // stored referral code rides along for attribution.
+      const url = await getGoogleAuthorizeUrl("/dashboard", i18n.language, getStoredRefCode() ?? "");
       window.location.href = url;
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("login.googleError")));

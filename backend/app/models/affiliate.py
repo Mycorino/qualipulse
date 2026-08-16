@@ -33,6 +33,9 @@ class Affiliate(Base):
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # UI language captured at apply time — drives the language of every
+    # affiliate lifecycle email (Affiliate has no Company row to read it from).
+    preferred_language: Mapped[str] = mapped_column(String(5), default="en", nullable=False)
 
     # Relationships
     referrals = relationship("AffiliateReferral", back_populates="affiliate", cascade="all, delete-orphan")
