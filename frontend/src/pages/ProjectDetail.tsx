@@ -117,6 +117,11 @@ export default function ProjectDetail() {
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const headerMenuRef = useRef<HTMLDivElement>(null);
+  const [participantMenuOpen, setParticipantMenuOpen] = useState(false);
+  const participantMenuRef = useRef<HTMLDivElement>(null);
+  const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
+  const [deleteProjectTyped, setDeleteProjectTyped] = useState("");
+  const [deleteParticipantOpen, setDeleteParticipantOpen] = useState(false);
   const COACHMARK_KEY = "coachmark-analysis-iteration:dismissed";
   const [coachmarkDismissed, setCoachmarkDismissed] = useState<boolean>(
     () => localStorage.getItem(COACHMARK_KEY) === "true"
@@ -314,13 +319,14 @@ export default function ProjectDetail() {
   }, []);
 
   useEffect(() => {
-    if (!exportMenuOpen && !headerMenuOpen) return;
+    if (!exportMenuOpen && !headerMenuOpen && !participantMenuOpen) return;
     function onDoc(e: MouseEvent) {
       if (!exportMenuRef.current?.contains(e.target as Node)) setExportMenuOpen(false);
       if (!headerMenuRef.current?.contains(e.target as Node)) setHeaderMenuOpen(false);
+      if (!participantMenuRef.current?.contains(e.target as Node)) setParticipantMenuOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { setExportMenuOpen(false); setHeaderMenuOpen(false); }
+      if (e.key === "Escape") { setExportMenuOpen(false); setHeaderMenuOpen(false); setParticipantMenuOpen(false); }
     }
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -328,7 +334,7 @@ export default function ProjectDetail() {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [exportMenuOpen, headerMenuOpen]);
+  }, [exportMenuOpen, headerMenuOpen, participantMenuOpen]);
 
   // Guard tab switches when there are unsaved edits in Setup
   function hasUnsavedSetupEdits(): boolean {
@@ -1024,16 +1030,13 @@ export default function ProjectDetail() {
     }
   }
 
-  async function handleDeleteProject() {
+  async function confirmDeleteProject() {
     const expected = project?.name ?? "";
-    const typed = window.prompt(
-      tProject("confirms.deleteProjectPrompt", { name: expected })
-    );
-    if (typed === null) return;
-    if (typed.trim() !== expected) {
+    if (deleteProjectTyped.trim() !== expected) {
       toast(tProject("toasts.projectDeleteNameMismatch"), "error");
       return;
     }
+    setDeleteProjectOpen(false);
     try {
       await deleteProject(id!);
       toast(tProject("toasts.projectDeleted"), "success");
@@ -1043,9 +1046,9 @@ export default function ProjectDetail() {
     }
   }
 
-  async function handleDeleteParticipant() {
+  async function confirmDeleteParticipant() {
     if (!selectedParticipant) return;
-    if (!confirm(tProject("confirms.deleteParticipant"))) return;
+    setDeleteParticipantOpen(false);
     try {
       await deleteParticipant(id!, selectedParticipant.id);
       toast(tProject("toasts.participantDeleted"), "success");
@@ -1860,8 +1863,8 @@ export default function ProjectDetail() {
           {/* Desktop: inline actions */}
           <button className="btn btn-ghost btn-sm detail-header-actions__inline" onClick={handleExportCSV}>{tProject("responses.exportCSV")}</button>
           <button className="btn btn-ghost btn-sm detail-header-actions__inline" onClick={handleArchive}>{tProject("detail.archiveProject")}</button>
-          <button className="btn btn-ghost btn-sm detail-header-actions__inline" style={{ color: "var(--danger, #b91c1c)" }} onClick={handleDeleteProject}>{tProject("detail.deleteProject")}</button>
-          {/* Mobile: overflow menu (<768px) */}
+          {/* Overflow menu: always shown (holds destructive actions), and on
+              mobile (<768px) it also absorbs the inline actions above. */}
           <div className="overflow-menu detail-header-actions__overflow" ref={headerMenuRef}>
             <button
               className="overflow-menu__trigger"
@@ -1874,13 +1877,13 @@ export default function ProjectDetail() {
             </button>
             {headerMenuOpen && (
               <div className="overflow-menu__dropdown" role="menu">
-                <button role="menuitem" className="overflow-menu__item" onClick={() => { setHeaderMenuOpen(false); handleExportCSV(); }}>
+                <button role="menuitem" className="overflow-menu__item overflow-menu__item--compact-only" onClick={() => { setHeaderMenuOpen(false); handleExportCSV(); }}>
                   {tProject("responses.exportCSV")}
                 </button>
-                <button role="menuitem" className="overflow-menu__item" onClick={() => { setHeaderMenuOpen(false); handleArchive(); }}>
+                <button role="menuitem" className="overflow-menu__item overflow-menu__item--compact-only" onClick={() => { setHeaderMenuOpen(false); handleArchive(); }}>
                   {tProject("detail.archiveProject")}
                 </button>
-                <button role="menuitem" className="overflow-menu__item" style={{ color: "var(--danger, #b91c1c)" }} onClick={() => { setHeaderMenuOpen(false); handleDeleteProject(); }}>
+                <button role="menuitem" className="overflow-menu__item overflow-menu__item--danger" onClick={() => { setHeaderMenuOpen(false); setDeleteProjectTyped(""); setDeleteProjectOpen(true); }}>
                   {tProject("detail.deleteProject")}
                 </button>
               </div>
@@ -2953,13 +2956,29 @@ export default function ProjectDetail() {
                           ← {tProject("responses.backToParticipants")}
                         </button>
                         {!project?.is_demo && (
-                          <button
-                            className="btn btn-ghost btn-xs"
-                            style={{ color: "var(--danger, #b91c1c)", marginLeft: "auto", marginRight: 8 }}
-                            onClick={handleDeleteParticipant}
-                          >
-                            {tProject("responses.deleteParticipant")}
-                          </button>
+                          <div className="overflow-menu overflow-menu--on-dark" ref={participantMenuRef} style={{ marginLeft: "auto", marginRight: 8 }}>
+                            <button
+                              className="overflow-menu__trigger"
+                              aria-haspopup="menu"
+                              aria-expanded={participantMenuOpen}
+                              aria-label={tProject("detail.moreActions")}
+                              title={tProject("detail.moreActions")}
+                              onClick={() => setParticipantMenuOpen((v) => !v)}
+                            >
+                              ⋯
+                            </button>
+                            {participantMenuOpen && (
+                              <div className="overflow-menu__dropdown" role="menu">
+                                <button
+                                  role="menuitem"
+                                  className="overflow-menu__item overflow-menu__item--danger"
+                                  onClick={() => { setParticipantMenuOpen(false); setDeleteParticipantOpen(true); }}
+                                >
+                                  {tProject("responses.deleteParticipant")}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                         <button className="participant-card__close" onClick={() => { setTranscript(null); setSelectedParticipant(null); setSelectionInfo(null); }} aria-label={tProject("responses.close")}>✕</button>
                       </div>
@@ -4246,6 +4265,69 @@ export default function ProjectDetail() {
           </div>
         )}
       </main>
+
+      {/* ── Delete study confirmation (type-the-name) ───────────────────── */}
+      {deleteProjectOpen && project && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-project-title"
+          onClick={() => setDeleteProjectOpen(false)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <button className="modal-close" onClick={() => setDeleteProjectOpen(false)} aria-label={tProject("a11y.close")}>×</button>
+            <h3 id="delete-project-title" style={{ marginTop: 0 }}>{tProject("detail.deleteProject")}</h3>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+              {tProject("confirms.deleteProjectPrompt", { name: project.name })}
+            </p>
+            <input
+              type="text"
+              className="input"
+              autoFocus
+              value={deleteProjectTyped}
+              placeholder={project.name}
+              aria-label={tProject("detail.deleteProject")}
+              onChange={(e) => setDeleteProjectTyped(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && deleteProjectTyped.trim() === project.name) confirmDeleteProject(); }}
+              style={{ width: "100%", marginBottom: 16 }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteProjectOpen(false)}>{tCommon("cancel")}</button>
+              <button
+                className="btn btn-sm btn-danger"
+                disabled={deleteProjectTyped.trim() !== project.name}
+                onClick={confirmDeleteProject}
+              >
+                {tCommon("delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete participant confirmation ─────────────────────────────── */}
+      {deleteParticipantOpen && selectedParticipant && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-participant-title"
+          onClick={() => setDeleteParticipantOpen(false)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <button className="modal-close" onClick={() => setDeleteParticipantOpen(false)} aria-label={tProject("a11y.close")}>×</button>
+            <h3 id="delete-participant-title" style={{ marginTop: 0 }}>{tProject("responses.deleteParticipant")}</h3>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+              {tProject("confirms.deleteParticipant")}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteParticipantOpen(false)}>{tCommon("cancel")}</button>
+              <button className="btn btn-sm btn-danger" onClick={confirmDeleteParticipant}>{tCommon("delete")}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── AI starter-codebook proposal modal ─────────────────────────── */}
       {suggestedCodes && (
