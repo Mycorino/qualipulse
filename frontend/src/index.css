@@ -327,6 +327,22 @@ textarea:focus-visible {
   border-radius: var(--radius-lg);
 }
 
+/* Solid destructive button — confirm step of a delete dialog */
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-danger-text {
   color: var(--danger);
 }
@@ -1149,8 +1165,8 @@ select.field-input {
   gap: var(--space-2);
   align-items: center;
 }
-/* Default (>=768px): show inline buttons, hide overflow trigger */
-.detail-header-actions .detail-header-actions__overflow { display: none; }
+/* Default (>=768px): inline buttons + a "⋯" menu holding destructive actions */
+.detail-header-actions .detail-header-actions__overflow { display: inline-block; }
 .detail-header-actions__inline { display: inline-flex; }
 
 .detail-breadcrumb {
@@ -6724,6 +6740,22 @@ select.field-input {
   cursor: pointer;
 }
 .overflow-menu__item:hover { background: var(--bg-sunken); }
+/* Destructive actions live in the menu instead of the toolbar */
+.overflow-menu__item--danger { color: var(--danger, #b91c1c); }
+.overflow-menu__item--danger:hover { background: var(--danger-bg, #fef2f2); }
+/* Items the menu only needs when the inline toolbar is collapsed (<768px) */
+.overflow-menu__item--compact-only { display: none; }
+
+/* Overflow trigger sitting on a dark surface (participant card header) */
+.overflow-menu--on-dark .overflow-menu__trigger {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.7);
+}
+.overflow-menu--on-dark .overflow-menu__trigger:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
 
 /* Visually-hidden aria-live region for inline edit announcements */
 .sr-only {
@@ -7155,6 +7187,8 @@ select.field-input {
   /* B1: collapse Export CSV / Archive into "..." overflow menu */
   .detail-header-actions .detail-header-actions__inline { display: none !important; }
   .detail-header-actions .detail-header-actions__overflow { display: inline-block !important; }
+  /* the menu absorbs Export CSV / Archive once the inline row is hidden */
+  .overflow-menu__item--compact-only { display: block; }
 
   /* B2: long interview URL — truncate from the start so the unique tail
      stays visible (RTL trick + plaintext bidi keeps "https://" lhs). */
