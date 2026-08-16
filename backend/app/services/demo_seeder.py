@@ -71,7 +71,15 @@ from app.services.study_provisioning import create_study
 
 
 DEMO_PROJECT_NAME = "[Demo] How people choose streaming services"
-DEMO_PROJECT_NAME_FR = "[Démo] Courses alimentaires en ligne — habitudes & freins"
+DEMO_PROJECT_NAME_FR = "[Démo] Courses alimentaires en ligne : habitudes & freins"
+# Pre-August-2026 accounts were seeded with an em dash in the FR name; the
+# backfill script still needs to recognise them.
+LEGACY_DEMO_PROJECT_NAME_FR = "[Démo] Courses alimentaires en ligne — habitudes & freins"
+
+# Participant-facing researcher identity for the demo study, so the branding
+# preview and the interview consent card demonstrate the filled-in state.
+DEMO_RESEARCHER_NAME = "Consumer Insights Team"
+DEMO_RESEARCHER_NAME_FR = "Équipe Études Conso"
 
 DEMO_RESEARCH_OBJECTIVE = (
     "Understand how consumers decide which video streaming services to "
@@ -916,8 +924,13 @@ DEMO_MEMOS_FR = [
 # approach as the ProjectAnalysis reports above) so seeding never makes an
 # AI call.
 
-DEMO_SURVEY_NAME = "Streaming habits — quick pulse"
-DEMO_SURVEY_NAME_FR = "Courses en ligne — sondage éclair"
+DEMO_SURVEY_NAME = "Streaming habits: quick pulse"
+DEMO_SURVEY_NAME_FR = "Courses en ligne : sondage éclair"
+
+# Pre-August-2026 accounts were seeded with em dashes in the survey names;
+# the backfill script still needs to recognise them.
+LEGACY_DEMO_SURVEY_NAME = "Streaming habits — quick pulse"
+LEGACY_DEMO_SURVEY_NAME_FR = "Courses en ligne — sondage éclair"
 
 # Per-language survey plan — a ten-question instrument that uses every
 # question type the product supports: frequency (mc_single), current stack
@@ -1579,6 +1592,7 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
 
     if lang == "fr":
         demo_name = DEMO_PROJECT_NAME_FR
+        demo_researcher_name = DEMO_RESEARCHER_NAME_FR
         demo_welcome = DEMO_WELCOME_MESSAGE_FR
         demo_objective = DEMO_RESEARCH_OBJECTIVE_FR
         demo_context = DEMO_RESEARCH_CONTEXT_FR
@@ -1602,6 +1616,7 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         )
     else:
         demo_name = DEMO_PROJECT_NAME
+        demo_researcher_name = DEMO_RESEARCHER_NAME
         demo_welcome = DEMO_WELCOME_MESSAGE
         demo_objective = DEMO_RESEARCH_OBJECTIVE
         demo_context = DEMO_RESEARCH_CONTEXT
@@ -1633,6 +1648,11 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
         name=demo_name,
         language=lang,
         interview_duration_minutes=25,
+        # Match the ten seeded interviews so the plan reads consistently, and
+        # fill the researcher identity so the branding preview shows the
+        # participant-facing state rather than an empty form.
+        target_participants=10,
+        researcher_name=demo_researcher_name,
         welcome_message=demo_welcome,
         research_objective=demo_objective,
         research_context=demo_context,

@@ -72,6 +72,8 @@ export interface ProjectNbaInput {
   /** How many participants the latest ready analysis covered. */
   analysisParticipantCount: number;
   annotationCount: number;
+  /** The researcher's stated interview target (null when unset). */
+  targetParticipants: number | null;
 }
 
 interface Rule<T> {
@@ -181,6 +183,26 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
       params: { count: s.completedCount - s.analysisParticipantCount },
       kind: "do",
       weight: 70,
+    }),
+  },
+  {
+    // Below the stated interview target with a live link: analysis polish
+    // can wait, the study still needs data. Reuses the share_link action
+    // type so the pages' existing handlers route it unchanged.
+    test: (s) =>
+      s.activeLinkCount > 0 &&
+      s.targetParticipants != null &&
+      s.completedCount > 0 &&
+      s.completedCount < s.targetParticipants &&
+      s.analysisStatus === "ready",
+    action: (s) => ({
+      id: "collect_to_target",
+      actionType: "share_link",
+      labelKey: `${NS}collectToTarget.label`,
+      reasonKey: `${NS}collectToTarget.reason`,
+      params: { count: s.completedCount, target: s.targetParticipants ?? 0 },
+      kind: "do",
+      weight: 65,
     }),
   },
   {

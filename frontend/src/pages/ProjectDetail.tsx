@@ -74,6 +74,7 @@ import { getCreditUsage } from "../api/billing";
 import { PaywallCard, UnlockModal } from "../components/UnlockPaywall";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
 import { NextActionChip } from "../components/NextActionChip";
+import RecruitSharePanel from "../components/RecruitSharePanel";
 import { resolveProjectNextAction } from "../copilot/nextAction";
 import type { ProjectNbaInput } from "../copilot/nextAction";
 import {
@@ -1746,6 +1747,7 @@ export default function ProjectDetail() {
       (analysis?.status as ProjectNbaInput["analysisStatus"]) ?? "none",
     analysisParticipantCount: analysis?.participant_count ?? 0,
     annotationCount: Object.keys(themeAnnotations).length,
+    targetParticipants,
   };
   const projectMission = tDashboard(PROJECT_MISSION_KEYS[tab]);
   const projectNextAction = resolveProjectNextAction(projectNbaInput);
@@ -2340,6 +2342,12 @@ export default function ProjectDetail() {
                       defaultValue: "A low-stakes icebreaker before the real research questions. Recommended.",
                     })}
                   </span>
+                  <span className="muted-text" style={{ fontSize: 12, fontStyle: "italic" }}>
+                    {tProject("setup.warmupExample", {
+                      defaultValue:
+                        "The AI writes it from your research objective. Example: “Welcome! Before we dive in, what does a typical week look like for you?”",
+                    })}
+                  </span>
                 </div>
               </label>
             </section>
@@ -2436,7 +2444,24 @@ export default function ProjectDetail() {
                   <h2>{tProject("setup.screeningTitle")}</h2>
                   <p className="muted-text" style={{ fontSize: 13, marginTop: 2 }}>{tProject("setup.screeningSubtitle")}</p>
                 </div>
-                {!editingScreening && <button className="btn btn-ghost btn-sm" onClick={startEditScreening}>{tCommon("edit")}</button>}
+                {!editingScreening && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {(project.screening_questions ?? []).length > 0 && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={async () => {
+                          try {
+                            await regenerateScreeningTranslations(project.id);
+                            toast(tProject("toasts.translationsRegenerating"), "info");
+                          } catch { toast(tProject("toasts.translationsRegenerateFailed"), "error"); }
+                        }}
+                      >
+                        🌐 {tProject("screeningTranslations.regenerateAll")}
+                      </button>
+                    )}
+                    <button className="btn btn-ghost btn-sm" onClick={startEditScreening}>{tCommon("edit")}</button>
+                  </div>
+                )}
               </div>
 
               {!editingScreening && (
@@ -2468,18 +2493,6 @@ export default function ProjectDetail() {
                         />
                       </div>
                     ))}
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      style={{ marginTop: 8 }}
-                      onClick={async () => {
-                        try {
-                          await regenerateScreeningTranslations(project.id);
-                          toast(tProject("toasts.translationsRegenerating"), "info");
-                        } catch { toast(tProject("toasts.translationsRegenerateFailed"), "error"); }
-                      }}
-                    >
-                      🌐 {tProject("screeningTranslations.regenerateAll")}
-                    </button>
                   </div>
                 )
               )}
@@ -2584,7 +2597,7 @@ export default function ProjectDetail() {
                       <div key={title} className="guide-section">
                         <h3 className="guide-section-title">{title}</h3>
                         <div>
-                          {activeQs.map((q, qi) => {
+                          {activeQs.map((q) => {
                             const isEditing = editingQuestionId === q.id;
                             const allSorted = [...project.questions].filter((x) => !x.deprecated_at).sort((a, b) => a.section_index - b.section_index || a.question_index - b.question_index);
                             const globalIdx = allSorted.findIndex((x) => x.id === q.id);
@@ -2638,7 +2651,8 @@ export default function ProjectDetail() {
                                         onClick={() => { setEditingQuestionId(q.id); setQuestionDraft(q.main_question); }}
                                         title={tProject("setup.clickToEdit")}
                                       >
-                                        <span className="guide-question-card__num">Q{qi + 1}</span>
+                                        {/* Continuous numbering across sections (globalIdx), not per-section. */}
+                                        <span className="guide-question-card__num">Q{globalIdx + 1}</span>
                                         {q.main_question}
                                       </span>
                                     )}
@@ -2755,6 +2769,10 @@ export default function ProjectDetail() {
                 </>
               )}
             </section>
+
+            {/* Publication step: link + test drive + invitation templates,
+                so a configured study doesn't dead-end before collection. */}
+            <RecruitSharePanel project={project} links={links} />
 
             {/* System prompt accordion removed — hidden from researchers */}
           </div>

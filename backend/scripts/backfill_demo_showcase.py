@@ -58,14 +58,19 @@ from app.services.demo_seeder import (  # noqa: E402
     DEMO_GUIDE_FR,
     DEMO_PROJECT_NAME,
     DEMO_PROJECT_NAME_FR,
+    DEMO_RESEARCHER_NAME,
+    DEMO_RESEARCHER_NAME_FR,
     DEMO_SURVEY_EN,
     DEMO_SURVEY_FR,
     DEMO_SURVEY_NAME,
     DEMO_SURVEY_NAME_FR,
+    LEGACY_DEMO_PROJECT_NAME_FR,
+    LEGACY_DEMO_SURVEY_NAME,
+    LEGACY_DEMO_SURVEY_NAME_FR,
     _decision_integration,
 )
 
-_FLAGSHIP = {DEMO_PROJECT_NAME, DEMO_PROJECT_NAME_FR}
+_FLAGSHIP = {DEMO_PROJECT_NAME, DEMO_PROJECT_NAME_FR, LEGACY_DEMO_PROJECT_NAME_FR}
 _ALL_DEMO_NAMES = _FLAGSHIP
 
 # Exact main-question text → (interview_notes, researcher_notes) from the
@@ -213,26 +218,35 @@ def _upgrade_survey(db, survey: Survey, cfg: dict, dry_run: bool) -> bool:
 
 
 # Accounts seeded before the "sondage éclair" rename carry the old FR survey
-# name — match it too so they keep getting backfilled.
+# name — match it too so they keep getting backfilled. The August-2026
+# em-dash removal added two more legacy spellings.
 _LEGACY_SURVEY_NAME_FR = "Courses en ligne — pouls rapide"
+_LEGACY_SURVEY_NAMES_FR = (
+    DEMO_SURVEY_NAME_FR,
+    LEGACY_DEMO_SURVEY_NAME_FR,
+    _LEGACY_SURVEY_NAME_FR,
+)
+_ALL_SURVEY_NAMES = [
+    DEMO_SURVEY_NAME,
+    LEGACY_DEMO_SURVEY_NAME,
+    *_LEGACY_SURVEY_NAMES_FR,
+]
 
 
 def _backfill_surveys(db, dry_run: bool, company_id: str | None) -> int:
-    q = db.query(Survey).filter(
-        Survey.name.in_(
-            [DEMO_SURVEY_NAME, DEMO_SURVEY_NAME_FR, _LEGACY_SURVEY_NAME_FR]
-        )
-    )
+    q = db.query(Survey).filter(Survey.name.in_(_ALL_SURVEY_NAMES))
     if company_id:
         q = q.filter(Survey.company_id == company_id)
     upgraded = 0
     for survey in q.all():
-        cfg = (
-            DEMO_SURVEY_FR
-            if survey.name in (DEMO_SURVEY_NAME_FR, _LEGACY_SURVEY_NAME_FR)
-            else DEMO_SURVEY_EN
-        )
-        if _upgrade_survey(db, survey, cfg, dry_run):
+        is_fr = survey.name in _LEGACY_SURVEY_NAMES_FR
+        cfg = DEMO_SURVEY_FR if is_fr else DEMO_SURVEY_EN
+        renamed = False
+        if survey.name in (LEGACY_DEMO_SURVEY_NAME, LEGACY_DEMO_SURVEY_NAME_FR, _LEGACY_SURVEY_NAME_FR):
+            if not dry_run:
+                survey.name = DEMO_SURVEY_NAME_FR if is_fr else DEMO_SURVEY_NAME
+            renamed = True
+        if _upgrade_survey(db, survey, cfg, dry_run) or renamed:
             upgraded += 1
     return upgraded
 
@@ -253,12 +267,45 @@ def _backfill_decision_reports(db, dry_run: bool, company_id: str | None) -> int
             current = None
         if not isinstance(current, dict) or current.get("schema") != "decision_v1":
             continue  # a real regenerated analysis — never touch it
-        lang = "fr" if project.name == DEMO_PROJECT_NAME_FR else "en"
+        lang = (
+            "fr"
+            if project.name in (DEMO_PROJECT_NAME_FR, LEGACY_DEMO_PROJECT_NAME_FR)
+            else "en"
+        )
         fresh = _decision_integration(lang)
         if current == fresh:
             continue
         if not dry_run:
             analysis.report = json.dumps(fresh)
+        updated += 1
+    return updated
+
+
+def _backfill_project_meta(db, dry_run: bool, company_id: str | None) -> int:
+    """August-2026 polish: rename the legacy em-dash FR title and fill the
+    interview target + researcher identity on already-seeded demo projects."""
+    q = db.query(Project).filter(
+        Project.is_demo.is_(True), Project.name.in_(_ALL_DEMO_NAMES)
+    )
+    if company_id:
+        q = q.filter(Project.company_id == company_id)
+    updated = 0
+    for project in q.all():
+        is_fr = project.name in (DEMO_PROJECT_NAME_FR, LEGACY_DEMO_PROJECT_NAME_FR)
+        changes: dict[str, str | int] = {}
+        if project.name == LEGACY_DEMO_PROJECT_NAME_FR:
+            changes["name"] = DEMO_PROJECT_NAME_FR
+        if not project.target_participants:
+            changes["target_participants"] = 10
+        if not (project.researcher_name or "").strip():
+            changes["researcher_name"] = (
+                DEMO_RESEARCHER_NAME_FR if is_fr else DEMO_RESEARCHER_NAME
+            )
+        if not changes:
+            continue
+        if not dry_run:
+            for field, value in changes.items():
+                setattr(project, field, value)
         updated += 1
     return updated
 
@@ -271,15 +318,22 @@ def run(dry_run: bool, company_id: str | None, db=None) -> dict:
         notes = _backfill_guide_notes(db, dry_run, company_id)
         surveys = _backfill_surveys(db, dry_run, company_id)
         reports = _backfill_decision_reports(db, dry_run, company_id)
+        meta = _backfill_project_meta(db, dry_run, company_id)
         if not dry_run:
             db.commit()
         verb = "would update" if dry_run else "updated"
         print(
             f"Done: {verb} {notes} guide question(s), upgraded {surveys} "
-            f"survey(s), refreshed {reports} decision report(s)"
+            f"survey(s), refreshed {reports} decision report(s), "
+            f"patched {meta} project(s) metadata"
             f"{' (dry-run — nothing written)' if dry_run else ''}."
         )
-        return {"guide_questions": notes, "surveys": surveys, "reports": reports}
+        return {
+            "guide_questions": notes,
+            "surveys": surveys,
+            "reports": reports,
+            "project_meta": meta,
+        }
     finally:
         if owns_session:
             db.close()

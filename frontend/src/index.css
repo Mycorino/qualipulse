@@ -1278,6 +1278,13 @@ select.field-input {
   letter-spacing: -0.02em;
   line-height: 1.15;
   margin: 0;
+  /* The inline-rename <input> child sizes with flex; without this the h1
+     is a plain block and the input collapses to the browser's ~20ch
+     default, truncating long study names despite free header width. */
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .instrument-header__status {
@@ -9757,6 +9764,10 @@ select.field-input {
   color: var(--text-primary);
   letter-spacing: -0.015em;
   padding: 4px 6px;
+  /* Where supported (Chromium), hug the text so the status pill sits right
+     after the name instead of at the far end of the flexed title. */
+  field-sizing: content;
+  max-width: 100%;
   border-radius: var(--radius-sm);
   min-width: 0;
   /* A long round name can't wrap inside an <input> — show an ellipsis

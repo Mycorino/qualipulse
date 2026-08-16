@@ -288,6 +288,12 @@ export default function BrandingSettings({
                 if (v !== (project.researcher_name ?? "")) void save({ researcher_name: v });
               }}
             />
+            <p className="field-hint" style={{ fontSize: 12, marginTop: 4 }}>
+              {t("setup.brandingResearcherBiasHint", {
+                defaultValue:
+                  "Tip: naming who runs the study builds trust, but can soften criticism of your own product. For unfiltered feedback, use Anonymous mode.",
+              })}
+            </p>
 
             <label className="field-label" style={{ marginTop: 12 }}>
               {t("setup.brandingLogo", { defaultValue: "Logo" })}
@@ -347,7 +353,7 @@ export default function BrandingSettings({
             </p>
 
             <label className="field-label" htmlFor="branding-privacy-url" style={{ marginTop: 12 }}>
-              {t("setup.brandingPrivacyUrl", { defaultValue: "Privacy policy URL (optional)" })}
+              {t("setup.brandingPrivacyUrl", { defaultValue: "Your own privacy policy URL (optional)" })}
             </label>
             <input
               id="branding-privacy-url"
@@ -362,6 +368,12 @@ export default function BrandingSettings({
                 if (v !== (project.privacy_policy_url ?? "")) void save({ privacy_policy_url: v });
               }}
             />
+            <p className="field-hint" style={{ fontSize: 12, marginTop: 4 }}>
+              {t("setup.brandingPrivacyHint", {
+                defaultValue:
+                  "Participants always see our participant notice on the consent screen. Add your company's own privacy policy here if your legal team requires it.",
+              })}
+            </p>
 
             {mode === "branded" && (
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 12 }}>
