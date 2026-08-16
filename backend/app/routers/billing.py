@@ -526,6 +526,11 @@ def create_credit_pack_checkout(
             # propagates it to the charge) so a later charge.refunded
             # webhook can resolve the workspace without an API lookup.
             payment_intent_data={"metadata": pack_metadata},
+            # Checkout in ``payment`` mode issues no invoice unless asked.
+            # Without this a credit-pack buyer gets a card receipt and
+            # nothing their accountant can file, which for an EU business
+            # purchase is not enough.
+            invoice_creation={"enabled": True},
             **mode_kwargs,
         )
         if settings.STRIPE_AUTOMATIC_TAX:
@@ -563,6 +568,70 @@ def create_portal_session(
     except Exception as e:  # pragma: no cover
         logger.error("Stripe portal error: %s", e)
         raise HTTPException(status_code=500, detail="Failed to open billing portal")
+
+
+class InvoiceResponse(BaseModel):
+    """One finalized Stripe invoice, flattened for the account UI."""
+
+    id: str
+    number: str | None
+    created: str
+    amount_paid: int
+    currency: str
+    status: str | None
+    hosted_invoice_url: str | None
+    invoice_pdf: str | None
+
+
+@router.get("/invoices", response_model=list[InvoiceResponse])
+def list_invoices(
+    limit: int = 24,
+    company: Company = Depends(get_current_company),
+):
+    """Past invoices for the workspace, newest first.
+
+    Read-through to Stripe rather than a local mirror: Stripe is the
+    system of record for invoices and copying them into our DB would
+    only create a second thing to keep in sync. Returns an empty list
+    (not an error) when the workspace has no Stripe customer yet, so
+    the UI can render an empty state instead of special-casing 503.
+    """
+    if not settings.STRIPE_SECRET_KEY or not company.stripe_customer_id:
+        return []
+    try:
+        import stripe  # type: ignore
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+
+        invoices = stripe.Invoice.list(
+            customer=company.stripe_customer_id,
+            limit=max(1, min(limit, 100)),
+        )
+        out: list[InvoiceResponse] = []
+        for inv in invoices.get("data", []):
+            # Drafts have no number and no stable PDF; showing them would
+            # surface amounts that can still change.
+            if inv.get("status") == "draft":
+                continue
+            out.append(
+                InvoiceResponse(
+                    id=inv.get("id", ""),
+                    number=inv.get("number"),
+                    created=datetime.utcfromtimestamp(inv["created"]).isoformat()
+                    if inv.get("created")
+                    else "",
+                    amount_paid=inv.get("amount_paid", 0),
+                    currency=(inv.get("currency") or "eur").upper(),
+                    status=inv.get("status"),
+                    hosted_invoice_url=inv.get("hosted_invoice_url"),
+                    invoice_pdf=inv.get("invoice_pdf"),
+                )
+            )
+        return out
+    except ImportError:
+        return []
+    except Exception as e:  # pragma: no cover — Stripe SDK errors
+        logger.error("Stripe invoice list error: %s", e)
+        raise HTTPException(status_code=502, detail="Could not load invoices")
 
 
 # ── Webhook ──────────────────────────────────────────────────────────────────
@@ -706,9 +775,20 @@ def _handle_checkout_session_completed(db: Session, session: dict) -> None:
     from app.models.company import Company
 
     company = db.query(Company).filter(Company.id == workspace_id).first()
-    if company is not None and not company.has_ever_paid:
-        company.has_ever_paid = True
-        db.commit()
+    if company is not None:
+        dirty = False
+        if not company.has_ever_paid:
+            company.has_ever_paid = True
+            dirty = True
+        # Pack-only buyers never trigger a subscription event, so without
+        # this they never get a stripe_customer_id and the billing portal
+        # (their only route to past invoices) stays hidden from them.
+        customer_id = session.get("customer")
+        if customer_id and not company.stripe_customer_id:
+            company.stripe_customer_id = customer_id
+            dirty = True
+        if dirty:
+            db.commit()
 
 
 def _handle_subscription_event(db: Session, event_type: str, sub: dict) -> None:
