@@ -1032,9 +1032,9 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Admin panel (user management, tier changes, trial management, user deletion)
 - [x] Admin stats dashboard (users, tiers, interviews, signups over 7/30 days)
 - [x] Admin AI cost reporting (platform-wide + per-company breakdown)
-- [x] Affiliate program (apply, login, dashboard, referral tracking, commission calculation)
+- [x] Affiliate program (apply, magic-link login, dashboard, referral tracking, commission calculation). Attribution: `?ref=` is captured on any public page into localStorage (`qp_ref`, 60-day first-touch window, `utils/referral.ts`), read back at signup, and carried through the Google OAuth round-trip inside the signed state. Self-referrals are ignored. Lifecycle emails (EN/FR per `Affiliate.preferred_language`): application received, approved (with referral link), rejected, magic sign-in link, commission earned, payout recorded. All amounts in euros. Marketing footer links `/affiliate`. Tests: `backend/tests/test_affiliate.py`.
 - [x] Affiliate admin management (approve/reject, commission %, payout recording)
-- [x] Stripe webhook affiliate conversion tracking (commission on subscription)
+- [x] Stripe webhook affiliate conversion tracking (one-time commission on the referred customer's first subscription payment; idempotent per referral, so cancel+resubscribe or replayed webhooks never double-pay; notifies the affiliate by email)
 - [x] AI usage tracking (Claude tokens, Whisper seconds, TTS characters → cost_usd)
 - [x] Research participant panel (PanelProfile, PanelTag, magic link auth)
 - [x] Blog CMS (TipTap WYSIWYG editor, live preview, draft/publish, SEO meta + OG tags)
@@ -1165,7 +1165,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `company_id`, `token` (unique, urlsafe), `used`, `expires_at`, `created_at`
 
 ### Affiliate
-`id` (str), `company_id` (FK), `name`, `email` (unique), `code` (unique), `website`, `how_they_found_us`, `commission_pct` (default 20%), `status` (pending/active/rejected), `payout_threshold` (default $50), `total_earned`, `total_paid`, `created_at`, `approved_at`, `notes`
+`id` (str), `company_id` (FK), `name`, `email` (unique), `code` (unique), `website`, `how_they_found_us`, `commission_pct` (default 20%), `status` (pending/active/rejected), `payout_threshold` (default €50), `total_earned`, `total_paid`, `created_at`, `approved_at`, `notes`, `preferred_language` (en/fr, drives lifecycle emails; Alembic 0059)
 
 ### AffiliateReferral
 `id` (str), `affiliate_id` (FK), `referred_company_id` (FK, unique), `signed_up_at`, `converted_at`, `commission_amount`, `status` (signed_up/converted/paid)
@@ -1349,8 +1349,9 @@ All copilot POST endpoints return **SSE** (`text/event-stream`) — events `stat
 ### Affiliate (`/affiliates`)
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/affiliates/apply` | No (5/min) | Apply to become affiliate |
-| POST | `/affiliates/login` | No (10/min) | Login with email + code |
+| POST | `/affiliates/apply` | No (5/min) | Apply to become affiliate (captures `preferred_language`; sends confirmation email) |
+| POST | `/affiliates/login-request` | No (5/min) | Email a 30-min magic sign-in link (always 200; the referral code is public, so it is never a credential) |
+| POST | `/affiliates/login/verify` | No (10/min) | Exchange the emailed magic token for a 24h dashboard session |
 | GET | `/affiliates/me` | Affiliate JWT | Get affiliate stats & earnings |
 | GET | `/affiliates/me/link` | Affiliate JWT | Get shareable referral link |
 | GET | `/affiliates/me/referrals` | Affiliate JWT | List referred companies |

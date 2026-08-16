@@ -138,6 +138,150 @@ def _normalise_lang(lang: Optional[str]) -> str:
 # All translated copy lives here so we can see both languages side-by-side.
 # Keys correspond 1:1 to the template helpers below.
 _COPY: dict[str, dict[str, dict[str, str]]] = {
+    "affiliate_received": {
+        "en": {
+            "subject": "We received your affiliate application",
+            "heading": "Thanks for applying, {name}!",
+            "body": (
+                "Your application to the QualiPulse affiliate program is in. "
+                "We review every application by hand and will get back to you "
+                "within 2 to 3 business days."
+            ),
+            "foot": "Questions in the meantime? Just reply to this email.",
+        },
+        "fr": {
+            "subject": "Nous avons bien reçu votre candidature d'affilié",
+            "heading": "Merci pour votre candidature, {name} !",
+            "body": (
+                "Votre candidature au programme d'affiliation QualiPulse est "
+                "bien enregistrée. Nous examinons chaque candidature à la main "
+                "et vous répondrons sous 2 à 3 jours ouvrés."
+            ),
+            "foot": "Une question entre-temps ? Répondez simplement à cet email.",
+        },
+    },
+    "affiliate_approved": {
+        "en": {
+            "subject": "You're in! Your QualiPulse affiliate account is live",
+            "heading": "Welcome aboard, {name}!",
+            "body": (
+                "Your affiliate application was approved. Share your referral "
+                "link and you earn {commission}% of each referred customer's "
+                "first subscription payment."
+            ),
+            "link_label": "Your referral link:",
+            "cta": "Open your affiliate dashboard",
+            "foot": "Sign in any time with your email address; we send you a secure link.",
+        },
+        "fr": {
+            "subject": "C'est parti ! Votre compte affilié QualiPulse est actif",
+            "heading": "Bienvenue à bord, {name} !",
+            "body": (
+                "Votre candidature d'affilié a été approuvée. Partagez votre "
+                "lien de parrainage et gagnez {commission}% du premier paiement "
+                "d'abonnement de chaque client parrainé."
+            ),
+            "link_label": "Votre lien de parrainage :",
+            "cta": "Ouvrir votre tableau de bord affilié",
+            "foot": "Connectez-vous à tout moment avec votre adresse email ; nous vous envoyons un lien sécurisé.",
+        },
+    },
+    "affiliate_rejected": {
+        "en": {
+            "subject": "About your QualiPulse affiliate application",
+            "heading": "Thanks for your interest, {name}",
+            "body": (
+                "We reviewed your application to the QualiPulse affiliate "
+                "program and can't accept it at this time. This is often about "
+                "audience fit rather than quality, and you're welcome to apply "
+                "again as your audience evolves."
+            ),
+            "foot": "If you think we got this wrong, reply to this email and tell us more.",
+        },
+        "fr": {
+            "subject": "Au sujet de votre candidature d'affilié QualiPulse",
+            "heading": "Merci de votre intérêt, {name}",
+            "body": (
+                "Nous avons examiné votre candidature au programme "
+                "d'affiliation QualiPulse et ne pouvons pas l'accepter pour le "
+                "moment. C'est souvent une question d'adéquation d'audience "
+                "plutôt que de qualité, et vous pouvez repostuler quand votre "
+                "audience évolue."
+            ),
+            "foot": "Si vous pensez que nous nous trompons, répondez à cet email pour nous en dire plus.",
+        },
+    },
+    "affiliate_magic": {
+        "en": {
+            "subject": "Your affiliate dashboard sign-in link",
+            "heading": "Sign in to your affiliate dashboard",
+            "body": "Click the button below to open your QualiPulse affiliate dashboard.",
+            "cta": "Open my dashboard",
+            "foot": (
+                "This link expires in {expiry_minutes} minutes and can only be "
+                "used with this email address. If you didn't request it, you "
+                "can safely ignore this email."
+            ),
+        },
+        "fr": {
+            "subject": "Votre lien de connexion au tableau de bord affilié",
+            "heading": "Connectez-vous à votre tableau de bord affilié",
+            "body": "Cliquez sur le bouton ci-dessous pour ouvrir votre tableau de bord affilié QualiPulse.",
+            "cta": "Ouvrir mon tableau de bord",
+            "foot": (
+                "Ce lien expire dans {expiry_minutes} minutes et ne peut être "
+                "utilisé qu'avec cette adresse email. Si vous n'en êtes pas à "
+                "l'origine, vous pouvez ignorer cet email."
+            ),
+        },
+    },
+    "affiliate_conversion": {
+        "en": {
+            "subject": "You earned a commission: {amount}",
+            "heading": "A referral just converted 🎉",
+            "body": (
+                "One of your referrals upgraded to a paid QualiPulse plan. "
+                "You earned {amount} in commission. Your pending balance is "
+                "now {pending}."
+            ),
+            "cta": "See your earnings",
+            "foot": "Payouts unlock once your pending balance reaches {threshold}.",
+        },
+        "fr": {
+            "subject": "Vous avez gagné une commission : {amount}",
+            "heading": "Un parrainage vient de convertir 🎉",
+            "body": (
+                "Un de vos parrainages est passé sur une offre payante "
+                "QualiPulse. Vous avez gagné {amount} de commission. Votre "
+                "solde en attente est maintenant de {pending}."
+            ),
+            "cta": "Voir vos gains",
+            "foot": "Les paiements se débloquent quand votre solde en attente atteint {threshold}.",
+        },
+    },
+    "affiliate_payout": {
+        "en": {
+            "subject": "Your affiliate payout of {amount} is on its way",
+            "heading": "Payout recorded, {name}",
+            "body": (
+                "We just recorded a payout of {amount} to you. Depending on "
+                "the payment method it can take a few business days to arrive."
+            ),
+            "cta": "View payout history",
+            "foot": "Thanks for spreading the word about QualiPulse.",
+        },
+        "fr": {
+            "subject": "Votre paiement affilié de {amount} est en route",
+            "heading": "Paiement enregistré, {name}",
+            "body": (
+                "Nous venons d'enregistrer un paiement de {amount} en votre "
+                "faveur. Selon le moyen de paiement, il peut mettre quelques "
+                "jours ouvrés à arriver."
+            ),
+            "cta": "Voir l'historique des paiements",
+            "foot": "Merci de faire connaître QualiPulse.",
+        },
+    },
     "welcome": {
         "en": {
             "subject": "Welcome to QualiPulse",
@@ -1230,4 +1374,142 @@ def send_newsletter_welcome(to: str, lang: str = "en") -> bool:
         subject=_c("newsletter", lang, "subject"),
         body_html=_wrap_email(content, lang),
         email_type="marketing",
+    )
+
+
+# ── Affiliate program ───────────────────────────────────────────────────────
+
+
+def _fmt_eur(amount: float, lang: str) -> str:
+    """€12.50 (en) / 12,50 € (fr) — the program pays in euros."""
+    if lang == "fr":
+        return f"{amount:.2f}".replace(".", ",") + " €"
+    return f"€{amount:.2f}"
+
+
+def send_affiliate_application_received(to: str, name: str, lang: str = "en") -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("affiliate_received", lang, "heading", name=name)}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("affiliate_received", lang, "body")}</p>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("affiliate_received", lang, "foot")}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("affiliate_received", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_affiliate_approved(
+    to: str,
+    name: str,
+    referral_link: str,
+    dashboard_url: str,
+    commission_pct: float,
+    lang: str = "en",
+) -> bool:
+    lang = _normalise_lang(lang)
+    commission = f"{commission_pct:g}"
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("affiliate_approved", lang, "heading", name=name)}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;">{_c("affiliate_approved", lang, "body", commission=commission)}</p>
+      <p style="color:#475569;line-height:1.6;margin:0 0 4px;font-weight:600;">{_c("affiliate_approved", lang, "link_label")}</p>
+      <p style="background:#f1f5f9;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:0.85rem;color:#0f172a;word-break:break-all;margin:0 0 24px;">{referral_link}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{dashboard_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("affiliate_approved", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("affiliate_approved", lang, "foot")}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("affiliate_approved", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_affiliate_rejected(to: str, name: str, lang: str = "en") -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("affiliate_rejected", lang, "heading", name=name)}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("affiliate_rejected", lang, "body")}</p>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("affiliate_rejected", lang, "foot")}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("affiliate_rejected", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_affiliate_magic_link(
+    to: str,
+    magic_url: str,
+    expiry_minutes: int = 30,
+    lang: str = "en",
+) -> bool:
+    lang = _normalise_lang(lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("affiliate_magic", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("affiliate_magic", lang, "body")}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{magic_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("affiliate_magic", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("affiliate_magic", lang, "foot", expiry_minutes=expiry_minutes)}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("affiliate_magic", lang, "subject"),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_affiliate_conversion(
+    to: str,
+    amount_eur: float,
+    pending_eur: float,
+    threshold_eur: float,
+    dashboard_url: str,
+    lang: str = "en",
+) -> bool:
+    lang = _normalise_lang(lang)
+    amount = _fmt_eur(amount_eur, lang)
+    pending = _fmt_eur(pending_eur, lang)
+    threshold = _fmt_eur(threshold_eur, lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("affiliate_conversion", lang, "heading")}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("affiliate_conversion", lang, "body", amount=amount, pending=pending)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{dashboard_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("affiliate_conversion", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("affiliate_conversion", lang, "foot", threshold=threshold)}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("affiliate_conversion", lang, "subject", amount=amount),
+        body_html=_wrap_email(content, lang),
+    )
+
+
+def send_affiliate_payout(
+    to: str,
+    name: str,
+    amount_eur: float,
+    dashboard_url: str,
+    lang: str = "en",
+) -> bool:
+    lang = _normalise_lang(lang)
+    amount = _fmt_eur(amount_eur, lang)
+    content = f"""
+      <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("affiliate_payout", lang, "heading", name=name)}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("affiliate_payout", lang, "body", amount=amount)}</p>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{dashboard_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("affiliate_payout", lang, "cta")}</a>
+      </div>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("affiliate_payout", lang, "foot")}</p>
+    """
+    return send_email(
+        to=to,
+        subject=_c("affiliate_payout", lang, "subject", amount=amount),
+        body_html=_wrap_email(content, lang),
     )

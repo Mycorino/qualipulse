@@ -1094,7 +1094,7 @@ def _handle_charge_dispute(db: Session, event_type: str, dispute: dict) -> None:
 
 
 def _track_affiliate_conversion(db: Session, workspace_id: str, sub: dict) -> None:
-    """Replicate the prior affiliate-conversion side effect."""
+    """Credit the referring affiliate on the referred workspace's first paid subscription."""
     referral = (
         db.query(AffiliateReferral)
         .filter(AffiliateReferral.referred_company_id == workspace_id)
@@ -1102,9 +1102,14 @@ def _track_affiliate_conversion(db: Session, workspace_id: str, sub: dict) -> No
     )
     if not referral:
         return
+    # Idempotency: a cancel+resubscribe (or replayed webhook) fires
+    # customer.subscription.created again — never credit the same referral twice.
+    if referral.status in ("converted", "paid"):
+        return
     referral.status = "converted"
     referral.converted_at = datetime.utcnow()
     affiliate = referral.affiliate
+    commission = None
     if affiliate and sub.get("items", {}).get("data"):
         item = sub["items"]["data"][0]
         unit_amount = item.get("price", {}).get("unit_amount_decimal")
@@ -1114,6 +1119,21 @@ def _track_affiliate_conversion(db: Session, workspace_id: str, sub: dict) -> No
             referral.commission_amount = commission
             affiliate.total_earned += commission
     db.commit()
+
+    if affiliate and commission:
+        try:
+            from app.services.email import send_affiliate_conversion
+
+            send_affiliate_conversion(
+                to=affiliate.email,
+                amount_eur=commission,
+                pending_eur=affiliate.total_earned - affiliate.total_paid,
+                threshold_eur=affiliate.payout_threshold,
+                dashboard_url=f"{settings.APP_BASE_URL}/affiliate/login",
+                lang=affiliate.preferred_language,
+            )
+        except Exception:
+            logger.exception("Failed to send affiliate conversion email")
 
 
 def _ts(v):
