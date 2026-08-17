@@ -77,8 +77,56 @@ class TestBlogListingPage:
         assert 'href="/blog/entretien-test"' in page
         assert "Un extrait descriptif." in page
         assert "Brouillon secret" not in page
+        # Hero copy matches the SPA blog page
+        assert "Le blog QualiPulse" in page
 
     def test_empty_listing_renders(self, client):
         resp = client.get("/blog/pages")
         assert resp.status_code == 200
-        assert "articles arrivent" in resp.text
+        assert "Aucun article pour le moment" in resp.text
+
+
+class TestChrome:
+    """Both rendered pages carry the site's real header and footer, since
+    visitors arriving from search or a shared link read THIS page, not the SPA."""
+
+    @pytest.mark.parametrize("path", ["/blog/pages", "/blog/pages/entretien-test"])
+    def test_header_and_footer(self, client, published_post, path):
+        page = client.get(path).text
+        # Header: brand home link + nav + signup CTA
+        assert 'class="qp-brand" href="/"' in page
+        assert 'href="/#pricing"' in page
+        assert 'href="/login"' in page
+        assert 'href="/signup"' in page
+        # Footer: site + legal links and copyright
+        assert 'href="/terms"' in page
+        assert 'href="/privacy"' in page
+        assert "Tous droits réservés" in page
+
+    def test_post_links_back_to_listing(self, client, published_post):
+        page = client.get("/blog/pages/entretien-test").text
+        assert 'class="qp-back" href="/blog"' in page
+
+    def test_cover_image_renders_on_card_and_article(self, client, db_session):
+        """Images uploaded from the admin editor show up in both rendered views."""
+        db_session.add(
+            BlogPost(
+                slug="avec-couverture",
+                title="Avec couverture",
+                content="<p>corps</p>",
+                cover_image_url="https://cdn.example.com/cover.png",
+                status="published",
+                published_at=datetime(2026, 8, 2),
+            )
+        )
+        db_session.commit()
+        listing = client.get("/blog/pages").text
+        assert 'class="qp-card-cover" src="https://cdn.example.com/cover.png"' in listing
+        article = client.get("/blog/pages/avec-couverture").text
+        assert "https://cdn.example.com/cover.png" in article
+
+    def test_french_date_is_localized(self, client, published_post):
+        """Byline shows "1 août 2026", not the ISO date (which stays in JSON-LD)."""
+        page = client.get("/blog/pages/entretien-test").text
+        assert "1 août 2026" in page
+        assert '"datePublished": "2026-08-01"' in page
