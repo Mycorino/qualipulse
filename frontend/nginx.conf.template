@@ -10,10 +10,17 @@ server {
         try_files /home.html /index.html;
     }
 
+    # Behind Cloud Run, nginx listens on 8080 over http; an absolute
+    # directory redirect would leak "http://host:8080/..." and dead-end.
+    # Relative redirects keep the public scheme/host if one ever fires.
+    absolute_redirect off;
+
     # SPA fallback. Prerendered public routes (terms/, privacy/, ...) are
-    # picked up as static $uri/index.html before the shell fallback.
+    # served directly as $uri/index.html, WITHOUT the trailing-slash
+    # directory redirect ($uri/ would 301 /terms -> /terms/), so the
+    # canonical slash-less URL answers 200 with content.
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files $uri $uri/index.html $uri/ /index.html;
     }
 
     # Blog: server-rendered by the backend so crawlers and link unfurlers get
