@@ -14030,10 +14030,22 @@ select.field-input {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* The account dropdown sits at the very bottom of the rail — open upward. */
+/* The account dropdown sits at the very bottom of the rail — open upward.
+   The rail is only 220px wide, so right-anchoring a 220px-min menu to the
+   36px avatar would push its left edge past the viewport (x = -14px) and
+   clip it. Anchor it to the whole user row instead so it spans the rail. */
+.hub-rail__user {
+  position: relative;
+}
+.hub-rail__user .account-menu {
+  position: static;
+}
 .hub-rail__user .account-menu__dropdown {
   bottom: calc(100% + 8px);
   top: auto;
+  left: 0;
+  right: 0;
+  min-width: 0;
 }
 
 /* ── Canvas + header ──────────────────────────────────────────────── */
@@ -14891,7 +14903,10 @@ select.field-input {
     align-items: center;
     gap: var(--space-3);
     padding: 10px 16px;
-    overflow-x: auto;
+    /* Not overflow-x: auto — a non-visible overflow on one axis forces the
+       other to auto too, which clips the account dropdown below the bar.
+       The nav is the part that can outgrow the bar, so it scrolls instead. */
+    overflow: visible;
   }
   .hub-rail__logo {
     padding: 0;
@@ -14907,6 +14922,9 @@ select.field-input {
   }
   .hub-rail__nav {
     flex-direction: row;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-x: auto;
   }
   .hub-rail__item {
     white-space: nowrap;
@@ -14924,10 +14942,20 @@ select.field-input {
   .hub-rail__user-id {
     display: none;
   }
-  /* Back at the top of the page — dropdown opens downward again. */
+  /* Back at the top of the page — dropdown opens downward again, and the
+     rail row is now full-width, so re-anchor it to the avatar. */
+  .hub-rail__user {
+    position: static;
+  }
+  .hub-rail__user .account-menu {
+    position: relative;
+  }
   .hub-rail__user .account-menu__dropdown {
     top: calc(100% + 8px);
     bottom: auto;
+    left: auto;
+    right: 0;
+    min-width: 220px;
   }
   .hub-sidecar {
     grid-template-columns: 1fr;
