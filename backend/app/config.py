@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
 
+    # TTS voice for the AI interviewer. gpt-4o-mini-tts follows per-language
+    # accent/tone instructions, so non-English interviews get a native-sounding
+    # voice instead of tts-1's anglophone prosody. Env-overridable to pin back
+    # to "tts-1"/"alloy" if the newer model misbehaves.
+    TTS_MODEL: str = "gpt-4o-mini-tts"
+    TTS_VOICE: str = "coral"
+
     # Claude model IDs — single source of truth (see services/ai_models.py).
     # Blank => use the pinned default in ai_models.py. Set these to swap a model
     # in production without a code deploy (e.g. when Anthropic retires one).

@@ -341,7 +341,8 @@
     "playQuestion": "Frage anhören",
     "rateLimited": "Zu viele Versuche in kurzer Zeit. Bitte warten Sie eine Minute und tippen Sie dann erneut auf Absenden, Ihre Antwort ist gespeichert.",
     "serverError": "Bei uns ist etwas schiefgelaufen. Bitte tippen Sie auf Absenden, um es erneut zu versuchen.",
-    "skipAudio": "Audio überspringen, ich bin bereit"
+    "skipAudio": "Audio überspringen, ich bin bereit",
+    "warmupLabel": "Zum Aufwärmen"
   },
   "completion": {
     "title": "Vielen Dank, {{name}}!",

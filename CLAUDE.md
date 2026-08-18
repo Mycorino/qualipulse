@@ -55,7 +55,7 @@ A SaaS platform that lets companies create AI-driven voice interviews. Researche
   - Sampling params go through `ai_models.temperature_kwargs()` so model upgrades can't 400 on removed `temperature`
   - Anthropic SDK pinned at **`anthropic==0.102.0`** (0.43.x lacked `output_config` / adaptive thinking)
 - **STT:** OpenAI Whisper (`whisper-1`)
-- **TTS:** OpenAI TTS (`tts-1`, voice: `alloy`)
+- **TTS:** OpenAI TTS (`gpt-4o-mini-tts`, voice: `coral`, per-language native-accent instructions; env-overridable via `TTS_MODEL` / `TTS_VOICE`, falls back to `tts-1`/`alloy` on failure)
 - **Infra:** GCP Cloud Run (auto-scaling), Neon PostgreSQL, Cloudflare R2 (audio storage)
 
 ## Copy Conventions
@@ -1061,7 +1061,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Client-side error reporting: SPA window.onerror/unhandledrejection → `POST /telemetry/client-error` (rate-limited, capped payload) → backend ERROR log → Sentry/Cloud Logging. No frontend SDK (VITE_ vars are baked at build; the pipeline injects no DSN).
 - [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented — dead columns; `/billing` reads them as 0)
 - [ ] Email invitation sending (template exists, no send endpoint)
-- [ ] Multi-language TTS voices (single `alloy` voice; language handled via prompts + Whisper hint)
+- [x] Language-aware TTS voice (`gpt-4o-mini-tts` + per-language accent instructions in `services/tts.py`)
 - [ ] Dashboard-level analytics across projects
 
 ### Participant Side
@@ -1089,7 +1089,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] In-app webview interstitial (Instagram/Facebook/TikTok/…): UA + capability detection in `frontend/src/utils/inAppBrowser.ts`, shown before any phase — open-in-browser steps, copy-link, Android Chrome `intent://` escape, "Try here anyway" only when recording APIs are present. QA override: `sessionStorage.qp_force_webview=1`. i18n'd in all 6 participant locales
 - [x] Participant completion email (10 languages, sent on completion when the participant left an email)
 - [x] Text input fallback (accessibility): `/respond` accepts `text` instead of `audio` (exactly one required; empty text mirrors the silent-audio 422). Interview UI has a "type your answer instead" toggle and the mic-permission-denied panel leads with it. i18n in all 6 participant locales.
-- [x] Multi-language interviews (en/fr/de/es/it/pt participant UI; engine prompts in 10 languages; Whisper receives the interview language as a hint). TTS voice remains `alloy` for all languages.
+- [x] Multi-language interviews (en/fr/de/es/it/pt participant UI; engine prompts in 10 languages; Whisper receives the interview language as a hint). TTS speaks with a native accent per language (`gpt-4o-mini-tts` instructions).
 
 ### Infrastructure & DevOps
 - [x] Docker: backend + frontend Dockerfiles, docker-compose.yml with PostgreSQL

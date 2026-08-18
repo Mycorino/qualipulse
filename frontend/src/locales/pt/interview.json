@@ -341,7 +341,8 @@
     "playQuestion": "Ouvir a pergunta",
     "rateLimited": "Demasiadas tentativas em pouco tempo. Aguarde um minuto e toque novamente em Enviar, a sua resposta está guardada.",
     "serverError": "Algo correu mal do nosso lado. Toque em Enviar para tentar novamente.",
-    "skipAudio": "Saltar o áudio, estou pronto"
+    "skipAudio": "Saltar o áudio, estou pronto",
+    "warmupLabel": "Para começar"
   },
   "completion": {
     "title": "Obrigado, {{name}}!",

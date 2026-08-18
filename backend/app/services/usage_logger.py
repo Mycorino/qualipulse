@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.logging_config import logger
 from app.models.usage import AIUsageLog
 
@@ -115,7 +116,7 @@ def log_tts_usage(
                 project_id=project_id,
                 participant_id=participant_id,
                 operation="tts",
-                model="tts-1",
+                model=settings.TTS_MODEL or "tts-1",
                 characters=chars,
                 cost_usd=cost,
             )

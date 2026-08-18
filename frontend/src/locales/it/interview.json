@@ -341,7 +341,8 @@
     "playQuestion": "Ascolta la domanda",
     "rateLimited": "Troppi tentativi in poco tempo. Attenda un minuto, poi tocchi di nuovo Invia, la sua risposta è salvata.",
     "serverError": "Qualcosa è andato storto da parte nostra. Tocchi Invia per riprovare.",
-    "skipAudio": "Salta l'audio, sono pronto"
+    "skipAudio": "Salta l'audio, sono pronto",
+    "warmupLabel": "Per cominciare"
   },
   "completion": {
     "title": "Grazie, {{name}}!",

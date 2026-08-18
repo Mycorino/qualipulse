@@ -180,6 +180,39 @@ export default function ProjectDetail() {
   const [highlightTarget, setHighlightTarget] = useState<{ turnIndex: number; quoteText: string } | null>(null);
   const transcriptListRef = useRef<HTMLDivElement>(null);
 
+  // ── Responses layout viewport sizing ──────────────────────────────────────
+  // The two-column Responses grid fills the viewport below the page chrome
+  // (hub breadcrumb + instrument header + subnav + any banners). That chrome
+  // height isn't constant, and a hardcoded CSS calc drifted after the hub
+  // redesign, cutting off the bottom of the transcript. Measure the layout's
+  // real document offset and hand it to CSS as --responses-top.
+  const responsesLayoutRef = useRef<HTMLDivElement | null>(null);
+  const measureResponsesLayout = React.useCallback(() => {
+    const el = responsesLayoutRef.current;
+    if (!el) return;
+    const top = Math.max(0, Math.round(el.getBoundingClientRect().top + window.scrollY));
+    el.style.setProperty("--responses-top", `${top}px`);
+  }, []);
+  const setResponsesLayoutRef = React.useCallback(
+    (el: HTMLDivElement | null) => {
+      responsesLayoutRef.current = el;
+      if (el) measureResponsesLayout();
+    },
+    [measureResponsesLayout],
+  );
+  useEffect(() => {
+    window.addEventListener("resize", measureResponsesLayout);
+    // Chrome above the layout can grow/shrink (unsaved-changes banner, title
+    // wrap). Any of those changes the body height, so observing body catches
+    // them without wiring every banner state through here.
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measureResponsesLayout) : null;
+    ro?.observe(document.body);
+    return () => {
+      window.removeEventListener("resize", measureResponsesLayout);
+      ro?.disconnect();
+    };
+  }, [measureResponsesLayout]);
+
   // ── Transcript translation (reading aid) ──────────────────────────────────
   const [transcriptViewMode, setTranscriptViewMode] = useState<"original" | "cleaned" | "translated">("original");
   const [translating, setTranslating] = useState(false);
@@ -2898,7 +2931,7 @@ export default function ProjectDetail() {
 
           return (
           <div className="tab-content" role="tabpanel" id="isection-panel-responses" aria-labelledby="isection-tab-responses" style={{ padding: 0 }}>
-            <div className={`responses-layout${selectedParticipant && transcript !== null ? " responses-layout--detail-active" : ""}`}>
+            <div ref={setResponsesLayoutRef} className={`responses-layout${selectedParticipant && transcript !== null ? " responses-layout--detail-active" : ""}`}>
               {/* ── Left column: filter + list ── */}
               <div className="responses-list-col">
                 {/* Header row */}
