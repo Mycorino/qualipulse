@@ -195,6 +195,115 @@ def _build_codebook_block(stats: list[dict]) -> str:
     return "\n".join(lines) + "\n\n"
 
 
+_SUGGESTION_QUOTE_SAMPLE = 3  # sample quotes per machine-coded candidate category
+_SUGGESTION_MAX_CODES = 8
+
+
+def _suggestion_stats(db: Session, participants: list[Participant]) -> list[dict]:
+    """Deterministic per-category stats over PENDING AI tag suggestions.
+
+    Tier 2 evidence: verbatim, offset-verified quotes located by the AI
+    coding pass that the researcher has NOT reviewed yet. Kept strictly
+    separate from `_codebook_stats` (accepted tags) so machine-coded
+    candidates can never masquerade as researcher-verified evidence.
+    Grouped by the target code name (existing code or proposed new code).
+    """
+    from app.models.coding import ManualCode, TagSuggestion
+
+    participant_ids = [p.id for p in participants]
+    if not participant_ids:
+        return []
+
+    rows = (
+        db.query(TagSuggestion)
+        .filter(
+            TagSuggestion.participant_id.in_(participant_ids),
+            TagSuggestion.status == "pending",
+        )
+        .all()
+    )
+    if not rows:
+        return []
+
+    code_names = {
+        c.id: c.name
+        for c in db.query(ManualCode)
+        .filter(ManualCode.id.in_({r.manual_code_id for r in rows if r.manual_code_id}))
+        .all()
+    }
+    names_by_id = {p.id: (p.display_name or "Participant") for p in participants}
+    by_code: dict[str, dict] = {}
+    for s in rows:
+        name = code_names.get(s.manual_code_id) or (s.proposed_code_name or "").strip()
+        if not name:
+            continue
+        entry = by_code.setdefault(
+            name.lower(),
+            {"code": name, "quote_count": 0, "participant_ids": set(), "quotes": []},
+        )
+        entry["quote_count"] += 1
+        entry["participant_ids"].add(s.participant_id)
+        if len(entry["quotes"]) < _SUGGESTION_QUOTE_SAMPLE:
+            entry["quotes"].append(
+                {
+                    "text": (s.selected_text or "")[:240],
+                    "participant": names_by_id.get(s.participant_id, "Participant"),
+                }
+            )
+
+    stats = [
+        {
+            "code": e["code"],
+            "quote_count": e["quote_count"],
+            "participant_count": len(e["participant_ids"]),
+            "participants_total": len(participants),
+            "quotes": e["quotes"],
+        }
+        for e in by_code.values()
+    ]
+    stats.sort(key=lambda s: s["quote_count"], reverse=True)
+    return stats[:_SUGGESTION_MAX_CODES]
+
+
+def _build_suggestion_block(stats: list[dict]) -> str:
+    """Render machine-coded candidate evidence for the synthesis prompt.
+
+    Weaker framing than `_build_codebook_block` on purpose: these quotes are
+    verbatim and offset-verified, but no human judged the category, so the
+    model is told to treat them as leads to check against the transcripts,
+    never as researcher-verified signals.
+    """
+    if not stats:
+        return ""
+    lines = [
+        "MACHINE-CODED CANDIDATE EVIDENCE (verbatim quotes located by an AI "
+        "coding pass, NOT yet reviewed by the researcher, treat as leads to "
+        "verify against the transcripts, a weaker signal than researcher "
+        "codebook evidence):"
+    ]
+    for s in stats:
+        lines.append(
+            f"- {s['code']}: candidate in {s['participant_count']}/{s['participants_total']} "
+            f"interviews ({s['quote_count']} quotes). Samples:"
+        )
+        for q in s["quotes"]:
+            lines.append(f"    \"{q['text']}\" ({q['participant']})")
+    lines.append(
+        "Use these only where the surrounding transcript confirms them. Never "
+        "present a machine-coded category as researcher-verified."
+    )
+    return "\n".join(lines) + "\n\n"
+
+
+def _set_stage(db: Session, analysis: ProjectAnalysis, stage: str | None, detail: dict | None = None) -> None:
+    """Advance the pipeline stage, committed immediately so the polling
+    frontend sees progress in near-real-time. Pass stage=None to clear
+    (terminal states)."""
+    analysis.stage = stage
+    analysis.stage_detail = json.dumps(detail) if detail else None
+    db.commit()
+
+
 def _normalize_for_match(text: str) -> str:
     """Lenient normalisation for verbatim-quote matching.
 
@@ -723,10 +832,14 @@ def run_analysis(
     db: Session,
     filter_by: str | None = None,
     filter_values: list[str] | None = None,
+    auto_tag: bool = False,
 ) -> None:
-    """Run full synthesis for completed interviews.
+    """Run full synthesis for completed interviews as a staged pipeline.
 
-    Upserts a ProjectAnalysis row. Meant to be called in a background thread.
+    Stages (visible to the polling frontend via ProjectAnalysis.stage):
+    auto_tagging (optional, when the researcher chose "auto-tag first" in the
+    readiness gate) → preparing → synthesizing → verifying. Upserts a
+    ProjectAnalysis row. Meant to be called in a background thread.
     """
     filter_values = filter_values or []
 
@@ -789,11 +902,51 @@ def run_analysis(
     db.commit()
 
     try:
-        transcripts_block, participant_map = _build_transcripts_block(completed)
-        # Load the owning company so we can prepend business context to the
-        # Claude prompt. The analysis is infinitely more useful when the model
-        # knows what the researcher actually sells and who they sell it to.
         company = db.query(Company).filter(Company.id == project.company_id).first()
+        lang = getattr(company, "preferred_language", None) or "en"
+
+        if auto_tag:
+            # Researcher confirmed AI coding in the readiness gate: run the
+            # hybrid tag-suggestion pass over every included participant that
+            # has neither accepted tags nor pending suggestions. Suggestions
+            # stay pending (the codebook is never mutated without an explicit
+            # accept) and feed the Tier-2 candidate-evidence block below.
+            # Per-participant failures are swallowed inside
+            # suggest_tags_for_participant so one bad interview never kills
+            # the whole run.
+            from app.models.coding import QuoteTag, TagSuggestion
+            from app.models.interview import InterviewTurn
+            from app.services.tag_suggestions import suggest_tags_for_participant
+
+            pids = [p.id for p in completed]
+            tagged_pids = {
+                pid
+                for (pid,) in db.query(InterviewTurn.participant_id)
+                .join(QuoteTag, QuoteTag.turn_id == InterviewTurn.id)
+                .filter(InterviewTurn.participant_id.in_(pids))
+                .distinct()
+            } if pids else set()
+            suggested_pids = {
+                pid
+                for (pid,) in db.query(TagSuggestion.participant_id)
+                .filter(
+                    TagSuggestion.participant_id.in_(pids),
+                    TagSuggestion.status == "pending",
+                )
+                .distinct()
+            } if pids else set()
+            to_tag = [p for p in completed if p.id not in tagged_pids and p.id not in suggested_pids]
+            total = len(to_tag)
+            for i, p in enumerate(to_tag):
+                _set_stage(db, analysis, "auto_tagging", {"done": i, "total": total})
+                suggest_tags_for_participant(p.id, db, language=lang)
+            if total:
+                _set_stage(db, analysis, "auto_tagging", {"done": total, "total": total})
+
+        _set_stage(db, analysis, "preparing")
+        transcripts_block, participant_map = _build_transcripts_block(completed)
+        # Business context: the analysis is infinitely more useful when the
+        # model knows what the researcher actually sells and who they sell to.
         context_block = full_context_block(company, project)
 
         objective_block = (
@@ -812,7 +965,10 @@ def run_analysis(
         codebook_stats = _codebook_stats(db, project_id, completed)
         codebook_block = _build_codebook_block(codebook_stats)
 
-        lang = getattr(company, "preferred_language", None) or "en"
+        # Tier-2 evidence: pending AI tag suggestions (offset-verified but
+        # not researcher-reviewed), framed strictly weaker than the codebook.
+        suggestion_block = _build_suggestion_block(_suggestion_stats(db, completed))
+
         lang_instruction = _lang_instruction(lang)
 
         # Static blocks first (rules + schema + examples) → cached prefix.
@@ -823,11 +979,12 @@ def run_analysis(
             f"<task>\nSynthesize the interviews below into a research report. "
             f"Apply the rules above without exception. Confidence MUST be calibrated to N "
             f"(N={len(completed)} here).{lang_instruction}\n</task>\n\n"
-            f"{context_block}{objective_block}{filter_note}{codebook_block}"
+            f"{context_block}{objective_block}{filter_note}{codebook_block}{suggestion_block}"
             f"<transcripts count=\"{len(completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
             f"Return the JSON object now. participant_count must be {len(completed)}."
         )
 
+        _set_stage(db, analysis, "synthesizing")
         response = _synthesize_response(prompt, effort="high")
         log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
         _raise_on_bad_stop(response)
@@ -835,6 +992,7 @@ def run_analysis(
         # Parse (structured output guarantees a valid object), then verify every
         # quote against the real transcripts so hallucinated evidence is flagged
         # (verified=false) rather than trusted.
+        _set_stage(db, analysis, "verifying")
         report_obj = _parse_report(response)
         v_count, v_total = _verify_report_quotes(report_obj, completed)
         if v_total:
@@ -858,6 +1016,8 @@ def run_analysis(
         analysis.status = "failed"
         analysis.error = str(e)
 
+    analysis.stage = None
+    analysis.stage_detail = None
     db.commit()
 
 
@@ -882,6 +1042,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         return
 
     try:
+        _set_stage(db, new_analysis, "preparing")
         # Load annotations from the parent analysis
         annotations = (
             db.query(AnalysisThemeAnnotation)
@@ -1030,10 +1191,12 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
 
         # Refined synthesis is the researcher's high-stakes pass (they've reviewed
         # v1 and annotated) → run it at xhigh effort.
+        _set_stage(db, new_analysis, "synthesizing")
         response = _synthesize_response(prompt, effort="xhigh")
         log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
         _raise_on_bad_stop(response)
 
+        _set_stage(db, new_analysis, "verifying")
         report_obj = _parse_report(response)
         v_count, v_total = _verify_report_quotes(report_obj, all_completed)
         if v_total:
@@ -1056,4 +1219,6 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         new_analysis.status = "failed"
         new_analysis.error = str(e)
 
+    new_analysis.stage = None
+    new_analysis.stage_detail = None
     db.commit()

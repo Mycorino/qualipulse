@@ -97,6 +97,24 @@
   "readyToAnalyse": "{{count}} entretien(s) terminé(s), prêt(s) pour l'analyse.",
   "claudeReading_one": "Qualipulse lit {{count}} entretien…",
   "claudeReading_other": "Qualipulse lit {{count}} entretiens…",
+  "stages": {
+    "auto_tagging": "Codage des entretiens par l'IA…",
+    "preparing": "Préparation des éléments de preuve…",
+    "synthesizing_one": "Lecture de {{count}} entretien et rédaction du rapport…",
+    "synthesizing_other": "Lecture de {{count}} entretiens et rédaction du rapport…",
+    "verifying": "Vérification de chaque citation dans les transcriptions…"
+  },
+  "stageAutoTaggingProgress": "Codage de l'entretien {{done}} sur {{total}} par l'IA…",
+  "stageStep": "Étape {{current}} sur {{total}}",
+  "gate": {
+    "title": "Ancrer l'analyse dans votre codage ?",
+    "body_one": "Aucune citation n'est encore taguée sur votre {{count}} entretien terminé. L'analyse est plus solide quand elle s'appuie sur des preuves codées.",
+    "body_other": "Aucune citation n'est encore taguée sur vos {{count}} entretiens terminés. L'analyse est plus solide quand elle s'appuie sur des preuves codées.",
+    "autoTag": "Laisser l'IA coder les entretiens, puis analyser",
+    "autoTagHint": "Les suggestions de l'IA restent en attente de votre relecture, votre grille de codes n'est jamais modifiée sans votre accord.",
+    "runAnyway": "Analyser sans codage",
+    "tagFirst": "Je tague d'abord des citations moi-même"
+  },
   "failedTitle": "Nous n'avons pas pu terminer votre analyse",
   "failedTimeout": "L'analyse a expiré, votre jeu de données est peut-être trop volumineux. Essayez de filtrer un groupe plus restreint.",
   "failedNoCompleted": "Aucun entretien terminé à analyser.",

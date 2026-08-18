@@ -730,13 +730,34 @@ Pacing safety guards:
 - System prompt customizable per project
 
 ### Analysis Pipeline
-1. Researcher triggers analysis (optional demographic filters)
-2. Background thread builds transcript blocks → calls Claude
-3. Claude returns structured JSON: themes, JTBDs, tensions, recommendations, confidence scores
-4. Versioned (keeps 5 most recent), can be filtered by segment
-5. Researcher can annotate themes (confirmed/disputed/needs_evidence) + add context
-6. Refined analysis incorporates annotations and re-analyzes with feedback
-7. Shareable via public token (read-only report page)
+1. Researcher triggers analysis (optional demographic filters). Before
+   triggering, the frontend checks `GET /projects/{id}/analysis/readiness`
+   (codebook size, accepted-tag counts, pending-suggestion count,
+   `tagging_state`: anchored / partial / untagged). **Untagged studies get a
+   readiness-gate modal**: "let AI code first, then analyse" (POSTs
+   `auto_tag: true`), "analyse without coding", or "I'll tag myself" — a
+   nudge, never a wall (readiness fetch failure falls through to a plain run).
+2. Background thread runs a **staged pipeline**; the stage is persisted on
+   `ProjectAnalysis.stage` (+ `stage_detail` JSON counters) and rendered by
+   the polling frontend as a labelled progress bar: optional `auto_tagging`
+   ("interview 3 of 10", runs `suggest_tags_for_participant` over completed
+   interviews with no tags and no pending suggestions; suggestions stay
+   pending, the codebook is never mutated) → `preparing` → `synthesizing` →
+   `verifying`. Stage is cleared on ready/failed/timeout. The watchdog budget
+   grows with the cohort when auto-tag is on (300s + 30s/interview, cap 15 min).
+3. Prompt evidence is **provenance-tiered**: Tier 1 = researcher-accepted tags
+   (`_build_codebook_block`, "researcher-verified"), Tier 2 = pending AI
+   suggestions (`_build_suggestion_block`, "machine-coded candidates, NOT yet
+   reviewed" — never allowed to borrow Tier-1 framing), Tier 3 = the model's
+   own reading of transcripts.
+4. Claude returns structured JSON: themes, JTBDs, tensions, recommendations, confidence scores
+5. Versioned (keeps 5 most recent), can be filtered by segment
+6. Researcher can annotate themes (confirmed/disputed/needs_evidence) + add context
+7. Refined analysis incorporates annotations and re-analyzes with feedback (same staged progress, no auto-tag stage)
+8. Shareable via public token (read-only report page)
+
+Tests: `backend/tests/test_analysis_stages.py`. Schema: Alembic 0060
+(`project_analyses.stage` + `stage_detail`).
 
 ### Screening Questions
 - Stored in `screening_questions` table, linked to `projects`
@@ -1280,7 +1301,8 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | Method | Path | Gate | Description |
 |---|---|---|---|
 | POST | `/projects/{id}/analysis` | ai_analysis | Trigger AI synthesis |
-| GET | `/projects/{id}/analysis` | — | Get latest analysis |
+| GET | `/projects/{id}/analysis` | — | Get latest analysis (incl. `stage` + `stage_detail` while generating) |
+| GET | `/projects/{id}/analysis/readiness` | — | Tagging state for the readiness gate (codebook/tag/suggestion counts, `tagging_state`) |
 | GET | `/projects/{id}/analysis/heatmap` | — | Demographic heatmap |
 | GET | `/projects/{id}/analysis/versions` | — | List versions |
 | GET | `/projects/{id}/analysis/{version}` | — | Get specific version |

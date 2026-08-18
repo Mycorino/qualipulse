@@ -287,8 +287,14 @@ export interface AnalysisReport {
   /** Deterministic per-code tag counts, computed server-side in Python. */
   codebook_stats?: CodebookStat[];
 }
+export type AnalysisStage = "auto_tagging" | "preparing" | "synthesizing" | "verifying";
+
 export interface AnalysisResponse {
   status: "none" | "generating" | "ready" | "failed";
+  /** Pipeline stage while status is "generating"; null otherwise. */
+  stage?: AnalysisStage | null;
+  /** Stage counters, e.g. { done, total } during auto_tagging. */
+  stage_detail?: { done?: number; total?: number } | null;
   completed_count: number;
   participant_count: number;
   generated_at: string | null;
@@ -610,9 +616,27 @@ export async function getAnalysis(projectId: string): Promise<AnalysisResponse> 
 
 export async function triggerAnalysis(
   projectId: string,
-  filters?: { filter_by: string; filter_values: string[] }
+  filters?: { filter_by: string; filter_values: string[] },
+  autoTag?: boolean
 ): Promise<void> {
-  await client.post(`/projects/${projectId}/analysis`, filters ?? {});
+  await client.post(`/projects/${projectId}/analysis`, {
+    ...(filters ?? {}),
+    ...(autoTag ? { auto_tag: true } : {}),
+  });
+}
+
+export interface AnalysisReadiness {
+  completed_count: number;
+  code_count: number;
+  tag_count: number;
+  tagged_participant_count: number;
+  pending_suggestion_count: number;
+  tagging_state: "anchored" | "partial" | "untagged";
+}
+
+export async function getAnalysisReadiness(projectId: string): Promise<AnalysisReadiness> {
+  const { data } = await client.get<AnalysisReadiness>(`/projects/${projectId}/analysis/readiness`);
+  return data;
 }
 
 export async function getHeatmap(projectId: string): Promise<HeatmapResponse> {

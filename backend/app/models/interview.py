@@ -105,6 +105,13 @@ class ProjectAnalysis(Base):
     status: Mapped[str] = mapped_column(
         String(20), default="generating", nullable=False
     )  # "generating" | "ready" | "failed"
+    # Pipeline stage while status == "generating":
+    # "auto_tagging" | "preparing" | "synthesizing" | "verifying". NULL once
+    # the run leaves the generating state (ready/failed) and on pre-stage rows.
+    stage: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # JSON blob of stage progress counters, e.g. {"done": 3, "total": 10}
+    # during auto_tagging. NULL when the stage has no counters.
+    stage_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
     participant_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     report: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
     filters: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: {filter_by, filter_values}
