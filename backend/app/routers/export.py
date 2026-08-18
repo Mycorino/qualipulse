@@ -180,6 +180,7 @@ def list_participants(
                 email=None if is_locked else p.email,
                 email_verified=p.email_verified,
                 panel_consent=p.panel_consent,
+                screening_answers=p.screening_answers_list or None,
                 quality_score=q_score,
                 quality_label=q_label,
                 quality_summary=p.quality_summary,
@@ -328,6 +329,7 @@ def export_transcripts_csv(
         "display_name",
         "email",
         "follow_up_consent",
+        "screening_answers",
         "status",
         "started_at",
         "completed_at",
@@ -346,6 +348,13 @@ def export_transcripts_csv(
             return "no"
         return ""
 
+    def _screening_cell(p: Participant) -> str:
+        return " | ".join(
+            f"{a.get('question', '')} = {a.get('answer', '')}"
+            for a in p.screening_answers_list
+            if a.get("question") and a.get("answer")
+        )
+
     for p in participants:
         turns = sorted(p.turns, key=lambda t: t.turn_index)
         if not turns:
@@ -355,6 +364,7 @@ def export_transcripts_csv(
                 _csv_safe(p.display_name or ""),
                 _csv_safe(p.email or ""),
                 _consent_cell(p),
+                _csv_safe(_screening_cell(p)),
                 p.status,
                 _fmt_dt(p.started_at),
                 _fmt_dt(p.completed_at),
@@ -367,6 +377,7 @@ def export_transcripts_csv(
                     _csv_safe(p.display_name or ""),
                     _csv_safe(p.email or ""),
                     _consent_cell(p),
+                    _csv_safe(_screening_cell(p)),
                     p.status,
                     _fmt_dt(p.started_at),
                     _fmt_dt(p.completed_at),

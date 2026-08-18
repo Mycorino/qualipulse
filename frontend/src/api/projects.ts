@@ -147,6 +147,8 @@ export interface ParticipantResponse {
   /** True = agreed to be recontacted for future studies, false = declined,
    *  null/undefined = unknown (pre-feature participants). */
   panel_consent?: boolean | null;
+  /** Screener snapshot: the options this participant clicked through. */
+  screening_answers?: { question_id: string; question: string; answer: string }[] | null;
   quality_score?: number | null;
   quality_label?: string | null;
   quality_summary?: string | null;

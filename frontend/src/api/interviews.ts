@@ -135,6 +135,8 @@ export interface StartInterviewParams {
   email?: string;
   sessionToken?: string;
   preferredLanguage?: string;
+  /** Screener answers (question_id → canonical option value) carried from the screening phase. */
+  screeningAnswers?: Record<string, string>;
 }
 
 export async function startInterview(
@@ -151,6 +153,10 @@ export async function startInterview(
       email: params.email || undefined,
       session_token: params.sessionToken || undefined,
       preferred_language: params.preferredLanguage || undefined,
+      screening_answers:
+        params.screeningAnswers && Object.keys(params.screeningAnswers).length > 0
+          ? params.screeningAnswers
+          : undefined,
     }
   );
   return data;

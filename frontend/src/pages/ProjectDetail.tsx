@@ -1477,8 +1477,29 @@ export default function ProjectDetail() {
       if (p.profession) { opts["profession"] = opts["profession"] || new Set(); opts["profession"].add(p.profession); }
       if (p.age_range) { opts["age_range"] = opts["age_range"] || new Set(); opts["age_range"].add(p.age_range); }
       if (p.country) { opts["country"] = opts["country"] || new Set(); opts["country"].add(p.country); }
+      // Screener answers are researcher-designed profile variables — each
+      // question becomes its own filter dimension, keyed screening:<qid>.
+      for (const a of p.screening_answers ?? []) {
+        const key = `screening:${a.question_id}`;
+        opts[key] = opts[key] || new Set();
+        opts[key].add(a.answer);
+      }
     }
     return Object.fromEntries(Object.entries(opts).map(([k, v]) => [k, Array.from(v)]));
+  }
+
+  /** Human label for a filter dimension: demographic attrs read as-is,
+   *  screening:<qid> resolves to the screener question text. */
+  function filterLabel(attr: string): string {
+    if (attr.startsWith("screening:")) {
+      const qid = attr.slice("screening:".length);
+      for (const p of participants) {
+        const match = (p.screening_answers ?? []).find((a) => a.question_id === qid);
+        if (match) return match.question.length > 60 ? `${match.question.slice(0, 57)}…` : match.question;
+      }
+      return tAnalysis("screeningFilterLabel");
+    }
+    return attr.replace("_", " ");
   }
 
   function toggleFilterValue(attr: string, val: string) {
@@ -3155,6 +3176,11 @@ export default function ProjectDetail() {
                                 ✓ {tProject("responses.followUpOk")}
                               </span>
                             )}
+                            {(selectedParticipant.screening_answers ?? []).map((a) => (
+                              <span key={a.question_id} className="participant-card__badge" title={a.question}>
+                                {a.answer}
+                              </span>
+                            ))}
                           </div>
                           <span className="participant-card__date">{new Date(selectedParticipant.started_at).toLocaleDateString(i18n.language, { day: "numeric", month: "short", year: "numeric" })}</span>
                         </div>
@@ -3778,7 +3804,7 @@ export default function ProjectDetail() {
                     <div style={{ padding: 12, border: "1px solid var(--border-default)", borderRadius: "var(--radius)", background: "var(--bg-base)" }}>
                       {Object.entries(filterOptions).map(([attr, values]) => (
                         <div key={attr} style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4, textTransform: "capitalize" }}>{attr.replace("_", " ")}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4, textTransform: attr.startsWith("screening:") ? "none" : "capitalize" }}>{filterLabel(attr)}</div>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {values.map((val) => {
                               const active = activeFilterBy === attr && activeFilterValues.includes(val);
@@ -3801,7 +3827,7 @@ export default function ProjectDetail() {
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, marginTop: 6 }}>
                       <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{tAnalysis("filteredBy")}</span>
                       {analysis.filters.filter_values.map((v) => (
-                        <span key={v} className="badge" style={{ background: "var(--brand-50)", color: "var(--brand-700)" }}>{analysis.filters!.filter_by}: {v}</span>
+                        <span key={v} className="badge" style={{ background: "var(--brand-50)", color: "var(--brand-700)" }}>{filterLabel(analysis.filters!.filter_by)}: {v}</span>
                       ))}
                     </div>
                   )}

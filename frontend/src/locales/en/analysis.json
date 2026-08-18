@@ -205,5 +205,6 @@
       "jtbd_note": "JTBD note"
     }
   },
-  "exportPdfBtn": "Open full report (PDF)"
+  "exportPdfBtn": "Open full report (PDF)",
+  "screeningFilterLabel": "Screening question"
 }

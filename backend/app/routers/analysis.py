@@ -419,11 +419,18 @@ def get_heatmap(
     seg_participants: dict[str, list[str]] = {}  # segment → list of display names
 
     for p in participants:
-        for attr, val in [
+        dims = [
             ("profession", p.profession),
             ("age_range", p.age_range),
             ("country", p.country),
-        ]:
+        ]
+        # Screener answers join the demographic dimensions: the label is the
+        # question text (colons stripped, they delimit the segment key).
+        for a in p.screening_answers_list:
+            q_label = (a.get("question") or "").replace(":", " ").strip()[:48]
+            if q_label and a.get("answer"):
+                dims.append((q_label, a["answer"]))
+        for attr, val in dims:
             if val:
                 seg = f"{attr}:{val}"
                 if seg not in seg_participants:
