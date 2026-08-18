@@ -97,6 +97,24 @@
   "readyToAnalyse": "{{count}} completed interview(s) ready to analyse.",
   "claudeReading_one": "Qualipulse is reading {{count}} interview…",
   "claudeReading_other": "Qualipulse is reading {{count}} interviews…",
+  "stages": {
+    "auto_tagging": "Coding interviews with AI…",
+    "preparing": "Preparing the evidence…",
+    "synthesizing_one": "Reading {{count}} interview and writing the report…",
+    "synthesizing_other": "Reading {{count}} interviews and writing the report…",
+    "verifying": "Checking every quote against the transcripts…"
+  },
+  "stageAutoTaggingProgress": "Coding interview {{done}} of {{total}} with AI…",
+  "stageStep": "Step {{current}} of {{total}}",
+  "gate": {
+    "title": "Anchor the analysis in your coding?",
+    "body_one": "No quotes are tagged yet across your {{count}} completed interview. The analysis is stronger when it can build on coded evidence.",
+    "body_other": "No quotes are tagged yet across your {{count}} completed interviews. The analysis is stronger when it can build on coded evidence.",
+    "autoTag": "Let AI code the interviews first, then analyse",
+    "autoTagHint": "AI suggestions stay pending for your review, your codebook is never changed without your accept.",
+    "runAnyway": "Analyse without coding",
+    "tagFirst": "I'll tag quotes myself first"
+  },
   "failedTitle": "We couldn't complete your analysis",
   "failedTimeout": "The analysis timed out, your dataset may be too large. Try filtering to a smaller group first.",
   "failedNoCompleted": "No completed interviews to analyse yet.",

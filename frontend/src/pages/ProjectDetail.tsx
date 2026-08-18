@@ -24,6 +24,8 @@ import {
   deleteParticipant,
   getAnalysis,
   triggerAnalysis,
+  getAnalysisReadiness,
+  AnalysisReadiness,
   updateTurn,
   patchQuestion,
   getCodes,
@@ -183,6 +185,13 @@ export default function ProjectDetail() {
   // ── Transcript translation (reading aid) ──────────────────────────────────
   const [transcriptViewMode, setTranscriptViewMode] = useState<"original" | "cleaned" | "translated">("original");
   const [translating, setTranslating] = useState(false);
+
+  // ── Analysis readiness gate + staged progress ─────────────────────────────
+  // Non-null readiness opens the gate modal (untagged studies get offered an
+  // AI coding pass before synthesis). runHadAutoTag keeps the progress bar at
+  // 4 steps once an auto-tag stage has been seen this run.
+  const [gateReadiness, setGateReadiness] = useState<AnalysisReadiness | null>(null);
+  const [runHadAutoTag, setRunHadAutoTag] = useState(false);
 
   // ── V4 paywall (unlock modal triggered by 402 from gated endpoints) ──
   const [unlockState, setUnlockState] = useState<{
@@ -514,6 +523,9 @@ export default function ProjectDetail() {
         return;
       }
       setAnalysis(ana);
+      // Remember that this run had an auto-tag stage so the progress bar
+      // keeps showing 4 steps after the stage advances (survives reloads).
+      if (ana.stage === "auto_tagging") setRunHadAutoTag(true);
       if (ana.status !== "generating") {
         clearInterval(iv);
         analysisPollRef.current = null;
@@ -542,12 +554,30 @@ export default function ProjectDetail() {
       const ok = window.confirm(tAnalysis("regenerateConfirm"));
       if (!ok) return;
     }
+    // Readiness gate: when no human coding exists at all, offer the AI
+    // coding pass before synthesis. Never a wall, the modal always carries
+    // a "run anyway" path, and a readiness fetch failure falls through to
+    // a plain run.
+    try {
+      const readiness = await getAnalysisReadiness(id!);
+      if (readiness.tagging_state === "untagged" && readiness.completed_count > 0) {
+        setGateReadiness(readiness);
+        return;
+      }
+    } catch {
+      // Fall through to a plain run.
+    }
+    await runAnalysisNow(false);
+  }
+
+  async function runAnalysisNow(autoTag: boolean) {
+    setGateReadiness(null);
     const filters =
       activeFilterBy && activeFilterValues.length > 0
         ? { filter_by: activeFilterBy, filter_values: activeFilterValues }
         : undefined;
     try {
-      await triggerAnalysis(id!, filters);
+      await triggerAnalysis(id!, filters, autoTag);
     } catch (err) {
       // V4 paywall — AI analysis is gated for free workspaces.
       // Backend returns 402; we open the unlock modal with the
@@ -562,7 +592,8 @@ export default function ProjectDetail() {
       }
       throw err;
     }
-    setAnalysis((prev) => prev ? { ...prev, status: "generating" } : null);
+    setRunHadAutoTag(autoTag);
+    setAnalysis((prev) => prev ? { ...prev, status: "generating", stage: autoTag ? "auto_tagging" : "preparing", stage_detail: null } : null);
     startPolling();
   }
 
@@ -3754,9 +3785,48 @@ export default function ProjectDetail() {
               {analysis.status === "none" && analysis.completed_count > 0 && (
                 <p className="muted-text">{tAnalysis("readyToAnalyse", { count: analysis.completed_count })}</p>
               )}
-              {analysis.status === "generating" && (
-                <div className="analysis-generating"><span className="spinner-sm" /><span>{tAnalysis("claudeReading", { count: analysis.participant_count })}</span></div>
-              )}
+              {analysis.status === "generating" && (() => {
+                const stage = analysis.stage ?? "preparing";
+                const withAutoTag = runHadAutoTag || stage === "auto_tagging";
+                const stages: string[] = withAutoTag
+                  ? ["auto_tagging", "preparing", "synthesizing", "verifying"]
+                  : ["preparing", "synthesizing", "verifying"];
+                const idx = Math.max(0, stages.indexOf(stage));
+                const detail = analysis.stage_detail;
+                const label =
+                  stage === "auto_tagging" && detail?.total
+                    ? tAnalysis("stageAutoTaggingProgress", {
+                        done: Math.min((detail.done ?? 0) + 1, detail.total),
+                        total: detail.total,
+                      })
+                    : tAnalysis(`stages.${stage}`, { count: analysis.participant_count });
+                return (
+                  <div className="analysis-generating" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className="spinner-sm" />
+                      <span>{label}</span>
+                      <span className="muted-text" style={{ fontSize: 12, marginLeft: "auto", whiteSpace: "nowrap" }}>
+                        {tAnalysis("stageStep", { current: idx + 1, total: stages.length })}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: 4 }} aria-hidden="true">
+                      {stages.map((s, i) => (
+                        <div
+                          key={s}
+                          style={{
+                            flex: 1,
+                            height: 4,
+                            borderRadius: 2,
+                            background:
+                              i < idx ? "var(--brand-500)" : i === idx ? "var(--brand-300)" : "var(--border-default)",
+                            transition: "background 0.4s",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               {analysis.status === "failed" && (
                 <div style={{ padding: "16px", borderRadius: "var(--radius)", background: "var(--danger-bg)", border: "1px solid var(--danger-border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <span style={{ fontSize: 18 }}>⚠</span>
@@ -4361,6 +4431,43 @@ export default function ProjectDetail() {
           </div>
         )}
       </main>
+
+      {/* ── Analysis readiness gate (untagged study → offer AI coding) ──── */}
+      {gateReadiness && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="analysis-gate-title"
+          onClick={() => setGateReadiness(null)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <button className="modal-close" onClick={() => setGateReadiness(null)} aria-label={tProject("a11y.close")}>×</button>
+            <h3 id="analysis-gate-title" style={{ marginTop: 0 }}>{tAnalysis("gate.title")}</h3>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+              {tAnalysis("gate.body", { count: gateReadiness.completed_count })}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
+              <button className="btn btn-ai btn-sm" onClick={() => runAnalysisNow(true)}>
+                ✨ {tAnalysis("gate.autoTag")}
+              </button>
+              <p className="muted-text" style={{ fontSize: 12, margin: "0 0 4px" }}>{tAnalysis("gate.autoTagHint")}</p>
+              <button className="btn btn-secondary btn-sm" onClick={() => runAnalysisNow(false)}>
+                {tAnalysis("gate.runAnyway")}
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setGateReadiness(null);
+                  setTab("responses");
+                }}
+              >
+                {tAnalysis("gate.tagFirst")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Delete study confirmation (type-the-name) ───────────────────── */}
       {deleteProjectOpen && project && (

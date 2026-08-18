@@ -34,6 +34,9 @@ ANALYSIS_TIMEOUT_SECONDS = 300  # 5 minutes
 class AnalysisTriggerRequest(BaseModel):
     filter_by: str | None = None       # e.g. "profession"
     filter_values: list[str] = []      # e.g. ["Engineer", "Designer"]
+    # Readiness-gate choice: run the AI coding pass over untagged completed
+    # interviews before synthesis (suggestions stay pending, codebook untouched).
+    auto_tag: bool = False
 
 
 class AnnotationUpsertRequest(BaseModel):
@@ -105,6 +108,7 @@ def trigger_analysis(
 
     filter_by = body.filter_by if body else None
     filter_values = body.filter_values if body else []
+    auto_tag = bool(body.auto_tag) if body else False
 
     completed_count = (
         db.query(Participant)
@@ -121,13 +125,13 @@ def trigger_analysis(
     if filter_by and filter_values:
         filters_json = json.dumps({"filter_by": filter_by, "filter_values": filter_values})
 
-    def _run_with_timeout(project_id: str, filter_by, filter_values):
+    def _run_with_timeout(project_id: str, filter_by, filter_values, auto_tag):
         # Create a fresh session for the background thread — the request-scoped
         # session will be closed by FastAPI after the 202 response returns.
         bg_db = SessionLocal()
         try:
             logger.info("Analysis started for project %s", project_id)
-            run_analysis(project_id, bg_db, filter_by, filter_values)
+            run_analysis(project_id, bg_db, filter_by, filter_values, auto_tag=auto_tag)
             logger.info("Analysis completed for project %s", project_id)
             # Notify company that analysis is ready (email + Slack)
             try:
@@ -200,16 +204,22 @@ def trigger_analysis(
     # Run in background thread so the response returns immediately
     thread = threading.Thread(
         target=_run_with_timeout,
-        args=(project_id, filter_by, filter_values),
+        args=(project_id, filter_by, filter_values, auto_tag),
         daemon=True,
     )
     thread.start()
 
+    # The auto-tag pre-stage adds one Sonnet call per untagged interview, so
+    # the watchdog budget grows with the cohort (capped at 15 minutes).
+    timeout_seconds = ANALYSIS_TIMEOUT_SECONDS
+    if auto_tag:
+        timeout_seconds = min(ANALYSIS_TIMEOUT_SECONDS + 30 * completed_count, 900)
+
     # Monitor timeout in a watchdog thread
     def _watchdog(t: threading.Thread, project_id: str):
-        t.join(timeout=ANALYSIS_TIMEOUT_SECONDS)
+        t.join(timeout=timeout_seconds)
         if t.is_alive():
-            logger.error("Analysis timed out after 5 minutes for project %s", project_id)
+            logger.error("Analysis timed out after %ss for project %s", timeout_seconds, project_id)
             wd_db = SessionLocal()
             try:
                 analysis = (
@@ -220,7 +230,9 @@ def trigger_analysis(
                 )
                 if analysis and analysis.status == "generating":
                     analysis.status = "failed"
-                    analysis.error = "Analysis timed out after 5 minutes"
+                    analysis.error = f"Analysis timed out after {timeout_seconds // 60} minutes"
+                    analysis.stage = None
+                    analysis.stage_detail = None
                     wd_db.commit()
             except Exception:
                 pass
@@ -259,6 +271,8 @@ def get_analysis(
     if analysis is None:
         return {
             "status": "none",
+            "stage": None,
+            "stage_detail": None,
             "completed_count": completed_count,
             "participant_count": 0,
             "generated_at": None,
@@ -277,8 +291,17 @@ def get_analysis(
         except Exception:
             pass
 
+    stage_detail = None
+    if analysis.stage_detail:
+        try:
+            stage_detail = json.loads(analysis.stage_detail)
+        except Exception:
+            pass
+
     return {
         "status": analysis.status,
+        "stage": analysis.stage,
+        "stage_detail": stage_detail,
         "completed_count": completed_count,
         "participant_count": analysis.participant_count,
         "generated_at": analysis.generated_at.isoformat() if analysis.generated_at else None,
@@ -288,6 +311,78 @@ def get_analysis(
         "analysis_id": analysis.id,
         "version": analysis.version,
         "version_label": analysis.version_label,
+    }
+
+
+@router.get("/{project_id}/analysis/readiness")
+def get_analysis_readiness(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+):
+    """Annotation state the frontend checks before triggering synthesis.
+
+    Powers the readiness gate: well-tagged studies run immediately, thin or
+    untagged ones get the modal offering an AI coding pass first. Cheap,
+    count-only queries, no model calls.
+    """
+    _get_project_or_404(project_id, company.id, db)
+
+    from app.models.coding import ManualCode, QuoteTag, TagSuggestion
+    from app.models.interview import InterviewTurn
+
+    completed_ids = [
+        pid
+        for (pid,) in db.query(Participant.id).filter(
+            Participant.project_id == project_id,
+            Participant.status == "completed",
+        )
+    ]
+
+    code_count = (
+        db.query(ManualCode).filter(ManualCode.project_id == project_id).count()
+    )
+
+    tagged_ids: set[str] = set()
+    tag_count = 0
+    pending_suggestions = 0
+    if completed_ids:
+        tag_rows = (
+            db.query(InterviewTurn.participant_id)
+            .join(QuoteTag, QuoteTag.turn_id == InterviewTurn.id)
+            .filter(InterviewTurn.participant_id.in_(completed_ids))
+            .all()
+        )
+        tag_count = len(tag_rows)
+        tagged_ids = {pid for (pid,) in tag_rows}
+        pending_suggestions = (
+            db.query(TagSuggestion)
+            .filter(
+                TagSuggestion.participant_id.in_(completed_ids),
+                TagSuggestion.status == "pending",
+            )
+            .count()
+        )
+
+    completed = len(completed_ids)
+    tagged = len(tagged_ids)
+    # Tagging state the frontend branches on: "anchored" (most interviews
+    # carry tags → run immediately), "partial" (some tagging or pending
+    # suggestions → soft prompt), "untagged" (no human coding at all → gate).
+    if completed and tagged * 2 >= completed:
+        tagging_state = "anchored"
+    elif tag_count > 0 or pending_suggestions > 0:
+        tagging_state = "partial"
+    else:
+        tagging_state = "untagged"
+
+    return {
+        "completed_count": completed,
+        "code_count": code_count,
+        "tag_count": tag_count,
+        "tagged_participant_count": tagged,
+        "pending_suggestion_count": pending_suggestions,
+        "tagging_state": tagging_state,
     }
 
 
