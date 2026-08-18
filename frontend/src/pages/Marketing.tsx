@@ -224,33 +224,57 @@ export default function Marketing() {
       { property: "og:description", content: t("meta.description") },
       { property: "og:url", content: "https://app.qualipulse.com/" },
       { property: "og:image", content: "https://app.qualipulse.com/og-image.png" },
+      { property: "og:locale", content: isFr ? "fr_FR" : "en_US" },
     ],
     links: [{ rel: "canonical", href: "https://app.qualipulse.com/" }],
+    // One @graph so the page ships every entity in a single data block:
+    // the product with its real plan prices, the publisher, and the pricing
+    // FAQ (eligible for FAQ rich results, content comes from faq.items).
     jsonLd: {
       "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      name: "QualiPulse",
-      applicationCategory: "BusinessApplication",
-      operatingSystem: "Web",
-      description: t("meta.description"),
-      url: "https://app.qualipulse.com",
-      // Real plan catalogue so crawlers and AI search see actual prices.
-      // Prices come from MARKETING_PLANS (kept in sync with billing_plans.py).
-      offers: [
+      "@graph": [
         {
-          "@type": "Offer",
-          name: t("pricing.trial.name"),
-          price: "0",
-          priceCurrency: "EUR",
-          description: t("pricing.trial.desc"),
+          "@type": "SoftwareApplication",
+          name: "QualiPulse",
+          applicationCategory: "BusinessApplication",
+          operatingSystem: "Web",
+          description: t("meta.description"),
+          url: "https://app.qualipulse.com",
+          // Prices come from MARKETING_PLANS (kept in sync with billing_plans.py).
+          offers: [
+            {
+              "@type": "Offer",
+              name: t("pricing.trial.name"),
+              price: "0",
+              priceCurrency: "EUR",
+              description: t("pricing.trial.desc"),
+            },
+            ...MARKETING_PLANS.map((p) => ({
+              "@type": "Offer",
+              name: t(`pricing.plans.${p.id}.name`),
+              price: String(p.monthlyEur),
+              priceCurrency: "EUR",
+              description: t(`pricing.plans.${p.id}.desc`),
+            })),
+          ],
         },
-        ...MARKETING_PLANS.map((p) => ({
-          "@type": "Offer",
-          name: t(`pricing.plans.${p.id}.name`),
-          price: String(p.monthlyEur),
-          priceCurrency: "EUR",
-          description: t(`pricing.plans.${p.id}.desc`),
-        })),
+        {
+          "@type": "Organization",
+          name: "QualiPulse",
+          url: "https://app.qualipulse.com",
+          logo: "https://app.qualipulse.com/apple-touch-icon.png",
+          description: t("meta.description"),
+        },
+        {
+          "@type": "FAQPage",
+          mainEntity: (
+            t("faq.items", { returnObjects: true }) as Array<{ question: string; answer: string }>
+          ).map((item) => ({
+            "@type": "Question",
+            name: item.question,
+            acceptedAnswer: { "@type": "Answer", text: item.answer },
+          })),
+        },
       ],
     },
   });
