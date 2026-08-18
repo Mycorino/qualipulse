@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -41,6 +42,7 @@ Voice & stance:
 - Avoid "why" questions — they invite rationalisation. Prefer "walk me through", "tell me about \
 the last time", "what was happening when".
 - Single concept per question. No double-barrelled questions, no preambles longer than one sentence.
+- Never use em dashes (—), en dashes (–), or double hyphens in anything you say. Use a comma or a colon instead.
 
 Continuity (critical — the participant hears every turn):
 - The greeting belongs to the OPENING question only. You have already greeted them. NEVER open a later \
@@ -92,13 +94,13 @@ LANGUAGE_NAMES: dict[str, str] = {
 
 
 CLOSING_MESSAGES: dict[str, str] = {
-    "en": "That wraps up our interview. Thank you so much for your time and thoughtful responses — it's been really helpful!",
-    "fr": "Voilà qui conclut notre entretien. Merci beaucoup pour votre temps et vos réponses — cela nous a été précieux !",
-    "es": "Con esto cerramos la entrevista. Muchas gracias por su tiempo y sus respuestas — ha sido muy útil.",
-    "de": "Damit beenden wir unser Interview. Vielen Dank für Ihre Zeit und Ihre durchdachten Antworten — das war sehr hilfreich!",
-    "it": "Con questo concludiamo la nostra intervista. Grazie mille per il suo tempo e le sue risposte — è stato davvero utile!",
-    "pt": "Com isto encerramos a entrevista. Muito obrigado pelo seu tempo e pelas suas respostas — foi muito útil!",
-    "nl": "Daarmee sluiten we dit interview af. Heel erg bedankt voor uw tijd en doordachte antwoorden — het was enorm behulpzaam!",
+    "en": "That wraps up our interview. Thank you so much for your time and thoughtful responses. It's been really helpful!",
+    "fr": "Voilà qui conclut notre entretien. Merci beaucoup pour votre temps et vos réponses, cela nous a été précieux !",
+    "es": "Con esto cerramos la entrevista. Muchas gracias por su tiempo y sus respuestas, ha sido muy útil.",
+    "de": "Damit beenden wir unser Interview. Vielen Dank für Ihre Zeit und Ihre durchdachten Antworten, das war sehr hilfreich!",
+    "it": "Con questo concludiamo la nostra intervista. Grazie mille per il suo tempo e le sue risposte, è stato davvero utile!",
+    "pt": "Com isto encerramos a entrevista. Muito obrigado pelo seu tempo e pelas suas respostas, foi muito útil!",
+    "nl": "Daarmee sluiten we dit interview af. Heel erg bedankt voor uw tijd en doordachte antwoorden, het was enorm behulpzaam!",
     "ja": "以上でインタビューは終了です。お時間を割いて丁寧にお答えいただき、本当にありがとうございました。",
     "ko": "이것으로 인터뷰를 마치겠습니다. 시간을 내어 성의 있게 답해 주셔서 정말 감사합니다.",
     "zh": "我们的访谈到此结束。非常感谢您抽出宝贵时间并认真回答，这对我们非常有帮助！",
@@ -115,70 +117,70 @@ MAX_FOLLOWUPS_PER_QUESTION = 3
 # then the project language) — same rule the spoken interview follows.
 COMPLETION_EMAILS: dict[str, dict[str, str]] = {
     "en": {
-        "subject": "Thank you for your interview — {project_name}",
+        "subject": "Thank you for your interview: {project_name}",
         "body": (
             "<p>Hi{greeting},</p>"
             "<p>Thank you for taking part in the <strong>{project_name}</strong> interview. "
             "Your responses have been recorded and will help shape the research.</p>"
-            "<p>You can close this email — no further action is needed.</p>"
+            "<p>You can close this email, no further action is needed.</p>"
         ),
     },
     "fr": {
-        "subject": "Merci pour votre entretien — {project_name}",
+        "subject": "Merci pour votre entretien : {project_name}",
         "body": (
             "<p>Bonjour{greeting},</p>"
             "<p>Merci d'avoir participé à l'entretien <strong>{project_name}</strong>. "
             "Vos réponses ont bien été enregistrées et contribueront à la recherche.</p>"
-            "<p>Vous pouvez fermer cet e-mail — aucune action n'est requise de votre part.</p>"
+            "<p>Vous pouvez fermer cet e-mail, aucune action n'est requise de votre part.</p>"
         ),
     },
     "es": {
-        "subject": "Gracias por su entrevista — {project_name}",
+        "subject": "Gracias por su entrevista: {project_name}",
         "body": (
             "<p>Hola{greeting},</p>"
             "<p>Gracias por participar en la entrevista <strong>{project_name}</strong>. "
             "Sus respuestas han quedado registradas y contribuirán a la investigación.</p>"
-            "<p>Puede cerrar este correo — no se requiere ninguna otra acción.</p>"
+            "<p>Puede cerrar este correo, no se requiere ninguna otra acción.</p>"
         ),
     },
     "de": {
-        "subject": "Vielen Dank für Ihr Interview — {project_name}",
+        "subject": "Vielen Dank für Ihr Interview: {project_name}",
         "body": (
             "<p>Hallo{greeting},</p>"
             "<p>vielen Dank für Ihre Teilnahme am Interview <strong>{project_name}</strong>. "
             "Ihre Antworten wurden gespeichert und fließen in die Forschung ein.</p>"
-            "<p>Sie können diese E-Mail schließen — es ist nichts weiter zu tun.</p>"
+            "<p>Sie können diese E-Mail schließen, es ist nichts weiter zu tun.</p>"
         ),
     },
     "it": {
-        "subject": "Grazie per la sua intervista — {project_name}",
+        "subject": "Grazie per la sua intervista: {project_name}",
         "body": (
             "<p>Salve{greeting},</p>"
             "<p>grazie per aver partecipato all'intervista <strong>{project_name}</strong>. "
             "Le sue risposte sono state registrate e contribuiranno alla ricerca.</p>"
-            "<p>Può chiudere questa email — non è richiesta alcuna ulteriore azione.</p>"
+            "<p>Può chiudere questa email, non è richiesta alcuna ulteriore azione.</p>"
         ),
     },
     "pt": {
-        "subject": "Obrigado pela sua entrevista — {project_name}",
+        "subject": "Obrigado pela sua entrevista: {project_name}",
         "body": (
             "<p>Olá{greeting},</p>"
             "<p>obrigado por participar na entrevista <strong>{project_name}</strong>. "
             "As suas respostas foram registadas e vão contribuir para a investigação.</p>"
-            "<p>Pode fechar este email — não é necessária mais nenhuma ação.</p>"
+            "<p>Pode fechar este email, não é necessária mais nenhuma ação.</p>"
         ),
     },
     "nl": {
-        "subject": "Bedankt voor uw interview — {project_name}",
+        "subject": "Bedankt voor uw interview: {project_name}",
         "body": (
             "<p>Hallo{greeting},</p>"
             "<p>Bedankt voor uw deelname aan het interview <strong>{project_name}</strong>. "
             "Uw antwoorden zijn opgeslagen en dragen bij aan het onderzoek.</p>"
-            "<p>U kunt deze e-mail sluiten — er is verder niets nodig.</p>"
+            "<p>U kunt deze e-mail sluiten, er is verder niets nodig.</p>"
         ),
     },
     "ja": {
-        "subject": "インタビューへのご協力ありがとうございました — {project_name}",
+        "subject": "インタビューへのご協力ありがとうございました：{project_name}",
         "body": (
             "<p>こんにちは{greeting}。</p>"
             "<p><strong>{project_name}</strong>のインタビューにご協力いただき、誠にありがとうございました。"
@@ -187,16 +189,16 @@ COMPLETION_EMAILS: dict[str, dict[str, str]] = {
         ),
     },
     "ko": {
-        "subject": "인터뷰에 참여해 주셔서 감사합니다 — {project_name}",
+        "subject": "인터뷰에 참여해 주셔서 감사합니다: {project_name}",
         "body": (
             "<p>안녕하세요{greeting},</p>"
             "<p><strong>{project_name}</strong> 인터뷰에 참여해 주셔서 감사합니다. "
             "답변이 잘 기록되었으며 연구에 소중히 활용될 예정입니다.</p>"
-            "<p>이 메일은 확인만 하시면 됩니다 — 추가 조치는 필요하지 않습니다.</p>"
+            "<p>이 메일은 확인만 하시면 됩니다. 추가 조치는 필요하지 않습니다.</p>"
         ),
     },
     "zh": {
-        "subject": "感谢您参与访谈 — {project_name}",
+        "subject": "感谢您参与访谈：{project_name}",
         "body": (
             "<p>您好{greeting}，</p>"
             "<p>感谢您参与<strong>{project_name}</strong>访谈。"
@@ -716,6 +718,7 @@ WHY: generic answer with no behaviour or example.
         result["action"] = "follow_up"
     if "question" not in result:
         result["question"] = _fallback_follow_up(language)
+    result["question"] = _strip_banned_dashes(result["question"])
 
     # Optional participant-facing coaching line (only requested via the
     # engagement block). Sanitize hard: it renders verbatim in the participant
@@ -725,6 +728,21 @@ WHY: generic answer with no behaviour or example.
     return result
 
 
+_BANNED_DASH_RE = re.compile(r"\s*(?:—|–|--)\s*")
+
+
+def _strip_banned_dashes(text: str) -> str:
+    """Em/en dashes and double hyphens are banned from user-facing copy (see
+    CLAUDE.md Copy Conventions). The prompts instruct the model; this
+    guarantees it on everything the participant hears or reads."""
+    if not text or not _BANNED_DASH_RE.search(text):
+        return text
+    # After sentence punctuation the dash is redundant: drop it.
+    text = re.sub(r"([,;:.!?…])\s*(?:—|–|--)\s*", r"\1 ", text)
+    # Between words it reads as a comma.
+    return _BANNED_DASH_RE.sub(", ", text)
+
+
 def _sanitize_coaching(value) -> str | None:
     """Whitelist a model-produced coaching line for direct participant display."""
     if not isinstance(value, str):
@@ -732,7 +750,7 @@ def _sanitize_coaching(value) -> str | None:
     value = " ".join(value.split())
     if not value or len(value) > 240:
         return None
-    return value
+    return _strip_banned_dashes(value)
 
 
 # Sentinel used in InterviewTurn.question_index to mark the warm-up turn
@@ -854,10 +872,10 @@ def _get_warmup_question(
     language_name = LANGUAGE_NAMES.get(language_code, "English")
 
     fallbacks = {
-        "en": "Welcome! Before we dive into the questions, could you tell me a bit about your typical week — just so we ease in?",
-        "fr": "Bienvenue ! Avant d'entrer dans les questions, pourriez-vous me parler un peu de votre semaine type — juste pour démarrer en douceur ?",
+        "en": "Welcome! Before we dive into the questions, could you tell me a bit about your typical week, just so we ease in?",
+        "fr": "Bienvenue ! Avant d'entrer dans les questions, pourriez-vous me parler un peu de votre semaine type, juste pour démarrer en douceur ?",
         "es": "¡Bienvenido! Antes de entrar en las preguntas, ¿podría contarme un poco de su semana típica para empezar con calma?",
-        "de": "Willkommen! Bevor wir zu den Fragen kommen, könnten Sie mir kurz von Ihrer typischen Woche erzählen — einfach zum Einstieg?",
+        "de": "Willkommen! Bevor wir zu den Fragen kommen, könnten Sie mir kurz von Ihrer typischen Woche erzählen, einfach zum Einstieg?",
         "it": "Benvenuto! Prima di entrare nelle domande, può raccontarmi un po' della sua settimana tipo, giusto per iniziare?",
         "pt": "Bem-vindo! Antes de entrar nas perguntas, poderia me contar um pouco sobre sua semana típica — só para começar?",
     }
@@ -876,9 +894,29 @@ def _get_warmup_question(
     if not topic_hint or not settings.ANTHROPIC_API_KEY:
         return fallback
 
+    # The first guide question follows immediately after the warm-up. The
+    # warm-up MUST NOT overlap with it, or the participant hears the same
+    # question twice in a row (classic case: warm-up "what do you do
+    # day-to-day?" followed by guide Q1 "tell me about your role").
+    guide_questions = sorted(
+        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
+        key=lambda q: (q.section_index, q.question_index),
+    )
+    first_guide_q = guide_questions[0].main_question if guide_questions else ""
+
     try:
         client = get_anthropic_client(60.0)
         effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
+        avoid_block = (
+            f"\n\nThe FIRST real interview question, asked right after your warm-up, will be:\n"
+            f'"{first_guide_q[:300]}"\n'
+            f"Your warm-up must NOT overlap with it in any way. If that question already asks "
+            f"about their role, work, or daily routine, pick a different low-stakes angle "
+            f"(e.g. how they came across this topic, or the setting they are in). The "
+            f"participant must never feel asked the same thing twice."
+            if first_guide_q
+            else ""
+        )
         response = client.messages.create(
             model=ai_models.sonnet(),
             max_tokens=180,
@@ -893,14 +931,15 @@ def _get_warmup_question(
                         f"Write a WARM-UP opener in {language_name}. The goal is to put the "
                         f"participant at ease before the real questions begin. One short sentence "
                         f"of welcome, then ONE simple, low-stakes question that gently touches the "
-                        f"topic — something they can answer without thinking hard. Avoid 'why'. "
+                        f"topic, something they can answer without thinking hard. Avoid 'why'. "
                         f"Avoid asking for opinions or evaluations. Under 28 words. "
-                        f"Return ONLY the spoken text — no JSON, no quotes, no preamble."
+                        f"Return ONLY the spoken text, no JSON, no quotes, no preamble."
+                        f"{avoid_block}"
                     ),
                 }
             ],
         )
-        text = response.content[0].text.strip()
+        text = _strip_banned_dashes(response.content[0].text.strip())
         if db is not None:
             log_claude_usage(
                 db, response, "interview_warmup",
@@ -918,8 +957,15 @@ def _get_first_question(
     db=None,
     participant_id=None,
     language_override: str | None = None,
+    warmup_exchange: tuple[str, str] | None = None,
 ) -> tuple[str, int]:
-    """Get the first non-deprecated question from the interview guide, rephrased as an opener."""
+    """Get the first non-deprecated question from the interview guide, rephrased as an opener.
+
+    When ``warmup_exchange`` is provided (the warm-up question and the
+    participant's answer), the conversation has already started: the rephrase
+    must NOT re-greet, and must acknowledge the answer instead of re-asking
+    anything it already covered.
+    """
     guide_questions = sorted(
         [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
         key=lambda q: (q.section_index, q.question_index),
@@ -949,27 +995,41 @@ def _get_first_question(
 
     effective_system_prompt = INTERVIEWER_SYSTEM_PROMPT + _language_instruction(language_code)
 
+    if warmup_exchange:
+        warmup_q, warmup_a = warmup_exchange
+        user_prompt = (
+            f"You are mid-interview. You already welcomed the participant with this warm-up:\n"
+            f'"{warmup_q[:300]}"\n'
+            f"and they answered:\n"
+            f'"{(warmup_a or "")[:600]}"\n\n'
+            f"The first question from the guide is:\n"
+            f'"{first_q.main_question}"\n\n'
+            f"Continue the conversation in {language_name}. Do NOT greet again (no welcome, "
+            f'no "to start with"): open with a few words acknowledging something specific '
+            f"they just said, then ask the guide question conversationally. If their answer "
+            f"already covered part of the guide question, do not re-ask that part: go one "
+            f"level deeper on what they said instead. Avoid 'why'. Single concept. "
+            f"Under 35 words. Return ONLY the spoken text, no JSON, no quotes, no preamble."
+        )
+    else:
+        user_prompt = (
+            f"You are starting an interview. The first question from the guide is:\n"
+            f'"{first_q.main_question}"\n\n'
+            f"Rephrase as a warm, natural OPENER in {language_name}. One short sentence "
+            f"of welcome (no name needed), then the question, phrased conversationally. "
+            f"Avoid 'why'. Single concept. Under 30 words. "
+            f"Return ONLY the spoken text, no JSON, no quotes, no preamble."
+        )
+
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=256,
         **ai_models.temperature_kwargs(ai_models.sonnet(), 0.5),
         system=effective_system_prompt,
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f"You are starting an interview. The first question from the guide is:\n"
-                    f'"{first_q.main_question}"\n\n'
-                    f"Rephrase as a warm, natural OPENER in {language_name}. One short sentence "
-                    f"of welcome (no name needed), then the question, phrased conversationally. "
-                    f"Avoid 'why'. Single concept. Under 30 words. "
-                    f"Return ONLY the spoken text — no JSON, no quotes, no preamble."
-                ),
-            }
-        ],
+        messages=[{"role": "user", "content": user_prompt}],
     )
 
-    question_text = response.content[0].text.strip()
+    question_text = _strip_banned_dashes(response.content[0].text.strip())
 
     if db is not None:
         log_claude_usage(
@@ -1021,7 +1081,10 @@ def start_interview(participant_id: str, db: Session) -> dict:
     tts_audio_url = None
     try:
         tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
-        tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
+        tts_audio_url = upload_audio(
+            generate_speech(question_text, language=participant_lang or getattr(project, "language", None)),
+            tts_key,
+        )
         log_tts_usage(db, question_text, company_id=company_id, project_id=proj_id, participant_id=participant_id)
     except Exception:
         logger.warning("TTS failed for start_interview participant=%s; text-only fallback", participant_id)
@@ -1171,10 +1234,13 @@ def process_interview_turn(
         first_q_text, _ = _get_first_question(
             _proj, db=db, participant_id=participant_id,
             language_override=context.get("language"),
+            # The rephrase must know the warm-up Q&A: without it the model
+            # re-greets and can re-ask what the warm-up already covered.
+            warmup_exchange=(turns[-1].question_text or "", transcript or ""),
         )
         first_tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
         try:
-            first_tts_url = upload_audio(generate_speech(first_q_text), first_tts_key)
+            first_tts_url = upload_audio(generate_speech(first_q_text, language=context.get("language")), first_tts_key)
             log_tts_usage(db, first_q_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
         except Exception:
             logger.exception("Warm-up handoff TTS failed for participant %s; continuing text-only", participant_id)
@@ -1275,7 +1341,7 @@ def process_interview_turn(
     # audio URL and degrades to text-only, matching start_interview's fallback.
     tts_key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
     try:
-        tts_audio_url = upload_audio(generate_speech(question_text), tts_key)
+        tts_audio_url = upload_audio(generate_speech(question_text, language=context.get("language")), tts_key)
         log_tts_usage(db, question_text, company_id=_company_id, project_id=_project_id, participant_id=participant_id)
     except Exception:
         logger.exception("TTS generation failed for participant %s; continuing text-only", participant_id)
@@ -1583,7 +1649,7 @@ def skip_question(participant_id: str, db) -> dict:
         closing_text = _closing_message(getattr(project, "language", None))
         tts_url = None
         try:
-            audio_data = generate_speech(closing_text)
+            audio_data = generate_speech(closing_text, language=context.get("language"))
             key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
             # Use the URL upload returns — it's the R2 public URL in prod and
             # only "/audio/{key}" on local disk. Hardcoding the local shape
@@ -1679,7 +1745,7 @@ def skip_question(participant_id: str, db) -> dict:
 
     tts_url = None
     try:
-        audio_data = generate_speech(question_text)
+        audio_data = generate_speech(question_text, language=context.get("language"))
         key = f"tts/{participant_id}/{uuid.uuid4().hex}.mp3"
         # upload_audio returns the playback URL (R2 public URL in prod,
         # "/audio/{key}" on disk). Persist and return that same URL so the

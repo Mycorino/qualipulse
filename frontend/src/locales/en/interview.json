@@ -341,7 +341,8 @@
     "emptyTranscript": "We couldn't hear anything in that recording. Make sure your microphone is close by, then record again, if this keeps happening, try a different device.",
     "playQuestion": "Play the question",
     "skipAudio": "Skip audio, I'm ready",
-    "maxRecordingHint": "Up to {{minutes}} minutes per answer"
+    "maxRecordingHint": "Up to {{minutes}} minutes per answer",
+    "warmupLabel": "Warming up"
   },
   "completion": {
     "title": "Thank you, {{name}}!",

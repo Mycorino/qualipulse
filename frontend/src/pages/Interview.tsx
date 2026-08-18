@@ -160,6 +160,9 @@ export default function Interview() {
   const [turnCount, setTurnCount] = useState(0);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isFollowUp, setIsFollowUp] = useState(false);
+  // True while the current prompt is the warm-up (not a guide question):
+  // the progress label must not claim "Q1 of N" during it.
+  const [isWarmup, setIsWarmup] = useState(false);
   // PF-3: live coaching tip surfaced when the engine detects a short-answer
   // run. Persists between turns until the user dismisses or the engine clears
   // it because the participant elaborated again.
@@ -862,6 +865,7 @@ export default function Interview() {
     setTurnCount(1);
     setQuestionIndex(0);
     setIsFollowUp(false);
+    setIsWarmup(res.is_warmup ?? false);
     const total = (info?.interview_duration_minutes ?? 0) * 60;
     setTotalSeconds(total);
     setElapsedSeconds(0);
@@ -999,6 +1003,7 @@ export default function Interview() {
         setTurnCount(nextTurn);
         setQuestionIndex(res.question_index ?? questionIndex);
         setIsFollowUp(res.is_follow_up ?? false);
+        setIsWarmup(false);
         if (res.elapsed_seconds !== undefined) setElapsedSeconds(res.elapsed_seconds);
         if (res.total_seconds !== undefined && res.total_seconds > 0) setTotalSeconds(res.total_seconds);
         if (res.transcript) {
@@ -1969,15 +1974,17 @@ export default function Interview() {
             >
               <div
                 className="interview-progress-bar-fill"
-                style={{ width: `${Math.min(((questionIndex) / info.question_count) * 100, 95)}%` }}
+                style={{ width: `${isWarmup ? 0 : Math.min(((questionIndex) / info.question_count) * 100, 95)}%` }}
               />
             </div>
           )}
           <div className="interview-progress" role="status" aria-live="polite">
             <span className="interview-turn-count">
-              {isFollowUp
-                ? t("interview.followUpLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })
-                : t("interview.progressLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })}
+              {isWarmup
+                ? t("interview.warmupLabel")
+                : isFollowUp
+                  ? t("interview.followUpLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })
+                  : t("interview.progressLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               {totalSeconds > 0 && (

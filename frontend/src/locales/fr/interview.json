@@ -341,7 +341,8 @@
     "emptyTranscript": "Nous n'avons rien entendu dans cet enregistrement. Vérifiez que votre micro est proche de vous, puis réenregistrez, si le problème persiste, essayez un autre appareil.",
     "playQuestion": "Écouter la question",
     "skipAudio": "Passer l'audio, je suis prêt·e",
-    "maxRecordingHint": "Jusqu'à {{minutes}} minutes par réponse"
+    "maxRecordingHint": "Jusqu'à {{minutes}} minutes par réponse",
+    "warmupLabel": "Pour faire connaissance"
   },
   "completion": {
     "title": "Merci, {{name}} !",

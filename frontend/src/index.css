@@ -1240,6 +1240,12 @@ select.field-input {
      last row of page content (e.g. the Analysis confidence stat). */
   padding-bottom: 6rem;
 }
+/* The Responses tab is a self-scrolling viewport-height grid: the FAB
+   clearance would only add dead page scroll below it. */
+.instrument-shell:has(.responses-layout) {
+  padding-bottom: 0;
+  min-height: 0;
+}
 
 .instrument-header {
   display: flex;
@@ -5637,10 +5643,11 @@ select.field-input {
 /* Responses tab needs full width — break out of .detail-main max-width */
 /* The responses view is a self-contained two-pane scroll region: the list
    and transcript columns each scroll independently and fill the space below
-   the sticky header (56px) + tabs (44px). Kill the default .detail-main
-   padding entirely — any vertical padding here isn't subtracted from the
-   column heights below, so it pushes the scroll region's bottom past the
-   viewport and the last turns become unreachable. */
+   the page chrome above it (measured at runtime into --responses-top).
+   Kill the default .detail-main padding entirely — any vertical padding
+   here isn't subtracted from the column heights below, so it pushes the
+   scroll region's bottom past the viewport and the last turns become
+   unreachable. */
 .detail-main:has(.responses-layout) {
   max-width: none;
   padding: 0;
@@ -5649,7 +5656,10 @@ select.field-input {
   display: grid;
   grid-template-columns: 300px 1fr;
   gap: 0;
-  height: calc(100dvh - 56px - 44px);
+  /* --responses-top is measured by ProjectDetail (the layout's real offset
+     below the hub chrome + banners); the fallback approximates the standard
+     chrome so a missed measurement degrades gracefully. */
+  height: calc(100dvh - var(--responses-top, 190px));
   align-items: stretch;
   overflow: hidden;
 }
