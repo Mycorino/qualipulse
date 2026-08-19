@@ -44,6 +44,13 @@ no preamble, no trailing commentary. All reasoning and self-critique belong in y
 never in the visible answer."""
 
 
+# Below this many completed interviews the analysis is a "first read", not
+# findings: the report gets a deterministic small_sample flag, and the
+# frontend intercepts the trigger with an expectations modal. Themes need
+# ≥2 distinct participants by rule, so N=1-2 output is structurally thin.
+SMALL_SAMPLE_THRESHOLD = 3
+
+
 def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict[str, dict]]:
     """Build transcript block and a participant metadata map keyed by identifier.
 
@@ -1036,6 +1043,11 @@ def run_analysis(
                 {k: v for k, v in s.items() if k != "quotes"} for s in codebook_stats
             ]
 
+        # Deterministic small-sample flag, set in Python (never by the model)
+        # so every consumer (Analysis tab, shared report, PDF export) shows
+        # the same honest "first read, not findings" marking at N < 3.
+        report_obj["small_sample"] = len(completed) < SMALL_SAMPLE_THRESHOLD
+
         analysis.report = json.dumps(report_obj)
         analysis.status = "ready"
         analysis.generated_at = datetime.utcnow()
@@ -1237,6 +1249,8 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
             report_obj["codebook_stats"] = [
                 {k: v for k, v in s.items() if k != "quotes"} for s in codebook_stats
             ]
+
+        report_obj["small_sample"] = len(all_completed) < SMALL_SAMPLE_THRESHOLD
 
         new_analysis.report = json.dumps(report_obj)
         new_analysis.status = "ready"

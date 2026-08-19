@@ -144,6 +144,29 @@ export default function SharedReport() {
           </div>
         </div>
 
+        {/* Small-sample notice — public readers especially must not mistake
+            a 1-2 interview first read for validated findings. */}
+        {(Boolean(report.small_sample) || (report.participant_count > 0 && report.participant_count < 3)) && (
+          <section className="shared-report-section">
+            <div
+              role="note"
+              style={{
+                border: "1.5px solid var(--warning-border, #d9a441)",
+                background: "var(--warning-bg, #fdf6ee)",
+                borderRadius: 8,
+                padding: "12px 16px",
+                fontSize: 13,
+                lineHeight: 1.5,
+              }}
+            >
+              <strong style={{ color: "var(--warning-text, #8a6116)", display: "block", marginBottom: 2 }}>
+                {t("smallSampleTitle")}
+              </strong>
+              {t("smallSampleBody", { count: report.participant_count })}
+            </div>
+          </section>
+        )}
+
         {/* Summary */}
         <section className="shared-report-section">
           <div className="analysis-summary-box">

@@ -746,6 +746,14 @@ Pacing safety guards:
    readiness-gate modal**: "let AI code first, then analyse" (POSTs
    `auto_tag: true`), "analyse without coding", or "I'll tag myself" — a
    nudge, never a wall (readiness fetch failure falls through to a plain run).
+   **Fewer than 3 completed interviews adds a low-N rung to the same modal**
+   ("first read, not findings" expectations + "run a first read anyway" /
+   "wait for more interviews"); the run itself is never hard-blocked above
+   N=0. Ready reports at N<3 carry a deterministic `small_sample: true` flag
+   (set in Python by `run_analysis`/`run_refined_analysis`, threshold
+   `SMALL_SAMPLE_THRESHOLD` in `services/analysis.py`, participant-count
+   fallback for pre-flag reports) rendered as a warning banner in the
+   Analysis tab, the public shared report, and the HTML export.
 2. Background thread runs a **staged pipeline**; the stage is persisted on
    `ProjectAnalysis.stage` (+ `stage_detail` JSON counters) and rendered by
    the polling frontend as a labelled progress bar: optional `auto_tagging`
