@@ -12,6 +12,7 @@ from app.models.panel import (
     ParticipantMagicToken,
     PanelAttribute,
     PanelAnswer,
+    StudyInvite,
 )
 from app.models.affiliate import Affiliate, AffiliateReferral, AffiliatePayout
 from app.models.blog import BlogPost

@@ -26,7 +26,7 @@ import { CommandPalette } from "./CommandPalette";
 
 interface HubShellProps {
   /** Which rail destination the current page belongs to. */
-  active?: "studies" | "reports" | "account";
+  active?: "studies" | "reports" | "pool" | "account";
   /** Optional breadcrumb row rendered at the top of the content area. */
   crumbs?: Crumb[];
   /** Preloaded studies (skips the palette's lazy fetch). */
@@ -50,6 +50,17 @@ function MemoGlyph() {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M3 3h10v8.5H8L5 14v-2.5H3V3Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PoolGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="5.5" cy="5.5" r="2.2" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="11" cy="6.5" r="1.8" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M2 13c.5-2.2 1.9-3.3 3.5-3.3S8.5 10.8 9 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M10.5 12.5c.4-1.6 1.4-2.4 2.6-2.4.5 0 .9.1 1.3.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -160,6 +171,15 @@ export function HubShell({
             {typeof memoCount === "number" && memoCount > 0 && (
               <span className="hub-rail__count">{memoCount}</span>
             )}
+          </button>
+          <button
+            type="button"
+            className={`hub-rail__item${active === "pool" ? " hub-rail__item--active" : ""}`}
+            aria-current={active === "pool" ? "page" : undefined}
+            onClick={() => navigate("/pool")}
+          >
+            <PoolGlyph />
+            {t("hub.nav.pool")}
           </button>
           <button
             type="button"

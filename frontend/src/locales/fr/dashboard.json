@@ -392,7 +392,8 @@
       "memos": "Mémos de décision",
       "reports": "Rapports",
       "account": "Compte",
-      "breadcrumbAria": "Fil d'Ariane"
+      "breadcrumbAria": "Fil d'Ariane",
+      "pool": "Participants"
     },
     "credits": {
       "left": "crédits restants",
@@ -500,5 +501,28 @@
       "restoredToast": "« {{name}} » restaurée",
       "error": "Une erreur est survenue, réessayez."
     }
+  },
+  "pool": {
+    "title": "Vivier de participants",
+    "subtitle": "Les anciens participants qui ont accepté d'être recontactés pour de futures études. Invitez-les depuis le panneau Recruter & partager d'une étude.",
+    "statPool": "dans votre vivier",
+    "statInvited30d": "invités sur les 30 derniers jours",
+    "empty": "Votre vivier est vide pour l'instant. Il se remplit quand des participants terminent vos entretiens et cochent « invitez-moi aux prochaines études » sur l'écran de fin.",
+    "filter": {
+      "country": "Pays",
+      "job_function": "Fonction",
+      "age_range": "Tranche d'âge"
+    },
+    "clearFilters": "Effacer les filtres",
+    "col": {
+      "person": "Personne",
+      "profile": "Profil",
+      "studies": "Études",
+      "invites": "Invitations",
+      "lastInvited": "Dernière invitation",
+      "lastActive": "Dernière activité"
+    },
+    "noMatch": "Personne ne correspond à ces filtres.",
+    "inviteHint": "Pour inviter des personnes de ce vivier, ouvrez une étude et utilisez « Inviter d'anciens participants » dans sa section Recruter & partager. Chacun peut se retirer à tout moment via le lien présent dans chaque invitation."
   }
 }

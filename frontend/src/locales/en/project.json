@@ -646,5 +646,31 @@
     "postBody": "We're collecting real stories for a research study. It's a {{duration}}-minute voice conversation you do in your browser, no scheduling, no calls. If you have {{duration}} minutes and opinions, we'd love to hear them: {{link}}",
     "shortLabel": "Short message (support chat, in-app, WhatsApp)",
     "shortBody": "Would you help us with a quick {{duration}}-minute voice interview? It runs in your browser, whenever suits you: {{link}}"
+  },
+  "recontact": {
+    "sectionTitle": "Invite past participants",
+    "sectionHint": "People from your previous studies who agreed to be recontacted. Invitations go out by email in each person's language, with a one-click opt-out.",
+    "openCta": "Invite past participants",
+    "modalTitle": "Invite past participants",
+    "modalSubtitle": "Consented participants from your previous studies. Each person gets the interview link by email, in their language.",
+    "loading": "Loading your participant pool…",
+    "emptyPool": "No one in your pool yet. Participants join it when they finish one of your interviews and tick \"invite me to future studies\".",
+    "eligibleCount_one": "{{count}} person can be invited",
+    "eligibleCount_other": "{{count}} people can be invited",
+    "selectAll": "Select all",
+    "blockedCount_one": "{{count}} person can't be invited right now",
+    "blockedCount_other": "{{count}} people can't be invited right now",
+    "blockedParticipated": "already took part in this study",
+    "blockedInvited": "already invited to this study",
+    "blockedCooldown": "invited elsewhere in the last {{days}} days",
+    "funnelLine": "So far: {{invited}} invited, {{started}} started, {{completed}} completed.",
+    "guardrailsHint": "Each person can be invited at most once per study and once every {{days}} days across all studies. {{remaining}} invitations left today.",
+    "sendCta_one": "Send {{count}} invitation",
+    "sendCta_other": "Send {{count}} invitations",
+    "sending": "Sending…",
+    "cancel": "Cancel",
+    "sentToast_one": "{{count}} invitation sent",
+    "sentToast_other": "{{count}} invitations sent",
+    "allSkipped": "No invitations were sent. Check the reasons next to each person."
   }
 }

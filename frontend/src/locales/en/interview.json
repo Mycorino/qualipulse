@@ -162,7 +162,7 @@
     "seniorityQ": "What's your level?",
     "companySizeQ": "How big is the company you work for?",
     "consentQ": "Can we invite you to future studies?",
-    "consentHelp": "We'll only contact you about paid studies that match your profile. You can opt out anytime.",
+    "consentHelp": "We'll only contact you about studies that match your profile. You can opt out anytime.",
     "consentYes": "Yes, keep me posted",
     "consentNo": "No thanks",
     "ageOptions": {

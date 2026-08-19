@@ -204,7 +204,7 @@ from app.routers import (
     auth, projects, links, interview, export, audio, files,
     analysis, responses, coding, memos, billing, admin, affiliate, blog,
     templates, team, surveys, public_surveys, studies, copilot,
-    scheduled_emails, panel, synthesis, telemetry, seo,
+    scheduled_emails, panel, panel_recontact, synthesis, telemetry, seo,
 )
 
 app.include_router(auth.router)
@@ -231,6 +231,7 @@ app.include_router(copilot.router)
 app.include_router(synthesis.router)
 app.include_router(scheduled_emails.router)
 app.include_router(panel.router)
+app.include_router(panel_recontact.router)
 app.include_router(telemetry.router)
 app.include_router(seo.router)
 
