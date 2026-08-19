@@ -39,6 +39,14 @@ logger = logging.getLogger("auto_interview")
 # Operations that make up the participant interview loop's AI spend.
 _INTERVIEW_COST_OPERATIONS = ("interview_turn", "interview_warmup", "stt", "tts")
 
+# How long an in-progress interview stays resumable (measured from the last
+# answered turn). Must cover the reminder-email schedule in
+# routers/scheduled_emails.py: the second reminder lands around day 3.
+RESUME_MAX_IDLE_DAYS = 7
+# Idle gap beyond which we rebase the pacing clock on resume (see
+# check_resume_by_email). Short same-sitting reloads keep the true clock.
+RESUME_REBASE_IDLE_SECONDS = 30 * 60
+
 
 def _check_interview_budget(
     db: Session, company_id: str, *, in_flight: bool = False
@@ -606,17 +614,35 @@ def check_resume_by_email(
     if not participant:
         return ResumeCheckResponse(found=False)
 
-    # Reject stale sessions (>24h old) — elapsed-time math + topic memory
-    # are no longer meaningful, and the participant is better off starting fresh.
-    if participant.started_at:
-        started = participant.started_at
-        if started.tzinfo is not None:
-            started = started.replace(tzinfo=None)
-        if (datetime.utcnow() - started).total_seconds() > 24 * 3600:
-            return ResumeCheckResponse(found=False)
-
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
     last_turn = turns[-1] if turns else None
+
+    # Resume window: reject sessions idle for more than RESUME_MAX_IDLE_DAYS
+    # (measured from the last answered turn, not the start) — beyond that the
+    # participant is better off starting fresh.
+    def _naive(dt: datetime) -> datetime:
+        return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
+
+    now = datetime.utcnow()
+    started = _naive(participant.started_at) if participant.started_at else now
+    last_activity = (
+        _naive(last_turn.created_at)
+        if last_turn is not None and last_turn.created_at
+        else started
+    )
+    if (now - last_activity).total_seconds() > RESUME_MAX_IDLE_DAYS * 86400:
+        return ResumeCheckResponse(found=False)
+
+    # Rebase the pacing clock after a long break. The engine paces the
+    # interview on wall-clock elapsed time from started_at, so a participant
+    # coming back a day later (e.g. from a reminder email) would instantly
+    # trip the "time's up" close gate. Shift started_at so elapsed reflects
+    # the time actually spent interviewing, not the days spent away.
+    idle_seconds = (now - last_activity).total_seconds()
+    if idle_seconds > RESUME_REBASE_IDLE_SECONDS:
+        active_seconds = max(0.0, (last_activity - started).total_seconds())
+        participant.started_at = now - timedelta(seconds=active_seconds)
+        db.commit()
     return ResumeCheckResponse(
         found=True,
         participant_id=participant.id,
