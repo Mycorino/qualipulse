@@ -235,6 +235,13 @@
       "setup": "Préparer ce guide d'entretien pour la collecte.",
       "responses": "Suivre les données et repérer tôt les problèmes de qualité.",
       "analysis": "Transformer les transcriptions en décisions."
+    },
+    "teaser": {
+      "eyebrow": "✦ Copilote de recherche",
+      "firstRun": "Je suis votre copilote de recherche. Je peux rédiger vos questions, votre screening et vos analyses, que vous validez en un clic.",
+      "cta": "Aidez-moi à le faire",
+      "ctaNudge": "Voir",
+      "dismiss": "Ignorer la suggestion"
     }
   },
   "nba": {

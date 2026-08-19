@@ -11,6 +11,12 @@ import type {
 } from "../api/copilot";
 import type { NextAction } from "../copilot/nextAction";
 import type { Nudge } from "../copilot/signals";
+import {
+  hasOpenedCopilot,
+  markCopilotOpened,
+  markTeaserSeen,
+  teaserSeen,
+} from "../copilot/teaser";
 import { useNudgeAnnounce } from "../copilot/useNudgeAnnounce";
 import { NextActionChip } from "./NextActionChip";
 import { useToast } from "./Toast";
@@ -43,6 +49,17 @@ type ThreadItem =
        * to the model; renders an inline notice + retry. */
       error?: boolean;
     };
+
+/** The proactive dock popup — a fresh nudge wins over the static NBA. */
+type Teaser =
+  | { key: string; kind: "nudge"; nudge: Nudge }
+  | { key: string; kind: "nba"; action: NextAction };
+
+/** How long the collapsed dock waits before popping the teaser — it should
+ * read as "the copilot noticed something", not a page-load banner. */
+const TEASER_SHOW_DELAY_MS = 2500;
+/** After this, the teaser folds away; the dock chip keeps the suggestion. */
+const TEASER_AUTO_HIDE_MS = 15000;
 
 /** Server JSON → ThreadItem[], defensively. A malformed persisted item
  * (missing `actions`, unknown kind) must not crash the whole panel. */
@@ -106,6 +123,7 @@ export function ResearchCopilotPanel({
   onDismissNudge,
   intro,
   disableInput,
+  suppressTeaser,
 }: {
   target: CopilotTarget;
   onApplied: () => void;
@@ -125,6 +143,9 @@ export function ResearchCopilotPanel({
   intro?: { lead: string; ctaLabel?: string; onCta?: () => void };
   /** Hide the free-text input (surfaces with no chat backend). */
   disableInput?: boolean;
+  /** Never pop the proactive teaser (e.g. while the demo tour is guiding
+   * the user — two competing popups would fight for attention). */
+  suppressTeaser?: boolean;
 }) {
   const { t } = useTranslation("dashboard");
   const { toast } = useToast();
@@ -160,6 +181,27 @@ export function ResearchCopilotPanel({
   // True while the user is scrolled to (near) the bottom — auto-scroll
   // only then, so reading an earlier proposal mid-stream isn't yanked.
   const isAtBottom = useRef(true);
+  // ── Proactive teaser (collapsed dock popup) ──
+  const [teaser, setTeaser] = useState<Teaser | null>(null);
+  // First-run explainer is decided when the teaser pops (reading it at
+  // render time would flip mid-display once the panel gets opened).
+  const [teaserFirstRun, setTeaserFirstRun] = useState(false);
+  // At most one teaser per surface mount — a nudge landing later must not
+  // pop a second bubble in the same visit.
+  const teaserShownFor = useRef<string | null>(null);
+  // Prompt queued by the teaser CTA — sent once the panel is open AND the
+  // persisted conversation finished hydrating (sending earlier would race
+  // the thread restore).
+  const pendingPromptRef = useRef<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  /** Open the panel; optionally queue a prompt to auto-send once hydrated. */
+  const openPanel = (prompt?: string) => {
+    markCopilotOpened();
+    if (prompt && !disableInput) pendingPromptRef.current = prompt;
+    setTeaser(null);
+    setOpen(true);
+  };
 
   const updateThread = (updater: (cur: ThreadItem[]) => ThreadItem[]) => {
     threadData.current = updater(threadData.current);
@@ -171,6 +213,9 @@ export function ResearchCopilotPanel({
   useEffect(() => {
     let cancelled = false;
     loaded.current = false;
+    setHydrated(false);
+    pendingPromptRef.current = null;
+    setTeaser(null);
     turnToken.current += 1; // invalidate any in-flight turn for the old target
     abortRef.current?.abort();
     abortRef.current = null;
@@ -196,7 +241,10 @@ export function ResearchCopilotPanel({
       })
       .catch(() => undefined)
       .finally(() => {
-        if (!cancelled) loaded.current = true;
+        if (!cancelled) {
+          loaded.current = true;
+          setHydrated(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -269,6 +317,56 @@ export function ResearchCopilotPanel({
     if (!busy && open && !disableInput) inputRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy]);
+
+  // ── Teaser: pick + pop ──
+  // A fresh nudge (event-driven, "your analysis just finished") beats the
+  // static NBA. Each candidate teases once ever (persisted); the surface
+  // pops at most one bubble per mount; the delay makes it read as noticed,
+  // not preloaded.
+  const nudgeIdsKey = (nudges ?? []).map((n) => n.id).join(",");
+  useEffect(() => {
+    if (open || suppressTeaser) return;
+    if (teaserShownFor.current === target.id) return;
+    let candidate: Teaser | null = null;
+    const freshNudge = (nudges ?? []).find(
+      (n) => !teaserSeen(`${target.id}:nudge:${n.id}`),
+    );
+    if (freshNudge) {
+      candidate = {
+        key: `${target.id}:nudge:${freshNudge.id}`,
+        kind: "nudge",
+        nudge: freshNudge,
+      };
+    } else if (
+      nextAction &&
+      nextAction.kind === "do" &&
+      !teaserSeen(`${target.id}:nba:${nextAction.id}`)
+    ) {
+      candidate = {
+        key: `${target.id}:nba:${nextAction.id}`,
+        kind: "nba",
+        action: nextAction,
+      };
+    }
+    if (!candidate) return;
+    const picked = candidate;
+    const timer = setTimeout(() => {
+      teaserShownFor.current = target.id;
+      markTeaserSeen(picked.key);
+      setTeaserFirstRun(!hasOpenedCopilot());
+      setTeaser(picked);
+    }, TEASER_SHOW_DELAY_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, suppressTeaser, target.id, nextAction?.id, nudgeIdsKey]);
+
+  // Teaser: fold away on its own — the dock chip keeps the suggestion, so
+  // an ignored bubble never lingers (and never pops again).
+  useEffect(() => {
+    if (!teaser) return;
+    const timer = setTimeout(() => setTeaser(null), TEASER_AUTO_HIDE_MS);
+    return () => clearTimeout(timer);
+  }, [teaser]);
 
   // Error bubbles (and empty drafts) are UI artifacts — never replay them
   // to the model as real assistant turns.
@@ -377,6 +475,18 @@ export function ResearchCopilotPanel({
     await runTurnWith(baseItems);
   };
 
+  // Fire the teaser's queued prompt once the panel is open and the persisted
+  // conversation has hydrated — the copilot starts working immediately, so
+  // one click on the popup demonstrates what the agent actually does.
+  useEffect(() => {
+    if (!open || !hydrated || busy || disableInput) return;
+    const prompt = pendingPromptRef.current;
+    if (!prompt) return;
+    pendingPromptRef.current = null;
+    send(prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, hydrated, busy]);
+
   /** Re-run the turn behind a failed assistant bubble, in place. */
   const retryLast = async () => {
     if (busy) return;
@@ -466,23 +576,83 @@ export function ResearchCopilotPanel({
   if (!open) {
     // Collapsed dock — the FAB, plus the live next-best-action when there
     // is one. A soft dot signals an unseen nudge. Either opens the copilot.
+    // A freshly-picked teaser pops as a speech bubble above the FAB; while
+    // it's up the chip hides (both would repeat the same suggestion).
     const hasNudge = (nudges?.length ?? 0) > 0;
     return (
       <div className="copilot-dock">
         <div className="sr-only" aria-live="polite" role="status">
           {announce}
         </div>
-        {nextAction && nextAction.kind === "do" && (
+        {teaser && (
+          <div className="copilot-teaser" role="status" aria-live="polite">
+            <button
+              type="button"
+              className="copilot-teaser__dismiss"
+              onClick={() => setTeaser(null)}
+              aria-label={t("copilot.teaser.dismiss")}
+            >
+              ✕
+            </button>
+            <span className="copilot-teaser__eyebrow">
+              {t("copilot.teaser.eyebrow")}
+            </span>
+            {teaserFirstRun && (
+              <p className="copilot-teaser__intro">
+                {t("copilot.teaser.firstRun")}
+              </p>
+            )}
+            {teaser.kind === "nudge" ? (
+              <>
+                <p className="copilot-teaser__body">
+                  {teaser.nudge.textKey
+                    ? t(teaser.nudge.textKey, teaser.nudge.textParams)
+                    : teaser.nudge.text}
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm copilot-teaser__cta"
+                  onClick={() => openPanel()}
+                >
+                  {t("copilot.teaser.ctaNudge")}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="copilot-teaser__body">
+                  {t(teaser.action.labelKey, teaser.action.params)}
+                </p>
+                <p className="copilot-teaser__reason">
+                  {t(teaser.action.reasonKey, teaser.action.params)}
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm copilot-teaser__cta"
+                  onClick={() =>
+                    openPanel(
+                      t("copilot.helpMePrefix", {
+                        label: t(teaser.action.labelKey, teaser.action.params),
+                      }),
+                    )
+                  }
+                >
+                  {t("copilot.teaser.cta")}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {!teaser && nextAction && nextAction.kind === "do" && (
           <NextActionChip
             action={nextAction}
             variant="dock"
-            onRun={() => setOpen(true)}
+            onRun={() => openPanel()}
           />
         )}
         <button
           type="button"
           className="copilot-fab"
-          onClick={() => setOpen(true)}
+          onClick={() => openPanel()}
           aria-label={
             hasNudge ? t("copilot.openWithUpdates") : t("copilot.open")
           }

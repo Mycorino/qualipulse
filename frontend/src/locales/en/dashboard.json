@@ -235,6 +235,13 @@
       "setup": "Get this interview guide ready to collect.",
       "responses": "Watch the data land and flag quality problems early.",
       "analysis": "Turn transcripts into decisions."
+    },
+    "teaser": {
+      "eyebrow": "✦ Research Copilot",
+      "firstRun": "I'm your research copilot. I can draft questions, screeners and analyses that you approve with one click.",
+      "cta": "Help me do this",
+      "ctaNudge": "Show me",
+      "dismiss": "Dismiss suggestion"
     }
   },
   "nba": {
