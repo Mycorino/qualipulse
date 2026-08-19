@@ -593,7 +593,8 @@ export default function ProjectDetail() {
     // a plain run.
     try {
       const readiness = await getAnalysisReadiness(id!);
-      if (readiness.tagging_state === "untagged" && readiness.completed_count > 0) {
+      const lowN = readiness.completed_count > 0 && readiness.completed_count < 3;
+      if ((readiness.tagging_state === "untagged" || lowN) && readiness.completed_count > 0) {
         setGateReadiness(readiness);
         return;
       }
@@ -3918,8 +3919,29 @@ export default function ProjectDetail() {
                 ).length;
                 const canRefine = actionableAnnotationCount > 0 || researcherContext.trim().length > 0;
 
+                const isSmallSample = Boolean(r.small_sample) || (r.participant_count > 0 && r.participant_count < 3);
+
                 return (
                   <div className="analysis-report">
+                    {isSmallSample && (
+                      <div
+                        role="note"
+                        style={{
+                          border: "1.5px solid var(--warning-border, #d9a441)",
+                          background: "var(--warning-bg, #fdf6ee)",
+                          borderRadius: "var(--radius)",
+                          padding: "12px 16px",
+                          marginBottom: 14,
+                          fontSize: 13,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        <strong style={{ color: "var(--warning-text)", display: "block", marginBottom: 2 }}>
+                          {tAnalysis("smallSampleTitle")}
+                        </strong>
+                        {tAnalysis("smallSampleBody", { count: r.participant_count })}
+                      </div>
+                    )}
                     <h3 style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{tAnalysis("summary")}</h3>
                     <div className="analysis-summary">{r.summary}</div>
                     <div className="analysis-meta">
@@ -4491,8 +4513,12 @@ export default function ProjectDetail() {
         )}
       </main>
 
-      {/* ── Analysis readiness gate (untagged study → offer AI coding) ──── */}
-      {gateReadiness && (
+      {/* ── Analysis readiness gate (untagged study → offer AI coding;
+             fewer than 3 interviews → set first-read expectations) ──────── */}
+      {gateReadiness && (() => {
+        const gateUntagged = gateReadiness.tagging_state === "untagged";
+        const gateLowN = gateReadiness.completed_count > 0 && gateReadiness.completed_count < 3;
+        return (
         <div
           className="modal-overlay"
           role="dialog"
@@ -4502,31 +4528,55 @@ export default function ProjectDetail() {
         >
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <button className="modal-close" onClick={() => setGateReadiness(null)} aria-label={tProject("a11y.close")}>×</button>
-            <h3 id="analysis-gate-title" style={{ marginTop: 0 }}>{tAnalysis("gate.title")}</h3>
-            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-              {tAnalysis("gate.body", { count: gateReadiness.completed_count })}
-            </p>
+            <h3 id="analysis-gate-title" style={{ marginTop: 0 }}>
+              {gateLowN ? tAnalysis("gate.lowNTitle", { count: gateReadiness.completed_count }) : tAnalysis("gate.title")}
+            </h3>
+            {gateLowN && (
+              <p style={{ fontSize: 13, color: "var(--warning-text)", lineHeight: 1.5, fontWeight: 500 }}>
+                {tAnalysis("gate.lowNBody", { count: gateReadiness.completed_count })}
+              </p>
+            )}
+            {gateUntagged && (
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                {tAnalysis("gate.body", { count: gateReadiness.completed_count })}
+              </p>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
-              <button className="btn btn-ai btn-sm" onClick={() => runAnalysisNow(true)}>
-                ✨ {tAnalysis("gate.autoTag")}
-              </button>
-              <p className="muted-text" style={{ fontSize: 12, margin: "0 0 4px" }}>{tAnalysis("gate.autoTagHint")}</p>
-              <button className="btn btn-secondary btn-sm" onClick={() => runAnalysisNow(false)}>
-                {tAnalysis("gate.runAnyway")}
-              </button>
+              {gateUntagged && (
+                <>
+                  <button className="btn btn-ai btn-sm" onClick={() => runAnalysisNow(true)}>
+                    ✨ {tAnalysis("gate.autoTag")}
+                  </button>
+                  <p className="muted-text" style={{ fontSize: 12, margin: "0 0 4px" }}>{tAnalysis("gate.autoTagHint")}</p>
+                </>
+              )}
               <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setGateReadiness(null);
-                  setTab("responses");
-                }}
+                className={gateUntagged ? "btn btn-secondary btn-sm" : "btn btn-ai btn-sm"}
+                onClick={() => runAnalysisNow(false)}
               >
-                {tAnalysis("gate.tagFirst")}
+                {gateLowN ? tAnalysis("gate.runFirstRead") : tAnalysis("gate.runAnyway")}
               </button>
+              {gateUntagged && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setGateReadiness(null);
+                    setTab("responses");
+                  }}
+                >
+                  {tAnalysis("gate.tagFirst")}
+                </button>
+              )}
+              {gateLowN && (
+                <button className="btn btn-ghost btn-sm" onClick={() => setGateReadiness(null)}>
+                  {tAnalysis("gate.waitForMore")}
+                </button>
+              )}
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── Delete study confirmation (type-the-name) ───────────────────── */}
       {deleteProjectOpen && project && (

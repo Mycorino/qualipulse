@@ -288,6 +288,8 @@ export interface AnalysisReport {
   participant_count: number;
   /** Deterministic per-code tag counts, computed server-side in Python. */
   codebook_stats?: CodebookStat[];
+  /** Deterministic server-side flag: fewer than 3 interviews, first read not findings. */
+  small_sample?: boolean;
 }
 export type AnalysisStage = "auto_tagging" | "preparing" | "synthesizing" | "verifying";
 

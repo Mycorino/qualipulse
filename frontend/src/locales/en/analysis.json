@@ -113,7 +113,13 @@
     "autoTag": "Let AI code the interviews first, then analyse",
     "autoTagHint": "AI suggestions stay pending for your review, your codebook is never changed without your accept.",
     "runAnyway": "Analyse without coding",
-    "tagFirst": "I'll tag quotes myself first"
+    "tagFirst": "I'll tag quotes myself first",
+    "lowNTitle_one": "Analyse {{count}} interview?",
+    "lowNTitle_other": "Analyse {{count}} interviews?",
+    "lowNBody_one": "With {{count}} completed interview, the result is a first read, not findings: themes need at least two participants and confidence will be marked anecdotal.",
+    "lowNBody_other": "With {{count}} completed interviews, the result is a first read, not findings: themes need at least two participants and confidence will be marked anecdotal.",
+    "runFirstRead": "Run a first read anyway",
+    "waitForMore": "Wait for more interviews"
   },
   "failedTitle": "We couldn't complete your analysis",
   "failedTimeout": "The analysis timed out, your dataset may be too large. Try filtering to a smaller group first.",
@@ -206,5 +212,8 @@
     }
   },
   "exportPdfBtn": "Open full report (PDF)",
-  "screeningFilterLabel": "Screening question"
+  "screeningFilterLabel": "Screening question",
+  "smallSampleTitle": "First read, not findings",
+  "smallSampleBody_one": "Based on {{count}} completed interview. At this size the analysis is an early, anecdotal read: themes need at least two participants, and nothing here is validated. Collect more interviews before acting on it.",
+  "smallSampleBody_other": "Based on {{count}} completed interviews. At this size the analysis is an early, anecdotal read: themes need at least two participants, and nothing here is validated. Collect more interviews before acting on it."
 }

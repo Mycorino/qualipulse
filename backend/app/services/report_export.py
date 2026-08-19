@@ -40,6 +40,8 @@ _STRINGS = {
         "ai_discovery": "AI discovery",
         "segment_filter": "Segment filter",
         "exec_summary": "Executive summary",
+        "small_sample_title": "First read, not findings",
+        "small_sample_body": "This analysis is based on {n} completed interview(s). At this sample size the output is an early, anecdotal read: themes need at least two participants, and no claim here should be treated as validated. Collect more interviews before acting on it.",
         "at_a_glance": "At a glance",
         "stat_participants": "Interviews analysed",
         "stat_themes": "Key themes",
@@ -138,6 +140,8 @@ _STRINGS = {
         "ai_discovery": "Découverte IA",
         "segment_filter": "Filtre de segment",
         "exec_summary": "Synthèse",
+        "small_sample_title": "Première lecture, pas des conclusions",
+        "small_sample_body": "Cette analyse repose sur {n} entretien(s) terminé(s). À cette taille d'échantillon, le résultat est une lecture préliminaire et anecdotique : un thème exige au moins deux participants, et aucune affirmation ne doit être considérée comme validée. Collectez plus d'entretiens avant d'agir.",
         "at_a_glance": "En un coup d'œil",
         "stat_participants": "Entretiens analysés",
         "stat_themes": "Thèmes clés",
@@ -370,6 +374,12 @@ section { margin-top: 44px; margin-bottom: 0; }
 .quote footer { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
 .quote__prompt { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; }
 .quote__unverified { font-size: 11.5px; color: var(--copper); margin-top: 4px; font-weight: 600; }
+
+.small-sample { border: 1.5px solid var(--copper); background: #fdf6ee;
+  padding: 14px 18px; margin: 18px 0 4px; max-width: 680px; }
+.small-sample h4 { font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--copper); margin-bottom: 6px; }
+.small-sample p { font-size: 13px; margin: 0; }
 
 .contract { background: #f4f6f4; padding: 16px 20px; font-size: 13px; margin-top: 22px; max-width: 680px; }
 .contract h4 { font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
@@ -1058,6 +1068,18 @@ def render_analysis_report_html(
     </section>
     """
 
+    # ── small-sample notice ───────────────────────────────────────────────
+    # Deterministic flag stamped by the analysis service; participant_count
+    # fallback covers reports generated before the flag existed.
+    n_analysed = analysis.participant_count or 0
+    is_small_sample = bool(report.get("small_sample")) or (0 < n_analysed < 3)
+    small_sample_notice = f"""
+    <aside class="small-sample avoid-break">
+      <h4>{L["small_sample_title"]}</h4>
+      <p>{L["small_sample_body"].format(n=n_analysed)}</p>
+    </aside>
+    """ if is_small_sample else ""
+
     # ── qualitative sections (shared verbatim with the Decision report) ───
     codebook_section = _codebook_section_html(report.get("codebook_stats", []) or [], L)
     themes_section = _themes_section_html(themes, roster, annot_by_theme, L)
@@ -1120,6 +1142,7 @@ def render_analysis_report_html(
 <div class="toolbar"><button onclick="window.print()">{L["print_btn"]}</button></div>
 <div class="sheet">
 {header}
+{small_sample_notice}
 {exec_summary}
 {glance}
 {design}

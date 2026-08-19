@@ -113,7 +113,13 @@
     "autoTag": "Laisser l'IA coder les entretiens, puis analyser",
     "autoTagHint": "Les suggestions de l'IA restent en attente de votre relecture, votre grille de codes n'est jamais modifiée sans votre accord.",
     "runAnyway": "Analyser sans codage",
-    "tagFirst": "Je tague d'abord des citations moi-même"
+    "tagFirst": "Je tague d'abord des citations moi-même",
+    "lowNTitle_one": "Analyser {{count}} entretien ?",
+    "lowNTitle_other": "Analyser {{count}} entretiens ?",
+    "lowNBody_one": "Avec {{count}} entretien terminé, le résultat est une première lecture, pas des conclusions : un thème exige au moins deux participants et la confiance sera marquée anecdotique.",
+    "lowNBody_other": "Avec {{count}} entretiens terminés, le résultat est une première lecture, pas des conclusions : un thème exige au moins deux participants et la confiance sera marquée anecdotique.",
+    "runFirstRead": "Lancer quand même une première lecture",
+    "waitForMore": "Attendre plus d'entretiens"
   },
   "failedTitle": "Nous n'avons pas pu terminer votre analyse",
   "failedTimeout": "L'analyse a expiré, votre jeu de données est peut-être trop volumineux. Essayez de filtrer un groupe plus restreint.",
@@ -206,5 +212,8 @@
     }
   },
   "exportPdfBtn": "Ouvrir le rapport complet (PDF)",
-  "screeningFilterLabel": "Question de screening"
+  "screeningFilterLabel": "Question de screening",
+  "smallSampleTitle": "Première lecture, pas des conclusions",
+  "smallSampleBody_one": "Basée sur {{count}} entretien terminé. À cette taille, l'analyse est une lecture préliminaire et anecdotique : un thème exige au moins deux participants, et rien ici n'est validé. Collectez plus d'entretiens avant d'agir.",
+  "smallSampleBody_other": "Basée sur {{count}} entretiens terminés. À cette taille, l'analyse est une lecture préliminaire et anecdotique : un thème exige au moins deux participants, et rien ici n'est validé. Collectez plus d'entretiens avant d'agir."
 }
