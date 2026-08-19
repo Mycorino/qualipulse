@@ -167,6 +167,21 @@ export default function ProjectDetail() {
   });
   // Inline unsaved-changes banner (replaces blocking window.confirm for tab switches)
   const [pendingTab, setPendingTab] = useState<Tab | null>(null);
+  // Overview "how to share" pointer → scroll to Setup's Recruit & share once
+  // the tab has rendered (the searchParams sync resets scroll, so scrolling
+  // from the click handler directly gets overridden)
+  const [scrollToRecruit, setScrollToRecruit] = useState(false);
+  useEffect(() => {
+    if (tab !== "setup" || !scrollToRecruit) return;
+    const timer = setTimeout(() => {
+      // Instant scroll on purpose: the Setup tab's first mount keeps
+      // relayouting for a moment, and Chrome cancels an in-flight smooth
+      // scroll on relayout, leaving the user stuck at the top.
+      document.getElementById("recruit-share")?.scrollIntoView({ block: "start" });
+      setScrollToRecruit(false);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [tab, scrollToRecruit]);
   // advancedPromptOpen removed — system prompt hidden from researchers
   const [accountName, setAccountName] = useState<string>("");
 
@@ -2441,6 +2456,20 @@ export default function ProjectDetail() {
                     </div>
                   ))}
                 </div>
+              )}
+              {!project.is_demo && links.some((l) => l.is_active) && (
+                <p className="share-pointer">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setScrollToRecruit(true);
+                      setTab("setup");
+                    }}
+                  >
+                    {tProject("overview.shareHowTo")}
+                  </button>
+                </p>
               )}
             </section>
           </div>

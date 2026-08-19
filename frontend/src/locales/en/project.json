@@ -294,6 +294,7 @@
     "newLink": "+ New link",
     "demoLinkDisabled": "Demo projects don't support live interviews",
     "noLinksHint": "No links yet. Generate one to share with participants.",
+    "shareHowTo": "How to share this link? Get ready-to-send invitations",
     "linkBlockedTitle": "Not enough credits for your target",
     "creditGateTitle": "Not enough credits to field this study",
     "creditGateBody": "Your target is {{target}} interviews, but you have {{credits}} credit(s), 1 credit = 1 completed interview. Lower your target or get more credits to generate the link.",
