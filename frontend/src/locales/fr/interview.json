@@ -162,7 +162,7 @@
     "seniorityQ": "Quel est votre niveau ?",
     "companySizeQ": "Quelle est la taille de l'entreprise où vous travaillez ?",
     "consentQ": "Pouvons-nous vous inviter à de futures études ?",
-    "consentHelp": "Nous vous contacterons uniquement pour des études rémunérées correspondant à votre profil. Vous pouvez vous désinscrire à tout moment.",
+    "consentHelp": "Nous vous contacterons uniquement pour des études correspondant à votre profil. Vous pouvez vous désinscrire à tout moment.",
     "consentYes": "Oui, tenez-moi informé·e",
     "consentNo": "Non merci",
     "ageOptions": {

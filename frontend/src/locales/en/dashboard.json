@@ -392,7 +392,8 @@
       "memos": "Decision memos",
       "reports": "Reports",
       "account": "Account",
-      "breadcrumbAria": "Breadcrumb"
+      "breadcrumbAria": "Breadcrumb",
+      "pool": "Participants"
     },
     "credits": {
       "left": "credits left",
@@ -500,5 +501,28 @@
       "restoredToast": "“{{name}}” restored",
       "error": "Something went wrong, please try again."
     }
+  },
+  "pool": {
+    "title": "Participant pool",
+    "subtitle": "Past participants who agreed to be recontacted for future studies. Invite them from a study's Recruit & share panel.",
+    "statPool": "in your pool",
+    "statInvited30d": "invited in the last 30 days",
+    "empty": "Your pool is empty for now. It fills up as participants finish your interviews and tick \"invite me to future studies\" on the closing screen.",
+    "filter": {
+      "country": "Country",
+      "job_function": "Job function",
+      "age_range": "Age range"
+    },
+    "clearFilters": "Clear filters",
+    "col": {
+      "person": "Person",
+      "profile": "Profile",
+      "studies": "Studies",
+      "invites": "Invites",
+      "lastInvited": "Last invited",
+      "lastActive": "Last active"
+    },
+    "noMatch": "No one matches these filters.",
+    "inviteHint": "To invite people from this pool, open a study and use \"Invite past participants\" in its Recruit & share section. Everyone here can withdraw at any time via the link in each invitation."
   }
 }

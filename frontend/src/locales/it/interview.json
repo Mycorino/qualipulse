@@ -162,7 +162,7 @@
     "seniorityQ": "Qual è il suo livello?",
     "companySizeQ": "Quanto è grande l'azienda per cui lavora?",
     "consentQ": "Possiamo invitarla a studi futuri?",
-    "consentHelp": "La contatteremo solo per studi retribuiti adatti al suo profilo. Può annullare l'iscrizione in qualsiasi momento.",
+    "consentHelp": "La contatteremo solo per studi adatti al suo profilo. Può annullare l'iscrizione in qualsiasi momento.",
     "consentYes": "Sì, tienimi aggiornato",
     "consentNo": "No, grazie",
     "ageOptions": {

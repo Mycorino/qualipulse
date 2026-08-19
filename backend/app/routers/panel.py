@@ -189,6 +189,42 @@ def confirm_panel_join(request: Request, body: TokenRequest, db: Session = Depen
     return {"token": ps.create_panel_session(profile.email)}
 
 
+@router.post("/opt-out")
+@limiter.limit("20/minute")
+def opt_out(request: Request, body: TokenRequest, db: Session = Depends(get_db)):
+    """Withdraw recontact consent via the signed link in an invite email.
+
+    Idempotent — re-clicking keeps returning ok. Consent is flipped off on the
+    profile and mirrored onto every participant row for that email so the
+    researcher-facing consent badge goes dark everywhere at once.
+    """
+    email = ps.resolve_optout_token(body.token)
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired opt-out link.",
+        )
+    profile = (
+        db.query(PanelProfile)
+        .filter(func.lower(PanelProfile.email) == email.lower())
+        .first()
+    )
+    if profile is not None and profile.panel_consent:
+        profile.panel_consent = False
+        from app.models.interview import Participant
+
+        participants = (
+            db.query(Participant)
+            .filter(func.lower(Participant.email) == email.lower())
+            .all()
+        )
+        for p in participants:
+            p.panel_consent = False
+        db.commit()
+        logger.info("panel opt-out recorded for profile=%s", profile.id)
+    return {"ok": True}
+
+
 @router.post("/request-access")
 @limiter.limit("5/minute")
 def request_access(request: Request, body: RequestAccessRequest, db: Session = Depends(get_db)):

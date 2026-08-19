@@ -1098,7 +1098,8 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Abuse/cost protection: per-workspace daily AI-spend ceiling on the public interview loop (`INTERVIEW_DAILY_COST_LIMIT_USD`, default $50; blocks `/start` at 1x, `/respond` at 2x grace), mirroring the copilot's `COPILOT_DAILY_COST_LIMIT_USD`.
 - [x] Client-side error reporting: SPA window.onerror/unhandledrejection → `POST /telemetry/client-error` (rate-limited, capped payload) → backend ERROR log → Sentry/Cloud Logging. No frontend SDK (VITE_ vars are baked at build; the pipeline injects no DSN).
 - [ ] Usage counters enforcement (`interview_count`, `storage_bytes` fields exist, not yet incremented — dead columns; `/billing` reads them as 0)
-- [ ] Email invitation sending (template exists, no send endpoint)
+- [x] Email invitation sending: manual typed-email invites per link (`POST /projects/{id}/links/{lid}/invites`, max 20, untracked) AND panel recontact invites (below)
+- [x] Panel recontact (V1+V2): workspace-scoped pool of past participants who consented to future studies (`PanelProfile.panel_consent` captured post-interview). Send side: `GET /projects/{id}/invite-candidates` (pool minus already-participated / already-invited / 7-day platform cooldown, blocked rows kept with reason), `POST /projects/{id}/invites` (claim-then-send: `StudyInvite` row committed under a `(project_id, email)` unique constraint BEFORE the email, released if the provider refuses; per-workspace daily cap `INVITE_DAILY_LIMIT`, batch max 100, verified email + editor role required, demo projects refused), `GET /projects/{id}/invites` (funnel derived by joining participants on `(project_id, lower(email))` — never stored), `GET /workspace/panel` (V2 Participants page payload). Emails go out in the panelist's `preferred_language` (interview_invite copy in all 6 langs) with a signed one-click opt-out link (`POST /panel/opt-out`, 1y token, flips `panel_consent` + mirrors onto participant rows; frontend page `/panel/optout` requires a button click so scanner prefetch can't unsubscribe). UI: "Invite past participants" modal in the Setup tab's Recruit & share panel; workspace "Participants" rail page at `/pool` (`ParticipantPool.tsx`) with attribute filters + per-person invite/participation history. Logic in `services/panel_invites.py`, router `routers/panel_recontact.py`. Alembic 0062. Tests: `backend/tests/test_panel_recontact.py`.
 - [x] Language-aware TTS voice (`gpt-4o-mini-tts` + per-language accent instructions in `services/tts.py`)
 - [ ] Dashboard-level analytics across projects
 
@@ -1224,6 +1225,9 @@ gcloud builds list --region=europe-west1 --limit=5
 
 ### PanelTag
 `id`, `name` (unique), `category` (interest/behavior/consumer)
+
+### StudyInvite
+`id` (uuid str), `project_id` (FK Project, indexed), `company_id` (workspace owner at send time, indexed), `profile_id` (FK PanelProfile, SET NULL), `email` (lowercased, indexed), `language`, `sent_by` (company id of the sender), `sent_at` (indexed). Unique on `(project_id, email)` — one invite per person per study, enforced at the schema level. Append-only: funnel status (started/completed) is derived by joining `participants` on `(project_id, lower(email))`, never stored. Alembic 0062.
 
 ### ParticipantMagicToken
 `id`, `email` (indexed), `token` (unique, indexed), `interview_link_token`, `used`, `expires_at`, `created_at`
@@ -1410,6 +1414,15 @@ All copilot POST endpoints return **SSE** (`text/event-stream`) — events `stat
 | POST | `/admin/blog` | X-Admin-Key | Create post |
 | PUT | `/admin/blog/:id` | X-Admin-Key | Update post |
 | DELETE | `/admin/blog/:id` | X-Admin-Key | Delete post |
+
+### Panel recontact (`/projects/{id}/invite*` + `/workspace/panel` + `/panel/opt-out`)
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/projects/{id}/invite-candidates` | Yes | Workspace pool with per-person `blocked_reason` (already_participated / already_invited / cooldown) + guardrail numbers |
+| POST | `/projects/{id}/invites` | Yes (editor, verified email) | Send invites to selected `profile_ids` (claim-then-send, daily cap, 100/batch); returns `{sent, skipped[]}` |
+| GET | `/projects/{id}/invites` | Yes | Invite list + derived funnel `{invited, started, completed}` |
+| GET | `/workspace/panel` | Yes | Consented pool with participation + invite history (V2 `/pool` page) |
+| POST | `/panel/opt-out` | No (20/min) | Withdraw recontact consent via signed token from the invite email footer |
 
 ### Admin (`/admin`)
 | Method | Path | Auth | Description |

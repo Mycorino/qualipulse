@@ -49,5 +49,15 @@
     "media": "Médias",
     "values": "À propos de vous",
     "identity": "Identité"
+  },
+  "optout": {
+    "title": "Ne plus recevoir d'invitations aux études ?",
+    "body": "Vous ne serez plus contacté·e pour de futures études. Vos réponses aux entretiens passés ne sont pas affectées.",
+    "cta": "Oui, arrêter les invitations",
+    "working": "Un instant…",
+    "doneTitle": "Vous êtes désinscrit·e",
+    "doneBody": "Vous ne recevrez plus d'invitations aux études. Vous changez d'avis ? Vous pourrez vous réinscrire à la fin de votre prochain entretien.",
+    "errorTitle": "Ce lien n'est pas valide",
+    "errorBody": "Le lien de désinscription a peut-être expiré. Répondez à l'email d'invitation et nous vous retirerons manuellement."
   }
 }

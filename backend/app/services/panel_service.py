@@ -53,6 +53,36 @@ def resolve_panel_email(token: str | None) -> str | None:
     return email if isinstance(email, str) and email else None
 
 
+# ── Recontact opt-out token ──────────────────────────────────────────────────
+# Signed link embedded in every study-invite email. Long-lived on purpose:
+# GDPR says withdrawing consent must stay as easy as giving it, so the link
+# in a months-old email should still work.
+
+PANEL_OPTOUT_DAYS = 365
+
+
+def create_optout_token(email: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(days=PANEL_OPTOUT_DAYS)
+    return jwt.encode(
+        {"email": email, "type": "panel_optout", "exp": expire},
+        settings.SECRET_KEY, algorithm=ALGORITHM,
+    )
+
+
+def resolve_optout_token(token: str | None) -> str | None:
+    """Return the email a valid panel_optout token belongs to."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("type") != "panel_optout":
+        return None
+    email = payload.get("email")
+    return email if isinstance(email, str) and email else None
+
+
 # ── Public join (double opt-in) token ────────────────────────────────────────
 
 def create_join_token(email: str, first_name: str | None, lang: str) -> str:

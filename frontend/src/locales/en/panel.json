@@ -49,5 +49,15 @@
     "media": "Media",
     "values": "About you",
     "identity": "Identity"
+  },
+  "optout": {
+    "title": "Stop receiving study invitations?",
+    "body": "You'll no longer be contacted about future studies. Your past interview answers are not affected.",
+    "cta": "Yes, stop invitations",
+    "working": "One moment…",
+    "doneTitle": "You're unsubscribed",
+    "doneBody": "You won't receive study invitations anymore. Changed your mind? You can opt back in at the end of your next interview.",
+    "errorTitle": "This link isn't valid",
+    "errorBody": "The opt-out link may have expired. Reply to the invitation email and we'll remove you manually."
   }
 }

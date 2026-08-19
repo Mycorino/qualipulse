@@ -124,7 +124,11 @@ def _unsubscribe_headers(email_type: str = "transactional") -> dict[str, str]:
 
 # ── Language utilities ─────────────────────────────────────────────────────
 
-_SUPPORTED_LANGS = ("en", "fr")
+# Researcher-facing emails only exist in en/fr; participant-facing sections
+# (interview_invite) carry all six interview languages. _c falls back to the
+# section's "en" block when a language has no translation, so widening this
+# tuple is safe for en/fr-only sections.
+_SUPPORTED_LANGS = ("en", "fr", "de", "es", "it", "pt")
 
 
 def _normalise_lang(lang: Optional[str]) -> str:
@@ -543,6 +547,8 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "body": "{sender_name} has invited you to a voice interview about <strong>{project_name}</strong>. It takes about 15-30 minutes and runs entirely in your browser.",
             "cta": "Start interview",
             "foot": "No account needed. Just click the button and speak naturally.",
+            "consent_note": "You're receiving this because you agreed to be recontacted for future studies after a previous interview.",
+            "optout_cta": "Stop receiving invitations",
         },
         "fr": {
             "subject": "Invitation à un entretien de recherche",
@@ -550,6 +556,44 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "body": "{sender_name} vous invite à un entretien vocal sur <strong>{project_name}</strong>. Cela prend environ 15 à 30 minutes et se déroule entièrement dans votre navigateur.",
             "cta": "Commencer l'entretien",
             "foot": "Aucun compte requis. Cliquez simplement sur le bouton et parlez naturellement.",
+            "consent_note": "Vous recevez cet email car vous avez accepté d'être recontacté·e pour de futures études après un précédent entretien.",
+            "optout_cta": "Ne plus recevoir d'invitations",
+        },
+        "de": {
+            "subject": "Einladung zu einem Forschungsinterview",
+            "heading": "Sie sind eingeladen",
+            "body": "{sender_name} lädt Sie zu einem Sprachinterview über <strong>{project_name}</strong> ein. Es dauert etwa 15 bis 30 Minuten und läuft vollständig in Ihrem Browser.",
+            "cta": "Interview starten",
+            "foot": "Kein Konto nötig. Klicken Sie einfach auf den Button und sprechen Sie ganz natürlich.",
+            "consent_note": "Sie erhalten diese E-Mail, weil Sie nach einem früheren Interview zugestimmt haben, für zukünftige Studien kontaktiert zu werden.",
+            "optout_cta": "Keine Einladungen mehr erhalten",
+        },
+        "es": {
+            "subject": "Invitación a una entrevista de investigación",
+            "heading": "Estás invitado/a a participar",
+            "body": "{sender_name} te invita a una entrevista de voz sobre <strong>{project_name}</strong>. Dura entre 15 y 30 minutos y se realiza íntegramente en tu navegador.",
+            "cta": "Comenzar la entrevista",
+            "foot": "No necesitas cuenta. Solo haz clic en el botón y habla con naturalidad.",
+            "consent_note": "Recibes este correo porque aceptaste que te contactáramos para futuros estudios tras una entrevista anterior.",
+            "optout_cta": "Dejar de recibir invitaciones",
+        },
+        "it": {
+            "subject": "Invito a un'intervista di ricerca",
+            "heading": "È invitato/a a partecipare",
+            "body": "{sender_name} La invita a un'intervista vocale su <strong>{project_name}</strong>. Dura circa 15-30 minuti e si svolge interamente nel browser.",
+            "cta": "Inizia l'intervista",
+            "foot": "Nessun account necessario. Basta cliccare il pulsante e parlare con naturalezza.",
+            "consent_note": "Riceve questa email perché ha accettato di essere ricontattato/a per studi futuri dopo una precedente intervista.",
+            "optout_cta": "Non ricevere più inviti",
+        },
+        "pt": {
+            "subject": "Convite para uma entrevista de investigação",
+            "heading": "Está convidado(a) a participar",
+            "body": "{sender_name} convida-o(a) para uma entrevista de voz sobre <strong>{project_name}</strong>. Demora cerca de 15 a 30 minutos e decorre inteiramente no seu navegador.",
+            "cta": "Começar a entrevista",
+            "foot": "Não precisa de conta. Basta clicar no botão e falar naturalmente.",
+            "consent_note": "Recebe este email porque aceitou ser recontactado(a) para estudos futuros após uma entrevista anterior.",
+            "optout_cta": "Deixar de receber convites",
         },
     },
     "interview_magic": {
@@ -1176,15 +1220,25 @@ def send_interview_invite(
     interview_url: str,
     sender_name: str,
     lang: str = "en",
+    optout_url: str | None = None,
 ) -> bool:
     lang = _normalise_lang(lang)
+    optout_block = ""
+    if optout_url:
+        # Recontact invites (panel flow) must carry a one-click withdrawal
+        # link — consent-based sends without one are a GDPR problem.
+        optout_block = f"""
+      <p style="color:#94a3b8;font-size:0.75rem;margin:16px 0 0;border-top:1px solid #e2e8f0;padding-top:12px;">
+        {_c("interview_invite", lang, "consent_note")}
+        <a href="{optout_url}" style="color:#64748b;">{_c("interview_invite", lang, "optout_cta")}</a>
+      </p>"""
     content = f"""
       <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("interview_invite", lang, "heading")}</h2>
       <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("interview_invite", lang, "body", sender_name=sender_name, project_name=project_name)}</p>
       <div style="text-align:center;margin:24px 0;">
         <a href="{interview_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:0.9rem;">{_c("interview_invite", lang, "cta")}</a>
       </div>
-      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("interview_invite", lang, "foot")}</p>
+      <p style="color:#94a3b8;font-size:0.85rem;margin:0;">{_c("interview_invite", lang, "foot")}</p>{optout_block}
     """
     return send_email(
         to=to,

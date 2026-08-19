@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from sqlalchemy import (
@@ -120,6 +121,35 @@ class PanelAnswer(Base):
 
     profile = relationship("PanelProfile", back_populates="answers")
     attribute = relationship("PanelAttribute", back_populates="answers")
+
+
+class StudyInvite(Base):
+    """One recontact invitation: a consented panelist asked to take part in a
+    specific study. Append-only — funnel status (started / completed) is never
+    stored here but derived by joining ``participants`` on
+    ``(project_id, lower(email))``, so replayed webhooks or engine changes
+    can't desync it. The unique constraint makes re-sends to the same person
+    for the same study impossible at the schema level.
+    """
+    __tablename__ = "study_invites"
+    __table_args__ = (
+        UniqueConstraint("project_id", "email", name="uq_invite_per_project_email"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = Column(
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Workspace owner of the project at send time — denormalised so the pool
+    # page and daily-cap queries never need a join through projects.
+    company_id = Column(String(36), nullable=False, index=True)
+    profile_id = Column(
+        Integer, ForeignKey("panel_profiles.id", ondelete="SET NULL"), nullable=True
+    )
+    email = Column(String, nullable=False, index=True)  # lowercased at write
+    language = Column(String, nullable=True)  # locale the email was sent in
+    sent_by = Column(String(36), nullable=True)  # company id of the sending user
+    sent_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
 class ParticipantMagicToken(Base):

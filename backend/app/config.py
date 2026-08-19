@@ -151,6 +151,11 @@ class Settings(BaseSettings):
     # so a real participant mid-session isn't cut off. 0 disables the gate.
     INTERVIEW_DAILY_COST_LIMIT_USD: float = 50.0
 
+    # Recontact invitations: max panel invites one workspace may send per
+    # rolling 24h. Protects the sending domain's reputation and the panel
+    # itself from over-contacting. 0 disables recontact sending entirely.
+    INVITE_DAILY_LIMIT: int = 200
+
     @property
     def allowed_origins_list(self) -> list[str]:
         if self.ALLOWED_ORIGINS == "*":

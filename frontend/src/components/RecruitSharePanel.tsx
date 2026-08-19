@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InterviewLink, ProjectResponse } from "../api/projects";
+import InvitePastParticipantsModal from "./InvitePastParticipantsModal";
 import { useToast } from "./Toast";
 
 /**
@@ -25,6 +26,7 @@ export default function RecruitSharePanel({
   const { t, i18n } = useTranslation("project");
   const { toast } = useToast();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
   const activeLink = links.find((l) => l.is_active) ?? null;
   const linkUrl = activeLink
@@ -148,7 +150,28 @@ export default function RecruitSharePanel({
               </div>
             ))}
           </div>
+
+          {!project.is_demo && (
+            <>
+              <h3 style={{ fontSize: 14, marginTop: 18, marginBottom: 2 }}>
+                {t("recontact.sectionTitle")}
+              </h3>
+              <p className="muted-text" style={{ fontSize: 12, marginBottom: 10 }}>
+                {t("recontact.sectionHint")}
+              </p>
+              <button className="btn btn-secondary btn-sm" onClick={() => setInviteModalOpen(true)}>
+                {t("recontact.openCta")}
+              </button>
+            </>
+          )}
         </>
+      )}
+
+      {inviteModalOpen && (
+        <InvitePastParticipantsModal
+          projectId={project.id}
+          onClose={() => setInviteModalOpen(false)}
+        />
       )}
     </section>
   );

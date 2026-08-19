@@ -645,5 +645,31 @@
     "postBody": "Nous recueillons des témoignages pour une étude. C'est une conversation vocale de {{duration}} minutes dans votre navigateur, sans rendez-vous ni appel. Si vous avez {{duration}} minutes et des choses à dire, on veut bien vous écouter : {{link}}",
     "shortLabel": "Message court (chat support, in-app, WhatsApp)",
     "shortBody": "Pourriez-vous nous aider avec un court entretien vocal de {{duration}} minutes ? Ça se passe dans votre navigateur, quand ça vous arrange : {{link}}"
+  },
+  "recontact": {
+    "sectionTitle": "Inviter d'anciens participants",
+    "sectionHint": "Les personnes de vos études précédentes qui ont accepté d'être recontactées. Les invitations partent par email dans la langue de chacun, avec un lien de désinscription en un clic.",
+    "openCta": "Inviter d'anciens participants",
+    "modalTitle": "Inviter d'anciens participants",
+    "modalSubtitle": "Participants consentants de vos études précédentes. Chaque personne reçoit le lien d'entretien par email, dans sa langue.",
+    "loading": "Chargement de votre vivier de participants…",
+    "emptyPool": "Personne dans votre vivier pour l'instant. Les participants le rejoignent en terminant un de vos entretiens et en cochant « invitez-moi aux prochaines études ».",
+    "eligibleCount_one": "{{count}} personne peut être invitée",
+    "eligibleCount_other": "{{count}} personnes peuvent être invitées",
+    "selectAll": "Tout sélectionner",
+    "blockedCount_one": "{{count}} personne ne peut pas être invitée pour le moment",
+    "blockedCount_other": "{{count}} personnes ne peuvent pas être invitées pour le moment",
+    "blockedParticipated": "a déjà participé à cette étude",
+    "blockedInvited": "déjà invité·e à cette étude",
+    "blockedCooldown": "invité·e ailleurs dans les {{days}} derniers jours",
+    "funnelLine": "À ce jour : {{invited}} invitations, {{started}} démarrés, {{completed}} terminés.",
+    "guardrailsHint": "Chaque personne peut être invitée au plus une fois par étude et une fois tous les {{days}} jours, toutes études confondues. {{remaining}} invitations restantes aujourd'hui.",
+    "sendCta_one": "Envoyer {{count}} invitation",
+    "sendCta_other": "Envoyer {{count}} invitations",
+    "sending": "Envoi…",
+    "cancel": "Annuler",
+    "sentToast_one": "{{count}} invitation envoyée",
+    "sentToast_other": "{{count}} invitations envoyées",
+    "allSkipped": "Aucune invitation envoyée. Consultez les raisons à côté de chaque personne."
   }
 }
