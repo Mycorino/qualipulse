@@ -294,6 +294,7 @@
     "newLink": "+ Nouveau lien",
     "demoLinkDisabled": "Les projets d'exemple ne prennent pas en charge les entretiens en direct",
     "noLinksHint": "Aucun lien pour l'instant. Générez-en un à partager avec les participants.",
+    "shareHowTo": "Comment partager ce lien ? Invitations prêtes à envoyer",
     "linkBlockedTitle": "Crédits insuffisants pour votre objectif",
     "creditGateTitle": "Crédits insuffisants pour mener cette étude",
     "creditGateBody": "Votre objectif est de {{target}} entretiens, mais vous avez {{credits}} crédit(s), 1 crédit = 1 entretien terminé. Réduisez votre objectif ou ajoutez des crédits pour générer le lien.",

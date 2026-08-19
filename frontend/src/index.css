@@ -1678,6 +1678,13 @@ select.field-input {
   gap: 6px;
 }
 
+/* Pointer from the Overview link list to Setup's Recruit & share section */
+.share-pointer {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
 /* Per-link participant cap */
 .link-cap-summary {
   display: flex;
