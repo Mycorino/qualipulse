@@ -5,7 +5,7 @@ from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestio
 from app.models.coding import ManualCode, QuoteTag, TagSuggestion
 from app.models.memo import ProjectMemo
 from app.models.usage import AIUsageLog
-from app.models.email_log import EmailSendLog
+from app.models.email_log import EmailSendLog, ParticipantEmailLog
 from app.models.panel import (
     PanelProfile,
     PanelTag,
@@ -40,6 +40,7 @@ __all__ = [
     "AdminAuditLog",
     "AIUsageLog",
     "EmailSendLog",
+    "ParticipantEmailLog",
     "Affiliate",
     "AffiliateReferral",
     "AffiliatePayout",

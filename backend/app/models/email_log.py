@@ -26,6 +26,38 @@ def _uuid() -> str:
     return str(uuid.uuid4())
 
 
+class ParticipantEmailLog(Base):
+    """Append-only audit log for participant-facing lifecycle emails.
+
+    Mirrors ``EmailSendLog`` but keyed per participant: one row per
+    (participant × event), with the unique constraint making the
+    interview-reminder pass of ``/admin/scheduled-emails/run`` idempotent
+    across replayed or concurrent cron firings.
+    """
+
+    __tablename__ = "participant_email_log"
+    __table_args__ = (
+        UniqueConstraint(
+            "participant_id", "event", name="uq_participant_email_log_event"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    participant_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("participants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # Event vocabulary:
+    #   - interview_reminder_1 : ~1 day after the participant went idle mid-interview
+    #   - interview_reminder_2 : ~2 days after reminder 1, final nudge
+    event: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+
 class EmailSendLog(Base):
     __tablename__ = "email_send_log"
     __table_args__ = (

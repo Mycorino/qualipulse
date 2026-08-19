@@ -1219,6 +1219,178 @@ def send_interview_magic_link(
     )
 
 
+# Interview reminder for participants who went idle mid-interview, in every
+# supported interview language (same key set as the engine's
+# COMPLETION_EMAILS). Keyed off the participant's effective language: their
+# own choice first, then the project language. Sent by the
+# /admin/scheduled-emails/run cron, at most twice per participant.
+INTERVIEW_REMINDER_EMAILS: dict[str, dict[str, str]] = {
+    "en": {
+        "subject": "Your interview is waiting: {project_name}",
+        "subject_final": "Last chance to finish your interview: {project_name}",
+        "body": (
+            "<p>Hi{greeting},</p>"
+            "<p>You started the <strong>{project_name}</strong> interview but didn't get to the end. "
+            "Your answers so far are saved, so you can pick up right where you left off. "
+            "It only takes a few more minutes.</p>"
+        ),
+        "cta": "Continue my interview →",
+        "foot": "If you'd rather not continue, you can simply ignore this email.",
+        "foot_final": "This is the last reminder we'll send about this interview. If you'd rather not continue, no action is needed.",
+    },
+    "fr": {
+        "subject": "Votre entretien vous attend : {project_name}",
+        "subject_final": "Dernière chance de terminer votre entretien : {project_name}",
+        "body": (
+            "<p>Bonjour{greeting},</p>"
+            "<p>Vous avez commencé l'entretien <strong>{project_name}</strong> sans aller jusqu'au bout. "
+            "Vos réponses sont enregistrées, vous pouvez reprendre exactement là où vous en étiez. "
+            "Il ne reste que quelques minutes.</p>"
+        ),
+        "cta": "Reprendre mon entretien →",
+        "foot": "Si vous préférez ne pas continuer, vous pouvez simplement ignorer cet email.",
+        "foot_final": "Ceci est le dernier rappel concernant cet entretien. Si vous préférez ne pas continuer, aucune action n'est requise.",
+    },
+    "es": {
+        "subject": "Su entrevista le espera: {project_name}",
+        "subject_final": "Última oportunidad para terminar su entrevista: {project_name}",
+        "body": (
+            "<p>Hola{greeting},</p>"
+            "<p>Comenzó la entrevista <strong>{project_name}</strong> pero no llegó al final. "
+            "Sus respuestas están guardadas, así que puede retomarla justo donde la dejó. "
+            "Solo le llevará unos minutos más.</p>"
+        ),
+        "cta": "Continuar mi entrevista →",
+        "foot": "Si prefiere no continuar, puede simplemente ignorar este correo.",
+        "foot_final": "Este es el último recordatorio sobre esta entrevista. Si prefiere no continuar, no necesita hacer nada.",
+    },
+    "de": {
+        "subject": "Ihr Interview wartet: {project_name}",
+        "subject_final": "Letzte Chance, Ihr Interview abzuschließen: {project_name}",
+        "body": (
+            "<p>Hallo{greeting},</p>"
+            "<p>Sie haben das Interview <strong>{project_name}</strong> begonnen, aber nicht beendet. "
+            "Ihre bisherigen Antworten sind gespeichert, Sie können genau dort weitermachen, wo Sie aufgehört haben. "
+            "Es dauert nur noch wenige Minuten.</p>"
+        ),
+        "cta": "Interview fortsetzen →",
+        "foot": "Wenn Sie nicht fortfahren möchten, können Sie diese E-Mail einfach ignorieren.",
+        "foot_final": "Dies ist die letzte Erinnerung zu diesem Interview. Wenn Sie nicht fortfahren möchten, ist nichts weiter zu tun.",
+    },
+    "it": {
+        "subject": "La sua intervista la aspetta: {project_name}",
+        "subject_final": "Ultima occasione per completare la sua intervista: {project_name}",
+        "body": (
+            "<p>Salve{greeting},</p>"
+            "<p>Ha iniziato l'intervista <strong>{project_name}</strong> senza arrivare alla fine. "
+            "Le sue risposte sono salvate, può riprendere esattamente da dove aveva interrotto. "
+            "Bastano pochi minuti.</p>"
+        ),
+        "cta": "Riprendere la mia intervista →",
+        "foot": "Se preferisce non continuare, può semplicemente ignorare questa email.",
+        "foot_final": "Questo è l'ultimo promemoria per questa intervista. Se preferisce non continuare, non è richiesta alcuna azione.",
+    },
+    "pt": {
+        "subject": "A sua entrevista está à espera: {project_name}",
+        "subject_final": "Última oportunidade para terminar a sua entrevista: {project_name}",
+        "body": (
+            "<p>Olá{greeting},</p>"
+            "<p>Começou a entrevista <strong>{project_name}</strong> mas não chegou ao fim. "
+            "As suas respostas estão guardadas, pode retomar exatamente onde ficou. "
+            "Só demora mais alguns minutos.</p>"
+        ),
+        "cta": "Continuar a minha entrevista →",
+        "foot": "Se preferir não continuar, pode simplesmente ignorar este email.",
+        "foot_final": "Este é o último lembrete sobre esta entrevista. Se preferir não continuar, não precisa de fazer nada.",
+    },
+    "nl": {
+        "subject": "Uw interview wacht op u: {project_name}",
+        "subject_final": "Laatste kans om uw interview af te ronden: {project_name}",
+        "body": (
+            "<p>Hallo{greeting},</p>"
+            "<p>U bent aan het interview <strong>{project_name}</strong> begonnen, maar heeft het niet afgemaakt. "
+            "Uw antwoorden zijn bewaard, dus u kunt precies verdergaan waar u was gebleven. "
+            "Het duurt nog maar een paar minuten.</p>"
+        ),
+        "cta": "Mijn interview hervatten →",
+        "foot": "Wilt u liever niet verdergaan? Dan kunt u deze e-mail gewoon negeren.",
+        "foot_final": "Dit is de laatste herinnering voor dit interview. Wilt u liever niet verdergaan, dan hoeft u niets te doen.",
+    },
+    "ja": {
+        "subject": "インタビューの続きをお待ちしています：{project_name}",
+        "subject_final": "インタビュー完了の最後のご案内：{project_name}",
+        "body": (
+            "<p>こんにちは{greeting}。</p>"
+            "<p><strong>{project_name}</strong>のインタビューが途中のままになっています。"
+            "これまでのご回答は保存されていますので、中断したところから再開できます。"
+            "あと数分で完了します。</p>"
+        ),
+        "cta": "インタビューを再開する →",
+        "foot": "続行をご希望でない場合は、このメールを無視していただいて構いません。",
+        "foot_final": "このインタビューに関するご案内はこれが最後です。続行をご希望でない場合、お手続きは不要です。",
+    },
+    "ko": {
+        "subject": "인터뷰가 기다리고 있습니다: {project_name}",
+        "subject_final": "인터뷰를 완료할 마지막 기회입니다: {project_name}",
+        "body": (
+            "<p>안녕하세요{greeting},</p>"
+            "<p><strong>{project_name}</strong> 인터뷰를 시작하셨지만 끝까지 완료하지 못하셨습니다. "
+            "지금까지의 답변은 저장되어 있으니 중단한 부분부터 바로 이어서 진행하실 수 있습니다. "
+            "몇 분이면 완료됩니다.</p>"
+        ),
+        "cta": "인터뷰 이어하기 →",
+        "foot": "계속하지 않으시려면 이 메일을 무시하셔도 됩니다.",
+        "foot_final": "이 인터뷰에 대한 마지막 알림입니다. 계속하지 않으시려면 별도의 조치가 필요하지 않습니다.",
+    },
+    "zh": {
+        "subject": "您的访谈还在等您：{project_name}",
+        "subject_final": "完成访谈的最后机会：{project_name}",
+        "body": (
+            "<p>您好{greeting}，</p>"
+            "<p>您开始了<strong>{project_name}</strong>访谈，但尚未完成。"
+            "您已作答的内容都已保存，可以从上次中断的地方继续。"
+            "只需再花几分钟即可完成。</p>"
+        ),
+        "cta": "继续我的访谈 →",
+        "foot": "如果您不想继续，直接忽略这封邮件即可。",
+        "foot_final": "这是关于本次访谈的最后一次提醒。如果您不想继续，无需任何操作。",
+    },
+}
+
+
+def send_interview_reminder(
+    to: str,
+    project_name: str,
+    resume_url: str,
+    greeting_name: Optional[str] = None,
+    lang: str = "en",
+    final: bool = False,
+) -> bool:
+    """Nudge a participant who went idle mid-interview to finish it.
+
+    ``resume_url`` is a magic-link verify URL, so one click re-establishes
+    their verified session and drops them into the resume flow. ``final``
+    switches to the last-reminder copy (the cron sends at most two).
+    """
+    code = (lang or "en").lower()[:2]
+    copy = INTERVIEW_REMINDER_EMAILS.get(code, INTERVIEW_REMINDER_EMAILS["en"])
+    greeting = f" {greeting_name}" if greeting_name else ""
+    subject_key = "subject_final" if final else "subject"
+    foot_key = "foot_final" if final else "foot"
+    body_html = (
+        copy["body"].format(project_name=project_name, greeting=greeting)
+        + '<div style="text-align:center;margin:28px 0;">'
+        + f'<a href="{resume_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">{copy["cta"]}</a>'
+        + "</div>"
+        + f'<p style="color:#94a3b8;font-size:0.85rem;margin:0;">{copy[foot_key]}</p>'
+    )
+    return send_email(
+        to=to,
+        subject=copy[subject_key].format(project_name=project_name),
+        body_html=body_html,
+    )
+
+
 def send_panel_join_confirm(email: str, token: str, lang: str = "en") -> bool:
     """Double-opt-in confirmation for a public panel signup. Consent is only
     recorded when the link is clicked. The token rides in the URL fragment

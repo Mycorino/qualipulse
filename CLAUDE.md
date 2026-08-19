@@ -1105,7 +1105,8 @@ gcloud builds list --region=europe-west1 --limit=5
 ### Participant Side
 - [x] Consent screen (decline → thank-you, no record created)
 - [x] Interview landing page (name, profession, age range, country, email — all optional)
-- [x] Email-based interview resume (cross-device, shows covered topics + elapsed time)
+- [x] Email-based interview resume (cross-device, shows covered topics + elapsed time; resumable up to 7 days idle, pacing clock rebased on resume after a long break)
+- [x] Interview reminder emails (2 max, on different days) for verified-email participants who abandoned mid-interview, with a one-click magic resume link (sent by the scheduled-emails cron; see "Lifecycle emails")
 - [x] Session-storage resume (same device/tab, survives page reload)
 - [x] Screening questions phase (one at a time, progress bar, back button, disqualification flow)
 - [x] Voice interview (record → STT → Claude → TTS)
@@ -1218,6 +1219,9 @@ gcloud builds list --region=europe-west1 --limit=5
 
 ### EmailSendLog
 `id` (str uuid), `company_id` (FK, indexed), `event` (str, indexed — `day_1_followup` | `trial_half_over` | `trial_ending`), `sent_at`. Unique constraint on `(company_id, event)` — append-only log that makes the Wave 3B `/admin/scheduled-emails/run` runner idempotent: a duplicate cron firing in the same window trips the constraint instead of double-sending. Alembic 0032. The Wave 3A first-response email predates this table and uses `Company.first_response_email_sent_at` instead.
+
+### ParticipantEmailLog
+Per-participant analogue of EmailSendLog for participant-facing lifecycle emails. `id` (str uuid), `participant_id` (FK, CASCADE, indexed), `event` (indexed — `interview_reminder_1` | `interview_reminder_2`), `sent_at`. Unique on `(participant_id, event)`. Alembic 0062.
 
 ### PanelProfile
 `id` (int), `email` (unique), `first_name`, `age_range`, `gender`, `country`, `city`, `education`, `employment_status`, `job_function`, `seniority`, `industry`, `company_size`, `panel_consent`, `consent_at`, `consent_interview_token`, `interviews_completed`, `last_active`, `created_at`
@@ -1441,6 +1445,7 @@ gcloud scheduler jobs create http qualipulse-lifecycle-emails \
 
 **Currently sent:**
 - `day_1_followup` — 18h–7d after signup, only if `onboarding_completed=true` and email verified
+- `interview_reminder_1` / `interview_reminder_2` — participant-facing nudges for interviews abandoned mid-way. Reminder 1 fires after ~1 day idle (22h–4d window since the last answered turn); reminder 2 (final copy) ~2 days after reminder 1 (44h gap), so the two land on different days; both stop 10 days after start. Eligibility: `status=in_progress`, **verified** participant email (the email embeds a 7-day magic link that re-establishes the interview session, so typo'd addresses must never get one), active link, non-archived non-demo project, and no completed participant with the same email on the same link. Idempotent per (participant × event) via `participant_email_log`. Templates in `services/email.py::INTERVIEW_REMINDER_EMAILS` (10 languages, participant's language first, then project language). To make the click actually work, `/interview/{token}/resume` now accepts sessions idle up to 7 days (`RESUME_MAX_IDLE_DAYS`) and **rebases the pacing clock** on resume after >30 min idle (shifts `started_at` so elapsed = time actually spent interviewing, otherwise the engine's close gate would fire instantly). Tests: `backend/tests/test_interview_reminders.py`. Alembic 0062.
 
 **Retired:** `trial_half_over` (Day-7) and `trial_ending` (Day-12) were retired with the credits-native billing model — credits gate usage, not calendar days. Their HTML templates remain in `services/email.py` as dead code in case we revive them, but the cron no longer fires them.
 
