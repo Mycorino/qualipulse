@@ -810,6 +810,7 @@ export default function Interview() {
         email: email || undefined,
         sessionToken: sessionToken || undefined,
         preferredLanguage: chosenLang,
+        screeningAnswers,
       });
     } catch (err: unknown) {
       // The workspace billing gate returns 403 {code: "study_unavailable"} —

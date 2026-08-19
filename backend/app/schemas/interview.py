@@ -59,6 +59,10 @@ class StartInterviewRequest(BaseModel):
     # Participant-chosen interview language (en/fr/de/es/it/pt). Overrides
     # the study's default language for the AI interviewer + voice.
     preferred_language: str | None = None
+    # Screening answers the participant clicked through (question_id →
+    # canonical option value). Sanitized server-side against the project's
+    # screener before persisting; unknown ids/options are dropped.
+    screening_answers: dict[str, str] | None = None
 
 
 class StartInterviewResponse(BaseModel):
@@ -113,6 +117,8 @@ class ParticipantResponse(BaseModel):
     # Denormalised recontact flag (see Participant.panel_consent):
     # True = agreed to follow-ups, False = declined, None = unknown.
     panel_consent: bool | None = None
+    # Screener snapshot: [{question_id, question, answer}], canonical values.
+    screening_answers: list[dict] | None = None
     quality_score: float | None = None
     quality_label: str | None = None
     quality_summary: str | None = None

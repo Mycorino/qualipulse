@@ -716,6 +716,15 @@ Landing (name + profession + age_range + country + email)
 ```
 - Participant record is only created **after** passing screening (or if no screening)
 - Demographics (profession, age_range, country) power the segment heatmap in Analysis
+- **Screening answers are persisted on the qualified participant** (Alembic
+  0061, `Participant.screening_answers` JSON snapshot of
+  `{question_id, question, answer}` with canonical option values, sanitized
+  server-side in `/start` against the project's screener). They feed: the
+  analysis prompt headers (`screener: Q = A` per participant), segment
+  filters (`filter_by="screening:<question_id>"` in `_filter_participants`),
+  the heatmap (each screener question is a dimension), the participants
+  list/card, and the CSV export. Screened-out participants still leave no
+  record. Tests: `backend/tests/test_screening_answers.py`.
 - Session-storage resume (same device) + email-based resume (cross-device)
 
 ### Claude Interview Engine
@@ -1155,7 +1164,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `project_id`, `token` (unique, urlsafe), `is_active`, `created_at`
 
 ### Participant
-`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `status` (in_progress/completed), `quality_score`, `quality_label`, `quality_summary`, `quality_strengths`, `quality_issues`, `key_takeaways` (JSON list), `notable_quotes` (JSON list, verbatim), `started_at`, `completed_at`
+`id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `screening_answers` (JSON snapshot of screener clicks, Alembic 0061), `status` (in_progress/completed), `quality_score`, `quality_label`, `quality_summary`, `quality_strengths`, `quality_issues`, `key_takeaways` (JSON list), `notable_quotes` (JSON list, verbatim), `started_at`, `completed_at`
 
 ### InterviewTurn
 `id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `translated_response`, `translated_question`, `translation_language`, `translation_source_language`, `cleaned_response`, `cleaned_at`, `created_at`

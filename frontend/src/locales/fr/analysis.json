@@ -205,5 +205,6 @@
       "jtbd_note": "Note JTBD"
     }
   },
-  "exportPdfBtn": "Ouvrir le rapport complet (PDF)"
+  "exportPdfBtn": "Ouvrir le rapport complet (PDF)",
+  "screeningFilterLabel": "Question de screening"
 }

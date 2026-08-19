@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -63,6 +64,12 @@ class Participant(Base):
     # Participant-chosen interview language — overrides Project.language for the
     # AI interviewer + voice when set (en/fr/de/es/it/pt).
     preferred_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # Screening answers the participant clicked through before qualifying —
+    # JSON list of {question_id, question, answer} snapshots (question text is
+    # frozen at answer time so later edits to the screener don't rewrite
+    # history). Researcher-designed profile variables: they feed the analysis
+    # prompt headers, segment filters, and the heatmap.
+    screening_answers: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), default="in_progress", nullable=False
     )
@@ -89,6 +96,17 @@ class Participant(Base):
     turns = relationship(
         "InterviewTurn", back_populates="participant", cascade="all, delete-orphan"
     )
+
+    @property
+    def screening_answers_list(self) -> list[dict]:
+        """Parsed screening answers: [{question_id, question, answer}]."""
+        if not self.screening_answers:
+            return []
+        try:
+            parsed = json.loads(self.screening_answers)
+            return parsed if isinstance(parsed, list) else []
+        except Exception:
+            return []
 
 
 class ProjectAnalysis(Base):

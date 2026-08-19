@@ -73,6 +73,20 @@ def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict
                 q_str += f" ({q_score:.2f})"
             attrs.append(q_str)
 
+        # Screener answers: researcher-designed profile variables the
+        # participant clicked through before qualifying. Far more
+        # study-relevant than the generic demographics, so the model gets
+        # them as grounded per-participant context.
+        screening = getattr(p, "screening_answers_list", None) or []
+        if screening:
+            pairs = "; ".join(
+                f"{(a.get('question') or '').strip()[:80]} = {(a.get('answer') or '').strip()[:60]}"
+                for a in screening
+                if a.get("question") and a.get("answer")
+            )
+            if pairs:
+                attrs.append(f"screener: {pairs}")
+
         attr_str = f" ({', '.join(attrs)})" if attrs else ""
         header = f"--- [{identifier}] {name}{attr_str} ---"
 
@@ -817,8 +831,22 @@ def _filter_participants(
     filter_by: str | None,
     filter_values: list[str],
 ) -> list[Participant]:
+    """Segment filter. Demographic attributes filter by column value;
+    ``filter_by="screening:<question_id>"`` filters by the participant's
+    stored screener answer to that question."""
     if not filter_by or not filter_values:
         return participants
+    if filter_by.startswith("screening:"):
+        question_id = filter_by.split(":", 1)[1]
+        result = []
+        for p in participants:
+            answers = {
+                a.get("question_id"): a.get("answer")
+                for a in (getattr(p, "screening_answers_list", None) or [])
+            }
+            if answers.get(question_id) in filter_values:
+                result.append(p)
+        return result
     result = []
     for p in participants:
         val = getattr(p, filter_by, None)

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import uuid
@@ -812,6 +813,23 @@ def start_interview_session(
     chosen_lang = (getattr(body, "preferred_language", None) or "").lower()[:2] if body else ""
     preferred_language = chosen_lang if chosen_lang in SUPPORTED_INTERVIEW_LANGS else None
 
+    # Snapshot the screening answers the participant clicked through, keyed
+    # by canonical option values (the gate's stable identity). Sanitized
+    # against the project's screener: unknown question ids and options that
+    # aren't in the canonical list are dropped, so a crafted request can't
+    # inject text into researcher-facing surfaces or the analysis prompt.
+    # Question text is frozen at answer time.
+    screening_snapshot = None
+    raw_answers = getattr(body, "screening_answers", None) if body else None
+    if raw_answers:
+        snapshot = []
+        for q in sorted(link.project.screening_questions, key=lambda q: q.sort_order):
+            answer = raw_answers.get(q.id)
+            if answer and answer in q.options_list:
+                snapshot.append({"question_id": q.id, "question": q.question, "answer": answer})
+        if snapshot:
+            screening_snapshot = json.dumps(snapshot)
+
     participant = Participant(
         link_id=link.id,
         project_id=link.project_id,
@@ -822,6 +840,7 @@ def start_interview_session(
         email=verified_email,
         email_verified=email_was_verified,
         preferred_language=preferred_language,
+        screening_answers=screening_snapshot,
         status="in_progress",
     )
     db.add(participant)
