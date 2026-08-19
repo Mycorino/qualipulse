@@ -4897,6 +4897,11 @@ export default function ProjectDetail() {
           dismissNudge(nid);
           if (project) setNudges(activeNudgesFor(project.id));
         }}
+        suppressTeaser={
+          project.is_demo &&
+          (searchParams.get("tour") === "1" ||
+            (isDemoTourArmed() && getDemoTourPhase() === "study"))
+        }
       />
 
       {/* V4 paywall — opens when a locked transcript is clicked or
