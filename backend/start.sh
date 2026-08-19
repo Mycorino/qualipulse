@@ -23,12 +23,64 @@ ALTERS = [
     ('copilot_conversations', 'version',
      'ALTER TABLE copilot_conversations ADD COLUMN IF NOT EXISTS '
      'version INTEGER NOT NULL DEFAULT 0'),
+    # 0061 — screener answer snapshot. The 2026-08-19 deploy rolled this
+    # migration back: alembic_version.version_num was VARCHAR(32) and the
+    # 34-char revision id '0061_participant_screening_answers' failed the
+    # version-table UPDATE, so transactional DDL dropped the column again
+    # and the create_all fallback stamped head without it.
+    ('participants', 'screening_answers',
+     # no IF NOT EXISTS: the column-presence check below already guards
+     # re-runs, and plain ADD COLUMN also works on SQLite
+     'ALTER TABLE participants ADD COLUMN screening_answers TEXT NULL'),
 ]
 
 inspector = inspect(engine)
 existing_tables = set(inspector.get_table_names())
 
+is_postgres = engine.dialect.name == 'postgresql'
+
 with engine.begin() as conn:
+    # Widen alembic_version.version_num (default VARCHAR(32)) so long
+    # revision ids can be recorded. Must run before alembic itself.
+    if is_postgres and 'alembic_version' in existing_tables:
+        length = conn.execute(text(
+            \"SELECT character_maximum_length FROM information_schema.columns \"
+            \"WHERE table_name = 'alembic_version' AND column_name = 'version_num'\"
+        )).scalar()
+        if length is not None and length < 255:
+            conn.execute(text(
+                'ALTER TABLE alembic_version '
+                'ALTER COLUMN version_num TYPE VARCHAR(255)'
+            ))
+            print('✓ Widened alembic_version.version_num to VARCHAR(255)')
+
+    # Repair the stamp left by the 2026-08-19 fallback: the DB was stamped
+    # at one of the two parallel 0062 heads while create_all had already
+    # built both 0062 tables. Re-point it at the 0063 merge revision so
+    # 'alembic upgrade head' doesn't try to re-create existing tables.
+    if 'alembic_version' in existing_tables and \
+            'participant_email_log' in existing_tables and \
+            'study_invites' in existing_tables:
+        stale = conn.execute(text(
+            \"SELECT version_num FROM alembic_version WHERE version_num IN \"
+            \"('0062_participant_email_log', '0062_study_invites')\"
+        )).scalars().all()
+        if stale:
+            conn.execute(text(
+                \"DELETE FROM alembic_version WHERE version_num IN \"
+                \"('0062_participant_email_log', '0062_study_invites')\"
+            ))
+            existing = conn.execute(text(
+                \"SELECT 1 FROM alembic_version \"
+                \"WHERE version_num = '0063_merge_0062_heads'\"
+            )).first()
+            if existing is None:
+                conn.execute(text(
+                    \"INSERT INTO alembic_version (version_num) \"
+                    \"VALUES ('0063_merge_0062_heads')\"
+                ))
+            print(f'✓ Re-stamped alembic_version {stale} -> 0063_merge_0062_heads')
+
     for table, column, sql in ALTERS:
         if table not in existing_tables:
             print(f'⏭  {table}.{column} — table not present yet, skipping')
