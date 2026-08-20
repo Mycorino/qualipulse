@@ -4,6 +4,7 @@ import { useTranslation, Trans } from "react-i18next";
 import { useHead } from "../hooks/useHead";
 import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { track } from "../utils/analytics";
 
 // Credits-based plan catalogue (PR 3). Prices match the plans seeded in the
 // backend ``billing_plans.py``; keep in sync if either side changes.
@@ -55,6 +56,31 @@ function useInView(threshold = 0.12, initiallyVisible = false) {
     return () => obs.disconnect();
   }, [threshold]);
   return { ref, visible };
+}
+
+/** Fire one analytics event the first time an element scrolls into view. */
+function useTrackInView(
+  ref: React.RefObject<HTMLElement | null>,
+  event: "pricing_viewed"
+) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    // Deliberately a separate observer from useInView: that one reports
+    // "visible" immediately under prefers-reduced-motion, which would
+    // count a section as seen by someone who never scrolled to it.
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          track(event, { once: true });
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [ref, event]);
 }
 
 /* ---- Live interview simulation (hero) ----
@@ -293,6 +319,10 @@ export default function Marketing() {
   const pricingAnim = useInView(0.12, initialHash === "#pricing");
   const faqAnim = useInView(0.12, initialHash === "#faq");
 
+  // "Did they even reach pricing?" is the first question any homepage
+  // conversion number raises, so it gets its own event.
+  useTrackInView(pricingAnim.ref, "pricing_viewed");
+
   useEffect(() => {
     if (!initialHash) return;
     const id = initialHash.slice(1);
@@ -345,7 +375,7 @@ export default function Marketing() {
           <a href="#faq">{t("nav.faq")}</a>
           <LanguageSwitcher variant="dark" />
           <Link to="/login" className="mkt-nav-login">{t("nav.login")}</Link>
-          <Link to="/signup" className="mkt-btn mkt-btn-primary mkt-nav-cta">{t("nav.startTrial")}</Link>
+          <Link to="/signup" className="mkt-btn mkt-btn-primary mkt-nav-cta" onClick={() => track("cta_signup_click", { location: "nav" })}>{t("nav.startTrial")}</Link>
         </div>
         <button
           ref={hamburgerRef}
@@ -366,7 +396,7 @@ export default function Marketing() {
             <a href="#faq" onClick={closeMobileMenu}>{t("nav.faq")}</a>
             <LanguageSwitcher variant="dark" />
             <Link to="/login" onClick={closeMobileMenu}>{t("nav.login")}</Link>
-            <Link to="/signup" className="mkt-btn mkt-btn-primary mkt-mobile-cta" onClick={closeMobileMenu}>{t("nav.startTrial")}</Link>
+            <Link to="/signup" className="mkt-btn mkt-btn-primary mkt-mobile-cta" onClick={() => { track("cta_signup_click", { location: "nav_mobile" }); closeMobileMenu(); }}>{t("nav.startTrial")}</Link>
           </div>
         )}
       </nav>
@@ -381,7 +411,7 @@ export default function Marketing() {
               <Trans t={t} i18nKey="hero.sub" components={{ b: <strong /> }} />
             </p>
             <div className="mkt-hero-ctas">
-              <Link to="/signup" className="mkt-btn mkt-btn-primary mkt-btn-lg">{t("hero.cta")}</Link>
+              <Link to="/signup" className="mkt-btn mkt-btn-primary mkt-btn-lg" onClick={() => track("cta_signup_click", { location: "hero" })}>{t("hero.cta")}</Link>
               <a href="#evidence" className="mkt-btn mkt-btn-ghost">{t("hero.secondaryCta")}</a>
             </div>
             <div className="mkt-hero-facts">
@@ -564,7 +594,7 @@ export default function Marketing() {
               type="button"
               aria-pressed={billingInterval === "monthly"}
               className={billingInterval === "monthly" ? "active" : ""}
-              onClick={() => setBillingInterval("monthly")}
+              onClick={() => { track("pricing_interval_toggled", { location: "monthly" }); setBillingInterval("monthly"); }}
             >
               {t("pricing.billingMonthly")}
             </button>
@@ -572,7 +602,7 @@ export default function Marketing() {
               type="button"
               aria-pressed={billingInterval === "annual"}
               className={billingInterval === "annual" ? "active" : ""}
-              onClick={() => setBillingInterval("annual")}
+              onClick={() => { track("pricing_interval_toggled", { location: "annual" }); setBillingInterval("annual"); }}
             >
               {t("pricing.billingAnnual")}{" "}
               <span className="mkt-billing-save">{t("pricing.billingAnnualSave")}</span>
@@ -589,7 +619,7 @@ export default function Marketing() {
               <ul className="mkt-plan-features">
                 {trialFeatures.map((f) => <li key={f}>{f}</li>)}
               </ul>
-              <Link to="/signup" className="mkt-btn mkt-btn-outline mkt-plan-cta">{t("pricing.trial.cta")}</Link>
+              <Link to="/signup" className="mkt-btn mkt-btn-outline mkt-plan-cta" onClick={() => track("cta_signup_click", { location: "plan_trial" })}>{t("pricing.trial.cta")}</Link>
             </div>
             {/* Paid plans */}
             {MARKETING_PLANS.map((p) => {
@@ -624,6 +654,7 @@ export default function Marketing() {
                   <Link
                     to={`/signup?plan=${p.id}&interval=${billingInterval}`}
                     className={`mkt-btn ${p.highlight ? "mkt-btn-primary" : "mkt-btn-outline"} mkt-plan-cta`}
+                    onClick={() => track("cta_signup_click", { location: `plan_${p.id}` })}
                   >
                     {t(`pricing.plans.${p.id}.cta`)}
                   </Link>
@@ -669,7 +700,7 @@ export default function Marketing() {
           <h2>{t("finalCta.title")}</h2>
           <p>{t("finalCta.subtitle")}</p>
           <div className="mkt-hero-ctas mkt-final-ctas">
-            <Link to="/signup" className="mkt-btn mkt-btn-primary mkt-btn-lg">{t("finalCta.cta")}</Link>
+            <Link to="/signup" className="mkt-btn mkt-btn-primary mkt-btn-lg" onClick={() => track("cta_signup_click", { location: "final" })}>{t("finalCta.cta")}</Link>
             <a href="#evidence" className="mkt-btn mkt-btn-ghost">{t("finalCta.secondaryCta")}</a>
           </div>
         </div>
@@ -693,7 +724,7 @@ export default function Marketing() {
             <div className="mkt-footer-col">
               <h4>{t("footer.companyTitle")}</h4>
               <Link to="/login">{t("footer.login")}</Link>
-              <Link to="/signup">{t("footer.signup")}</Link>
+              <Link to="/signup" onClick={() => track("cta_signup_click", { location: "footer" })}>{t("footer.signup")}</Link>
               <Link to="/participants">{t("footer.becomeParticipant")}</Link>
               <Link to="/affiliate">{t("footer.affiliate")}</Link>
               <a href="mailto:hello@qualipulse.com">{t("footer.contact")}</a>

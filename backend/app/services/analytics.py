@@ -17,6 +17,21 @@ Event catalogue (keep this stable — downstream dashboards depend on it):
 - ``trial_paywall_hit``       — a feature gate blocked a trial user
 - ``paid_converted``          — Stripe subscription went active
 
+Front-of-funnel events arrive from the SPA via ``POST /telemetry/event``
+(see ``routers/telemetry.py``) and share this stream so a session can be
+followed from first pageview to paid without a third-party SDK:
+
+- ``page_view``               — a public marketing/auth route was rendered
+- ``cta_signup_click``        — a signup CTA was clicked (``location`` says which)
+- ``pricing_viewed``          — the pricing section scrolled into view
+- ``pricing_interval_toggled``— monthly/annual toggle flipped
+- ``newsletter_submit``       — newsletter form submitted
+
+Those carry ``source=web`` plus an anonymous daily-rotating ``visitor``
+hash instead of ``company_id``, and the first-touch ``utm_*`` trio. The
+same trio is persisted on the Company at signup, which is what lets a
+``paid_converted`` event be attributed back to an acquisition channel.
+
 Standard properties on every event: ``company_id``, ``plan_id``,
 ``company_size``, ``use_case``, ``role``, ``days_since_signup``. Event-
 specific properties go in ``extra``.
@@ -77,9 +92,11 @@ def emit_event(
 
 def _fmt(value: Any) -> str:
     """Render a property value as a single token, quoting if it contains spaces."""
-    text = str(value)
+    # Newlines are stripped unconditionally: some events originate from a
+    # public endpoint, and a raw "\n" in a value would let a caller forge
+    # an extra log line.
+    text = str(value).replace("\n", " ").replace("\r", " ")
     if " " in text or "=" in text:
-        # Strip quotes/newlines that would break parsing.
-        text = text.replace('"', "'").replace("\n", " ")
+        text = text.replace('"', "'")
         return f'"{text}"'
     return text
