@@ -69,7 +69,11 @@ class Settings(BaseSettings):
     # SendGrid > Settings > Mail Settings > Event Webhook). Unset disables
     # the webhook outside development — see routers/email_events.py.
     SENDGRID_WEBHOOK_PUBLIC_KEY: str = ""
-    EMAIL_FROM: str = "noreply@qualipulse.com"
+    # Not "noreply@": Google's sender guidelines advise against no-reply
+    # addresses, and replies are a positive engagement signal for inbox
+    # placement. Requires a "hello" alias on the domain so replies from
+    # clients that ignore Reply-To still land somewhere real.
+    EMAIL_FROM: str = "hello@qualipulse.com"
     EMAIL_FROM_NAME: str = "QualiPulse"
 
     # Stripe (billing)
