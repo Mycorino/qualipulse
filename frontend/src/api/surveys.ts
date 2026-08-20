@@ -91,7 +91,11 @@ export async function patchSurvey(
 }
 
 export async function archiveSurvey(id: string): Promise<void> {
-  await client.delete(`/surveys/${id}`);
+  await client.patch(`/surveys/${id}/archive`);
+}
+
+export async function unarchiveSurvey(id: string): Promise<void> {
+  await client.patch(`/surveys/${id}/unarchive`);
 }
 
 /* ── Question CRUD ─────────────────────────────────────────────────── */

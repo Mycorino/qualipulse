@@ -9,7 +9,16 @@
     "instruments": {
       "empty": "No instruments yet. Start with a screener survey to qualify respondents, or go straight to an interview round.",
       "surveyEyebrow": "Survey · {{role}} · {{status}}",
-      "interviewEyebrow": "Interviews · {{language}}"
+      "interviewEyebrow": "Interviews · {{language}}",
+      "archiveAction": "Archive instrument",
+      "archiveNamed": "Archive {{name}}",
+      "archiveFailed": "Something went wrong, please try again.",
+      "archivedToast": "“{{name}}” archived",
+      "restoredToast": "“{{name}}” restored",
+      "archivedToggle": "Archived ({{count}})",
+      "archivedSurveyKind": "Survey",
+      "archivedInterviewKind": "Interviews",
+      "restore": "Restore"
     },
     "reportsIndex": {
       "title": "All reports for this study",

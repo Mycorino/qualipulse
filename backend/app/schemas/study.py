@@ -146,6 +146,11 @@ class StudyDetail(BaseModel):
     archived_at: datetime | None = None
     surveys: list[SurveyMini]
     projects: list[ProjectMini]
+    # Archived instruments, kept out of the active lists so progress,
+    # counts, and report consumers never see them. The workspace renders
+    # them in a collapsed "Archived" disclosure with a restore action.
+    archived_surveys: list[SurveyMini] = Field(default_factory=list)
+    archived_projects: list[ProjectMini] = Field(default_factory=list)
     progress: StudyProgress
     # True when this Study holds seeded showcase content (a demo project).
     # The UI suppresses billing/quota chrome on demo studies — they're a

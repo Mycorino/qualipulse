@@ -289,6 +289,21 @@ def get_study(
     survey_minis = [_survey_mini(db, s) for s in surveys]
     project_minis = [_project_mini(db, p) for p in projects]
 
+    # Archived instruments ride along so the workspace can offer restore
+    # without a separate fetch; they stay out of progress + demo signals.
+    archived_surveys = (
+        db.query(Survey)
+        .filter(Survey.study_id == study.id, Survey.archived_at.isnot(None))
+        .order_by(Survey.created_at.desc())
+        .all()
+    )
+    archived_projects = (
+        db.query(Project)
+        .filter(Project.study_id == study.id, Project.archived_at.isnot(None))
+        .order_by(Project.created_at.desc())
+        .all()
+    )
+
     latest_ready = (
         db.query(StudyAnalysis)
         .filter(StudyAnalysis.study_id == study.id, StudyAnalysis.status == "ready")
@@ -310,6 +325,8 @@ def get_study(
         archived_at=study.archived_at,
         surveys=survey_minis,
         projects=project_minis,
+        archived_surveys=[_survey_mini(db, s) for s in archived_surveys],
+        archived_projects=[_project_mini(db, p) for p in archived_projects],
         progress=progress,
         is_demo=any(p.is_demo for p in projects),
         recommended_action=recommended[2] if recommended else None,

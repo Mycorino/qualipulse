@@ -328,6 +328,33 @@ def archive_survey(
     db.commit()
 
 
+@router.patch("/{survey_id}/archive", status_code=status.HTTP_200_OK)
+def archive_survey_patch(
+    survey_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> dict:
+    """Archive an instrument — same soft-delete as DELETE, but with a
+    response body and a restore counterpart, mirroring projects."""
+
+    survey = _get_survey_or_404(db, survey_id, company)
+    survey.archived_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"id": survey.id, "archived_at": survey.archived_at.isoformat()}
+
+
+@router.patch("/{survey_id}/unarchive", status_code=status.HTTP_200_OK)
+def unarchive_survey(
+    survey_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> dict:
+    survey = _get_survey_or_404(db, survey_id, company)
+    survey.archived_at = None
+    db.commit()
+    return {"id": survey.id, "archived_at": None}
+
+
 # ── Question CRUD ─────────────────────────────────────────────────────
 
 
