@@ -70,6 +70,10 @@ from app.schemas.survey import (
 from app.services.question_coach import lint_question
 from app.models.interview import InterviewLink
 from app.models.project import InterviewGuideQuestion, Project
+from sqlalchemy.exc import IntegrityError
+
+from app.models.panel import StudyInvite
+from app.services import panel_invites as pi
 from app.services.email import send_interview_invite
 from app.services.segment_discoveries import compute_discoveries
 from app.services.segment_recommendation import build_recommendation
@@ -772,6 +776,15 @@ def invite_segment_to_interview(
     One interview_link per invitee (so the link binds 1:1 to the
     StudyParticipant on first use — Sprint 11 wires this association
     fully when participant creation flows through study_participant_id).
+
+    **Claim-then-send, one recipient per transaction.** The link and the
+    ``StudyInvite`` row are committed BEFORE the email leaves. The previous
+    shape flushed links inside the loop and committed once at the end, so a
+    request that died partway (a large segment against Cloud Run's 300s
+    ceiling) rolled back every link while the already-sent emails kept
+    pointing at tokens that no longer existed. Committing per recipient also
+    makes the unique constraint on ``(project_id, email)`` the thing that
+    prevents double-invites, exactly as in the panel recontact flow.
     """
 
     survey = _get_survey_or_404(db, survey_id, company)
@@ -783,49 +796,116 @@ def invite_segment_to_interview(
     participants = resolve_segment(db, survey, clauses)
     invitable, skipped = invitable_participants(participants)
 
+    # Share the panel flow's budget rather than inventing a second one: both
+    # paths mail the same people from the same domain, so a reputation guard
+    # that only covers one of them guards nothing.
+    if settings.INVITE_DAILY_LIMIT <= 0:
+        raise HTTPException(status_code=403, detail="recontact_disabled")
+    remaining_today = settings.INVITE_DAILY_LIMIT - pi.invites_sent_today(db, company.id)
+    if remaining_today <= 0:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "invite_daily_limit", "message": "Daily invitation limit reached."},
+        )
+
+    already_invited = {
+        row[0]
+        for row in db.query(StudyInvite.email)
+        .filter(StudyInvite.project_id == target_project.id)
+        .all()
+    }
+
+    # Deduplicate within the batch too — a segment can surface the same person
+    # twice if they answered the survey more than once.
+    queue: list[str] = []
+    already_invited_count = 0
+    for participant in invitable:
+        email = (participant.email_normalized or "").lower()
+        if not email:
+            continue
+        if email in already_invited:
+            already_invited_count += 1
+            continue
+        if email in queue:
+            continue
+        queue.append(email)
+
+    # Two ceilings: the per-request batch bound and whatever is left of today's
+    # allowance. Anything above them is reported, never silently dropped.
+    ceiling = min(pi.INVITE_BATCH_MAX, remaining_today)
+    capped_count = max(0, len(queue) - ceiling)
+    queue = queue[:ceiling]
+
     invited = 0
     failed: list[str] = []
     tokens: list[str] = []
     base_url = settings.APP_BASE_URL or "http://localhost:5173"
+    # Invite in the language the interview will be conducted in — this email
+    # is participant-facing, not researcher-facing.
+    invite_lang = (target_project.language or "en").lower()
+    sender_fallback = (
+        "Votre équipe de recherche" if invite_lang.startswith("fr") else "Your researcher"
+    )
+    sender_name = company.name or sender_fallback
 
-    for participant in invitable:
+    for email in queue:
         token = _generate_link_token(db)
         link = InterviewLink(project_id=target_project.id, token=token)
         db.add(link)
-        # Flush per-iteration so the in-loop token uniqueness check stays correct.
-        db.flush()
-        tokens.append(token)
-
-        interview_url = f"{base_url.rstrip('/')}/i/{token}"
-        # Invite in the language the interview will be conducted in —
-        # this email is participant-facing, not researcher-facing.
-        invite_lang = (target_project.language or "en").lower()
-        sender_fallback = (
-            "Votre équipe de recherche" if invite_lang.startswith("fr") else "Your researcher"
+        db.add(
+            StudyInvite(
+                project_id=target_project.id,
+                company_id=target_project.company_id,
+                email=email,
+                language=invite_lang,
+                sent_by=company.id,
+            )
         )
         try:
+            # Claim first: this commit is what makes the link real and blocks
+            # a concurrent request from inviting the same person twice.
+            db.commit()
+        except IntegrityError:
+            # Lost the race on (project_id, email) — someone else just invited
+            # them. Not an error worth surfacing as a failure.
+            db.rollback()
+            already_invited_count += 1
+            continue
+
+        tokens.append(token)
+        interview_url = f"{base_url.rstrip('/')}/i/{token}"
+        try:
             ok = send_interview_invite(
-                to=participant.email_normalized,  # type: ignore[arg-type]
+                to=email,
                 project_name=target_project.name,
                 interview_url=interview_url,
-                sender_name=company.name or sender_fallback,
+                sender_name=sender_name,
                 lang=invite_lang,
                 db=db,
             )
-            if ok:
-                invited += 1
-            else:
-                failed.append(participant.email_normalized or "(unknown)")
         except Exception:  # noqa: BLE001 — email service may be unconfigured in dev
-            failed.append(participant.email_normalized or "(unknown)")
+            ok = False
 
-    db.commit()
+        if ok:
+            invited += 1
+        else:
+            # Release the claim so the researcher can retry this recipient
+            # once the underlying problem is fixed. The link row stays: it is
+            # harmless, and deleting it would invalidate a mail that may in
+            # fact have gone out.
+            failed.append(email)
+            db.query(StudyInvite).filter(
+                StudyInvite.project_id == target_project.id, StudyInvite.email == email
+            ).delete()
+            db.commit()
 
     return SegmentInviteResult(
         invited_count=invited,
         skipped_count=len(skipped),
         failed_emails=failed,
         interview_link_tokens=tokens,
+        already_invited_count=already_invited_count,
+        capped_count=capped_count,
     )
 
 

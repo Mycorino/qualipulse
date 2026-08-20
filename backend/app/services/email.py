@@ -362,7 +362,7 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "foot": (
                 "Ce lien expire dans 24 heures. Si vous n'avez pas créé de "
                 "compte QualiPulse, vous pouvez ignorer cet email en toute "
-                "sécurité — le compte sera supprimé automatiquement."
+                "sécurité : le compte sera supprimé automatiquement."
             ),
         },
     },
@@ -398,12 +398,12 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
     },
     "day_1_followup": {
         "en": {
-            "subject": "Your study, day 1 — what to do today",
-            "heading": "Day 1 — keep momentum",
+            "subject": "Your study, day 1: what to do today",
+            "heading": "Day 1: keep momentum",
             "body": (
                 "Yesterday we drafted <strong>{study_name}</strong> together. "
                 "Today the highest-leverage thing you can do is share your "
-                "interview link with one real participant — even a teammate "
+                "interview link with one real participant, even a teammate "
                 "works. Voice interviews surface the why; the only way to "
                 "feel that is to hear it."
             ),
@@ -413,12 +413,12 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             ),
         },
         "fr": {
-            "subject": "Votre étude, jour 1 — quoi faire aujourd'hui",
-            "heading": "Jour 1 — gardons l'élan",
+            "subject": "Votre étude, jour 1 : quoi faire aujourd'hui",
+            "heading": "Jour 1 : gardons l'élan",
             "body": (
                 "Hier nous avons rédigé <strong>{study_name}</strong> "
                 "ensemble. Aujourd'hui, le plus important : partager votre "
-                "lien d'entretien avec un participant réel — même un collègue "
+                "lien d'entretien avec un participant réel, même un collègue "
                 "fait l'affaire. Les entretiens vocaux révèlent le pourquoi ; "
                 "il faut l'entendre pour le sentir."
             ),
@@ -435,8 +435,8 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "body": (
                 "You're {days_left} days away from the end of your trial. "
                 "{usage_line} The teams who renew tend to be the ones who "
-                "shared their link with at least three participants by now — "
-                "if you haven't yet, a quick share or two will tell you "
+                "shared their link with at least three participants by now. "
+                "If you haven't yet, a quick share or two will tell you "
                 "everything you need to know about whether voice interviews "
                 "fit your research."
             ),
@@ -451,7 +451,7 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "body": (
                 "Il vous reste {days_left} jours d'essai. {usage_line} Les "
                 "équipes qui restent sont celles qui ont partagé leur lien "
-                "avec au moins trois participants à ce stade — si ce n'est "
+                "avec au moins trois participants à ce stade. Si ce n'est "
                 "pas encore fait, un ou deux partages vous diront si les "
                 "entretiens vocaux conviennent à votre recherche."
             ),
@@ -468,12 +468,12 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             "body": (
                 "Your trial wraps up in {days_left} days. You've run "
                 "{interviews} interview{interviews_plural} so far. To keep "
-                "your studies live past then, pick a plan — or grab a credit "
+                "your studies live past then, pick a plan, or grab a credit "
                 "pack if you only need a handful more interviews."
             ),
             "cta": "Choose a plan",
             "foot": (
-                "{plan_line} You can also continue on a credit pack — "
+                "{plan_line} You can also continue on a credit pack: "
                 "low-commitment, no monthly fee."
             ),
         },
@@ -484,39 +484,39 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
                 "Votre essai se termine dans {days_left} jours. Vous avez "
                 "lancé {interviews} entretien{interviews_plural} jusqu'ici. "
                 "Pour garder vos études en ligne au-delà, choisissez un plan "
-                "— ou prenez un pack de crédits si vous n'avez besoin que "
+                "ou prenez un pack de crédits si vous n'avez besoin que "
                 "de quelques entretiens de plus."
             ),
             "cta": "Choisir un plan",
             "foot": (
                 "{plan_line} Vous pouvez aussi continuer avec un pack de "
-                "crédits — sans engagement mensuel."
+                "crédits, sans engagement mensuel."
             ),
         },
     },
     "free_preview_full": {
         "en": {
-            "subject": "Your 3 free transcripts are unlocked — more waiting",
+            "subject": "Your 3 free transcripts are unlocked, more waiting",
             "heading": "All 3 free transcripts are ready",
             "body": (
                 "You've now collected 3+ responses for <strong>{project_name}"
-                "</strong> — and you can listen to, tag, and annotate "
+                "</strong>, and you can listen to, tag, and annotate "
                 "every one of them. Any further responses are waiting to "
                 "be unlocked. Subscribe (or grab a credit pack) to read "
                 "the rest and run AI analysis across the full study."
             ),
             "cta": "Unlock the rest",
             "foot": (
-                "The first 3 stay free forever — no time pressure on the "
+                "The first 3 stay free forever, no time pressure on the "
                 "ones you've already explored."
             ),
         },
         "fr": {
-            "subject": "Vos 3 transcriptions gratuites sont débloquées — d'autres attendent",
+            "subject": "Vos 3 transcriptions gratuites sont débloquées, d'autres attendent",
             "heading": "Vos 3 transcriptions gratuites sont prêtes",
             "body": (
                 "Vous avez désormais collecté 3+ réponses pour <strong>"
-                "{project_name}</strong> — et vous pouvez les écouter, "
+                "{project_name}</strong>, et vous pouvez les écouter, "
                 "les taguer et les annoter toutes. Les réponses "
                 "supplémentaires attendent d'être débloquées. Abonnez-"
                 "vous (ou prenez un pack de crédits) pour lire la suite "
@@ -524,19 +524,19 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             ),
             "cta": "Débloquer le reste",
             "foot": (
-                "Les 3 premières restent gratuites pour toujours — pas "
+                "Les 3 premières restent gratuites pour toujours, pas "
                 "de pression sur celles que vous avez déjà explorées."
             ),
         },
     },
     "first_response_in": {
         "en": {
-            "subject": "Your first response is in — {project_name}",
+            "subject": "Your first response is in: {project_name}",
             "heading": "Your first interview is in",
             "body": (
                 "Someone just completed your <strong>{project_name}</strong> "
                 "interview. Listen to the transcript, tag a quote, or add a "
-                "memo while it's fresh — these small touches are what turn "
+                "memo while it's fresh: these small touches are what turn "
                 "responses into research insights."
             ),
             "cta": "Listen to the response",
@@ -546,12 +546,12 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
             ),
         },
         "fr": {
-            "subject": "Votre première réponse est arrivée — {project_name}",
+            "subject": "Votre première réponse est arrivée : {project_name}",
             "heading": "Votre premier entretien est arrivé",
             "body": (
                 "Quelqu'un vient de compléter l'entretien <strong>"
                 "{project_name}</strong>. Écoutez la transcription, taguez "
-                "une citation ou ajoutez une note pendant que c'est frais — "
+                "une citation ou ajoutez une note pendant que c'est frais : "
                 "ces petits gestes transforment les réponses en insights."
             ),
             "cta": "Écouter la réponse",
@@ -637,30 +637,30 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
         "en": {
             "subject": "Confirm your spot on the QualiPulse panel",
             "heading": "One click to join the panel",
-            "body": "Thanks for signing up! Confirm your email to join the QualiPulse research panel. You'll be invited to paid studies that match your profile — most are short voice interviews you can do from any device.",
+            "body": "Thanks for signing up! Confirm your email to join the QualiPulse research panel. You'll be invited to paid studies that match your profile: most are short voice interviews you can do from any device.",
             "cta": "Confirm & join the panel →",
-            "foot": "This link expires in 48 hours. If you didn't sign up, you can safely ignore this email — nothing is stored without your confirmation.",
+            "foot": "This link expires in 48 hours. If you didn't sign up, you can safely ignore this email: nothing is stored without your confirmation.",
         },
         "fr": {
             "subject": "Confirmez votre place sur le panel QualiPulse",
             "heading": "Un clic pour rejoindre le panel",
-            "body": "Merci de votre inscription ! Confirmez votre email pour rejoindre le panel de recherche QualiPulse. Vous serez invité·e à des études rémunérées correspondant à votre profil — la plupart sont de courts entretiens vocaux, réalisables depuis n'importe quel appareil.",
+            "body": "Merci de votre inscription ! Confirmez votre email pour rejoindre le panel de recherche QualiPulse. Vous serez invité·e à des études rémunérées correspondant à votre profil : la plupart sont de courts entretiens vocaux, réalisables depuis n'importe quel appareil.",
             "cta": "Confirmer et rejoindre le panel →",
-            "foot": "Ce lien expire dans 48 heures. Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email — rien n'est enregistré sans votre confirmation.",
+            "foot": "Ce lien expire dans 48 heures. Si vous n'êtes pas à l'origine de cette inscription, ignorez simplement cet email : rien n'est enregistré sans votre confirmation.",
         },
     },
     "panel_access": {
         "en": {
             "subject": "Get matched to more (paid) studies",
             "heading": "You're on the QualiPulse panel 🎉",
-            "body": "Thanks for joining! The more you tell us about yourself, the more relevant — and paid — studies we can invite you to. Add a few details whenever you like, from any device.",
+            "body": "Thanks for joining! The more you tell us about yourself, the more relevant, and paid, studies we can invite you to. Add a few details whenever you like, from any device.",
             "cta": "Add to my profile →",
             "foot": "Only you can use this link. You can update or opt out at any time.",
         },
         "fr": {
             "subject": "Soyez invité·e à plus d'études (rémunérées)",
             "heading": "Vous faites partie du panel QualiPulse 🎉",
-            "body": "Merci de nous avoir rejoint ! Plus vous nous en dites sur vous, plus nous pourrons vous proposer d'études pertinentes — et rémunérées. Ajoutez quelques informations quand vous voulez, depuis n'importe quel appareil.",
+            "body": "Merci de nous avoir rejoint ! Plus vous nous en dites sur vous, plus nous pourrons vous proposer d'études pertinentes et rémunérées. Ajoutez quelques informations quand vous voulez, depuis n'importe quel appareil.",
             "cta": "Compléter mon profil →",
             "foot": "Ce lien n'est utilisable que par vous. Vous pouvez modifier vos informations ou vous désinscrire à tout moment.",
         },
@@ -699,11 +699,11 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
     },
     "footer": {
         "en": {
-            "tagline": "QualiPulse — AI-powered qualitative research",
+            "tagline": "QualiPulse: AI-powered qualitative research",
             "reason": "You're receiving this because you signed up or were invited to QualiPulse.",
         },
         "fr": {
-            "tagline": "QualiPulse — Recherche qualitative boostée à l'IA",
+            "tagline": "QualiPulse : Recherche qualitative boostée à l'IA",
             "reason": "Vous recevez cet email parce que vous vous êtes inscrit·e ou avez été invité·e sur QualiPulse.",
         },
     },
@@ -1169,16 +1169,16 @@ def send_trial_half_over(
     if interviews_run > 0:
         usage_line_en = (
             f"You've run {interviews_run} interview"
-            f"{'s' if interviews_run != 1 else ''} so far — nice."
+            f"{'s' if interviews_run != 1 else ''} so far, nice."
         )
         usage_line_fr = (
             f"Vous avez lancé {interviews_run} entretien"
-            f"{'s' if interviews_run != 1 else ''} jusqu'ici — bravo."
+            f"{'s' if interviews_run != 1 else ''} jusqu'ici, bravo."
         )
     else:
-        usage_line_en = "You haven't run an interview yet — now's the time."
+        usage_line_en = "You haven't run an interview yet. Now's the time."
         usage_line_fr = (
-            "Vous n'avez pas encore lancé d'entretien — c'est le moment."
+            "Vous n'avez pas encore lancé d'entretien. C'est le moment."
         )
     usage_line = usage_line_en if lang == "en" else usage_line_fr
 

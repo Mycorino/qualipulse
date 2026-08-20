@@ -336,6 +336,10 @@ class SegmentInviteResult(BaseModel):
     skipped_count: int
     failed_emails: list[str] = Field(default_factory=list)
     interview_link_tokens: list[str] = Field(default_factory=list)
+    # Additive fields — existing clients ignore them. They exist so the UI can
+    # explain a partial send instead of silently under-delivering.
+    already_invited_count: int = 0
+    capped_count: int = 0
 
 
 # ── Sprint 10: Segment Discoveries ────────────────────────────────────
