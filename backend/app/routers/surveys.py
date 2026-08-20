@@ -810,6 +810,7 @@ def invite_segment_to_interview(
                 interview_url=interview_url,
                 sender_name=company.name or sender_fallback,
                 lang=invite_lang,
+                db=db,
             )
             if ok:
                 invited += 1
