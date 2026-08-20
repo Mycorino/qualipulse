@@ -14416,6 +14416,8 @@ select.field-input {
 }
 .hub-table tbody tr:hover .hub-row-archive,
 .hub-table tbody tr:focus-within .hub-row-archive,
+.chart-card--row:hover .hub-row-archive,
+.chart-card--row:focus-within .hub-row-archive,
 .hub-row-archive:focus-visible {
   opacity: 1;
 }

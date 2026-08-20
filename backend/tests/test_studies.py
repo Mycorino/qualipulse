@@ -425,3 +425,80 @@ def test_archived_study_reports_leave_the_catalog(client, auth_headers):
 
     client.patch(f"/studies/{survey['study_id']}/archive", headers=auth_headers)
     assert client.get("/studies/report-catalog", headers=auth_headers).json() == []
+
+
+# ── Instrument archive / unarchive (inside the study workspace) ───────
+
+
+def test_archived_survey_moves_to_archived_list_and_back(client, auth_headers):
+    """Archiving an instrument hides it from the active list but keeps it
+    restorable from the workspace's archived disclosure."""
+
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "Old screener"}
+    ).json()
+    study_id = survey["study_id"]
+
+    resp = client.patch(f"/surveys/{survey['id']}/archive", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["archived_at"] is not None
+
+    detail = client.get(f"/studies/{study_id}", headers=auth_headers).json()
+    assert detail["surveys"] == []
+    assert [s["id"] for s in detail["archived_surveys"]] == [survey["id"]]
+    assert detail["archived_projects"] == []
+
+    resp = client.patch(f"/surveys/{survey['id']}/unarchive", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["archived_at"] is None
+
+    detail = client.get(f"/studies/{study_id}", headers=auth_headers).json()
+    assert [s["id"] for s in detail["surveys"]] == [survey["id"]]
+    assert detail["archived_surveys"] == []
+
+
+def test_archived_project_moves_to_archived_list_and_back(client, auth_headers):
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "Anchor"}
+    ).json()
+    study_id = survey["study_id"]
+    project = client.post(
+        "/projects/",
+        headers=auth_headers,
+        json={"name": "Round 1", "language": "en", "study_id": study_id, "questions": []},
+    ).json()
+
+    client.patch(f"/projects/{project['id']}/archive", headers=auth_headers)
+    detail = client.get(f"/studies/{study_id}", headers=auth_headers).json()
+    assert detail["projects"] == []
+    assert [p["id"] for p in detail["archived_projects"]] == [project["id"]]
+
+    client.patch(f"/projects/{project['id']}/unarchive", headers=auth_headers)
+    detail = client.get(f"/studies/{study_id}", headers=auth_headers).json()
+    assert [p["id"] for p in detail["projects"]] == [project["id"]]
+    assert detail["archived_projects"] == []
+
+
+def test_survey_archive_requires_ownership(client, auth_headers):
+    survey = client.post(
+        "/surveys/", headers=auth_headers, json={"name": "Mine only"}
+    ).json()
+
+    client.post(
+        "/auth/signup",
+        json={"email": "intruder2@example.com", "password": "Passw0rd1", "name": "Intruder"},
+    )
+    login = client.post(
+        "/auth/login",
+        json={"email": "intruder2@example.com", "password": "Passw0rd1"},
+    ).json()
+    intruder = {"Authorization": f"Bearer {login['access_token']}"}
+
+    assert (
+        client.patch(f"/surveys/{survey['id']}/archive", headers=intruder).status_code
+        == 404
+    )
+    assert (
+        client.patch(f"/surveys/{survey['id']}/unarchive", headers=intruder).status_code
+        == 404
+    )

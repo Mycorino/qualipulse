@@ -6,8 +6,10 @@ import { useTranslation } from "react-i18next";
 import { DemoCallout, getDemoTourPhase, isDemoTourArmed } from "../components/DemoTour";
 
 import {
+  ProjectMini,
   StudyAnalysis,
   StudyDetail,
+  SurveyMini,
   ValidationSummary,
   createValidationSurvey,
   fetchStudyReportHtml,
@@ -16,8 +18,8 @@ import {
   getValidationSummary,
   triggerAnalysis,
 } from "../api/studies";
-import { createSurvey } from "../api/surveys";
-import { createProject } from "../api/projects";
+import { archiveSurvey, createSurvey, unarchiveSurvey } from "../api/surveys";
+import { archiveProject, createProject, unarchiveProject } from "../api/projects";
 import { SurveyQuotaBanner } from "../components/SurveyQuotaBanner";
 import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
@@ -98,6 +100,15 @@ export default function StudyOverview() {
       .then(setStudy)
       .catch(() => setError(t("overview.studyNotFound")));
   }, [id]);
+
+  /** Re-fetch after an instrument archive/restore so counts, progress and
+   *  the recommended action stay server-truthful. */
+  const reloadStudy = () => {
+    if (!id) return;
+    getStudy(id)
+      .then(setStudy)
+      .catch(() => {});
+  };
 
   const setTabAndUrl = (next: Tab) => {
     setTab(next);
@@ -240,6 +251,7 @@ export default function StudyOverview() {
             study={study}
             onCreateSurvey={handleCreateSurvey}
             onCreateInterview={handleCreateInterview}
+            onChanged={reloadStudy}
           />
         )}
         {tab === "participants" && <ParticipantsTab study={study} />}
@@ -388,12 +400,21 @@ function InstrumentsTab({
   study,
   onCreateSurvey,
   onCreateInterview,
+  onChanged,
 }: {
   study: StudyDetail;
   onCreateSurvey: () => void;
   onCreateInterview: () => void;
+  onChanged: () => void;
 }) {
   const { t } = useTranslation("study");
+  const { toast } = useToast();
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Deployment-skew guard: older API payloads don't carry the archived lists.
+  const archivedSurveys = study.archived_surveys ?? [];
+  const archivedProjects = study.archived_projects ?? [];
+  const archivedCount = archivedSurveys.length + archivedProjects.length;
 
   const surveyStatusLabel = (status: string) =>
     status === "live"
@@ -401,6 +422,56 @@ function InstrumentsTab({
       : status === "closed"
         ? t("shell:instrument.statusClosed")
         : t("shell:instrument.statusDraft");
+
+  const runInstrumentAction = async (
+    action: () => Promise<unknown>,
+    successMessage: string,
+  ) => {
+    try {
+      await action();
+      toast(successMessage, "success");
+      onChanged();
+    } catch {
+      toast(t("overview.instruments.archiveFailed"), "error");
+    }
+  };
+
+  const handleArchive = (kind: "survey" | "interview", id: string, name: string) =>
+    runInstrumentAction(
+      () => (kind === "survey" ? archiveSurvey(id) : archiveProject(id)),
+      t("overview.instruments.archivedToast", { name }),
+    );
+
+  const handleRestore = (kind: "survey" | "interview", id: string, name: string) =>
+    runInstrumentAction(
+      () => (kind === "survey" ? unarchiveSurvey(id) : unarchiveProject(id)),
+      t("overview.instruments.restoredToast", { name }),
+    );
+
+  const archiveButton = (kind: "survey" | "interview", id: string, name: string) => (
+    <button
+      type="button"
+      className="hub-row-archive"
+      title={t("overview.instruments.archiveAction")}
+      aria-label={t("overview.instruments.archiveNamed", { name })}
+      onClick={(e) => {
+        // The button lives inside the row's <Link> — swallow the navigation.
+        e.preventDefault();
+        e.stopPropagation();
+        handleArchive(kind, id, name);
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2" y="3" width="12" height="3" rx="0.8" stroke="currentColor" strokeWidth="1.3" />
+        <path
+          d="M3.5 6v6a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V6M6.5 9h3"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
+      </svg>
+    </button>
+  );
 
   const createButtons = (
     <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
@@ -413,25 +484,94 @@ function InstrumentsTab({
     </div>
   );
 
+  // Same collapsed disclosure as the Studies home — archived instruments stay
+  // out of the way until the researcher goes looking for them.
+  const archivedSection = archivedCount > 0 && (
+    <div className="hub-archived">
+      <button
+        type="button"
+        className="hub-archived__toggle"
+        aria-expanded={showArchived}
+        onClick={() => setShowArchived((v) => !v)}
+      >
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          fill="none"
+          aria-hidden="true"
+          style={{
+            transform: showArchived ? "rotate(90deg)" : undefined,
+            transition: "transform 0.15s",
+          }}
+        >
+          <path
+            d="M3 1.5 6.5 5 3 8.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        {t("overview.instruments.archivedToggle", { count: archivedCount })}
+      </button>
+      {showArchived && (
+        <ul className="hub-archived__list">
+          {archivedSurveys.map((s: SurveyMini) => (
+            <li key={s.id} className="hub-archived__row">
+              <span className="hub-archived__name">
+                {t("overview.instruments.archivedSurveyKind")} · {s.name}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => handleRestore("survey", s.id, s.name)}
+              >
+                {t("overview.instruments.restore")}
+              </button>
+            </li>
+          ))}
+          {archivedProjects.map((p: ProjectMini) => (
+            <li key={p.id} className="hub-archived__row">
+              <span className="hub-archived__name">
+                {t("overview.instruments.archivedInterviewKind")} · {p.name}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => handleRestore("interview", p.id, p.name)}
+              >
+                {t("overview.instruments.restore")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
   if (study.surveys.length === 0 && study.projects.length === 0) {
     return (
-      <div
-        style={{
-          background: "var(--bg-surface)",
-          border: "1px dashed var(--border-default)",
-          borderRadius: "var(--radius-md)",
-          padding: "var(--space-8)",
-          textAlign: "center",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "var(--space-4)",
-        }}
-      >
-        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-md)", maxWidth: 540, margin: 0, lineHeight: 1.5 }}>
-          {t("overview.instruments.empty")}
-        </p>
-        {createButtons}
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        <div
+          style={{
+            background: "var(--bg-surface)",
+            border: "1px dashed var(--border-default)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-8)",
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "var(--space-4)",
+          }}
+        >
+          <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-md)", maxWidth: 540, margin: 0, lineHeight: 1.5 }}>
+            {t("overview.instruments.empty")}
+          </p>
+          {createButtons}
+        </div>
+        {archivedSection}
       </div>
     );
   }
@@ -468,6 +608,7 @@ function InstrumentsTab({
               <span className="chart-card__footer-divider">·</span>
               <span>{t("overview.surveys.total", { count: s.response_count })}</span>
             </div>
+            {archiveButton("survey", s.id, s.name)}
           </Link>
         ))}
         {study.projects.map((p, pi) => (
@@ -491,10 +632,12 @@ function InstrumentsTab({
               <span className="chart-card__footer-divider">·</span>
               <span>{t("overview.interviews.links", { count: p.interview_link_count })}</span>
             </div>
+            {archiveButton("interview", p.id, p.name)}
           </Link>
         ))}
       </div>
       {createButtons}
+      {archivedSection}
     </div>
   );
 }

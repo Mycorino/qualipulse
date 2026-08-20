@@ -88,6 +88,9 @@ export interface StudyDetail {
   archived_at: string | null;
   surveys: SurveyMini[];
   projects: ProjectMini[];
+  /** Archived instruments, rendered in the workspace's "Archived" disclosure. */
+  archived_surveys: SurveyMini[];
+  archived_projects: ProjectMini[];
   progress: StudyProgress;
   is_demo: boolean;
   /** English fallback text — prefer `recommended_action_key` for display. */
