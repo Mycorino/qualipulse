@@ -65,6 +65,10 @@ class Settings(BaseSettings):
 
     # Email (SendGrid)
     SENDGRID_API_KEY: str = ""
+    # SendGrid Event Webhook verification key (base64 DER, copied from
+    # SendGrid > Settings > Mail Settings > Event Webhook). Unset disables
+    # the webhook outside development — see routers/email_events.py.
+    SENDGRID_WEBHOOK_PUBLIC_KEY: str = ""
     EMAIL_FROM: str = "noreply@qualipulse.com"
     EMAIL_FROM_NAME: str = "QualiPulse"
 

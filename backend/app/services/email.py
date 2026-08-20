@@ -26,9 +26,12 @@ To enable SendGrid: set SENDGRID_API_KEY in .env
 import html as _html_stdlib
 import logging
 import re
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from app.config import settings
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger("auto_interview.email")
 
@@ -102,24 +105,42 @@ def _html_to_text(html: str) -> str:
 _UNSUBSCRIBE_MAILTO = "mailto:support@qualipulse.com?subject=Unsubscribe%20from%20QualiPulse"
 
 
-def _unsubscribe_headers(email_type: str = "transactional") -> dict[str, str]:
+def _unsubscribe_url(to: str) -> str:
+    """One-click unsubscribe URL for ``to``.
+
+    Routed through the frontend origin's ``/api`` proxy rather than the API
+    domain directly, so the link works with the infrastructure we already
+    deploy (nginx strips the prefix) and no new env var is needed.
+    """
+    from app.services.email_suppression import make_unsubscribe_token
+
+    base = (settings.APP_BASE_URL or "http://localhost:5173").rstrip("/")
+    return f"{base}/api/email/unsubscribe?token={make_unsubscribe_token(to)}"
+
+
+def _unsubscribe_headers(email_type: str = "transactional", to: str = "") -> dict[str, str]:
     """Return the ``List-Unsubscribe`` (+ variants) headers for a message.
 
-    Only marketing/bulk mail (newsletter, digests) gets ``List-Unsubscribe``.
-    Transactional mail (verification, magic link, password reset, team
-    invite, analysis-ready, welcome) intentionally does NOT — advertising
-    "mailing list" on an account-lifecycle email trips spam filters (Apple
-    Mail even renders a "This message is from a mailing list" banner) and
-    confuses recipients who never opted into a list.
+    Only marketing/bulk mail (newsletter, digests, study invitations) gets
+    ``List-Unsubscribe``. Transactional mail (verification, magic link,
+    password reset, team invite, analysis-ready, welcome) intentionally does
+    NOT — advertising "mailing list" on an account-lifecycle email trips spam
+    filters (Apple Mail even renders a "This message is from a mailing list"
+    banner) and confuses recipients who never opted into a list.
 
-    For marketing we include ``mailto:`` because Gmail accepts that alone.
-    We skip ``List-Unsubscribe-Post: List-Unsubscribe=One-Click`` (RFC 8058)
-    because we don't have a POST endpoint to honour one-click yet —
-    advertising one and returning 404 is worse than not advertising.
+    Bulk mail advertises **RFC 8058 one-click** alongside the mailto. Gmail
+    and Outlook surface a native "Unsubscribe" control for it and reward its
+    presence; the POST target is honoured for real by
+    ``routers/email_events.py``, which is what makes advertising it honest.
     """
     if email_type != "marketing":
         return {}
-    return {"List-Unsubscribe": f"<{_UNSUBSCRIBE_MAILTO}>"}
+    headers = {"List-Unsubscribe": f"<{_UNSUBSCRIBE_MAILTO}>"}
+    if to:
+        # URL first: providers prefer the HTTPS target when both are present.
+        headers["List-Unsubscribe"] = f"<{_unsubscribe_url(to)}>, <{_UNSUBSCRIBE_MAILTO}>"
+        headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    return headers
 
 
 # ── Language utilities ─────────────────────────────────────────────────────
@@ -859,17 +880,53 @@ def send_email(
     body_html: str,
     body_text: Optional[str] = None,
     email_type: str = "transactional",
+    db: Optional["Session"] = None,
 ) -> bool:
     """Dispatch email via the configured provider. Returns delivery status.
 
     ``email_type`` picks the ``List-Unsubscribe`` header flavour
-    (``"transactional"`` or ``"marketing"``). All outgoing mail gets the
-    header — Gmail rewards its presence even on transactional mail.
+    (``"transactional"`` or ``"marketing"``) and decides which suppressions
+    apply — see ``services/email_suppression``.
+
+    Suppressed recipients return ``False`` without a provider call. Callers
+    already treat ``False`` as "not delivered", so no call site changes.
+
+    ``db`` is optional: callers inside a request pass their session, and
+    everything else gets a short-lived one. Any error while checking fails
+    **open** (we send) rather than silently swallowing account mail.
     """
-    headers = _unsubscribe_headers(email_type)
+    if _is_suppressed_safe(to, email_type, db):
+        logger.info(
+            "Skipping %s email to %s — address is suppressed", email_type, to
+        )
+        return False
+
+    headers = _unsubscribe_headers(email_type, to)
     if settings.SENDGRID_API_KEY:
         return _send_sendgrid(to, subject, body_html, body_text, headers)
     return _send_console(to, subject, body_html, body_text, headers)
+
+
+def _is_suppressed_safe(
+    to: str, email_type: str, db: Optional["Session"] = None
+) -> bool:
+    """Suppression check that can never raise into a send path."""
+    try:
+        from app.services.email_suppression import is_suppressed
+
+        if db is not None:
+            return is_suppressed(db, to, email_type)
+
+        from app.database import SessionLocal
+
+        session = SessionLocal()
+        try:
+            return is_suppressed(session, to, email_type)
+        finally:
+            session.close()
+    except Exception:  # noqa: BLE001 — never block a send on a bookkeeping error.
+        logger.exception("Suppression check failed for %s; sending anyway", to)
+        return False
 
 
 # ── Shared email wrapper ──────────────────────────────────────────────────
@@ -1248,6 +1305,7 @@ def send_interview_invite(
     sender_name: str,
     lang: str = "en",
     optout_url: str | None = None,
+    db: Optional["Session"] = None,
 ) -> bool:
     lang = _normalise_lang(lang)
     optout_block = ""
@@ -1275,6 +1333,9 @@ def send_interview_invite(
         # not account-lifecycle mail — Gmail expects List-Unsubscribe here
         # and its absence on bulk-pattern sends hurts inbox placement.
         email_type="marketing",
+        # Callers inside a request hand us their session so the suppression
+        # check reuses it instead of opening one per invite in a send loop.
+        db=db,
     )
 
 
