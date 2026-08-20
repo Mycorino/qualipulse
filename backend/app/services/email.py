@@ -792,6 +792,33 @@ def _send_sendgrid(
         )
         message.reply_to = ReplyTo("support@qualipulse.com", "QualiPulse Support")
 
+        # Deliverability: force click/open tracking OFF per message so the
+        # account-level SendGrid defaults can never rewrite our links
+        # through the shared sendgrid.net click-tracking domain. A From
+        # domain (qualipulse.com) whose only link points at a third-party
+        # redirect domain is a strong phishing signal to Gmail/Outlook —
+        # fatal for emails whose entire purpose is one interview link.
+        # If we ever want click analytics back, set up SendGrid link
+        # branding (a CNAME on our domain) first, then re-enable here.
+        try:
+            from sendgrid.helpers.mail import (  # type: ignore
+                ClickTracking,
+                OpenTracking,
+                SubscriptionTracking,
+                TrackingSettings,
+            )
+
+            tracking = TrackingSettings()
+            tracking.click_tracking = ClickTracking(False, False)
+            tracking.open_tracking = OpenTracking(False)
+            tracking.subscription_tracking = SubscriptionTracking(False)
+            message.tracking_settings = tracking
+        except Exception:  # pragma: no cover - SDK version guard
+            logger.warning(
+                "SendGrid tracking helpers unavailable; account-level "
+                "tracking settings will apply"
+            )
+
         # Custom headers (List-Unsubscribe, etc.). SendGrid's helper uses
         # a Header object keyed on name→value, added via add_header.
         for name, value in (headers or {}).items():
@@ -1244,6 +1271,10 @@ def send_interview_invite(
         to=to,
         subject=_c("interview_invite", lang, "subject"),
         body_html=_wrap_email(content, lang),
+        # Segment invites are solicited bulk (panel members who opted in),
+        # not account-lifecycle mail — Gmail expects List-Unsubscribe here
+        # and its absence on bulk-pattern sends hurts inbox placement.
+        email_type="marketing",
     )
 
 
