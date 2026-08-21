@@ -9,6 +9,7 @@ def transcribe_audio(
     audio_data: bytes,
     filename: str = "recording.webm",
     language: str | None = None,
+    prompt: str | None = None,
 ) -> tuple[str, float, list[dict]]:
     """Transcribe audio bytes using OpenAI Whisper.
 
@@ -16,6 +17,11 @@ def transcribe_audio(
     interview language. Passing it measurably lowers Whisper's error rate
     on non-English speech and prevents code-switching misdetection on
     short answers; omit/None keeps Whisper's auto-detect.
+
+    ``prompt`` is an optional glossary (study name, brands, product terms)
+    that biases Whisper's decoding toward the right spelling of proper
+    nouns ("Air France" rather than "la France"). Capped to ~800 chars so
+    it stays under Whisper's 224-token prompt window.
 
     Returns (transcript_text, duration_seconds, segments).
     Each segment is a dict with keys: start (float seconds), end (float
@@ -30,6 +36,9 @@ def transcribe_audio(
     lang = (language or "").strip().lower()[:2]
     if lang:
         kwargs["language"] = lang
+    glossary = (prompt or "").strip()
+    if glossary:
+        kwargs["prompt"] = glossary[:800]
 
     transcript = call_openai_with_retries(
         lambda: client.audio.transcriptions.create(

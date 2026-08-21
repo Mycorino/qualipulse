@@ -61,7 +61,7 @@
     "startError": "Non siamo riusciti ad avviare la sua intervista. Riprovi.",
     "anonymousStudy": "Questo studio è condotto in forma anonima, l'organizzazione che lo conduce ha scelto di non rivelare la propria identità.",
     "declineConfirmNo": "Continua",
-    "declineConfirmText": "È sicuro? Rifiutando, la sua partecipazione termina, non potrà tornare a questo studio.",
+    "declineConfirmText": "È sicuro? Rifiutando, la sua partecipazione a questo studio termina.",
     "declineConfirmYes": "Sì, rifiuto",
     "resumeAvailable": "Ha un'intervista in corso su questo dispositivo.",
     "resumeCta": "Riprendere da dove era rimasto"
@@ -136,20 +136,20 @@
     "sectionWorkExperience": "Esperienza lavorativa",
     "sectionLocation": "Località",
     "optional": "(facoltativo)",
-    "tagsLabel": "Interessi / argomenti"
+    "tagsLabel": "Interessi / argomenti",
+    "skipName": "Continua senza indicare il nome"
   },
   "questionnaire": {
-    "intro": "Innanzitutto, qualche breve domanda su di lei",
-    "introSubtitle": "Questo aiuta il suo intervistatore, e lo chiediamo una sola volta. Tocchi semplicemente la sua risposta.",
+    "intro": "Un minuto su di lei",
+    "introSubtitle": "Tutto facoltativo. Aiuta il team di ricerca a inquadrare meglio le sue risposte. Tocchi semplicemente la sua risposta.",
     "progress": "{{current}} di {{total}}",
     "back": "Indietro",
     "skip": "Salta",
     "continue": "Continua",
-    "finish": "Inizia l'intervista",
     "saving": "Salvataggio in corso…",
     "saveError": "Non siamo riusciti a salvare le sue risposte. Riprovi.",
     "firstNameQ": "Qual è il suo nome?",
-    "firstNameHelp": "Il suo intervistatore lo userà per parlarle in modo naturale.",
+    "firstNameHelp": "Così il team di ricerca sa come rivolgersi a lei.",
     "firstNamePlaceholder": "es. Alex",
     "countryQ": "In quale paese vive?",
     "countrySearch": "Cerchi il suo paese…",
@@ -235,7 +235,11 @@
       "1000+": "Più di 1.000 persone"
     },
     "consentAccept": "Sì, ci sto",
-    "consentDecline": "Non adesso"
+    "consentDecline": "Non adesso",
+    "emailQ": "Vuole lasciare un indirizzo email?",
+    "emailHelp": "Facoltativo. Verrà usato solo se il team di ricerca avrà bisogno di chiarimenti sulle sue risposte.",
+    "emailPlaceholder": "nome@esempio.com",
+    "done": "Concludi"
   },
   "micPrompt": {
     "title": "Questa intervista usa il suo microfono",
@@ -290,16 +294,14 @@
     "rateLimited": "Troppi tentativi in poco tempo. Attenda un minuto prima di riprovare."
   },
   "interview": {
-    "progressLabel": "D{{current}} di {{total}}",
-    "followUpLabel": "Approfondimento · D{{current}} di {{total}}",
+    "progressLabel": "Tema {{current}} di {{total}}",
+    "followUpLabel": "Approfondimento · Tema {{current}} di {{total}}",
     "timeRemaining": "{{minutes}}:{{seconds}} rimanenti",
     "timeWarning": "Meno di 2 minuti rimanenti",
     "timeCritical": "Meno di 30 secondi rimanenti",
     "timeMinLeft": "~{{mins}} min rimasti",
     "timeSecLeft": "{{secs}}s rimasti",
-    "recordButton": "Tieni premuto per registrare",
-    "stopButton": "Rilascia per fermare",
-    "submitButton": "Invia risposta",
+    "submitButton": "Invia la mia risposta",
     "reRecord": "Registra di nuovo",
     "muteAudio": "Disattiva audio",
     "unmuteAudio": "Riattiva audio",
@@ -314,10 +316,8 @@
       "emptyError": "Scriva una risposta prima di inviare."
     },
     "processing": {
-      "transcribing": "🎙️ Trascrizione della sua risposta…",
-      "thinking": "💭 Sto riflettendo…",
-      "preparing": "🔊 Preparazione della prossima domanda…",
-      "takingLonger": "Ancora un attimo, ci siamo quasi…"
+      "listening": "Stiamo ascoltando la sua risposta…",
+      "stillWorking": "Ci stiamo ancora lavorando, grazie per la pazienza"
     },
     "transcript": "Abbiamo sentito:",
     "transcriptDismiss": "Chiudi",
@@ -326,11 +326,11 @@
     "networkError": "Problema di connessione. La sua risposta è salvata, tocchi Invia per riprovare.",
     "ttsFailedWarning": "Non siamo riusciti a riprodurre l'audio della domanda. Può leggere la domanda qui sopra e registrare la sua risposta.",
     "ttsReplay": "Riascolta",
-    "recordingCaptured": "Registrazione acquisita",
-    "tapToStop": "Tocchi per fermare la registrazione",
+    "recordingCaptured": "Ecco la sua risposta. La riascolti se vuole, oppure la invii.",
+    "tapToStop": "Tocca per fermare",
     "remaining": "rimanenti",
     "listeningToQuestion": "Ascolto della domanda…",
-    "tapToRecord": "Tocchi per iniziare a registrare",
+    "tapToRecord": "Tocca per rispondere",
     "waitForQuestion": "Attenda che la domanda finisca",
     "preparingFirst": "Preparazione della sua prima domanda…",
     "uploadError": "Non siamo riusciti a inviare la sua risposta. Tocchi 'Riprova' per inviarla di nuovo.",
@@ -342,7 +342,24 @@
     "rateLimited": "Troppi tentativi in poco tempo. Attenda un minuto, poi tocchi di nuovo Invia, la sua risposta è salvata.",
     "serverError": "Qualcosa è andato storto da parte nostra. Tocchi Invia per riprovare.",
     "skipAudio": "Salta l'audio, sono pronto",
-    "warmupLabel": "Per cominciare"
+    "warmupLabel": "Per conoscerci",
+    "sendingAnswer": "Invio della sua risposta…",
+    "undo": "Annulla",
+    "turnResynced": "Abbiamo già quella risposta, ecco la prossima domanda.",
+    "pause": {
+      "button": "Pausa",
+      "title": "Intervista in pausa",
+      "body": "Si prenda il tempo che serve. I suoi progressi sono salvati, riprenda quando è pronto.",
+      "resume": "Riprendi l'intervista"
+    },
+    "finish": {
+      "button": "Concludi qui",
+      "confirmText": "Concludere l'intervista con quanto condiviso finora?",
+      "confirmYes": "Sì, concludi",
+      "confirmNo": "Continua",
+      "finishing": "Chiusura in corso…",
+      "error": "Non siamo riusciti a concludere l'intervista. Riprovi."
+    }
   },
   "completion": {
     "title": "Grazie, {{name}}!",
@@ -371,7 +388,15 @@
       "dismiss": "No, grazie"
     },
     "enrichCta": "Aggiungi qualche dettaglio → sblocca più studi",
-    "dataRights": "Per richiedere la cancellazione dei suoi dati, contatti la persona che ha condiviso questo link con lei."
+    "dataRights": "Per richiedere la cancellazione dei suoi dati, contatti la persona che ha condiviso questo link con lei.",
+    "postProfile": {
+      "title": "Un minuto su di lei",
+      "body": "Qualche domanda facoltativa su di lei. Aiuta il team di ricerca a leggere le sue risposte nel giusto contesto.",
+      "cta": "Va bene, cominciamo",
+      "dismiss": "No, grazie",
+      "thanksTitle": "Grazie!",
+      "thanksBody": "I suoi dati sono stati salvati insieme alle sue risposte."
+    }
   },
   "resume": {
     "title": "Bentornato!",
@@ -425,5 +450,11 @@
   "alreadyCompleted": {
     "title": "Hai già completato questa intervista",
     "body": "Questo indirizzo e-mail ha già completato questa intervista. Grazie, non c'è altro da fare."
+  },
+  "recording": {
+    "tooShort": "La registrazione era troppo breve. Parli per uno o due secondi prima di fermarsi.",
+    "tooLong": "La registrazione è troppo lunga per essere inviata. Registri una risposta più breve.",
+    "interruptedHidden": "La registrazione si è interrotta perché lo schermo si è spento. Riascolti quello che abbiamo, o registri di nuovo.",
+    "interruptedDevice": "Il microfono si è interrotto a metà risposta. Riascolti quello che abbiamo, o registri di nuovo."
   }
 }

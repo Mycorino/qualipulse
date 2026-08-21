@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # accent/tone instructions, so non-English interviews get a native-sounding
     # voice instead of tts-1's anglophone prosody. Env-overridable to pin back
     # to "tts-1"/"alloy" if the newer model misbehaves.
+    # When true, /respond returns the question text as soon as Claude has
+    # decided, and the voice is fetched by the client in a second request
+    # (GET /interview/{token}/{pid}/turn-audio). The participant reads the
+    # question ~2s sooner; total wall time to audio is unchanged.
+    INTERVIEW_DEFER_TTS: bool = True
     TTS_MODEL: str = "gpt-4o-mini-tts"
     TTS_VOICE: str = "coral"
 

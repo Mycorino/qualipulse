@@ -4,7 +4,10 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from concurrent.futures import ThreadPoolExecutor
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, File, status
+from starlette.concurrency import run_in_threadpool
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -12,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.dependencies import get_db
-from app.limiter import limiter
+from app.limiter import limiter, participant_rate_key
 from app.models.company import Company
 from app.models.interview import InterviewLink, InterviewTurn, Participant
 from app.models.panel import PanelProfile, PanelTag, ParticipantMagicToken
@@ -25,6 +28,9 @@ from app.schemas.interview import (
 )
 from app.services.feature_gates import require_participant_limit
 from app.services.interview_engine import (
+    _active_elapsed_minutes as engine_active_elapsed_minutes,
+    ensure_turn_audio as engine_ensure_turn_audio,
+    finish_interview as engine_finish_interview,
     process_interview_turn,
     start_interview,
     skip_question as engine_skip_question,
@@ -176,6 +182,26 @@ class VerificationRequest(BaseModel):
     # Participant-chosen UI/interview language for the magic-link email copy.
     # Falls back to the project language when omitted.
     lang: str | None = None
+
+
+# Recording uploads run concurrently with transcription. Small pool: the work
+# is network-bound and one slot per in-flight turn is plenty at Cloud Run's
+# concurrency of 16.
+_UPLOAD_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="rec-upload")
+
+
+class SkipRequest(BaseModel):
+    """Optional body for /skip. ``turn_index`` lets the server verify the
+    client is skipping the question it is actually showing."""
+    turn_index: int | None = None
+
+
+class ParticipantProfileRequest(BaseModel):
+    display_name: str | None = None
+    age_range: str | None = None
+    country: str | None = None
+    profession: str | None = None
+    email: str | None = None
 
 
 class PanelProfileRequest(BaseModel):
@@ -676,9 +702,11 @@ def get_resume_summary(
             seen_q.add(t.question_index)
             covered.append(t.question_text)
 
-    now = datetime.utcnow()
-    started = participant.started_at.replace(tzinfo=None) if participant.started_at.tzinfo else participant.started_at
-    elapsed_minutes = (now - started).total_seconds() / 60.0
+    # Same active-time clock the engine paces on, so the summary can never
+    # tell a returning participant they have been interviewing for hours.
+    elapsed_minutes = engine_active_elapsed_minutes(
+        participant, turns, datetime.utcnow()
+    )
 
     last_turn = turns[-1] if turns else None
     return ResumeSummaryResponse(
@@ -754,7 +782,7 @@ def start_interview_session(
             .first()
         )
         if existing is not None and existing.status == "completed":
-            raise HTTPException(
+                raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "already_completed",
@@ -879,6 +907,7 @@ def start_interview_session(
         participant_id=participant.id,
         first_question=result["question_text"],
         tts_audio_url=result["tts_audio_url"],
+        turn_index=int(result.get("turn_index", 0)),
         is_warmup=bool(result.get("is_warmup", False)),
         language=_effective_interview_language(participant),
     )
@@ -890,13 +919,14 @@ MAX_TEXT_ANSWER_CHARS = 5000
 
 
 @router.post("/{token}/{participant_id}/respond", response_model=TurnResponse)
-@limiter.limit("30/minute")
+@limiter.limit("30/minute", key_func=participant_rate_key)
 async def respond_to_question(
     request: Request,
     token: str,
     participant_id: str,
     audio: UploadFile | None = File(None),
     text: str | None = Form(None),
+    turn_index: int | None = Form(None),
     db: Session = Depends(get_db),
 ):
     """Accept a participant response, process it, and return the next question.
@@ -927,21 +957,46 @@ async def respond_to_question(
             detail="Interview is already completed",
         )
 
-    # Deduplication: if the most recent turn already has a response, return it
+    # Turn reconciliation. The client echoes the turn_index it believes it is
+    # answering; without it, a retry sent after the client's timeout (but
+    # after the server finished) was accepted as the answer to a question the
+    # participant never heard.
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
-    if turns:
-        last_turn = turns[-1]
-        if last_turn.response_transcript:
-            return TurnResponse(
-                question_text=last_turn.question_text,
-                tts_audio_url=last_turn.tts_audio_url or "",
-                is_complete=participant.status == "completed",
-                is_follow_up=last_turn.is_follow_up or False,
-                question_index=last_turn.question_index or 0,
-                elapsed_seconds=0,
-                total_seconds=0,
-                transcript=last_turn.response_transcript,
-            )
+    pending = turns[-1] if turns else None
+
+    def _turn_response(turn, *, transcript=None) -> TurnResponse:
+        return TurnResponse(
+            question_text=turn.question_text,
+            tts_audio_url=turn.tts_audio_url or "",
+            is_complete=participant.status == "completed",
+            is_follow_up=turn.is_follow_up or False,
+            question_index=turn.question_index or 0,
+            turn_index=turn.turn_index,
+            elapsed_seconds=0,
+            total_seconds=0,
+            transcript=transcript,
+        )
+
+    if pending is not None and turn_index is not None and turn_index != pending.turn_index:
+        answered = next((t for t in turns if t.turn_index == turn_index), None)
+        following = next((t for t in turns if t.turn_index == turn_index + 1), None)
+        if answered is not None and answered.response_transcript and following is not None:
+            # The server already processed this answer (the client timed out
+            # and retried): replay the question that followed it instead of
+            # accepting the blob against a question they never heard.
+            return _turn_response(following, transcript=answered.response_transcript)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "turn_mismatch",
+                "message": "This answer is for an earlier question.",
+                "current": _turn_response(pending).model_dump(),
+            },
+        )
+
+    # Deduplication: the pending turn already has a response (double submit).
+    if pending is not None and pending.response_transcript:
+        return _turn_response(pending, transcript=pending.response_transcript)
 
     if text is not None:
         # Accessibility text fallback — no STT, no transcode, no audio upload.
@@ -967,8 +1022,9 @@ async def respond_to_question(
                 },
             )
         try:
-            result = process_interview_turn(
-                participant_id, None, None, db, transcript_override=typed
+            result = await run_in_threadpool(
+                process_interview_turn,
+                participant_id, None, None, db, transcript_override=typed,
             )
         except EmptyTranscriptError as e:
             raise HTTPException(
@@ -980,21 +1036,29 @@ async def respond_to_question(
         ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
 
         # Normalise to MP3 for cross-browser playback. Participant browsers record
-        # webm/opus (Chrome/Firefox/Android), which Safari/iOS cannot decode — so a
+        # webm/opus (Chrome/Firefox/Android), which Safari/iOS cannot decode, so a
         # researcher reviewing on a Mac would see "Audio unavailable". MP3 plays
         # everywhere and Whisper transcribes it fine. On any transcode failure
         # (e.g. ffmpeg missing in local dev) we fall back to the original bytes.
+        # ffmpeg is blocking and CPU-bound: keep it off the event loop.
         if needs_transcode(ext):
-            mp3_data = transcode_to_mp3(audio_data, ext)
+            mp3_data = await run_in_threadpool(transcode_to_mp3, audio_data, ext)
             if mp3_data:
                 audio_data = mp3_data
                 ext = ".mp3"
 
         audio_key = f"recordings/{participant_id}/{uuid.uuid4().hex}{ext}"
-        audio_url = upload_audio(audio_data, audio_key)
+        # Upload the recording concurrently with transcription instead of
+        # serialising put -> get -> Whisper. The engine resolves the future
+        # once it needs the playback URL, and tolerates an upload failure.
+        upload_future = _UPLOAD_POOL.submit(upload_audio, audio_data, audio_key)
 
         try:
-            result = process_interview_turn(participant_id, audio_key, audio_url, db)
+            result = await run_in_threadpool(
+                process_interview_turn,
+                participant_id, audio_key, None, db,
+                None, audio_data, upload_future,
+            )
         except EmptyTranscriptError as e:
             # 422 so the frontend can distinguish "bad audio, please retry" from
             # 5xx transport failures. The frontend preserves the blob for re-submit.
@@ -1017,6 +1081,7 @@ async def respond_to_question(
         is_complete=result["is_complete"],
         is_follow_up=result.get("is_follow_up", False),
         question_index=result.get("question_index", 0),
+        turn_index=result.get("turn_index", 0),
         elapsed_seconds=result.get("elapsed_seconds", 0),
         total_seconds=result.get("total_seconds", 0),
         coaching_hint=result.get("coaching_hint"),
@@ -1026,10 +1091,12 @@ async def respond_to_question(
 
 
 @router.post("/{token}/{participant_id}/skip")
+@limiter.limit("30/minute", key_func=participant_rate_key)
 async def skip_question(
     request: Request,
     token: str,
     participant_id: str,
+    body: SkipRequest | None = None,
     db: Session = Depends(get_db),
 ):
     """Skip the current question and advance to the next one."""
@@ -1039,10 +1106,37 @@ async def skip_question(
     if participant.status == "completed":
         raise HTTPException(status_code=400, detail="Interview already completed")
 
-    result = engine_skip_question(participant_id, db)
+    # Same reconciliation as /respond: never skip a question other than the
+    # one the participant is actually looking at.
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    pending = turns[-1] if turns else None
+    if (
+        body is not None
+        and body.turn_index is not None
+        and pending is not None
+        and body.turn_index != pending.turn_index
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "turn_mismatch",
+                "message": "This skip is for an earlier question.",
+                "current": TurnResponse(
+                    question_text=pending.question_text,
+                    tts_audio_url=pending.tts_audio_url or "",
+                    is_complete=False,
+                    is_follow_up=pending.is_follow_up or False,
+                    question_index=pending.question_index or 0,
+                    turn_index=pending.turn_index,
+                ).model_dump(),
+            },
+        )
+
+    result = await run_in_threadpool(engine_skip_question, participant_id, db)
 
     if result["is_complete"]:
         _sync_panel_consent_to_participant(participant, db)
+        _spawn_transcript_cleanup(participant_id)
 
     return TurnResponse(
         question_text=result["question_text"],
@@ -1050,9 +1144,100 @@ async def skip_question(
         is_complete=result["is_complete"],
         is_follow_up=result.get("is_follow_up", False),
         question_index=result.get("question_index", 0),
+        turn_index=result.get("turn_index", 0),
         elapsed_seconds=result.get("elapsed_seconds", 0),
         total_seconds=result.get("total_seconds", 0),
     )
+
+
+@router.post("/{token}/{participant_id}/finish", response_model=TurnResponse)
+@limiter.limit("10/minute", key_func=participant_rate_key)
+async def finish_interview_early(
+    request: Request,
+    token: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+):
+    """Participant-initiated "Finish here". Closes the interview gracefully.
+
+    Idempotent: calling it on an already-completed interview replays the
+    stored closing turn.
+    """
+    link = _get_active_link_or_404(token, db)
+    participant = _get_participant_or_404(participant_id, link, db)
+    already_complete = participant.status == "completed"
+
+    result = await run_in_threadpool(engine_finish_interview, participant_id, db)
+
+    if not already_complete:
+        _sync_panel_consent_to_participant(participant, db)
+        _spawn_transcript_cleanup(participant_id)
+
+    return TurnResponse(
+        question_text=result["question_text"],
+        tts_audio_url=result["tts_audio_url"],
+        is_complete=True,
+        is_follow_up=False,
+        question_index=result.get("question_index", 0),
+        turn_index=result.get("turn_index", 0),
+        elapsed_seconds=result.get("elapsed_seconds", 0),
+        total_seconds=result.get("total_seconds", 0),
+    )
+
+
+@router.get("/{token}/{participant_id}/turn-audio")
+@limiter.limit("60/minute", key_func=participant_rate_key)
+async def get_turn_audio(
+    request: Request,
+    token: str,
+    participant_id: str,
+    turn_index: int,
+    db: Session = Depends(get_db),
+):
+    """Voice for one interviewer turn, synthesised on first request.
+
+    /respond returns the question text without waiting for TTS; the client
+    renders it immediately and calls this to fetch the audio. Returns
+    ``{"tts_audio_url": null}`` when synthesis is unavailable, which the
+    client already handles by staying text-only.
+    """
+    link = _get_active_link_or_404(token, db)
+    _get_participant_or_404(participant_id, link, db)
+    url = await run_in_threadpool(engine_ensure_turn_audio, participant_id, turn_index, db)
+    return {"tts_audio_url": url}
+
+
+@router.patch("/{token}/{participant_id}/profile")
+@limiter.limit("10/minute", key_func=participant_rate_key)
+def update_participant_profile(
+    request: Request,
+    token: str,
+    participant_id: str,
+    body: ParticipantProfileRequest,
+    db: Session = Depends(get_db),
+):
+    """Post-interview demographics for participants without a magic-link
+    session. Cannot set panel consent (that needs a verified email, see
+    POST /interview/{token}/panel-profile); email lands unverified.
+    """
+    link = _get_active_link_or_404(token, db)
+    participant = _get_participant_or_404(participant_id, link, db)
+
+    if body.display_name is not None:
+        participant.display_name = body.display_name.strip()[:255] or None
+    if body.age_range is not None:
+        participant.age_range = body.age_range.strip()[:20] or None
+    if body.country is not None:
+        participant.country = body.country.strip()[:100] or None
+    if body.profession is not None:
+        participant.profession = body.profession.strip()[:100] or None
+    if body.email is not None and not participant.email:
+        email = body.email.strip().lower()[:255]
+        if email:
+            participant.email = email
+            participant.email_verified = False
+    db.commit()
+    return {"saved": True}
 
 
 @router.get("/{token}/{participant_id}/status")

@@ -62,7 +62,7 @@
     "startError": "We couldn't start your interview. Please try again.",
     "resumeAvailable": "You have an interview in progress on this device.",
     "resumeCta": "Continue where you left off",
-    "declineConfirmText": "Are you sure? Declining ends your participation, you won't be able to come back to this study.",
+    "declineConfirmText": "Are you sure? Declining ends your participation in this study.",
     "declineConfirmYes": "Yes, decline",
     "declineConfirmNo": "Keep going"
   },
@@ -136,20 +136,20 @@
     "sectionWorkExperience": "Work Experience",
     "sectionLocation": "Location",
     "optional": "(optional)",
-    "tagsLabel": "Interests / topics"
+    "tagsLabel": "Interests / topics",
+    "skipName": "Continue without a name"
   },
   "questionnaire": {
-    "intro": "First, a few quick questions about you",
-    "introSubtitle": "This helps your interviewer, and we only ask once. Just tap your answer.",
+    "intro": "A minute about you",
+    "introSubtitle": "All optional. It helps the research team understand who they heard from. Just tap your answer.",
     "progress": "{{current}} of {{total}}",
     "back": "Back",
     "skip": "Skip",
     "continue": "Continue",
-    "finish": "Start the interview",
     "saving": "Saving…",
     "saveError": "We couldn't save your answers. Please try again.",
     "firstNameQ": "What's your first name?",
-    "firstNameHelp": "Your interviewer will use it to talk to you naturally.",
+    "firstNameHelp": "So the research team knows how to refer to you.",
     "firstNamePlaceholder": "e.g. Alex",
     "countryQ": "Which country do you live in?",
     "countrySearch": "Search for your country…",
@@ -235,7 +235,11 @@
       "1000+": "More than 1,000 people"
     },
     "consentAccept": "Yes, count me in",
-    "consentDecline": "Not right now"
+    "consentDecline": "Not right now",
+    "emailQ": "Want to leave an email address?",
+    "emailHelp": "Optional. Only used if the research team needs to follow up on your answers.",
+    "emailPlaceholder": "you@example.com",
+    "done": "Finish"
   },
   "micPrompt": {
     "title": "This interview uses your microphone",
@@ -290,16 +294,14 @@
     }
   },
   "interview": {
-    "progressLabel": "Q{{current}} of {{total}}",
-    "followUpLabel": "Follow-up · Q{{current}} of {{total}}",
+    "progressLabel": "Topic {{current}} of {{total}}",
+    "followUpLabel": "Follow-up · Topic {{current}} of {{total}}",
     "timeRemaining": "{{minutes}}:{{seconds}} remaining",
     "timeWarning": "Less than 2 minutes remaining",
     "timeCritical": "Less than 30 seconds remaining",
     "timeMinLeft": "~{{mins}} min left",
     "timeSecLeft": "{{secs}}s left",
-    "recordButton": "Hold to record",
-    "stopButton": "Release to stop",
-    "submitButton": "Send answer",
+    "submitButton": "Send my answer",
     "reRecord": "Re-record",
     "muteAudio": "Mute",
     "unmuteAudio": "Unmute",
@@ -314,10 +316,8 @@
       "emptyError": "Please write an answer before sending."
     },
     "processing": {
-      "transcribing": "🎙️ Transcribing your answer…",
-      "thinking": "💭 Thinking…",
-      "preparing": "🔊 Preparing next question…",
-      "takingLonger": "Still working, hang tight…"
+      "listening": "Listening back to your answer…",
+      "stillWorking": "Still working, thanks for your patience"
     },
     "transcript": "We heard:",
     "transcriptDismiss": "Dismiss",
@@ -326,11 +326,11 @@
     "networkError": "Connection issue. Your answer is saved, tap Send to retry.",
     "ttsFailedWarning": "We couldn't play the question audio. You can read the question above and record your answer.",
     "ttsReplay": "Replay",
-    "recordingCaptured": "Recording captured",
-    "tapToStop": "Tap to stop recording",
+    "recordingCaptured": "Here is your answer. Listen back if you like, or send it.",
+    "tapToStop": "Tap to stop",
     "remaining": "remaining",
     "listeningToQuestion": "Listening to question…",
-    "tapToRecord": "Tap to start recording",
+    "tapToRecord": "Tap to answer",
     "waitForQuestion": "Wait for the question to finish",
     "preparingFirst": "Preparing your first question…",
     "uploadError": "Couldn't send your answer. Tap 'Try again' to resend.",
@@ -342,7 +342,24 @@
     "playQuestion": "Play the question",
     "skipAudio": "Skip audio, I'm ready",
     "maxRecordingHint": "Up to {{minutes}} minutes per answer",
-    "warmupLabel": "Warming up"
+    "warmupLabel": "Getting to know you",
+    "sendingAnswer": "Sending your answer…",
+    "undo": "Undo",
+    "turnResynced": "We already have that answer, here is the next question.",
+    "pause": {
+      "button": "Pause",
+      "title": "Interview paused",
+      "body": "Take all the time you need. Your progress is saved, come back whenever you're ready.",
+      "resume": "Resume the interview"
+    },
+    "finish": {
+      "button": "Finish here",
+      "confirmText": "End the interview with what you've shared so far?",
+      "confirmYes": "Yes, finish",
+      "confirmNo": "Keep going",
+      "finishing": "Wrapping up…",
+      "error": "We couldn't wrap up the interview. Please try again."
+    }
   },
   "completion": {
     "title": "Thank you, {{name}}!",
@@ -371,7 +388,15 @@
       "dismiss": "No thanks"
     },
     "enrichCta": "Add a few more details → unlock more studies",
-    "dataRights": "To request deletion of your data, contact the researcher who shared this link."
+    "dataRights": "To request deletion of your data, contact the researcher who shared this link.",
+    "postProfile": {
+      "title": "One minute about you",
+      "body": "A few optional questions about who you are. They help the research team read your answers in context.",
+      "cta": "Sure, ask away",
+      "dismiss": "No thanks",
+      "thanksTitle": "Thank you!",
+      "thanksBody": "Your details were saved along with your answers."
+    }
   },
   "resume": {
     "title": "Welcome back!",
@@ -425,5 +450,11 @@
   "alreadyCompleted": {
     "title": "You have already completed this interview",
     "body": "Our records show this email address already finished this interview. Thank you, there is nothing more to do."
+  },
+  "recording": {
+    "tooShort": "That recording was too short. Please speak for a second or two before stopping.",
+    "tooLong": "That recording is too long to send. Please record a shorter answer.",
+    "interruptedHidden": "Recording stopped because the screen turned off. Listen back to what we caught, or record again.",
+    "interruptedDevice": "Your microphone stopped mid-answer. Listen back to what we caught, or record again."
   }
 }

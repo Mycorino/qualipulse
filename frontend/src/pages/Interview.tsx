@@ -12,16 +12,23 @@ import {
   checkResume,
   getResumeSummary,
   skipQuestion,
+  finishInterview,
+  getTurnAudio,
   requestVerification,
-  getPanelTags,
   savePanelProfile,
+  RECORDING_TOO_LARGE,
   InterviewInfo,
   ScreeningQuestion,
   ResumeCheck,
   ResumeSummary,
-  PanelTag,
+  SubmitAudioResponse,
+  TurnMismatchDetail,
 } from "../api/interviews";
-import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import {
+  useAudioRecorder,
+  RECORDING_TOO_SHORT,
+  RecordingInterruptReason,
+} from "../hooks/useAudioRecorder";
 import LanguagePicker from "../components/LanguagePicker";
 import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/ParticipantQuestionnaire";
 import PanelEnrichment from "../components/PanelEnrichment";
@@ -41,7 +48,6 @@ type Phase =
   | "email_sent"
   | "consent"
   | "profile"
-  | "questionnaire"
   | "screening"
   | "disqualified"
   | "study_unavailable"
@@ -114,8 +120,6 @@ export default function Interview() {
 
   // Panel profile
   const [profile, setProfile] = useState<ProfileState>(EMPTY_PROFILE);
-  const [panelTags, setPanelTags] = useState<PanelTag[]>([]);
-  const [panelProfileSaving, setPanelProfileSaving] = useState(false);
   // Returning-participant recognition: set from the magic-link verify response
   // (stashed in sessionStorage by InterviewVerify). When the profile is already
   // complete we skip the questionnaire entirely.
@@ -135,13 +139,10 @@ export default function Interview() {
   // Inline panel-enrichment ("add more details, get more studies") on the
   // completion screen for consented panelists.
   const [showEnrichment, setShowEnrichment] = useState(false);
-  // TEMP dev/testing shortcut: visit any interview link with `?devskip=1` once
-  // to enable a "Skip to end" button (persisted in localStorage; `?devskip=0`
-  // to disable). Lets you jump straight to the completion screen to test the
-  // post-interview panel flow without recording an interview. Remove later.
-  const [devSkip, setDevSkip] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("qp_devskip") === "1"
-  );
+  // Post-interview "a minute about you" questionnaire (optional). Lives on the
+  // completion screen so the pre-interview path stays near-frictionless.
+  const [showPostQuestionnaire, setShowPostQuestionnaire] = useState(false);
+  const [postProfileState, setPostProfileState] = useState<"idle" | "done" | "skipped">("idle");
 
   // Interview state
   const [displayName, setDisplayName] = useState("");
@@ -163,6 +164,17 @@ export default function Interview() {
   // True while the current prompt is the warm-up (not a guide question):
   // the progress label must not claim "Q1 of N" during it.
   const [isWarmup, setIsWarmup] = useState(false);
+  // Index of the pending interviewer turn, echoed back on /respond and /skip
+  // so a retried upload can never be applied to the wrong question. Null when
+  // unknown (resume paths that predate the field).
+  const [turnIndex, setTurnIndex] = useState<number | null>(null);
+  // Pause / finish-here controls.
+  const [paused, setPaused] = useState(false);
+  const pausedTtsRef = useRef(false);
+  const [finishConfirming, setFinishConfirming] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  // Neutral, non-error notices (turn resync, recording interrupted).
+  const [notice, setNotice] = useState<string | null>(null);
   // PF-3: live coaching tip surfaced when the engine detects a short-answer
   // run. Persists between turns until the user dismisses or the engine clears
   // it because the participant elaborated again.
@@ -194,7 +206,15 @@ export default function Interview() {
   const MAX_TYPED_ANSWER_CHARS = 5000;
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [ttsEnded, setTtsEnded] = useState(true);
-  const [processingStep, setProcessingStep] = useState(0);
+  // Honest processing state: one calm label, plus a patience hint after 8s.
+  const [processingLong, setProcessingLong] = useState(false);
+  // One-tap answering: after tap-to-stop the take auto-sends in 2.5s unless
+  // the participant taps Undo (which drops them into a playable preview).
+  const [autoSending, setAutoSending] = useState(false);
+  const autoSendTimerRef = useRef<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Single polite live region for screen readers (question, then processing).
+  const [liveMessage, setLiveMessage] = useState("");
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const recordingStartTimeRef = useRef<number | null>(null);
   const MAX_RECORDING_SECONDS = 240;
@@ -233,18 +253,59 @@ export default function Interview() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pendingFirstTtsRef = useRef<string | null>(null);
-  // Holds the questionnaire result so doStartInterview reads it synchronously
-  // (setState is async — the no-screening path starts the interview in the
-  // same tick the questionnaire completes).
-  const collectedRef = useRef<QuestionnaireResult | null>(null);
   const { isRecording, error: recError, startRecording, stopRecording } =
-    useAudioRecorder();
+    useAudioRecorder({
+      onInterrupted: (blob: Blob | null, reason: RecordingInterruptReason) => {
+        if (blob) {
+          lastBlobRef.current = blob;
+          setPendingBlob(blob);
+          setTtsEnded(false);
+        }
+        setNotice(
+          reason === "hidden"
+            ? t("recording.interruptedHidden")
+            : t("recording.interruptedDevice")
+        );
+      },
+    });
+
+  // Object URL for the preview player; revoked whenever the blob changes.
+  useEffect(() => {
+    if (!pendingBlob) { setPreviewUrl(null); return; }
+    const url = URL.createObjectURL(pendingBlob);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingBlob]);
+
+  // Clear the auto-send timer on unmount so a late fire can't hit a dead page.
+  useEffect(() => () => {
+    if (autoSendTimerRef.current) window.clearTimeout(autoSendTimerRef.current);
+  }, []);
+
+  // Patience hint after 8s of processing (no fake step progression).
+  useEffect(() => {
+    if (!processing) { setProcessingLong(false); return; }
+    const timer = window.setTimeout(() => setProcessingLong(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [processing]);
+
+  // Feed the single live region: the new question text first, then processing
+  // state changes. Plain text only, never emoji.
+  useEffect(() => {
+    if (phase !== "interview") return;
+    if (processing) {
+      setLiveMessage(processingLong ? t("interview.processing.stillWorking") : t("interview.processing.listening"));
+    } else if (currentQuestion) {
+      setLiveMessage(currentQuestion);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, processing, processingLong, currentQuestion]);
 
   // Auto-dismiss the "We heard" flash so the previous answer doesn't linger
   // under the next question: start fading at 6.5s, gone at 7.5s. Paused while
   // the participant has expanded it to read the full transcript.
   useEffect(() => {
-    if (!showTranscript || !lastTranscript || transcriptDismissed || transcriptExpanded) return;
+    if (!showTranscript || !lastTranscript || transcriptDismissed || transcriptExpanded || paused) return;
     const fadeTimer = window.setTimeout(() => setTranscriptFading(true), 6500);
     const hideTimer = window.setTimeout(() => setTranscriptDismissed(true), 7500);
     return () => {
@@ -252,7 +313,7 @@ export default function Interview() {
       window.clearTimeout(hideTimer);
       setTranscriptFading(false);
     };
-  }, [showTranscript, lastTranscript, transcriptDismissed, transcriptExpanded]);
+  }, [showTranscript, lastTranscript, transcriptDismissed, transcriptExpanded, paused]);
 
   // ── Session / URL handling on load ──────────────────────────────────────
 
@@ -360,24 +421,10 @@ export default function Interview() {
       .finally(() => setInfoLoading(false));
   }, [token]);
 
-  // Load panel tags when entering profile phase
-  useEffect(() => {
-    if (phase === "profile" && panelTags.length === 0) {
-      getPanelTags().then(setPanelTags).catch(() => {});
-    }
-  }, [phase]);
-
   // Branded studies re-theme the whole participant experience (accent color
   // + font) by overriding the design-system CSS variables; cleanup restores
   // them so the theme never leaks past this page.
   useEffect(() => applyParticipantBranding(info?.branding), [info?.branding]);
-
-  // TEMP: toggle the dev "skip to end" affordance from the URL (?devskip=1/0).
-  useEffect(() => {
-    const v = new URLSearchParams(location.search).get("devskip");
-    if (v === "1") { localStorage.setItem("qp_devskip", "1"); setDevSkip(true); }
-    else if (v === "0") { localStorage.removeItem("qp_devskip"); setDevSkip(false); }
-  }, [location.search]);
 
   // Resend countdown
   useEffect(() => {
@@ -387,8 +434,10 @@ export default function Interview() {
   }, [resendCountdown]);
 
   // ── Skip-button gating: 5s grace period after each question ──────────────
+  // Frozen while paused: the grace period is about giving the participant a
+  // moment with the question, and a paused interview isn't that moment.
   useEffect(() => {
-    if (phase !== "interview") return;
+    if (phase !== "interview" || paused) return;
     setSkipBtnReady(false);
     if (skipBtnTimerRef.current) window.clearTimeout(skipBtnTimerRef.current);
     if (!currentQuestion) return;
@@ -396,27 +445,34 @@ export default function Interview() {
     return () => {
       if (skipBtnTimerRef.current) window.clearTimeout(skipBtnTimerRef.current);
     };
-  }, [currentQuestion, phase]);
+  }, [currentQuestion, phase, paused]);
 
   // ── Live countdown during interview ──────────────────────────────────────
-
+  // This local ticker is only a between-turns *estimate*. The server paces on
+  // an active-time clock (per-gap capped at 5 minutes, so pauses and locked
+  // screens don't burn the budget) and its elapsed_seconds / total_seconds are
+  // authoritative: every TurnResponse resyncs us via syncClockFromServer, so
+  // local drift can never accumulate across turns.
+  //
+  // While paused the ticker stops entirely and does NOT back-fill the gap on
+  // resume, which is what keeps the UI honest with the server's clock.
   useEffect(() => {
-    if (phase !== "interview" || totalSeconds === 0) return;
+    if (phase !== "interview" || totalSeconds === 0 || paused) return;
     const interval = setInterval(() => {
       setElapsedSeconds((s) => Math.min(s + 1, totalSeconds));
     }, 1000);
     return () => clearInterval(interval);
-  }, [phase, totalSeconds]);
+  }, [phase, totalSeconds, paused]);
 
   // ── beforeunload warning during active interview ─────────────────────
   useEffect(() => {
-    if (phase !== "interview" || !participantId) return;
+    if (phase !== "interview" || !participantId || paused) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [phase, participantId]);
+  }, [phase, participantId, paused]);
 
   // Lock both the live i18n language AND the persisted interview-language key
   // to the backend-authoritative value so the UI never drifts from the AI, and
@@ -511,10 +567,54 @@ export default function Interview() {
     [muted, getAudioEl]
   );
 
+  // ── Deferred voice synthesis (item 13) ──────────────────────────────────
+  // The backend now usually returns tts_audio_url: null so the question text
+  // renders sooner; the voice is fetched separately, once per turn. The
+  // record button is never gated on audio that has not arrived.
+  const ttsFetchSeqRef = useRef(0);
+  const micTestDoneRef = useRef(false);
+  useEffect(() => { micTestDoneRef.current = micTestDone; }, [micTestDone]);
+  const answeringRef = useRef(false);
+  useEffect(() => {
+    answeringRef.current = isRecording || !!pendingBlob || processing || paused;
+  }, [isRecording, pendingBlob, processing, paused]);
+
+  const fetchDeferredTts = useCallback(
+    async (pid: string, turnIdx: number | null | undefined) => {
+      if (!token || !pid || turnIdx === null || turnIdx === undefined) return;
+      const seq = ++ttsFetchSeqRef.current;
+      const startedAt = Date.now();
+      let url: string | null = null;
+      try {
+        url = await getTurnAudio(token, pid, turnIdx);
+      } catch {
+        return; // stay text-only, the supported degradation
+      }
+      if (seq !== ttsFetchSeqRef.current || !url) return; // superseded / failed
+      if (!micTestDoneRef.current) {
+        // First question, mic check still on screen: park it like a direct
+        // first-turn URL; the existing effect plays it once the check ends.
+        pendingFirstTtsRef.current = url;
+        return;
+      }
+      if (answeringRef.current) return; // never talk over the participant
+      if (Date.now() - startedAt > 10_000) {
+        // Arrived late: offer tap-to-play instead of surprising autoplay.
+        try {
+          getAudioEl().src = url;
+          setTtsBlocked(true);
+        } catch { /* no-op */ }
+        return;
+      }
+      playTTS(url);
+    },
+    [token, playTTS, getAudioEl]
+  );
+
   // ── Recording time limit ─────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!isRecording) {
+    if (!isRecording || paused) {
       setRecordingSeconds(0);
       recordingStartTimeRef.current = null;
       return;
@@ -548,7 +648,7 @@ export default function Interview() {
         } catch { /* no-op */ }
       }
       if (elapsed >= MAX_RECORDING_SECONDS) {
-        handleStopAndPreview();
+        handleStopAndPreview(false);
         setRecordingSeconds(MAX_RECORDING_SECONDS);
       } else {
         setRecordingSeconds(elapsed);
@@ -556,7 +656,7 @@ export default function Interview() {
     }, 1000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRecording]);
+  }, [isRecording, paused]);
 
   // ── Mic level meter ───────────────────────────────────────────────────
 
@@ -601,16 +701,19 @@ export default function Interview() {
 
   const sessionKey = token ? `interview_progress_${token}` : null;
 
-  function saveSession(pid: string, question: string, turn: number) {
+  function saveSession(pid: string, question: string, turn: number, ti?: number | null, qi?: number) {
     if (!sessionKey) return;
-    sessionStorage.setItem(sessionKey, JSON.stringify({ participantId: pid, currentQuestion: question, turnCount: turn }));
+    sessionStorage.setItem(sessionKey, JSON.stringify({
+      participantId: pid, currentQuestion: question, turnCount: turn,
+      turnIndex: ti ?? null, questionIndex: qi ?? 0,
+    }));
   }
 
   function clearSession() {
     if (sessionKey) sessionStorage.removeItem(sessionKey);
   }
 
-  function getSavedSession(): { participantId: string; currentQuestion: string; turnCount: number } | null {
+  function getSavedSession(): { participantId: string; currentQuestion: string; turnCount: number; turnIndex?: number | null; questionIndex?: number } | null {
     if (!sessionKey) return null;
     try {
       const raw = sessionStorage.getItem(sessionKey);
@@ -675,22 +778,18 @@ export default function Interview() {
       // Check for session-storage resume
       const saved = getSavedSession();
       if (saved) {
-        setParticipantId(saved.participantId);
-        setCurrentQuestion(saved.currentQuestion);
-        setTurnCount(saved.turnCount);
-        setPhase("interview");
+        restoreSavedSession(saved);
         setStarting(false);
         return;
       }
-      // Returning participant with a complete panel profile → skip the
-      // profiling questionnaire and go straight to screening/interview.
-      if (profileComplete) {
+      // Returning participant we already know by name: straight on to
+      // screening/interview. Everyone else gets the one-field first-name
+      // screen; demographics are asked AFTER the interview, optionally.
+      if (profileComplete && profile.firstName) {
         await routeAfterProfile();
         return;
       }
-      // New / incomplete participant → run the profiling questionnaire
-      // (collects demographics into the reusable panel profile).
-      setPhase("questionnaire");
+      setPhase("profile");
       setStarting(false);
       return;
     } catch {
@@ -726,40 +825,21 @@ export default function Interview() {
   }
 
   async function proceedFromProfile() {
+    const name = profile.firstName.trim();
+    if (name) setDisplayName(name);
     await routeAfterProfile();
   }
 
-  async function handleProfileContinue() {
-    await routeAfterProfile();
-  }
-
-  function handleSkipProfile() {
-    routeAfterProfile();
-  }
-
-  /** Called when the participant finishes (or skips through) the profiling
-   *  questionnaire. The questionnaire already persisted the panel profile;
-   *  here we just carry the few fields needed to create the participant row
-   *  and continue to screening/interview. */
-  async function handleQuestionnaireComplete(data: QuestionnaireResult) {
-    collectedRef.current = data;
+  /** Called when the participant finishes (or skips through) the optional
+   *  post-interview questionnaire on the completion screen. The component
+   *  already persisted the answers (panel profile or participant profile). */
+  function handleQuestionnaireComplete(data: QuestionnaireResult) {
     setPanelConsentGiven(data.panelConsent);
-    if (data.firstName) {
-      setProfile((p) => ({ ...p, firstName: data.firstName }));
-      setDisplayName(data.firstName);
-    }
+    if (data.firstName) setProfile((p) => ({ ...p, firstName: data.firstName }));
     if (data.ageRange) setAgeRange(data.ageRange);
     if (data.country) setCountry(data.country);
-    await routeAfterProfile();
-  }
-
-  /** TEMP dev shortcut — jump straight to the completion screen (skipping
-   *  questionnaire / screening / interview) to test the post-interview panel
-   *  flow. Treats the panelist as consented so the enrichment CTA shows. */
-  function handleDevSkipToEnd() {
-    setPanelConsentGiven(true);
-    setTurnCount(3);
-    setPhase("complete");
+    setPostProfileState("done");
+    setShowPostQuestionnaire(false);
   }
 
   /** Post-interview panel opt-in for participants who declined earlier. Flips
@@ -781,32 +861,18 @@ export default function Interview() {
     }
   }
 
-  function toggleTag(id: number) {
-    setProfile((p) => {
-      const has = p.selectedTagIds.includes(id);
-      if (has) {
-        return { ...p, selectedTagIds: p.selectedTagIds.filter((t) => t !== id) };
-      }
-      if (p.selectedTagIds.length >= 5) return p; // max 5
-      return { ...p, selectedTagIds: [...p.selectedTagIds, id] };
-    });
-  }
-
   // ── Interview start ────────────────────────────────────────────────────
 
   async function doStartInterview() {
     if (!token) return;
-    // Prefer the just-collected questionnaire data (read synchronously from a
-    // ref to dodge setState lag), then fall back to any restored state.
-    const c = collectedRef.current;
     const chosenLang = (i18n.language || "en").slice(0, 2);
     let res;
     try {
       res = await startInterview(token, {
-        displayName: c?.firstName || profile.firstName || displayName || undefined,
+        displayName: profile.firstName.trim() || displayName || undefined,
         profession: profile.jobFunction || profession || undefined,
-        ageRange: c?.ageRange || profile.ageRange || ageRange || undefined,
-        country: c?.country || country || profile.city || undefined,
+        ageRange: profile.ageRange || ageRange || undefined,
+        country: country || profile.city || undefined,
         email: email || undefined,
         sessionToken: sessionToken || undefined,
         preferredLanguage: chosenLang,
@@ -864,25 +930,36 @@ export default function Interview() {
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
     setTurnCount(1);
-    setQuestionIndex(0);
+    setQuestionIndex(res.question_index ?? 0);
     setIsFollowUp(false);
     setIsWarmup(res.is_warmup ?? false);
+    setTurnIndex(res.turn_index ?? null);
     const total = (info?.interview_duration_minutes ?? 0) * 60;
     setTotalSeconds(total);
     setElapsedSeconds(0);
-    saveSession(res.participant_id, res.first_question, 1);
+    saveSession(res.participant_id, res.first_question, 1, res.turn_index ?? null, res.question_index ?? 0);
     setPhase("interview");
-    if (res.tts_audio_url) pendingFirstTtsRef.current = res.tts_audio_url;
-    else setTtsEnded(true);
+    if (res.tts_audio_url) {
+      pendingFirstTtsRef.current = res.tts_audio_url;
+    } else {
+      setTtsEnded(true);
+      void fetchDeferredTts(res.participant_id, res.turn_index);
+    }
+  }
+
+  function restoreSavedSession(saved: NonNullable<ReturnType<typeof getSavedSession>>) {
+    setParticipantId(saved.participantId);
+    setCurrentQuestion(saved.currentQuestion);
+    setTurnCount(saved.turnCount);
+    setTurnIndex(saved.turnIndex ?? null);
+    setQuestionIndex(saved.questionIndex ?? 0);
+    setPhase("interview");
   }
 
   function handleResumeSession() {
     const saved = getSavedSession();
     if (!saved) return;
-    setParticipantId(saved.participantId);
-    setCurrentQuestion(saved.currentQuestion);
-    setTurnCount(saved.turnCount);
-    setPhase("interview");
+    restoreSavedSession(saved);
   }
 
   async function handleConfirmResume() {
@@ -893,6 +970,7 @@ export default function Interview() {
     setCurrentQuestion(resumeCheck.last_question ?? "");
     setTurnCount(resumeCheck.turn_count ?? 1);
     setQuestionIndex(resumeCheck.question_index ?? 0);
+    setTurnIndex(null);
     const total = (info?.interview_duration_minutes ?? 0) * 60;
     setTotalSeconds(total);
     const alreadyElapsed = (resumeSummary?.elapsed_minutes ?? 0) * 60;
@@ -945,15 +1023,39 @@ export default function Interview() {
     }
   }
 
-  async function handleStopAndPreview() {
+  /** Tap-to-stop. With `autoSend` (the normal tap) the take sends itself
+   *  after a short Undo window; the 240s cap and interruptions land in the
+   *  playable preview instead so the participant can listen before sending. */
+  async function handleStopAndPreview(autoSend = true) {
     try {
       const blob = await stopRecording();
       lastBlobRef.current = blob;
       setPendingBlob(blob);
       setTtsEnded(false);
-    } catch (_e) {
-      setError(t("interview.recordingError", { defaultValue: "Recording was interrupted. Please try again." }));
+      if (autoSend) {
+        setAutoSending(true);
+        if (autoSendTimerRef.current) window.clearTimeout(autoSendTimerRef.current);
+        autoSendTimerRef.current = window.setTimeout(() => {
+          autoSendTimerRef.current = null;
+          setAutoSending(false);
+          setPendingBlob(null);
+          void submitAnswer(blob);
+        }, 2500);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "";
+      setError(
+        msg === RECORDING_TOO_SHORT
+          ? t("recording.tooShort")
+          : t("interview.recordingError")
+      );
     }
+  }
+
+  function handleUndoAutoSend() {
+    if (autoSendTimerRef.current) window.clearTimeout(autoSendTimerRef.current);
+    autoSendTimerRef.current = null;
+    setAutoSending(false);
   }
 
   async function handleSubmitPending() {
@@ -961,6 +1063,73 @@ export default function Interview() {
     const blob = pendingBlob;
     setPendingBlob(null);
     await submitAnswer(blob);
+  }
+
+  /** The server's active-time clock is authoritative: it ignores the gaps
+   *  where the participant paused or locked their screen (each gap capped at
+   *  5 minutes), so it is always the truth about the remaining budget. Every
+   *  TurnResponse (start / respond / skip / finish / 409 resync) snaps the
+   *  local countdown back onto it instead of letting local drift accumulate. */
+  function syncClockFromServer(res: Pick<SubmitAudioResponse, "elapsed_seconds" | "total_seconds">) {
+    if (res.total_seconds !== undefined && res.total_seconds > 0) setTotalSeconds(res.total_seconds);
+    if (res.elapsed_seconds !== undefined) setElapsedSeconds(res.elapsed_seconds);
+  }
+
+  /** Apply a TurnResponse that carries the next (non-complete) question. */
+  function applyNextTurn(res: SubmitAudioResponse, nextTurn: number) {
+    setCurrentQuestion(res.question_text ?? "");
+    setTurnCount(nextTurn);
+    setQuestionIndex(res.question_index ?? questionIndex);
+    setIsFollowUp(res.is_follow_up ?? false);
+    setIsWarmup(false);
+    setTurnIndex(res.turn_index ?? null);
+    syncClockFromServer(res);
+    setTtsEnded(false);
+    saveSession(participantId, res.question_text ?? "", nextTurn, res.turn_index ?? null, res.question_index ?? questionIndex);
+    if (res.tts_audio_url) {
+      playTTS(res.tts_audio_url);
+    } else {
+      setTtsEnded(true);
+      void fetchDeferredTts(participantId, res.turn_index);
+    }
+  }
+
+  /** Completion, whether it came from /respond, /skip or /finish. */
+  function applyCompletion(res: SubmitAudioResponse, playClosing: boolean) {
+    clearSession();
+    setTurnIndex(res.turn_index ?? null);
+    syncClockFromServer(res);
+    setPendingBlob(null);
+    lastBlobRef.current = null;
+    setPhase("complete");
+    if (playClosing && res.tts_audio_url) {
+      playTTS(res.tts_audio_url);
+    } else if (playClosing) {
+      void fetchDeferredTts(participantId, res.turn_index);
+    } else if (audioRef.current) {
+      audioRef.current.pause();
+    }
+  }
+
+  /** HTTP 409 turn_mismatch: the server is ahead of us (a retried upload it
+   *  had already processed, or a second tab). Resync to its view of the
+   *  interview and drop the pending take. Returns true when handled. */
+  function handleTurnMismatch(err: unknown): boolean {
+    const e = err as { response?: { status?: number; data?: { detail?: Partial<TurnMismatchDetail> } } };
+    const detail = e?.response?.data?.detail;
+    if (e?.response?.status !== 409 || detail?.code !== "turn_mismatch" || !detail.current) return false;
+    const current = detail.current;
+    setPendingBlob(null);
+    lastBlobRef.current = null;
+    setTypedAnswer("");
+    setError("");
+    if (current.is_complete) {
+      applyCompletion(current, true);
+    } else {
+      applyNextTurn(current, turnCount + 1);
+      setNotice(t("interview.turnResynced"));
+    }
+    return true;
   }
 
   async function handleSubmitTyped() {
@@ -975,38 +1144,18 @@ export default function Interview() {
   async function submitAnswer(payload: Blob | string) {
     const isTyped = typeof payload === "string";
     setProcessing(true);
-    // Typed answers skip STT, so jump straight to the "thinking" step.
-    setProcessingStep(isTyped ? 1 : 0);
     setShowTranscript(false);
     setLastTranscript(null);
     setError("");
-
-    const stepInterval = setInterval(() => {
-      setProcessingStep((s) => Math.min(s + 1, 3));
-    }, 3000);
+    setNotice(null);
 
     try {
-      const res = await submitAudio(token!, participantId, payload);
-      clearInterval(stepInterval);
+      const res = await submitAudio(token!, participantId, payload, turnIndex);
       if (isTyped) setTypedAnswer("");
       if (res.is_complete) {
-        clearSession();
-        setPhase("complete");
-        if (audioRef.current) audioRef.current.pause();
-        // Save panel profile if consent given
-        // Panel-join surface was removed from consent; participants no
-        // longer opt into the panel during the interview flow. Leave the
-        // hook in place so it's a one-line restore if we add a panel
-        // surface elsewhere — but never call it without consent.
+        applyCompletion(res, false);
       } else if (res.question_text) {
         const nextTurn = turnCount + 1;
-        setCurrentQuestion(res.question_text);
-        setTurnCount(nextTurn);
-        setQuestionIndex(res.question_index ?? questionIndex);
-        setIsFollowUp(res.is_follow_up ?? false);
-        setIsWarmup(false);
-        if (res.elapsed_seconds !== undefined) setElapsedSeconds(res.elapsed_seconds);
-        if (res.total_seconds !== undefined && res.total_seconds > 0) setTotalSeconds(res.total_seconds);
         if (res.transcript) {
           setLastTranscript(res.transcript);
           setShowTranscript(true);
@@ -1023,20 +1172,23 @@ export default function Interview() {
         } else {
           setCoachingHint(null);
         }
-        setTtsEnded(false);
-        saveSession(participantId, res.question_text, nextTurn);
-        if (res.tts_audio_url) playTTS(res.tts_audio_url);
-        else setTtsEnded(true);
+        applyNextTurn(res, nextTurn);
       }
     } catch (err: unknown) {
-      clearInterval(stepInterval);
+      if (handleTurnMismatch(err)) return;
       // Distinguish "we didn't hear you" (422) from transport failures.
       // Empty-transcript: clear the blob so the participant records fresh;
       // transport: keep the blob in pending so they can retry the same take.
-      const errWithResp = err as { response?: { status?: number; data?: { detail?: { code?: string } } } };
+      const errWithResp = err as { response?: { status?: number; data?: { detail?: { code?: string } } }; code?: string };
       const status = errWithResp?.response?.status;
       const code = errWithResp?.response?.data?.detail?.code;
-      if (status === 422 && code === "empty_transcript") {
+      if (errWithResp?.code === RECORDING_TOO_LARGE) {
+        // Client-side size guard: the take never left the device. Drop it so
+        // the participant records a shorter answer.
+        setPendingBlob(null);
+        lastBlobRef.current = null;
+        setError(t("recording.tooLong"));
+      } else if (status === 422 && code === "empty_transcript") {
         if (isTyped) {
           setError(t("interview.textAnswer.emptyError", {
             defaultValue: "Please write an answer before sending.",
@@ -1073,6 +1225,7 @@ export default function Interview() {
     setPendingBlob(null);
     lastBlobRef.current = null;
     setError("");
+    setNotice(null);
     setTtsEnded(true);
   }
 
@@ -1080,30 +1233,66 @@ export default function Interview() {
     if (!token) return;
     setProcessing(true);
     setPendingBlob(null);
+    setNotice(null);
     try {
-      const res = await skipQuestion(token, participantId);
+      const res = await skipQuestion(token, participantId, turnIndex);
       if (res.is_complete) {
-        clearSession();
-        setPhase("complete");
-        // Panel-join surface was removed from consent; participants no
-        // longer opt into the panel during the interview flow. Leave the
-        // hook in place so it's a one-line restore if we add a panel
-        // surface elsewhere — but never call it without consent.
+        applyCompletion(res, false);
       } else if (res.question_text) {
-        const nextTurn = turnCount + 1;
-        setCurrentQuestion(res.question_text);
-        setTurnCount(nextTurn);
-        setQuestionIndex(res.question_index ?? questionIndex);
-        setIsFollowUp(false);
-        setTtsEnded(false);
-        saveSession(participantId, res.question_text, nextTurn);
-        if (res.tts_audio_url) playTTS(res.tts_audio_url);
-        else setTtsEnded(true);
+        applyNextTurn(res, turnCount + 1);
       }
-    } catch {
+    } catch (err: unknown) {
+      if (handleTurnMismatch(err)) return;
       setError(t("interview.skipError"));
     } finally {
       setProcessing(false);
+    }
+  }
+
+  /** Discreet pause: stops the question audio and any in-progress take (kept
+   *  as a reviewable preview). Resume picks the audio back up. */
+  function handlePause() {
+    if (isRecording) void handleStopAndPreview(false);
+    if (autoSending) handleUndoAutoSend();
+    const audio = audioRef.current;
+    pausedTtsRef.current = false;
+    if (audio && ttsPlaying) {
+      try { audio.pause(); } catch { /* no-op */ }
+      pausedTtsRef.current = true;
+      setTtsPlaying(false);
+    }
+    setFinishConfirming(false);
+    setPaused(true);
+  }
+
+  function handleResume() {
+    setPaused(false);
+    const audio = audioRef.current;
+    if (pausedTtsRef.current && audio && !muted) {
+      pausedTtsRef.current = false;
+      setTtsPlaying(true);
+      audio.play().catch(() => { setTtsPlaying(false); setTtsEnded(true); });
+    }
+  }
+
+  /** "Finish here": end the interview early with what has been shared so far. */
+  async function handleFinish() {
+    if (!token || !participantId) return;
+    setFinishing(true);
+    setError("");
+    try {
+      if (isRecording) {
+        try { await stopRecording(); } catch { /* nothing worth keeping */ }
+      }
+      handleUndoAutoSend();
+      const res = await finishInterview(token, participantId);
+      setFinishConfirming(false);
+      setPaused(false);
+      applyCompletion(res, true);
+    } catch {
+      setError(t("interview.finish.error"));
+    } finally {
+      setFinishing(false);
     }
   }
 
@@ -1126,9 +1315,6 @@ export default function Interview() {
   }
 
   // ── Render helpers ─────────────────────────────────────────────────────
-
-  const interestTags = panelTags.filter((t) => t.category === "interest");
-  const behaviorTags = panelTags.filter((t) => t.category === "behavior");
 
   // Conservative-but-tolerant email regex: must look like an address.
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1168,23 +1354,6 @@ export default function Interview() {
       </div>
     );
   }
-
-  // TEMP dev affordance — a small floating "Skip to end" button shown only when
-  // `?devskip=1` was set and a session exists, so the post-interview screen can
-  // be reached without recording an interview. Remove when done testing.
-  const devSkipBtn = devSkip && sessionToken && phase !== "complete" ? (
-    <button
-      onClick={handleDevSkipToEnd}
-      style={{
-        position: "fixed", bottom: 16, right: 16, zIndex: 9999,
-        padding: "8px 14px", fontSize: 13, fontFamily: "inherit",
-        background: "#1f2937", color: "#fff", border: "1px dashed #9ca3af",
-        borderRadius: 8, cursor: "pointer", opacity: 0.85,
-      }}
-    >
-      ⏭ Skip to end (dev)
-    </button>
-  ) : null;
 
   // ── Loading / error states ──────────────────────────────────────────────
 
@@ -1378,6 +1547,19 @@ export default function Interview() {
             <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5 }}>
               {t("emailEntry.emailNote")}
             </p>
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ width: "100%", minHeight: 44 }}
+                onClick={() => { setError(""); setPhase("consent"); }}
+              >
+                {t("emailEntry.skipSession")}
+              </button>
+              <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 8 }}>
+                {t("emailEntry.skipEmailNote")}
+              </p>
+            </div>
 
             {/* "Why we ask for your email" expander — addresses the trust ask */}
             <div className="why-email-expander">
@@ -1444,7 +1626,6 @@ export default function Interview() {
   if (phase === "consent" && info) {
     return (
       <div className="interview-page">
-        {devSkipBtn}
         <div
           className="interview-container consent-card"
           style={{ maxWidth: "var(--participant-card-max-w)" }}
@@ -1462,6 +1643,7 @@ export default function Interview() {
             <p className="consent-research-context">{info.research_context}</p>
           )}
           <div className="consent-body">
+            <p className="consent-ai-disclosure">{t("consent.desc")}</p>
             <p>{t("consent.byParticipating")}</p>
             <ul className="consent-list" style={{ textAlign: "left" }}>
               <li dangerouslySetInnerHTML={{ __html: t("consent.listRecorded") }} />
@@ -1516,7 +1698,7 @@ export default function Interview() {
             {declineConfirming ? (
               <>
                 <p style={{ width: "100%", margin: "0 0 8px", fontSize: 14, color: "var(--text-secondary)" }} role="alert">
-                  {t("consent.declineConfirmText", { defaultValue: "Are you sure? Declining ends your participation — you won't be able to come back to this study." })}
+                  {t("consent.declineConfirmText")}
                 </p>
                 <button className="btn btn-primary" onClick={() => setDeclineConfirming(false)}>
                   {t("consent.declineConfirmNo", { defaultValue: "Keep going" })}
@@ -1673,32 +1855,16 @@ export default function Interview() {
               </button>
               <button
                 className="btn btn-ghost"
-                onClick={proceedFromProfile}
-                style={{ alignSelf: "center", color: "var(--text-tertiary)", fontSize: 13 }}
+                onClick={() => { setProfile((p) => ({ ...p, firstName: "" })); void routeAfterProfile(); }}
+                style={{ alignSelf: "center", color: "var(--text-tertiary)", fontSize: 13, minHeight: 44 }}
+                disabled={starting}
               >
-                {t("profile.skip")}
+                {t("profile.skipName")}
               </button>
             </div>
           </div>
         </div>
       </div>
-    );
-  }
-
-  // ── Profiling questionnaire phase ────────────────────────────────────────
-
-  if (phase === "questionnaire") {
-    return (
-      <>
-        {devSkipBtn}
-        <ParticipantQuestionnaire
-          linkToken={token!}
-          email={email}
-          sessionToken={sessionToken}
-          initialFirstName={profile.firstName}
-          onComplete={handleQuestionnaireComplete}
-        />
-      </>
     );
   }
 
@@ -1710,7 +1876,6 @@ export default function Interview() {
     const progress = ((screeningStep + 1) / screeningQuestions.length) * 100;
     return (
       <div className="interview-page">
-        {devSkipBtn}
         <div className="interview-container interview-profiling">
           <div className="profiling-header">
             <p className="profiling-intro">{t("screening.title")}</p>
@@ -1958,9 +2123,57 @@ export default function Interview() {
     );
   }
 
+  // ── Paused screen ────────────────────────────────────────────────────────
+
+  if (phase === "interview" && paused) {
+    return (
+      <div className="interview-page">
+        <div className="interview-container mic-test-card">
+          <div className="mic-prompt-icon"><span aria-hidden="true">⏸</span></div>
+          <h2 className="mic-test-title">{t("interview.pause.title")}</h2>
+          <p className="mic-test-subtitle">{t("interview.pause.body")}</p>
+          {error && <div className="error-banner" role="alert">{error}</div>}
+          <button
+            className="btn btn-primary"
+            style={{ minHeight: 48, minWidth: 220 }}
+            onClick={handleResume}
+          >
+            {t("interview.pause.resume")}
+          </button>
+          {finishConfirming ? (
+            <div style={{ marginTop: 20 }}>
+              <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 10 }}>
+                {t("interview.finish.confirmText")}
+              </p>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                <button className="btn btn-secondary" style={{ minHeight: 44 }} disabled={finishing} onClick={handleFinish}>
+                  {finishing ? t("interview.finish.finishing") : t("interview.finish.confirmYes")}
+                </button>
+                <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={() => setFinishConfirming(false)}>
+                  {t("interview.finish.confirmNo")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="btn btn-ghost"
+              style={{ marginTop: 12, minHeight: 44, color: "var(--text-secondary)" }}
+              onClick={() => setFinishConfirming(true)}
+            >
+              {t("interview.finish.button")}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // ── Interview phase ───────────────────────────────────────────────────────
 
   if (phase === "interview") {
+    const hideCounter = isWarmup || questionIndex < 0;
+    const remainingSecs = Math.max(0, totalSeconds - elapsedSeconds);
+    const showTimeLeft = totalSeconds > 0 && remainingSecs < 120 && !paused;
     return (
       <div className="interview-page">
         <div className="interview-container interview-active">
@@ -1975,28 +2188,30 @@ export default function Interview() {
             >
               <div
                 className="interview-progress-bar-fill"
-                style={{ width: `${isWarmup ? 0 : Math.min(((questionIndex) / info.question_count) * 100, 95)}%` }}
+                style={{ width: `${(isWarmup || questionIndex < 0) ? 0 : Math.min(((questionIndex) / info.question_count) * 100, 95)}%` }}
               />
             </div>
           )}
-          <div className="interview-progress" role="status" aria-live="polite">
+          {/* Single polite live region: announces the new question text, then
+              processing-state changes. Plain text, no emoji. */}
+          <div className="sr-only" aria-live="polite" aria-atomic="true">{liveMessage}</div>
+          <div className="interview-progress">
             <span className="interview-turn-count">
               {isWarmup
                 ? t("interview.warmupLabel")
-                : isFollowUp
-                  ? t("interview.followUpLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })
-                  : t("interview.progressLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })}
+                : hideCounter
+                  ? ""
+                  : isFollowUp
+                    ? t("interview.followUpLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })
+                    : t("interview.progressLabel", { current: questionIndex + 1, total: info?.question_count ?? "?" })}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {totalSeconds > 0 && (
+              {showTimeLeft && (
                 <span className="interview-time-remaining">
                   {(() => {
-                    const remaining = Math.max(0, totalSeconds - elapsedSeconds);
-                    const mins = Math.floor(remaining / 60);
-                    const secs = remaining % 60;
-                    const pct = elapsedSeconds / totalSeconds;
-                    const cls = pct > 0.9 ? "time-critical" : pct > 0.75 ? "time-warning" : "";
-                    return <span className={cls}>{mins > 0 ? t("interview.timeMinLeft", { mins }) : t("interview.timeSecLeft", { secs })}</span>;
+                    const mins = Math.floor(remainingSecs / 60);
+                    const secs = remainingSecs % 60;
+                    return <span>{mins > 0 ? t("interview.timeMinLeft", { mins }) : t("interview.timeSecLeft", { secs })}</span>;
                   })()}
                 </span>
               )}
@@ -2026,11 +2241,7 @@ export default function Interview() {
             </div>
           </div>
 
-          <div
-            className="interview-question-area"
-            aria-live="polite"
-            aria-atomic="true"
-          >
+          <div className="interview-question-area">
             {!currentQuestion ? (
               <div style={{ textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>
                 <div className="spinner" style={{ margin: "0 auto 12px" }} />
@@ -2054,7 +2265,7 @@ export default function Interview() {
                   else setTtsBlocked(false);
                 }}
               >
-                🔊 {t("interview.playQuestion", { defaultValue: "Play the question" })}
+                <span aria-hidden="true">🔊</span> {t("interview.playQuestion", { defaultValue: "Play the question" })}
               </button>
             </div>
           )}
@@ -2081,6 +2292,19 @@ export default function Interview() {
             </div>
           )}
           {error && <div className="error-banner" role="alert">{error}</div>}
+          {notice && (
+            <div className="interview-notice">
+              <span>{notice}</span>
+              <button
+                type="button"
+                className="interview-notice__close"
+                aria-label={t("interview.transcriptDismiss")}
+                onClick={() => setNotice(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
           {recError === "PERMISSION_DENIED" && !textMode ? (
             <div className="mic-permission-error">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2147,7 +2371,7 @@ export default function Interview() {
           ) : null}
 
           {coachingHint && !coachingHintDismissed && (
-            <div className="coaching-hint" role="status" aria-live="polite">
+            <div className="coaching-hint">
               <span className="coaching-hint__icon" aria-hidden="true">💡</span>
               <span className="coaching-hint__text">{coachingHint}</span>
               <button
@@ -2194,24 +2418,39 @@ export default function Interview() {
 
           <div className="interview-controls">
             {processing ? (
-              <div className={`processing-indicator processing-step-${processingStep}`} aria-live="polite">
+              <div className="processing-indicator">
                 <div className="spinner" style={{ width: 28, height: 28 }} />
                 <span className="processing-label">
-                  {processingStep === 0 && <>{t("interview.processing.transcribing")}</>}
-                  {processingStep === 1 && <>{t("interview.processing.thinking")}</>}
-                  {processingStep === 2 && <>{t("interview.processing.preparing")}</>}
-                  {processingStep >= 3 && <>{t("interview.processing.takingLonger", { defaultValue: "Still working — hang tight…" })}</>}
+                  {processingLong
+                    ? t("interview.processing.stillWorking")
+                    : t("interview.processing.listening")}
                 </span>
+              </div>
+            ) : autoSending && pendingBlob ? (
+              <div className="autosend-toast" role="status">
+                <div className="spinner" style={{ width: 20, height: 20 }} />
+                <span className="autosend-toast__label">{t("interview.sendingAnswer")}</span>
+                <button type="button" className="btn btn-secondary autosend-toast__undo" onClick={handleUndoAutoSend}>
+                  {t("interview.undo")}
+                </button>
               </div>
             ) : pendingBlob ? (
               <div className="recording-preview">
-                <div className="recording-preview-icon">✓</div>
+                <div className="recording-preview-icon" aria-hidden="true">✓</div>
                 <p className="recording-preview-label">{t("interview.recordingCaptured")}</p>
+                {previewUrl && (
+                  <audio
+                    controls
+                    src={previewUrl}
+                    className="recording-preview-player"
+                    style={{ width: "100%", maxWidth: 320 }}
+                  />
+                )}
                 <div className="recording-preview-actions">
-                  <button className="btn btn-primary" onClick={handleSubmitPending}>
+                  <button className="btn btn-primary" style={{ minHeight: 44 }} onClick={handleSubmitPending}>
                     {t("interview.submitButton")} →
                   </button>
-                  <button className="btn btn-ghost" onClick={handleReRecord}>
+                  <button className="btn btn-ghost" style={{ minHeight: 44 }} onClick={handleReRecord}>
                     ↺ {t("interview.reRecord")}
                   </button>
                 </div>
@@ -2293,7 +2532,12 @@ export default function Interview() {
               </div>
             ) : isRecording ? (
               <>
-                <button className="record-btn recording" onClick={handleStopAndPreview} aria-label={t("interview.tapToStop")}>
+                <button
+                  className="record-btn recording"
+                  onClick={() => handleStopAndPreview(true)}
+                  aria-label={t("interview.tapToStop")}
+                  aria-pressed={true}
+                >
                   <div className="record-btn-inner recording-pulse" />
                 </button>
                 <p className="record-label">{t("interview.tapToStop")}</p>
@@ -2331,16 +2575,41 @@ export default function Interview() {
                   className={`record-btn ${ttsPlaying ? "record-btn--waiting" : ttsEnded ? "record-btn--ready" : ""}`}
                   onClick={ttsPlaying ? undefined : () => {
                     setTranscriptDismissed(true);
+                    setNotice(null);
                     startRecording();
                   }}
                   disabled={ttsPlaying}
                   title={ttsPlaying ? t("interview.waitForQuestion") : t("interview.tapToRecord")}
                   aria-label={ttsPlaying ? t("interview.waitForQuestion") : t("interview.tapToRecord")}
+                  aria-pressed={false}
                 >
-                  <div className="record-btn-inner" />
+                  <svg
+                    className="record-btn-mic"
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                    <path d="M19 11a7 7 0 0 1-14 0" />
+                    <line x1="12" y1="18" x2="12" y2="22" />
+                    <line x1="8" y1="22" x2="16" y2="22" />
+                  </svg>
                 </button>
                 <p className="record-label">
-                  {ttsPlaying ? "⏵ " + t("interview.listeningToQuestion") : t("interview.tapToRecord")}
+                  {ttsPlaying ? (
+                    <>
+                      <span aria-hidden="true">⏵ </span>
+                      {t("interview.listeningToQuestion")}
+                    </>
+                  ) : (
+                    t("interview.tapToRecord")
+                  )}
                 </p>
                 {!ttsPlaying && (
                   <p className="muted-text" style={{ fontSize: 12, marginTop: 4 }}>
@@ -2396,7 +2665,7 @@ export default function Interview() {
             </button>
           )}
 
-          {!processing && !isRecording && !pendingBlob && (
+          {!processing && !isRecording && !pendingBlob && !hideCounter && (
             <button
               className={`skip-question-btn skip-question-btn--fade${skipBtnReady ? " skip-question-btn--visible" : ""}`}
               onClick={handleSkip}
@@ -2407,6 +2676,30 @@ export default function Interview() {
               {t("interview.skipQuestion")}
             </button>
           )}
+
+          {!processing && (
+            <div className="interview-session-controls">
+              <button type="button" className="session-control-btn" onClick={handlePause}>
+                {t("interview.pause.button")}
+              </button>
+              <span aria-hidden="true">·</span>
+              {finishConfirming ? (
+                <span className="session-finish-confirm">
+                  {t("interview.finish.confirmText")}{" "}
+                  <button type="button" className="session-control-btn session-control-btn--strong" disabled={finishing} onClick={handleFinish}>
+                    {finishing ? t("interview.finish.finishing") : t("interview.finish.confirmYes")}
+                  </button>{" "}
+                  <button type="button" className="session-control-btn" onClick={() => setFinishConfirming(false)}>
+                    {t("interview.finish.confirmNo")}
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="session-control-btn" onClick={() => setFinishConfirming(true)}>
+                  {t("interview.finish.button")}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2414,7 +2707,20 @@ export default function Interview() {
 
   // ── Complete phase ────────────────────────────────────────────────────────
 
-  const completeName = profile.firstName || email?.split("@")[0] || null;
+  if (showPostQuestionnaire) {
+    return (
+      <ParticipantQuestionnaire
+        linkToken={token!}
+        email={email}
+        sessionToken={sessionToken}
+        participantId={participantId || null}
+        initialFirstName={profile.firstName}
+        onComplete={handleQuestionnaireComplete}
+      />
+    );
+  }
+
+  const completeName = profile.firstName || displayName || email?.split("@")[0] || null;
 
   return (
     <div className="interview-page">
@@ -2450,9 +2756,35 @@ export default function Interview() {
           )}
         </div>
 
-        {/* Panel opt-in. If they accepted pre-interview, just confirm. If they
-            declined (or skipped), re-prompt here with the fuller paid-studies
-            explanation — a softer, better-informed second ask. */}
+        {/* Optional post-interview questionnaire: "a minute about you". For
+            magic-link participants it feeds the reusable panel profile; for
+            everyone else it lands on the participant row only. Returning
+            panelists with a complete profile skip it. */}
+        {postProfileState === "done" ? (
+          <div className="interview-complete-future">
+            <strong style={{ color: "var(--text-primary)" }}>{t("completion.postProfile.thanksTitle")}</strong>{" "}
+            {t("completion.postProfile.thanksBody")}
+          </div>
+        ) : postProfileState === "idle" && !profileComplete && participantId ? (
+          <div className="interview-complete-future interview-complete-future--prompt">
+            <strong style={{ color: "var(--text-primary)" }}>{t("completion.postProfile.title")}</strong>
+            <p style={{ margin: "8px 0 14px" }}>{t("completion.postProfile.body")}</p>
+            <button
+              className="btn btn-primary"
+              style={{ width: "100%", minHeight: 44 }}
+              onClick={() => setShowPostQuestionnaire(true)}
+            >
+              {t("completion.postProfile.cta")}
+            </button>
+            <button className="questionnaire-decline-btn" onClick={() => setPostProfileState("skipped")}>
+              {t("completion.postProfile.dismiss")}
+            </button>
+          </div>
+        ) : null}
+
+        {/* Panel opt-in. If they accepted in the questionnaire, just confirm.
+            If they declined (or skipped), re-prompt here with the fuller
+            paid-studies explanation — a softer, better-informed second ask. */}
         {panelConsentGiven ? (
           <div className="interview-complete-future">
             <strong style={{ color: "var(--text-primary)" }}>{t("completion.panelConfirmTitle")}</strong>{" "}
@@ -2463,7 +2795,7 @@ export default function Interview() {
             <strong style={{ color: "var(--text-primary)" }}>{t("completion.panelConfirmTitle")}</strong>{" "}
             {t("completion.panelConfirmBody")}
           </div>
-        ) : repromptState === "dismissed" || !sessionToken ? null : (
+        ) : repromptState === "dismissed" || !sessionToken || postProfileState === "idle" ? null : (
           <div className="interview-complete-future interview-complete-future--prompt">
             <strong style={{ color: "var(--text-primary)" }}>{t("completion.panelReprompt.title")}</strong>
             <p style={{ margin: "8px 0 14px" }}>{t("completion.panelReprompt.body")}</p>

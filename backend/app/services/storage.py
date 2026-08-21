@@ -144,6 +144,24 @@ def delete_audio_by_url(url: str) -> bool:
     return delete_audio(key)
 
 
+def audio_exists(key: str) -> bool:
+    """True when an object is already stored under ``key`` (R2 or disk)."""
+    try:
+        if _r2_enabled():
+            _r2_client().head_object(Bucket=settings.R2_BUCKET, Key=key)
+            return True
+        return os.path.exists(os.path.join(settings.UPLOAD_DIR, key))
+    except Exception:
+        return False
+
+
+def public_url_for(key: str) -> str:
+    """The playback URL ``upload_audio`` would return for ``key``."""
+    if _r2_enabled():
+        return f"{settings.R2_PUBLIC_URL.rstrip('/')}/{key}"
+    return f"/audio/{key}"
+
+
 def download_audio(key: str) -> bytes:
     """Retrieve audio bytes by the key used when uploading."""
     if _r2_enabled():

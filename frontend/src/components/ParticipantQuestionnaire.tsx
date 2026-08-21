@@ -1,15 +1,19 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { savePanelProfile, PanelProfileData } from "../api/interviews";
+import { savePanelProfile, updateParticipantProfile, PanelProfileData } from "../api/interviews";
 
 /**
- * Pre-interview profiling questionnaire (one question per screen, all-tap,
- * grandma-friendly). Maps to the reusable PanelProfile. Runs after consent,
- * before the study's screening questions.
+ * Post-interview profiling questionnaire (one question per screen, all-tap,
+ * grandma-friendly). Offered as an optional "a minute about you" step on the
+ * completion screen.
  *
- * Self-contained: owns its own stepper + the savePanelProfile call. The
- * parent only needs the handful of fields used to create the participant
- * row + the chosen language, returned via onComplete.
+ * Two persistence paths:
+ * - magic-link participants (sessionToken set): saves the reusable
+ *   PanelProfile, including the panel-consent step.
+ * - everyone else (participantId set, no sessionToken): saves onto the
+ *   participant row via PATCH /interview/{token}/{pid}/profile. The
+ *   panel-consent step is hidden (it needs a verified email); an optional
+ *   email field is offered instead.
  */
 
 // ISO 3166-1 alpha-2 codes for the country picker. Names are localized at
@@ -30,10 +34,11 @@ const WORK_EMPLOYMENT = new Set(["full_time", "part_time", "freelance"]);
 
 type StepKey =
   | "firstName" | "country" | "age" | "gender" | "education" | "employment"
-  | "industry" | "jobFunction" | "seniority" | "companySize" | "consent";
+  | "industry" | "jobFunction" | "seniority" | "companySize" | "consent" | "email";
 
 interface Answers {
   firstName: string;
+  email: string;
   country: string; // ISO code
   age: string;
   gender: string;
@@ -58,6 +63,8 @@ interface Props {
   linkToken: string;
   email: string;
   sessionToken: string | null;
+  /** The just-completed participant, used for the no-session profile path. */
+  participantId?: string | null;
   initialFirstName?: string;
   onComplete: (data: QuestionnaireResult) => void;
 }
@@ -86,13 +93,14 @@ const OPTION_ORDER: Record<string, string[]> = {
 };
 
 export default function ParticipantQuestionnaire({
-  linkToken, email, sessionToken, initialFirstName, onComplete,
+  linkToken, email, sessionToken, participantId, initialFirstName, onComplete,
 }: Props) {
   const { t, i18n } = useTranslation("interview");
   const lang = (i18n.language || "en").slice(0, 2);
 
   const [answers, setAnswers] = useState<Answers>({
     firstName: initialFirstName || "",
+    email: "",
     country: "", age: "", gender: "", education: "", employment: "",
     industry: "", jobFunction: "", seniority: "", companySize: "", consent: "",
   });
@@ -102,13 +110,18 @@ export default function ParticipantQuestionnaire({
   const [countryQuery, setCountryQuery] = useState("");
 
   // Step list is derived from employment so non-workers skip the work block.
+  // The first-name step is omitted when we already know it; the closing step
+  // depends on the persistence path: panel consent needs a verified email
+  // (magic-link session), so session-less participants get an optional email
+  // field instead.
   const steps: StepKey[] = useMemo(() => {
-    const base: StepKey[] = ["firstName", "country", "age", "gender", "education", "employment"];
+    const base: StepKey[] = ["country", "age", "gender", "education", "employment"];
+    if (!(initialFirstName || "").trim()) base.unshift("firstName");
     const work: StepKey[] = WORK_EMPLOYMENT.has(answers.employment)
       ? ["industry", "jobFunction", "seniority", "companySize"]
       : [];
-    return [...base, ...work, "consent"];
-  }, [answers.employment]);
+    return [...base, ...work, sessionToken ? "consent" : "email"];
+  }, [answers.employment, sessionToken, initialFirstName]);
 
   const safeIndex = Math.min(stepIndex, steps.length - 1);
   const step = steps[safeIndex];
@@ -157,7 +170,16 @@ export default function ParticipantQuestionnaire({
     setError("");
     const englishCountry = a.country ? String(countryLabelEN(a.country)) : undefined;
     try {
-      if (sessionToken) {
+      if (!sessionToken && participantId) {
+        // Session-less path: everything lands on the participant row only.
+        await updateParticipantProfile(linkToken, participantId, {
+          display_name: a.firstName.trim() || undefined,
+          age_range: a.age || undefined,
+          country: englishCountry,
+          profession: WORK_EMPLOYMENT.has(a.employment) ? (a.jobFunction || undefined) : undefined,
+          email: a.email.trim() || undefined,
+        });
+      } else if (sessionToken) {
         const payload: PanelProfileData = {
           email,
           session_token: sessionToken,
@@ -242,6 +264,33 @@ export default function ParticipantQuestionnaire({
       );
     }
 
+    if (step === "email") {
+      const trimmedEmail = answers.email.trim();
+      const emailOk = trimmedEmail === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
+      return (
+        <div className="profiling-question">
+          <h2 className="profiling-label">{t("questionnaire.emailQ")}</h2>
+          <p className="questionnaire-help">{t("questionnaire.emailHelp")}</p>
+          <input
+            type="email"
+            className="field-input questionnaire-text-input"
+            value={answers.email}
+            onChange={(e) => setAnswers((a) => ({ ...a, email: e.target.value }))}
+            placeholder={t("questionnaire.emailPlaceholder")}
+            autoComplete="email"
+            onKeyDown={(e) => { if (e.key === "Enter" && emailOk) goNext(); }}
+          />
+          <button
+            className="btn btn-primary questionnaire-continue"
+            disabled={!emailOk || saving}
+            onClick={goNext}
+          >
+            {t("questionnaire.done")}
+          </button>
+        </div>
+      );
+    }
+
     if (step === "consent") {
       // Soft, low-pressure framing: a single "accept & continue" primary with
       // a quiet decline. Anyone who declines here is re-prompted (with a fuller
@@ -290,7 +339,7 @@ export default function ParticipantQuestionnaire({
     );
   }
 
-  const canSkip = step !== "firstName" && step !== "consent";
+  const canSkip = step !== "consent" && step !== "email";
 
   return (
     <div className="interview-page">
