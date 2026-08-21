@@ -101,8 +101,10 @@ Handling people, not just answers:
 the research team; you do not know the study results; their answers are reviewed by the team), then gently return to the topic.
 - If they say "I don't know" or go quiet, lower the stakes: offer a concrete, easier angle (a recent moment, a typical day). Never push twice.
 - If they drift off-topic, acknowledge briefly and steer back with a bridge to the guide topic.
-- If they ask to stop, say they are done, seem distressed, or signal discomfort, you MUST choose end_early: thank them \
-warmly in one or two sentences, never argue or negotiate for "one more question".
+- If they ask to stop, say they are done with the SESSION, seem distressed, or signal discomfort, you MUST choose \
+end_early: thank them warmly in one or two sentences, never argue or negotiate for "one more question". Fill \
+stop_quote with their exact words. Be careful: "I'm done" / "that's all" about the CURRENT TOPIC is not a request to \
+end the interview, it means move on to the next question.
 - If they switch language, continue in the interview language unless they explicitly ask to switch.
 
 Continuity (critical, the participant hears every turn):
@@ -135,7 +137,8 @@ just said (use their exact words where natural), THEN introduce the new topic. T
 NOT available, you MUST NOT return "close" no matter how exhausted the conversation feels. When you close, thank them \
 for something specific they shared and say what happens next in one sentence (the team reviews the conversation).
 
-4. end_early: the participant asked to stop or is uncomfortable. Always available. One or two warm sentences, no new question.
+4. end_early: the participant asked to stop the interview, or is uncomfortable. Always available, but only ever on \
+their explicit signal, which you MUST quote verbatim in stop_quote. One or two warm sentences, no new question.
 
 The host system enforces the close gate and follow-up caps; when it tells you an action is forced, obey it and write \
 the best possible wording for that action.
@@ -652,6 +655,10 @@ DECISION_TOOL = {
                 "type": "string",
                 "description": "Which probing technique the question uses (follow_up only), e.g. specific_moment, laddering, contrast, reflect_back, counter_example, unpack_term, walk_through, none.",
             },
+            "stop_quote": {
+                "type": "string",
+                "description": "REQUIRED for end_early: the participant's own words, copied verbatim from their latest answer, that ask to stop the interview. Never paraphrase or invent. If they only finished a topic rather than the session, do not use end_early.",
+            },
             "learning_goals_met": {
                 "type": "boolean",
                 "description": "Whether the current guide question's desired learning is now covered by the conversation.",
@@ -987,6 +994,7 @@ def _parse_decision_response(response, language: str | None) -> dict:
     out = {
         "action": action,
         "question": _strip_banned_dashes(question.strip()),
+        "stop_quote": result.get("stop_quote") if isinstance(result.get("stop_quote"), str) else None,
         "coaching": _sanitize_coaching(result.get("coaching")),
         "probe": result.get("probe") if isinstance(result.get("probe"), str) else None,
         "learning_goals_met": result.get("learning_goals_met") if isinstance(result.get("learning_goals_met"), bool) else None,
@@ -1429,6 +1437,29 @@ def start_interview(participant_id: str, db: Session) -> dict:
     }
 
 
+def _lock_participant(db: Session, participant_id: str):
+    """Fetch the participant, serialising concurrent turns for that person.
+
+    Two overlapping /respond calls (an HTTP retry, a second tab, a proxy
+    replay) would otherwise both see the same unanswered pending turn, both
+    transcribe, and both append a turn at ``turns[-1].turn_index + 1``,
+    producing two turns sharing an index. This used to be masked by the
+    handler being ``async def`` with a blocking body, which accidentally
+    serialised every request on the event loop; moving the work to a
+    threadpool removed that side effect, so take the lock explicitly.
+
+    SQLite has no row locks (and is single-writer anyway), so the clause is
+    only emitted on Postgres.
+    """
+    query = db.query(Participant).filter(Participant.id == participant_id)
+    try:
+        if db.get_bind().dialect.name == "postgresql":
+            query = query.with_for_update()
+    except Exception:  # pragma: no cover - defensive, bind always resolves
+        pass
+    return query.first()
+
+
 def _stt_glossary(project) -> str:
     """Whisper decoding hint: the study's proper nouns and domain terms.
 
@@ -1569,6 +1600,36 @@ def _spawn_completion_side_effects(participant_id: str) -> None:
         logger.exception("Could not spawn completion side effects for %s", participant_id)
 
 
+def _stop_request_is_grounded(stop_quote: str | None, transcript: str | None) -> bool:
+    """True when the claimed stop request really appears in what was said.
+
+    The model must copy the participant's own words. We normalise
+    punctuation and whitespace, then require either a substring match or a
+    strong word overlap (Whisper punctuation and the model's copy can differ
+    slightly). A missing or invented quote fails closed: the interview keeps
+    going with an ordinary follow-up rather than ending on a misread.
+    """
+    if not stop_quote or not transcript:
+        return False
+
+    def _norm(text: str) -> str:
+        return re.sub(r"[^\w\s]", " ", text.lower()).strip()
+
+    quote = re.sub(r"\s+", " ", _norm(stop_quote))
+    said = re.sub(r"\s+", " ", _norm(transcript))
+    if len(quote) < 3:
+        return False
+    if quote in said:
+        return True
+
+    quote_words = [w for w in quote.split() if len(w) > 2]
+    if not quote_words:
+        return False
+    said_words = set(said.split())
+    overlap = sum(1 for w in quote_words if w in said_words)
+    return overlap / len(quote_words) >= 0.8
+
+
 def _answered_main_questions(turns: list) -> int:
     """Distinct guide questions (index >= 0) that received a real answer."""
     return len({
@@ -1578,29 +1639,55 @@ def _answered_main_questions(turns: list) -> int:
     })
 
 
-def _mark_completed(participant, db: Session, *, reason: str, bill: bool, completed_via: str) -> None:
-    """Flip status, stamp the reason, consume a credit (when ``bill``) and
-    emit the funnel event. Never raises on billing/analytics."""
+def _consume_credit_isolated(billing: dict | None) -> None:
+    """Charge one interview credit on its own session, after the turn commits."""
+    if not billing:
+        return
+    try:
+        from app.database import session_scope
+        from app.services.billing_service import consume_interview_credit
+
+        with session_scope() as bdb:
+            consume_interview_credit(
+                bdb,
+                workspace_id=billing["workspace_id"],
+                participant_id=billing["participant_id"],
+                project_id=billing["project_id"],
+                metadata=billing["metadata"],
+            )
+    except Exception:  # pragma: no cover - never fail an interview on billing
+        logger.exception(
+            "Credit consumption failed for participant %s; interview still completed",
+            billing.get("participant_id"),
+        )
+
+
+def _mark_completed(participant, db: Session, *, reason: str, bill: bool, completed_via: str) -> dict | None:
+    """Flip status, stamp the reason, emit the funnel event, and return the
+    billing payload for the caller to charge after the commit (or None).
+    Never raises on analytics."""
     participant.status = "completed"
     participant.completed_at = datetime.utcnow()
     participant.completion_reason = reason
 
+    # Billing is deferred to the caller, AFTER the turn commits:
+    # consume_interview_credit commits (and on a duplicate rolls back) the
+    # session it is handed, which on the request session would discard the
+    # just-flushed answer and the pending closing turn. It also sends the
+    # usage-warning email inline, which has no business running inside the
+    # participant's final turn.
+    billing = None
     if bill:
-        try:
-            from app.services.billing_service import consume_interview_credit
-            consume_interview_credit(
-                db,
-                workspace_id=participant.project.company_id,
-                participant_id=participant.id,
-                project_id=participant.project_id,
-                metadata={
-                    "duration_seconds": int((participant.completed_at - participant.started_at).total_seconds()) if participant.started_at else None,
-                    "language": participant.project.language if participant.project else None,
-                    "completed_via": completed_via,
-                },
-            )
-        except Exception:  # pragma: no cover
-            logger.exception("Credit consumption failed for participant %s; interview still completed", participant.id)
+        billing = {
+            "participant_id": participant.id,
+            "workspace_id": participant.project.company_id,
+            "project_id": participant.project_id,
+            "metadata": {
+                "duration_seconds": int((participant.completed_at - participant.started_at).total_seconds()) if participant.started_at else None,
+                "language": participant.project.language if participant.project else None,
+                "completed_via": completed_via,
+            },
+        }
 
     try:
         from app.services.analytics import emit_event
@@ -1617,6 +1704,8 @@ def _mark_completed(participant, db: Session, *, reason: str, bill: bool, comple
         )
     except Exception:
         pass
+
+    return billing
 
 
 def process_interview_turn(
@@ -1643,7 +1732,7 @@ def process_interview_turn(
     is_follow_up, question_index, turn_index, elapsed_seconds,
     total_seconds, coaching_hint, transcript.
     """
-    participant = db.query(Participant).filter(Participant.id == participant_id).first()
+    participant = _lock_participant(db, participant_id)
     if participant is None:
         raise ValueError(f"Participant {participant_id} not found")
 
@@ -1694,8 +1783,20 @@ def process_interview_turn(
         try:
             audio_url = audio_url_future.result()
         except Exception:
-            logger.exception("Recording upload failed for participant %s; turn continues without playback URL", participant_id)
+            # One inline retry before giving up: losing the recording costs
+            # the researcher the audio permanently, but failing the turn
+            # would make the participant re-record an answer we already
+            # transcribed. Retry, then keep the transcript either way.
+            logger.warning("Recording upload failed for participant %s; retrying once", participant_id)
             audio_url = None
+            if audio_path and audio_bytes:
+                try:
+                    audio_url = upload_audio(audio_bytes, audio_path)
+                except Exception:
+                    logger.exception(
+                        "Recording upload retry failed for participant %s; transcript kept, audio lost",
+                        participant_id,
+                    )
 
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
     if turns:
@@ -1836,6 +1937,21 @@ def process_interview_turn(
         decision = _fallback()
 
     # ── Host guards ──────────────────────────────────────────────────────
+    # Ending the session is irreversible, so end_early must be grounded in
+    # something the participant actually said. Requiring a verbatim quote
+    # stops the model from reading "I'm done with this topic" (or an
+    # imagined signal) as "I want to stop the interview".
+    if decision["action"] == "end_early" and not _stop_request_is_grounded(
+        decision.get("stop_quote"), transcript
+    ):
+        logger.info(
+            "end_early rejected for participant %s: stop request not grounded in the answer",
+            participant_id,
+        )
+        decision["action"] = "follow_up"
+        decision["question"] = _fallback_follow_up(language)
+
+
     # Each guard may change the action. When it does, the wording Claude
     # produced no longer fits (a follow-up spoken while the guide advances
     # silently skips a topic), so we regenerate for the forced action and
@@ -1856,6 +1972,16 @@ def process_interview_turn(
         existing_followups = sum(1 for t in turns if t.question_index == cur_q and t.is_follow_up)
         if existing_followups >= MAX_FOLLOWUPS_PER_QUESTION and has_next_question:
             forced = "next_question"
+        elif (
+            not has_next_question
+            and can_close
+            and total > 0
+            and time_used_pct >= 100.0
+        ):
+            # On the last question the follow-up cap is deliberately waived so
+            # a rich final topic can breathe, but with the budget fully spent
+            # and nowhere left to advance, the model could probe forever.
+            forced = "close"
 
     if forced is not None and forced != action:
         regenerated = None
@@ -1896,7 +2022,7 @@ def process_interview_turn(
     if action == "end_early":
         new_turn = _persist_turn(question_text=question_text, tts_url=_tts(question_text), question_index=cur_q, is_follow_up=False)
         answered = _answered_main_questions(turns)
-        _mark_completed(
+        billing = _mark_completed(
             participant, db,
             reason="participant_requested",
             # Only bill when at least half of the guide was actually answered:
@@ -1906,9 +2032,11 @@ def process_interview_turn(
         )
         db.commit()
         db.refresh(new_turn)
+        _consume_credit_isolated(billing)
         _spawn_completion_side_effects(participant_id)
         return _result(new_turn, is_complete=True)
 
+    billing = None
     if action == "next_question":
         new_turn = _persist_turn(question_text=question_text, tts_url=_tts(question_text), question_index=cur_q + 1, is_follow_up=False)
         is_complete = False
@@ -1919,12 +2047,13 @@ def process_interview_turn(
     else:  # close
         new_turn = _persist_turn(question_text=question_text, tts_url=_tts(question_text), question_index=cur_q, is_follow_up=False)
         is_complete = True
-        _mark_completed(participant, db, reason="natural", bill=True, completed_via="respond")
+        billing = _mark_completed(participant, db, reason="natural", bill=True, completed_via="respond")
 
     db.commit()
     db.refresh(new_turn)
 
     if is_complete:
+        _consume_credit_isolated(billing)
         _spawn_completion_side_effects(participant_id)
 
     coaching_hint = None
@@ -2032,7 +2161,7 @@ def finish_interview(participant_id: str, db: Session) -> dict:
 
     total_q = len([q for q in participant.project.guide_questions if not getattr(q, "deprecated_at", None)])
     answered = _answered_main_questions(turns)
-    _mark_completed(
+    billing = _mark_completed(
         participant, db,
         reason="participant_finished",
         bill=total_q > 0 and answered * 2 >= total_q,
@@ -2040,6 +2169,7 @@ def finish_interview(participant_id: str, db: Session) -> dict:
     )
     db.commit()
     db.refresh(new_turn)
+    _consume_credit_isolated(billing)
     _spawn_completion_side_effects(participant_id)
 
     return {
@@ -2093,9 +2223,19 @@ def skip_question(participant_id: str, db) -> dict:
             tts_audio_url=tts_url,
         )
         db.add(new_turn)
-        _mark_completed(participant, db, reason="skipped_to_end", bill=True, completed_via="skip")
+        # Same rule as end_early / finish: a transcript that is entirely
+        # "[Skipped]" is not a usable interview and must not burn a credit.
+        total_q = len(ordered_questions)
+        answered = _answered_main_questions(turns)
+        billing = _mark_completed(
+            participant, db,
+            reason="skipped_to_end",
+            bill=total_q > 0 and answered * 2 >= total_q,
+            completed_via="skip",
+        )
         db.commit()
         db.refresh(new_turn)
+        _consume_credit_isolated(billing)
         _spawn_completion_side_effects(participant_id)
         return {
             "question_text": closing_text,

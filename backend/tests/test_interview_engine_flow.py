@@ -208,7 +208,12 @@ def test_end_early_completes_and_flags_reason(db_session, monkeypatch):
     participant = _seed(db_session, answered_up_to=2)
     _patch_io(
         monkeypatch,
-        decision={"action": "end_early", "question": "Of course, thank you for your time."},
+        transcript="Sorry, I have to go now, can we stop here?",
+        decision={
+            "action": "end_early",
+            "question": "Of course, thank you for your time.",
+            "stop_quote": "I have to go now, can we stop here",
+        },
     )
 
     result = process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
@@ -229,7 +234,15 @@ def test_end_early_on_first_question_is_not_billed(db_session, monkeypatch):
         lambda *a, **k: consumed.append(k) or None,
     )
     participant = _seed(db_session)  # on question 0 of 3
-    _patch_io(monkeypatch, decision={"action": "end_early", "question": "No problem, take care."})
+    _patch_io(
+        monkeypatch,
+        transcript="I need to stop the interview here, sorry.",
+        decision={
+            "action": "end_early",
+            "question": "No problem, take care.",
+            "stop_quote": "I need to stop the interview here",
+        },
+    )
 
     process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
 
@@ -458,3 +471,71 @@ def test_blank_study_prompt_falls_back_to_methodology():
 def test_language_instruction_still_appended():
     built = interview_engine._effective_system_prompt(None, "fr")
     assert "French" in built
+
+
+def test_end_early_needs_a_quote_from_the_participant(db_session, monkeypatch):
+    """A stop the participant never asked for must not end the session."""
+    participant = _seed(db_session, answered_up_to=1)
+    _patch_io(
+        monkeypatch,
+        transcript="Yeah I'm done with that topic, it works fine for me.",
+        decision={
+            "action": "end_early",
+            "question": "Thanks so much, take care!",
+            "stop_quote": "I want to stop the interview",  # never said
+        },
+    )
+
+    result = process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    assert result["is_complete"] is False
+    db_session.refresh(participant)
+    assert participant.status == "in_progress"
+
+
+def test_end_early_without_any_quote_is_rejected(db_session, monkeypatch):
+    participant = _seed(db_session, answered_up_to=1)
+    _patch_io(
+        monkeypatch,
+        transcript="It is mostly fine, we use it every Monday.",
+        decision={"action": "end_early", "question": "Thanks, goodbye!"},
+    )
+
+    result = process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    assert result["is_complete"] is False
+    db_session.refresh(participant)
+    assert participant.status == "in_progress"
+
+
+def test_stop_request_grounding_helper():
+    g = interview_engine._stop_request_is_grounded
+    assert g("can we stop here", "Sorry, can we stop here? I have a call.")
+    # Punctuation and case differences still match.
+    assert g("I have to go now", "i have to GO now!!")
+    assert not g("I want to stop", "This tool is fine, I have no complaints.")
+    assert not g(None, "anything")
+    assert not g("", "anything")
+    assert not g("stop", None)
+
+
+def test_skip_to_end_without_real_answers_is_not_billed(db_session, monkeypatch):
+    """A transcript that is entirely [Skipped] is not a usable interview."""
+    consumed = []
+    monkeypatch.setattr(
+        interview_engine, "_consume_credit_isolated",
+        lambda billing: consumed.append(billing) if billing else None,
+    )
+    monkeypatch.setattr(interview_engine, "_cached_tts", lambda text, language=None: None)
+    monkeypatch.setattr(interview_engine, "_spawn_completion_side_effects", lambda pid: None)
+
+    participant = _seed(db_session, answered_up_to=2)
+    for turn in participant.turns:
+        turn.response_transcript = "[Skipped]"
+    db_session.commit()
+
+    interview_engine.skip_question(participant.id, db_session)
+
+    db_session.refresh(participant)
+    assert participant.status == "completed"
+    assert consumed == []

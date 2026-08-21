@@ -951,12 +951,6 @@ async def respond_to_question(
     # STT/Claude/TTS work is done.
     _check_interview_budget(db, link.project.company_id, in_flight=True)
 
-    if participant.status == "completed":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Interview is already completed",
-        )
-
     # Turn reconciliation. The client echoes the turn_index it believes it is
     # answering; without it, a retry sent after the client's timeout (but
     # after the server finished) was accepted as the answer to a question the
@@ -975,6 +969,18 @@ async def respond_to_question(
             elapsed_seconds=0,
             total_seconds=0,
             transcript=transcript,
+        )
+
+    # Already finished: replay the stored closing turn so a lost 200 (mobile
+    # drop, client timeout) cannot strand the participant on a retry loop.
+    # Returning 400 here left them tapping Submit against an error forever,
+    # never reaching the completion screen.
+    if participant.status == "completed":
+        if pending is not None:
+            return _turn_response(pending, transcript=pending.response_transcript)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Interview is already completed",
         )
 
     if pending is not None and turn_index is not None and turn_index != pending.turn_index:

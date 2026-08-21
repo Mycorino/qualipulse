@@ -598,7 +598,7 @@ export default function Interview() {
         return;
       }
       if (answeringRef.current) return; // never talk over the participant
-      if (Date.now() - startedAt > 10_000) {
+      if (Date.now() - startedAt > 10_000 && ttsFetchSeqRef.current > 1) {
         // Arrived late: offer tap-to-play instead of surprising autoplay.
         try {
           getAudioEl().src = url;
@@ -1085,6 +1085,15 @@ export default function Interview() {
     setTurnIndex(res.turn_index ?? null);
     syncClockFromServer(res);
     setTtsEnded(false);
+    // Drop any parked audio from the previous turn: if this turn's deferred
+    // fetch fails, a stale "Play the question" button would otherwise replay
+    // the question they already answered.
+    setTtsBlocked(false);
+    try {
+      const el = getAudioEl();
+      el.pause();
+      el.removeAttribute("src");
+    } catch { /* element not created yet */ }
     saveSession(participantId, res.question_text ?? "", nextTurn, res.turn_index ?? null, res.question_index ?? questionIndex);
     if (res.tts_audio_url) {
       playTTS(res.tts_audio_url);
@@ -1197,7 +1206,7 @@ export default function Interview() {
           setPendingBlob(null);
           lastBlobRef.current = null;
           setError(t("interview.emptyTranscript", {
-            defaultValue: "We didn't catch that — please record again in a quieter spot.",
+            defaultValue: "We didn't catch that. Please record again in a quieter spot.",
           }));
         }
       } else {
@@ -1207,11 +1216,11 @@ export default function Interview() {
         if (!isTyped) setPendingBlob(lastBlobRef.current);
         const isNetwork = !(err as { response?: unknown })?.response;
         if (isNetwork) {
-          setError(t("interview.networkError", { defaultValue: "Connection lost — please check your internet and tap Submit to retry." }));
+          setError(t("interview.networkError", { defaultValue: "Connection lost. Please check your internet and tap Submit to retry." }));
         } else if (status === 429) {
           // Rate-limited: retrying immediately just re-trips the limit —
           // tell the participant to wait instead of showing a generic error.
-          setError(t("interview.rateLimited", { defaultValue: "Too many attempts in a short time. Please wait a minute, then tap Submit again — your answer is saved." }));
+          setError(t("interview.rateLimited", { defaultValue: "Too many attempts in a short time. Please wait a minute, then tap Submit again, your answer is saved." }));
         } else {
           setError(t("interview.serverError", { defaultValue: "Something went wrong on our end. Please tap Submit to try again." }));
         }
@@ -2509,7 +2518,7 @@ export default function Interview() {
                       setTtsEnded(true);
                     }}
                   >
-                    {t("interview.skipAudio", { defaultValue: "Skip audio — I'm ready" })}
+                    {t("interview.skipAudio", { defaultValue: "Skip audio, I'm ready" })}
                   </button>
                 )}
                 <button
@@ -2633,7 +2642,7 @@ export default function Interview() {
                       setTtsEnded(true);
                     }}
                   >
-                    {t("interview.skipAudio", { defaultValue: "Skip audio — I'm ready" })}
+                    {t("interview.skipAudio", { defaultValue: "Skip audio, I'm ready" })}
                   </button>
                 )}
               </>
