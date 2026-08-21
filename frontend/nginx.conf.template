@@ -89,10 +89,16 @@ server {
     #   If the handler text in backend/app/services/report_export.py ever
     #   changes, recompute: echo -n '<handler>' | openssl dgst -sha256 -binary | base64
     # - connect-src allows Stripe Checkout iframes + our own API.
+    # - static.cloudflareinsights.com is the Cloudflare Web Analytics beacon
+    #   (cookieless audience measurement, free tier). It is inert until the
+    #   beacon <script> is added to index.html with a real token; the
+    #   allowance is pre-placed so adding the token is a one-line change and
+    #   not a prod-only CSP surprise. Our own funnel events do NOT go
+    #   through it, they POST to /api/telemetry/event under 'self'.
     # - img-src allows data: for TipTap inline previews and R2 cover images.
     # - frame-src allows blob: so the Reports tab can embed the server-rendered
     #   report.html document (fetched with auth, mounted as a same-origin blob).
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-hashes' 'sha256-MguIPR6qNR8D3B+eAlK+bIRTZe8t3wkOY4B/56Me9FU=' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.qualipulse.com https://api.stripe.com https://maps.googleapis.com https://*.sentry.io; frame-src 'self' blob: https://js.stripe.com https://hooks.stripe.com; media-src 'self' blob: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-hashes' 'sha256-MguIPR6qNR8D3B+eAlK+bIRTZe8t3wkOY4B/56Me9FU=' https://js.stripe.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.qualipulse.com https://api.stripe.com https://maps.googleapis.com https://*.sentry.io https://cloudflareinsights.com; frame-src 'self' blob: https://js.stripe.com https://hooks.stripe.com; media-src 'self' blob: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
     add_header Permissions-Policy "microphone=(self), camera=(), geolocation=(), payment=(self)";
 
     # Cache static assets

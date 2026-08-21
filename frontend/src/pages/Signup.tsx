@@ -7,6 +7,7 @@ import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import { checkoutUrlForSelectedPlan } from "../utils/planCheckout";
 import { getStoredRefCode } from "../utils/referral";
+import { getAttribution } from "../utils/attribution";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 
@@ -44,7 +45,7 @@ export default function Signup() {
     setError("");
     setGoogleLoading(true);
     try {
-      const url = await getGoogleAuthorizeUrl("/welcome", i18n.language, refCode ?? "");
+      const url = await getGoogleAuthorizeUrl("/welcome", i18n.language, refCode ?? "", getAttribution() ?? {});
       window.location.href = url;
     } catch (err: unknown) {
       setError(getErrorMessage(err, t("login.googleError")));
@@ -113,6 +114,7 @@ export default function Signup() {
         preferredLanguage: uiLang,
         firstName: trimmedFirst,
         lastName: trimmedLast,
+        attribution: getAttribution(),
       });
       saveToken(res.access_token, res.refresh_token);
       setCachedOnboarded(false);

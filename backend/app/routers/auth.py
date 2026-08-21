@@ -169,12 +169,23 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
         first_name=body.first_name.strip() if body.first_name else None,
         last_name=body.last_name.strip() if body.last_name else None,
     )
+    _apply_signup_attribution(
+        company, body.utm_source, body.utm_medium, body.utm_campaign
+    )
     db.add(company)
     db.commit()
     db.refresh(company)
 
     logger.info("New company signup: %s", company.email)
-    emit_event("signup", company=company, plan_requested=requested_plan or "starter")
+    emit_event(
+        "signup",
+        company=company,
+        plan_requested=requested_plan or "starter",
+        method="password",
+        utm_source=company.utm_source,
+        utm_medium=company.utm_medium,
+        utm_campaign=company.utm_campaign,
+    )
 
     # W2.5 — fire the domain pre-fetch in a background thread so the
     # copilot walks into the very first /welcome turn already knowing
@@ -1387,6 +1398,37 @@ def _google_configured() -> bool:
     )
 
 
+_UTM_STRIP_RE = re.compile(r"[^A-Za-z0-9 ._\-/:+@]")
+
+
+def _clean_utm(value: str | None) -> str | None:
+    """Sanitise one utm_* value: the trio ends up in log lines and in
+    admin-facing reports, so strip anything that could forge either."""
+    if not value:
+        return None
+    text = _UTM_STRIP_RE.sub("", value).strip()[:100]
+    return text or None
+
+
+def _apply_signup_attribution(
+    company: Company,
+    source: str | None,
+    medium: str | None,
+    campaign: str | None,
+) -> None:
+    """Stamp first-touch attribution onto a brand-new Company.
+
+    First write wins — the SPA already resolves first touch client-side,
+    this is just belt and braces for a re-signup edge case.
+    """
+    if not company.utm_source:
+        company.utm_source = _clean_utm(source)
+    if not company.utm_medium:
+        company.utm_medium = _clean_utm(medium)
+    if not company.utm_campaign:
+        company.utm_campaign = _clean_utm(campaign)
+
+
 def _track_referral_signup(db: Session, company: Company, ref_code: str | None) -> None:
     """Attribute a fresh signup to an active affiliate (idempotent, best-effort).
 
@@ -1442,6 +1484,9 @@ def google_login(
     next: str = "/dashboard",
     lang: str = "",
     ref: str = "",
+    utm_source: str = "",
+    utm_medium: str = "",
+    utm_campaign: str = "",
 ):
     """Return the Google authorization URL the frontend should redirect to."""
     if not _google_configured():
@@ -1460,7 +1505,18 @@ def google_login(
     if not re.fullmatch(r"[a-z0-9_-]{3,50}", safe_ref):
         safe_ref = ""
 
-    state = _encode_oauth_state({"next": safe_next, "lang": safe_lang, "ref": safe_ref})
+    # Marketing attribution has the same problem as ``ref``: Google's
+    # redirect drops our query params, so it rides inside the signed state.
+    state = _encode_oauth_state(
+        {
+            "next": safe_next,
+            "lang": safe_lang,
+            "ref": safe_ref,
+            "us": _clean_utm(utm_source) or "",
+            "um": _clean_utm(utm_medium) or "",
+            "uc": _clean_utm(utm_campaign) or "",
+        }
+    )
 
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -1588,10 +1644,28 @@ def google_callback(
             first_name=given_name,
             last_name=family_name,
         )
+        _apply_signup_attribution(
+            company,
+            state_payload.get("us"),
+            state_payload.get("um"),
+            state_payload.get("uc"),
+        )
         db.add(company)
         db.commit()
         db.refresh(company)
         logger.info("New Google signup: %s", company.email)
+        # Google signups used to be invisible in the funnel: this branch
+        # never emitted ``signup``, so an entire acquisition channel was
+        # missing from every conversion count built on the event stream.
+        emit_event(
+            "signup",
+            company=company,
+            plan_requested="starter",
+            method="google",
+            utm_source=company.utm_source,
+            utm_medium=company.utm_medium,
+            utm_campaign=company.utm_campaign,
+        )
         _track_referral_signup(db, company, state_payload.get("ref") or None)
     else:
         # Link Google to existing account (idempotent) and trust Google's

@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth, getCachedOnboarded, setCachedOnboarded } from "./hooks/useAuth";
 import { getMe } from "./api/auth";
 import i18n from "./i18n";
 import { ToastProvider } from "./components/Toast";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 import { captureRefFromUrl } from "./utils/referral";
+import { captureAttributionFromUrl } from "./utils/attribution";
+import { trackPageView } from "./utils/analytics";
 // Eager-load the hot path: marketing, login, signup, interview, and dashboard
 // are what 99% of users see first and we don't want a chunk fetch on first
 // paint. Everything else is lazy so the main bundle shrinks from ~1.2MB to
@@ -154,12 +156,43 @@ function HomeRoute() {
   return <Navigate to="/dashboard" replace />;
 }
 
+// Pageviews are only reported for the public marketing/auth/legal surface.
+// Authenticated routes carry study, survey, and participant ids in the
+// path, and those have no business in an analytics stream.
+const PUBLIC_PAGEVIEW_PATHS = new Set([
+  "/",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/terms",
+  "/privacy",
+  "/dpa",
+  "/subprocessors",
+  "/participant-notice",
+  "/ai-use-policy",
+  "/retention-policy",
+  "/blog",
+]);
+
+function isPublicPageviewPath(pathname: string): boolean {
+  return PUBLIC_PAGEVIEW_PATHS.has(pathname) || pathname.startsWith("/blog/");
+}
+
 export default function App() {
+  const location = useLocation();
+
   // Affiliate links land on any public page (/?ref=code); stash the code so
   // it survives navigation to /signup and the Google OAuth round-trip.
+  // Campaign attribution has the same lifetime problem, same treatment.
   useEffect(() => {
     captureRefFromUrl();
+    captureAttributionFromUrl();
   }, []);
+
+  useEffect(() => {
+    if (isPublicPageviewPath(location.pathname)) trackPageView();
+  }, [location.pathname]);
 
   return (
     <ToastProvider>

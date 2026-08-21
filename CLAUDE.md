@@ -652,6 +652,62 @@ It does **not** retro-add interviews 5–10 to accounts seeded with the
 four-interview demo — only new signups get the ten-interview cast. Run
 it once against production after deploy.
 
+### Web analytics & marketing attribution
+
+No third-party analytics SDK ships with the app: **no GA, no Plausible,
+no PostHog, no pixel, no cookie banner**. Funnel measurement is entirely
+first-party and lands in one place, the `analytics event=…` INFO log
+stream produced by `services/analytics.py`.
+
+**Two halves.**
+
+1. **Front of funnel (FE-fired).** `frontend/src/utils/analytics.ts`
+   POSTs a closed set of events to `POST /telemetry/event`
+   (`page_view`, `cta_signup_click`, `pricing_viewed`,
+   `pricing_interval_toggled`, `newsletter_submit`, `analysis_viewed`).
+   The backend enforces the catalogue (unknown names are dropped
+   silently), filters obvious bots, redacts any non-public path to
+   `/redacted`, and stamps an anonymous **daily-rotating visitor hash**
+   (`sha256(SECRET_KEY | utc-date | ip | ua)`, truncated) so uniques can
+   be counted without a cookie and without storing anything derived from
+   an IP. That is what keeps this inside the CNIL audience-measurement
+   exemption, i.e. no consent banner. Adding an event name to the
+   frontend union type without adding it to `_ALLOWED_EVENTS` in
+   `routers/telemetry.py` is a silent no-op.
+2. **Back of funnel (server-fired).** The existing `emit_event` milestones
+   (`signup`, `onboarding_completed`, `study_created`, `link_shared`,
+   `participant_completed`, `paid_converted`).
+
+**Attribution stitches the two.** `frontend/src/utils/attribution.ts`
+captures the `utm_*` trio on first touch (60-day localStorage window,
+same shape as `utils/referral.ts`), falling back to the referring
+hostname so untagged organic/social traffic is still attributable. It is
+replayed at signup through **both** paths: the password signup body, and
+the signed Google OAuth state (`us` / `um` / `uc` keys, because Google's
+redirect drops query params). The backend persists it on
+`Company.utm_source/medium/campaign` and echoes it on the `signup` event,
+so a `paid_converted` months later is traceable to a channel.
+`referral_source` is unrelated: that is what the user *says* when asked
+during onboarding, this is what was *measured*.
+
+**Log safety.** `/telemetry/event` is unauthenticated, so every value is
+sanitised to a charset that excludes `=`, `?`, `&`, and newlines before
+it reaches a log line. Without that, a caller could smuggle a second
+`event=…` token in and poison any count built by grepping the stream.
+`_fmt` in `analytics.py` strips newlines unconditionally for the same
+reason.
+
+**Reading the data.** `gcloud logging read` for now; the natural next step
+is a log sink to BigQuery, since Cloud Logging retention is 30 days by
+default.
+
+**Cloudflare Web Analytics (optional, free).** The CSP in
+`frontend/nginx.conf.template` + `nginx.conf` already allows
+`static.cloudflareinsights.com` (script) and `cloudflareinsights.com`
+(connect), so enabling cookieless pageview/referrer/country reporting is
+a one-line beacon `<script>` in `index.html` with a real token. It is
+inert until then. Add it to `/subprocessors` if you turn it on.
+
 ### Email Verification
 - On signup: `EmailVerificationToken` created (24h expiry). Only the verification email is sent, and it greets by **first name** ("Welcome, Marie") rather than company name (falls back to company name if first name is missing).
 - `POST /auth/verify-email?token=...` marks `email_verified = True`
@@ -1167,7 +1223,7 @@ gcloud builds list --region=europe-west1 --limit=5
 ## Data Models Summary
 
 ### Company (auth)
-`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at` (legacy plans only — credits-native flow ignores it), `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience`, `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at`, `has_ever_paid` (sticky paid-once flag for paywall), `welcome_greeting_text` / `welcome_greeting_at` (Haiku-personalised /welcome greeting + 24h cache), `starter_suggestions_json` / `starter_suggestions_at` (Haiku-generated starter chips + 24h cache), `created_at`
+`id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at` (legacy plans only — credits-native flow ignores it), `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience`, `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at`, `has_ever_paid` (sticky paid-once flag for paywall), `welcome_greeting_text` / `welcome_greeting_at` (Haiku-personalised /welcome greeting + 24h cache), `starter_suggestions_json` / `starter_suggestions_at` (Haiku-generated starter chips + 24h cache), `utm_source` / `utm_medium` / `utm_campaign` (measured first-touch attribution, Alembic 0064), `created_at`
 
 ### Project
 `id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `decision_to_inform`, `timeline`, `success_criteria`, `target_customer_description`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
@@ -1477,6 +1533,12 @@ gcloud scheduler jobs create http qualipulse-lifecycle-emails \
 **Retired:** `trial_half_over` (Day-7) and `trial_ending` (Day-12) were retired with the credits-native billing model — credits gate usage, not calendar days. Their HTML templates remain in `services/email.py` as dead code in case we revive them, but the cron no longer fires them.
 
 Each Company × event sends at most once thanks to the unique constraint on `email_send_log (company_id, event)`. Test with `?dry_run=true` before flipping on the cron.
+
+### Telemetry (`/telemetry` — public, no auth)
+| Method | Path | Rate limit | Description |
+|---|---|---|---|
+| POST | `/telemetry/client-error` | 10/min | Uncaught SPA errors, logged at ERROR into Sentry + Cloud Logging |
+| POST | `/telemetry/event` | 60/min | One anonymous funnel event from the marketing site (see "Web analytics" above) |
 
 ### Health
 | Method | Path | Description |

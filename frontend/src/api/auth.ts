@@ -88,7 +88,15 @@ export async function signup(
   name: string,
   email: string,
   password: string,
-  opts?: { plan?: string; refCode?: string; preferredLanguage?: string; firstName?: string; lastName?: string }
+  opts?: {
+    plan?: string;
+    refCode?: string;
+    preferredLanguage?: string;
+    firstName?: string;
+    lastName?: string;
+    /** First-touch attribution from utils/attribution.ts. */
+    attribution?: { utm_source?: string; utm_medium?: string; utm_campaign?: string };
+  }
 ): Promise<TokenResponse> {
   const { data } = await client.post<TokenResponse>("/auth/signup", {
     name,
@@ -99,6 +107,9 @@ export async function signup(
     preferred_language: opts?.preferredLanguage,
     first_name: opts?.firstName,
     last_name: opts?.lastName,
+    utm_source: opts?.attribution?.utm_source,
+    utm_medium: opts?.attribution?.utm_medium,
+    utm_campaign: opts?.attribution?.utm_campaign,
   });
   return data;
 }
@@ -169,10 +180,20 @@ export async function deleteAccount(password?: string, confirm?: string): Promis
 export async function getGoogleAuthorizeUrl(
   next: string = "/dashboard",
   lang: string = "",
-  ref: string = ""
+  ref: string = "",
+  attribution: { utm_source?: string; utm_medium?: string; utm_campaign?: string } = {}
 ): Promise<string> {
   const { data } = await client.get<{ authorize_url: string }>("/auth/google/login", {
-    params: { next, lang, ref: ref || undefined },
+    params: {
+      next,
+      lang,
+      ref: ref || undefined,
+      // Query params don't survive Google's redirect, so the backend
+      // folds these into the signed OAuth state.
+      utm_source: attribution.utm_source,
+      utm_medium: attribution.utm_medium,
+      utm_campaign: attribution.utm_campaign,
+    },
   });
   return data.authorize_url;
 }

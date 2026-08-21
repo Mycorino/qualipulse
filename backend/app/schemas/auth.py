@@ -19,6 +19,11 @@ class SignupRequest(BaseModel):
     # Personal identity (onboarding redesign)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    # First-touch marketing attribution, captured from the landing URL by
+    # the SPA (see frontend/src/utils/attribution.ts) and replayed here.
+    utm_source: Optional[str] = None
+    utm_medium: Optional[str] = None
+    utm_campaign: Optional[str] = None
 
 
 class LoginRequest(BaseModel):

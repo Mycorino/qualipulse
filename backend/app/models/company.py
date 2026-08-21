@@ -66,6 +66,12 @@ class Company(Base):
     # analysis depend on this. Free-text with suggested chips
     # (Google / LinkedIn / Colleague / Other). Alembic 0033.
     referral_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Measured first-touch attribution, captured from the landing URL by the
+    # SPA and carried through signup. Distinct from ``referral_source``,
+    # which is what the user *says* when asked. Alembic 0064.
+    utm_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    utm_medium: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    utm_campaign: Mapped[str | None] = mapped_column(String(100), nullable=True)
     goals_classification: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Claude-classified bucket(s), e.g. "product_discovery,customer_retention"
 

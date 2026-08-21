@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useHead } from "../hooks/useHead";
 import { getPublishedPosts, type BlogPost } from "../api/blog";
+import { track } from "../utils/analytics";
 
 export default function Blog() {
   const { t, i18n } = useTranslation("blog");
@@ -281,6 +282,7 @@ export function NewsletterCTA() {
         throw new Error(data.detail || t("newsletter.errorGeneric"));
       }
       setSubmitted(true);
+      track("newsletter_submit");
     } catch (err: any) {
       setError(err.message || t("newsletter.errorGeneric"));
     }
