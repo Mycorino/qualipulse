@@ -207,6 +207,20 @@ class TestAdminTraffic:
         assert {"label": "linkedin", "count": 1} in body["signups_by_source"]
         assert body["daily"]
 
+    def test_channel_split_never_double_counts_a_visitor(
+        self, client, db_session, admin_headers
+    ):
+        """A visitor who arrives direct and later clicks a campaign link is
+        one visit, not one in each channel."""
+        _post_event(client, event="page_view", path="/")
+        _post_event(client, event="page_view", path="/", utm_source="linkedin")
+
+        body = client.get("/admin/traffic?days=30", headers=admin_headers).json()
+        assert body["visits"] == 1
+        assert sum(b["count"] for b in body["top_sources"]) == body["visits"]
+        # Credited to where they were first seen.
+        assert body["top_sources"] == [{"label": "(direct)", "count": 1}]
+
     def test_zero_traffic_does_not_divide_by_zero(self, client, admin_headers):
         res = client.get("/admin/traffic?days=7", headers=admin_headers)
         assert res.status_code == 200
