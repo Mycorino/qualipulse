@@ -10,16 +10,31 @@ from app.config import settings
 from app.models.panel import ParticipantMagicToken
 
 
+# Recontact invites are read hours or days after they land, so their token
+# cannot expire on the 30-minute verification clock. Two weeks comfortably
+# covers a weekend plus a reminder without leaving links valid indefinitely.
+INVITE_TOKEN_EXPIRY_MINUTES = 14 * 24 * 60
+
+
 def mint_magic_token(
     db: Session,
     email: str,
     interview_link_token: str,
     expiry_minutes: int = 30,
+    reusable: bool = False,
 ) -> str:
     """Create and persist a magic token without sending any email.
 
     Used directly by the interview-reminder emails, which embed the magic
-    URL in their own template instead of the standard verification email.
+    URL in their own template instead of the standard verification email,
+    and by recontact invites (see ``reusable``).
+
+    ``reusable`` tokens are not burned by ``verify_magic_token``. Invite
+    links need this: the session JWT a click issues lasts only 2 hours, so a
+    single-use invite would lock a panelist out of their own invitation as
+    soon as they stepped away, with no self-serve way to request another.
+    It stays safe because the token is bound to one email and the
+    one-completed-interview-per-email-per-link guard is unchanged.
     """
     # Use base58-safe alphabet (no ambiguous chars)
     alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
@@ -32,6 +47,7 @@ def mint_magic_token(
         token=token,
         interview_link_token=interview_link_token,
         expires_at=expires_at,
+        reusable=reusable,
     )
     db.add(db_token)
     db.commit()
@@ -86,12 +102,18 @@ def verify_magic_token(db: Session, token: str) -> ParticipantMagicToken | None:
         db.query(ParticipantMagicToken)
         .filter(
             ParticipantMagicToken.token == token,
-            ParticipantMagicToken.used.is_(False),
             ParticipantMagicToken.expires_at > datetime.utcnow(),
         )
         .first()
     )
-    if record:
-        record.used = True
-        db.commit()
+    if record is None:
+        return None
+    # Reusable (invite) tokens stay valid until they expire; everything else
+    # is single-use and burns on first successful verification.
+    if record.reusable:
+        return record
+    if record.used:
+        return None
+    record.used = True
+    db.commit()
     return record
