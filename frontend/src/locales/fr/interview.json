@@ -62,7 +62,7 @@
     "startError": "Nous n'avons pas pu démarrer votre entretien. Veuillez réessayer.",
     "resumeAvailable": "Vous avez un entretien en cours sur cet appareil.",
     "resumeCta": "Reprendre là où vous en étiez",
-    "declineConfirmText": "Êtes-vous sûr·e ? Refuser met fin à votre participation, vous ne pourrez pas revenir à cette étude.",
+    "declineConfirmText": "Êtes-vous sûr·e ? Refuser met fin à votre participation à cette étude.",
     "declineConfirmYes": "Oui, refuser",
     "declineConfirmNo": "Continuer"
   },
@@ -136,20 +136,20 @@
     "sectionWorkExperience": "Expérience professionnelle",
     "sectionLocation": "Localisation",
     "optional": "(facultatif)",
-    "tagsLabel": "Centres d'intérêt / thématiques"
+    "tagsLabel": "Centres d'intérêt / thématiques",
+    "skipName": "Continuer sans donner de prénom"
   },
   "questionnaire": {
-    "intro": "D'abord, quelques questions rapides sur vous",
-    "introSubtitle": "Cela aide votre interviewer, et on ne le demande qu'une fois. Appuyez simplement sur votre réponse.",
+    "intro": "Une minute pour parler de vous",
+    "introSubtitle": "Tout est facultatif. Cela aide l'équipe de recherche à mieux situer vos réponses. Appuyez simplement sur votre réponse.",
     "progress": "{{current}} sur {{total}}",
     "back": "Retour",
     "skip": "Passer",
     "continue": "Continuer",
-    "finish": "Démarrer l'entretien",
     "saving": "Enregistrement…",
     "saveError": "Nous n'avons pas pu enregistrer vos réponses. Veuillez réessayer.",
     "firstNameQ": "Quel est votre prénom ?",
-    "firstNameHelp": "Votre interviewer l'utilisera pour s'adresser à vous naturellement.",
+    "firstNameHelp": "Pour que l'équipe de recherche sache comment vous désigner.",
     "firstNamePlaceholder": "ex. Alex",
     "countryQ": "Dans quel pays vivez-vous ?",
     "countrySearch": "Recherchez votre pays…",
@@ -235,7 +235,11 @@
       "1000+": "Plus de 1 000 personnes"
     },
     "consentAccept": "Oui, je veux bien",
-    "consentDecline": "Pas pour le moment"
+    "consentDecline": "Pas pour le moment",
+    "emailQ": "Souhaitez-vous laisser une adresse email ?",
+    "emailHelp": "Facultatif. Utilisée uniquement si l'équipe de recherche doit revenir vers vous au sujet de vos réponses.",
+    "emailPlaceholder": "vous@exemple.com",
+    "done": "Terminer"
   },
   "micPrompt": {
     "title": "Cet entretien utilise votre microphone",
@@ -290,15 +294,13 @@
     }
   },
   "interview": {
-    "progressLabel": "Q{{current}} sur {{total}}",
-    "followUpLabel": "Question complémentaire · Q{{current}} sur {{total}}",
+    "progressLabel": "Sujet {{current}} sur {{total}}",
+    "followUpLabel": "Question complémentaire · Sujet {{current}} sur {{total}}",
     "timeRemaining": "{{minutes}}:{{seconds}} restant",
     "timeWarning": "Moins de 2 minutes restantes",
     "timeCritical": "Moins de 30 secondes restantes",
     "timeMinLeft": "~{{mins}} min restantes",
     "timeSecLeft": "{{secs}}s restantes",
-    "recordButton": "Maintenez pour enregistrer",
-    "stopButton": "Relâchez pour arrêter",
     "submitButton": "Envoyer ma réponse",
     "reRecord": "Réenregistrer",
     "muteAudio": "Couper le son",
@@ -314,10 +316,8 @@
       "emptyError": "Veuillez écrire une réponse avant d'envoyer."
     },
     "processing": {
-      "transcribing": "🎙️ Transcription de votre réponse…",
-      "thinking": "💭 Analyse en cours…",
-      "preparing": "🔊 Préparation de la prochaine question…",
-      "takingLonger": "Encore un instant, on y est presque…"
+      "listening": "Nous écoutons votre réponse…",
+      "stillWorking": "Encore un instant, merci de votre patience"
     },
     "transcript": "Nous avons entendu :",
     "transcriptDismiss": "Fermer",
@@ -326,11 +326,11 @@
     "networkError": "Problème de connexion. Votre réponse est sauvegardée, appuyez sur Envoyer pour réessayer.",
     "ttsFailedWarning": "Nous n'avons pas pu lire l'audio de la question. Vous pouvez lire la question ci-dessus et enregistrer votre réponse.",
     "ttsReplay": "Réécouter",
-    "recordingCaptured": "Enregistrement terminé",
-    "tapToStop": "Appuyez pour arrêter l'enregistrement",
+    "recordingCaptured": "Voici votre réponse. Réécoutez-la si vous voulez, ou envoyez-la.",
+    "tapToStop": "Appuyez pour arrêter",
     "remaining": "restant",
     "listeningToQuestion": "Écoute de la question…",
-    "tapToRecord": "Appuyez pour commencer l'enregistrement",
+    "tapToRecord": "Appuyez pour répondre",
     "waitForQuestion": "Attendez la fin de la question",
     "preparingFirst": "Préparation de votre première question…",
     "uploadError": "Nous n'avons pas pu envoyer votre réponse. Appuyez sur « Réessayer » pour la renvoyer.",
@@ -342,7 +342,24 @@
     "playQuestion": "Écouter la question",
     "skipAudio": "Passer l'audio, je suis prêt·e",
     "maxRecordingHint": "Jusqu'à {{minutes}} minutes par réponse",
-    "warmupLabel": "Pour faire connaissance"
+    "warmupLabel": "Pour faire connaissance",
+    "sendingAnswer": "Envoi de votre réponse…",
+    "undo": "Annuler",
+    "turnResynced": "Nous avons déjà cette réponse, voici la question suivante.",
+    "pause": {
+      "button": "Pause",
+      "title": "Entretien en pause",
+      "body": "Prenez votre temps. Votre progression est enregistrée, revenez quand vous êtes prêt·e.",
+      "resume": "Reprendre l'entretien"
+    },
+    "finish": {
+      "button": "Terminer ici",
+      "confirmText": "Terminer l'entretien avec ce que vous avez déjà partagé ?",
+      "confirmYes": "Oui, terminer",
+      "confirmNo": "Continuer",
+      "finishing": "Clôture en cours…",
+      "error": "Nous n'avons pas pu clôturer l'entretien. Veuillez réessayer."
+    }
   },
   "completion": {
     "title": "Merci, {{name}} !",
@@ -371,7 +388,15 @@
       "dismiss": "Non merci"
     },
     "enrichCta": "Ajouter quelques infos → débloquer plus d'études",
-    "dataRights": "Pour demander la suppression de vos données, contactez le chercheur qui a partagé ce lien avec vous."
+    "dataRights": "Pour demander la suppression de vos données, contactez le chercheur qui a partagé ce lien avec vous.",
+    "postProfile": {
+      "title": "Une minute pour parler de vous",
+      "body": "Quelques questions facultatives sur vous. Elles aident l'équipe de recherche à mieux situer vos réponses.",
+      "cta": "D'accord, allons-y",
+      "dismiss": "Non merci",
+      "thanksTitle": "Merci !",
+      "thanksBody": "Vos informations ont été enregistrées avec vos réponses."
+    }
   },
   "resume": {
     "title": "Ravi de vous revoir !",
@@ -425,5 +450,11 @@
   "alreadyCompleted": {
     "title": "Vous avez déjà terminé cet entretien",
     "body": "Cette adresse e-mail a déjà terminé cet entretien. Merci, vous n'avez rien d'autre à faire."
+  },
+  "recording": {
+    "tooShort": "Cet enregistrement était trop court. Parlez une seconde ou deux avant d'arrêter.",
+    "tooLong": "Cet enregistrement est trop long pour être envoyé. Enregistrez une réponse plus courte.",
+    "interruptedHidden": "L'enregistrement s'est arrêté car l'écran s'est éteint. Réécoutez ce que nous avons capté, ou réenregistrez.",
+    "interruptedDevice": "Votre microphone s'est arrêté en cours de réponse. Réécoutez ce que nous avons capté, ou réenregistrez."
   }
 }

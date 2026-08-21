@@ -43,6 +43,10 @@ export interface StartInterviewResponse {
   is_warmup?: boolean;
   /** Authoritative language the AI + voice are using; UI locks to this. */
   language?: string;
+  /** Index of the pending interviewer turn the participant must answer. */
+  turn_index?: number;
+  /** Guide question index of the opening turn (<0 = non-counting turn). */
+  question_index?: number;
 }
 
 export interface SubmitAudioResponse {
@@ -60,6 +64,24 @@ export interface SubmitAudioResponse {
    * as a soft, dismissable inline banner above the record button.
    */
   coaching_hint?: string | null;
+  /** The NEW pending turn to answer (on completion: the last turn). The
+   *  client echoes it back on the next /respond or /skip so a retried
+   *  upload can never be applied to the wrong question. */
+  turn_index?: number;
+}
+
+/** Body of the HTTP 409 `turn_mismatch` error from /respond or /skip. */
+export interface TurnMismatchDetail {
+  code: "turn_mismatch";
+  current: SubmitAudioResponse;
+}
+
+export interface ParticipantProfileUpdate {
+  display_name?: string;
+  age_range?: string;
+  country?: string;
+  profession?: string;
+  email?: string;
 }
 
 export interface ResumeCheck {
@@ -177,6 +199,10 @@ export async function submitScreening(token: string, answers: Record<string, str
 
 const MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024;
 
+/** Stable sentinel for the client-side size guard; the UI maps it to a
+ *  localized "recording too long" message instead of a connection error. */
+export const RECORDING_TOO_LARGE = "RECORDING_TOO_LARGE";
+
 /**
  * Submit a participant answer. Accepts either a recorded audio Blob (the
  * default voice path) or a typed string (accessibility fallback for
@@ -186,17 +212,23 @@ const MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024;
 export async function submitAudio(
   token: string,
   participantId: string,
-  answer: Blob | string
+  answer: Blob | string,
+  turnIndex?: number | null
 ): Promise<SubmitAudioResponse> {
   const form = new FormData();
   if (typeof answer === "string") {
     form.append("text", answer);
   } else {
     if (answer.size > MAX_AUDIO_UPLOAD_BYTES) {
-      throw new Error("Recording is too large. Please try a shorter response.");
+      const err = new Error(RECORDING_TOO_LARGE) as Error & { code?: string };
+      err.code = RECORDING_TOO_LARGE;
+      throw err;
     }
     const ext = answer.type.includes("mp4") ? "mp4" : answer.type.includes("ogg") ? "ogg" : "webm";
     form.append("audio", answer, `recording.${ext}`);
+  }
+  if (turnIndex !== undefined && turnIndex !== null) {
+    form.append("turn_index", String(turnIndex));
   }
   const { data } = await client.post<SubmitAudioResponse>(
     `/interview/${token}/${participantId}/respond`,
@@ -225,12 +257,59 @@ export async function getResumeSummary(token: string, participantId: string): Pr
 
 export async function skipQuestion(
   token: string,
+  participantId: string,
+  turnIndex?: number | null
+): Promise<SubmitAudioResponse> {
+  const { data } = await client.post<SubmitAudioResponse>(
+    `/interview/${token}/${participantId}/skip`,
+    turnIndex !== undefined && turnIndex !== null ? { turn_index: turnIndex } : {}
+  );
+  return data;
+}
+
+/** "Finish here": closes the interview early. Idempotent; the response is a
+ *  completed TurnResponse whose question_text is the spoken closing line. */
+export async function finishInterview(
+  token: string,
   participantId: string
 ): Promise<SubmitAudioResponse> {
   const { data } = await client.post<SubmitAudioResponse>(
-    `/interview/${token}/${participantId}/skip`
+    `/interview/${token}/${participantId}/finish`,
+    {}
   );
   return data;
+}
+
+/** Post-interview demographics for participants WITHOUT a magic-link session.
+ *  (Magic-link participants keep using savePanelProfile, the only path that
+ *  can record panel consent.) */
+export async function updateParticipantProfile(
+  token: string,
+  participantId: string,
+  profile: ParticipantProfileUpdate
+): Promise<{ saved: boolean }> {
+  const { data } = await client.patch<{ saved: boolean }>(
+    `/interview/${token}/${participantId}/profile`,
+    profile
+  );
+  return data;
+}
+
+/** Deferred voice synthesis (item 13): /start, /respond, /skip and /finish
+ *  usually return tts_audio_url: null so the question TEXT renders ~2s
+ *  sooner. This endpoint synthesises the voice for a turn on first call and
+ *  returns the stored URL on later calls (idempotent). `null` = synthesis
+ *  genuinely failed; the interview stays text-only. */
+export async function getTurnAudio(
+  token: string,
+  participantId: string,
+  turnIndex: number
+): Promise<string | null> {
+  const { data } = await client.get<{ tts_audio_url: string | null }>(
+    `/interview/${token}/${participantId}/turn-audio`,
+    { params: { turn_index: turnIndex }, timeout: 30_000 }
+  );
+  return data.tts_audio_url ?? null;
 }
 
 export async function requestVerification(

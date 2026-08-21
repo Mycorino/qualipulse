@@ -77,6 +77,11 @@ class Participant(Base):
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # How the interview reached "completed": NULL/"natural" = the engine closed
+    # after covering the guide, "participant_finished" = the participant used
+    # "Finish here", "participant_requested" = they asked the interviewer to
+    # stop mid-conversation, "skipped_to_end" = skip on the last question.
+    completion_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
     quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     quality_label: Mapped[str | None] = mapped_column(String(20), nullable=True)
     quality_summary: Mapped[str | None] = mapped_column(Text, nullable=True)

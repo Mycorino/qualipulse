@@ -69,6 +69,10 @@ class StartInterviewResponse(BaseModel):
     participant_id: str
     first_question: str
     tts_audio_url: str | None = None
+    # Index of the pending interviewer turn the participant must answer. The
+    # client echoes it back on /respond so a retry after a timeout can never
+    # be accepted as the answer to a question the participant never heard.
+    turn_index: int = 0
     # PF-3: True when the engine is opening with a warm-up turn (low-stakes
     # icebreaker) before the first guide question. Frontend uses this to
     # soften the chrome on turn 0 — no progress count, no skip button.
@@ -84,6 +88,8 @@ class TurnResponse(BaseModel):
     question_text: str
     tts_audio_url: str | None = None
     is_complete: bool
+    # The NEW pending turn to answer (on completion: the closing turn).
+    turn_index: int = 0
     is_follow_up: bool = False
     question_index: int = 0
     elapsed_seconds: int = 0
@@ -106,6 +112,7 @@ class ParticipantResponse(BaseModel):
     id: str
     display_name: str | None = None
     status: str
+    completion_reason: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     turn_count: int

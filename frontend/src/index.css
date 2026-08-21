@@ -2701,25 +2701,30 @@ select.field-input {
 
 .record-btn.recording {
   border-color: var(--danger);
+  background: var(--danger);
   animation: record-ring 1.8s var(--ease-in-out) infinite;
+}
+.record-btn.recording:hover {
+  border-color: var(--danger);
 }
 @keyframes record-ring {
   0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0), var(--shadow-lg); }
-  50%       { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0.1), var(--shadow-lg); }
+  50%       { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0.18), var(--shadow-lg); }
 }
 
+/* Idle glyph: a microphone, brand-tinted — never red before recording */
+.record-btn-mic {
+  color: var(--brand-500);
+  display: block;
+}
+
+/* Recording glyph: the universal white stop square on the red fill */
 .record-btn-inner {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--danger);
-  transition: all 0.2s;
-}
-
-.record-btn.recording .record-btn-inner {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 6px;
+  background: #fff;
+  transition: all 0.2s;
 }
 
 .recording-pulse {
@@ -5073,7 +5078,9 @@ select.field-input {
 
 /* ── Record button states ────────────────────────────────────────────────── */
 .record-btn--waiting { opacity: 0.5; cursor: not-allowed; }
-.record-btn--ready { box-shadow: 0 0 0 4px rgba(67, 105, 245, 0.2); }
+/* Subtle "your turn" affordance — a neutral border lift, nothing that could
+   read as "already live". */
+.record-btn--ready { border-color: var(--brand-300, #a5b4fc); }
 
 /* ── Skip question ───────────────────────────────────────────────────────── */
 .skip-question-btn {
@@ -15404,3 +15411,116 @@ select.field-input {
 .invite-card--email { --invite-accent: #2d53e8; --invite-tint: #e4eaff; }
 .invite-card--post  { --invite-accent: #0a66c2; --invite-tint: #e2eefa; }
 .invite-card--short { --invite-accent: #128c7e; --invite-tint: #dcf3ee; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Participant interview overhaul — interview-scoped additions
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* AI-moderator disclosure line on the consent screen */
+.consent-ai-disclosure {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  line-height: 1.55;
+}
+
+/* Neutral (non-error) notice: turn resync, interrupted recording */
+.interview-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+.interview-notice__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+/* One-tap answering: "Sending… Undo" toast */
+.autosend-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: var(--shadow-md);
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.autosend-toast__label {
+  font-weight: 500;
+  color: var(--text);
+}
+.autosend-toast__undo {
+  min-height: 44px;
+  padding: 8px 18px;
+}
+
+/* Playable preview of the pending take */
+.recording-preview-player {
+  margin: 4px 0 8px;
+}
+
+/* Ensure the record/stop control never drops below the touch-target floor */
+.record-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Discreet Pause / Finish-here row */
+.interview-session-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.session-control-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  padding: 10px 6px;
+  min-height: 44px;
+}
+.session-control-btn--strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.session-finish-confirm {
+  color: var(--text-secondary);
+}
+
+/* Calm the interview animations for motion-sensitive participants */
+@media (prefers-reduced-motion: reduce) {
+  .record-btn.recording { animation: none; }
+  .recording-pulse { animation: none; }
+  .spinner { animation: none; }
+}

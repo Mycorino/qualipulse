@@ -161,7 +161,7 @@ def test_respond_returns_transcript_and_coaching(client, db_session, monkeypatch
     monkeypatch.setattr(
         interview_router,
         "process_interview_turn",
-        lambda pid, key, url, db: {
+        lambda pid, key, url, db, *a, **k: {
             "question_text": "Next question?",
             "tts_audio_url": None,
             "is_complete": False,
@@ -171,6 +171,7 @@ def test_respond_returns_transcript_and_coaching(client, db_session, monkeypatch
             "total_seconds": 600,
             "coaching_hint": "If a story comes to mind, share it.",
             "transcript": "I use it every day on my commute",
+            "turn_index": 1,
         },
     )
 
