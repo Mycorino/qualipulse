@@ -263,3 +263,30 @@ def test_skip_rejects_a_stale_turn_index(client, db_session):
     assert r.status_code == 409, r.text
     assert r.json()["detail"]["code"] == "turn_mismatch"
     assert r.json()["detail"]["current"]["turn_index"] == 1
+
+
+def test_completed_interview_replays_instead_of_400(client, db_session):
+    """A lost 200 on the final turn must not strand the participant.
+
+    The client keeps the blob and retries; returning 400 left them tapping
+    Submit against an error forever, never reaching the completion screen.
+    """
+    link, participant = _seed(db_session, token="tok-done")
+    participant.status = "completed"
+    db_session.add(
+        InterviewTurn(
+            participant_id=participant.id, turn_index=2, question_index=1,
+            question_text="That wraps it up, thank you!", tts_audio_url="http://x/bye.mp3",
+        )
+    )
+    db_session.commit()
+
+    r = client.post(
+        f"/interview/{link.token}/{participant.id}/respond",
+        files={"audio": ("recording.webm", b"0" * 1000, "audio/webm")},
+        data={"turn_index": "1"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["is_complete"] is True
+    assert body["question_text"] == "That wraps it up, thank you!"
