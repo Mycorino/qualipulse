@@ -34,6 +34,25 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
 
+      # Guards the failure mode that has broken four production deploys:
+      # two PRs open at once each add a migration off the same parent, each
+      # sees a single head on its own branch, and main ends up with two.
+      # `alembic upgrade head` then refuses to run, start.sh falls back to
+      # create_all(), and the container exits 255 without listening.
+      #
+      # This catches it because actions/checkout on a pull_request event
+      # checks out the MERGE commit, so `alembic heads` sees what main will
+      # look like after the merge, not what the branch looks like before it.
+      - name: Single alembic head
+        run: |
+          heads=$(PYTHONPATH=. alembic heads | grep -c '(head)' || true)
+          if [ "$heads" -ne 1 ]; then
+            echo "Expected exactly 1 alembic head, found $heads:"
+            PYTHONPATH=. alembic heads
+            echo "::error::Multiple alembic heads. Add a merge revision (see 0063/0065/0067) before merging."
+            exit 1
+          fi
+
       - name: Run tests
         run: PYTHONPATH=. pytest tests/ -v --tb=short
 
