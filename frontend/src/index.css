@@ -1451,6 +1451,12 @@ select.field-input {
   gap: 0;
   animation: tab-enter 180ms var(--ease-out) both;
 }
+/* NOTE: animating transform makes .tab-content the containing block for its
+   position: fixed descendants (true even once the animation has filled, and
+   even if the last keyframe is `transform: none` — verified in-browser). A
+   modal rendered from inside a tab panel therefore sizes itself to the panel
+   instead of the viewport: render it through a portal on document.body, the
+   way InvitePastParticipantsModal does. */
 @keyframes tab-enter {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }

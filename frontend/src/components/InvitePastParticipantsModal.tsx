@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -19,6 +20,13 @@ import { useToast } from "./Toast";
  * rows stay visible with the reason, so the list never silently shrinks),
  * lets the researcher select recipients, and shows the study's invite
  * funnel (sent → started → completed) once invites exist.
+ *
+ * Rendered through a portal on document.body: the panel that opens it lives
+ * inside `.tab-content`, whose enter animation leaves a transform on the
+ * element, and a transformed ancestor becomes the containing block for
+ * `position: fixed` children. Without the portal the overlay was sized to
+ * the tab panel instead of the viewport, so the dialog opened somewhere in
+ * the middle of a long page rather than in front of the researcher.
  */
 export default function InvitePastParticipantsModal({
   projectId,
@@ -107,7 +115,7 @@ export default function InvitePastParticipantsModal({
     cooldown: t("recontact.blockedCooldown", { days: data?.cooldown_days ?? 7 }),
   };
 
-  return (
+  return createPortal(
     <div
       className="modal-overlay"
       role="dialog"
@@ -224,6 +232,7 @@ export default function InvitePastParticipantsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
