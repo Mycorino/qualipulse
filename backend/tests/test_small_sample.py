@@ -54,7 +54,7 @@ def _seed(db, registered_company, n_participants):
 
 def _patch_claude(monkeypatch):
     monkeypatch.setattr(
-        analysis_service, "_synthesize_response", lambda prompt, effort="high": object()
+        analysis_service, "_synthesize_response", lambda prompt, effort="high", **kw: object()
     )
     monkeypatch.setattr(analysis_service, "_raise_on_bad_stop", lambda response: None)
     monkeypatch.setattr(analysis_service, "_parse_report", lambda response: dict(REPORT))

@@ -298,7 +298,11 @@ export interface AnalysisResponse {
   /** Pipeline stage while status is "generating"; null otherwise. */
   stage?: AnalysisStage | null;
   /** Stage counters, e.g. { done, total } during auto_tagging. */
-  stage_detail?: { done?: number; total?: number } | null;
+  stage_detail?: { done?: number; total?: number; section?: string; output_tokens?: number; participants?: number } | null;
+  /** Server-side seconds since the run started (generating only). */
+  elapsed_seconds?: number | null;
+  /** Learned expected duration for this cohort size (generating only). */
+  estimated_seconds?: number | null;
   completed_count: number;
   participant_count: number;
   generated_at: string | null;
@@ -636,6 +640,8 @@ export interface AnalysisReadiness {
   tagged_participant_count: number;
   pending_suggestion_count: number;
   tagging_state: "anchored" | "partial" | "untagged";
+  /** Learned expected analysis duration for the current completed count. */
+  estimated_seconds?: number | null;
 }
 
 export async function getAnalysisReadiness(projectId: string): Promise<AnalysisReadiness> {

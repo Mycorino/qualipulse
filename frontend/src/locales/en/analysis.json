@@ -119,7 +119,8 @@
     "lowNBody_one": "With {{count}} completed interview, the result is a first read, not findings: themes need at least two participants and confidence will be marked anecdotal.",
     "lowNBody_other": "With {{count}} completed interviews, the result is a first read, not findings: themes need at least two participants and confidence will be marked anecdotal.",
     "runFirstRead": "Run a first read anyway",
-    "waitForMore": "Wait for more interviews"
+    "waitForMore": "Wait for more interviews",
+    "duration": "Usually takes about {{time}}. You can leave the page while it runs."
   },
   "failedTitle": "We couldn't complete your analysis",
   "failedTimeout": "The analysis timed out, your dataset may be too large. Try filtering to a smaller group first.",
@@ -215,5 +216,18 @@
   "screeningFilterLabel": "Screening question",
   "smallSampleTitle": "First read, not findings",
   "smallSampleBody_one": "Based on {{count}} completed interview. At this size the analysis is an early, anecdotal read: themes need at least two participants, and nothing here is validated. Collect more interviews before acting on it.",
-  "smallSampleBody_other": "Based on {{count}} completed interviews. At this size the analysis is an early, anecdotal read: themes need at least two participants, and nothing here is validated. Collect more interviews before acting on it."
+  "smallSampleBody_other": "Based on {{count}} completed interviews. At this size the analysis is an early, anecdotal read: themes need at least two participants, and nothing here is validated. Collect more interviews before acting on it.",
+  "sections": {
+    "summary": "Writing the executive summary…",
+    "themes": "Writing the key themes…",
+    "jobs_to_be_done": "Writing the jobs to be done…",
+    "tensions": "Writing the tensions…",
+    "recommendations": "Writing the recommendations…",
+    "personas": "Drafting personas…",
+    "journey": "Mapping the journey…",
+    "confidence": "Calibrating confidence…"
+  },
+  "elapsed": "{{time}} elapsed",
+  "usuallyTakes": "usually about {{time}}",
+  "canLeavePage": "You can leave this page, we'll email you when it's ready."
 }

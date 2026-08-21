@@ -325,6 +325,32 @@ def _set_stage(db: Session, analysis: ProjectAnalysis, stage: str | None, detail
     db.commit()
 
 
+def _progress_reporter(db: Session, analysis: ProjectAnalysis, min_interval: float = 2.0):
+    """Build an on_progress callback that persists synthesis progress into
+    stage_detail at most once per ``min_interval`` seconds (and whenever the
+    section changes), so the polling UI can narrate the run without the
+    background thread hammering the database on every token."""
+    import time
+
+    state = {"last": 0.0, "section": None}
+
+    def _report(section, output_tokens):
+        now = time.monotonic()
+        changed = section != state["section"]
+        if not changed and now - state["last"] < min_interval:
+            return
+        state["last"] = now
+        state["section"] = section
+        _set_stage(
+            db,
+            analysis,
+            "synthesizing",
+            {"section": section, "output_tokens": int(output_tokens or 0)},
+        )
+
+    return _report
+
+
 def _normalize_for_match(text: str) -> str:
     """Lenient normalisation for verbatim-quote matching.
 
@@ -767,15 +793,45 @@ def _is_output_format_error(exc: Exception) -> bool:
     return hit and (status in (400, None))
 
 
-def _synthesize_response(prompt: str, effort: str = "high"):
+# Top-level report keys in the order structured output writes them. Watching
+# the text deltas for each key lets the pipeline narrate "writing key themes…"
+# while the model is mid-generation, with no extra model calls.
+REPORT_SECTIONS = (
+    "summary",
+    "themes",
+    "jobs_to_be_done",
+    "tensions",
+    "recommendations",
+    "personas",
+    "journey",
+    "confidence",
+)
+
+
+def _detect_section(text: str, current_idx: int) -> int:
+    """Return the index of the furthest REPORT_SECTIONS key present in the
+    streamed text so far, never moving backwards (keys can be mentioned
+    inside string values later, so monotonic is the honest reading)."""
+    idx = current_idx
+    for i in range(current_idx + 1, len(REPORT_SECTIONS)):
+        if f'"{REPORT_SECTIONS[i]}"' in text:
+            idx = i
+        else:
+            break
+    return idx
+
+
+def _synthesize_response(prompt: str, effort: str = "high", on_progress=None):
     """Run one Opus 4.8 synthesis turn — adaptive thinking + effort + structured
     output, streamed — and return the final Message.
 
-    Structured output is best-effort: if the server rejects the schema we retry
-    once without it (thinking + effort + streaming stay on), so a schema issue
-    can never take the analysis path down — the model still returns the same JSON
-    shape from the prompt contract. Temperature is dropped automatically on Opus
-    via ``temperature_kwargs``.
+    ``on_progress(section, output_tokens)`` is called as the stream advances
+    (the caller throttles persistence). Structured output is best-effort: if
+    the server rejects the schema we retry once without it (thinking + effort
+    + streaming stay on), so a schema issue can never take the analysis path
+    down — the model still returns the same JSON shape from the prompt
+    contract. Temperature is dropped automatically on Opus via
+    ``temperature_kwargs``.
     """
     client = get_anthropic_client()
     model = ai_models.analysis()
@@ -793,6 +849,40 @@ def _synthesize_response(prompt: str, effort: str = "high"):
             output_config["format"] = {"type": "json_schema", "schema": _REPORT_SCHEMA}
         try:
             with client.messages.stream(output_config=output_config, **base) as stream:
+                if on_progress is None:
+                    return stream.get_final_message()
+                buf: list[str] = []
+                buf_len = 0
+                section_idx = -1
+                out_tokens = 0
+                for event in stream:
+                    etype = getattr(event, "type", None)
+                    if etype == "content_block_delta":
+                        delta = getattr(event, "delta", None)
+                        if getattr(delta, "type", None) == "text_delta":
+                            buf.append(delta.text)
+                            buf_len += len(delta.text)
+                    elif etype == "message_delta":
+                        usage = getattr(event, "usage", None)
+                        if usage is not None and getattr(usage, "output_tokens", None):
+                            out_tokens = usage.output_tokens
+                    else:
+                        continue
+                    # Only re-scan when text actually grew; the scan is a
+                    # handful of substring checks over the tail, so keep it
+                    # bounded by looking at the last 4k chars.
+                    if buf_len:
+                        tail = "".join(buf[-40:])
+                        new_idx = _detect_section(tail, section_idx)
+                        if new_idx != section_idx:
+                            section_idx = new_idx
+                    try:
+                        on_progress(
+                            REPORT_SECTIONS[section_idx] if section_idx >= 0 else None,
+                            out_tokens or max(buf_len // 4, 0),
+                        )
+                    except Exception:  # noqa: BLE001 - progress is best-effort
+                        pass
                 return stream.get_final_message()
         except Exception as exc:  # noqa: BLE001
             if use_schema and _is_output_format_error(exc):
@@ -978,7 +1068,7 @@ def run_analysis(
             if total:
                 _set_stage(db, analysis, "auto_tagging", {"done": total, "total": total})
 
-        _set_stage(db, analysis, "preparing")
+        _set_stage(db, analysis, "preparing", {"participants": len(completed)})
         transcripts_block, participant_map = _build_transcripts_block(completed)
         # Business context: the analysis is infinitely more useful when the
         # model knows what the researcher actually sells and who they sell to.
@@ -1020,7 +1110,9 @@ def run_analysis(
         )
 
         _set_stage(db, analysis, "synthesizing")
-        response = _synthesize_response(prompt, effort="high")
+        response = _synthesize_response(
+            prompt, effort="high", on_progress=_progress_reporter(db, analysis)
+        )
         log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
         _raise_on_bad_stop(response)
 
@@ -1232,7 +1324,9 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         # Refined synthesis is the researcher's high-stakes pass (they've reviewed
         # v1 and annotated) → run it at xhigh effort.
         _set_stage(db, new_analysis, "synthesizing")
-        response = _synthesize_response(prompt, effort="xhigh")
+        response = _synthesize_response(
+            prompt, effort="xhigh", on_progress=_progress_reporter(db, new_analysis)
+        )
         log_claude_usage(db, response, "analysis", company_id=project.company_id, project_id=project_id)
         _raise_on_bad_stop(response)
 
