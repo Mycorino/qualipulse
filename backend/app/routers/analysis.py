@@ -50,6 +50,58 @@ class ResearcherContextRequest(BaseModel):
     researcher_context: str
 
 
+# Fallback duration model until a workspace has real run history: a fixed
+# overhead plus a per-interview cost. Real past runs (created_at →
+# generated_at on ready analyses) replace it as soon as a few exist.
+_EST_FIXED_SECONDS = 45
+_EST_PER_INTERVIEW_SECONDS = 10
+
+
+def _estimate_seconds(db: Session, n_participants: int) -> int:
+    """Expected wall-clock seconds for an analysis over ``n_participants``.
+
+    Learns from the most recent ready runs platform-wide (durations scale
+    roughly with N plus a fixed overhead, so each past run is rescaled to
+    the target N before taking the median). No PII, no per-workspace
+    leakage: only timings and counts are read.
+    """
+    n = max(int(n_participants or 0), 1)
+    rows = (
+        db.query(ProjectAnalysis.created_at, ProjectAnalysis.generated_at, ProjectAnalysis.participant_count)
+        .filter(ProjectAnalysis.status == "ready", ProjectAnalysis.generated_at.isnot(None))
+        .order_by(ProjectAnalysis.generated_at.desc())
+        .limit(20)
+        .all()
+    )
+    samples: list[float] = []
+    for created, generated, count in rows:
+        if not created or not generated:
+            continue
+        try:
+            dur = (generated.replace(tzinfo=None) - created.replace(tzinfo=None)).total_seconds()
+        except Exception:
+            continue
+        if 5 <= dur <= 900:
+            past_n = max(int(count or 0), 1)
+            samples.append(dur * (n + 3) / (past_n + 3))
+    if len(samples) >= 3:
+        samples.sort()
+        est = samples[len(samples) // 2]
+    else:
+        est = _EST_FIXED_SECONDS + _EST_PER_INTERVIEW_SECONDS * n
+    return int(min(max(est, 20), 900))
+
+
+def _elapsed_seconds(analysis: ProjectAnalysis) -> int | None:
+    if analysis.status != "generating" or not analysis.created_at:
+        return None
+    try:
+        start = analysis.created_at.replace(tzinfo=None)
+        return max(int((datetime.utcnow() - start).total_seconds()), 0)
+    except Exception:
+        return None
+
+
 @router.post("/{project_id}/analysis", status_code=status.HTTP_202_ACCEPTED)
 def trigger_analysis(
     project_id: str,
@@ -302,6 +354,11 @@ def get_analysis(
         "status": analysis.status,
         "stage": analysis.stage,
         "stage_detail": stage_detail,
+        # Time disclaimer inputs: server-side elapsed (correct after a page
+        # reload) and a learned estimate for this cohort size.
+        "elapsed_seconds": _elapsed_seconds(analysis),
+        "estimated_seconds": _estimate_seconds(db, analysis.participant_count or completed_count)
+        if analysis.status == "generating" else None,
         "completed_count": completed_count,
         "participant_count": analysis.participant_count,
         "generated_at": analysis.generated_at.isoformat() if analysis.generated_at else None,
@@ -383,6 +440,7 @@ def get_analysis_readiness(
         "tagged_participant_count": tagged,
         "pending_suggestion_count": pending_suggestions,
         "tagging_state": tagging_state,
+        "estimated_seconds": _estimate_seconds(db, completed),
     }
 
 

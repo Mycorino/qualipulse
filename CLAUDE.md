@@ -762,6 +762,20 @@ Pacing safety guards:
    pending, the codebook is never mutated) → `preparing` → `synthesizing` →
    `verifying`. Stage is cleared on ready/failed/timeout. The watchdog budget
    grows with the cohort when auto-tag is on (300s + 30s/interview, cap 15 min).
+   **Live synthesis narration:** `_synthesize_response` takes an
+   `on_progress(section, output_tokens)` callback; it already streams from
+   Anthropic, so it watches the text deltas for each top-level report key
+   in schema order (`REPORT_SECTIONS`) and the throttled
+   `_progress_reporter` (≤1 commit / 2s, or on section change) persists
+   `stage_detail = {section, output_tokens}`. The UI shows "Writing the key
+   themes…" and partially fills the active bar segment. **Time disclaimer:**
+   GET analysis returns `elapsed_seconds` (server-side, reload-safe) and
+   `estimated_seconds` (median of the last 20 ready runs' created_at →
+   generated_at durations, rescaled to the cohort size; fallback 45s +
+   10s/interview); readiness returns `estimated_seconds` for the gate
+   modal. The UI shows "0:42 elapsed · usually about 1:30" plus "you can
+   leave this page, we'll email you" (the analysis-ready email already
+   fires on completion).
 3. Prompt evidence is **provenance-tiered**: Tier 1 = researcher-accepted tags
    (`_build_codebook_block`, "researcher-verified"), Tier 2 = pending AI
    suggestions (`_build_suggestion_block`, "machine-coded candidates, NOT yet

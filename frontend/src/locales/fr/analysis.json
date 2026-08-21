@@ -119,7 +119,8 @@
     "lowNBody_one": "Avec {{count}} entretien terminé, le résultat est une première lecture, pas des conclusions : un thème exige au moins deux participants et la confiance sera marquée anecdotique.",
     "lowNBody_other": "Avec {{count}} entretiens terminés, le résultat est une première lecture, pas des conclusions : un thème exige au moins deux participants et la confiance sera marquée anecdotique.",
     "runFirstRead": "Lancer quand même une première lecture",
-    "waitForMore": "Attendre plus d'entretiens"
+    "waitForMore": "Attendre plus d'entretiens",
+    "duration": "Prend généralement environ {{time}}. Vous pouvez quitter la page pendant l'analyse."
   },
   "failedTitle": "Nous n'avons pas pu terminer votre analyse",
   "failedTimeout": "L'analyse a expiré, votre jeu de données est peut-être trop volumineux. Essayez de filtrer un groupe plus restreint.",
@@ -215,5 +216,18 @@
   "screeningFilterLabel": "Question de screening",
   "smallSampleTitle": "Première lecture, pas des conclusions",
   "smallSampleBody_one": "Basée sur {{count}} entretien terminé. À cette taille, l'analyse est une lecture préliminaire et anecdotique : un thème exige au moins deux participants, et rien ici n'est validé. Collectez plus d'entretiens avant d'agir.",
-  "smallSampleBody_other": "Basée sur {{count}} entretiens terminés. À cette taille, l'analyse est une lecture préliminaire et anecdotique : un thème exige au moins deux participants, et rien ici n'est validé. Collectez plus d'entretiens avant d'agir."
+  "smallSampleBody_other": "Basée sur {{count}} entretiens terminés. À cette taille, l'analyse est une lecture préliminaire et anecdotique : un thème exige au moins deux participants, et rien ici n'est validé. Collectez plus d'entretiens avant d'agir.",
+  "sections": {
+    "summary": "Rédaction de la synthèse…",
+    "themes": "Rédaction des thèmes clés…",
+    "jobs_to_be_done": "Rédaction des jobs to be done…",
+    "tensions": "Rédaction des tensions…",
+    "recommendations": "Rédaction des recommandations…",
+    "personas": "Ébauche des personas…",
+    "journey": "Cartographie du parcours…",
+    "confidence": "Calibrage de la confiance…"
+  },
+  "elapsed": "{{time}} écoulées",
+  "usuallyTakes": "généralement environ {{time}}",
+  "canLeavePage": "Vous pouvez quitter cette page, nous vous enverrons un e-mail dès que c'est prêt."
 }

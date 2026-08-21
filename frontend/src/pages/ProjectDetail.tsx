@@ -240,6 +240,15 @@ export default function ProjectDetail() {
   // 4 steps once an auto-tag stage has been seen this run.
   const [gateReadiness, setGateReadiness] = useState<AnalysisReadiness | null>(null);
   const [runHadAutoTag, setRunHadAutoTag] = useState(false);
+  // Elapsed-time display: the server reports elapsed_seconds on every poll;
+  // between polls a 1s ticker advances it locally so the counter reads smoothly.
+  const analysisReceivedAtRef = useRef<number>(Date.now());
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => {
+    if (analysis?.status !== "generating") return;
+    const iv = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [analysis?.status]);
 
   // ── V4 paywall (unlock modal triggered by 402 from gated endpoints) ──
   const [unlockState, setUnlockState] = useState<{
@@ -535,6 +544,7 @@ export default function ProjectDetail() {
         setActiveFilterBy(ana.filters.filter_by);
         setActiveFilterValues(ana.filters.filter_values);
       }
+      analysisReceivedAtRef.current = Date.now();
       if (ana.status === "generating") startPolling();
       // Load annotations and context for the current analysis
       if (ana.analysis_id && ana.status === "ready") {
@@ -571,6 +581,7 @@ export default function ProjectDetail() {
         return;
       }
       setAnalysis(ana);
+      analysisReceivedAtRef.current = Date.now();
       // Remember that this run had an auto-tag stage so the progress bar
       // keeps showing 4 steps after the stage advances (survives reloads).
       if (ana.stage === "auto_tagging") setRunHadAutoTag(true);
@@ -642,7 +653,8 @@ export default function ProjectDetail() {
       throw err;
     }
     setRunHadAutoTag(autoTag);
-    setAnalysis((prev) => prev ? { ...prev, status: "generating", stage: autoTag ? "auto_tagging" : "preparing", stage_detail: null } : null);
+    analysisReceivedAtRef.current = Date.now();
+    setAnalysis((prev) => prev ? { ...prev, status: "generating", stage: autoTag ? "auto_tagging" : "preparing", stage_detail: null, elapsed_seconds: 0, estimated_seconds: gateReadiness?.estimated_seconds ?? prev.estimated_seconds ?? null } : null);
     startPolling();
   }
 
@@ -3882,13 +3894,29 @@ export default function ProjectDetail() {
                   : ["preparing", "synthesizing", "verifying"];
                 const idx = Math.max(0, stages.indexOf(stage));
                 const detail = analysis.stage_detail;
-                const label =
-                  stage === "auto_tagging" && detail?.total
-                    ? tAnalysis("stageAutoTaggingProgress", {
-                        done: Math.min((detail.done ?? 0) + 1, detail.total),
-                        total: detail.total,
-                      })
-                    : tAnalysis(`stages.${stage}`, { count: analysis.participant_count });
+                const SECTIONS = ["summary", "themes", "jobs_to_be_done", "tensions", "recommendations", "personas", "journey", "confidence"];
+                // Within-stage progress: auto-tagging counts interviews, synthesis
+                // walks the report sections as the model writes them.
+                let within = 0;
+                let label: string;
+                if (stage === "auto_tagging" && detail?.total) {
+                  within = (detail.done ?? 0) / detail.total;
+                  label = tAnalysis("stageAutoTaggingProgress", {
+                    done: Math.min((detail.done ?? 0) + 1, detail.total),
+                    total: detail.total,
+                  });
+                } else if (stage === "synthesizing" && detail?.section) {
+                  const si = SECTIONS.indexOf(detail.section);
+                  within = si >= 0 ? (si + 1) / SECTIONS.length : 0;
+                  label = tAnalysis(`sections.${detail.section}`);
+                } else {
+                  label = tAnalysis(`stages.${stage}`, { count: analysis.participant_count });
+                }
+                const elapsed =
+                  analysis.elapsed_seconds != null
+                    ? analysis.elapsed_seconds + Math.max(0, Math.floor((nowTick - analysisReceivedAtRef.current) / 1000))
+                    : null;
+                const fmt = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
                 return (
                   <div className="analysis-generating" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -3906,12 +3934,31 @@ export default function ProjectDetail() {
                             flex: 1,
                             height: 4,
                             borderRadius: 2,
-                            background:
-                              i < idx ? "var(--brand-500)" : i === idx ? "var(--brand-300)" : "var(--border-default)",
+                            overflow: "hidden",
+                            background: i < idx ? "var(--brand-500)" : "var(--border-default)",
                             transition: "background 0.4s",
                           }}
-                        />
+                        >
+                          {i === idx && (
+                            <div
+                              style={{
+                                width: `${Math.max(8, Math.round(within * 100))}%`,
+                                height: "100%",
+                                background: "var(--brand-400, var(--brand-500))",
+                                transition: "width 0.6s ease",
+                              }}
+                            />
+                          )}
+                        </div>
                       ))}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", fontSize: 12 }} className="muted-text">
+                      <span>
+                        {elapsed != null && tAnalysis("elapsed", { time: fmt(elapsed) })}
+                        {elapsed != null && analysis.estimated_seconds != null && " · "}
+                        {analysis.estimated_seconds != null && tAnalysis("usuallyTakes", { time: fmt(analysis.estimated_seconds) })}
+                      </span>
+                      <span>{tAnalysis("canLeavePage")}</span>
                     </div>
                   </div>
                 );
@@ -4568,6 +4615,13 @@ export default function ProjectDetail() {
             {gateUntagged && (
               <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
                 {tAnalysis("gate.body", { count: gateReadiness.completed_count })}
+              </p>
+            )}
+            {gateReadiness.estimated_seconds != null && (
+              <p className="muted-text" style={{ fontSize: 12, margin: "4px 0 0" }}>
+                {tAnalysis("gate.duration", {
+                  time: `${Math.floor(gateReadiness.estimated_seconds / 60)}:${String(gateReadiness.estimated_seconds % 60).padStart(2, "0")}`,
+                })}
               </p>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>

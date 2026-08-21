@@ -56,12 +56,12 @@ def _seed_project(db):
 
 def _patch_claude(monkeypatch, *, fail=False):
     if fail:
-        def _boom(prompt, effort="high"):
+        def _boom(prompt, effort="high", **kw):
             raise RuntimeError("claude down")
         monkeypatch.setattr(analysis_service, "_synthesize_response", _boom)
     else:
         monkeypatch.setattr(
-            analysis_service, "_synthesize_response", lambda prompt, effort="high": object()
+            analysis_service, "_synthesize_response", lambda prompt, effort="high", **kw: object()
         )
     monkeypatch.setattr(analysis_service, "_raise_on_bad_stop", lambda response: None)
     monkeypatch.setattr(analysis_service, "_parse_report", lambda response: dict(REPORT))
