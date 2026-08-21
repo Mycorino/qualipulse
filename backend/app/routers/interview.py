@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -958,26 +959,13 @@ async def respond_to_question(
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
     pending = turns[-1] if turns else None
 
-    def _turn_response(turn, *, transcript=None) -> TurnResponse:
-        return TurnResponse(
-            question_text=turn.question_text,
-            tts_audio_url=turn.tts_audio_url or "",
-            is_complete=participant.status == "completed",
-            is_follow_up=turn.is_follow_up or False,
-            question_index=turn.question_index or 0,
-            turn_index=turn.turn_index,
-            elapsed_seconds=0,
-            total_seconds=0,
-            transcript=transcript,
-        )
-
     # Already finished: replay the stored closing turn so a lost 200 (mobile
     # drop, client timeout) cannot strand the participant on a retry loop.
     # Returning 400 here left them tapping Submit against an error forever,
     # never reaching the completion screen.
     if participant.status == "completed":
         if pending is not None:
-            return _turn_response(pending, transcript=pending.response_transcript)
+            return _turn_response(participant, pending, transcript=pending.response_transcript)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Interview is already completed",
@@ -990,19 +978,19 @@ async def respond_to_question(
             # The server already processed this answer (the client timed out
             # and retried): replay the question that followed it instead of
             # accepting the blob against a question they never heard.
-            return _turn_response(following, transcript=answered.response_transcript)
+            return _turn_response(participant, following, transcript=answered.response_transcript)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "code": "turn_mismatch",
                 "message": "This answer is for an earlier question.",
-                "current": _turn_response(pending).model_dump(),
+                "current": _turn_response(participant, pending).model_dump(),
             },
         )
 
     # Deduplication: the pending turn already has a response (double submit).
     if pending is not None and pending.response_transcript:
-        return _turn_response(pending, transcript=pending.response_transcript)
+        return _turn_response(participant, pending, transcript=pending.response_transcript)
 
     if text is not None:
         # Accessibility text fallback — no STT, no transcode, no audio upload.
@@ -1037,6 +1025,8 @@ async def respond_to_question(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={"code": "empty_transcript", "message": str(e)},
             )
+        except IntegrityError:
+            return _recover_from_turn_race(db, participant)
     else:
         audio_data = await audio.read()
         ext = os.path.splitext(audio.filename or "recording.webm")[1] or ".webm"
@@ -1072,6 +1062,8 @@ async def respond_to_question(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={"code": "empty_transcript", "message": str(e)},
             )
+        except IntegrityError:
+            return _recover_from_turn_race(db, participant)
 
     # On completion, kick off an async ASR sense-check pass (Haiku) that fixes
     # obvious STT errors (proper nouns, domain terms) using study context. The
@@ -1138,7 +1130,10 @@ async def skip_question(
             },
         )
 
-    result = await run_in_threadpool(engine_skip_question, participant_id, db)
+    try:
+        result = await run_in_threadpool(engine_skip_question, participant_id, db)
+    except IntegrityError:
+        return _recover_from_turn_race(db, participant)
 
     if result["is_complete"]:
         _sync_panel_consent_to_participant(participant, db)
@@ -1173,7 +1168,10 @@ async def finish_interview_early(
     participant = _get_participant_or_404(participant_id, link, db)
     already_complete = participant.status == "completed"
 
-    result = await run_in_threadpool(engine_finish_interview, participant_id, db)
+    try:
+        result = await run_in_threadpool(engine_finish_interview, participant_id, db)
+    except IntegrityError:
+        return _recover_from_turn_race(db, participant)
 
     if not already_complete:
         _sync_panel_consent_to_participant(participant, db)
@@ -1286,6 +1284,45 @@ def _get_active_link_or_404(token: str, db: Session) -> InterviewLink:
             detail="Interview link not found or inactive",
         )
     return link
+
+
+def _turn_response(participant: Participant, turn: InterviewTurn, *, transcript: str | None = None) -> TurnResponse:
+    return TurnResponse(
+        question_text=turn.question_text,
+        tts_audio_url=turn.tts_audio_url or "",
+        is_complete=participant.status == "completed",
+        is_follow_up=turn.is_follow_up or False,
+        question_index=turn.question_index or 0,
+        turn_index=turn.turn_index,
+        elapsed_seconds=0,
+        total_seconds=0,
+        transcript=transcript,
+    )
+
+
+def _recover_from_turn_race(db: Session, participant: Participant) -> TurnResponse:
+    """Called after ``uq_turn_participant_index`` rejects a losing insert.
+
+    Two /respond (or /skip, /finish) calls for the same participant can pass
+    the router's own dedupe check and both reach the engine before either
+    commits (an HTTP retry racing the original, a proxy replay, two tabs).
+    The unique constraint on ``interview_turns(participant_id, turn_index)``
+    makes the second one fail fast at INSERT time instead of, at any point,
+    silently producing two turns at the same index. Recovery here mirrors
+    the ordinary dedupe path: roll back the loser's half-built transaction,
+    re-fetch what the winner actually committed, and hand the participant
+    that turn, exactly as if their own request had landed second.
+    """
+    db.rollback()
+    db.refresh(participant)
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    last = turns[-1]
+    # The pending turn itself has no transcript yet (it's the next question);
+    # what the participant actually said lives on the turn just before it,
+    # committed by whichever request won the race.
+    answered = turns[-2] if len(turns) > 1 else None
+    transcript = answered.response_transcript if answered else None
+    return _turn_response(participant, last, transcript=transcript)
 
 
 def _get_participant_or_404(

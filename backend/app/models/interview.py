@@ -216,6 +216,14 @@ class InterviewTurn(Base):
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
+    __table_args__ = (
+        # Two /respond (or /skip) calls for the same participant racing past
+        # the router's own dedupe check must never both succeed in inserting
+        # a turn: this makes the second insert fail fast with IntegrityError
+        # instead of, at any point, corrupting the turn sequence.
+        UniqueConstraint("participant_id", "turn_index", name="uq_turn_participant_index"),
+    )
+
     # Relationships
     participant = relationship("Participant", back_populates="turns")
     quote_tags = relationship("QuoteTag", back_populates="turn", cascade="all, delete-orphan")
