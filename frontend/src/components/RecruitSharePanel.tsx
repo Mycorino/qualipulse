@@ -1,9 +1,32 @@
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InterviewLink, ProjectResponse } from "../api/projects";
 import InvitePastParticipantsModal from "./InvitePastParticipantsModal";
 import { useToast } from "./Toast";
+
+/** Channel glyphs for the invitation cards (inline so no icon dep is needed). */
+const CHANNEL_ICONS: Record<string, ReactElement> = {
+  email: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+      <path d="m3 7 8.4 5.6a1.5 1.5 0 0 0 1.7 0L21.5 7" />
+    </svg>
+  ),
+  post: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 11v2a1 1 0 0 0 1 1h3l7 4.5V5.5L7 10H4a1 1 0 0 0-1 1Z" />
+      <path d="M18 9.5a4 4 0 0 1 0 5" />
+      <path d="M6.5 14.5 7.5 20" />
+    </svg>
+  ),
+  short: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.5 11.5a7.5 7.5 0 0 1-10.9 6.7L4 19.5l1.4-5.2A7.5 7.5 0 1 1 20.5 11.5Z" />
+      <path d="M9 11h6M9 14h4" />
+    </svg>
+  ),
+};
 
 /**
  * Setup-tab "Recruit & share" section — the publication step that closes the
@@ -132,21 +155,20 @@ export default function RecruitSharePanel({
           </p>
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {templates.map((tpl) => (
-              <div key={tpl.key} className="screening-card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <strong style={{ fontSize: 13 }}>{tpl.label}</strong>
-                <p
-                  className="muted-text"
-                  style={{ fontSize: 12.5, whiteSpace: "pre-wrap", margin: 0, flex: 1 }}
-                >
-                  {tpl.body}
-                </p>
-                <div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => void copy(tpl.key, tpl.body)}>
-                    {copiedKey === tpl.key
-                      ? t("recruit.copied", { defaultValue: "Copied ✓" })
-                      : t("recruit.copyTemplate", { defaultValue: "Copy text" })}
-                  </button>
+              <div key={tpl.key} className={`invite-card invite-card--${tpl.key}`}>
+                <div className="invite-card__header">
+                  <span className="invite-card__icon">{CHANNEL_ICONS[tpl.key]}</span>
+                  <strong className="invite-card__label">{tpl.label}</strong>
                 </div>
+                <p className="invite-card__body">{tpl.body}</p>
+                <button
+                  className="btn btn-ghost btn-sm invite-card__copy"
+                  onClick={() => void copy(tpl.key, tpl.body)}
+                >
+                  {copiedKey === tpl.key
+                    ? t("recruit.copied", { defaultValue: "Copied ✓" })
+                    : t("recruit.copyTemplate", { defaultValue: "Copy text" })}
+                </button>
               </div>
             ))}
           </div>

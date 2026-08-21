@@ -15317,3 +15317,84 @@ select.field-input {
   padding: 24px 16px;
   font-size: 14px;
 }
+
+/* ── Recruit & share: invitation template cards ───────────────────────────
+   One card per channel, tinted with that channel's own colour so the three
+   templates read as three different places to post rather than one wall of
+   grey. Long interview links inside the body wrap instead of spilling out
+   of the card. */
+.invite-card {
+  --invite-accent: var(--brand-600);
+  --invite-tint: var(--brand-50);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-top: 3px solid var(--invite-accent);
+  border-radius: var(--radius-md);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.invite-card:hover {
+  box-shadow: 0 2px 12px rgba(13, 15, 26, 0.07);
+  border-color: var(--border-strong);
+  border-top-color: var(--invite-accent);
+}
+
+.invite-card__header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.invite-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--invite-tint);
+  color: var(--invite-accent);
+}
+
+.invite-card__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.invite-card__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.invite-card__body {
+  flex: 1;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.invite-card__copy {
+  align-self: flex-start;
+  color: var(--invite-accent);
+  font-weight: 600;
+}
+
+.invite-card__copy:hover,
+.invite-card__copy:focus-visible {
+  background: var(--invite-tint);
+  color: var(--invite-accent);
+}
+
+.invite-card--email { --invite-accent: #2d53e8; --invite-tint: #e4eaff; }
+.invite-card--post  { --invite-accent: #0a66c2; --invite-tint: #e2eefa; }
+.invite-card--short { --invite-accent: #128c7e; --invite-tint: #dcf3ee; }
