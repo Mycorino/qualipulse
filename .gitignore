@@ -36,3 +36,7 @@ frontend/dist-ssr/
 .idea/
 auto_interview.db.bak-*
 .claude/worktrees/
+
+# Symlinked node_modules (worktree previews reuse the main checkout deps);
+# the trailing-slash pattern above does not match a symlink.
+frontend/node_modules

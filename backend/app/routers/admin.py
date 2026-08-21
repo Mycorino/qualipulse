@@ -1078,11 +1078,23 @@ def get_traffic(
         fallback="(direct)",
     )
 
-    top_sources = _buckets(
-        db.query(WebEvent.utm_source, func.count(func.distinct(WebEvent.visitor)))
+    # Each visitor is attributed to the channel on their FIRST event in the
+    # window, not counted once per channel they touched. Grouping by
+    # utm_source directly would put one person in both "(direct)" and
+    # "linkedin" if their session started before the campaign link, and the
+    # column would then sum to more than `visits` -- which reads as
+    # double-counted traffic to anyone using it to make a decision.
+    first_events = (
+        db.query(func.min(WebEvent.id).label("id"))
         .filter(WebEvent.created_at >= cutoff)
+        .group_by(WebEvent.visitor)
+        .subquery()
+    )
+    top_sources = _buckets(
+        db.query(WebEvent.utm_source, func.count(WebEvent.id))
+        .join(first_events, WebEvent.id == first_events.c.id)
         .group_by(WebEvent.utm_source)
-        .order_by(func.count(func.distinct(WebEvent.visitor)).desc())
+        .order_by(func.count(WebEvent.id).desc())
         .limit(10)
         .all(),
         fallback="(direct)",
