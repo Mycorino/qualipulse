@@ -23,9 +23,12 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.dependencies import get_db
 from app.limiter import limiter
+from app.models.web_event import WebEvent
 from app.services.analytics import emit_event
 
 logger = logging.getLogger("auto_interview.client")
@@ -163,8 +166,18 @@ class ClientEvent(BaseModel):
 
 @router.post("/event", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("60/minute")
-def report_client_event(request: Request, body: ClientEvent) -> None:
-    """Ingest one anonymous funnel event from the marketing site."""
+def report_client_event(
+    request: Request,
+    body: ClientEvent,
+    db: Session = Depends(get_db),
+) -> None:
+    """Ingest one anonymous funnel event from the marketing site.
+
+    Written twice on purpose: to the log stream (grep-able alongside the
+    server-side milestones, and the thing that works even if the DB is
+    down) and to ``web_events`` (permanent, aggregated by the admin
+    Traffic tab, where Cloud Logging would have dropped it after 30 days).
+    """
     if body.event not in _ALLOWED_EVENTS:
         return
 
@@ -177,15 +190,22 @@ def report_client_event(request: Request, body: ClientEvent) -> None:
         # Authenticated deep link: keep the event, drop the identifiers.
         path = "/redacted"
 
-    emit_event(
-        body.event,
-        source="web",
-        visitor=_visitor_hash(request),
-        path=path,
-        location=_clean(body.location, 64),
-        referrer=_clean(body.referrer, 300),
-        utm_source=_clean(body.utm_source, 100),
-        utm_medium=_clean(body.utm_medium, 100),
-        utm_campaign=_clean(body.utm_campaign, 100),
-        lang=_clean(body.lang, 5),
-    )
+    fields = {
+        "visitor": _visitor_hash(request),
+        "path": path,
+        "location": _clean(body.location, 64),
+        "referrer": _clean(body.referrer, 300),
+        "utm_source": _clean(body.utm_source, 100),
+        "utm_medium": _clean(body.utm_medium, 100),
+        "utm_campaign": _clean(body.utm_campaign, 100),
+        "lang": _clean(body.lang, 5),
+    }
+
+    emit_event(body.event, source="web", **fields)
+
+    try:
+        db.add(WebEvent(event=body.event, **fields))
+        db.commit()
+    except Exception:  # noqa: BLE001 — analytics must never break a page.
+        db.rollback()
+        logger.exception("web_event persist failed")

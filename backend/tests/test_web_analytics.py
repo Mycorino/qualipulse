@@ -10,7 +10,9 @@ import logging
 
 import pytest
 
+from app.config import settings
 from app.models.company import Company
+from app.models.web_event import WebEvent
 
 
 def _post_event(client, **payload):
@@ -147,3 +149,68 @@ def _analytics_line(caplog) -> str:
     lines = _analytics_lines(caplog)
     assert lines, "expected an analytics log line"
     return lines[-1]
+
+
+ADMIN_KEY = "test-admin-secret-key"
+
+
+@pytest.fixture
+def admin_headers():
+    prev = settings.ADMIN_SECRET_KEY
+    settings.ADMIN_SECRET_KEY = ADMIN_KEY
+    try:
+        yield {"Authorization": f"Bearer {ADMIN_KEY}", "X-Admin-Identity": "test-admin"}
+    finally:
+        settings.ADMIN_SECRET_KEY = prev
+
+
+class TestEventPersistence:
+    def test_event_is_stored_for_the_admin_dashboard(self, client, db_session):
+        _post_event(client, event="page_view", path="/", utm_source="linkedin")
+        row = db_session.query(WebEvent).one()
+        assert row.event == "page_view"
+        assert row.path == "/"
+        assert row.utm_source == "linkedin"
+        assert row.visitor  # anonymous hash, always present
+
+    def test_dropped_events_are_not_stored(self, client, db_session):
+        _post_event(client, event="totally_made_up")
+        assert db_session.query(WebEvent).count() == 0
+
+
+class TestAdminTraffic:
+    def test_rollup_counts_the_funnel(self, client, db_session, admin_headers):
+        for _ in range(4):
+            _post_event(client, event="page_view", path="/", utm_source="linkedin")
+        _post_event(client, event="cta_signup_click", location="hero", utm_source="linkedin")
+        _post_event(client, event="pricing_viewed", utm_source="linkedin")
+        client.post(
+            "/auth/signup",
+            json={
+                "name": "Funnel Co",
+                "email": "funnel@example.com",
+                "password": "Testpass123",
+                "utm_source": "linkedin",
+            },
+        )
+
+        res = client.get("/admin/traffic?days=30", headers=admin_headers)
+        assert res.status_code == 200
+        body = res.json()
+
+        assert body["page_views"] == 4
+        assert body["cta_clicks"] == 1
+        assert body["pricing_views"] == 1
+        assert body["signups"] == 1
+        assert body["signup_rate_pct"] == 25.0
+        assert {"label": "hero", "count": 1} in body["cta_by_location"]
+        assert {"label": "linkedin", "count": 1} in body["signups_by_source"]
+        assert body["daily"]
+
+    def test_zero_traffic_does_not_divide_by_zero(self, client, admin_headers):
+        res = client.get("/admin/traffic?days=7", headers=admin_headers)
+        assert res.status_code == 200
+        assert res.json()["signup_rate_pct"] == 0.0
+
+    def test_requires_admin_key(self, client):
+        assert client.get("/admin/traffic").status_code == 403

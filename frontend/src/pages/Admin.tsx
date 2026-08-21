@@ -96,6 +96,29 @@ interface CompanyCost {
   interview_count: number;
 }
 
+interface TrafficBucket {
+  label: string;
+  count: number;
+}
+
+interface AdminTraffic {
+  days: number;
+  page_views: number;
+  /** Visits, not people: the visitor hash rotates daily by design. */
+  visits: number;
+  cta_clicks: number;
+  pricing_views: number;
+  signups: number;
+  signup_rate_pct: number;
+  cta_by_location: TrafficBucket[];
+  top_paths: TrafficBucket[];
+  top_referrers: TrafficBucket[];
+  top_sources: TrafficBucket[];
+  signups_by_source: TrafficBucket[];
+  paid_by_source: TrafficBucket[];
+  daily: { date: string; page_views: number; signups: number }[];
+}
+
 interface CostsReport {
   total_cost_usd: number;
   this_month_usd: number;
@@ -270,7 +293,7 @@ export default function Admin() {
 
   const [costs, setCosts] = useState<CostsReport | null>(null);
 
-  const [tab, setTab] = useState<"users" | "affiliates" | "blog" | "audit" | "panel">("users");
+  const [tab, setTab] = useState<"users" | "traffic" | "affiliates" | "blog" | "audit" | "panel">("users");
   // Panel / consumer-account deletion (GDPR erasure + testing reset).
   const [panelEmail, setPanelEmail] = useState("");
   const [panelIncludeInterviews, setPanelIncludeInterviews] = useState(false);
@@ -386,6 +409,24 @@ export default function Admin() {
     return () => clearTimeout(handle);
   }, [searchInput]);
 
+  const [traffic, setTraffic] = useState<AdminTraffic | null>(null);
+  const [trafficDays, setTrafficDays] = useState(30);
+  const [trafficLoading, setTrafficLoading] = useState(false);
+
+  const loadTraffic = useCallback(async () => {
+    setTrafficLoading(true);
+    try {
+      const res = await client().get<AdminTraffic>("/admin/traffic", {
+        params: { days: trafficDays },
+      });
+      setTraffic(res.data);
+    } catch {
+      setError("Failed to load traffic");
+    } finally {
+      setTrafficLoading(false);
+    }
+  }, [client, trafficDays]);
+
   const loadStats = useCallback(async () => {
     try {
       const res = await client().get<AdminStats>("/admin/stats");
@@ -441,10 +482,12 @@ export default function Admin() {
         loadAffiliates();
       } else if (tab === "audit") {
         loadAuditLog(1);
+      } else if (tab === "traffic") {
+        loadTraffic();
       }
       loadStats();
     }
-  }, [authed, search, tierFilter, userPage, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authed, search, tierFilter, userPage, tab, trafficDays]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Silent affiliate fetch on auth so the pending-application badge shows
   // without opening the tab
@@ -1025,6 +1068,21 @@ export default function Admin() {
             }}
           >
             {t("tabs.users")}
+          </button>
+          <button
+            onClick={() => setTab("traffic")}
+            style={{
+              padding: "12px 0",
+              border: "none",
+              background: "none",
+              borderBottom: tab === "traffic" ? "2px solid var(--primary)" : "none",
+              color: tab === "traffic" ? "var(--primary)" : "var(--text-secondary)",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: tab === "traffic" ? 600 : 500,
+            }}
+          >
+            {t("tabs.traffic", "Traffic")}
           </button>
           <button
             onClick={() => setTab("affiliates")}
@@ -2058,6 +2116,119 @@ export default function Admin() {
           </div>
         )}
 
+        {/* Traffic tab */}
+        {tab === "traffic" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
+                {t("traffic.title", "Marketing funnel")}
+              </h2>
+              <select
+                value={trafficDays}
+                onChange={(e) => setTrafficDays(Number(e.target.value))}
+                style={{
+                  padding: "6px 10px",
+                  fontSize: 13,
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-xs)",
+                  background: "var(--bg-surface)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <option value={7}>{t("traffic.days7", "Last 7 days")}</option>
+                <option value={30}>{t("traffic.days30", "Last 30 days")}</option>
+                <option value={90}>{t("traffic.days90", "Last 90 days")}</option>
+              </select>
+              {trafficLoading && (
+                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                  {t("traffic.loading", "Loading…")}
+                </span>
+              )}
+            </div>
+
+            {traffic && traffic.page_views === 0 && (
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.5,
+                  marginBottom: 20,
+                  padding: "10px 12px",
+                  background: "var(--bg-subtle, #f8fafc)",
+                  borderRadius: "var(--radius-xs)",
+                }}
+              >
+                {t(
+                  "traffic.empty",
+                  "No pageviews recorded yet. Events start landing once the analytics build is deployed and someone visits the marketing site."
+                )}
+              </p>
+            )}
+
+            {traffic && (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                    gap: 12,
+                    marginBottom: 28,
+                  }}
+                >
+                  <TrafficTile label={t("traffic.pageViews", "Pageviews")} value={traffic.page_views} />
+                  <TrafficTile
+                    label={t("traffic.visits", "Visits")}
+                    value={traffic.visits}
+                    hint={t("traffic.visitsHint", "Not unique people: the visitor hash rotates daily.")}
+                  />
+                  <TrafficTile label={t("traffic.pricingViews", "Pricing viewed")} value={traffic.pricing_views} />
+                  <TrafficTile label={t("traffic.ctaClicks", "Signup CTA clicks")} value={traffic.cta_clicks} />
+                  <TrafficTile label={t("traffic.signups", "Signups")} value={traffic.signups} />
+                  <TrafficTile
+                    label={t("traffic.conversion", "Signup rate")}
+                    value={`${traffic.signup_rate_pct}%`}
+                    highlight
+                  />
+                </div>
+
+                {traffic.daily.length > 0 && <TrafficSparkline daily={traffic.daily} />}
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                    gap: 24,
+                    marginTop: 28,
+                  }}
+                >
+                  <BucketTable
+                    title={t("traffic.byCta", "Which CTA earns the click")}
+                    rows={traffic.cta_by_location}
+                  />
+                  <BucketTable
+                    title={t("traffic.bySource", "Visits by channel")}
+                    rows={traffic.top_sources}
+                  />
+                  <BucketTable
+                    title={t("traffic.signupsBySource", "Signups by channel")}
+                    rows={traffic.signups_by_source}
+                  />
+                  <BucketTable
+                    title={t("traffic.paidBySource", "Paying customers by channel")}
+                    rows={traffic.paid_by_source}
+                    note={t("traffic.paidNote", "All time, not windowed: first touch keeps its credit however long the deal takes.")}
+                  />
+                  <BucketTable
+                    title={t("traffic.topReferrers", "Top referrers")}
+                    rows={traffic.top_referrers}
+                  />
+                  <BucketTable title={t("traffic.topPaths", "Top pages")} rows={traffic.top_paths} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
       {/* Suspend dialog */}
       {suspendDialog && (
         <div
@@ -2401,6 +2572,139 @@ export default function Admin() {
           onConfirm={() => handleDelete(confirmDelete)}
           onCancel={() => setConfirmDelete(null)}
         />
+      )}
+    </div>
+  );
+}
+
+/* ---- Traffic tab presentation ---- */
+
+function TrafficTile({
+  label,
+  value,
+  hint,
+  highlight,
+}: {
+  label: string;
+  value: number | string;
+  hint?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        border: `1px solid ${highlight ? "var(--primary)" : "var(--border)"}`,
+        borderRadius: "var(--radius-sm, 8px)",
+        padding: "14px 16px",
+        background: "var(--bg-surface)",
+      }}
+      title={hint}
+    >
+      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{label}</div>
+      <div
+        style={{
+          fontSize: 24,
+          fontWeight: 600,
+          color: highlight ? "var(--primary)" : "var(--text-primary)",
+        }}
+      >
+        {typeof value === "number" ? value.toLocaleString() : value}
+      </div>
+    </div>
+  );
+}
+
+/** Pageviews and signups per day, as bars. Deliberately dependency-free. */
+function TrafficSparkline({
+  daily,
+}: {
+  daily: { date: string; page_views: number; signups: number }[];
+}) {
+  const peak = Math.max(1, ...daily.map((d) => d.page_views));
+  return (
+    <div
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-sm, 8px)",
+        padding: "16px",
+        background: "var(--bg-surface)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 100 }}>
+        {daily.map((d) => (
+          <div
+            key={d.date}
+            title={`${d.date}: ${d.page_views} views, ${d.signups} signups`}
+            style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 2 }}
+          >
+            {d.signups > 0 && (
+              <div
+                style={{
+                  height: Math.max(3, (d.signups / peak) * 100),
+                  background: "var(--primary)",
+                  borderRadius: "2px 2px 0 0",
+                }}
+              />
+            )}
+            <div
+              style={{
+                height: Math.max(2, (d.page_views / peak) * 100),
+                background: "var(--border)",
+                borderRadius: d.signups > 0 ? 0 : "2px 2px 0 0",
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11, color: "var(--text-secondary)" }}>
+        <span>{daily[0]?.date}</span>
+        <span>Pageviews (grey) · signups (blue)</span>
+        <span>{daily[daily.length - 1]?.date}</span>
+      </div>
+    </div>
+  );
+}
+
+function BucketTable({
+  title,
+  rows,
+  note,
+}: {
+  title: string;
+  rows: { label: string; count: number }[];
+  note?: string;
+}) {
+  const total = rows.reduce((sum, r) => sum + r.count, 0);
+  return (
+    <div>
+      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</h3>
+      {note && (
+        <p style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.4, marginBottom: 8 }}>
+          {note}
+        </p>
+      )}
+      {rows.length === 0 ? (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>-</p>
+      ) : (
+        <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label} style={{ borderBottom: "1px solid var(--border)" }}>
+                <td style={{ padding: "6px 0", color: "var(--text-primary)", wordBreak: "break-all" }}>
+                  {r.label}
+                </td>
+                <td style={{ padding: "6px 0", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>
+                  {r.count.toLocaleString()}
+                  {total > 0 && (
+                    <span style={{ color: "var(--text-secondary)", fontWeight: 400, marginLeft: 6 }}>
+                      {Math.round((r.count / total) * 100)}%
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );
