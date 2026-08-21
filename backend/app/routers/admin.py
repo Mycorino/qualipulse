@@ -32,6 +32,7 @@ from app.models.memo import ProjectMemo
 from app.models.panel import PanelAnswer, PanelProfile, ParticipantMagicToken
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
 from app.models.usage import AIUsageLog
+from app.models.web_event import WebEvent
 from app.services.deletion import delete_company_data
 from app.services.storage import delete_audio_by_url
 
@@ -146,6 +147,40 @@ class AdminStats(BaseModel):
     total_interviews_completed: int
     signups_last_7_days: int
     signups_last_30_days: int
+
+
+class TrafficBucket(BaseModel):
+    label: str
+    count: int
+
+
+class TrafficDay(BaseModel):
+    date: str
+    page_views: int
+    signups: int
+
+
+class AdminTraffic(BaseModel):
+    """Marketing-funnel rollup for the admin Traffic tab."""
+
+    days: int
+    page_views: int
+    # NOT unique people: the visitor hash rotates daily by design, so a
+    # returning visitor counts once per day. Same definition as
+    # Cloudflare's "visits".
+    visits: int
+    cta_clicks: int
+    pricing_views: int
+    signups: int
+    # The number this whole feature exists to produce.
+    signup_rate_pct: float
+    cta_by_location: list[TrafficBucket]
+    top_paths: list[TrafficBucket]
+    top_referrers: list[TrafficBucket]
+    top_sources: list[TrafficBucket]
+    signups_by_source: list[TrafficBucket]
+    paid_by_source: list[TrafficBucket]
+    daily: list[TrafficDay]
 
 
 class AuditLogEntry(BaseModel):
@@ -958,4 +993,159 @@ def get_stats(
         total_interviews_completed=total_interviews_completed,
         signups_last_7_days=signups_last_7_days,
         signups_last_30_days=signups_last_30_days,
+    )
+
+
+def _buckets(rows, *, fallback: str = "(none)", limit: int | None = None) -> list[TrafficBucket]:
+    """Turn (label, count) rows into buckets, naming the null group."""
+    out = [
+        TrafficBucket(label=(label or fallback), count=int(count or 0))
+        for label, count in rows
+    ]
+    return out[:limit] if limit else out
+
+
+@router.get("/traffic", response_model=AdminTraffic)
+@limiter.limit("60/minute")
+def get_traffic(
+    request: Request,
+    days: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin),
+) -> AdminTraffic:
+    """Marketing-funnel rollup: traffic in, signups out, by channel.
+
+    Reads ``web_events`` (anonymous, written by /telemetry/event) and
+    joins nothing: the conversion side comes from Company rows, which
+    already carry first-touch utm_* since Alembic 0064.
+    """
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    def _count(event: str) -> int:
+        return (
+            db.query(func.count(WebEvent.id))
+            .filter(WebEvent.event == event, WebEvent.created_at >= cutoff)
+            .scalar()
+            or 0
+        )
+
+    page_views = _count("page_view")
+    cta_clicks = _count("cta_signup_click")
+    pricing_views = _count("pricing_viewed")
+
+    visits = (
+        db.query(func.count(func.distinct(WebEvent.visitor)))
+        .filter(WebEvent.created_at >= cutoff)
+        .scalar()
+        or 0
+    )
+
+    signups = (
+        db.query(func.count(Company.id))
+        .filter(Company.created_at >= cutoff)
+        .scalar()
+        or 0
+    )
+
+    cta_by_location = _buckets(
+        db.query(WebEvent.location, func.count(WebEvent.id))
+        .filter(WebEvent.event == "cta_signup_click", WebEvent.created_at >= cutoff)
+        .group_by(WebEvent.location)
+        .order_by(func.count(WebEvent.id).desc())
+        .all()
+    )
+
+    top_paths = _buckets(
+        db.query(WebEvent.path, func.count(WebEvent.id))
+        .filter(WebEvent.event == "page_view", WebEvent.created_at >= cutoff)
+        .group_by(WebEvent.path)
+        .order_by(func.count(WebEvent.id).desc())
+        .limit(10)
+        .all()
+    )
+
+    top_referrers = _buckets(
+        db.query(WebEvent.referrer, func.count(WebEvent.id))
+        .filter(
+            WebEvent.event == "page_view",
+            WebEvent.created_at >= cutoff,
+            WebEvent.referrer.isnot(None),
+        )
+        .group_by(WebEvent.referrer)
+        .order_by(func.count(WebEvent.id).desc())
+        .limit(10)
+        .all(),
+        fallback="(direct)",
+    )
+
+    top_sources = _buckets(
+        db.query(WebEvent.utm_source, func.count(func.distinct(WebEvent.visitor)))
+        .filter(WebEvent.created_at >= cutoff)
+        .group_by(WebEvent.utm_source)
+        .order_by(func.count(func.distinct(WebEvent.visitor)).desc())
+        .limit(10)
+        .all(),
+        fallback="(direct)",
+    )
+
+    signups_by_source = _buckets(
+        db.query(Company.utm_source, func.count(Company.id))
+        .filter(Company.created_at >= cutoff)
+        .group_by(Company.utm_source)
+        .order_by(func.count(Company.id).desc())
+        .limit(10)
+        .all(),
+        fallback="(direct)",
+    )
+
+    # Deliberately NOT windowed: the point of first-touch attribution is
+    # that a customer who signed up in March and paid in June still credits
+    # March's channel. Filtering paid conversions by a 30-day window would
+    # throw away exactly the answer we built this for.
+    paid_by_source = _buckets(
+        db.query(Company.utm_source, func.count(Company.id))
+        .filter(Company.has_ever_paid.is_(True))
+        .group_by(Company.utm_source)
+        .order_by(func.count(Company.id).desc())
+        .limit(10)
+        .all(),
+        fallback="(direct)",
+    )
+
+    views_by_day = dict(
+        db.query(func.date(WebEvent.created_at), func.count(WebEvent.id))
+        .filter(WebEvent.event == "page_view", WebEvent.created_at >= cutoff)
+        .group_by(func.date(WebEvent.created_at))
+        .all()
+    )
+    signups_by_day = dict(
+        db.query(func.date(Company.created_at), func.count(Company.id))
+        .filter(Company.created_at >= cutoff)
+        .group_by(func.date(Company.created_at))
+        .all()
+    )
+    daily = [
+        TrafficDay(
+            date=str(day),
+            page_views=int(views_by_day.get(day, 0)),
+            signups=int(signups_by_day.get(day, 0)),
+        )
+        for day in sorted(set(views_by_day) | set(signups_by_day))
+    ]
+
+    return AdminTraffic(
+        days=days,
+        page_views=page_views,
+        visits=visits,
+        cta_clicks=cta_clicks,
+        pricing_views=pricing_views,
+        signups=signups,
+        signup_rate_pct=round(100 * signups / page_views, 2) if page_views else 0.0,
+        cta_by_location=cta_by_location,
+        top_paths=top_paths,
+        top_referrers=top_referrers,
+        top_sources=top_sources,
+        signups_by_source=signups_by_source,
+        paid_by_source=paid_by_source,
+        daily=daily,
     )

@@ -697,9 +697,29 @@ it reaches a log line. Without that, a caller could smuggle a second
 `_fmt` in `analytics.py` strips newlines unconditionally for the same
 reason.
 
-**Reading the data.** `gcloud logging read` for now; the natural next step
-is a log sink to BigQuery, since Cloud Logging retention is 30 days by
-default.
+**Storage is deliberately doubled up.** Every accepted event is written
+to the log stream *and* to the `web_events` table. The log line is the
+resilient path (works with the DB down, greppable next to the
+server-side milestones); the table is the durable one, since Cloud
+Logging drops these after 30 days while the rollup needs months to
+answer "did March's channel convert by June?". At marketing-site volume
+the table is a few thousand rows a month, which is nothing.
+
+**Reading the data.** Three ways, in descending order of convenience:
+
+1. **Admin panel → Traffic tab** (`GET /admin/traffic?days=`). Pageviews,
+   visits, pricing views, CTA clicks, signups, and the signup rate, plus
+   breakdowns by CTA location, channel, referrer, and page. Note
+   `paid_by_source` is deliberately **not** windowed: first-touch
+   attribution exists precisely so a customer who signed up in March and
+   paid in June still credits March's channel.
+2. **Cloudflare Web Analytics** for raw traffic volume and Web Vitals.
+3. **`gcloud logging read`** for anything ad hoc.
+
+`deploy/setup-analytics-sink.sh` sets up a BigQuery sink with a parsed
+SQL view over the raw log table. It is written but **not run**: the
+`web_events` table already solves retention at this scale. Run it if
+event volume outgrows Postgres or you need warehouse joins.
 
 **Cloudflare Web Analytics (optional, free).** The CSP in
 `frontend/nginx.conf.template` + `nginx.conf` already allows
@@ -1309,6 +1329,9 @@ Per-participant analogue of EmailSendLog for participant-facing lifecycle emails
 ### BlogPost
 `id` (str), `slug` (unique, indexed), `title`, `subtitle`, `content` (HTML from TipTap), `excerpt`, `cover_image_url`, `meta_title`, `meta_description`, `og_image_url`, `author_name`, `tags` (JSON text), `status` (draft/published, indexed), `published_at`, `created_at`, `updated_at`
 
+### WebEvent
+`id` (int), `event` (indexed), `location` (which CTA fired it), `path`, `visitor` (daily-rotating anonymous hash, indexed), `referrer`, `utm_source` (indexed), `utm_medium`, `utm_campaign`, `lang`, `created_at` (indexed). Composite index on `(event, created_at)` since every admin-traffic query is "this event, over this window". Written by `POST /telemetry/event`; read by `GET /admin/traffic`. Contains nothing that identifies a person. Alembic 0066.
+
 ### Plan (credits-based billing)
 `id` (str PK, eg. `team`, `legacy_starter`), `public_name`, `description`, `is_public`, `is_legacy`, `is_custom`, `monthly_price_cents`, `annual_price_cents`, `currency`, `included_credits`, `credit_period` (`trial_total` | `monthly` | `annual` | `custom` | `legacy_none`), `max_editors`, `max_viewers`, `overage_price_cents`, `overage_enabled_default`, `stripe_monthly_price_id`, `stripe_annual_price_id`, `sort_order`, `created_at`, `updated_at`
 
@@ -1508,6 +1531,7 @@ All copilot POST endpoints return **SSE** (`text/event-stream`) — events `stat
 | DELETE | `/admin/users/{company_id}` | X-Admin-Key | Delete user & cascade all data |
 | GET | `/admin/stats` | X-Admin-Key | Platform stats (users, tiers, interviews, signups) |
 | GET | `/admin/costs` | X-Admin-Key | Platform-wide AI cost report |
+| GET | `/admin/traffic` | X-Admin-Key | Marketing-funnel rollup (`?days=`): traffic, CTA clicks, signups, signup rate, per-channel breakdowns |
 | GET | `/admin/costs/company/{company_id}` | X-Admin-Key | Per-company cost breakdown |
 | POST | `/admin/scheduled-emails/run` | X-Admin-Key | Run the lifecycle-email cron pass (Day-1, Day-7, Day-12). Supports `?dry_run=true`. Idempotent via `email_send_log` unique constraint. Hit hourly by Cloud Scheduler. Returns per-event sent/skipped counts. |
 | POST | `/admin/retention/run` | X-Admin-Key | Purge participant audio for interviews completed > `RETENTION_AUDIO_DAYS` days ago (0=disabled). `?dry_run=true`, `?days=` override. Transcripts kept; URLs nulled after file deletion. |
