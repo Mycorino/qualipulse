@@ -5,6 +5,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
+# .dockerignore excludes node_modules from the build context so nothing
+# committed at frontend/node_modules (it has happened: a symlink meant only
+# for local worktree previews was tracked by git once) can clobber the
+# node_modules npm ci just installed and silently break the build.
 COPY . .
 RUN npm run build
 
