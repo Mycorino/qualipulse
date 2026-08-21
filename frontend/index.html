@@ -31,6 +31,19 @@
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://app.qualipulse.com/og-image.png" />
+    <!-- Cloudflare Web Analytics: cookieless pageview / referrer / country
+         measurement, free tier. No cookie and no cross-site identifier, so
+         it needs no consent banner. Allowed in the CSP (script-src +
+         connect-src) in frontend/nginx.conf{,.template}. The token is a
+         public site id, not a secret. CTA clicks and utm-to-paid
+         attribution do NOT go through this: those are first-party events
+         POSTed to /api/telemetry/event. -->
+    <script
+      type="module"
+      defer
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+      data-cf-beacon='{"token": "c4dc5a8660a84a8fbfb1a3f194d0f3f6"}'
+    ></script>
   </head>
   <body>
     <div id="root"></div>
