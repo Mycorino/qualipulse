@@ -5,6 +5,8 @@ corrupt data: a client that times out, retries, and has its answer accepted
 against a question the participant never heard.
 """
 
+import pytest
+
 from app.models.company import Company
 from app.models.interview import InterviewLink, InterviewTurn, Participant
 from app.models.project import InterviewGuideQuestion, Project
@@ -290,3 +292,89 @@ def test_completed_interview_replays_instead_of_400(client, db_session):
     body = r.json()
     assert body["is_complete"] is True
     assert body["question_text"] == "That wraps it up, thank you!"
+
+
+# ── turn-race recovery (replaces the row lock removed after a production hang) ──
+
+def test_unique_constraint_rejects_duplicate_turn_index(db_session):
+    """The DB itself, not application locking, is now the source of truth
+    that two turns can never share an index for one participant."""
+    from sqlalchemy.exc import IntegrityError
+
+    link, participant = _seed(db_session, token="tok-uniq")
+    db_session.add(
+        InterviewTurn(participant_id=participant.id, turn_index=0, question_index=0, question_text="Q one?")
+    )
+    db_session.commit()
+
+    db_session.add(
+        InterviewTurn(participant_id=participant.id, turn_index=0, question_index=0, question_text="Duplicate")
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_respond_recovers_when_a_race_loses_the_insert(client, db_session, monkeypatch):
+    """Two racing /respond calls for the same participant: the loser must
+    replay the winner's turn, not 500. Simulates the race by having the
+    already-answered turn's ID collide with what process_interview_turn is
+    about to insert (mirroring what really happens when two threads compute
+    the same next turn_index and one wins the commit)."""
+    from sqlalchemy.exc import IntegrityError
+    from app.routers import interview as interview_router
+
+    link, participant = _seed(db_session, token="tok-race")
+    db_session.add(
+        InterviewTurn(
+            participant_id=participant.id, turn_index=0, question_index=0,
+            question_text="Q one?", response_transcript="the winner's answer",
+        )
+    )
+    # The winner already advanced to turn 1.
+    db_session.add(
+        InterviewTurn(
+            participant_id=participant.id, turn_index=1, question_index=1,
+            question_text="Q two?", tts_audio_url="http://x/q2.mp3",
+        )
+    )
+    db_session.commit()
+
+    monkeypatch.setattr(interview_router, "upload_audio", lambda data, key: "http://x/a.mp3")
+    monkeypatch.setattr(interview_router, "needs_transcode", lambda ext: False)
+
+    def _boom(pid, key, url, db, *a, **k):
+        raise IntegrityError("insert", {}, Exception("uq_turn_participant_index"))
+
+    monkeypatch.setattr(interview_router, "process_interview_turn", _boom)
+
+    r = client.post(
+        f"/interview/{link.token}/{participant.id}/respond",
+        files={"audio": ("recording.webm", b"0" * 1000, "audio/webm")},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["question_text"] == "Q two?"
+    assert body["turn_index"] == 1
+    assert body["transcript"] == "the winner's answer"
+
+
+def test_skip_recovers_when_a_race_loses_the_insert(client, db_session, monkeypatch):
+    from sqlalchemy.exc import IntegrityError
+    from app.routers import interview as interview_router
+
+    link, participant = _seed(db_session, token="tok-race-skip")
+    db_session.add_all([
+        InterviewTurn(participant_id=participant.id, turn_index=0, question_index=0, question_text="Q one?", response_transcript="[Skipped]"),
+        InterviewTurn(participant_id=participant.id, turn_index=1, question_index=1, question_text="Q two?"),
+    ])
+    db_session.commit()
+
+    def _boom(pid, db):
+        raise IntegrityError("insert", {}, Exception("uq_turn_participant_index"))
+
+    monkeypatch.setattr(interview_router, "engine_skip_question", _boom)
+
+    r = client.post(f"/interview/{link.token}/{participant.id}/skip")
+    assert r.status_code == 200, r.text
+    assert r.json()["question_text"] == "Q two?"

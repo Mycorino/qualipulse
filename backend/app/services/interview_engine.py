@@ -1438,26 +1438,31 @@ def start_interview(participant_id: str, db: Session) -> dict:
 
 
 def _lock_participant(db: Session, participant_id: str):
-    """Fetch the participant, serialising concurrent turns for that person.
+    """Fetch the participant for this turn.
 
     Two overlapping /respond calls (an HTTP retry, a second tab, a proxy
-    replay) would otherwise both see the same unanswered pending turn, both
+    replay) could otherwise both see the same unanswered pending turn, both
     transcribe, and both append a turn at ``turns[-1].turn_index + 1``,
     producing two turns sharing an index. This used to be masked by the
     handler being ``async def`` with a blocking body, which accidentally
-    serialised every request on the event loop; moving the work to a
-    threadpool removed that side effect, so take the lock explicitly.
+    serialised every request on the event loop.
 
-    SQLite has no row locks (and is single-writer anyway), so the clause is
-    only emitted on Postgres.
+    A prior version of this function closed that gap with a per-participant
+    ``SELECT ... FOR UPDATE``. In production that hung a genuine /respond
+    call for the full 300s Cloud Run request timeout with zero forward
+    progress (no Whisper/Claude/TTS call was ever even attempted): Neon's
+    serverless Postgres has no ``lock_timeout`` set, so any contention on
+    that lock blocks indefinitely instead of failing fast, and the
+    participant is left staring at a spinner for five minutes. An unbounded
+    wait on the request path is unacceptable regardless of what exactly
+    triggers the contention, so the protection now lives entirely in the
+    ``uq_turn_participant_index`` unique constraint (Alembic 0068) instead:
+    a genuine race loses at INSERT time with an immediate, catchable
+    IntegrityError, which the router recovers from by replaying the
+    winner's turn (see ``_recover_from_turn_race`` in routers/interview.py).
+    This function is a plain read; it never blocks.
     """
-    query = db.query(Participant).filter(Participant.id == participant_id)
-    try:
-        if db.get_bind().dialect.name == "postgresql":
-            query = query.with_for_update()
-    except Exception:  # pragma: no cover - defensive, bind always resolves
-        pass
-    return query.first()
+    return db.query(Participant).filter(Participant.id == participant_id).first()
 
 
 def _stt_glossary(project) -> str:
