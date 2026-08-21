@@ -163,6 +163,14 @@ def _normalise_lang(lang: Optional[str]) -> str:
 # All translated copy lives here so we can see both languages side-by-side.
 # Keys correspond 1:1 to the template helpers below.
 _COPY: dict[str, dict[str, dict[str, str]]] = {
+    "unsubscribe_footer": {
+        "en": {"cta": "Unsubscribe from research invitations"},
+        "fr": {"cta": "Se désabonner des invitations à des études"},
+        "de": {"cta": "Keine Studieneinladungen mehr erhalten"},
+        "es": {"cta": "Cancelar la suscripción a invitaciones de estudios"},
+        "it": {"cta": "Annulla l'iscrizione agli inviti agli studi"},
+        "pt": {"cta": "Cancelar a subscrição de convites para estudos"},
+    },
     "affiliate_received": {
         "en": {
             "subject": "We received your affiliate application",
@@ -881,6 +889,7 @@ def send_email(
     body_text: Optional[str] = None,
     email_type: str = "transactional",
     db: Optional["Session"] = None,
+    lang: str = "en",
 ) -> bool:
     """Dispatch email via the configured provider. Returns delivery status.
 
@@ -901,6 +910,7 @@ def send_email(
         )
         return False
 
+    body_html = _fill_unsubscribe_slot(body_html, to, email_type, lang)
     headers = _unsubscribe_headers(email_type, to)
     if settings.SENDGRID_API_KEY:
         return _send_sendgrid(to, subject, body_html, body_text, headers)
@@ -929,6 +939,38 @@ def _is_suppressed_safe(
         return False
 
 
+_UNSUBSCRIBE_SLOT = "<!--QP_UNSUBSCRIBE_SLOT-->"
+
+
+def _fill_unsubscribe_slot(
+    body_html: str, to: str, email_type: str, lang: str = "en"
+) -> str:
+    """Render a visible unsubscribe link into bulk mail, strip it from the rest.
+
+    The ``List-Unsubscribe`` header alone is what Gmail requires, but the
+    native button it produces is not shown by every client. When someone
+    cannot find a way out, the control they reach for is "report spam",
+    which is the most damaging signal a sending domain can collect. So bulk
+    mail carries a link people can actually see.
+
+    Done here rather than in each template so a future marketing email
+    cannot forget it: ``send_email`` is the one place that knows both the
+    recipient and whether the message is bulk.
+    """
+    if _UNSUBSCRIBE_SLOT not in body_html:
+        return body_html
+    if email_type != "marketing" or not to:
+        return body_html.replace(_UNSUBSCRIBE_SLOT, "")
+
+    lang = _normalise_lang(lang)
+    link = (
+        f'<p><a href="{_unsubscribe_url(to)}" '
+        f'style="color:#94a3b8;text-decoration:underline;">'
+        f'{_c("unsubscribe_footer", lang, "cta")}</a></p>'
+    )
+    return body_html.replace(_UNSUBSCRIBE_SLOT, link)
+
+
 # ── Shared email wrapper ──────────────────────────────────────────────────
 
 
@@ -952,6 +994,7 @@ def _wrap_email(content: str, lang: str = "en") -> str:
         <div style="text-align:center;font-size:0.75rem;color:#94a3b8;">
           <p>{tagline}</p>
           <p>{reason}</p>
+          <!--QP_UNSUBSCRIBE_SLOT-->
         </div>
       </div>
     </body>
@@ -1336,6 +1379,7 @@ def send_interview_invite(
         # Callers inside a request hand us their session so the suppression
         # check reuses it instead of opening one per invite in a send loop.
         db=db,
+        lang=lang,
     )
 
 
@@ -1692,6 +1736,7 @@ def send_newsletter_welcome(to: str, lang: str = "en") -> bool:
         subject=_c("newsletter", lang, "subject"),
         body_html=_wrap_email(content, lang),
         email_type="marketing",
+        lang=lang,
     )
 
 
