@@ -375,6 +375,27 @@ export default function BrandingSettings({
               })}
             </p>
 
+            <label className="field-label" htmlFor="branding-incentive" style={{ marginTop: 12 }}>
+              {t("setup.incentiveLabel")}
+            </label>
+            <input
+              id="branding-incentive"
+              key={`inc-${project.incentive_text ?? ""}`}
+              className="field-input"
+              type="text"
+              maxLength={300}
+              placeholder={t("setup.incentivePlaceholder")}
+              defaultValue={project.incentive_text ?? ""}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v !== (project.incentive_text ?? "")) void save({ incentive_text: v });
+              }}
+            />
+            <p className="field-hint" style={{ fontSize: 12, marginTop: 4 }}>
+              {t("setup.incentiveHint")}
+            </p>
+
+
             {mode === "branded" && (
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 12 }}>
                 <div>

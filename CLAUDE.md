@@ -1246,7 +1246,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `name`, `email`, `password_hash`, `email_verified`, `company_size`, `role`, `industry`, `use_case`, `onboarding_completed`, `subscription_tier` (solo/team/lab/enterprise), `subscription_status`, `stripe_customer_id`, `stripe_subscription_id`, `trial_ends_at` (legacy plans only — credits-native flow ignores it), `interview_count`, `storage_bytes`, `preferred_language` (en/fr), `website_url`, `business_summary`, `research_experience`, `primary_region`, `goals_freeform`, `slack_webhook_url`, `demo_seeded_at`, `has_ever_paid` (sticky paid-once flag for paywall), `welcome_greeting_text` / `welcome_greeting_at` (Haiku-personalised /welcome greeting + 24h cache), `starter_suggestions_json` / `starter_suggestions_at` (Haiku-generated starter chips + 24h cache), `utm_source` / `utm_medium` / `utm_campaign` (measured first-touch attribution, Alembic 0064), `created_at`
 
 ### Project
-`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `decision_to_inform`, `timeline`, `success_criteria`, `target_customer_description`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
+`id`, `company_id`, `name`, `language`, `interview_duration_minutes`, `system_prompt`, `welcome_message`, `research_objective`, `decision_to_inform`, `timeline`, `success_criteria`, `target_customer_description`, `researcher_name`, `researcher_logo_url`, `research_context`, `privacy_policy_url`, `incentive_text`, `is_demo` (excluded from tier project quota), `created_at`, `archived_at`
 
 ### ResearchPlan (Wave E)
 `id` (uuid str), `company_id` (FK Company, indexed), `name`, `rationale`, `decision_to_inform`, `timeline`, `success_criteria`, `target_customer_description`, `created_at`. The multi-step research program a researcher commits to at the end of onboarding. Has a `steps` relationship to `ResearchPlanStep` ordered by `order_index`.
@@ -1445,6 +1445,31 @@ One executive memo synthesised across 2–8 completed Studies. Inputs are each s
 | GET | `/synthesis/{id}` | Yes | Full memo (parsed report JSON) |
 | GET | `/synthesis/{id}/report.html` | Yes | Print/PDF-ready decision memo document |
 | DELETE | `/synthesis/{id}` | Yes | Delete a memo |
+
+### Participant review + rewards (compensated studies)
+Researcher-only tools, we never move money. `Project.incentive_text` (Setup →
+participant-facing settings, max 300 chars) is the opt-in switch: it is shown
+verbatim on the consent screen with a "subject to review, the researcher pays"
+note, and from then on completions land as `Participant.review_status="pending"`
+instead of the default `"approved"`. `Participant.counts_for_research` (hybrid:
+`status == "completed" AND review_status != "rejected"`) is the single
+definition of "does this interview count" and is what analysis input, study
+reports, CSV export, dashboard counts, copilot snapshots and `project_state`
+read. Billing, the free-preview paywall and funnel analytics deliberately keep
+counting plain completions: **rejecting is never a refund**. The Responses tab
+gains "To review" / "To reward" filters (only when an incentive is set),
+approve / reject (optional private note) / mark-reward-sent actions on the
+participant card, a bulk "mark all sent" + reward-list CSV export, the NBA rungs
+`review_interviews` (weight 88, above run_analysis) and `send_rewards` (62), and
+the `rewards_pending` nudge. Alembic 0069. Tests:
+`backend/tests/test_participant_review.py`.
+
+| Method | Path | Description |
+|---|---|---|
+| PATCH | `/projects/{id}/participants/{pid}/review` | `{status: pending\|approved\|rejected, note?}`; 400 unless the interview is completed; rejecting clears `reward_sent_at` |
+| PATCH | `/projects/{id}/participants/{pid}/reward` | `{sent: bool}`; 400 `participant_not_approved` when marking sent on a non-approved row |
+| POST | `/projects/{id}/participants/rewards/bulk` | `{participant_ids, sent}`; skips non-approved ids silently |
+| GET | `/projects/{id}/participants/rewards.csv` | Payout list (approved rows, `?pending_only=false` for all); not behind the CSV-export entitlement |
 
 ### Export & Responses (`/projects/{id}/participants`)
 | Method | Path | Gate | Description |

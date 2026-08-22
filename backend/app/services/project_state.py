@@ -88,7 +88,7 @@ def compute_project_state(
         }
     """
     participants = list(project.participants or [])
-    completed = [p for p in participants if p.status == "completed"]
+    completed = [p for p in participants if p.counts_for_research]
     in_progress = [p for p in participants if p.status == "in_progress"]
 
     # Last completion timestamp — drives staleness.

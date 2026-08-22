@@ -19,6 +19,10 @@ import {
   setLinkCap,
   updateProject,
   exportCSV,
+  exportRewardsCSV,
+  reviewParticipant,
+  markRewardSent,
+  markRewardsSentBulk,
   archiveProject,
   deleteProject,
   deleteParticipant,
@@ -186,7 +190,8 @@ export default function ProjectDetail() {
   const [accountName, setAccountName] = useState<string>("");
 
   // ── Responses tab filters/sort ─────────────────────────────────────────────
-  const [responseStatusFilter, setResponseStatusFilter] = useState<"all" | "completed" | "in_progress">("all");
+  const [responseStatusFilter, setResponseStatusFilter] = useState<"all" | "completed" | "in_progress" | "to_review" | "to_reward">("all");
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [responseSortBy, setResponseSortBy] = useState<"date" | "quality" | "name">("date");
 
   // ── Analysis version history ───────────────────────────────────────────────
@@ -494,6 +499,9 @@ export default function ProjectDetail() {
           lowQualityCount: completedParts.filter(
             (p) => p.quality_label === "low",
           ).length,
+          pendingRewardCount: project.incentive_text
+            ? completedParts.filter((p) => p.review_status === "approved" && !p.reward_sent_at).length
+            : 0,
         },
         tab,
       ),
@@ -1133,6 +1141,74 @@ export default function ProjectDetail() {
     } catch {
       setTranslating(false);
       toast(tProject("responses.translationFailed"), "error");
+    }
+  }
+
+  /** Patch one participant's review / reward state into local lists. */
+  function applyReviewState(state: { id: string; review_status: string; review_note: string | null; reviewed_at: string | null; reward_sent_at: string | null }) {
+    const patch = (p: ParticipantResponse): ParticipantResponse =>
+      p.id === state.id
+        ? { ...p, review_status: state.review_status as ParticipantResponse["review_status"], review_note: state.review_note, reviewed_at: state.reviewed_at, reward_sent_at: state.reward_sent_at }
+        : p;
+    setParticipants((prev) => prev.map(patch));
+    setSelectedParticipant((prev) => (prev ? patch(prev) : prev));
+  }
+
+  async function handleReview(participantId: string, status: "pending" | "approved" | "rejected") {
+    setReviewBusy(true);
+    try {
+      let note: string | undefined;
+      if (status === "rejected") {
+        const typed = window.prompt(tProject("responses.review.rejectPrompt"), "");
+        if (typed === null) return;
+        note = typed.trim() || undefined;
+      }
+      applyReviewState(await reviewParticipant(id!, participantId, status, note));
+      toast(tProject(status === "rejected" ? "responses.review.rejectedToast" : status === "approved" ? "responses.review.approvedToast" : "responses.review.resetToast"), "success");
+    } catch {
+      toast(tProject("responses.review.failed"), "error");
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  async function handleReward(participantId: string, sent: boolean) {
+    setReviewBusy(true);
+    try {
+      applyReviewState(await markRewardSent(id!, participantId, sent));
+    } catch {
+      toast(tProject("responses.review.failed"), "error");
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  async function handleRewardAllSent(ids: string[]) {
+    if (ids.length === 0) return;
+    if (!window.confirm(tProject("responses.review.markAllConfirm", { count: ids.length }))) return;
+    setReviewBusy(true);
+    try {
+      const states = await markRewardsSentBulk(id!, ids, true);
+      states.forEach(applyReviewState);
+      toast(tProject("responses.review.markAllDone", { count: states.length }), "success");
+    } catch {
+      toast(tProject("responses.review.failed"), "error");
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  async function handleExportRewards() {
+    try {
+      const blob = await exportRewardsCSV(id!, true);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${project?.name || "study"}-rewards.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast(tProject("toasts.csvExportFailed"), "error");
     }
   }
 
@@ -1899,6 +1975,12 @@ export default function ProjectDetail() {
     analysisParticipantCount: analysis?.participant_count ?? 0,
     annotationCount: Object.keys(themeAnnotations).length,
     targetParticipants,
+    pendingReviewCount: project?.incentive_text
+      ? participants.filter((p) => p.status === "completed" && p.review_status === "pending").length
+      : 0,
+    pendingRewardCount: project?.incentive_text
+      ? participants.filter((p) => p.status === "completed" && p.review_status === "approved" && !p.reward_sent_at).length
+      : 0,
   };
   const projectMission = tDashboard(PROJECT_MISSION_KEYS[tab]);
   const projectNextAction = resolveProjectNextAction(projectNbaInput);
@@ -2987,12 +3069,17 @@ export default function ProjectDetail() {
         {tab === "responses" && (() => {
           const completedCount = participants.filter(p => p.status === "completed").length;
           const inProgressCount = participants.filter(p => p.status !== "completed").length;
+          const reviewMode = Boolean(project.incentive_text);
+          const toReview = participants.filter(p => p.status === "completed" && p.review_status === "pending");
+          const toReward = participants.filter(p => p.status === "completed" && p.review_status === "approved" && !p.reward_sent_at);
 
           const qualityOrder: Record<string, number> = { strong: 0, good: 1, fair: 2, low: 3 };
           const filtered = participants
             .filter(p => {
               if (responseStatusFilter === "completed") return p.status === "completed";
               if (responseStatusFilter === "in_progress") return p.status !== "completed";
+              if (responseStatusFilter === "to_review") return p.status === "completed" && p.review_status === "pending";
+              if (responseStatusFilter === "to_reward") return p.status === "completed" && p.review_status === "approved" && !p.reward_sent_at;
               return true;
             })
             .sort((a, b) => {
@@ -3035,9 +3122,9 @@ export default function ProjectDetail() {
 
                 {/* Status filter pills */}
                 <div role="group" aria-label={tProject("a11y.statusFilter")} style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-                  {(["all", "completed", "in_progress"] as const).map(f => {
-                    const label = f === "all" ? tProject("responses.allFilter") : f === "completed" ? tProject("responses.doneFilter") : tProject("responses.inProgressFilter");
-                    const count = f === "all" ? participants.length : f === "completed" ? completedCount : inProgressCount;
+                  {([...(["all", "completed", "in_progress"] as const), ...(reviewMode ? (["to_review", "to_reward"] as const) : [])]).map(f => {
+                    const label = f === "all" ? tProject("responses.allFilter") : f === "completed" ? tProject("responses.doneFilter") : f === "in_progress" ? tProject("responses.inProgressFilter") : f === "to_review" ? tProject("responses.review.toReviewFilter") : tProject("responses.review.toRewardFilter");
+                    const count = f === "all" ? participants.length : f === "completed" ? completedCount : f === "in_progress" ? inProgressCount : f === "to_review" ? toReview.length : toReward.length;
                     const active = responseStatusFilter === f;
                     return (
                       <button
@@ -3052,6 +3139,20 @@ export default function ProjectDetail() {
                     );
                   })}
                 </div>
+
+                {reviewMode && responseStatusFilter === "to_reward" && (
+                  <div className="reward-toolbar" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12, padding: "8px 10px", background: "var(--surface-subtle, #f8fafc)", borderRadius: 8 }}>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)", flex: 1, minWidth: 160 }}>
+                      {tProject("responses.review.rewardToolbarHint", { incentive: project.incentive_text })}
+                    </span>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={handleExportRewards} disabled={toReward.length === 0}>
+                      {tProject("responses.review.exportRewards")}
+                    </button>
+                    <button type="button" className="btn btn-primary btn-sm" disabled={reviewBusy || toReward.length === 0} onClick={() => handleRewardAllSent(toReward.map(p => p.id))}>
+                      {tProject("responses.review.markAllSent", { count: toReward.length })}
+                    </button>
+                  </div>
+                )}
 
                 {/* V4 paywall — visibility banner. Shown when any
                  * participants in this project are locked, so the user
@@ -3105,7 +3206,13 @@ export default function ProjectDetail() {
                   </div>
                 ) : filtered.length === 0 ? (
                   <div style={{ padding: "24px 0", textAlign: "center" }}>
-                    <p className="muted-text" style={{ fontSize: 13 }}>{tProject("responses.noFiltered", { status: responseStatusFilter === "completed" ? tProject("responses.doneFilter").toLowerCase() : tProject("responses.inProgressFilter").toLowerCase() })}</p>
+                    <p className="muted-text" style={{ fontSize: 13 }}>
+                      {responseStatusFilter === "to_review"
+                        ? tProject("responses.review.noneToReview")
+                        : responseStatusFilter === "to_reward"
+                          ? tProject("responses.review.noneToReward")
+                          : tProject("responses.noFiltered", { status: responseStatusFilter === "completed" ? tProject("responses.doneFilter").toLowerCase() : tProject("responses.inProgressFilter").toLowerCase() })}
+                    </p>
                   </div>
                 ) : (
                   <div className="participants-list" style={{ gap: 2 }}>
@@ -3150,6 +3257,21 @@ export default function ProjectDetail() {
                             {p.quality_label && (
                               <span className={`quality-badge quality-badge--${p.quality_label}`} style={{ fontSize: 10, padding: "1px 6px" }}>
                                 {tProject(`responses.quality${p.quality_label!.charAt(0).toUpperCase() + p.quality_label!.slice(1)}`)}
+                              </span>
+                            )}
+                            {reviewMode && p.status === "completed" && p.review_status === "pending" && (
+                              <span className="status-badge" style={{ fontSize: 10, background: "var(--warning-bg, #fffbeb)", color: "var(--warning-text, #b45309)" }}>
+                                {tProject("responses.review.pendingBadge")}
+                              </span>
+                            )}
+                            {p.status === "completed" && p.review_status === "rejected" && (
+                              <span className="status-badge" style={{ fontSize: 10, background: "var(--danger-bg, #fef2f2)", color: "var(--danger-text, #b91c1c)" }} title={p.review_note ?? undefined}>
+                                {tProject("responses.review.rejectedBadge")}
+                              </span>
+                            )}
+                            {reviewMode && p.status === "completed" && p.review_status === "approved" && p.reward_sent_at && (
+                              <span className="status-badge" style={{ fontSize: 10, background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }}>
+                                {tProject("responses.review.rewardSentBadge")}
                               </span>
                             )}
                             {p.panel_consent && (
@@ -3225,6 +3347,54 @@ export default function ProjectDetail() {
                             ))}
                           </div>
                           <span className="participant-card__date">{new Date(selectedParticipant.started_at).toLocaleDateString(i18n.language, { day: "numeric", month: "short", year: "numeric" })}</span>
+                          {selectedParticipant.status === "completed" && (project.incentive_text || selectedParticipant.review_status === "rejected") && (
+                            <div className="participant-review-bar" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                              {selectedParticipant.review_status === "rejected" ? (
+                                <>
+                                  <span className="status-badge" style={{ background: "var(--danger-bg, #fef2f2)", color: "var(--danger-text, #b91c1c)" }}>
+                                    {tProject("responses.review.rejectedBadge")}
+                                    {selectedParticipant.review_note ? ` · ${selectedParticipant.review_note}` : ""}
+                                  </span>
+                                  <button type="button" className="btn btn-ghost btn-sm" disabled={reviewBusy} onClick={() => handleReview(selectedParticipant.id, project.incentive_text ? "pending" : "approved")}>
+                                    {tProject("responses.review.undoReject")}
+                                  </button>
+                                </>
+                              ) : selectedParticipant.review_status === "pending" ? (
+                                <>
+                                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{tProject("responses.review.pendingHint")}</span>
+                                  <button type="button" className="btn btn-primary btn-sm" disabled={reviewBusy} onClick={() => handleReview(selectedParticipant.id, "approved")}>
+                                    {tProject("responses.review.approve")}
+                                  </button>
+                                  <button type="button" className="btn btn-ghost btn-sm" disabled={reviewBusy} onClick={() => handleReview(selectedParticipant.id, "rejected")}>
+                                    {tProject("responses.review.reject")}
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  {selectedParticipant.reward_sent_at ? (
+                                    <>
+                                      <span className="status-badge" style={{ background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }}>
+                                        {tProject("responses.review.rewardSentOn", { date: new Date(selectedParticipant.reward_sent_at).toLocaleDateString(i18n.language, { day: "numeric", month: "short" }) })}
+                                      </span>
+                                      <button type="button" className="btn btn-ghost btn-sm" disabled={reviewBusy} onClick={() => handleReward(selectedParticipant.id, false)}>
+                                        {tProject("responses.review.undoRewardSent")}
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{tProject("responses.review.approvedHint", { incentive: project.incentive_text })}</span>
+                                      <button type="button" className="btn btn-primary btn-sm" disabled={reviewBusy} onClick={() => handleReward(selectedParticipant.id, true)}>
+                                        {tProject("responses.review.markRewardSent")}
+                                      </button>
+                                    </>
+                                  )}
+                                  <button type="button" className="btn btn-ghost btn-sm" disabled={reviewBusy} onClick={() => handleReview(selectedParticipant.id, "rejected")}>
+                                    {tProject("responses.review.reject")}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                         {selectedParticipant.quality_label && (
                           <span className={`quality-badge quality-badge--${selectedParticipant.quality_label} quality-badge--lg participant-card__quality`}>

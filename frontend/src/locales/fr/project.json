@@ -402,7 +402,10 @@
     "addQuestionError": "Impossible d'ajouter une question",
     "brandingUpgradeBody": "Habillez tout l'entretien avec votre logo, votre couleur et votre police, inclus dans le plan Agency.",
     "brandingUpgradeCta": "Voir les plans",
-    "brandingUpgradeDismiss": "Plus tard"
+    "brandingUpgradeDismiss": "Plus tard",
+    "incentiveLabel": "Récompense participant (optionnel)",
+    "incentivePlaceholder": "ex. bon d'achat Amazon de 20 €, envoyé sous 7 jours après validation",
+    "incentiveHint": "Affiché aux participants sur l'écran de consentement, mot pour mot. Définir une récompense active la validation : chaque entretien terminé attend votre accord avant de compter, et les participants validés apparaissent dans une liste de récompenses à payer. Qualipulse ne gère jamais l'argent."
   },
   "responses": {
     "title": "Réponses",
@@ -511,7 +514,34 @@
     "translationFailed": "Nous n'avons pas pu traduire cette transcription. Veuillez réessayer.",
     "tagTurn": "Annoter la réponse",
     "tagWholeTurn": "Annoter toute la réponse (sélection précise indisponible en vue traduite)",
-    "memoPlaceholder": "Note de recherche..."
+    "memoPlaceholder": "Note de recherche...",
+    "review": {
+      "toReviewFilter": "À valider",
+      "toRewardFilter": "À récompenser",
+      "pendingBadge": "En attente de validation",
+      "rejectedBadge": "Rejeté",
+      "rewardSentBadge": "Récompense envoyée",
+      "pendingHint": "Validez pour inclure cet entretien dans votre analyse et la liste des récompenses, ou rejetez-le.",
+      "approvedHint": "Validé. Promis : {{incentive}}",
+      "approve": "Valider",
+      "reject": "Rejeter",
+      "undoReject": "Annuler le rejet",
+      "markRewardSent": "Marquer la récompense envoyée",
+      "undoRewardSent": "Annuler",
+      "rewardSentOn": "Récompense envoyée le {{date}}",
+      "rejectPrompt": "Pourquoi rejetez-vous cet entretien ? (optionnel, visible par vous seul)",
+      "approvedToast": "Entretien validé.",
+      "rejectedToast": "Entretien rejeté. Il est désormais exclu de l'analyse, des rapports et des exports.",
+      "resetToast": "Validation réinitialisée.",
+      "failed": "Impossible de mettre à jour la validation. Réessayez.",
+      "rewardToolbarHint": "Participants validés en attente de : {{incentive}}. Exportez la liste pour envoyer les récompenses avec votre propre outil, puis marquez-les envoyées.",
+      "exportRewards": "Exporter la liste des récompenses (CSV)",
+      "markAllSent": "Tout marquer envoyé ({{count}})",
+      "markAllConfirm": "Marquer {{count}} récompenses comme envoyées ?",
+      "markAllDone": "{{count}} récompenses marquées envoyées.",
+      "noneToReview": "Rien à valider. Les nouveaux entretiens terminés apparaîtront ici.",
+      "noneToReward": "Aucune récompense en attente. Validez des entretiens pour constituer la liste de paiement."
+    }
   },
   "transcript": {
     "title": "Transcription",

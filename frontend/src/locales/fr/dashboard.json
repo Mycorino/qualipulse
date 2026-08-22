@@ -349,6 +349,16 @@
     "collectMore": {
       "label": "Collecter plus d'entretiens ({{count}}/{{min}})",
       "reason": "L'analyse se débloque à {{min}} entretiens terminés."
+    },
+    "reviewInterviews": {
+      "label": "Valider les nouveaux entretiens",
+      "reason_one": "{{count}} entretien terminé attend votre validation avant de compter.",
+      "reason_other": "{{count}} entretiens terminés attendent votre validation avant de compter."
+    },
+    "sendRewards": {
+      "label": "Envoyer les récompenses en attente",
+      "reason_one": "{{count}} participant validé n'a pas encore reçu la récompense promise.",
+      "reason_other": "{{count}} participants validés n'ont pas encore reçu la récompense promise."
     }
   },
   "nudges": {
@@ -356,7 +366,8 @@
     "dataMilestone": "Vous avez {{count}} entretiens terminés, assez pour lancer l'analyse.",
     "analysisStale": "{{count}} nouveaux entretiens depuis la dernière analyse, pensez à l'actualiser.",
     "qualityFlag": "Un entretien de faible qualité vient d'arriver, à vérifier.",
-    "studyReportReady": "« {{name}} », le rapport d'analyse est prêt."
+    "studyReportReady": "« {{name}} », le rapport d'analyse est prêt.",
+    "rewardsPending": "{{count}} participants validés attendent leur récompense."
   },
   "reports": {
     "eyebrow": "Vos livrables",

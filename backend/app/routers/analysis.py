@@ -164,7 +164,7 @@ def trigger_analysis(
 
     completed_count = (
         db.query(Participant)
-        .filter(Participant.project_id == project.id, Participant.status == "completed")
+        .filter(Participant.project_id == project.id, Participant.counts_for_research)
         .count()
     )
     if completed_count == 0:
@@ -316,7 +316,7 @@ def get_analysis(
     # Count total completed participants so frontend can show staleness
     completed_count = (
         db.query(Participant)
-        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .filter(Participant.project_id == project_id, Participant.counts_for_research)
         .count()
     )
 
@@ -392,7 +392,7 @@ def get_analysis_readiness(
         pid
         for (pid,) in db.query(Participant.id).filter(
             Participant.project_id == project_id,
-            Participant.status == "completed",
+            Participant.counts_for_research,
         )
     ]
 
@@ -468,7 +468,7 @@ def get_heatmap(
     # Build participant map: id → {display_name, profession, age_range, country}
     participants = (
         db.query(Participant)
-        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .filter(Participant.project_id == project_id, Participant.counts_for_research)
         .all()
     )
 
@@ -558,7 +558,7 @@ def export_analysis_report(
 
     participants = (
         db.query(Participant)
-        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .filter(Participant.project_id == project_id, Participant.counts_for_research)
         .all()
     )
     annotations = (
@@ -657,7 +657,7 @@ def get_analysis_by_version(
 
     completed_count = (
         db.query(Participant)
-        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .filter(Participant.project_id == project_id, Participant.counts_for_research)
         .count()
     )
 
@@ -896,7 +896,7 @@ def trigger_refined_analysis(
 
     completed_count = (
         db.query(Participant)
-        .filter(Participant.project_id == project_id, Participant.status == "completed")
+        .filter(Participant.project_id == project_id, Participant.counts_for_research)
         .count()
     )
 

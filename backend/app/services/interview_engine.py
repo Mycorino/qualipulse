@@ -48,7 +48,7 @@ from app.services._clients import get_anthropic_client
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models.interview import InterviewTurn, Participant
+from app.models.interview import REVIEW_APPROVED, REVIEW_PENDING, InterviewTurn, Participant
 from app.models.panel import PanelProfile
 from app.models.project import InterviewGuideQuestion, Project
 from app.services.stt import transcribe_audio
@@ -1674,6 +1674,11 @@ def _mark_completed(participant, db: Session, *, reason: str, bill: bool, comple
     participant.status = "completed"
     participant.completed_at = datetime.utcnow()
     participant.completion_reason = reason
+    # Compensated studies queue completions for researcher review before any
+    # reward is promised; unpaid studies auto-approve (no queue, no change).
+    participant.review_status = (
+        REVIEW_PENDING if getattr(participant.project, "incentive_text", None) else REVIEW_APPROVED
+    )
 
     # Billing is deferred to the caller, AFTER the turn commits:
     # consume_interview_credit commits (and on a duplicate rolls back) the

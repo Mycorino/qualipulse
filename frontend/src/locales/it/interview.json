@@ -71,7 +71,9 @@
     "declineConfirmText": "È sicuro? Rifiutando, la sua partecipazione a questo studio termina.",
     "declineConfirmYes": "Sì, rifiuto",
     "resumeAvailable": "Ha un'intervista in corso su questo dispositivo.",
-    "resumeCta": "Riprendere da dove era rimasto"
+    "resumeCta": "Riprendere da dove era rimasto",
+    "incentiveLabel": "Incentivo:",
+    "incentiveNote": "Soggetto a verifica da parte del team di ricerca, che invia il premio direttamente. Qualipulse non gestisce i pagamenti."
   },
   "profile": {
     "title": "Ci racconti qualcosa di lei",

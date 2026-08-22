@@ -2,7 +2,8 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, and_
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -35,6 +36,21 @@ class InterviewLink(Base):
     project = relationship("Project", back_populates="interview_links")
     participants = relationship(
         "Participant", back_populates="link", cascade="all, delete-orphan"
+    )
+
+
+REVIEW_PENDING = "pending"
+REVIEW_APPROVED = "approved"
+REVIEW_REJECTED = "rejected"
+REVIEW_STATUSES = {REVIEW_PENDING, REVIEW_APPROVED, REVIEW_REJECTED}
+
+
+def counts_for_research(participant) -> bool:
+    """Duck-typed twin of `Participant.counts_for_research` for code paths
+    that also run on plain fixtures (report rendering tests)."""
+    return (
+        getattr(participant, "status", None) == "completed"
+        and getattr(participant, "review_status", REVIEW_APPROVED) != REVIEW_REJECTED
     )
 
 
@@ -82,6 +98,21 @@ class Participant(Base):
     # "Finish here", "participant_requested" = they asked the interviewer to
     # stop mid-conversation, "skipped_to_end" = skip on the last question.
     completion_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Researcher review (participant-review feature). "approved" is the
+    # default so unpaid studies behave exactly as before; a study with an
+    # incentive lands completions as "pending" so the researcher vets them
+    # before promising a reward. "rejected" drops the interview from every
+    # research output (analysis input, reports, export, counts) while the
+    # row, its audio and its billing stay untouched: rejecting is a
+    # data-quality decision, not a refund.
+    review_status: Mapped[str] = mapped_column(
+        String(20), default=REVIEW_APPROVED, server_default=REVIEW_APPROVED, nullable=False
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Stamped when the researcher marks the incentive as sent. We track the
+    # promise, we never move money.
+    reward_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     quality_label: Mapped[str | None] = mapped_column(String(20), nullable=True)
     quality_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -98,6 +129,20 @@ class Participant(Base):
     # Relationships
     link = relationship("InterviewLink", back_populates="participants")
     project = relationship("Project", back_populates="participants")
+
+    @hybrid_property
+    def counts_for_research(self) -> bool:
+        """The ONE definition of "does this interview count": completed and
+        not rejected by the researcher. Use this (not `status == "completed"`)
+        for anything the researcher reads: analysis input, reports, CSV,
+        completion counts, copilot snapshots. Billing, the free-preview
+        paywall and funnel analytics deliberately keep counting plain
+        completions, so a reject never refunds anything."""
+        return self.status == "completed" and self.review_status != REVIEW_REJECTED
+
+    @counts_for_research.expression
+    def counts_for_research(cls):
+        return and_(cls.status == "completed", cls.review_status != REVIEW_REJECTED)
     turns = relationship(
         "InterviewTurn", back_populates="participant", cascade="all, delete-orphan"
     )

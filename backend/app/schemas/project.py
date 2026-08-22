@@ -19,6 +19,7 @@ class BrandingFieldsMixin(BaseModel):
     researcher_name: str | None = None
     researcher_logo_url: str | None = None
     privacy_policy_url: str | None = None
+    incentive_text: str | None = None
 
     @field_validator("branding_mode")
     @classmethod
@@ -207,6 +208,7 @@ class ProjectResponse(BaseModel):
     researcher_name: str | None = None
     researcher_logo_url: str | None = None
     privacy_policy_url: str | None = None
+    incentive_text: str | None = None
     created_at: datetime
     questions: list[QuestionResponse] = []
     screening_questions: list[ScreeningQuestionResponse] = []

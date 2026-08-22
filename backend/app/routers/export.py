@@ -14,7 +14,7 @@ from app.dependencies import (
     get_db,
 )
 from app.models.company import Company
-from app.models.interview import InterviewTurn, Participant
+from app.models.interview import REVIEW_REJECTED, InterviewTurn, Participant
 from app.models.project import Project
 from app.schemas.interview import (
     ParticipantResponse,
@@ -191,6 +191,10 @@ def list_participants(
                 notable_quotes=json.loads(p.notable_quotes) if p.notable_quotes else None,
                 avg_response_words=p.avg_response_words,
                 short_answer_pct=p.short_answer_pct,
+                review_status=p.review_status,
+                review_note=p.review_note,
+                reviewed_at=p.reviewed_at,
+                reward_sent_at=p.reward_sent_at,
                 is_locked=is_locked,
             )
         )
@@ -281,6 +285,10 @@ def get_transcript(
             notable_quotes=json.loads(participant.notable_quotes) if participant.notable_quotes else None,
             avg_response_words=participant.avg_response_words,
             short_answer_pct=participant.short_answer_pct,
+            review_status=participant.review_status,
+            review_note=participant.review_note,
+            reviewed_at=participant.reviewed_at,
+            reward_sent_at=participant.reward_sent_at,
         ),
         turns=[
             TranscriptTurnResponse(
@@ -317,9 +325,13 @@ def export_transcripts_csv(
     project = _get_project_or_404(project_id, company.id, db)
     _require_csv_export(db, company)
 
+    # Rejected interviews are not research data: they never reach the CSV.
     participants = (
         db.query(Participant)
-        .filter(Participant.project_id == project.id)
+        .filter(
+            Participant.project_id == project.id,
+            Participant.review_status != REVIEW_REJECTED,
+        )
         .order_by(Participant.started_at)
         .all()
     )

@@ -71,7 +71,9 @@
     "resumeCta": "Continue where you left off",
     "declineConfirmText": "Are you sure? Declining ends your participation in this study.",
     "declineConfirmYes": "Yes, decline",
-    "declineConfirmNo": "Keep going"
+    "declineConfirmNo": "Keep going",
+    "incentiveLabel": "Incentive:",
+    "incentiveNote": "Subject to review by the research team, who sends the reward directly. Qualipulse does not handle payments."
   },
   "profile": {
     "title": "Tell us a bit about yourself",

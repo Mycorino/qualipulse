@@ -135,6 +135,11 @@ class ParticipantResponse(BaseModel):
     notable_quotes: list[str] | None = None
     avg_response_words: float | None = None
     short_answer_pct: float | None = None
+    # Researcher review (see Participant.review_status).
+    review_status: str = "approved"
+    review_note: str | None = None
+    reviewed_at: datetime | None = None
+    reward_sent_at: datetime | None = None
     # V4 paywall — True when this participant's transcript is locked
     # behind the free-preview paywall for the current workspace. The
     # frontend renders a paywall card instead of the transcript body.

@@ -71,7 +71,9 @@
     "resumeCta": "Reprendre là où vous en étiez",
     "declineConfirmText": "Êtes-vous sûr·e ? Refuser met fin à votre participation à cette étude.",
     "declineConfirmYes": "Oui, refuser",
-    "declineConfirmNo": "Continuer"
+    "declineConfirmNo": "Continuer",
+    "incentiveLabel": "Récompense :",
+    "incentiveNote": "Sous réserve de validation par l'équipe de recherche, qui envoie la récompense directement. Qualipulse ne gère pas les paiements."
   },
   "profile": {
     "title": "Parlez-nous un peu de vous",
