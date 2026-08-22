@@ -95,78 +95,78 @@ const docs = {
       ],
     },
     fr: {
-      title: "Accord de traitement des donnees",
+      title: "Accord de traitement des données",
       intro:
-        "Cet accord de traitement des donnees fait partie de l'accord entre QualiPulse et chaque client qui utilise le Service pour traiter des donnees personnelles pour le compte de son organisation.",
+        "Cet accord de traitement des données fait partie de l'accord entre QualiPulse et chaque client qui utilise le Service pour traiter des données personnelles pour le compte de son organisation.",
       sections: [
         {
           id: "roles",
-          title: "1. Roles des parties",
+          title: "1. Rôles des parties",
           body: [
-            "Pour les donnees d'entretien participant, le client est responsable du traitement et QualiPulse est sous-traitant. Pour les donnees de compte, facturation, securite, support et analytics du service, QualiPulse agit comme responsable du traitement independant.",
+            "Pour les données d'entretien participant, le client est responsable du traitement et QualiPulse est sous-traitant. Pour les données de compte, facturation, sécurité, support et analytics du service, QualiPulse agit comme responsable du traitement indépendant.",
           ],
         },
         {
           id: "processing",
           title: "2. Instructions de traitement",
           body: [
-            "QualiPulse traite les donnees personnelles client uniquement pour fournir, securiser, supporter et maintenir le Service, ou selon la configuration du client ou ses instructions ecrites.",
+            "QualiPulse traite les données personnelles client uniquement pour fournir, sécuriser, supporter et maintenir le Service, ou selon la configuration du client ou ses instructions écrites.",
           ],
           bullets: [
-            "Objet: entretiens de recherche moderes par IA, transcription, analyse, stockage, export et support associe.",
-            "Duree: duree du compte client plus les periodes de suppression et conservation decrites dans la politique de conservation.",
-            "Personnes concernees: utilisateurs client, participants invites et contacts panel lorsque cette fonctionnalite est activee.",
-            "Categories: identifiants, coordonnees, donnees demographiques fournies, audio, transcriptions, reponses de recherche, metadonnees projet et journaux techniques.",
+            "Objet: entretiens de recherche modérés par IA, transcription, analyse, stockage, export et support associé.",
+            "Durée: durée du compte client plus les périodes de suppression et conservation décrites dans la politique de conservation.",
+            "Personnes concernées: utilisateurs client, participants invités et contacts panel lorsque cette fonctionnalité est activée.",
+            "Catégories: identifiants, coordonnées, données démographiques fournies, audio, transcriptions, réponses de recherche, métadonnées projet et journaux techniques.",
           ],
         },
         {
           id: "security",
-          title: "3. Mesures de securite",
+          title: "3. Mesures de sécurité",
           body: [
-            "QualiPulse maintient des mesures techniques et organisationnelles appropriees pour proteger les donnees personnelles contre destruction, perte, alteration, divulgation ou acces non autorise.",
+            "QualiPulse maintient des mesures techniques et organisationnelles appropriées pour protéger les données personnelles contre destruction, perte, altération, divulgation ou accès non autorisé.",
           ],
           bullets: [
             "Chiffrement en transit via TLS.",
             "Hachage des mots de passe.",
-            "Controles d'acces par role pour les espaces client.",
-            "Acces aux donnees de production limite au personnel autorise pour support ou securite.",
-            "Separation logique des espaces client.",
-            "Journaux de securite et d'application pour detecter les abus et enqueter sur les incidents.",
+            "Contrôles d'accès par rôle pour les espaces client.",
+            "Accès aux données de production limité au personnel autorisé pour support ou sécurité.",
+            "Séparation logique des espaces client.",
+            "Journaux de sécurité et d'application pour détecter les abus et enquêter sur les incidents.",
           ],
         },
         {
           id: "subprocessors",
-          title: "4. Sous-traitants ulterieurs",
+          title: "4. Sous-traitants ultérieurs",
           body: [
-            "Le client autorise QualiPulse a utiliser les sous-traitants listes sur la page Sous-traitants. QualiPulse reste responsable de l'execution de leurs obligations de protection des donnees et utilise des protections contractuelles adaptees.",
+            "Le client autorise QualiPulse à utiliser les sous-traitants listés sur la page Sous-traitants. QualiPulse reste responsable de l'exécution de leurs obligations de protection des données et utilise des protections contractuelles adaptées.",
           ],
         },
         {
           id: "assistance",
           title: "5. Assistance et demandes des personnes",
           body: [
-            "QualiPulse fournit une assistance raisonnable pour aider les clients a repondre aux demandes des personnes, obligations de securite, AIPD et demandes des autorites, selon la nature du traitement et les informations disponibles.",
+            "QualiPulse fournit une assistance raisonnable pour aider les clients à répondre aux demandes des personnes, obligations de sécurité, AIPD et demandes des autorités, selon la nature du traitement et les informations disponibles.",
           ],
         },
         {
           id: "breach",
-          title: "6. Incidents de securite",
+          title: "6. Incidents de sécurité",
           body: [
-            "QualiPulse notifiera les clients affectes sans retard injustifie apres avoir pris connaissance d'une violation de donnees personnelles impliquant des donnees client.",
+            "QualiPulse notifiera les clients affectés sans retard injustifié après avoir pris connaissance d'une violation de données personnelles impliquant des données client.",
           ],
         },
         {
           id: "transfers",
           title: "7. Transferts internationaux",
           body: [
-            "Lorsque des donnees sont transferees hors EEE, Royaume-Uni ou Suisse, QualiPulse s'appuie sur des garanties appropriees comme les Clauses Contractuelles Types, decisions d'adequation ou autres mecanismes licites.",
+            "Lorsque des données sont transférées hors EEE, Royaume-Uni ou Suisse, QualiPulse s'appuie sur des garanties appropriées comme les Clauses Contractuelles Types, décisions d'adéquation ou autres mécanismes licites.",
           ],
         },
         {
           id: "deletion",
           title: "8. Retour et suppression",
           body: [
-            "A la resiliation ou sur demande ecrite, QualiPulse supprime ou retourne les donnees personnelles client dans un delai raisonnable, sauf conservation requise par la loi, la securite, l'integrite des sauvegardes, un litige ou les registres commerciaux legitimes.",
+            "A la résiliation ou sur demande écrite, QualiPulse supprime ou retourne les données personnelles client dans un délai raisonnable, sauf conservation requise par la loi, la sécurité, l'intégrité des sauvegardes, un litige ou les registres commerciaux légitimes.",
           ],
         },
       ],
@@ -212,17 +212,17 @@ const docs = {
     fr: {
       title: "Sous-traitants",
       intro:
-        "QualiPulse utilise les fournisseurs suivants pour fournir, securiser et exploiter le Service. La disponibilite et la localisation peuvent dependre de la configuration client et de l'environnement de production.",
+        "QualiPulse utilise les fournisseurs suivants pour fournir, sécuriser et exploiter le Service. La disponibilité et la localisation peuvent dépendre de la configuration client et de l'environnement de production.",
       sections: [
         {
           id: "list",
           title: "Sous-traitants actuels",
           body: [],
           bullets: [
-            "OpenAI - transcription vocale et synthese vocale.",
+            "OpenAI - transcription vocale et synthèse vocale.",
             "Anthropic - orchestration d'entretiens IA, copilote de recherche et analyse.",
-            "Google Cloud Platform - hebergement applicatif et calcul.",
-            "Neon - hebergement de base de donnees PostgreSQL.",
+            "Google Cloud Platform - hébergement applicatif et calcul.",
+            "Neon - hébergement de base de données PostgreSQL.",
             "Cloudflare R2 - stockage audio et fichiers.",
             "Stripe - paiement et facturation.",
             "SendGrid - emails transactionnels.",
@@ -233,14 +233,14 @@ const docs = {
           id: "notice",
           title: "Notification des changements",
           body: [
-            "QualiPulse peut mettre a jour ses sous-traitants avec l'evolution du Service. Les changements materiels seront refletes sur cette page et, lorsque le contrat ou la loi l'exige, notifies aux clients avant utilisation pour les donnees personnelles client.",
+            "QualiPulse peut mettre à jour ses sous-traitants avec l'évolution du Service. Les changements matériels seront reflétés sur cette page et, lorsque le contrat ou la loi l'exige, notifiés aux clients avant utilisation pour les données personnelles client.",
           ],
         },
         {
           id: "transfers",
           title: "Transferts et garanties",
           body: [
-            "Lorsqu'un sous-traitant traite des donnees hors EEE, Royaume-Uni ou Suisse, QualiPulse s'appuie sur des garanties appropriees comme les Clauses Contractuelles Types, decisions d'adequation ou mecanismes equivalents.",
+            "Lorsqu'un sous-traitant traite des données hors EEE, Royaume-Uni ou Suisse, QualiPulse s'appuie sur des garanties appropriées comme les Clauses Contractuelles Types, décisions d'adéquation ou mécanismes équivalents.",
           ],
         },
       ],
@@ -292,41 +292,41 @@ const docs = {
     fr: {
       title: "Notice participant",
       intro:
-        "Cette notice explique ce qui se passe lorsque vous participez a un entretien de recherche propulse par QualiPulse. L'organisation qui a partage le lien est responsable de l'etude.",
+        "Cette notice explique ce qui se passe lorsque vous participez à un entretien de recherche propulsé par QualiPulse. L'organisation qui a partagé le lien est responsable de l'étude.",
       sections: [
         {
           id: "who",
-          title: "1. Qui mene l'etude",
+          title: "1. Qui mène l'étude",
           body: [
-            "Le chercheur ou l'organisation qui vous invite decide de l'objectif de l'etude, des questions et de l'utilisation des reponses. QualiPulse fournit la technologie d'entretien pour son compte.",
+            "Le chercheur ou l'organisation qui vous invite décide de l'objectif de l'étude, des questions et de l'utilisation des réponses. QualiPulse fournit la technologie d'entretien pour son compte.",
           ],
         },
         {
           id: "ai",
-          title: "2. Entretien modere par IA",
+          title: "2. Entretien modéré par IA",
           body: [
-            "L'entretien est conduit par un moderateur IA. Il suit le guide d'entretien et peut poser des questions de relance selon vos reponses. Vous pouvez arreter a tout moment en fermant la page.",
+            "L'entretien est conduit par un modérateur IA. Il suit le guide d'entretien et peut poser des questions de relance selon vos réponses. Vous pouvez arrêter à tout moment en fermant la page.",
           ],
         },
         {
           id: "data",
-          title: "3. Donnees collectees",
+          title: "3. Données collectées",
           body: [
-            "Vos reponses vocales sont enregistrees, transcrites et analysees a des fins de recherche. Des questions optionnelles de profil ou selection peuvent aussi etre posees, comme role, tranche d'age, pays ou email pour reprendre l'entretien.",
+            "Vos réponses vocales sont enregistrées, transcrites et analysées à des fins de recherche. Des questions optionnelles de profil ou sélection peuvent aussi être posées, comme rôle, tranche d'âge, pays ou email pour reprendre l'entretien.",
           ],
         },
         {
           id: "use",
-          title: "4. Utilisation des reponses",
+          title: "4. Utilisation des réponses",
           body: [
-            "Les chercheurs utilisent les reponses pour comprendre themes, citations, besoins, douleurs et retours produit ou service. QualiPulse ne vend pas les donnees participant et n'utilise pas les donnees de recherche client pour entrainer des modeles IA.",
+            "Les chercheurs utilisent les réponses pour comprendre thèmes, citations, besoins, douleurs et retours produit ou service. QualiPulse ne vend pas les données participant et n'utilise pas les données de recherche client pour entraîner des modèles IA.",
           ],
         },
         {
           id: "rights",
           title: "5. Vos droits",
           body: [
-            "Vous pouvez contacter le chercheur qui a partage l'entretien ou privacy@qualipulse.com pour demander acces, suppression, correction, limitation, opposition ou retrait du consentement lorsque applicable.",
+            "Vous pouvez contacter le chercheur qui a partagé l'entretien ou privacy@qualipulse.com pour demander accès, suppression, correction, limitation, opposition ou retrait du consentement lorsque applicable.",
           ],
         },
       ],
@@ -377,20 +377,20 @@ const docs = {
     fr: {
       title: "Politique d'utilisation de l'IA",
       intro:
-        "Cette politique explique comment QualiPulse utilise l'IA et quels usages sont interdits sans approbation ecrite prealable.",
+        "Cette politique explique comment QualiPulse utilise l'IA et quels usages sont interdits sans approbation écrite préalable.",
       sections: [
         {
           id: "ai-use",
           title: "1. Utilisation de l'IA",
           body: [
-            "QualiPulse utilise l'IA pour rediger des guides de recherche, mener des relances d'entretien, transcrire ou transformer du contenu, resumer des entretiens, identifier des themes, generer des memos et assister les chercheurs.",
+            "QualiPulse utilise l'IA pour rédiger des guides de recherche, mener des relances d'entretien, transcrire ou transformer du contenu, résumer des entretiens, identifier des thèmes, générer des memos et assister les chercheurs.",
           ],
         },
         {
           id: "human",
-          title: "2. Responsabilite humaine",
+          title: "2. Responsabilité humaine",
           body: [
-            "Les sorties IA sont des aides a la recherche, pas des decisions finales. Les clients restent responsables de relire conception d'etude, notices participant, questions generees, analyses et decisions prises a partir de la recherche.",
+            "Les sorties IA sont des aides à la recherche, pas des décisions finales. Les clients restent responsables de relire conception d'étude, notices participant, questions générées, analyses et décisions prises à partir de la recherche.",
           ],
         },
         {
@@ -398,11 +398,11 @@ const docs = {
           title: "3. Usages interdits ou restreints",
           body: ["Les clients ne doivent pas utiliser QualiPulse pour:"],
           bullets: [
-            "Recrutement, promotion, licenciement, surveillance des travailleurs ou decisions d'eligibilite a l'emploi.",
-            "Credit, assurance, logement, acces a l'education, diagnostic medical, eligibilite juridique ou aides publiques.",
-            "Identification biometrique, identification du locuteur, reconnaissance emotionnelle ou inference d'attributs sensibles.",
-            "Recherche visant des enfants ou groupes vulnerables sans garanties appropriees et approbation ecrite.",
-            "Collecte de donnees sensibles sans base juridique valide et garanties configurees.",
+            "Recrutement, promotion, licenciement, surveillance des travailleurs ou décisions d'éligibilité a l'emploi.",
+            "Credit, assurance, logement, accès à l'éducation, diagnostic médical, éligibilité juridique ou aides publiques.",
+            "Identification biométrique, identification du locuteur, reconnaissance émotionnelle ou inference d'attributs sensibles.",
+            "Recherche visant des enfants ou groupes vulnérables sans garanties appropriées et approbation écrite.",
+            "Collecte de données sensibles sans base juridique valide et garanties configurées.",
             "Usages trompeurs, manipulateurs, illicites, discriminatoires ou de surveillance.",
           ],
         },
@@ -410,7 +410,7 @@ const docs = {
           id: "disclosure",
           title: "4. Transparence",
           body: [
-            "Les participants doivent etre informes qu'ils interagissent avec un interviewer IA et que leurs reponses peuvent etre enregistrees, transcrites et analysees par IA.",
+            "Les participants doivent être informés qu'ils interagissent avec un interviewer IA et que leurs réponses peuvent être enregistrées, transcrites et analysées par IA.",
           ],
         },
       ],
@@ -467,50 +467,50 @@ const docs = {
       ],
     },
     fr: {
-      title: "Politique de conservation des donnees",
+      title: "Politique de conservation des données",
       intro:
-        "Cette politique resume combien de temps QualiPulse conserve les differentes categories de donnees. Les clients peuvent appliquer une conservation plus courte en supprimant projets, participants ou exports.",
+        "Cette politique résume combien de temps QualiPulse conserve les différentes catégories de données. Les clients peuvent appliquer une conservation plus courte en supprimant projets, participants ou exports.",
       sections: [
         {
           id: "customer",
-          title: "1. Donnees de compte client",
+          title: "1. Données de compte client",
           body: [
-            "Les donnees de profil, workspace, authentification et facturation sont conservees tant que le compte est actif puis pendant une periode raisonnable si necessaire pour raisons legales, fiscales, securite ou litiges.",
+            "Les données de profil, workspace, authentification et facturation sont conservées tant que le compte est actif puis pendant une période raisonnable si nécessaire pour raisons légales, fiscales, sécurité ou litiges.",
           ],
         },
         {
           id: "research",
-          title: "2. Donnees de projet de recherche",
+          title: "2. Données de projet de recherche",
           body: [
-            "Guides d'entretien, metadonnees projet, participants, transcriptions, analyses, memos, tags et rapports sont conserves tant que le projet ou workspace reste actif, sauf suppression plus tot par le client.",
+            "Guides d'entretien, métadonnées projet, participants, transcriptions, analyses, memos, tags et rapports sont conservés tant que le projet ou workspace reste actif, sauf suppression plus tôt par le client.",
           ],
         },
         {
           id: "audio",
           title: "3. Enregistrements audio",
           body: [
-            "Les enregistrements audio sont conserves tant que l'entretien associe existe et sont supprimes lorsque le participant, entretien, projet ou workspace est supprime, sous reserve des fenetres de sauvegarde et securite.",
+            "Les enregistrements audio sont conservés tant que l'entretien associé existe et sont supprimés lorsque le participant, entretien, projet ou workspace est supprimé, sous réserve des fenêtres de sauvegarde et sécurité.",
           ],
         },
         {
           id: "logs",
-          title: "4. Journaux et registres de securite",
+          title: "4. Journaux et registres de sécurité",
           body: [
-            "Les journaux applicatifs, securite, usage, facturation et audit peuvent etre conserves pour securite, prevention de fraude, debug, exactitude de facturation, conformite legale et support.",
+            "Les journaux applicatifs, sécurité, usage, facturation et audit peuvent être conservés pour sécurité, prévention de fraude, debug, exactitude de facturation, conformité légale et support.",
           ],
         },
         {
           id: "backups",
           title: "5. Sauvegardes",
           body: [
-            "Les donnees supprimees peuvent rester dans des sauvegardes chiffrees pendant une periode limitee jusqu'a rotation. Les sauvegardes ne sont pas utilisees pour l'acces production ordinaire.",
+            "Les données supprimées peuvent rester dans des sauvegardes chiffrées pendant une période limitée jusqu'à rotation. Les sauvegardes ne sont pas utilisées pour l'accès production ordinaire.",
           ],
         },
         {
           id: "deletion",
           title: "6. Demandes de suppression",
           body: [
-            "Les clients peuvent supprimer donnees projet et participant dans le produit. Les participants peuvent demander la suppression via le chercheur ou privacy@qualipulse.com afin que nous routions la demande correctement.",
+            "Les clients peuvent supprimer données projet et participant dans le produit. Les participants peuvent demander la suppression via le chercheur ou privacy@qualipulse.com afin que nous routions la demande correctement.",
           ],
         },
       ],
@@ -607,7 +607,7 @@ export default function LegalDocument() {
         <div className="legal-back">
           <Link to="/terms">{lang === "fr" ? "Conditions" : "Terms"}</Link>
           {" · "}
-          <Link to="/privacy">{lang === "fr" ? "Confidentialite" : "Privacy"}</Link>
+          <Link to="/privacy">{lang === "fr" ? "Confidentialité" : "Privacy"}</Link>
           {" · "}
           <Link to="/">{t("legal.backToHome")}</Link>
         </div>
