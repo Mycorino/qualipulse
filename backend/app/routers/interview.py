@@ -39,7 +39,12 @@ from app.services.interview_engine import (
 )
 from app.services.storage import upload_audio
 from app.services.transcode import needs_transcode, transcode_to_mp3
-from app.services.verification import generate_magic_token, verify_magic_token
+from app.services.verification import (
+    CodeResult,
+    generate_magic_token,
+    verify_code,
+    verify_magic_token,
+)
 
 logger = logging.getLogger("auto_interview")
 
@@ -176,6 +181,11 @@ class ResumeCheckRequest(BaseModel):
     # email. Required — without it, knowing someone's email + the public
     # link token would be enough to hijack their in-progress interview.
     session_token: str | None = None
+
+
+class VerifyCodeRequest(BaseModel):
+    email: str
+    code: str
 
 
 class VerificationRequest(BaseModel):
@@ -338,6 +348,68 @@ def verify_participant_token(
     # Recognize a returning participant: if a panel profile with the core
     # demographics already exists, the frontend skips the profiling
     # questionnaire entirely (the magic link behaves like a login).
+    profile = (
+        db.query(PanelProfile)
+        .filter(PanelProfile.email == record.email)
+        .first()
+    )
+    return {
+        "session_token": session_token,
+        "link_token": record.interview_link_token,
+        "email": record.email,
+        "profile_complete": _is_profile_complete(profile),
+        "first_name": profile.first_name if profile else None,
+        "preferred_language": profile.preferred_language if profile else None,
+    }
+
+
+@router.post("/{token}/verify-code")
+@limiter.limit("10/minute")
+def verify_participant_code(
+    request: Request,
+    token: str,
+    body: VerifyCodeRequest,
+    db: Session = Depends(get_db),
+):
+    """Exchange the six-digit code from the verification email for a session.
+
+    The OTP twin of GET /verify/{magic_token}, returning the identical shape
+    so the frontend can treat the two routes interchangeably. This is the
+    route that keeps a participant in the tab they started in: tapping the
+    emailed link instead opens the study in the mail app's in-app browser,
+    where MediaRecorder is frequently unavailable and the original tab's
+    sessionStorage is gone, which for a voice interview ends the session.
+    """
+    _get_active_link_or_404(token, db)
+
+    result, record = verify_code(db, body.email, token, body.code)
+
+    if result == CodeResult.TOO_MANY_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "too_many_attempts",
+                "message": "Too many incorrect codes. Request a new one to continue.",
+            },
+        )
+    if result == CodeResult.EXPIRED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "code_expired",
+                "message": "That code has expired or has already been used. Request a new one.",
+            },
+        )
+    if result != CodeResult.OK or record is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "code_invalid",
+                "message": "That code is not right. Check the email and try again.",
+            },
+        )
+
+    session_token = _create_session_token(record.email, record.interview_link_token)
     profile = (
         db.query(PanelProfile)
         .filter(PanelProfile.email == record.email)
