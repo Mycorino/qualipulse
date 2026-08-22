@@ -627,18 +627,22 @@ _COPY: dict[str, dict[str, dict[str, str]]] = {
     },
     "interview_magic": {
         "en": {
-            "subject": "Your interview access link",
-            "heading": "You're one click away",
-            "body": "Click the button below to verify your email and start your interview.",
+            "subject": "Your interview code: {code}",
+            "heading": "Your verification code",
+            "body": "Enter this code on the page you already have open to start your interview.",
+            "code_hint": "Typing the code keeps you in the same tab, which is the smoothest way to do a voice interview on a phone.",
+            "or": "Or open the interview directly",
             "cta": "Start my interview →",
-            "foot": "This link expires in {expiry_minutes} minutes. If you didn't request this, you can ignore this email.",
+            "foot": "This code and link expire in {expiry_minutes} minutes. If you didn't request this, you can ignore this email.",
         },
         "fr": {
-            "subject": "Votre lien d'accès à l'entretien",
-            "heading": "Plus qu'un clic",
-            "body": "Cliquez sur le bouton ci-dessous pour vérifier votre adresse email et démarrer l'entretien.",
+            "subject": "Votre code d'entretien : {code}",
+            "heading": "Votre code de vérification",
+            "body": "Saisissez ce code sur la page déjà ouverte pour démarrer votre entretien.",
+            "code_hint": "Saisir le code vous permet de rester dans le même onglet, ce qui est le plus simple pour un entretien vocal sur téléphone.",
+            "or": "Ou ouvrez directement l'entretien",
             "cta": "Démarrer mon entretien →",
-            "foot": "Ce lien expire dans {expiry_minutes} minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.",
+            "foot": "Ce code et ce lien expirent dans {expiry_minutes} minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.",
         },
     },
     "panel_join": {
@@ -1388,12 +1392,40 @@ def send_interview_magic_link(
     magic_url: str,
     expiry_minutes: int = 30,
     lang: str = "en",
+    code: str | None = None,
 ) -> bool:
+    """Verification email carrying both a code and a link.
+
+    The code leads, because tapping the link from a mail app opens the study
+    in that app's in-app browser, where MediaRecorder is often unavailable
+    and the original tab's sessionStorage is gone. For a voice interview
+    that breaks the session outright, so the route that keeps the
+    participant in the tab they started in is the one we put first. The link
+    stays as a one-tap option for everyone it does work for.
+    """
     lang = _normalise_lang(lang)
+    code_block = ""
+    if code:
+        # Letter-spaced monospace so the digits are easy to read off a phone
+        # and hard to mistranscribe. Kept as selectable text (not an image)
+        # so mail clients can offer copy and autofill.
+        code_block = f"""
+      <div style="text-align:center;margin:24px 0;">
+        <div style="display:inline-block;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:16px 28px;">
+          <span style="font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:2rem;font-weight:700;letter-spacing:0.35em;color:#0f172a;">{code}</span>
+        </div>
+      </div>
+      <p style="color:#94a3b8;font-size:0.8rem;text-align:center;margin:0 0 24px;">
+        {_c("interview_magic", lang, "code_hint")}
+      </p>
+      <p style="color:#64748b;font-size:0.85rem;text-align:center;margin:0 0 8px;">
+        {_c("interview_magic", lang, "or")}
+      </p>"""
     content = f"""
       <h2 style="margin:0 0 8px;font-size:1.25rem;color:#0f172a;">{_c("interview_magic", lang, "heading")}</h2>
       <p style="color:#475569;line-height:1.6;margin:0 0 24px;">{_c("interview_magic", lang, "body")}</p>
-      <div style="text-align:center;margin:32px 0;">
+      {code_block}
+      <div style="text-align:center;margin:0 0 32px;">
         <a href="{magic_url}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
           {_c("interview_magic", lang, "cta")}
         </a>
@@ -1404,7 +1436,7 @@ def send_interview_magic_link(
     """
     return send_email(
         to=email,
-        subject=_c("interview_magic", lang, "subject"),
+        subject=_c("interview_magic", lang, "subject", code=code or ""),
         body_html=_wrap_email(content, lang),
     )
 

@@ -320,6 +320,29 @@ export async function requestVerification(
   await client.post(`/interview/${linkToken}/request-verification`, { email, lang });
 }
 
+/**
+ * Exchange the six-digit code from the verification email for a session.
+ *
+ * The OTP twin of `verifyInterviewToken`: it returns the identical shape, so
+ * callers can treat the two routes interchangeably. This is the route that
+ * keeps a participant in the tab they already opened (and already granted the
+ * microphone to) instead of bouncing them into the mail app's browser.
+ *
+ * Errors carry a structured `detail: { code, message }`:
+ *   400 code_invalid / code_expired, 429 too_many_attempts.
+ */
+export async function verifyInterviewCode(
+  linkToken: string,
+  email: string,
+  code: string
+): Promise<VerifyTokenResponse> {
+  const { data } = await client.post<VerifyTokenResponse>(
+    `/interview/${linkToken}/verify-code`,
+    { email, code }
+  );
+  return data;
+}
+
 export async function verifyInterviewToken(magicToken: string): Promise<VerifyTokenResponse> {
   const { data } = await client.get<VerifyTokenResponse>(`/interview/verify/${magicToken}`);
   return data;
