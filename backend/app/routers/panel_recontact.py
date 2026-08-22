@@ -31,6 +31,11 @@ from app.services import panel_invites as pi
 from app.services import panel_service as ps
 from app.services.analytics import emit_event
 from app.services.email import send_interview_invite
+from app.services.verification import (
+    INVITE_TOKEN_EXPIRY_MINUTES,
+    magic_link_url,
+    mint_magic_token,
+)
 
 logger = logging.getLogger("auto_interview")
 
@@ -134,7 +139,6 @@ def send_invites(
     pool_emails = {p.email.lower() for p in pi.workspace_pool(db, project.company_id)}
     cooled = pi.emails_in_cooldown(db, {p.email.lower() for p in profiles})
 
-    interview_url = f"{settings.APP_BASE_URL}/i/{link.token}"
     sender_name = (project.researcher_name or company.name or "").strip() or "The research team"
 
     sent: list[str] = []
@@ -180,12 +184,34 @@ def send_invites(
             continue
 
         optout_url = f"{settings.APP_BASE_URL}/panel/optout?token={ps.create_optout_token(profile.email)}"
+        # Per-invitee magic link rather than the shared /i/{token} URL. We
+        # already know exactly who we invited, so the link itself can carry
+        # that identity: clicking the email proves possession the same way
+        # the verification flow does, with no extra step for the panelist.
+        # It also means the recontact funnel and the
+        # one-interview-per-email guard key off a verified address instead
+        # of whatever the participant happens to type in.
+        try:
+            invite_token = mint_magic_token(
+                db,
+                email=profile.email,
+                interview_link_token=link.token,
+                expiry_minutes=INVITE_TOKEN_EXPIRY_MINUTES,
+                reusable=True,
+            )
+        except Exception:  # pragma: no cover — defensive
+            logger.exception("invite token mint failed for profile=%s", pid)
+            db.rollback()
+            db.delete(invite)
+            db.commit()
+            skipped.append({"profile_id": pid, "reason": "send_failed"})
+            continue
         ok = False
         try:
             ok = send_interview_invite(
                 to=profile.email,
                 project_name=project.name,
-                interview_url=interview_url,
+                interview_url=magic_link_url(invite_token, lang),
                 sender_name=sender_name,
                 lang=lang,
                 optout_url=optout_url,

@@ -302,3 +302,131 @@ class TestInviteEmailTemplate:
         assert "Einladung" in captured["subject"]
         assert "https://x/panel/optout?token=abc" in captured["html"]
         assert "Keine Einladungen mehr erhalten" in captured["html"]
+
+
+class TestTokenizedInviteLinks:
+    """Invites carry a per-invitee magic link, not the shared /i/{token} URL.
+
+    The invite is sent to one known address, so the link itself can prove
+    possession of that address: the panelist gets identity for free, with no
+    verification step, and the one-interview-per-email guard finally applies
+    to invited participants (it is skipped entirely for anonymous starts).
+    """
+
+    @pytest.fixture
+    def sent_mails(self, monkeypatch):
+        calls = []
+
+        def fake_send(**kwargs):
+            calls.append(kwargs)
+            return True
+
+        from app.routers import panel_recontact
+        monkeypatch.setattr(panel_recontact, "send_interview_invite", fake_send)
+        return calls
+
+    def test_invite_url_is_a_per_invitee_magic_link(
+        self, client, auth_headers, db_session, setup, sent_mails
+    ):
+        from app.models.panel import ParticipantMagicToken
+
+        resp = client.post(
+            f"/projects/{setup['target'].id}/invites",
+            json={"profile_ids": [setup["alice"].id, setup["ben"].id]},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert len(sent_mails) == 2
+
+        urls = {m["to"]: m["interview_url"] for m in sent_mails}
+        # No longer the shared link every invitee received identically.
+        assert "/i/" not in urls["alice@example.com"]
+        assert "/interview/verify/" in urls["alice@example.com"]
+        # Each invitee gets a distinct credential.
+        assert urls["alice@example.com"] != urls["ben@example.com"]
+
+        # Each token resolves to the address it was sent to.
+        for email, url in urls.items():
+            token = url.split("/interview/verify/")[1].split("?")[0]
+            rec = (
+                db_session.query(ParticipantMagicToken)
+                .filter(ParticipantMagicToken.token == token)
+                .first()
+            )
+            assert rec is not None
+            assert rec.email == email
+            assert rec.reusable is True
+
+    def test_invite_token_survives_being_clicked_twice(
+        self, client, auth_headers, db_session, setup, sent_mails
+    ):
+        """The session JWT lasts 2 hours; a single-use invite would lock a
+        panelist out of their own invitation the moment they stepped away."""
+        client.post(
+            f"/projects/{setup['target'].id}/invites",
+            json={"profile_ids": [setup["alice"].id]},
+            headers=auth_headers,
+        )
+        url = sent_mails[0]["interview_url"]
+        token = url.split("/interview/verify/")[1].split("?")[0]
+
+        first = client.get(f"/interview/verify/{token}")
+        assert first.status_code == 200, first.text
+        assert first.json()["email"] == "alice@example.com"
+
+        second = client.get(f"/interview/verify/{token}")
+        assert second.status_code == 200, second.text
+        assert second.json()["email"] == "alice@example.com"
+
+    def test_invite_token_does_not_expire_on_the_verification_clock(
+        self, client, auth_headers, db_session, setup, sent_mails
+    ):
+        """Invites are read hours or days later, not within 30 minutes."""
+        from app.models.panel import ParticipantMagicToken
+
+        client.post(
+            f"/projects/{setup['target'].id}/invites",
+            json={"profile_ids": [setup["alice"].id]},
+            headers=auth_headers,
+        )
+        token = sent_mails[0]["interview_url"].split("/interview/verify/")[1].split("?")[0]
+        rec = (
+            db_session.query(ParticipantMagicToken)
+            .filter(ParticipantMagicToken.token == token)
+            .first()
+        )
+        assert (rec.expires_at - datetime.utcnow()) > timedelta(days=7)
+
+
+class TestSingleUseTokensStillBurn:
+    """Reusability is opt-in: the ordinary verification link must not become
+    replayable as a side effect of the invite change."""
+
+    def test_default_token_is_single_use(self, db_session):
+        from app.services.verification import mint_magic_token, verify_magic_token
+
+        token = mint_magic_token(
+            db_session, email="solo@example.com", interview_link_token="linktok"
+        )
+        assert verify_magic_token(db_session, token) is not None
+        assert verify_magic_token(db_session, token) is None
+
+    def test_expired_reusable_token_is_rejected(self, db_session):
+        from app.models.panel import ParticipantMagicToken
+        from app.services.verification import mint_magic_token, verify_magic_token
+
+        token = mint_magic_token(
+            db_session,
+            email="late@example.com",
+            interview_link_token="linktok",
+            reusable=True,
+        )
+        rec = (
+            db_session.query(ParticipantMagicToken)
+            .filter(ParticipantMagicToken.token == token)
+            .first()
+        )
+        rec.expires_at = datetime.utcnow() - timedelta(minutes=1)
+        db_session.commit()
+
+        assert verify_magic_token(db_session, token) is None

@@ -160,5 +160,13 @@ class ParticipantMagicToken(Base):
     token = Column(String, unique=True, nullable=False, index=True)
     interview_link_token = Column(String, nullable=False)
     used = Column(Boolean, default=False)
+    # Recontact invites mint a token that is NOT burned on first click.
+    # The session JWT it issues lasts only 2 hours, so a single-use invite
+    # would lock a panelist out of their own invitation the moment they
+    # stepped away and came back, with no way to re-request one. Reuse is
+    # safe here because the token is bound to a single email and the
+    # one-completed-interview-per-email-per-link guard still applies, so a
+    # forwarded or re-clicked invite can never yield a second interview.
+    reusable = Column(Boolean, default=False, nullable=False, server_default="0")
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
