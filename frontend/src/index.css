@@ -6887,6 +6887,109 @@ select.field-input {
   color: var(--text-secondary, #6b7280);
 }
 
+/* ── Participant verification code (OTP) screen ─────────────────────────── */
+.otp-screen {
+  text-align: center;
+}
+.otp-icon {
+  font-size: 52px;
+  margin-bottom: 16px;
+}
+.otp-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.otp-desc {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+.otp-why {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.otp-form {
+  text-align: left;
+  margin-bottom: 4px;
+}
+.otp-label {
+  margin-top: 0;
+}
+.otp-input {
+  /* Roomier than the standard 44px field: this is the one thing to do here. */
+  min-height: 52px;
+  text-align: center;
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4em;
+  /* letter-spacing pads the right edge, so nudge the glyphs back to centre */
+  text-indent: 0.4em;
+  font-weight: 600;
+}
+.otp-input::placeholder {
+  letter-spacing: 0.4em;
+  font-weight: 400;
+  font-size: 22px;
+}
+.otp-input:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+.otp-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.otp-submit {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+}
+.otp-status {
+  min-height: 8px;
+  margin-top: 12px;
+}
+.otp-error {
+  text-align: left;
+  margin-bottom: 0;
+}
+.otp-resent {
+  font-size: 13px;
+  color: var(--success-text);
+  margin: 0;
+}
+.otp-expiry {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 16px 0 12px;
+}
+.otp-resend {
+  min-height: 44px;
+}
+.otp-link-alt {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.otp-link-alt-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 4px;
+}
+.otp-link-alt-body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0;
+}
+.otp-change-email {
+  margin-top: 16px;
+  min-height: 44px;
+}
+
 /* Screening error block (rebuilt) */
 .screening-error-card {
   background: #fef2f2;
