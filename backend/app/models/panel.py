@@ -168,5 +168,15 @@ class ParticipantMagicToken(Base):
     # one-completed-interview-per-email-per-link guard still applies, so a
     # forwarded or re-clicked invite can never yield a second interview.
     reusable = Column(Boolean, default=False, nullable=False, server_default="0")
+    # Six-digit code carried in the same email as the magic link. Typing it
+    # keeps the participant in the tab they started in, which matters here:
+    # tapping the link from a mail app opens the study in that app's in-app
+    # browser, where MediaRecorder is often unavailable (the same webview
+    # problem the participant UI already ships an interstitial for) and the
+    # original tab's sessionStorage is gone.
+    code = Column(String(6), nullable=True, index=True)
+    # Failed code entries against this token. Six digits is only a million
+    # combinations, so the code is useless without a hard attempt cap.
+    code_attempts = Column(Integer, default=0, nullable=False, server_default="0")
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

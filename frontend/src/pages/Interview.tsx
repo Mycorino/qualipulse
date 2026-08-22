@@ -15,9 +15,11 @@ import {
   finishInterview,
   getTurnAudio,
   requestVerification,
+  verifyInterviewCode,
   savePanelProfile,
   RECORDING_TOO_LARGE,
   InterviewInfo,
+  VerifyTokenResponse,
   ScreeningQuestion,
   ResumeCheck,
   ResumeSummary,
@@ -82,6 +84,27 @@ const EMPTY_PROFILE: ProfileState = {
   selectedTagIds: [],
 };
 
+/** Returning-participant hints carried by both verification routes. */
+interface ProfileMeta {
+  profile_complete?: boolean;
+  first_name?: string | null;
+  preferred_language?: string | null;
+}
+
+/** The distinct outcomes of submitting a six-digit code. */
+type CodeErrorKind = "code_invalid" | "code_expired" | "too_many_attempts" | "generic";
+
+/** Map the backend's structured `detail: { code, message }` onto a localizable kind. */
+function codeErrorKind(err: unknown): CodeErrorKind {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  const raw =
+    detail && typeof detail === "object" && !Array.isArray(detail)
+      ? (detail as { code?: unknown }).code
+      : undefined;
+  if (raw === "code_invalid" || raw === "code_expired" || raw === "too_many_attempts") return raw;
+  return "generic";
+}
+
 function parseJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
@@ -110,6 +133,13 @@ export default function Interview() {
   const [resendCountdown, setResendCountdown] = useState(0);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [email, setEmail] = useState(""); // from verified session
+  // Six-digit code entry. The code is the primary route: typing it keeps the
+  // participant in the tab they already opened, where the microphone works.
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeError, setCodeError] = useState<CodeErrorKind | null>(null);
+  const [codeResent, setCodeResent] = useState(false);
+  const codeInputRef = useRef<HTMLInputElement | null>(null);
 
   // Consent
   const [consentGiven, setConsentGiven] = useState(false);
@@ -317,6 +347,38 @@ export default function Interview() {
 
   // ── Session / URL handling on load ──────────────────────────────────────
 
+  // Apply the returning-participant meta (profile_complete / first_name /
+  // preferred_language). Shared by both verification routes: the magic link
+  // (which stashes it in sessionStorage before redirecting here) and the
+  // six-digit code (which gets it straight off the verify-code response).
+  function applyProfileMeta(meta: ProfileMeta) {
+    if (meta.profile_complete) setProfileComplete(true);
+    if (meta.first_name) setProfile((p) => ({ ...p, firstName: meta.first_name as string }));
+    const ml = (meta.preferred_language || "").slice(0, 2);
+    if (ml && (SUPPORTED_LANGUAGES as readonly string[]).includes(ml)) {
+      localStorage.setItem("qp_interview_lang", ml);
+      i18n.changeLanguage(ml);
+    }
+  }
+
+  /** The one path a verified participant takes, whichever route verified them. */
+  function applyVerifiedSession(res: VerifyTokenResponse) {
+    const linkToken = res.link_token || token || "";
+    sessionStorage.setItem(`interview_session_${linkToken}`, res.session_token);
+    sessionStorage.setItem(
+      `interview_profile_meta_${linkToken}`,
+      JSON.stringify({
+        profile_complete: res.profile_complete,
+        first_name: res.first_name,
+        preferred_language: res.preferred_language,
+      })
+    );
+    setEmail(res.email);
+    setSessionToken(res.session_token);
+    applyProfileMeta(res);
+    setPhase("consent");
+  }
+
   useEffect(() => {
     if (!token) return;
 
@@ -324,24 +386,13 @@ export default function Interview() {
     const params = new URLSearchParams(location.search);
     const sessionParam = params.get("session");
 
-    // Read the returning-participant meta (profile_complete / first_name /
-    // preferred_language) that InterviewVerify stashed alongside the session.
-    const applyProfileMeta = () => {
+    // Read the returning-participant meta that InterviewVerify stashed
+    // alongside the session.
+    const applyStoredProfileMeta = () => {
       try {
         const raw = sessionStorage.getItem(`interview_profile_meta_${token}`);
         if (!raw) return;
-        const meta = JSON.parse(raw) as {
-          profile_complete?: boolean;
-          first_name?: string | null;
-          preferred_language?: string | null;
-        };
-        if (meta.profile_complete) setProfileComplete(true);
-        if (meta.first_name) setProfile((p) => ({ ...p, firstName: meta.first_name as string }));
-        const ml = (meta.preferred_language || "").slice(0, 2);
-        if (ml && (SUPPORTED_LANGUAGES as readonly string[]).includes(ml)) {
-          localStorage.setItem("qp_interview_lang", ml);
-          i18n.changeLanguage(ml);
-        }
+        applyProfileMeta(JSON.parse(raw) as ProfileMeta);
       } catch { /* meta is best-effort */ }
     };
 
@@ -353,7 +404,7 @@ export default function Interview() {
         setSessionToken(sessionParam);
         sessionStorage.setItem(`interview_session_${token}`, sessionParam);
         navigate(`/i/${token}`, { replace: true });
-        applyProfileMeta();
+        applyStoredProfileMeta();
         setPhase("consent");
         return;
       }
@@ -366,7 +417,7 @@ export default function Interview() {
       if (payload?.email) {
         setEmail(String(payload.email));
         setSessionToken(saved);
-        applyProfileMeta();
+        applyStoredProfileMeta();
         setPhase("consent");
         return;
       }
@@ -723,6 +774,20 @@ export default function Interview() {
 
   // ── Verification ─────────────────────────────────────────────────────────
 
+  /** Clear the code field and any error/confirmation left over from a past try. */
+  function resetCodeEntry() {
+    setVerificationCode("");
+    setCodeError(null);
+    setCodeResent(false);
+  }
+
+  /** Put the caret in the code box without yanking the page around on mobile. */
+  function focusCodeInput() {
+    window.setTimeout(() => {
+      codeInputRef.current?.focus({ preventScroll: true });
+    }, 80);
+  }
+
   async function handleSendVerification() {
     if (!token || !verificationEmail.trim()) return;
     setSendingVerification(true);
@@ -730,7 +795,9 @@ export default function Interview() {
     try {
       await requestVerification(token, verificationEmail.trim(), (i18n.language || "en").slice(0, 2));
       setResendCountdown(60);
+      resetCodeEntry();
       setPhase("email_sent");
+      focusCodeInput();
     } catch {
       setError(t("emailEntry.sendError"));
     } finally {
@@ -740,12 +807,49 @@ export default function Interview() {
 
   async function handleResendVerification() {
     if (!token || resendCountdown > 0) return;
+    setError("");
     try {
       await requestVerification(token, verificationEmail.trim(), (i18n.language || "en").slice(0, 2));
       setResendCountdown(60);
+      // A new code invalidates the previous one, so the field starts clean and
+      // an "attempts exhausted" lock is lifted.
+      resetCodeEntry();
+      setCodeResent(true);
+      focusCodeInput();
     } catch {
       setError(t("emailEntry.resendError"));
     }
+  }
+
+  /** Exchange the six-digit code for a session, then join the magic-link path. */
+  async function handleVerifyCode(candidate?: string) {
+    const digits = (candidate ?? verificationCode).replace(/\D/g, "").slice(0, 6);
+    if (!token || digits.length !== 6 || verifyingCode) return;
+    if (codeError === "too_many_attempts") return; // locked until a new code is sent
+    setVerifyingCode(true);
+    setCodeError(null);
+    setCodeResent(false);
+    setError("");
+    try {
+      const res = await verifyInterviewCode(token, verificationEmail.trim(), digits);
+      applyVerifiedSession(res);
+    } catch (err) {
+      const kind = codeErrorKind(err);
+      setCodeError(kind);
+      setVerificationCode("");
+      if (kind !== "too_many_attempts") focusCodeInput();
+    } finally {
+      setVerifyingCode(false);
+    }
+  }
+
+  /** Digits only, so a pasted "123 456" works. Auto-submits on the sixth digit. */
+  function handleCodeChange(raw: string) {
+    const digits = raw.replace(/\D/g, "").slice(0, 6);
+    setVerificationCode(digits);
+    setCodeResent(false);
+    if (codeError && codeError !== "too_many_attempts") setCodeError(null);
+    if (digits.length === 6) void handleVerifyCode(digits);
   }
 
   // ── Consent ──────────────────────────────────────────────────────────────
@@ -1556,20 +1660,6 @@ export default function Interview() {
             <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 12, lineHeight: 1.5 }}>
               {t("emailEntry.emailNote")}
             </p>
-            <div style={{ textAlign: "center", marginTop: 16 }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ width: "100%", minHeight: 44 }}
-                onClick={() => { setError(""); setPhase("consent"); }}
-              >
-                {t("emailEntry.skipSession")}
-              </button>
-              <p style={{ fontSize: 12, color: "var(--text-muted, #9ca3af)", marginTop: 8 }}>
-                {t("emailEntry.skipEmailNote")}
-              </p>
-            </div>
-
             {/* "Why we ask for your email" expander — addresses the trust ask */}
             <div className="why-email-expander">
               <button
@@ -1597,31 +1687,90 @@ export default function Interview() {
     );
   }
 
-  // ── Email sent (check inbox) phase ───────────────────────────────────────
+  // ── Code entry phase ─────────────────────────────────────────────────────
+  // The code is the primary route on purpose: tapping the emailed link opens
+  // the study in the mail app's browser, where the microphone often refuses to
+  // work and the tab they started in is gone. Typing the code keeps them here.
 
   if (phase === "email_sent") {
+    const codeLocked = codeError === "too_many_attempts";
+    const codeErrorText = !codeError
+      ? ""
+      : codeError === "code_invalid"
+      ? t("emailSent.errorInvalid")
+      : codeError === "code_expired"
+      ? t("emailSent.errorExpired")
+      : codeError === "too_many_attempts"
+      ? t("emailSent.errorLocked")
+      : t("emailSent.errorGeneric");
     return (
       <div className="interview-page">
-        <div className="interview-container" style={{ textAlign: "center", maxWidth: 440 }}>
-          <div style={{ fontSize: 52, marginBottom: 16 }}><span aria-hidden="true">📬</span></div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{t("emailSent.title")}</h1>
-          <p style={{ color: "var(--text-secondary, #6b7280)", lineHeight: 1.6, marginBottom: 8 }} dangerouslySetInnerHTML={{ __html: t("emailSent.desc", { email: verificationEmail }) }} />
-          <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 13, marginBottom: 24 }}>
-            {t("emailSent.expiry")}
-          </p>
+        <div className="interview-container otp-screen" style={{ maxWidth: 440 }}>
+          <div className="otp-icon"><span aria-hidden="true">📬</span></div>
+          <h1 className="otp-title">{t("emailSent.title")}</h1>
+          <p
+            className="otp-desc"
+            dangerouslySetInnerHTML={{ __html: t("emailSent.desc", { email: verificationEmail }) }}
+          />
+          <p className="otp-why">{t("emailSent.codeWhy")}</p>
+
+          <form
+            className="otp-form"
+            onSubmit={(e) => { e.preventDefault(); void handleVerifyCode(); }}
+          >
+            <label className="field-label otp-label" htmlFor="interview-otp">
+              {t("emailSent.codeLabel")}
+            </label>
+            <input
+              id="interview-otp"
+              ref={codeInputRef}
+              className="field-input otp-input"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              placeholder={t("emailSent.codePlaceholder")}
+              value={verificationCode}
+              disabled={verifyingCode || codeLocked}
+              aria-invalid={codeError ? true : undefined}
+              aria-describedby="interview-otp-status"
+              onChange={(e) => handleCodeChange(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg otp-submit"
+              disabled={verificationCode.length !== 6 || verifyingCode || codeLocked}
+            >
+              {verifyingCode ? t("emailSent.verifying") : t("emailSent.verify")}
+            </button>
+          </form>
+
+          <div id="interview-otp-status" className="otp-status" aria-live="polite">
+            {codeErrorText ? (
+              <p className="error-banner otp-error">{codeErrorText}</p>
+            ) : codeResent ? (
+              <p className="otp-resent">{t("emailSent.codeResent")}</p>
+            ) : null}
+          </div>
+
+          <p className="otp-expiry">{t("emailSent.expiry")}</p>
           {error && <div className="error-banner" role="alert">{error}</div>}
           <button
-            className="btn btn-ghost"
+            className="btn btn-ghost otp-resend"
             onClick={handleResendVerification}
             disabled={resendCountdown > 0}
-            style={{ marginBottom: 12 }}
           >
             {resendCountdown > 0 ? t("emailSent.resendCooldown", { seconds: resendCountdown }) : t("emailSent.resend")}
           </button>
-          <br />
+
+          <div className="otp-link-alt">
+            <p className="otp-link-alt-title">{t("emailSent.linkAlternativeTitle")}</p>
+            <p className="otp-link-alt-body">{t("emailSent.linkAlternative")}</p>
+          </div>
+
           <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => { setPhase("email_entry"); setError(""); }}
+            className="btn btn-ghost btn-sm otp-change-email"
+            onClick={() => { setPhase("email_entry"); setError(""); resetCodeEntry(); }}
           >
             ← {t("emailSent.differentEmail")}
           </button>
