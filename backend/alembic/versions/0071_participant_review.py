@@ -1,6 +1,6 @@
 """Participant review state + project incentive text.
 
-Revision ID: 0069_participant_review
+Revision ID: 0071_participant_review
 Revises: 0068_unique_turn_index
 Create Date: 2026-08-22
 
@@ -14,8 +14,8 @@ historical interview changes state.
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0069_participant_review"
-down_revision = "0068_unique_turn_index"
+revision = "0071_participant_review"
+down_revision = "0070_magic_token_code"
 branch_labels = None
 depends_on = None
 

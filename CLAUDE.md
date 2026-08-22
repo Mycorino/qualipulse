@@ -1461,7 +1461,7 @@ gains "To review" / "To reward" filters (only when an incentive is set),
 approve / reject (optional private note) / mark-reward-sent actions on the
 participant card, a bulk "mark all sent" + reward-list CSV export, the NBA rungs
 `review_interviews` (weight 88, above run_analysis) and `send_rewards` (62), and
-the `rewards_pending` nudge. Alembic 0069. Tests:
+the `rewards_pending` nudge. Alembic 0071. Tests:
 `backend/tests/test_participant_review.py`.
 
 | Method | Path | Description |
