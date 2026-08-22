@@ -71,7 +71,9 @@
     "declineConfirmText": "Sind Sie sicher? Wenn Sie ablehnen, endet Ihre Teilnahme an dieser Studie.",
     "declineConfirmYes": "Ja, ablehnen",
     "resumeAvailable": "Sie haben auf diesem Gerät ein laufendes Interview.",
-    "resumeCta": "Dort weitermachen, wo Sie aufgehört haben"
+    "resumeCta": "Dort weitermachen, wo Sie aufgehört haben",
+    "incentiveLabel": "Vergütung:",
+    "incentiveNote": "Vorbehaltlich der Prüfung durch das Forschungsteam, das die Vergütung direkt versendet. Qualipulse wickelt keine Zahlungen ab."
   },
   "profile": {
     "title": "Erzählen Sie uns ein wenig über sich",

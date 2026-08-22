@@ -12,6 +12,8 @@ export interface InterviewInfo {
   researcher_logo_url?: string;
   research_context?: string;
   privacy_policy_url?: string;
+  /** Researcher-promised incentive, shown verbatim on the consent screen. */
+  incentive_text?: string | null;
   panel_collection_enabled?: boolean;
   /** Identity policy + theme. In "anonymous" mode the server already
    *  stripped company_name / researcher_name / researcher_logo_url. */

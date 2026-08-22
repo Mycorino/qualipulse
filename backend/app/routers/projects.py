@@ -266,7 +266,7 @@ def list_projects(
 
     results = []
     for p in projects:
-        completed_participants = [pt for pt in p.participants if pt.status == "completed"]
+        completed_participants = [pt for pt in p.participants if pt.counts_for_research]
         completed = len(completed_participants)
         in_progress = sum(1 for pt in p.participants if pt.status == "in_progress")
         # Most recent completion so the dashboard can show "N days since last
@@ -526,6 +526,8 @@ def _apply_branding_fields(project: Project, body, company: Company, db: Session
         project.researcher_logo_url = body.researcher_logo_url.strip() or None
     if body.privacy_policy_url is not None:
         project.privacy_policy_url = body.privacy_policy_url.strip() or None
+    if body.incentive_text is not None:
+        project.incentive_text = body.incentive_text.strip()[:300] or None
     if body.branding_mode is not None:
         project.branding_mode = body.branding_mode
     if body.brand_primary_color is not None:
@@ -988,6 +990,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
         researcher_name=project.researcher_name,
         researcher_logo_url=project.researcher_logo_url,
         privacy_policy_url=project.privacy_policy_url,
+        incentive_text=getattr(project, "incentive_text", None),
         created_at=project.created_at,
         questions=questions,
         screening_questions=screening,

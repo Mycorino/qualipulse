@@ -349,6 +349,16 @@
     "collectMore": {
       "label": "Collect more interviews ({{count}}/{{min}})",
       "reason": "Analysis unlocks at {{min}} completed interviews."
+    },
+    "reviewInterviews": {
+      "label": "Review new interviews",
+      "reason_one": "{{count}} completed interview is waiting for your approval before it counts.",
+      "reason_other": "{{count}} completed interviews are waiting for your approval before they count."
+    },
+    "sendRewards": {
+      "label": "Send pending rewards",
+      "reason_one": "{{count}} approved participant has not received the promised reward yet.",
+      "reason_other": "{{count}} approved participants have not received the promised reward yet."
     }
   },
   "nudges": {
@@ -356,7 +366,8 @@
     "dataMilestone": "You've got {{count}} completed interviews, enough to analyse.",
     "analysisStale": "{{count}} new interviews since the last analysis, worth refreshing.",
     "qualityFlag": "A low-quality interview just came in, worth a look.",
-    "studyReportReady": "“{{name}}”, the analysis report is ready."
+    "studyReportReady": "“{{name}}”, the analysis report is ready.",
+    "rewardsPending": "{{count}} approved participants are waiting for their reward."
   },
   "reports": {
     "eyebrow": "Your outputs",

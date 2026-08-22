@@ -22,6 +22,8 @@ export type NbaActionType =
   | "draft_guide"
   | "create_link"
   | "share_link"
+  | "review_interviews"
+  | "send_rewards"
   | "run_analysis"
   | "refresh_analysis"
   | "review_themes"
@@ -74,6 +76,10 @@ export interface ProjectNbaInput {
   annotationCount: number;
   /** The researcher's stated interview target (null when unset). */
   targetParticipants: number | null;
+  /** Compensated studies: completed interviews awaiting approve / reject. */
+  pendingReviewCount?: number;
+  /** Compensated studies: approved interviews whose reward is not marked sent. */
+  pendingRewardCount?: number;
 }
 
 interface Rule<T> {
@@ -116,6 +122,20 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
       reasonKey: `${NS}shareLink.reason`,
       kind: "do",
       weight: 80,
+    }),
+  },
+  {
+    // Compensated study: vet new interviews before they feed the analysis
+    // and before any reward is promised. Outranks "run analysis" on purpose.
+    test: (s) => (s.pendingReviewCount ?? 0) > 0,
+    action: (s) => ({
+      id: "review_interviews",
+      actionType: "review_interviews",
+      labelKey: `${NS}reviewInterviews.label`,
+      reasonKey: `${NS}reviewInterviews.reason`,
+      params: { count: s.pendingReviewCount ?? 0 },
+      kind: "do",
+      weight: 88,
     }),
   },
   {
@@ -203,6 +223,19 @@ const PROJECT_RULES: Rule<ProjectNbaInput>[] = [
       params: { count: s.completedCount, target: s.targetParticipants ?? 0 },
       kind: "do",
       weight: 65,
+    }),
+  },
+  {
+    // Approved participants still waiting for the promised reward.
+    test: (s) => (s.pendingRewardCount ?? 0) > 0,
+    action: (s) => ({
+      id: "send_rewards",
+      actionType: "send_rewards",
+      labelKey: `${NS}sendRewards.label`,
+      reasonKey: `${NS}sendRewards.reason`,
+      params: { count: s.pendingRewardCount ?? 0 },
+      kind: "do",
+      weight: 62,
     }),
   },
   {

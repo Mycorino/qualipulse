@@ -1625,6 +1625,11 @@ export default function Interview() {
           {info?.interview_duration_minutes && (
             <p className="interview-duration" style={{ textAlign: "center" }}>⏱ {t("emailEntry.duration", { minutes: info.interview_duration_minutes })}</p>
           )}
+          {info?.incentive_text && (
+            <p className="interview-duration" style={{ textAlign: "center", marginTop: 6 }} title={t("consent.incentiveNote")}>
+              🎁 {t("consent.incentiveLabel")} {info.incentive_text}
+            </p>
+          )}
           <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6, textAlign: "center" }}>
             {t("emailEntry.enterEmailDesc")}
           </p>
@@ -1819,6 +1824,14 @@ export default function Interview() {
               ) : null}
               {(info.interview_duration_minutes || info.question_count) ? "." : null}
             </p>
+            {info.incentive_text && (
+              <p className="consent-incentive" style={{ fontSize: 14, margin: "8px 0 4px" }}>
+                <strong>{t("consent.incentiveLabel")}</strong> {info.incentive_text}
+                <span className="muted-text" style={{ display: "block", fontSize: 12, marginTop: 2 }}>
+                  {t("consent.incentiveNote")}
+                </span>
+              </p>
+            )}
             <p className="consent-privacy-link">
               <a href="/participant-notice" target="_blank" rel="noopener noreferrer">
                 {t("consent.participantNotice")}

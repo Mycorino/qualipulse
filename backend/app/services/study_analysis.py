@@ -262,7 +262,7 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
             db.query(Participant)
             .filter(
                 Participant.project_id == p.id,
-                Participant.status == "completed",
+                Participant.counts_for_research,
             )
             .order_by(Participant.completed_at.desc())
             .limit(MAX_PARTICIPANTS_TO_INCLUDE)

@@ -145,7 +145,7 @@ _TRANSCRIPT_BUDGET = 9000  # chars per single transcript fed to the model
 def _progress_snapshot(project: Project) -> dict:
     """Counts + quality spread for this round's interviews."""
     parts = list(project.participants)
-    completed = [p for p in parts if p.status == "completed"]
+    completed = [p for p in parts if p.counts_for_research]
     spread: dict[str, int] = {}
     for p in completed:
         label = p.quality_label or "unrated"
@@ -172,7 +172,7 @@ def _interviews_index(project: Project) -> list[dict]:
             "turns": len(list(p.turns)),
         }
         for p in project.participants
-        if p.status == "completed"
+        if p.counts_for_research
     ]
 
 

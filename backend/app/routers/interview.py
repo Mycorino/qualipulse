@@ -659,6 +659,9 @@ def validate_link(
         "researcher_logo_url": None if anonymous else project.researcher_logo_url,
         "research_context": project.localized_research_context(lang) if lang else project.research_context,
         "privacy_policy_url": project.privacy_policy_url,
+        # Shown verbatim on the landing screen, with a "subject to review"
+        # qualifier added client-side. Researcher pays, never Qualipulse.
+        "incentive_text": getattr(project, "incentive_text", None),
         "panel_collection_enabled": getattr(project, "panel_collection_enabled", True),
         "branding": {
             "mode": branding_mode,

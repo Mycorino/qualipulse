@@ -20,6 +20,7 @@ export type NudgeEvent =
   | "analysis_stale"
   | "data_milestone"
   | "quality_flag"
+  | "rewards_pending"
   | "study_report_ready";
 
 export interface Nudge {
@@ -44,6 +45,9 @@ export interface ProjectSnapshot {
   completedCount: number;
   analysisParticipantCount: number;
   lowQualityCount: number;
+  /** Compensated studies: approved interviews whose reward is not yet sent.
+   *  Optional so snapshots persisted before the field existed still diff. */
+  pendingRewardCount?: number;
   /** Version of the latest analysis — disambiguates re-runs that happen
    *  to cover the same participant count (id-reuse would otherwise keep
    *  a re-run permanently suppressed after one dismissal). */
@@ -74,6 +78,7 @@ const NUDGE_TONE: Record<NudgeEvent, Nudge["tone"]> = {
   data_milestone: "positive",
   analysis_stale: "neutral",
   quality_flag: "caution",
+  rewards_pending: "neutral",
   study_report_ready: "positive",
 };
 
@@ -115,7 +120,7 @@ function saveStore(store: SignalStore): void {
 /** Is a change on `event`'s home surface the one being watched right now? */
 function suppressed(event: NudgeEvent, activeSection?: string): boolean {
   const section = (activeSection ?? "").toLowerCase();
-  if (event === "data_milestone" || event === "quality_flag") {
+  if (event === "data_milestone" || event === "quality_flag" || event === "rewards_pending") {
     return section === "responses";
   }
   if (event === "analysis_ready" || event === "analysis_stale") {
@@ -205,6 +210,17 @@ export function detectProjectNudges(
           curr.completedCount,
           "nudges.analysisStale",
           { count: currGap },
+        ),
+      );
+    }
+    if ((curr.pendingRewardCount ?? 0) > (prev.pendingRewardCount ?? 0)) {
+      candidates.push(
+        makeNudge(
+          "rewards_pending",
+          scopeId,
+          curr.pendingRewardCount ?? 0,
+          "nudges.rewardsPending",
+          { count: curr.pendingRewardCount ?? 0 },
         ),
       );
     }

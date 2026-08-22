@@ -71,7 +71,9 @@
     "declineConfirmText": "Tem a certeza? Ao recusar, a sua participação neste estudo termina.",
     "declineConfirmYes": "Sim, recusar",
     "resumeAvailable": "Tem uma entrevista em curso neste dispositivo.",
-    "resumeCta": "Continuar onde ficou"
+    "resumeCta": "Continuar onde ficou",
+    "incentiveLabel": "Incentivo:",
+    "incentiveNote": "Sujeito a revisão pela equipa de investigação, que envia a recompensa diretamente. A Qualipulse não processa pagamentos."
   },
   "profile": {
     "title": "Conte-nos um pouco sobre si",

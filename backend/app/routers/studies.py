@@ -164,7 +164,7 @@ def report_catalog(
                 db.query(func.count(Participant.id))
                 .filter(
                     Participant.project_id == project.id,
-                    Participant.status == "completed",
+                    Participant.counts_for_research,
                 )
                 .scalar()
                 or 0
@@ -222,7 +222,7 @@ def report_catalog(
                 .join(Project, Participant.project_id == Project.id)
                 .filter(
                     Project.study_id == study.id,
-                    Participant.status == "completed",
+                    Participant.counts_for_research,
                 )
                 .scalar()
                 or 0
@@ -373,7 +373,7 @@ def _summary_for(db: Session, study: Study) -> StudySummary:
         .join(Project, Participant.project_id == Project.id)
         .filter(
             Project.study_id == study.id,
-            Participant.status == "completed",
+            Participant.counts_for_research,
         )
         .scalar()
         or 0
@@ -501,7 +501,7 @@ def _project_mini(db: Session, project: Project) -> ProjectMini:
         db.query(func.count(Participant.id))
         .filter(
             Participant.project_id == project.id,
-            Participant.status == "completed",
+            Participant.counts_for_research,
         )
         .scalar()
         or 0
@@ -866,7 +866,7 @@ def export_study_report(
             db.query(Participant)
             .filter(
                 Participant.project_id.in_(project_ids),
-                Participant.status == "completed",
+                Participant.counts_for_research,
             )
             .order_by(Participant.completed_at)
             .limit(50)

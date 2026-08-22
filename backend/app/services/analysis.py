@@ -972,7 +972,7 @@ def run_analysis(
     if project is None:
         return
 
-    all_completed = [p for p in project.participants if p.status == "completed" and p.turns]
+    all_completed = [p for p in project.participants if p.counts_for_research and p.turns]
     completed = _filter_participants(all_completed, filter_by, filter_values)
 
     # Create a new versioned analysis row (keep last 5 per project)
@@ -1274,7 +1274,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         annotations_block = "\n".join(annotation_sections)
 
         # Load completed participants
-        all_completed = [p for p in project.participants if p.status == "completed" and p.turns]
+        all_completed = [p for p in project.participants if p.counts_for_research and p.turns]
 
         # Business + study context — same grounding as the v1 run.
         company = db.query(Company).filter(Company.id == project.company_id).first()

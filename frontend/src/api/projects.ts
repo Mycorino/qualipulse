@@ -85,6 +85,9 @@ export interface ProjectResponse {
   researcher_name?: string | null;
   researcher_logo_url?: string | null;
   privacy_policy_url?: string | null;
+  /** Participant incentive, free text shown on the landing screen. Non-empty
+   *  turns on review mode (completions land as pending) + the reward queue. */
+  incentive_text?: string | null;
   created_at: string;
   questions: QuestionResponse[];
   screening_questions: ScreeningQuestionResponse[];
@@ -133,6 +136,8 @@ export interface InterviewLink {
   created_at: string;
 }
 
+export type ReviewStatus = "pending" | "approved" | "rejected";
+
 export interface ParticipantResponse {
   id: string;
   display_name: string | null;
@@ -158,6 +163,13 @@ export interface ParticipantResponse {
   notable_quotes?: string[] | null;
   avg_response_words?: number | null;
   short_answer_pct?: number | null;
+  /** Researcher review. "pending" only happens on studies with an
+   *  incentive; "rejected" drops the interview from every research output. */
+  review_status?: ReviewStatus;
+  review_note?: string | null;
+  reviewed_at?: string | null;
+  /** Stamped when the researcher marked the incentive as sent. */
+  reward_sent_at?: string | null;
   /** V4 paywall — true when this participant's transcript body is
    *  hidden behind the free-preview paywall for the current
    *  workspace. List view shows a locked row; transcript endpoint
@@ -421,6 +433,7 @@ export async function patchProjectSettings(
     researcher_name?: string;
     researcher_logo_url?: string;
     privacy_policy_url?: string;
+    incentive_text?: string;
   }
 ): Promise<ProjectResponse> {
   const { data } = await client.patch<ProjectResponse>(`/projects/${id}/settings`, settings);
@@ -651,6 +664,62 @@ export async function getAnalysisReadiness(projectId: string): Promise<AnalysisR
 
 export async function getHeatmap(projectId: string): Promise<HeatmapResponse> {
   const { data } = await client.get<HeatmapResponse>(`/projects/${projectId}/analysis/heatmap`);
+  return data;
+}
+
+export interface ReviewState {
+  id: string;
+  review_status: ReviewStatus;
+  review_note: string | null;
+  reviewed_at: string | null;
+  reward_sent_at: string | null;
+}
+
+/** Approve / reject / reset a completed interview (compensated studies). */
+export async function reviewParticipant(
+  projectId: string,
+  participantId: string,
+  status: ReviewStatus,
+  note?: string,
+): Promise<ReviewState> {
+  const { data } = await client.patch(
+    `/projects/${projectId}/participants/${participantId}/review`,
+    { status, note: note ?? null },
+  );
+  return data;
+}
+
+/** Mark (or unmark) an approved participant's reward as sent. */
+export async function markRewardSent(
+  projectId: string,
+  participantId: string,
+  sent = true,
+): Promise<ReviewState> {
+  const { data } = await client.patch(
+    `/projects/${projectId}/participants/${participantId}/reward`,
+    { sent },
+  );
+  return data;
+}
+
+export async function markRewardsSentBulk(
+  projectId: string,
+  participantIds: string[],
+  sent = true,
+): Promise<ReviewState[]> {
+  const { data } = await client.post(
+    `/projects/${projectId}/participants/rewards/bulk`,
+    { participant_ids: participantIds, sent },
+  );
+  return data;
+}
+
+/** The payout list: approved participants + contact details as CSV. */
+export async function exportRewardsCSV(projectId: string, pendingOnly = true): Promise<Blob> {
+  const { data } = await client.get(`/projects/${projectId}/participants/rewards.csv`, {
+    params: { pending_only: pendingOnly },
+    responseType: "blob",
+  });
   return data;
 }
 

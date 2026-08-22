@@ -21,6 +21,8 @@ import html
 import json
 from datetime import datetime
 
+from app.models.interview import counts_for_research
+
 _FREQ_LEVEL = {"all": 4, "most": 3, "some": 2, "few": 1}
 
 _MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July",
@@ -952,7 +954,7 @@ def render_analysis_report_html(
     annot_by_theme = {a.theme_title: a for a in annotations}
 
     # Stable participant ordering: by completion date, P1..Pn identifiers.
-    completed = [p for p in participants if p.status == "completed"]
+    completed = [p for p in participants if counts_for_research(p)]
     completed.sort(key=lambda p: (p.completed_at or p.started_at or datetime.min))
     roster = []  # (identifier, display name, participant)
     for i, p in enumerate(completed):
@@ -2325,7 +2327,7 @@ def render_decision_report_html(
     tensions = qual.get("tensions", []) or []
     recommendations = qual.get("recommendations", []) or []
 
-    completed = [p for p in participants if p.status == "completed"]
+    completed = [p for p in participants if counts_for_research(p)]
     completed.sort(key=lambda p: (p.completed_at or p.started_at or datetime.min))
     roster = [("P{}".format(i + 1), (p.display_name or "{} {}".format(Lq["anonymous"], i + 1)), p)
               for i, p in enumerate(completed)]

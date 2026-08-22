@@ -70,6 +70,12 @@ class Project(Base):
     # Setup sample-size guidance, not a hard gate. Nullable = not yet decided.
     target_participants: Mapped[int | None] = mapped_column(Integer, nullable=True)
     privacy_policy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Participant incentive, free text shown verbatim on the landing screen
+    # ("€20 voucher, sent within 7 days of approval"). Non-empty switches
+    # the study into review mode: completions land as review_status=pending
+    # and the Responses tab shows the review + reward queues. Empty = unpaid
+    # study, nothing changes.
+    incentive_text: Mapped[str | None] = mapped_column(String(300), nullable=True)
     # Participant-facing identity policy for this study:
     #   "standard"  — show researcher_name / logo when set (default, legacy behaviour)
     #   "branded"   — additionally theme the interview page with the brand
