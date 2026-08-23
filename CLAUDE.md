@@ -1193,7 +1193,7 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Email verification banner (yellow) when unverified
 - [x] Admin panel (user management, tier changes, trial management, user deletion)
 - [x] Admin stats dashboard (users, tiers, interviews, signups over 7/30 days)
-- [x] Admin AI cost reporting (platform-wide + per-company breakdown)
+- [x] Admin dashboard (`/admin`, `pages/admin/*`): Overview tab (windowed KPIs with deltas, daily activity, cohort funnel, plan mix), AI spend tab (unit economics, by area/model/operation, per-workspace table with a drill-down drawer down to each interview's cost) built on a small dependency-free UI kit (`pages/admin/ui.tsx` + `admin.css`). Queries live in `services/admin_analytics.py`; a *completed interview* is a non-demo `Participant.status == "completed"`, an *interview cost* is every `AIUsageLog` row with a `participant_id`. Tests: `tests/test_admin_ops.py::TestInterviewEconomics`.
 - [x] Affiliate program (apply, magic-link login, dashboard, referral tracking, commission calculation). Attribution: `?ref=` is captured on any public page into localStorage (`qp_ref`, 60-day first-touch window, `utils/referral.ts`), read back at signup, and carried through the Google OAuth round-trip inside the signed state. Self-referrals are ignored. Lifecycle emails (EN/FR per `Affiliate.preferred_language`): application received, approved (with referral link), rejected, magic sign-in link, commission earned, payout recorded. All amounts in euros. Marketing footer links `/affiliate`. Tests: `backend/tests/test_affiliate.py`.
 - [x] Affiliate admin management (approve/reject, commission %, payout recording)
 - [x] Stripe webhook affiliate conversion tracking (one-time commission on the referred customer's first subscription payment; idempotent per referral, so cancel+resubscribe or replayed webhooks never double-pay; notifies the affiliate by email)
@@ -1587,10 +1587,11 @@ All copilot POST endpoints return **SSE** (`text/event-stream`) — events `stat
 | PATCH | `/admin/users/{company_id}/tier` | X-Admin-Key | Change subscription tier |
 | PATCH | `/admin/users/{company_id}/trial` | X-Admin-Key | Extend/reset/expire trial |
 | DELETE | `/admin/users/{company_id}` | X-Admin-Key | Delete user & cascade all data |
-| GET | `/admin/stats` | X-Admin-Key | Platform stats (users, tiers, interviews, signups) |
-| GET | `/admin/costs` | X-Admin-Key | Platform-wide AI cost report |
+| GET | `/admin/stats` | X-Admin-Key | Legacy platform counts (kept for the login probe) |
+| GET | `/admin/overview` | X-Admin-Key | Growth + unit-economics KPIs for `?days=` (each with the previous window for deltas), zero-filled daily series, signup-cohort funnel, plan mix, most active workspaces. Demo studies excluded. |
+| GET | `/admin/costs` | X-Admin-Key | AI spend for `?days=` (0 = all time): by operation (tokens, avg/call), by product area, by model, daily, per-workspace rows (window + all-time spend, completed interviews, cost/interview, plan), and `interview_economics` (fully loaded cost per completed interview: avg / median / p90, STT/TTS/Claude split) |
 | GET | `/admin/traffic` | X-Admin-Key | Marketing-funnel rollup (`?days=`): traffic, CTA clicks, signups, signup rate, per-channel breakdowns |
-| GET | `/admin/costs/company/{company_id}` | X-Admin-Key | Per-company cost breakdown |
+| GET | `/admin/costs/company/{company_id}` | X-Admin-Key | One workspace: spend by study (cost/interview, demo flagged), per-interview rows (turns, minutes, Claude/STT/TTS/other) and its own economics. `?days=` optional |
 | POST | `/admin/scheduled-emails/run` | X-Admin-Key | Run the lifecycle-email cron pass (Day-1, Day-7, Day-12). Supports `?dry_run=true`. Idempotent via `email_send_log` unique constraint. Hit hourly by Cloud Scheduler. Returns per-event sent/skipped counts. |
 | POST | `/admin/retention/run` | X-Admin-Key | Purge participant audio for interviews completed > `RETENTION_AUDIO_DAYS` days ago (0=disabled). `?dry_run=true`, `?days=` override. Transcripts kept; URLs nulled after file deletion. |
 

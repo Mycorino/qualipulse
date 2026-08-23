@@ -331,6 +331,146 @@ class TestCostsReport:
         resp = client.get("/admin/costs", headers=_admin_headers())
         assert resp.status_code == 200, resp.text
         body = resp.json()
-        assert body["total_cost_usd"] > 0
+        assert body["all_time_cost_usd"] > 0
+        assert body["window_cost_usd"] > 0
         assert len(body["by_company"]) == 1
         assert body["by_company"][0]["company_id"] == tokens["company_id"]
+        assert body["by_operation"][0]["operation"] == "interview_turn"
+        assert body["interview_economics"]["interviews_with_cost"] == 1
+
+    def test_costs_all_time_and_company_drilldown(self, client, db_session):
+        from app.models.usage import AIUsageLog
+
+        tokens = _signup(client)
+        db_session.add(AIUsageLog(
+            company_id=tokens["company_id"], operation="stt", model="whisper-1",
+            audio_seconds=30.0, cost_usd=0.003, participant_id="p-1",
+        ))
+        db_session.commit()
+
+        resp = client.get("/admin/costs", params={"days": 0}, headers=_admin_headers())
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["days"] is None
+        assert resp.json()["daily"] == []
+
+        resp = client.get(f"/admin/costs/company/{tokens['company_id']}", headers=_admin_headers())
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["total_cost_usd"] > 0
+        assert body["interview_economics"]["breakdown"]["stt"] > 0
+        assert isinstance(body["interviews"], list)
+
+        resp = client.get("/admin/costs/company/nope", headers=_admin_headers())
+        assert resp.status_code == 404
+
+    def test_overview_shape(self, client, db_session):
+        _signup(client)
+        resp = client.get("/admin/overview", params={"days": 7}, headers=_admin_headers())
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["kpis"]["signups"]["value"] == 1
+        assert body["kpis"]["signups"]["previous"] == 0
+        assert body["totals"]["users"] == 1
+        assert len(body["daily"]) == 8
+        assert [f["step"] for f in body["funnel"]] == [
+            "signed_up", "onboarded", "created_study", "first_interview",
+        ]
+
+
+class TestInterviewEconomics:
+    """Per-interview cost math: fully-loaded cost, demo exclusion, drilldown."""
+
+    def _seed(self, db_session, company_id):
+        import uuid
+        from datetime import timedelta
+        from app.models.interview import InterviewLink, InterviewTurn, Participant
+        from app.models.project import Project
+        from app.models.usage import AIUsageLog
+
+        now = datetime.utcnow()
+        real = Project(id=str(uuid.uuid4()), company_id=company_id, name="Real study")
+        demo = Project(id=str(uuid.uuid4()), company_id=company_id, name="Demo", is_demo=True)
+        db_session.add_all([real, demo])
+        db_session.flush()
+        link = InterviewLink(id=str(uuid.uuid4()), project_id=real.id, token="tok-econ")
+        db_session.add(link)
+        db_session.flush()
+        pids = []
+        for i, cost in enumerate((0.10, 0.30)):
+            p = Participant(
+                id=str(uuid.uuid4()), link_id=link.id, project_id=real.id,
+                display_name=f"P{i}", status="completed",
+                started_at=now - timedelta(minutes=12), completed_at=now - timedelta(minutes=2),
+            )
+            db_session.add(p)
+            db_session.flush()
+            pids.append(p.id)
+            for t in range(3):
+                db_session.add(InterviewTurn(
+                    id=str(uuid.uuid4()), participant_id=p.id, turn_index=t,
+                    question_index=t, question_text="q", response_transcript="a",
+                ))
+            db_session.add(AIUsageLog(company_id=company_id, project_id=real.id, participant_id=p.id,
+                                      operation="interview_turn", model="claude-sonnet-4-6", cost_usd=cost))
+            db_session.add(AIUsageLog(company_id=company_id, project_id=real.id, participant_id=p.id,
+                                      operation="stt", model="whisper-1", audio_seconds=120, cost_usd=0.012))
+            db_session.add(AIUsageLog(company_id=company_id, project_id=real.id, participant_id=p.id,
+                                      operation="tts", model="tts-1", characters=1000, cost_usd=0.015))
+        # Demo participant: completed, no spend -- must not dilute averages.
+        db_session.add(Participant(id=str(uuid.uuid4()), link_id=link.id, project_id=demo.id,
+                                   display_name="Demo", status="completed", completed_at=now))
+        # Study-level overhead: not part of per-interview cost.
+        db_session.add(AIUsageLog(company_id=company_id, project_id=real.id,
+                                  operation="analysis", model="claude-sonnet-4-6", cost_usd=1.0))
+        db_session.commit()
+        return real.id, pids
+
+    def test_platform_economics(self, client, db_session):
+        tokens = _signup(client)
+        self._seed(db_session, tokens["company_id"])
+
+        body = client.get("/admin/costs", params={"days": 30}, headers=_admin_headers()).json()
+        econ = body["interview_economics"]
+        assert econ["completed_interviews"] == 2
+        assert econ["interviews_with_cost"] == 2
+        assert econ["total_cost_usd"] == pytest.approx(0.454, abs=1e-4)
+        assert econ["cost_per_completed_usd"] == pytest.approx(0.227, abs=1e-4)
+        assert econ["per_interview"]["median"] == pytest.approx(0.227, abs=1e-4)
+        assert econ["per_interview"]["max"] == pytest.approx(0.327, abs=1e-4)
+        assert econ["breakdown"]["stt"] == pytest.approx(0.024, abs=1e-4)
+        assert econ["avg_turns"] == 3.0
+        assert econ["avg_audio_minutes"] == 2.0
+        assert body["window_cost_usd"] == pytest.approx(1.454, abs=1e-4)
+        areas = {r["area"]: r["cost_usd"] for r in body["by_area"]}
+        assert areas["analysis"] == pytest.approx(1.0)
+        assert areas["interviews"] == pytest.approx(0.454, abs=1e-4)
+        row = body["by_company"][0]
+        assert row["window_interviews"] == 2 and row["total_interviews"] == 2
+        assert row["window_cost_per_interview_usd"] == pytest.approx(0.227, abs=1e-4)
+
+    def test_company_drilldown(self, client, db_session):
+        tokens = _signup(client)
+        real_id, pids = self._seed(db_session, tokens["company_id"])
+
+        body = client.get(f"/admin/costs/company/{tokens['company_id']}", headers=_admin_headers()).json()
+        projects = {p["project_id"]: p for p in body["by_project"]}
+        assert projects[real_id]["completed_interviews"] == 2
+        assert projects[real_id]["cost_per_interview_usd"] == pytest.approx(0.727, abs=1e-4)
+        demo = next(p for p in body["by_project"] if p["is_demo"])
+        assert demo["cost_per_interview_usd"] is None
+        assert len(body["interviews"]) == 2  # demo participant excluded
+        top = max(body["interviews"], key=lambda r: r["cost_usd"])
+        assert top["cost_usd"] == pytest.approx(0.327, abs=1e-4)
+        assert top["llm_usd"] == pytest.approx(0.30)
+        assert top["turns"] == 3 and top["duration_minutes"] == 10.0
+
+    def test_overview_counts_real_interviews_only(self, client, db_session):
+        tokens = _signup(client)
+        self._seed(db_session, tokens["company_id"])
+        body = client.get("/admin/overview", params={"days": 7}, headers=_admin_headers()).json()
+        assert body["kpis"]["interviews_completed"]["value"] == 2
+        assert body["kpis"]["active_workspaces"]["value"] == 1
+        assert body["kpis"]["cost_per_interview_usd"]["value"] == pytest.approx(0.227, abs=1e-4)
+        assert body["kpis"]["studies_created"]["value"] == 1
+        assert body["top_workspaces"][0]["interviews"] == 2
+        assert body["funnel"][-1]["count"] == 1
