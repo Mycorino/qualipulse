@@ -1340,6 +1340,9 @@ gcloud builds list --region=europe-west1 --limit=5
 ### AIUsageLog
 `id` (int), `company_id` (FK), `project_id` (FK), `participant_id` (FK), `operation` (indexed), `model`, `input_tokens`, `output_tokens`, `characters` (TTS), `audio_seconds` (STT), `cost_usd`, `created_at` (indexed). (No cache-token columns — cache reads/writes are priced into `cost_usd` and visible in log lines only.) **Cost is model-aware** (Opus / Sonnet / Haiku per-token rates in `services/usage_logger.py::_CLAUDE_RATES`) and **cache-aware** (cache writes 1.25× input price, cache reads 0.10×). Each Claude call also emits an INFO log line `"claude usage op=… model=… input=… output=… cache_read=… cache_write=… cost=$…"` so cache-hit rates are visible via `gcloud logging read`.
 
+### OpsAlertLog
+`id` (str uuid), `alert_key` (unique, indexed), `kind` (indexed — `ai_spend` | `provider_out_of_credit`), `detail`, `created_at` (indexed). Append-only idempotency log for team-facing alerts, which have no Company to key on and so cannot use `email_send_log`. The `alert_key` encodes both the alert and its window (`ai_spend:budget_80:2026-08`, `provider_out_of_credit:anthropic:2026-08-23T14`), so "once a month" or "once an hour" is expressed by the key rather than a query. Alembic 0074. See "AI provider spend alerts".
+
 ### EmailSendLog
 `id` (str uuid), `company_id` (FK, indexed), `event` (str, indexed — `day_1_followup` | `trial_half_over` | `trial_ending`), `sent_at`. Unique constraint on `(company_id, event)` — append-only log that makes the Wave 3B `/admin/scheduled-emails/run` runner idempotent: a duplicate cron firing in the same window trips the constraint instead of double-sending. Alembic 0032. The Wave 3A first-response email predates this table and uses `Company.first_response_email_sent_at` instead.
 
@@ -1616,6 +1619,65 @@ gcloud scheduler jobs create http qualipulse-lifecycle-emails \
 **Retired:** `trial_half_over` (Day-7) and `trial_ending` (Day-12) were retired with the credits-native billing model — credits gate usage, not calendar days. Their HTML templates remain in `services/email.py` as dead code in case we revive them, but the cron no longer fires them.
 
 Each Company × event sends at most once thanks to the unique constraint on `email_send_log (company_id, event)`. Test with `?dry_run=true` before flipping on the cron.
+
+### AI provider spend alerts (our bill, not customer credits)
+`services/ai_spend.py`. Two alarms guard against the Anthropic / OpenAI
+balance running dry, which breaks every interview turn at once. Both are
+ops-facing: they email `AI_SPEND_ALERT_EMAIL` (and post to
+`AI_SPEND_SLACK_WEBHOOK_URL` if set, deliberately **not** the sales
+webhook). Neither path can raise into a caller.
+
+**1. Burn rate** rides the same hourly `/admin/scheduled-emails/run` cron
+(no second Cloud Scheduler job needed) and sums `AIUsageLog.cost_usd`:
+
+| Alert | Fires when | Window |
+|---|---|---|
+| `ai_spend:daily_limit:{date}` | rolling 24h ≥ `AI_SPEND_DAILY_LIMIT_USD` | once/day |
+| `ai_spend:spike:{date}` | 24h ≥ `AI_SPEND_SPIKE_MULTIPLIER` × trailing-7d daily average, and ≥ `AI_SPEND_SPIKE_FLOOR_USD` | once/day |
+| `ai_spend:budget_80:{month}` / `budget_100:{month}` | month-to-date ≥ 80% / 100% of `AI_SPEND_MONTHLY_BUDGET_USD` | once/month each |
+| `ai_spend:projection:{month}` | linear projection of MTD ≥ budget, from day 3 of the month | once/month |
+
+The 7-day baseline **excludes the last 24h** so today is never compared
+against itself, and the spike floor exists because a quiet week makes any
+ordinary day look like a 10x spike. Every alert body carries the same
+summary: 24h, 7d average, MTD vs budget, end-of-month projection, and the
+top five operations by cost in the last 24h.
+
+**2. Out of credit** — neither provider exposes a remaining-balance
+endpoint, but both return a distinctive error once the balance is empty
+(Anthropic: "credit balance is too low"; OpenAI: `insufficient_quota`).
+`note_provider_error` is called from the two funnels every AI call passes
+through in `services/_clients.py`: `call_openai_with_retries`, and a
+`_WatchedMessages` proxy attached to `client.messages` in
+`get_anthropic_client` (the SDK's `messages` is a `cached_property`, so
+assigning it just seeds the instance dict). OpenAI's `insufficient_quota`
+now **fails fast** instead of burning three retries on the interview's
+critical path. Detection reads the SDK exception's parsed `.body`
+(`error.code` / `error.message`), not `str(exc)`, because Anthropic's
+billing refusal is an ordinary `invalid_request_error` 400 whose *message*
+is the only thing distinguishing it from a bad parameter. Matching is
+narrow on purpose: an alarm that fires on ordinary rate limits gets muted.
+`test_ai_spend.py` pins this against real `anthropic.BadRequestError` /
+`openai.RateLimitError` objects, so an SDK upgrade that reshapes them fails
+a test instead of silently disabling the alarm.
+
+Idempotency for both lives in `ops_alert_log` (Alembic 0074) — ops alerts
+have no Company, so they cannot reuse `email_send_log`. The unique
+`alert_key` encodes the alert *and* its window (daily, monthly, or hourly
+for the out-of-credit reminder), so a replayed cron or a second Cloud Run
+instance sends nothing. The out-of-credit path adds a 10-minute in-process
+cooldown so an empty balance does not hammer the DB on every failing turn.
+
+`cost_usd` is our own estimate from logged token counts, not an invoice, so
+set thresholds with a margin. **The provider consoles are still the only
+source of the true balance** — turn on Anthropic's credit-balance
+notification + auto-reload and OpenAI's usage alerts in their billing
+settings; this feature complements them, it does not replace them.
+Prod values live in `cloudbuild.yaml`'s `--set-env-vars` (a deploy wipes
+anything set by hand on the service). Test with
+`/admin/scheduled-emails/run?dry_run=true`, which reports which alerts
+would fire without claiming a key or sending. Tests:
+`backend/tests/test_ai_spend.py`.
 
 ### Telemetry (`/telemetry` — public, no auth)
 | Method | Path | Rate limit | Description |

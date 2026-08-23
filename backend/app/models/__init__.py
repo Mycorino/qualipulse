@@ -5,6 +5,7 @@ from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestio
 from app.models.coding import ManualCode, QuoteTag, TagSuggestion
 from app.models.memo import ProjectMemo
 from app.models.usage import AIUsageLog
+from app.models.ops_alert import OpsAlertLog
 from app.models.web_event import WebEvent
 from app.models.email_log import EmailSendLog, ParticipantEmailLog
 from app.models.email_suppression import EmailSuppression
@@ -43,6 +44,7 @@ __all__ = [
     "WebEvent",
     "AdminAuditLog",
     "AIUsageLog",
+    "OpsAlertLog",
     "EmailSendLog",
     "EmailSuppression",
     "ParticipantEmailLog",
