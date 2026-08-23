@@ -160,6 +160,11 @@ export interface ParticipantResponse {
   quality_summary?: string | null;
   quality_strengths?: string[] | null;
   quality_issues?: string[] | null;
+  /** "ok" = the AI pass produced an assessment, "failed" = it ran and came
+   *  back with nothing, null/undefined = never attempted or still running.
+   *  quality_label cannot stand in for this: the API falls back to a
+   *  word-count heuristic for it, so it is set even when the pass crashed. */
+  quality_status?: "ok" | "failed" | null;
   key_takeaways?: string[] | null;
   notable_quotes?: string[] | null;
   avg_response_words?: number | null;
@@ -193,9 +198,12 @@ export interface PaywallDetail {
 export interface QualityAssessment {
   quality_score: number;
   quality_label: string;
+  quality_status?: "ok" | "failed" | null;
   summary: string;
   strengths: string[];
   issues: string[];
+  key_takeaways?: string[];
+  notable_quotes?: string[];
   avg_response_words: number;
   short_answer_pct: number;
 }
@@ -799,6 +807,19 @@ export interface SuggestedCode {
   name: string;
   description: string;
   color: string;
+}
+
+/** Re-run the AI quality assessment for one participant.
+ *  Synchronous and slow (one or two Claude calls), so callers must show a
+ *  busy state. Used to recover an assessment that failed at completion time. */
+export async function assessParticipantQuality(
+  projectId: string,
+  participantId: string
+): Promise<QualityAssessment> {
+  const { data } = await client.post<QualityAssessment>(
+    `/projects/${projectId}/participants/${participantId}/quality`
+  );
+  return data;
 }
 
 export async function suggestTags(projectId: string, participantId: string): Promise<TagSuggestion[]> {

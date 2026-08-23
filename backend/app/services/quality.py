@@ -39,6 +39,107 @@ def _fallback_summary(label: str, language: str) -> str:
     return table.get(label, table["fair"])
 
 
+# The assessment object carries seven fields, three of them lists, so it is
+# long by construction. 1024 tokens used to cut a rich interview's reply off
+# mid-JSON, and the JSONDecodeError threw the whole (already paid for) pass
+# away. Budget for the real shape, then salvage anything that still overruns.
+_MAX_ASSESSMENT_TOKENS = 2000
+
+_RETRY_NUDGE = (
+    "\n\nYour previous reply ran out of room before the JSON closed. Answer "
+    "again with the same shape, but keep the whole object under 250 words: at "
+    "most 2 strengths, 2 issues, 3 key takeaways and 2 quotes."
+)
+
+
+def _strip_fences(raw: str) -> str:
+    if raw.startswith("```"):
+        lines = [l for l in raw.split("\n") if not l.strip().startswith("```")]
+        return "\n".join(lines).strip()
+    return raw
+
+
+def _truncation_candidates(raw: str) -> list[str]:
+    """Repair candidates for a reply cut off mid-JSON by the token cap.
+
+    The model emits fields in prompt order, so the ones that carry the rating
+    (score, label, summary) are complete long before a list of takeaways runs
+    out of budget. Close the object at the last provably complete value
+    instead of losing the whole assessment.
+
+    Two cut points are safe without parsing: a comma proves the value before
+    it finished, and a bracket that closes a nested container is itself a
+    finished value. Whatever containers are still open at that point get
+    closed explicitly.
+    """
+    stack: list[str] = []
+    in_string = False
+    escaped = False
+    cut = -1
+    cut_stack: list[str] = []
+
+    for i, ch in enumerate(raw):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]":
+            if stack:
+                stack.pop()
+            if stack:
+                cut, cut_stack = i + 1, list(stack)
+        elif ch == "," and stack:
+            cut, cut_stack = i, list(stack)
+
+    candidates: list[str] = []
+    tail = raw.rstrip()
+    if stack and not in_string and not tail.endswith((",", ":")):
+        # Cut landed exactly on a value boundary: only the closers are missing.
+        candidates.append(tail + "".join(reversed(stack)))
+    if cut > 0:
+        candidates.append(raw[:cut] + "".join(reversed(cut_stack)))
+    return candidates
+
+
+def _parse_assessment_json(raw: str) -> dict:
+    """Parse the model's assessment object, repairing truncation if needed."""
+    text = _strip_fences((raw or "").strip())
+    start = text.find("{")
+    if start > 0:
+        text = text[start:]
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    for candidate in _truncation_candidates(text):
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        # A salvage that lost the rating itself is not worth keeping: better to
+        # retry than to persist a confident-looking half assessment.
+        if isinstance(parsed, dict) and parsed.get("quality_label"):
+            logger.warning(
+                "Recovered a truncated quality assessment (%d chars in, %d kept)",
+                len(text),
+                len(candidate),
+            )
+            return parsed
+
+    raise ValueError("assessment JSON could not be parsed or repaired")
+
+
 def _score_turns(turns) -> tuple[float | None, str | None]:
     responses = [
         t.response_transcript
@@ -109,6 +210,28 @@ def run_ai_quality_assessment(
         _run_ai_quality_assessment_inner(participant_id, db, language)
     except Exception:
         logger.exception("AI quality assessment failed for participant %s", participant_id)
+        _mark_assessment_failed(participant_id, db)
+
+
+def _mark_assessment_failed(participant_id: str, db: Session) -> None:
+    """Record that the pass ran and came back with nothing.
+
+    Without this stamp the panel cannot tell a failure from an assessment
+    still in flight, so it told researchers the evaluation had "finished"
+    with no summary written when in fact it had crashed.
+    """
+    try:
+        db.rollback()
+        participant = (
+            db.query(Participant).filter(Participant.id == participant_id).first()
+        )
+        if participant is not None and not participant.quality_summary:
+            participant.quality_status = "failed"
+            db.commit()
+    except Exception:
+        logger.exception(
+            "Could not flag the failed quality assessment for %s", participant_id
+        )
 
 
 def _run_ai_quality_assessment_inner(
@@ -227,35 +350,51 @@ Return ONLY a JSON object — no markdown fences, no preamble:
   "key_takeaways": ["<what the participant said, one sentence>", "..."],
   "notable_quotes": ["<verbatim participant quote>", "..."]
 }}
+At most 3 strengths and 3 issues. Keep the whole object under 350 words so it
+is never cut off mid-field.
 </output_format>{language_instruction}"""
 
     client = get_anthropic_client(60.0)
 
-    response = client.messages.create(
-        model=ai_models.sonnet(),
-        max_tokens=1024,
-        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
-        messages=[{"role": "user", "content": prompt}],
-    )
+    # Two attempts: the first at full budget, the second explicitly asking for
+    # a shorter object. Salvage handles most overruns, so the retry only fires
+    # when the reply is unusable even after repair.
+    result: dict | None = None
+    last_error: Exception | None = None
+    for attempt in range(2):
+        response = client.messages.create(
+            model=ai_models.sonnet(),
+            max_tokens=_MAX_ASSESSMENT_TOKENS,
+            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
+            messages=[
+                {"role": "user", "content": prompt + (_RETRY_NUDGE if attempt else "")}
+            ],
+        )
 
-    # Log usage
-    log_claude_usage(
-        db,
-        response,
-        "quality",
-        company_id=getattr(participant.project, "company_id", None),
-        project_id=participant.project_id,
-        participant_id=participant_id,
-    )
+        # Log usage
+        log_claude_usage(
+            db,
+            response,
+            "quality",
+            company_id=getattr(participant.project, "company_id", None),
+            project_id=participant.project_id,
+            participant_id=participant_id,
+        )
 
-    raw = response.content[0].text.strip()
-    # Strip markdown fences if present
-    if raw.startswith("```"):
-        lines = raw.split("\n")
-        lines = [l for l in lines if not l.strip().startswith("```")]
-        raw = "\n".join(lines).strip()
+        try:
+            result = _parse_assessment_json(response.content[0].text)
+            break
+        except ValueError as exc:
+            last_error = exc
+            logger.warning(
+                "Quality assessment reply unusable for %s (attempt %d of 2, stop_reason=%s)",
+                participant_id,
+                attempt + 1,
+                getattr(response, "stop_reason", None),
+            )
 
-    result = json.loads(raw)
+    if result is None:
+        raise last_error or ValueError("quality assessment produced no usable JSON")
 
     # Persist all 7 fields
     label = result.get("quality_label", "fair")
@@ -281,6 +420,7 @@ Return ONLY a JSON object — no markdown fences, no preamble:
 
     participant.quality_score = float(result.get("quality_score", 0))
     participant.quality_label = label
+    participant.quality_status = "ok"
     participant.quality_summary = summary
     participant.quality_strengths = json.dumps(result.get("strengths", []))
     participant.quality_issues = json.dumps(result.get("issues", []))

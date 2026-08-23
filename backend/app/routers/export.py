@@ -187,6 +187,7 @@ def list_participants(
                 quality_summary=p.quality_summary,
                 quality_strengths=json.loads(p.quality_strengths) if p.quality_strengths else None,
                 quality_issues=json.loads(p.quality_issues) if p.quality_issues else None,
+                quality_status=p.quality_status,
                 key_takeaways=json.loads(p.key_takeaways) if p.key_takeaways else None,
                 notable_quotes=json.loads(p.notable_quotes) if p.notable_quotes else None,
                 avg_response_words=p.avg_response_words,
@@ -281,6 +282,7 @@ def get_transcript(
             quality_summary=participant.quality_summary,
             quality_strengths=json.loads(participant.quality_strengths) if participant.quality_strengths else None,
             quality_issues=json.loads(participant.quality_issues) if participant.quality_issues else None,
+            quality_status=participant.quality_status,
             key_takeaways=json.loads(participant.key_takeaways) if participant.key_takeaways else None,
             notable_quotes=json.loads(participant.notable_quotes) if participant.notable_quotes else None,
             avg_response_words=participant.avg_response_words,
@@ -444,6 +446,7 @@ def ai_quality_assessment(
 
     # Clear any existing assessment so the service re-runs
     participant.quality_summary = None
+    participant.quality_status = None
     db.flush()
 
     lang = company.preferred_language or "en"
@@ -458,6 +461,7 @@ def ai_quality_assessment(
     return {
         "quality_score": participant.quality_score,
         "quality_label": participant.quality_label,
+        "quality_status": participant.quality_status,
         "summary": participant.quality_summary,
         "strengths": json.loads(participant.quality_strengths) if participant.quality_strengths else [],
         "issues": json.loads(participant.quality_issues) if participant.quality_issues else [],
