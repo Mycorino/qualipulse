@@ -56,6 +56,7 @@ from app.services.storage import upload_audio, download_audio
 from app.services.tts import generate_speech
 from app.services import usage_logger
 from app.services import ai_models
+from app.services.text_style import strip_banned_dashes
 
 
 class _DeferTTS(Exception):
@@ -1092,19 +1093,7 @@ def _parse_decision_response(response, language: str | None) -> dict:
     return out
 
 
-_BANNED_DASH_RE = re.compile(r"\s*(?:—|–|--)\s*")
-
-
-def _strip_banned_dashes(text: str) -> str:
-    """Em/en dashes and double hyphens are banned from user-facing copy (see
-    CLAUDE.md Copy Conventions). The prompts instruct the model; this
-    guarantees it on everything the participant hears or reads."""
-    if not text or not _BANNED_DASH_RE.search(text):
-        return text
-    # After sentence punctuation the dash is redundant: drop it.
-    text = re.sub(r"([,;:.!?…])\s*(?:—|–|--)\s*", r"\1 ", text)
-    # Between words it reads as a comma.
-    return _BANNED_DASH_RE.sub(", ", text)
+_strip_banned_dashes = strip_banned_dashes  # shared house-style guard
 
 
 def _sanitize_coaching(value) -> str | None:
