@@ -6,6 +6,8 @@ transcript persistence, the close gate, the pace/follow-up server guards,
 and completion side effects.
 """
 
+import uuid
+
 import pytest
 
 from app.models.company import Company
@@ -13,30 +15,62 @@ from app.models.interview import InterviewLink, InterviewTurn, Participant
 from app.models.project import InterviewGuideQuestion, Project
 from app.services import interview_engine
 from app.services.interview_engine import (
+    AHEAD_PACE_QUESTIONS,
     EmptyTranscriptError,
+    GUIDE_COVERED_CLOSE_FLOOR_PCT,
+    MAX_FOLLOWUPS_CEILING,
     MAX_FOLLOWUPS_PER_QUESTION,
+    _close_gate_open,
+    _followup_allowance,
     process_interview_turn,
 )
 
 QUESTIONS = ["How do you work today?", "What tools do you use?", "What frustrates you?"]
 
+# The seeded study is 20 minutes over 3 questions; the follow-up cap is derived
+# from that budget rather than being a flat constant.
+SEEDED_ALLOWANCE = _followup_allowance(20, len(QUESTIONS))
 
-def _seed(db, *, answered_up_to: int = 0, followups_on_current: int = 0):
-    """Seed a 3-question interview.
+# The shape of the interview this regression came from: a 60-minute study over
+# 7 guide questions, which reached its last question at minute 20.
+BIG = dict(question_count=7, duration_minutes=60)
+BIG_ALLOWANCE = _followup_allowance(60, 7)
+
+
+def _seed(
+    db,
+    *,
+    answered_up_to: int = 0,
+    followups_on_current: int = 0,
+    question_count: int | None = None,
+    duration_minutes: int = 20,
+):
+    """Seed a 3-question interview (or a larger one via ``question_count``).
 
     ``answered_up_to`` = number of main questions already fully answered;
     the participant is currently on question index ``answered_up_to`` with
     an unanswered interviewer turn waiting for their response.
     """
-    company = Company(name="Acme", email="owner@acme.com", password_hash="x", email_verified=True)
+    questions = list(QUESTIONS)
+    while question_count is not None and len(questions) < question_count:
+        questions.append(f"Extra guide question {len(questions)}?")
+    if question_count is not None:
+        questions = questions[:question_count]
+
+    company = Company(
+        name="Acme", email=f"owner-{uuid.uuid4().hex[:8]}@acme.com", password_hash="x", email_verified=True
+    )
     db.add(company)
     db.flush()
     project = Project(
-        company_id=company.id, name="Study", language="en", interview_duration_minutes=20
+        company_id=company.id,
+        name="Study",
+        language="en",
+        interview_duration_minutes=duration_minutes,
     )
     db.add(project)
     db.flush()
-    for i, q in enumerate(QUESTIONS):
+    for i, q in enumerate(questions):
         db.add(
             InterviewGuideQuestion(
                 project_id=project.id,
@@ -47,7 +81,7 @@ def _seed(db, *, answered_up_to: int = 0, followups_on_current: int = 0):
                 sort_order=i,
             )
         )
-    link = InterviewLink(project_id=project.id, token=f"tok-{answered_up_to}-{followups_on_current}", is_active=True)
+    link = InterviewLink(project_id=project.id, token=f"tok-{uuid.uuid4().hex[:12]}", is_active=True)
     db.add(link)
     db.flush()
     participant = Participant(link_id=link.id, project_id=project.id, status="in_progress")
@@ -61,7 +95,7 @@ def _seed(db, *, answered_up_to: int = 0, followups_on_current: int = 0):
                 participant_id=participant.id,
                 turn_index=turn_index,
                 question_index=i,
-                question_text=QUESTIONS[i],
+                question_text=questions[i],
                 response_transcript=f"answer {i}",
             )
         )
@@ -86,7 +120,7 @@ def _seed(db, *, answered_up_to: int = 0, followups_on_current: int = 0):
             participant_id=participant.id,
             turn_index=turn_index,
             question_index=current_q,
-            question_text=QUESTIONS[min(current_q, len(QUESTIONS) - 1)],
+            question_text=questions[min(current_q, len(questions) - 1)],
         )
     )
     db.commit()
@@ -279,7 +313,7 @@ def test_pace_guard_regenerates_wording_for_forced_action(db_session, monkeypatc
 
 
 def test_follow_up_cap_regenerates_wording(db_session, monkeypatch):
-    participant = _seed(db_session, followups_on_current=MAX_FOLLOWUPS_PER_QUESTION)
+    participant = _seed(db_session, followups_on_current=SEEDED_ALLOWANCE)
     calls = _patch_io(
         monkeypatch, decision={"action": "follow_up", "question": "One more thing?"}
     )
@@ -564,3 +598,213 @@ def test_effective_system_prompt_carries_the_english_instruction():
     """The layering path is what actually reaches the model."""
     built = interview_engine._effective_system_prompt(None, "en")
     assert "conduct this entire interview in English" in built
+
+
+# ── Time budget: spread the guide, don't race it and pad the last topic ──────
+#
+# Regression cover for a real 60-minute / 7-question interview that reached its
+# last guide question at minute 20 and then spent 29 minutes asking 24
+# follow-ups on that one topic, because (a) nothing enforced the "you are ahead,
+# go deeper" advice, and (b) the close gate advertised to the model was shut
+# until 80% of the budget, leaving follow_up as the only legal action.
+
+
+def test_followup_allowance_scales_with_the_time_budget():
+    # A generous per-question budget buys more probing, not a padded last topic.
+    assert _followup_allowance(60, 7) > MAX_FOLLOWUPS_PER_QUESTION
+    assert _followup_allowance(60, 7) <= MAX_FOLLOWUPS_CEILING
+    # A tight budget never drops below the floor.
+    assert _followup_allowance(15, 10) == MAX_FOLLOWUPS_PER_QUESTION
+    # Even an absurd budget stays bounded, and a misconfigured one is safe.
+    assert _followup_allowance(600, 2) == MAX_FOLLOWUPS_CEILING
+    assert _followup_allowance(0, 0) == MAX_FOLLOWUPS_PER_QUESTION
+
+
+def test_close_gate_opens_once_the_guide_is_covered():
+    """The gate shown to the model must not be stricter than the host's own.
+
+    While it was, an interview that finished its guide early was told "close is
+    NOT available, keep the conversation going" and, with no next question to
+    advance to, could only answer with filler follow-ups.
+    """
+    floor = GUIDE_COVERED_CLOSE_FLOOR_PCT
+    assert _close_gate_open(all_questions_done=True, time_used_pct=floor, pacing_known=True)
+    # The old gate held until 80%; the whole guide being covered now suffices.
+    assert _close_gate_open(all_questions_done=True, time_used_pct=60.0, pacing_known=True)
+    # But not so early that a fast run gets no depth at all.
+    assert not _close_gate_open(all_questions_done=True, time_used_pct=floor - 10, pacing_known=True)
+    # Guide not covered: there is still somewhere to advance to, so stay shut.
+    assert not _close_gate_open(all_questions_done=False, time_used_pct=60.0, pacing_known=True)
+    # Duration misconfigured: coverage is the only signal left.
+    assert _close_gate_open(all_questions_done=True, time_used_pct=0.0, pacing_known=False)
+    assert not _close_gate_open(all_questions_done=False, time_used_pct=0.0, pacing_known=False)
+
+
+def _no_short_run(monkeypatch):
+    """Pin the participant as engaged.
+
+    The fixture's seeded answers are two words long, which is itself a
+    short-answer run and releases the ahead-of-schedule guard. Tests that
+    exercise the guard need an engaged participant, or they pass for the
+    wrong reason.
+    """
+    monkeypatch.setattr(
+        interview_engine, "_detect_short_answers", lambda turns: {"is_short_run": False}
+    )
+
+
+def _age(participant, db, *, minutes: float):
+    """Backdate the interview so ``minutes`` of active time have elapsed."""
+    from datetime import datetime, timedelta
+
+    now = datetime.utcnow()
+    participant.started_at = now - timedelta(minutes=minutes)
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    step = minutes / max(len(turns), 1)
+    for i, turn in enumerate(turns):
+        turn.created_at = now - timedelta(minutes=minutes - step * i)
+    db.commit()
+
+
+def test_racing_ahead_is_held_on_the_current_topic(db_session, monkeypatch):
+    """next_question while well ahead of schedule is overridden to follow_up.
+
+    Three of seven questions covered in the first 5 minutes of a 60-minute
+    study: advancing again strands the rest of the budget on the last question.
+    """
+    participant = _seed(db_session, answered_up_to=2, **BIG)
+    _age(participant, db_session, minutes=5)  # Angelo was on Q3 of 7 at minute 5
+    _no_short_run(monkeypatch)
+    calls = _patch_io(
+        monkeypatch, decision={"action": "next_question", "question": "Next topic!"}
+    )
+
+    process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    new_turn = sorted(participant.turns, key=lambda t: t.turn_index)[-1]
+    assert new_turn.is_follow_up is True
+    assert new_turn.question_index == 2  # held on the current topic
+    assert new_turn.question_text == "[regenerated for follow_up]"
+    assert any(c.get("forced_action") == "follow_up" for c in calls)
+
+
+def test_on_schedule_advances_normally(db_session, monkeypatch):
+    """The guard must not fire when the interview is pacing correctly."""
+    participant = _seed(db_session, answered_up_to=2, **BIG)
+    # 3 of 7 questions after 20 of 60 minutes is roughly an even spread.
+    _age(participant, db_session, minutes=20)
+    _no_short_run(monkeypatch)
+    calls = _patch_io(
+        monkeypatch, decision={"action": "next_question", "question": "Next topic!"}
+    )
+
+    process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    new_turn = sorted(participant.turns, key=lambda t: t.turn_index)[-1]
+    assert new_turn.is_follow_up is False
+    assert new_turn.question_index == 3
+    assert not any(c.get("forced_action") for c in calls)
+
+
+def test_ahead_guard_releases_once_the_topic_allowance_is_spent(db_session, monkeypatch):
+    """Holding a topic is bounded: the allowance releases the interview."""
+    participant = _seed(
+        db_session, answered_up_to=2, followups_on_current=BIG_ALLOWANCE, **BIG
+    )
+    _age(participant, db_session, minutes=5)  # still far ahead of schedule
+    _no_short_run(monkeypatch)
+    calls = _patch_io(
+        monkeypatch, decision={"action": "next_question", "question": "Next topic!"}
+    )
+
+    process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    new_turn = sorted(participant.turns, key=lambda t: t.turn_index)[-1]
+    assert new_turn.is_follow_up is False
+    assert new_turn.question_index == 3
+    assert not any(c.get("forced_action") for c in calls)
+
+
+def test_ahead_guard_releases_on_a_short_answer_run(db_session, monkeypatch):
+    """A disengaging participant is not held on a topic they are done with."""
+    participant = _seed(db_session, answered_up_to=2, **BIG)
+    _age(participant, db_session, minutes=5)
+    calls = _patch_io(
+        monkeypatch,
+        transcript="Not really.",  # short answer, and the seeded ones are short too
+        decision={"action": "next_question", "question": "Next topic!"},
+    )
+    monkeypatch.setattr(
+        interview_engine, "_detect_short_answers", lambda turns: {"is_short_run": True}
+    )
+
+    process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    new_turn = sorted(participant.turns, key=lambda t: t.turn_index)[-1]
+    assert new_turn.is_follow_up is False
+    assert new_turn.question_index == 3
+    assert not any(c.get("forced_action") for c in calls)
+
+
+def test_endless_probing_on_the_last_question_is_wrapped_up(db_session, monkeypatch):
+    """The Angelo case: out of guide, out of things to ask, so wrap up.
+
+    The last question has nowhere to advance to, so a model that keeps choosing
+    follow_up would otherwise probe until the clock ran out.
+    """
+    participant = _seed(
+        db_session, answered_up_to=2, followups_on_current=SEEDED_ALLOWANCE
+    )
+    _age(participant, db_session, minutes=12)  # past the close floor of a 20-min study
+    calls = _patch_io(
+        monkeypatch, decision={"action": "follow_up", "question": "And beyond that?"}
+    )
+
+    result = process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    # A forced close routes through the "anything we haven't covered?" check.
+    assert result["question_index"] == interview_engine.FINAL_CHECK_QUESTION_INDEX
+    assert result["is_complete"] is False
+    assert any(c.get("forced_action") == "close" for c in calls)
+
+
+def test_last_question_still_gets_its_allowance(db_session, monkeypatch):
+    """The wrap-up backstop must not cut a rich final topic short."""
+    participant = _seed(
+        db_session, answered_up_to=2, followups_on_current=SEEDED_ALLOWANCE - 1
+    )
+    _age(participant, db_session, minutes=12)
+    _patch_io(monkeypatch, decision={"action": "follow_up", "question": "And beyond that?"})
+
+    result = process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    new_turn = sorted(participant.turns, key=lambda t: t.turn_index)[-1]
+    assert new_turn.is_follow_up is True
+    assert result["is_complete"] is False
+
+
+def test_forced_close_without_regeneration_speaks_a_closing(db_session, monkeypatch):
+    """The deterministic fallback must not speak a probe while ending the call."""
+    participant = _seed(
+        db_session, answered_up_to=2, followups_on_current=SEEDED_ALLOWANCE
+    )
+    _age(participant, db_session, minutes=12)
+    _patch_io(monkeypatch)
+    # Model reachable for the first decision, unreachable for the regeneration.
+    seen: list[dict] = []
+
+    def _decide(*a, **k):
+        seen.append(k)
+        if k.get("forced_action"):
+            raise interview_engine.InterviewAIUnavailable("down")
+        return {"action": "follow_up", "question": "And beyond that?", "coaching": None}
+
+    monkeypatch.setattr(interview_engine, "decide_next_action", _decide)
+    monkeypatch.setattr(interview_engine, "_cached_tts", lambda text, language=None: None)
+
+    result = process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    assert any(c.get("forced_action") == "close" for c in seen)
+    spoken = result["question_text"]
+    assert spoken == interview_engine._final_check_question("en")
+    assert "?" in spoken  # the closing check, never a stale probe
