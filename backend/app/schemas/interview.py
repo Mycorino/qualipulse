@@ -131,8 +131,12 @@ class ParticipantResponse(BaseModel):
     quality_summary: str | None = None
     quality_strengths: list[str] | None = None
     quality_issues: list[str] | None = None
-    # "ok" | "failed" | None (never attempted / still running). Distinct from
-    # quality_label, which is heuristic-backed and therefore always present.
+    # "ok" | "failed" | None (may still be in flight). Derived by
+    # _effective_quality_status, not read straight off the column: an
+    # assessment killed with its instance never gets to stamp itself, so a
+    # completed interview still missing a summary well after the fact reads
+    # as failed. Distinct from quality_label, which is heuristic-backed and
+    # therefore always present even when no assessment ever succeeded.
     quality_status: str | None = None
     key_takeaways: list[str] | None = None
     notable_quotes: list[str] | None = None

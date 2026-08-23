@@ -1,7 +1,7 @@
 import csv
 import io
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -56,6 +56,32 @@ _FILLERS = {
     "don't know", "can't say", "cant say", "nothing", "nope", "yep", "yeah",
     "i guess", "i suppose", "not really", "kind of", "sort of",
 }
+
+# How long a completed interview may sit without a quality summary before the
+# assessment is presumed dead. The pass is one or two Claude calls with a 60s
+# client timeout, so a live run is always well inside this. Anything older
+# either crashed before it could stamp itself, or never got the chance: a
+# Cloud Run instance recycled mid-flight kills the daemon thread outright, so
+# the except branch that writes quality_status="failed" never runs.
+_QUALITY_ASSESSMENT_GRACE = timedelta(minutes=10)
+
+
+def _effective_quality_status(p: Participant) -> str | None:
+    """What the client should show, not merely what got recorded.
+
+    Returns "ok" when an assessment exists, "failed" when one is owed and is
+    not plausibly still running, and None while it may still be in flight.
+    """
+    if p.quality_summary:
+        return p.quality_status or "ok"
+    if p.quality_status:
+        return p.quality_status
+    if p.status != "completed" or p.completed_at is None:
+        return None
+    if datetime.utcnow() - p.completed_at > _QUALITY_ASSESSMENT_GRACE:
+        return "failed"
+    return None
+
 
 def _compute_quality(turns) -> tuple[float | None, str | None]:
     """Return (score 0.0-1.0, label) from participant turns. Returns (None, None) if no data."""
@@ -187,7 +213,7 @@ def list_participants(
                 quality_summary=p.quality_summary,
                 quality_strengths=json.loads(p.quality_strengths) if p.quality_strengths else None,
                 quality_issues=json.loads(p.quality_issues) if p.quality_issues else None,
-                quality_status=p.quality_status,
+                quality_status=_effective_quality_status(p),
                 key_takeaways=json.loads(p.key_takeaways) if p.key_takeaways else None,
                 notable_quotes=json.loads(p.notable_quotes) if p.notable_quotes else None,
                 avg_response_words=p.avg_response_words,
@@ -282,7 +308,7 @@ def get_transcript(
             quality_summary=participant.quality_summary,
             quality_strengths=json.loads(participant.quality_strengths) if participant.quality_strengths else None,
             quality_issues=json.loads(participant.quality_issues) if participant.quality_issues else None,
-            quality_status=participant.quality_status,
+            quality_status=_effective_quality_status(participant),
             key_takeaways=json.loads(participant.key_takeaways) if participant.key_takeaways else None,
             notable_quotes=json.loads(participant.notable_quotes) if participant.notable_quotes else None,
             avg_response_words=participant.avg_response_words,

@@ -160,10 +160,12 @@ export interface ParticipantResponse {
   quality_summary?: string | null;
   quality_strengths?: string[] | null;
   quality_issues?: string[] | null;
-  /** "ok" = the AI pass produced an assessment, "failed" = it ran and came
-   *  back with nothing, null/undefined = never attempted or still running.
-   *  quality_label cannot stand in for this: the API falls back to a
-   *  word-count heuristic for it, so it is set even when the pass crashed. */
+  /** "ok" = an assessment exists, "failed" = one is owed and is not
+   *  plausibly still running, null/undefined = may still be in flight.
+   *  Server-derived, so a pass that died with its instance still eventually
+   *  reads as failed. quality_label cannot stand in for this: the API falls
+   *  back to a word-count heuristic for it, so it is set even when the pass
+   *  never succeeded. */
   quality_status?: "ok" | "failed" | null;
   key_takeaways?: string[] | null;
   notable_quotes?: string[] | null;
