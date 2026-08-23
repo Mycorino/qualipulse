@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
@@ -349,6 +350,23 @@ export default function ProjectDetail() {
   const [newCodeName, setNewCodeName] = useState("");
   const [newCodeColor, setNewCodeColor] = useState(PRESET_COLORS[0]);
   const [showNewCode, setShowNewCode] = useState(false);
+
+  // ── Selection popup viewport clamp ────────────────────────────────────────
+  // The "Tag as" popup anchors above the selection. Near the bottom of the
+  // viewport a long code list would run off-screen, so after it renders we
+  // measure it and shift it up just enough to fit.
+  const selectionPopupRef = useRef<HTMLDivElement | null>(null);
+  const [selectionPopupTop, setSelectionPopupTop] = useState<number | null>(null);
+  React.useLayoutEffect(() => {
+    if (!selectionInfo) { setSelectionPopupTop(null); return; }
+    const el = selectionPopupRef.current;
+    if (!el) return;
+    const desired = Math.max(8, selectionInfo.y - window.scrollY);
+    const h = el.getBoundingClientRect().height;
+    const clamped = Math.max(8, Math.min(desired, window.innerHeight - h - 8));
+    setSelectionPopupTop(clamped);
+  }, [selectionInfo, showNewCode, codes.length]);
+
   const [creatingCode, setCreatingCode] = useState(false);
   const [renamingCodeId, setRenamingCodeId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
@@ -4026,11 +4044,18 @@ export default function ProjectDetail() {
 
             {/* Floating tag popup. Clamp top so it stays in viewport on touch
                 devices where rect.top can be near 0 after scrollIntoView. */}
-            {selectionInfo && (
-              <div style={{ position: "fixed", left: Math.max(8, Math.min(selectionInfo.x - 90, window.innerWidth - 196)), top: Math.max(8, selectionInfo.y - window.scrollY), zIndex: 1000, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)", padding: 8, minWidth: 180, maxWidth: "min(280px, calc(100vw - 16px))" }}>
+            {/* Portaled to <body>: .tab-content animates transform, which makes
+                it the containing block for position: fixed descendants (see the
+                note above @keyframes tab-enter), so an in-tree popup rendered
+                ~270px below the selection and got clipped at the bottom. */}
+            {selectionInfo && createPortal(
+              <div ref={selectionPopupRef} style={{ position: "fixed", left: Math.max(8, Math.min(selectionInfo.x - 90, window.innerWidth - 196)), top: selectionPopupTop ?? Math.max(8, selectionInfo.y - window.scrollY), zIndex: 1000, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)", padding: 8, minWidth: 180, maxWidth: "min(280px, calc(100vw - 16px))" }}>
                 {!showNewCode ? (
                   <div>
                     <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>{tProject("responses.tagAs")}</div>
+                    {/* Long codebooks scroll inside the popup instead of pushing
+                        "New code" / Cancel (and the tail of the list) off-screen. */}
+                    <div style={{ maxHeight: "min(320px, 45vh)", overflowY: "auto", overscrollBehavior: "contain" }}>
                     {codes.map((c) => (
                       <button key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "4px 8px", border: "none", background: "none", cursor: "pointer", borderRadius: 4, fontSize: 13, textAlign: "left" }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "var(--border-subtle)")}
@@ -4041,6 +4066,7 @@ export default function ProjectDetail() {
                         {c.name}
                       </button>
                     ))}
+                    </div>
                     <div style={{ borderTop: "1px solid var(--border-subtle)", marginTop: 4, paddingTop: 4 }}>
                       <button className="btn btn-ghost btn-xs" style={{ width: "100%" }} onClick={() => setShowNewCode(true)}>{tProject("responses.newCode")}</button>
                       <button className="btn btn-ghost btn-xs" style={{ width: "100%", color: "var(--text-disabled)" }} onClick={() => { setSelectionInfo(null); window.getSelection()?.removeAllRanges(); }}>{tCommon("cancel")}</button>
@@ -4060,7 +4086,8 @@ export default function ProjectDetail() {
                     </div>
                   </div>
                 )}
-              </div>
+              </div>,
+              document.body
             )}
           </div>
           );
