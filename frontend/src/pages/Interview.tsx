@@ -87,6 +87,7 @@ const EMPTY_PROFILE: ProfileState = {
 /** Returning-participant hints carried by both verification routes. */
 interface ProfileMeta {
   profile_complete?: boolean;
+  panel_consent?: boolean;
   first_name?: string | null;
   preferred_language?: string | null;
 }
@@ -379,6 +380,9 @@ export default function Interview() {
   // six-digit code (which gets it straight off the verify-code response).
   function applyProfileMeta(meta: ProfileMeta) {
     if (meta.profile_complete) setProfileComplete(true);
+    // Seed from the server so a returning panelist who already joined is not
+    // re-asked, and one who declined last time IS asked (see the reprompt).
+    if (meta.panel_consent) setPanelConsentGiven(true);
     if (meta.first_name) setProfile((p) => ({ ...p, firstName: meta.first_name as string }));
     const ml = (meta.preferred_language || "").slice(0, 2);
     if (ml && (SUPPORTED_LANGUAGES as readonly string[]).includes(ml)) {
@@ -2988,7 +2992,7 @@ export default function Interview() {
             <strong style={{ color: "var(--text-primary)" }}>{t("completion.panelConfirmTitle")}</strong>{" "}
             {t("completion.panelConfirmBody")}
           </div>
-        ) : repromptState === "dismissed" || !sessionToken || postProfileState === "idle" ? null : (
+        ) : repromptState === "dismissed" || !sessionToken || !(profileComplete || postProfileState !== "idle") ? null : (
           <div className="interview-complete-future interview-complete-future--prompt">
             <strong style={{ color: "var(--text-primary)" }}>{t("completion.panelReprompt.title")}</strong>
             <p style={{ margin: "8px 0 14px" }}>{t("completion.panelReprompt.body")}</p>
