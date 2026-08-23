@@ -143,6 +143,28 @@ class Settings(BaseSettings):
     # completes onboarding. Optional: if empty, notifications are skipped.
     SALES_SLACK_WEBHOOK_URL: str = ""
 
+    # ── AI provider spend monitoring ────────────────────────────────────
+    # Where the burn-rate and out-of-credit alerts go. Blank disables the
+    # email half (Slack still fires if a webhook is set). These are OUR
+    # provider bills (Anthropic / OpenAI), not a customer's credits.
+    AI_SPEND_ALERT_EMAIL: str = ""
+    # Ops Slack webhook. Opt-in: blank means email only. Deliberately does
+    # not reuse SALES_SLACK_WEBHOOK_URL, which a different audience watches.
+    AI_SPEND_SLACK_WEBHOOK_URL: str = ""
+    # What we expect to spend on AI per calendar month, in USD. Drives the
+    # "we are on pace to run out" alerts at 80% and 100% of month-to-date,
+    # and the end-of-month projection in every alert body. 0 disables both.
+    AI_SPEND_MONTHLY_BUDGET_USD: float = 0.0
+    # Hard ceiling on rolling-24h spend. 0 disables.
+    AI_SPEND_DAILY_LIMIT_USD: float = 0.0
+    # Spike detector: alert when rolling-24h spend exceeds this multiple of
+    # the trailing 7-day daily average. Catches a runaway loop or an abusive
+    # account days before a budget threshold would. 0 disables.
+    AI_SPEND_SPIKE_MULTIPLIER: float = 3.0
+    # Noise floor for the spike detector — below this, a quiet week makes any
+    # normal day look like a 10x spike.
+    AI_SPEND_SPIKE_FLOOR_USD: float = 10.0
+
     # Rate limits (requests per minute)
     # haveibeenpwned k-anonymity check on new passwords. Always on in
     # production; set true to also enable in dev/staging. Fail-open on

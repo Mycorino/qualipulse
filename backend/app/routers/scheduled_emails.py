@@ -15,6 +15,13 @@ The events handled here:
   - ``interview_reminder_1``   — participant idle mid-interview for ~1 day
   - ``interview_reminder_2``   — final nudge ~2 days after reminder 1
 
+The same hourly beat also runs the AI-spend burn-rate check
+(``services.ai_spend``), which alerts the team by email and Slack when our
+Anthropic / OpenAI spend crosses a ceiling, spikes, or is on pace to pass
+the monthly budget. It rides along here rather than on its own schedule so
+there is one cron to configure, and it has its own idempotency table
+(``ops_alert_log``) since ops alerts have no Company to key on.
+
 Calendar-trial emails (``trial_half_over`` / ``trial_ending``) were
 retired alongside the credits-native billing model — credits gate
 usage, not days. Their templates remain in ``services.email`` as
@@ -42,6 +49,7 @@ from app.models.email_log import EmailSendLog, ParticipantEmailLog
 from app.models.interview import InterviewLink, InterviewTurn, Participant
 from app.models.project import Project
 from app.routers.admin import require_admin
+from app.services.ai_spend import check_spend_alerts
 from app.services.email import send_day_1_followup, send_interview_reminder
 from app.services.verification import magic_link_url, mint_magic_token
 
@@ -306,6 +314,14 @@ def run_scheduled_emails(
     reminders_sent, reminders_skipped = _process_interview_reminders(
         db, now, dry_run
     )
+    # Ops-facing, not customer-facing: alerts the team about OUR provider
+    # spend. Self-contained and never raises, so a monitoring bug cannot
+    # take the lifecycle emails down with it.
+    try:
+        spend_alerts = check_spend_alerts(db, now, dry_run)
+    except Exception:
+        logger.exception("AI spend check failed")
+        spend_alerts = []
     return {
         "dry_run": dry_run,
         "ran_at": now.isoformat(),
@@ -316,5 +332,6 @@ def run_scheduled_emails(
                 "skipped": reminders_skipped,
             },
         },
+        "ai_spend_alerts": [alert["key"] for alert in spend_alerts],
         "total_sent": day_1_sent + reminders_sent,
     }
