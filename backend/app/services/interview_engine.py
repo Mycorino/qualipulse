@@ -174,10 +174,50 @@ CLOSING_MESSAGES: dict[str, str] = {
     "zh": "我们的访谈到此结束。非常感谢您抽出宝贵时间并认真回答，这对我们非常有帮助！",
 }
 
-# Hard ceiling on consecutive follow-ups per guide question. The AI prompt
-# advises moving on after ~2 follow-ups without new information; this is the
-# server-enforced backstop so one topic can never eat the whole interview.
+# Floor for the per-question follow-up allowance (see _followup_allowance).
+# The AI prompt advises moving on after ~2 follow-ups without new information;
+# this is the smallest server-enforced backstop, applied when the study's time
+# budget per question is too tight to justify anything more generous.
 MAX_FOLLOWUPS_PER_QUESTION = 3
+
+# Ceiling on the budget-derived follow-up allowance. Even a very generous
+# per-question time budget should not turn one topic into an interrogation.
+MAX_FOLLOWUPS_CEILING = 6
+
+# Typical wall-clock cost of one exchange (interviewer question + participant
+# answer + transcription), used to convert a per-question time budget into a
+# follow-up allowance. Measured against real interviews, which run a little
+# over a minute per turn.
+MINUTES_PER_EXCHANGE = 1.25
+
+# How far ahead of an even time-spread (in guide-question units) the interview
+# may drift before the host stops the model advancing. The prompt already asks
+# it to go deeper when ahead, but that is advisory and gets ignored: without
+# enforcement the guide is raced through and the leftover time pools on the
+# last question as filler probes.
+AHEAD_PACE_QUESTIONS = 1.0
+
+# Share of the time budget that must be spent before the model is allowed to
+# close an interview whose guide is already fully covered. Interviews that pace
+# normally reach the last question well past this, so the floor only bites on
+# fast runs, where it trades a little extra depth for a bounded amount of filler.
+GUIDE_COVERED_CLOSE_FLOOR_PCT = 50.0
+
+
+def _followup_allowance(total_minutes: float, total_questions: int) -> int:
+    """How many follow-ups one guide question may take, given the budget.
+
+    A flat cap spends a generous budget far too fast: 7 questions in a 60-minute
+    study is ~8.5 minutes per topic, which is several exchanges, not two. The
+    allowance is a ceiling rather than a target, so a talkative participant who
+    fills the time never reaches it; it exists so a terse one does not leave the
+    guide finished at minute 20 with 40 minutes of nothing to do.
+    """
+    if total_minutes <= 0 or total_questions <= 0:
+        return MAX_FOLLOWUPS_PER_QUESTION
+    per_question = total_minutes / total_questions
+    allowance = round(per_question / MINUTES_PER_EXCHANGE) - 1
+    return max(MAX_FOLLOWUPS_PER_QUESTION, min(allowance, MAX_FOLLOWUPS_CEILING))
 
 
 # Participant thank-you email, in every supported interview language.
@@ -713,6 +753,35 @@ def _decision_fallback(
     return {"action": "follow_up", "question": _fallback_follow_up(language), "coaching": None, "fallback": True}
 
 
+def _close_gate_open(
+    *,
+    all_questions_done: bool,
+    time_used_pct: float,
+    pacing_known: bool,
+) -> bool:
+    """The close gate advertised to the model.
+
+    This must never be STRICTER than the host-side gate in
+    ``process_interview_turn``: the model obeys a gate it is told is shut, and
+    on the last guide question the only legal action left is ``follow_up``. A
+    stricter advertised gate therefore makes an interview that finished its
+    guide early pad itself out with filler probes on one topic until the
+    stricter threshold is finally met.
+    """
+    if not pacing_known:
+        # Duration misconfigured: coverage is the only trustworthy signal.
+        return all_questions_done
+    if all_questions_done:
+        # Whole guide covered. Allow closing once a floor of the budget is
+        # spent, so a fast run still gets depth (the ahead-of-schedule pacing
+        # instruction pushes the model to probe rather than race) without the
+        # interview being padded out with filler.
+        return time_used_pct >= GUIDE_COVERED_CLOSE_FLOOR_PCT
+    # Guide not covered yet: there is still a next_question to advance to, so
+    # holding the gate shut cannot strand the model on a single topic.
+    return time_used_pct >= 95.0
+
+
 def decide_next_action(
     system_prompt: str,
     interview_guide_str: str,
@@ -768,6 +837,7 @@ def decide_next_action(
         pace_delta = 0.0
         pace_ratio = 1.0
         slack_minutes = remaining_minutes
+        questions_remaining = max(0, total_questions - current_question_index - 1)
 
     if pace_delta < -1.5:
         pacing_instruction = (
@@ -780,6 +850,19 @@ def decide_next_action(
             "PACING: You are slightly behind schedule. "
             "Only ask a follow-up if the participant's answer was genuinely too brief or unclear. "
             "Otherwise move to the next main question now."
+        )
+    elif pace_delta >= AHEAD_PACE_QUESTIONS:
+        # Far enough ahead that the host will now REFUSE next_question (see the
+        # ahead-of-schedule guard in process_interview_turn). Say so plainly:
+        # the model writes a better probe when it knows advancing is off the
+        # table than when it proposes one and gets overridden.
+        pacing_instruction = (
+            f"PACING: You are well ahead of schedule ({remaining_minutes:.0f} min left for "
+            f"{questions_remaining} more guide question(s)). Do NOT move to the next main "
+            "question yet. Stay on the current topic and probe deeper: a concrete example, "
+            "the last time it happened, the story behind the answer, the emotion underneath. "
+            "The study was scoped for this much time, so use it here rather than banking it "
+            "for the end, where there is nothing left to spend it on."
         )
     elif pace_ratio >= 1.25:
         pacing_instruction = (
@@ -795,11 +878,11 @@ def decide_next_action(
             f"You {fu_word} ask one follow-up if it genuinely adds value, then move to the next question."
         )
 
-    if pacing_known:
-        can_close = all_questions_done or time_used_pct >= 95.0
-        can_close = can_close and (time_used_pct >= 80.0)
-    else:
-        can_close = all_questions_done
+    can_close = _close_gate_open(
+        all_questions_done=all_questions_done,
+        time_used_pct=time_used_pct,
+        pacing_known=pacing_known,
+    )
 
     if after_final_check:
         close_instruction = (
@@ -1979,25 +2062,45 @@ def process_interview_turn(
     if action == "close" and not can_close:
         forced = "next_question" if has_next_question else "follow_up"
 
-    if action == "follow_up" and forced is None and total_q > 0 and total > 0:
-        minutes_per_q = total / total_q
-        expected_q = elapsed / minutes_per_q
-        if (cur_q - expected_q) < -1.5 and has_next_question:
+    existing_followups = sum(1 for t in turns if t.question_index == cur_q and t.is_follow_up)
+    allowance = _followup_allowance(total, total_q)
+    pace_delta = None
+    if total_q > 0 and total > 0:
+        pace_delta = cur_q - (elapsed / (total / total_q))
+
+    if action == "follow_up" and forced is None and pace_delta is not None:
+        if pace_delta < -1.5 and has_next_question:
             forced = "next_question"
 
-    if action == "follow_up" and forced is None:
-        existing_followups = sum(1 for t in turns if t.question_index == cur_q and t.is_follow_up)
-        if existing_followups >= MAX_FOLLOWUPS_PER_QUESTION and has_next_question:
-            forced = "next_question"
-        elif (
-            not has_next_question
-            and can_close
-            and total > 0
-            and time_used_pct >= 100.0
+    if action == "next_question" and forced is None and pace_delta is not None:
+        # Ahead-of-schedule guard, the mirror of the behind guard above. The
+        # prompt asks the model to go deeper when it has time in hand, but that
+        # is advisory and gets ignored, so the guide is raced through and the
+        # leftover time pools on the last question, which has nowhere to
+        # advance to and can only be filled with follow-up probes. Hold the
+        # current topic instead, bounded by its follow-up allowance.
+        #
+        # A participant giving one short answer after another has nothing more
+        # to give on this topic; holding them there would be filler of a
+        # different kind, so the short-answer run releases the guard.
+        if (
+            pace_delta >= AHEAD_PACE_QUESTIONS
+            and has_next_question
+            and existing_followups < allowance
+            and not (short_answer_state or {}).get("is_short_run")
         ):
-            # On the last question the follow-up cap is deliberately waived so
-            # a rich final topic can breathe, but with the budget fully spent
-            # and nowhere left to advance, the model could probe forever.
+            forced = "follow_up"
+
+    if action == "follow_up" and forced is None:
+        if existing_followups >= allowance and has_next_question:
+            forced = "next_question"
+        elif not has_next_question and can_close and (
+            existing_followups >= allowance
+            or (total > 0 and time_used_pct >= 100.0)
+        ):
+            # The last question has nowhere to advance to, so a model that
+            # keeps choosing follow_up could probe forever. Wrap up once the
+            # topic is demonstrably exhausted, or the budget is fully spent.
             forced = "close"
 
     if forced is not None and forced != action:
@@ -2015,6 +2118,8 @@ def process_interview_turn(
                 "question": f"{_bridge_to_next(language)} {context.get('next_question_text') or ''}".strip(),
                 "coaching": None,
             }
+        elif forced == "close":
+            decision = {"action": "close", "question": _closing_message(language), "coaching": None}
         else:
             decision = {"action": forced, "question": _fallback_follow_up(language), "coaching": None}
         action = decision["action"]
