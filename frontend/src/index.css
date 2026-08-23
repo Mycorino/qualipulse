@@ -2186,6 +2186,29 @@ select.field-input {
   color: #fff;
 }
 
+/* Badge row under a participant name. Badges must never wrap mid-label or
+   shrink, or a row with several of them spills past the 300px list column;
+   the row wraps to a second line instead. */
+.participant-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+  margin-top: 2px;
+  min-width: 0;
+}
+.participant-row__meta .status-badge,
+.participant-row__meta .quality-badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+/* Icon-only variant for confirmations whose full label is in the tooltip. */
+.status-badge--icon {
+  padding: 2px 6px;
+  line-height: 1.4;
+}
+
 .participant-avatar {
   width: 32px;
   height: 32px;

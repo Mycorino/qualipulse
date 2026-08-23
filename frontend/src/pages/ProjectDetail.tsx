@@ -3408,7 +3408,7 @@ export default function ProjectDetail() {
                               {[p.profession, p.country].filter(Boolean).join(" · ")}
                             </div>
                           )}
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                          <div className="participant-row__meta">
                             <span className="participant-date" style={{ fontSize: 11 }}>{relativeDate(p.started_at)}</span>
                             {p.quality_label && (
                               <span className={`quality-badge quality-badge--${p.quality_label}`} style={{ fontSize: 10, padding: "1px 6px" }}>
@@ -3426,13 +3426,28 @@ export default function ProjectDetail() {
                               </span>
                             )}
                             {reviewMode && p.status === "completed" && p.review_status === "approved" && p.reward_sent_at && (
-                              <span className="status-badge" style={{ fontSize: 10, background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }}>
-                                {tProject("responses.review.rewardSentBadge")}
+                              /* Icon pill: the label is long and repeats down the
+                                 list, crowding the 300px column. Text stays in the
+                                 tooltip / accessible name. */
+                              <span
+                                className="status-badge status-badge--icon"
+                                style={{ background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }}
+                                role="img"
+                                aria-label={tProject("responses.review.rewardSentBadge")}
+                                title={tProject("responses.review.rewardSentBadge")}
+                              >
+                                🎁
                               </span>
                             )}
                             {p.panel_consent && (
-                              <span className="status-badge" style={{ fontSize: 10, background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }} title={tProject("responses.followUpOkHint")}>
-                                ✓ {tProject("responses.followUpOk")}
+                              <span
+                                className="status-badge status-badge--icon"
+                                style={{ background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }}
+                                role="img"
+                                aria-label={tProject("responses.followUpOk")}
+                                title={`${tProject("responses.followUpOk")} - ${tProject("responses.followUpOkHint")}`}
+                              >
+                                ✓
                               </span>
                             )}
                           </div>
