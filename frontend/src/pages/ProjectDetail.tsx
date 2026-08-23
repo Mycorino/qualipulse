@@ -357,6 +357,35 @@ export default function ProjectDetail() {
   // measure it and shift it up just enough to fit.
   const selectionPopupRef = useRef<HTMLDivElement | null>(null);
   const [selectionPopupTop, setSelectionPopupTop] = useState<number | null>(null);
+  // Dismiss the popup on an outside click, Escape, or a scroll of the
+  // transcript column. Without this it only closed via Cancel / tagging /
+  // a fresh mouse-up inside an answer, so clicking anywhere else left it
+  // stranded, and scrolling detached it from the text it points at.
+  useEffect(() => {
+    if (!selectionInfo) return;
+    const dismiss = () => {
+      setSelectionInfo(null);
+      window.getSelection()?.removeAllRanges();
+    };
+    function onDown(e: MouseEvent) {
+      if (selectionPopupRef.current?.contains(e.target as Node)) return;
+      dismiss();
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") dismiss();
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    // Capture phase: the transcript column scrolls, not the window, and
+    // scroll doesn't bubble.
+    window.addEventListener("scroll", dismiss, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", dismiss, true);
+    };
+  }, [selectionInfo]);
+
   React.useLayoutEffect(() => {
     if (!selectionInfo) { setSelectionPopupTop(null); return; }
     const el = selectionPopupRef.current;
