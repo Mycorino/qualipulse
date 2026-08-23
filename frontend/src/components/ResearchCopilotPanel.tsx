@@ -129,6 +129,7 @@ export function ResearchCopilotPanel({
   onApplied,
   mission,
   nextAction,
+  onRunNextAction,
   nudges,
   onDismissNudge,
   intro,
@@ -141,6 +142,13 @@ export function ResearchCopilotPanel({
   mission?: string;
   /** The deterministic next-best-action for this surface, if any. */
   nextAction?: NextAction;
+  /**
+   * Handler for a click on the dock's next-action chip. Pages use it to
+   * route the researcher straight to the tab where the action lives
+   * (share a link → Setup's recruit section, run analysis → Analysis…).
+   * Without it the chip just opens the panel.
+   */
+  onRunNextAction?: (action: NextAction) => void;
   /** Event-driven nudges — "something changed while you were away." */
   nudges?: Nudge[];
   onDismissNudge?: (id: string) => void;
@@ -705,7 +713,9 @@ export function ResearchCopilotPanel({
           <NextActionChip
             action={nextAction}
             variant="dock"
-            onRun={() => openPanel()}
+            onRun={() =>
+              onRunNextAction ? onRunNextAction(nextAction) : openPanel()
+            }
           />
         )}
         <button
