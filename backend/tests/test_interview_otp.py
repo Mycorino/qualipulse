@@ -240,3 +240,59 @@ class TestProfilePositionSetting:
         link = _seed(db_session, "tok-prof-off")
         r = client.get(f"/interview/{link.token}")
         assert r.json()["profile_before_interview"] is False
+
+
+class TestVerifyReportsPanelConsent:
+    """Both verification routes tell the client whether this email is already
+    on the panel, separately from profile_complete. A returning panelist who
+    filled in demographics but declined the panel is "known" (skips the
+    questionnaire) yet must still be offered the panel on the completion
+    screen, or one refusal becomes permanent."""
+
+    def _profile(self, db, email, consent):
+        from app.models.panel import PanelProfile
+        p = PanelProfile(
+            email=email, first_name="Ana", country="France", age_range="25-34",
+            education="masters", employment_status="full_time", panel_consent=consent,
+        )
+        db.add(p); db.commit()
+        return p
+
+    def test_code_route_reports_consented_panelist(self, client, db_session):
+        link = _seed(db_session, "tok-pc-yes")
+        self._profile(db_session, "ana@example.com", True)
+        _, code = mint_magic_credentials(db_session, "ana@example.com", link.token)
+
+        r = client.post(f"/interview/{link.token}/verify-code",
+                        json={"email": "ana@example.com", "code": code})
+        assert r.status_code == 200, r.text
+        assert r.json()["profile_complete"] is True
+        assert r.json()["panel_consent"] is True
+
+    def test_code_route_distinguishes_known_but_declined(self, client, db_session):
+        """The case the completion-screen reprompt exists for."""
+        link = _seed(db_session, "tok-pc-no")
+        self._profile(db_session, "ana@example.com", False)
+        _, code = mint_magic_credentials(db_session, "ana@example.com", link.token)
+
+        r = client.post(f"/interview/{link.token}/verify-code",
+                        json={"email": "ana@example.com", "code": code})
+        assert r.json()["profile_complete"] is True
+        assert r.json()["panel_consent"] is False
+
+    def test_link_route_reports_it_too(self, client, db_session):
+        link = _seed(db_session, "tok-pc-link")
+        self._profile(db_session, "ana@example.com", True)
+        token, _ = mint_magic_credentials(db_session, "ana@example.com", link.token)
+
+        r = client.get(f"/interview/verify/{token}")
+        assert r.status_code == 200, r.text
+        assert r.json()["panel_consent"] is True
+
+    def test_unknown_email_is_false_not_missing(self, client, db_session):
+        link = _seed(db_session, "tok-pc-new")
+        _, code = mint_magic_credentials(db_session, "new@example.com", link.token)
+
+        r = client.post(f"/interview/{link.token}/verify-code",
+                        json={"email": "new@example.com", "code": code})
+        assert r.json()["panel_consent"] is False

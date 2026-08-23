@@ -358,6 +358,11 @@ def verify_participant_token(
         "link_token": record.interview_link_token,
         "email": record.email,
         "profile_complete": _is_profile_complete(profile),
+        # Distinct from profile_complete on purpose: a returning panelist who
+        # filled in their demographics but declined the panel is "known"
+        # (skips the questionnaire) yet must still be offered the panel on
+        # the completion screen, otherwise one refusal is permanent.
+        "panel_consent": bool(profile.panel_consent) if profile else False,
         "first_name": profile.first_name if profile else None,
         "preferred_language": profile.preferred_language if profile else None,
     }
@@ -420,6 +425,11 @@ def verify_participant_code(
         "link_token": record.interview_link_token,
         "email": record.email,
         "profile_complete": _is_profile_complete(profile),
+        # Distinct from profile_complete on purpose: a returning panelist who
+        # filled in their demographics but declined the panel is "known"
+        # (skips the questionnaire) yet must still be offered the panel on
+        # the completion screen, otherwise one refusal is permanent.
+        "panel_consent": bool(profile.panel_consent) if profile else False,
         "first_name": profile.first_name if profile else None,
         "preferred_language": profile.preferred_language if profile else None,
     }

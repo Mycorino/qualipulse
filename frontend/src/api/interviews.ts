@@ -137,6 +137,8 @@ export interface VerifyTokenResponse {
   /** True when a returning participant already has a complete panel profile —
    *  the frontend skips the profiling questionnaire when set. */
   profile_complete?: boolean;
+  /** Whether this email is already on the research panel. */
+  panel_consent?: boolean;
   first_name?: string | null;
   preferred_language?: string | null;
 }
