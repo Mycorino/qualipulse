@@ -2,6 +2,10 @@ import { Fragment, useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import AdminBlog from "./AdminBlog";
+import AdminOverview from "./admin/AdminOverview";
+import AdminCosts from "./admin/AdminCosts";
+import "./admin/admin.css";
+import { BarChart, Card, Kpi, WindowPicker } from "./admin/ui";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -73,27 +77,11 @@ interface AffiliatePayout {
   notes: string | null;
 }
 
-interface AdminStats {
-  total_users: number;
-  users_by_tier: Record<string, number>;
-  active_trials: number;
-  total_projects: number;
-  total_interviews_completed: number;
-  signups_last_7_days: number;
-  signups_last_30_days: number;
-}
-
-interface CostsByOperation {
-  [op: string]: { cost_usd: number; count: number };
-}
-
 interface CompanyCost {
   company_id: string;
-  name: string;
-  email: string;
   total_cost_usd: number;
-  this_month_usd: number;
-  interview_count: number;
+  window_cost_usd: number;
+  window_cost_per_interview_usd: number | null;
 }
 
 interface TrafficBucket {
@@ -120,13 +108,10 @@ interface AdminTraffic {
 }
 
 interface CostsReport {
-  total_cost_usd: number;
-  this_month_usd: number;
-  by_operation: CostsByOperation;
-  avg_cost_per_interview_usd: number;
-  total_interviews: number;
   by_company: CompanyCost[];
 }
+
+type AdminTab = "overview" | "costs" | "users" | "traffic" | "affiliates" | "blog" | "audit" | "panel";
 
 // ── API helpers ────────────────────────────────────────────────────────────
 
@@ -166,29 +151,6 @@ function TierBadge({ tier }: { tier: string }) {
 }
 
 // ── Stat card ──────────────────────────────────────────────────────────────
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div
-      style={{
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius)",
-        padding: "16px 20px",
-        minWidth: 140,
-      }}
-    >
-      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}>
-        {value}
-      </div>
-      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-        {label}
-      </div>
-    </div>
-  );
-}
-
-// ── Confirm dialog ─────────────────────────────────────────────────────────
 
 function ConfirmDialog({
   message,
@@ -266,7 +228,6 @@ export default function Admin() {
   const [keyError, setKeyError] = useState("");
   const [authed, setAuthed] = useState(false);
 
-  const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -293,7 +254,8 @@ export default function Admin() {
 
   const [costs, setCosts] = useState<CostsReport | null>(null);
 
-  const [tab, setTab] = useState<"users" | "traffic" | "affiliates" | "blog" | "audit" | "panel">("users");
+  const [tab, setTab] = useState<AdminTab>("overview");
+  const [costWorkspaceId, setCostWorkspaceId] = useState<string | null>(null);
   // Panel / consumer-account deletion (GDPR erasure + testing reset).
   const [panelEmail, setPanelEmail] = useState("");
   const [panelIncludeInterviews, setPanelIncludeInterviews] = useState(false);
@@ -358,8 +320,7 @@ export default function Admin() {
       return;
     }
     try {
-      const res = await adminClient(key, identity).get<AdminStats>("/admin/stats");
-      setStats(res.data);
+      await adminClient(key, identity).get("/admin/stats");
       sessionStorage.setItem("admin_key", key);
       sessionStorage.setItem("admin_identity", identity.trim());
       setAdminKey(key);
@@ -427,18 +388,9 @@ export default function Admin() {
     }
   }, [client, trafficDays]);
 
-  const loadStats = useCallback(async () => {
-    try {
-      const res = await client().get<AdminStats>("/admin/stats");
-      setStats(res.data);
-    } catch {
-      // non-critical
-    }
-  }, [client]);
-
   const loadCosts = useCallback(async () => {
     try {
-      const res = await client().get<CostsReport>("/admin/costs");
+      const res = await client().get<CostsReport>("/admin/costs", { params: { days: 30 } });
       setCosts(res.data);
     } catch {
       // non-critical
@@ -485,7 +437,6 @@ export default function Admin() {
       } else if (tab === "traffic") {
         loadTraffic();
       }
-      loadStats();
     }
   }, [authed, search, tierFilter, userPage, tab, trafficDays]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -570,7 +521,6 @@ export default function Admin() {
     try {
       await client().delete(`/admin/users/${user.id}`);
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
-      await loadStats();
       showSuccess(t("toasts.userDeleted"));
     } catch {
       setError(t("toasts.userDeleteFailed"));
@@ -859,312 +809,67 @@ export default function Admin() {
 
   // ── Main admin UI ─────────────────────────────────────────────────────────
 
+  const tabs: { id: AdminTab; label: string; count?: number }[] = [
+    { id: "overview", label: t("tabs.overview", "Overview") },
+    { id: "costs", label: t("tabs.costs", "AI spend") },
+    { id: "users", label: t("tabs.users") },
+    { id: "traffic", label: t("tabs.traffic", "Traffic") },
+    { id: "affiliates", label: t("tabs.affiliates"), count: pendingAffiliateCount },
+    { id: "blog", label: t("tabs.blog") },
+    { id: "audit", label: t("tabs.audit") },
+    { id: "panel", label: t("tabs.panel") },
+  ];
+
+  const openWorkspaceCosts = (companyId: string) => {
+    setTab("costs");
+    setCostWorkspaceId(companyId);
+  };
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg-base)",
-        padding: "0 0 60px",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          background: "var(--bg-surface)",
-          borderBottom: "1px solid var(--border)",
-          padding: "0 32px",
-          height: 56,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontWeight: 700, fontSize: 16, color: "var(--text-primary)" }}>
-            {t("header.title")}
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              background: "var(--danger-bg)",
-              color: "var(--danger)",
-              border: "1px solid var(--danger-border)",
-              borderRadius: 4,
-              padding: "2px 8px",
-              fontWeight: 600,
-            }}
-          >
-            {t("header.internalBadge")}
-          </span>
+    <div className="adm-page">
+      <header className="adm-header">
+        <div className="adm-header__brand">
+          <span>{t("header.title")}</span>
+          <span className="adm-header__badge">{t("header.internalBadge")}</span>
         </div>
-        <button
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--text-muted)",
-            cursor: "pointer",
-            fontSize: 13,
-          }}
-          onClick={() => {
-            sessionStorage.removeItem("admin_key");
-            sessionStorage.removeItem("admin_identity");
-            setAuthed(false);
-            setAdminKey("");
-            setAdminIdentity("");
-          }}
-        >
-          {t("header.signOut")}
-        </button>
-      </div>
-
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 0" }}>
-
-        {/* Stats bar */}
-        {stats && (
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              flexWrap: "wrap",
-              marginBottom: 28,
-            }}
-          >
-            <StatCard label={t("stats.totalUsers")} value={stats.total_users} />
-            <StatCard label={t("stats.totalProjects")} value={stats.total_projects} />
-            <StatCard label={t("stats.completedInterviews")} value={stats.total_interviews_completed} />
-            <StatCard label={t("stats.activeTrials")} value={stats.active_trials} />
-            <StatCard label={t("stats.signups7d")} value={stats.signups_last_7_days} />
-            <StatCard label={t("stats.signups30d")} value={stats.signups_last_30_days} />
-            {Object.entries(stats.users_by_tier).map(([tier, count]) => (
-              <StatCard key={tier} label={t("stats.tierUsers", { tier })} value={count} />
-            ))}
-          </div>
-        )}
-
-        {/* AI Costs card */}
-        {costs && (
-          <div
-            style={{
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-lg)",
-              padding: "20px 24px",
-              marginBottom: 24,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                marginBottom: 16,
-              }}
-            >
-              {t("costs.title")}
-            </div>
-
-            {/* Top-line numbers */}
-            <div style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)" }}>
-                  ${costs.total_cost_usd.toFixed(2)}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  {t("costs.allTime")}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)" }}>
-                  ${costs.this_month_usd.toFixed(2)}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  {t("costs.thisMonth")}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)" }}>
-                  ${costs.avg_cost_per_interview_usd.toFixed(3)}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  {t("costs.avgPerInterview", { count: costs.total_interviews })}
-                </div>
-              </div>
-            </div>
-
-            {/* By-operation table */}
-            {Object.keys(costs.by_operation).length > 0 && (
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: 13,
-                }}
-              >
-                <thead>
-                  <tr>
-                    {["costs.colOperation", "costs.colCalls", "costs.colTotalCost"].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: "left",
-                          padding: "4px 12px 8px 0",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "var(--text-muted)",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.06em",
-                          borderBottom: "1px solid var(--border-subtle)",
-                        }}
-                      >
-                        {t(h)}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(costs.by_operation)
-                    .sort((a, b) => b[1].cost_usd - a[1].cost_usd)
-                    .map(([op, data]) => (
-                      <tr key={op}>
-                        <td
-                          style={{
-                            padding: "6px 12px 6px 0",
-                            color: "var(--text-secondary)",
-                            fontFamily: "monospace",
-                            fontSize: 12,
-                          }}
-                        >
-                          {op}
-                        </td>
-                        <td style={{ padding: "6px 12px 6px 0", color: "var(--text-secondary)" }}>
-                          {data.count.toLocaleString()}
-                        </td>
-                        <td style={{ padding: "6px 0", color: "var(--text-primary)", fontWeight: 500 }}>
-                          ${data.cost_usd.toFixed(4)}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 24, borderBottom: "1px solid var(--border)" }}>
+        <div className="adm-header__meta">
+          {adminIdentity && <span>{adminIdentity}</span>}
           <button
-            onClick={() => setTab("users")}
-            style={{
-              padding: "12px 0",
-              border: "none",
-              background: "none",
-              borderBottom: tab === "users" ? "2px solid var(--primary)" : "none",
-              color: tab === "users" ? "var(--primary)" : "var(--text-secondary)",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: tab === "users" ? 600 : 500,
+            type="button"
+            onClick={() => {
+              sessionStorage.removeItem("admin_key");
+              sessionStorage.removeItem("admin_identity");
+              setAuthed(false);
+              setAdminKey("");
+              setAdminIdentity("");
             }}
           >
-            {t("tabs.users")}
-          </button>
-          <button
-            onClick={() => setTab("traffic")}
-            style={{
-              padding: "12px 0",
-              border: "none",
-              background: "none",
-              borderBottom: tab === "traffic" ? "2px solid var(--primary)" : "none",
-              color: tab === "traffic" ? "var(--primary)" : "var(--text-secondary)",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: tab === "traffic" ? 600 : 500,
-            }}
-          >
-            {t("tabs.traffic", "Traffic")}
-          </button>
-          <button
-            onClick={() => setTab("affiliates")}
-            style={{
-              padding: "12px 0",
-              border: "none",
-              background: "none",
-              borderBottom: tab === "affiliates" ? "2px solid var(--primary)" : "none",
-              color: tab === "affiliates" ? "var(--primary)" : "var(--text-secondary)",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: tab === "affiliates" ? 600 : 500,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {t("tabs.affiliates")}
-            {pendingAffiliateCount > 0 && (
-              <span
-                style={{
-                  background: "var(--warning-bg, #fffbeb)",
-                  color: "var(--warning-text, #92400e)",
-                  border: "1px solid var(--warning-border, #fcd34d)",
-                  borderRadius: 10,
-                  padding: "0 7px",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  lineHeight: "18px",
-                }}
-                title={t("affiliates.pendingBadgeTitle", { count: pendingAffiliateCount })}
-              >
-                {pendingAffiliateCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setTab("blog")}
-            style={{
-              padding: "12px 0",
-              border: "none",
-              background: "none",
-              borderBottom: tab === "blog" ? "2px solid var(--primary)" : "none",
-              color: tab === "blog" ? "var(--primary)" : "var(--text-secondary)",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: tab === "blog" ? 600 : 500,
-            }}
-          >
-            {t("tabs.blog")}
-          </button>
-          <button
-            onClick={() => setTab("audit")}
-            style={{
-              padding: "12px 0",
-              border: "none",
-              background: "none",
-              borderBottom: tab === "audit" ? "2px solid var(--primary)" : "none",
-              color: tab === "audit" ? "var(--primary)" : "var(--text-secondary)",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: tab === "audit" ? 600 : 500,
-            }}
-          >
-            {t("tabs.audit")}
-          </button>
-          <button
-            onClick={() => setTab("panel")}
-            style={{
-              padding: "12px 0",
-              border: "none",
-              background: "none",
-              borderBottom: tab === "panel" ? "2px solid var(--primary)" : "none",
-              color: tab === "panel" ? "var(--primary)" : "var(--text-secondary)",
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: tab === "panel" ? 600 : 500,
-            }}
-          >
-            {t("tabs.panel", "Panel")}
+            {t("header.signOut")}
           </button>
         </div>
+      </header>
+
+      <nav className="adm-tabs" role="tablist">
+        {tabs.map((tb) => (
+          <button key={tb.id} type="button" role="tab" className="adm-tab" aria-selected={tab === tb.id} onClick={() => setTab(tb.id)}>
+            {tb.label}
+            {tb.count ? (
+              <span className="adm-tab__count" title={t("affiliates.pendingBadgeTitle", { count: tb.count })}>{tb.count}</span>
+            ) : null}
+          </button>
+        ))}
+      </nav>
+
+      <div className="adm-main">
+        {tab === "overview" && <AdminOverview client={client} onOpenWorkspace={openWorkspaceCosts} />}
+        {tab === "costs" && (
+          <AdminCosts
+            client={client}
+            openWorkspaceId={costWorkspaceId}
+            onOpenWorkspace={setCostWorkspaceId}
+            onCloseWorkspace={() => setCostWorkspaceId(null)}
+          />
+        )}
 
         {/* Toolbar - Users only */}
         {tab === "users" && (
@@ -1681,13 +1386,20 @@ export default function Admin() {
                       <div style={{ marginBottom: 12, fontSize: 12, color: "var(--text-muted)" }}>
                         {t("users.aiSpendLabel")}{" "}
                         <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                          ${co.total_cost_usd.toFixed(4)}
+                          ${co.total_cost_usd.toFixed(2)}
                         </span>{" "}
                         {t("users.aiSpendTotal")} ·{" "}
                         <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                          ${co.this_month_usd.toFixed(4)}
+                          ${co.window_cost_usd.toFixed(2)}
                         </span>{" "}
-                        {t("users.aiSpendThisMonth")}
+                        {t("users.aiSpend30d", "last 30 days")}
+                        {co.window_cost_per_interview_usd != null && (
+                          <> · <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>${co.window_cost_per_interview_usd.toFixed(3)}</span> {t("users.aiSpendPerInterview", "per interview")}</>
+                        )}
+                        {" "}
+                        <button type="button" className="adm-link" onClick={() => openWorkspaceCosts(user.id)} style={{ marginLeft: 6, fontSize: 12 }}>
+                          {t("users.costBreakdown", "Cost breakdown →")}
+                        </button>
                       </div>
                     );
                   })()}
@@ -1887,7 +1599,6 @@ export default function Admin() {
           )}
         </div>
         )}
-      </div>
 
         {/* Blog management tab */}
         {tab === "blog" && <AdminBlog adminKey={adminKey} />}
@@ -2119,31 +1830,15 @@ export default function Admin() {
         {/* Traffic tab */}
         {tab === "traffic" && (
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
-                {t("traffic.title", "Marketing funnel")}
-              </h2>
-              <select
-                value={trafficDays}
-                onChange={(e) => setTrafficDays(Number(e.target.value))}
-                style={{
-                  padding: "6px 10px",
-                  fontSize: 13,
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-xs)",
-                  background: "var(--bg-surface)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                <option value={7}>{t("traffic.days7", "Last 7 days")}</option>
-                <option value={30}>{t("traffic.days30", "Last 30 days")}</option>
-                <option value={90}>{t("traffic.days90", "Last 90 days")}</option>
-              </select>
-              {trafficLoading && (
-                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                  {t("traffic.loading", "Loading…")}
-                </span>
-              )}
+            <div className="adm-toolbar">
+              <div>
+                <h2>{t("traffic.title", "Marketing funnel")}</h2>
+                <div className="adm-toolbar__hint">
+                  {t("traffic.hint", "First-party events from the marketing site, stitched to signups by first-touch attribution.")}
+                  {trafficLoading && <> · {t("traffic.loading", "Loading…")}</>}
+                </div>
+              </div>
+              <WindowPicker value={trafficDays} onChange={setTrafficDays} options={[7, 30, 90]} labels={(d) => t("overview.windowDays", "{{n}}d", { n: d })} />
             </div>
 
             {traffic && traffic.page_views === 0 && (
@@ -2167,40 +1862,29 @@ export default function Admin() {
 
             {traffic && (
               <>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                    gap: 12,
-                    marginBottom: 28,
-                  }}
-                >
-                  <TrafficTile label={t("traffic.pageViews", "Pageviews")} value={traffic.page_views} />
-                  <TrafficTile
-                    label={t("traffic.visits", "Visits")}
-                    value={traffic.visits}
-                    hint={t("traffic.visitsHint", "Not unique people: the visitor hash rotates daily.")}
-                  />
-                  <TrafficTile label={t("traffic.pricingViews", "Pricing viewed")} value={traffic.pricing_views} />
-                  <TrafficTile label={t("traffic.ctaClicks", "Signup CTA clicks")} value={traffic.cta_clicks} />
-                  <TrafficTile label={t("traffic.signups", "Signups")} value={traffic.signups} />
-                  <TrafficTile
-                    label={t("traffic.conversion", "Signup rate")}
-                    value={`${traffic.signup_rate_pct}%`}
-                    highlight
-                  />
+                <div className="adm-grid adm-grid--kpi">
+                  <Kpi label={t("traffic.pageViews", "Pageviews")} value={traffic.page_views.toLocaleString()} />
+                  <Kpi label={t("traffic.visits", "Visits")} value={traffic.visits.toLocaleString()} hint={t("traffic.visitsHint", "Not unique people: the visitor hash rotates daily.")} />
+                  <Kpi label={t("traffic.pricingViews", "Pricing viewed")} value={traffic.pricing_views.toLocaleString()} />
+                  <Kpi label={t("traffic.ctaClicks", "Signup CTA clicks")} value={traffic.cta_clicks.toLocaleString()} />
+                  <Kpi label={t("traffic.signups", "Signups")} value={traffic.signups.toLocaleString()} />
+                  <Kpi label={t("traffic.conversion", "Signup rate")} value={`${traffic.signup_rate_pct}%`} accent />
                 </div>
 
-                {traffic.daily.length > 0 && <TrafficSparkline daily={traffic.daily} />}
+                {traffic.daily.length > 0 && (
+                  <Card title={t("traffic.dailyTitle", "Pageviews and signups per day")} className="adm-grid">
+                    <BarChart
+                      data={traffic.daily}
+                      mode="overlay"
+                      series={[
+                        { key: "page_views", label: t("traffic.pageViews", "Pageviews"), tone: "muted" },
+                        { key: "signups", label: t("traffic.signups", "Signups"), tone: "primary" },
+                      ]}
+                    />
+                  </Card>
+                )}
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                    gap: 24,
-                    marginTop: 28,
-                  }}
-                >
+                <div className="adm-grid adm-grid--3">
                   <BucketTable
                     title={t("traffic.byCta", "Which CTA earns the click")}
                     rows={traffic.cta_by_location}
@@ -2228,6 +1912,7 @@ export default function Admin() {
             )}
           </div>
         )}
+      </div>
 
       {/* Suspend dialog */}
       {suspendDialog && (
@@ -2579,92 +2264,6 @@ export default function Admin() {
 
 /* ---- Traffic tab presentation ---- */
 
-function TrafficTile({
-  label,
-  value,
-  hint,
-  highlight,
-}: {
-  label: string;
-  value: number | string;
-  hint?: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        border: `1px solid ${highlight ? "var(--primary)" : "var(--border)"}`,
-        borderRadius: "var(--radius-sm, 8px)",
-        padding: "14px 16px",
-        background: "var(--bg-surface)",
-      }}
-      title={hint}
-    >
-      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{label}</div>
-      <div
-        style={{
-          fontSize: 24,
-          fontWeight: 600,
-          color: highlight ? "var(--primary)" : "var(--text-primary)",
-        }}
-      >
-        {typeof value === "number" ? value.toLocaleString() : value}
-      </div>
-    </div>
-  );
-}
-
-/** Pageviews and signups per day, as bars. Deliberately dependency-free. */
-function TrafficSparkline({
-  daily,
-}: {
-  daily: { date: string; page_views: number; signups: number }[];
-}) {
-  const peak = Math.max(1, ...daily.map((d) => d.page_views));
-  return (
-    <div
-      style={{
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-sm, 8px)",
-        padding: "16px",
-        background: "var(--bg-surface)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 100 }}>
-        {daily.map((d) => (
-          <div
-            key={d.date}
-            title={`${d.date}: ${d.page_views} views, ${d.signups} signups`}
-            style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 2 }}
-          >
-            {d.signups > 0 && (
-              <div
-                style={{
-                  height: Math.max(3, (d.signups / peak) * 100),
-                  background: "var(--primary)",
-                  borderRadius: "2px 2px 0 0",
-                }}
-              />
-            )}
-            <div
-              style={{
-                height: Math.max(2, (d.page_views / peak) * 100),
-                background: "var(--border)",
-                borderRadius: d.signups > 0 ? 0 : "2px 2px 0 0",
-              }}
-            />
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 11, color: "var(--text-secondary)" }}>
-        <span>{daily[0]?.date}</span>
-        <span>Pageviews (grey) · signups (blue)</span>
-        <span>{daily[daily.length - 1]?.date}</span>
-      </div>
-    </div>
-  );
-}
-
 function BucketTable({
   title,
   rows,
@@ -2675,37 +2274,31 @@ function BucketTable({
   note?: string;
 }) {
   const total = rows.reduce((sum, r) => sum + r.count, 0);
+  const max = Math.max(0, ...rows.map((r) => r.count));
   return (
-    <div>
-      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</h3>
-      {note && (
-        <p style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.4, marginBottom: 8 }}>
-          {note}
-        </p>
-      )}
+    <Card title={title} sub={note}>
       {rows.length === 0 ? (
-        <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>-</p>
+        <div className="adm-empty">-</div>
       ) : (
-        <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.label} style={{ borderBottom: "1px solid var(--border)" }}>
-                <td style={{ padding: "6px 0", color: "var(--text-primary)", wordBreak: "break-all" }}>
-                  {r.label}
-                </td>
-                <td style={{ padding: "6px 0", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>
-                  {r.count.toLocaleString()}
-                  {total > 0 && (
-                    <span style={{ color: "var(--text-secondary)", fontWeight: 400, marginLeft: 6 }}>
-                      {Math.round((r.count / total) * 100)}%
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="adm-table-wrap">
+          <table className="adm-table">
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.label}>
+                  <td className="bar-cell" style={{ wordBreak: "break-all" }}>
+                    <i style={{ width: `${max ? (100 * r.count) / max : 0}%` }} />
+                    <span>{r.label}</span>
+                  </td>
+                  <td className="num" style={{ whiteSpace: "nowrap" }}>
+                    <span className="primary">{r.count.toLocaleString()}</span>
+                    {total > 0 && <span className="dim" style={{ marginLeft: 6 }}>{Math.round((r.count / total) * 100)}%</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </div>
+    </Card>
   );
 }
