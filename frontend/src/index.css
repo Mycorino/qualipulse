@@ -1724,6 +1724,37 @@ select.field-input {
   border-radius: 6px;
 }
 
+.link-cap-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.link-cap-editor__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.link-cap-editor__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.link-cap-editor__hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  max-width: 420px;
+}
+
+.link-cap-warning {
+  flex-basis: 100%;
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--warning-text);
+}
+
 /* Guide */
 .system-prompt-preview {
   font-family: "Menlo", "Monaco", "Courier New", monospace;

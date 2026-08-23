@@ -2454,31 +2454,42 @@ export default function ProjectDetail() {
                         <code className="link-url" title={interviewUrl(l.token)}>{interviewUrl(l.token)}</code>
                         <span className="link-cap-summary">
                           {capEditLinkId === l.id ? (
-                            <>
-                              <input
-                                type="number"
-                                min={1}
-                                className="link-cap-input"
-                                value={capDraft}
-                                autoFocus
-                                aria-label={tProject("overview.capAriaLabel")}
-                                placeholder={tProject("overview.capNoLimit")}
-                                onChange={(e) => setCapDraft(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleSaveCap(l.id);
-                                  if (e.key === "Escape") setCapEditLinkId(null);
-                                }}
-                              />
-                              <button className="btn btn-ghost btn-sm" onClick={() => handleSaveCap(l.id)}>
-                                {tProject("overview.capSave")}
-                              </button>
-                              <button className="btn btn-ghost btn-sm" onClick={() => setCapEditLinkId(null)}>
-                                {tCommon("cancel")}
-                              </button>
-                            </>
+                            <span className="link-cap-editor">
+                              <label className="link-cap-editor__label" htmlFor={`link-cap-${l.id}`}>
+                                {tProject("overview.capEditLabel")}
+                              </label>
+                              <span className="link-cap-editor__row">
+                                <input
+                                  id={`link-cap-${l.id}`}
+                                  type="number"
+                                  min={1}
+                                  className="link-cap-input"
+                                  value={capDraft}
+                                  autoFocus
+                                  placeholder={tProject("overview.capNoLimit")}
+                                  onChange={(e) => setCapDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleSaveCap(l.id);
+                                    if (e.key === "Escape") setCapEditLinkId(null);
+                                  }}
+                                />
+                                <button className="btn btn-ghost btn-sm" onClick={() => handleSaveCap(l.id)}>
+                                  {tProject("overview.capSave")}
+                                </button>
+                                <button className="btn btn-ghost btn-sm" onClick={() => setCapEditLinkId(null)}>
+                                  {tCommon("cancel")}
+                                </button>
+                              </span>
+                              <span className="link-cap-editor__hint">
+                                {targetParticipants != null
+                                  ? tProject("overview.capEditHintWithTarget", { target: targetParticipants })
+                                  : tProject("overview.capEditHint")}
+                              </span>
+                            </span>
                           ) : (
                             <button
                               className="link-cap-pill"
+                              title={tProject("overview.capEditHint")}
                               onClick={() => {
                                 setCapEditLinkId(l.id);
                                 setCapDraft(l.max_participants ? String(l.max_participants) : "");
@@ -2489,11 +2500,21 @@ export default function ProjectDetail() {
                                     used: l.participant_count,
                                     max: l.max_participants,
                                   })
-                                : tProject("overview.capSet")}
+                                : tProject("overview.capOpen")}
                             </button>
                           )}
                         </span>
                       </div>
+                      {l.max_participants != null &&
+                        targetParticipants != null &&
+                        l.max_participants < targetParticipants && (
+                          <p className="link-cap-warning" role="status">
+                            {tProject("overview.capBelowTarget", {
+                              max: l.max_participants,
+                              target: targetParticipants,
+                            })}
+                          </p>
+                        )}
                       <div className="link-row-actions">
                         {l.is_active && (
                           <button className="btn btn-ghost btn-sm" onClick={() => copyLink(l.token)}>

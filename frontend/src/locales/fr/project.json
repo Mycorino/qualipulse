@@ -306,12 +306,15 @@
     "creditGateLower": "Fixer l'objectif à {{credits}} et continuer",
     "creditGateLowered": "Objectif fixé à {{credits}}, vous pouvez générer le lien.",
     "creditGateUpgrade": "Obtenir plus de crédits",
-    "capSet": "Définir une limite de participants",
     "capUsage": "{{used}} / {{max}} participants",
     "capSave": "Enregistrer la limite",
     "capNoLimit": "Sans limite",
-    "capAriaLabel": "Nombre maximum de participants pour ce lien",
-    "capInvalid": "Saisissez un nombre entier supérieur ou égal à 1, ou laissez vide pour ne pas fixer de limite."
+    "capInvalid": "Saisissez un nombre entier supérieur ou égal à 1, ou laissez vide pour ne pas fixer de limite.",
+    "capOpen": "Sans limite de participants",
+    "capEditLabel": "Maximum de participants admis sur ce lien",
+    "capEditHint": "Un garde-fou contre un lien trop partagé, distinct de votre objectif d'étude. Laissez vide pour ne pas fixer de limite.",
+    "capEditHintWithTarget": "Un garde-fou contre un lien trop partagé, distinct de votre objectif d'étude de {{target}}. Laissez vide pour ne pas fixer de limite.",
+    "capBelowTarget": "Ce lien cesse d'admettre des participants à {{max}}, en dessous de votre objectif d'étude de {{target}}. Augmentez ou retirez la limite pour atteindre votre objectif."
   },
   "setup": {
     "brandingTitle": "Image de marque & identité",
