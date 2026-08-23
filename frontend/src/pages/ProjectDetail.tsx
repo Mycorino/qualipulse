@@ -40,6 +40,7 @@ import {
   createTag,
   deleteTag,
   suggestTags,
+  assessParticipantQuality,
   getTagSuggestions,
   acceptTagSuggestion,
   rejectTagSuggestion,
@@ -355,6 +356,7 @@ export default function ProjectDetail() {
   // ── AI tag + codebook suggestions ──────────────────────────────────────────
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
   const [suggestingTags, setSuggestingTags] = useState(false);
+  const [assessingQuality, setAssessingQuality] = useState(false);
   const [suggestedCodes, setSuggestedCodes] = useState<SuggestedCode[] | null>(null);
   const [suggestedCodesChecked, setSuggestedCodesChecked] = useState<Record<string, boolean>>({});
   const [suggestingCodes, setSuggestingCodes] = useState(false);
@@ -1023,6 +1025,40 @@ export default function ProjectDetail() {
     handleViewTranscript(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, loading, participants, selectedParticipant]);
+
+  /** Re-run a quality assessment that failed at completion time.
+   *  Synchronous on the server (up to two Claude calls), so this can take
+   *  a while; the button carries the busy state. */
+  async function handleAssessQuality() {
+    if (!selectedParticipant || assessingQuality) return;
+    const participantId = selectedParticipant.id;
+    setAssessingQuality(true);
+    try {
+      const fresh = await assessParticipantQuality(id!, participantId);
+      const patch = (p: ParticipantResponse): ParticipantResponse =>
+        p.id === participantId
+          ? {
+              ...p,
+              quality_score: fresh.quality_score,
+              quality_label: fresh.quality_label,
+              quality_status: "ok",
+              quality_summary: fresh.summary,
+              quality_strengths: fresh.strengths,
+              quality_issues: fresh.issues,
+              key_takeaways: fresh.key_takeaways ?? p.key_takeaways,
+              notable_quotes: fresh.notable_quotes ?? p.notable_quotes,
+              avg_response_words: fresh.avg_response_words,
+              short_answer_pct: fresh.short_answer_pct,
+            }
+          : p;
+      setParticipants((prev) => prev.map(patch));
+      setSelectedParticipant((prev) => (prev ? patch(prev) : prev));
+    } catch (err) {
+      toast(getErrorMessage(err, tProject("responses.qualityRetryFailed")), "error");
+    } finally {
+      setAssessingQuality(false);
+    }
+  }
 
   async function handleSuggestTags() {
     if (!selectedParticipant || suggestingTags) return;
@@ -3790,22 +3826,19 @@ export default function ProjectDetail() {
                         </details>
                       )}
 
-                      {/* Quality Assessment panel — treat the assessment as
-                          done once a quality_label exists (that's what the
-                          header badge reads). Keying the pending state off
-                          quality_summary alone let a blank summary spin
-                          "in progress" forever while the badge showed a rating. */}
-                      {(selectedParticipant.quality_summary || selectedParticipant.quality_label) ? (
+                      {/* Quality Assessment panel — three honest states.
+                          The summary is the only proof the AI pass ran:
+                          quality_label is heuristic-backed server-side, so it
+                          is set even when the pass crashed, and gating on it
+                          made a failure look like a finished assessment with
+                          nothing to say. */}
+                      {selectedParticipant.quality_summary ? (
                         <details className="sidebar-panel" open>
                           <summary className="sidebar-panel__header">
                             <span className="sidebar-panel__title">{tProject("responses.qualityAssessment")}</span>
                           </summary>
                           <div className="sidebar-panel__body">
-                            {selectedParticipant.quality_summary ? (
-                              <p className="sidebar-panel__summary">{selectedParticipant.quality_summary}</p>
-                            ) : (
-                              <p className="sidebar-panel__summary sidebar-panel__pending">{tProject("responses.qualityNoSummary")}</p>
-                            )}
+                            <p className="sidebar-panel__summary">{selectedParticipant.quality_summary}</p>
                             {selectedParticipant.avg_response_words != null && (
                               <div className="sidebar-panel__stats">
                                 <div className="sidebar-panel__stat">
@@ -3848,7 +3881,24 @@ export default function ProjectDetail() {
                             <span className="sidebar-panel__title">{tProject("responses.qualityAssessment")}</span>
                           </div>
                           <div className="sidebar-panel__body">
-                            <p className="sidebar-panel__pending">{tProject("responses.qualityPending")}</p>
+                            {selectedParticipant.quality_status === "failed" ? (
+                              <>
+                                <p className="sidebar-panel__pending">{tProject("responses.qualityFailed")}</p>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={handleAssessQuality}
+                                  disabled={assessingQuality}
+                                  style={{ marginTop: 8 }}
+                                >
+                                  {assessingQuality
+                                    ? tProject("responses.assessing")
+                                    : tProject("responses.qualityRetry")}
+                                </button>
+                              </>
+                            ) : (
+                              <p className="sidebar-panel__pending">{tProject("responses.qualityPending")}</p>
+                            )}
                           </div>
                         </div>
                       )}

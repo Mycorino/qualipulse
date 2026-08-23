@@ -131,6 +131,9 @@ class ParticipantResponse(BaseModel):
     quality_summary: str | None = None
     quality_strengths: list[str] | None = None
     quality_issues: list[str] | None = None
+    # "ok" | "failed" | None (never attempted / still running). Distinct from
+    # quality_label, which is heuristic-backed and therefore always present.
+    quality_status: str | None = None
     key_takeaways: list[str] | None = None
     notable_quotes: list[str] | None = None
     avg_response_words: float | None = None

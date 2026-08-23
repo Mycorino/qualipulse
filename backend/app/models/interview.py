@@ -118,6 +118,10 @@ class Participant(Base):
     quality_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     quality_strengths: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
     quality_issues: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
+    # "ok" | "failed" | NULL (never attempted, or attempt still in flight).
+    # quality_label alone cannot stand in for this: the API falls back to a
+    # word-count heuristic for it, so it is set even when the AI pass died.
+    quality_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # Interview digest — filled by the same auto-run Claude pass as the quality
     # assessment so a researcher opening a fresh transcript gets an instant
     # read without triggering the project-level analysis.
