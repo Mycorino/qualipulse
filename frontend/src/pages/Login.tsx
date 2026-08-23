@@ -72,7 +72,12 @@ export default function Login() {
       }
       await finishLogin(res.access_token!, res.refresh_token);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, t("login.errors.generic")));
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      setError(
+        status === 401
+          ? t("login.errors.invalidCredentials")
+          : getErrorMessage(err, t("login.errors.generic"))
+      );
     } finally {
       setLoading(false);
     }

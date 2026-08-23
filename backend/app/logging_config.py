@@ -39,6 +39,11 @@ def setup_logging(level: str = "INFO") -> None:
     # Quieten noisy libraries
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    # python_http_client (the SendGrid SDK transport) logs every request's
+    # headers at INFO, which dumps the raw SendGrid API key into Cloud Run
+    # logs on every send. Quieten it so credentials stay out of the logs.
+    logging.getLogger("python_http_client").setLevel(logging.WARNING)
+    logging.getLogger("sendgrid").setLevel(logging.WARNING)
 
 
 logger = logging.getLogger("auto_interview")
