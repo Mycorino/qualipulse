@@ -2637,6 +2637,39 @@ export default function ProjectDetail() {
                   </span>
                 </div>
               </label>
+              <label className="setting-toggle-row" htmlFor="profile-position-toggle">
+                <input
+                  id="profile-position-toggle"
+                  type="checkbox"
+                  checked={project.profile_before_interview === true}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    try {
+                      const updated = await patchProjectSettings(project.id, { profile_before_interview: next });
+                      setProject(updated);
+                      toast(
+                        tProject(next ? "setup.profileBeforeSaved" : "setup.profileAfterSaved", {
+                          defaultValue: next
+                            ? "Profile questions will be asked before the interview"
+                            : "Profile questions will be asked after the interview",
+                        }),
+                        "success"
+                      );
+                    } catch {
+                      toast(tProject("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
+                    }
+                  }}
+                />
+                <div className="setting-toggle-row__copy">
+                  <strong>{tProject("setup.profileBeforeLabel", { defaultValue: "Ask profile questions before the interview" })}</strong>
+                  <span className="muted-text" style={{ fontSize: 12 }}>
+                    {tProject("setup.profileBeforeHelp", {
+                      defaultValue:
+                        "Off by default: participants answer age, country and job questions after the interview, so nothing delays the first question. Turn on if you need the profile to interpret or segment answers, at the cost of some drop-off.",
+                    })}
+                  </span>
+                </div>
+              </label>
             </section>
 
             {/* Interview plan — length + sample-size target. The Research

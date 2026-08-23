@@ -328,10 +328,7 @@
       "listening": "Listening back to your answer…",
       "stillWorking": "Still working, thanks for your patience"
     },
-    "transcript": "We heard:",
-    "transcriptDismiss": "Dismiss",
-    "transcriptReadMore": "Read more",
-    "transcriptReadLess": "Read less",
+    "dismiss": "Dismiss",
     "networkError": "Connection issue. Your answer is saved, tap Send to retry.",
     "ttsFailedWarning": "We couldn't play the question audio. You can read the question above and record your answer.",
     "ttsReplay": "Replay",

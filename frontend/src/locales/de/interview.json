@@ -328,10 +328,7 @@
       "listening": "Wir hören uns Ihre Antwort an…",
       "stillWorking": "Dauert noch einen Moment, danke für Ihre Geduld"
     },
-    "transcript": "Wir haben gehört:",
-    "transcriptDismiss": "Schließen",
-    "transcriptReadMore": "Mehr lesen",
-    "transcriptReadLess": "Weniger lesen",
+    "dismiss": "Schließen",
     "networkError": "Verbindungsproblem. Ihre Antwort ist gespeichert, tippen Sie auf Senden, um es erneut zu versuchen.",
     "ttsFailedWarning": "Wir konnten die Frage nicht als Audio abspielen. Sie können die Frage oben lesen und Ihre Antwort aufnehmen.",
     "ttsReplay": "Erneut abspielen",

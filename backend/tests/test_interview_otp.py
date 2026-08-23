@@ -216,3 +216,27 @@ class TestEmailCarriesBoth:
         assert "/interview/verify/abc" in sent["html"]
         # The code is in the subject so it is readable from the notification.
         assert "123456" in sent["subject"]
+
+
+class TestProfilePositionSetting:
+    """Where the socio-demographic questionnaire sits is per study: some
+    researchers need the profile to interpret answers, most do not and
+    should not make participants earn the first question."""
+
+    def test_defaults_to_after_the_interview(self, db_session):
+        link = _seed(db_session, "tok-prof-default")
+        assert link.project.profile_before_interview is False
+
+    def test_public_interview_info_exposes_the_flag(self, client, db_session):
+        link = _seed(db_session, "tok-prof-info")
+        link.project.profile_before_interview = True
+        db_session.commit()
+
+        r = client.get(f"/interview/{link.token}")
+        assert r.status_code == 200, r.text
+        assert r.json()["profile_before_interview"] is True
+
+    def test_flag_is_false_in_payload_when_unset(self, client, db_session):
+        link = _seed(db_session, "tok-prof-off")
+        r = client.get(f"/interview/{link.token}")
+        assert r.json()["profile_before_interview"] is False

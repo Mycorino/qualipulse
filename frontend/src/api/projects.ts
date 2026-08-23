@@ -77,6 +77,7 @@ export interface ProjectResponse {
   panel_collection_enabled?: boolean;
   /** PF-3: when true (default), engine opens with a warm-up turn before the first guide question. */
   warmup_enabled?: boolean;
+  profile_before_interview?: boolean;
   is_demo?: boolean;
   /** Participant-facing identity policy: standard | branded | anonymous. */
   branding_mode?: "standard" | "branded" | "anonymous";
@@ -423,6 +424,7 @@ export async function patchProjectSettings(
     name?: string;
     panel_collection_enabled?: boolean;
     warmup_enabled?: boolean;
+  profile_before_interview?: boolean;
     research_objective?: string;
     research_context?: string;
     interview_duration_minutes?: number;

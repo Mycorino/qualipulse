@@ -328,10 +328,7 @@
       "listening": "A ouvir a sua resposta…",
       "stillWorking": "Ainda a trabalhar, obrigado pela paciência"
     },
-    "transcript": "Ouvimos:",
-    "transcriptDismiss": "Fechar",
-    "transcriptReadMore": "Ler mais",
-    "transcriptReadLess": "Ler menos",
+    "dismiss": "Fechar",
     "networkError": "Problema de ligação. A sua resposta está guardada, toque em Enviar para tentar novamente.",
     "ttsFailedWarning": "Não conseguimos reproduzir o áudio da pergunta. Pode ler a pergunta acima e gravar a sua resposta.",
     "ttsReplay": "Repetir",
