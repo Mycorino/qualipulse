@@ -2186,6 +2186,29 @@ select.field-input {
   color: #fff;
 }
 
+/* Badge row under a participant name. Badges must never wrap mid-label or
+   shrink, or a row with several of them spills past the 300px list column;
+   the row wraps to a second line instead. */
+.participant-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+  margin-top: 2px;
+  min-width: 0;
+}
+.participant-row__meta .status-badge,
+.participant-row__meta .quality-badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+/* Icon-only variant for confirmations whose full label is in the tooltip. */
+.status-badge--icon {
+  padding: 2px 6px;
+  line-height: 1.4;
+}
+
 .participant-avatar {
   width: 32px;
   height: 32px;
@@ -5819,6 +5842,19 @@ select.field-input {
   gap: var(--space-4);
   position: sticky;
   top: var(--space-4);
+  /* A sticky column taller than its scroller (.responses-transcript-col)
+     would pin its top and hide the rest until the transcript ends. Cap it
+     to the scroller's visible height (same --responses-top measurement the
+     layout uses, minus the column padding) and let it scroll on its own. */
+  max-height: calc(100dvh - var(--responses-top, 190px) - var(--space-6) - var(--space-4) * 2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* Flex children would shrink to fit the capped height instead of
+   overflowing; keep each panel at its natural size so the column scrolls. */
+.transcript-sidebar > * {
+  flex-shrink: 0;
 }
 
 /* ── Sidebar panels ──────────────────────────────────────────────────────── */
@@ -6063,6 +6099,26 @@ select.field-input {
 }
 .analysis-codebook-signal__count {
   color: var(--text-tertiary);
+}
+/* Passage a pending AI tag suggestion refers to: a faint dotted underline in
+   the code colour, quiet enough not to compete with real (accepted) tags. */
+.transcript-suggested {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--brand-500);
+  opacity: 0.95;
+}
+/* Translated / corrected views can't map offsets onto the rewritten text, so
+   the whole reading-aid paragraph gets the same quiet dotted underline and the
+   precise passage is underlined on the raw text shown below it. */
+.transcript-a--has-suggestion .transcript-a__translated {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--brand-500) 55%, transparent);
 }
 .tag-pill--suggested {
   background: var(--bg-sunken);

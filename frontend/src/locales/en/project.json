@@ -480,6 +480,7 @@
     "noTagSuggestions": "No clear tag candidates found in this transcript.",
     "suggestTagsFailed": "Could not suggest tags. Please try again.",
     "acceptSuggestion": "Accept suggestion",
+    "suggestedTagHint": "Suggested tag",
     "rejectSuggestion": "Dismiss suggestion",
     "suggestedNewCode": "New: {{name}}",
     "suggestCodes": "Suggest codes",

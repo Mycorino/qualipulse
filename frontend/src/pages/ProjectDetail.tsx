@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../components/Toast";
@@ -349,6 +350,23 @@ export default function ProjectDetail() {
   const [newCodeName, setNewCodeName] = useState("");
   const [newCodeColor, setNewCodeColor] = useState(PRESET_COLORS[0]);
   const [showNewCode, setShowNewCode] = useState(false);
+
+  // ── Selection popup viewport clamp ────────────────────────────────────────
+  // The "Tag as" popup anchors above the selection. Near the bottom of the
+  // viewport a long code list would run off-screen, so after it renders we
+  // measure it and shift it up just enough to fit.
+  const selectionPopupRef = useRef<HTMLDivElement | null>(null);
+  const [selectionPopupTop, setSelectionPopupTop] = useState<number | null>(null);
+  React.useLayoutEffect(() => {
+    if (!selectionInfo) { setSelectionPopupTop(null); return; }
+    const el = selectionPopupRef.current;
+    if (!el) return;
+    const desired = Math.max(8, selectionInfo.y - window.scrollY);
+    const h = el.getBoundingClientRect().height;
+    const clamped = Math.max(8, Math.min(desired, window.innerHeight - h - 8));
+    setSelectionPopupTop(clamped);
+  }, [selectionInfo, showNewCode, codes.length]);
+
   const [creatingCode, setCreatingCode] = useState(false);
   const [renamingCodeId, setRenamingCodeId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
@@ -1726,10 +1744,12 @@ export default function ProjectDetail() {
     const turnTags = tags.filter((t) => t.turn_id === turnId)
       .sort((a, b) => a.start_index - b.start_index);
     const segRanges = computeSegmentRanges(text, segments);
+    const sugRanges = pendingSuggestionRanges(turnId, text.length);
 
     const boundaries = new Set<number>([0, text.length]);
     for (const s of segRanges) { boundaries.add(s.start); boundaries.add(s.end); }
     for (const t of turnTags) { boundaries.add(t.start_index); boundaries.add(t.end_index); }
+    for (const r of sugRanges) { boundaries.add(r.start); boundaries.add(r.end); }
     const points = Array.from(boundaries).filter(p => p >= 0 && p <= text.length).sort((a, b) => a - b);
 
     const parts: React.ReactNode[] = [];
@@ -1742,11 +1762,13 @@ export default function ProjectDetail() {
 
       const seg = segRanges.find(s => s.start <= start && end <= s.end);
       const tag = turnTags.find(t => t.start_index <= start && end <= t.end_index);
+      const sug = !tag ? sugRanges.find(r => r.start <= start && end <= r.end) : undefined;
 
       const tagColor = tag?.code_color || "#6366f1";
       const className = [
         seg ? "transcript-segment" : "",
         tag ? "transcript-tagged" : "",
+        sug ? "transcript-suggested" : "",
       ].filter(Boolean).join(" ");
 
       parts.push(
@@ -1759,8 +1781,8 @@ export default function ProjectDetail() {
             borderBottom: `2.5px solid ${tagColor}`,
             background: `${tagColor}22`,
             borderRadius: 2,
-          } : undefined}
-          title={tag ? `Tagged: ${tag.code_name}` : undefined}
+          } : sug ? { textDecorationColor: sug.color } : undefined}
+          title={tag ? `Tagged: ${tag.code_name}` : sug ? `${tProject("responses.suggestedTagHint", { defaultValue: "Suggested tag" })}: ${sug.label}` : undefined}
           onClick={seg ? () => {
             const audio = recordingAudioRefs.current[turnId];
             if (audio) {
@@ -1776,14 +1798,58 @@ export default function ProjectDetail() {
     return <span data-turn-text="" data-turn-id={turnId}>{parts}</span>;
   }
 
+  // Pending AI tag suggestions for a turn, as ordered, clipped ranges on the
+  // raw transcript. Offsets are against the raw STT text (same as tags).
+  function pendingSuggestionRanges(turnId: string, textLength: number) {
+    return tagSuggestions
+      .filter((s) => s.turn_id === turnId)
+      .map((s) => ({
+        id: s.id,
+        start: Math.max(0, Math.min(s.start_index, textLength)),
+        end: Math.max(0, Math.min(s.end_index, textLength)),
+        color: s.code_color || "var(--brand-500)",
+        label: s.code_name || s.proposed_code_name || "",
+      }))
+      .filter((r) => r.end > r.start)
+      .sort((a, b) => a.start - b.start);
+  }
+
+  // Render text[from, to) with every pending suggestion span inside that
+  // window drawn as a faint dotted underline, so the researcher can see
+  // *which* passage the accept/reject chip below refers to.
+  function renderSuggestedSpans(text: string, from: number, to: number, turnId: string): React.ReactNode[] {
+    const ranges = pendingSuggestionRanges(turnId, text.length);
+    const out: React.ReactNode[] = [];
+    let cursor = from;
+    for (const r of ranges) {
+      const start = Math.max(r.start, cursor);
+      const end = Math.min(r.end, to);
+      if (end <= start) continue;
+      if (start > cursor) out.push(text.slice(cursor, start));
+      out.push(
+        <span
+          key={`sug-${r.id}-${start}`}
+          className="transcript-suggested"
+          style={{ textDecorationColor: r.color }}
+          title={`${tProject("responses.suggestedTagHint", { defaultValue: "Suggested tag" })}: ${r.label}`}
+        >
+          {text.slice(start, end)}
+        </span>
+      );
+      cursor = end;
+    }
+    if (cursor < to) out.push(text.slice(cursor, to));
+    return out;
+  }
+
   function renderTaggedText(text: string, turnId: string): React.ReactNode {
     const turnTags = tags.filter((t) => t.turn_id === turnId).sort((a, b) => a.start_index - b.start_index);
-    if (!turnTags.length) return <span data-turn-text="">{text}</span>;
+    if (!turnTags.length) return <span data-turn-text="">{renderSuggestedSpans(text, 0, text.length, turnId)}</span>;
 
     const parts: React.ReactNode[] = [];
     let cursor = 0;
     for (const tag of turnTags) {
-      if (tag.start_index > cursor) parts.push(text.slice(cursor, tag.start_index));
+      if (tag.start_index > cursor) parts.push(...renderSuggestedSpans(text, cursor, tag.start_index, turnId));
       const color = tag.code_color || "#6366f1";
       parts.push(
         <span
@@ -1803,7 +1869,7 @@ export default function ProjectDetail() {
       );
       cursor = tag.end_index;
     }
-    if (cursor < text.length) parts.push(text.slice(cursor));
+    if (cursor < text.length) parts.push(...renderSuggestedSpans(text, cursor, text.length, turnId));
     return <span data-turn-text="">{parts}</span>;
   }
 
@@ -3342,7 +3408,7 @@ export default function ProjectDetail() {
                               {[p.profession, p.country].filter(Boolean).join(" · ")}
                             </div>
                           )}
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                          <div className="participant-row__meta">
                             <span className="participant-date" style={{ fontSize: 11 }}>{relativeDate(p.started_at)}</span>
                             {p.quality_label && (
                               <span className={`quality-badge quality-badge--${p.quality_label}`} style={{ fontSize: 10, padding: "1px 6px" }}>
@@ -3360,13 +3426,28 @@ export default function ProjectDetail() {
                               </span>
                             )}
                             {reviewMode && p.status === "completed" && p.review_status === "approved" && p.reward_sent_at && (
-                              <span className="status-badge" style={{ fontSize: 10, background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }}>
-                                {tProject("responses.review.rewardSentBadge")}
+                              /* Icon pill: the label is long and repeats down the
+                                 list, crowding the 300px column. Text stays in the
+                                 tooltip / accessible name. */
+                              <span
+                                className="status-badge status-badge--icon"
+                                style={{ background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }}
+                                role="img"
+                                aria-label={tProject("responses.review.rewardSentBadge")}
+                                title={tProject("responses.review.rewardSentBadge")}
+                              >
+                                🎁
                               </span>
                             )}
                             {p.panel_consent && (
-                              <span className="status-badge" style={{ fontSize: 10, background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }} title={tProject("responses.followUpOkHint")}>
-                                ✓ {tProject("responses.followUpOk")}
+                              <span
+                                className="status-badge status-badge--icon"
+                                style={{ background: "var(--success-bg, #ecfdf5)", color: "var(--success-text, #047857)" }}
+                                role="img"
+                                aria-label={tProject("responses.followUpOk")}
+                                title={`${tProject("responses.followUpOk")} - ${tProject("responses.followUpOkHint")}`}
+                              >
+                                ✓
                               </span>
                             )}
                           </div>
@@ -3560,6 +3641,7 @@ export default function ProjectDetail() {
                         {transcript.map((t) => {
                           const turnTags = tags.filter((tg) => tg.turn_id === t.id);
                           const isHighlighted = highlightTarget?.turnIndex === t.turn_index;
+                          const hasPendingSuggestion = tagSuggestions.some((s) => s.turn_id === t.id);
                           return (
                             <div
                               key={t.turn_index}
@@ -3595,7 +3677,7 @@ export default function ProjectDetail() {
                                 </div>
                               ) : t.response_transcript ? (
                                 <div
-                                  className={`transcript-a${(transcriptViewMode === "translated" && t.translated_response) || (transcriptViewMode === "cleaned" && t.cleaned_response) ? " transcript-a--translated" : ""}`}
+                                  className={`transcript-a${(transcriptViewMode === "translated" && t.translated_response) || (transcriptViewMode === "cleaned" && t.cleaned_response) ? " transcript-a--translated" : ""}${hasPendingSuggestion ? " transcript-a--has-suggestion" : ""}`}
                                   onMouseUp={() => transcriptViewMode === "original" && handleTranscriptMouseUp(t.id)}
                                   style={{ userSelect: "text" }}
                                 >
@@ -3603,7 +3685,7 @@ export default function ProjectDetail() {
                                     <>
                                       <div className="transcript-a__translated">{t.translated_response}</div>
                                       <div className="transcript-a__original" lang={project?.language || undefined}>
-                                        {t.response_transcript}
+                                        {renderSuggestedSpans(t.response_transcript, 0, t.response_transcript.length, t.id)}
                                       </div>
                                     </>
                                   ) : transcriptViewMode === "cleaned" && t.cleaned_response ? (
@@ -3619,7 +3701,7 @@ export default function ProjectDetail() {
                                         </span>
                                       </div>
                                       <div className="transcript-a__original" lang={project?.language || undefined}>
-                                        {t.response_transcript}
+                                        {renderSuggestedSpans(t.response_transcript, 0, t.response_transcript.length, t.id)}
                                       </div>
                                     </>
                                   ) : isHighlighted && highlightTarget
@@ -3977,11 +4059,18 @@ export default function ProjectDetail() {
 
             {/* Floating tag popup. Clamp top so it stays in viewport on touch
                 devices where rect.top can be near 0 after scrollIntoView. */}
-            {selectionInfo && (
-              <div style={{ position: "fixed", left: Math.max(8, Math.min(selectionInfo.x - 90, window.innerWidth - 196)), top: Math.max(8, selectionInfo.y - window.scrollY), zIndex: 1000, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)", padding: 8, minWidth: 180, maxWidth: "min(280px, calc(100vw - 16px))" }}>
+            {/* Portaled to <body>: .tab-content animates transform, which makes
+                it the containing block for position: fixed descendants (see the
+                note above @keyframes tab-enter), so an in-tree popup rendered
+                ~270px below the selection and got clipped at the bottom. */}
+            {selectionInfo && createPortal(
+              <div ref={selectionPopupRef} style={{ position: "fixed", left: Math.max(8, Math.min(selectionInfo.x - 90, window.innerWidth - 196)), top: selectionPopupTop ?? Math.max(8, selectionInfo.y - window.scrollY), zIndex: 1000, background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-md)", padding: 8, minWidth: 180, maxWidth: "min(280px, calc(100vw - 16px))" }}>
                 {!showNewCode ? (
                   <div>
                     <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6 }}>{tProject("responses.tagAs")}</div>
+                    {/* Long codebooks scroll inside the popup instead of pushing
+                        "New code" / Cancel (and the tail of the list) off-screen. */}
+                    <div style={{ maxHeight: "min(320px, 45vh)", overflowY: "auto", overscrollBehavior: "contain" }}>
                     {codes.map((c) => (
                       <button key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "4px 8px", border: "none", background: "none", cursor: "pointer", borderRadius: 4, fontSize: 13, textAlign: "left" }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "var(--border-subtle)")}
@@ -3992,6 +4081,7 @@ export default function ProjectDetail() {
                         {c.name}
                       </button>
                     ))}
+                    </div>
                     <div style={{ borderTop: "1px solid var(--border-subtle)", marginTop: 4, paddingTop: 4 }}>
                       <button className="btn btn-ghost btn-xs" style={{ width: "100%" }} onClick={() => setShowNewCode(true)}>{tProject("responses.newCode")}</button>
                       <button className="btn btn-ghost btn-xs" style={{ width: "100%", color: "var(--text-disabled)" }} onClick={() => { setSelectionInfo(null); window.getSelection()?.removeAllRanges(); }}>{tCommon("cancel")}</button>
@@ -4011,7 +4101,8 @@ export default function ProjectDetail() {
                     </div>
                   </div>
                 )}
-              </div>
+              </div>,
+              document.body
             )}
           </div>
           );
