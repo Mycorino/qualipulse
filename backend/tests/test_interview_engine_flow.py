@@ -539,3 +539,28 @@ def test_skip_to_end_without_real_answers_is_not_billed(db_session, monkeypatch)
     db_session.refresh(participant)
     assert participant.status == "completed"
     assert consumed == []
+
+
+def test_english_interviews_still_get_a_language_instruction():
+    """The guide may be written in French while the interview runs in
+    English. Returning "" for English left the model with no instruction to
+    translate it, so it spoke its own sentences in English and then read the
+    guide question out verbatim in French."""
+    built = interview_engine._language_instruction("en")
+
+    assert built.strip(), "English must not fall through with no instruction"
+    assert "English" in built
+    assert "NEVER read a guide question out in its original language" in built
+
+
+def test_language_instruction_covers_every_supported_language():
+    for code, name in interview_engine.LANGUAGE_NAMES.items():
+        built = interview_engine._language_instruction(code)
+        assert name in built, f"{code} instruction missing its language name"
+        assert "translate" in built.lower()
+
+
+def test_effective_system_prompt_carries_the_english_instruction():
+    """The layering path is what actually reaches the model."""
+    built = interview_engine._effective_system_prompt(None, "en")
+    assert "conduct this entire interview in English" in built

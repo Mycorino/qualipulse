@@ -128,6 +128,7 @@ class ProjectCreate(BrandingFieldsMixin):
     welcome_message: str | None = None
     panel_collection_enabled: bool = True
     warmup_enabled: bool = True
+    profile_before_interview: bool = False
     # Study grounding — used by AI analysis + interview engine
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
@@ -139,6 +140,7 @@ class ProjectSettingsPatch(BrandingFieldsMixin):
     name: str | None = None
     panel_collection_enabled: bool | None = None
     warmup_enabled: bool | None = None
+    profile_before_interview: bool | None = None
     # How long each interview should run and how many we're aiming to
     # collect. The Research Copilot recommends + sets these so it can own
     # interview-round setup ("let's do 1h in-depth interviews, ~10 people").
@@ -198,6 +200,7 @@ class ProjectResponse(BaseModel):
     welcome_message: str | None = None
     panel_collection_enabled: bool = True
     warmup_enabled: bool = True
+    profile_before_interview: bool = False
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
     target_participants: int | None = None

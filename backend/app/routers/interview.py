@@ -663,6 +663,9 @@ def validate_link(
         # qualifier added client-side. Researcher pays, never Qualipulse.
         "incentive_text": getattr(project, "incentive_text", None),
         "panel_collection_enabled": getattr(project, "panel_collection_enabled", True),
+        # Drives whether the participant UI runs the socio-demographic
+        # questionnaire before the interview or after it.
+        "profile_before_interview": getattr(project, "profile_before_interview", False),
         "branding": {
             "mode": branding_mode,
             "primary_color": getattr(project, "brand_primary_color", None) if branding_mode == "branded" else None,

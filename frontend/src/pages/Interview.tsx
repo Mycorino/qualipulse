@@ -116,6 +116,47 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+/** Line icons for the participant flow.
+ *  Emoji were rendering inconsistently across platforms (Apple's colour
+ *  glyphs next to a flat blue UI) and are not resizable or themeable, so
+ *  the display icons are inline SVG on currentColor instead. */
+function Icon({ path, size = 48, stroke = 1.5 }: { path: React.ReactNode; size?: number; stroke?: number }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden="true" focusable="false"
+    >
+      {path}
+    </svg>
+  );
+}
+
+const IconMail = (p: { size?: number }) => (
+  <Icon {...p} path={<><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m2 7 10 6 10-6" /></>} />
+);
+const IconMic = (p: { size?: number }) => (
+  <Icon {...p} path={<><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><path d="M12 17v5" /></>} />
+);
+const IconCompass = (p: { size?: number }) => (
+  <Icon {...p} path={<><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5.5-5.5 2 2-5.5z" /></>} />
+);
+const IconLink = (p: { size?: number }) => (
+  <Icon {...p} path={<><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" /><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></>} />
+);
+const IconHeart = (p: { size?: number }) => (
+  <Icon {...p} path={<path d="M12 20s-7-4.4-7-9.3A4 4 0 0 1 12 8a4 4 0 0 1 7 2.7c0 4.9-7 9.3-7 9.3z" />} />
+);
+const IconSpeaker = (p: { size?: number }) => (
+  <Icon {...p} size={p.size ?? 16} path={<><path d="M11 5 6 9H3v6h3l5 4z" /><path d="M16 9a4 4 0 0 1 0 6" /></>} />
+);
+const IconBulb = (p: { size?: number }) => (
+  <Icon {...p} size={p.size ?? 16} path={<><path d="M9 18h6" /><path d="M10 21h4" /><path d="M12 3a6 6 0 0 0-3.6 10.8c.4.3.6.8.6 1.2h6c0-.4.2-.9.6-1.2A6 6 0 0 0 12 3z" /></>} />
+);
+const IconGift = (p: { size?: number }) => (
+  <Icon {...p} size={p.size ?? 16} path={<><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M5 12v8h14v-8" /><path d="M12 8v12" /><path d="M12 8S9.5 3 7.5 4.5 9 8 12 8zM12 8s2.5-5 4.5-3.5S15 8 12 8z" /></>} />
+);
+
 export default function Interview() {
   const { t, i18n } = useTranslation("interview");
   const { token } = useParams<{ token: string }>();
@@ -172,6 +213,10 @@ export default function Interview() {
   // Post-interview "a minute about you" questionnaire (optional). Lives on the
   // completion screen so the pre-interview path stays near-frictionless.
   const [showPostQuestionnaire, setShowPostQuestionnaire] = useState(false);
+  // Studies that opt into profiling BEFORE the interview run the same
+  // questionnaire component up front instead of on the completion screen.
+  const [showPreQuestionnaire, setShowPreQuestionnaire] = useState(false);
+  const [didPreQuestionnaire, setDidPreQuestionnaire] = useState(false);
   const [postProfileState, setPostProfileState] = useState<"idle" | "done" | "skipped">("idle");
 
   // Interview state
@@ -253,8 +298,6 @@ export default function Interview() {
   const micStreamRef = useRef<MediaStream | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const micAnimRef = useRef<number | null>(null);
-  const [lastTranscript, setLastTranscript] = useState<string | null>(null);
-  const [showTranscript, setShowTranscript] = useState(false);
   const [micPermissionRequested, setMicPermissionRequested] = useState(false);
 
   const [ttsFailedWarning, setTtsFailedWarning] = useState(false);
@@ -273,9 +316,6 @@ export default function Interview() {
   const [whyEmailOpen, setWhyEmailOpen] = useState(false);
   const [screeningErrorKind, setScreeningErrorKind] = useState<"network" | "server" | "ratelimit" | null>(null);
   const [screeningRetryCount, setScreeningRetryCount] = useState(0);
-  const [transcriptDismissed, setTranscriptDismissed] = useState(false);
-  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
-  const [transcriptFading, setTranscriptFading] = useState(false);
   const [skipBtnReady, setSkipBtnReady] = useState(false);
   const skipBtnTimerRef = useRef<number | null>(null);
   const beepFiredRef = useRef(false);
@@ -330,20 +370,6 @@ export default function Interview() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, processing, processingLong, currentQuestion]);
-
-  // Auto-dismiss the "We heard" flash so the previous answer doesn't linger
-  // under the next question: start fading at 6.5s, gone at 7.5s. Paused while
-  // the participant has expanded it to read the full transcript.
-  useEffect(() => {
-    if (!showTranscript || !lastTranscript || transcriptDismissed || transcriptExpanded || paused) return;
-    const fadeTimer = window.setTimeout(() => setTranscriptFading(true), 6500);
-    const hideTimer = window.setTimeout(() => setTranscriptDismissed(true), 7500);
-    return () => {
-      window.clearTimeout(fadeTimer);
-      window.clearTimeout(hideTimer);
-      setTranscriptFading(false);
-    };
-  }, [showTranscript, lastTranscript, transcriptDismissed, transcriptExpanded, paused]);
 
   // ── Session / URL handling on load ──────────────────────────────────────
 
@@ -893,6 +919,14 @@ export default function Interview() {
         await routeAfterProfile();
         return;
       }
+      // Studies that need the profile to interpret or segment answers ask
+      // for it up front; everyone else gets the one-field first-name screen
+      // and the full questionnaire after the interview.
+      if (info?.profile_before_interview) {
+        setShowPreQuestionnaire(true);
+        setStarting(false);
+        return;
+      }
       setPhase("profile");
       setStarting(false);
       return;
@@ -944,6 +978,22 @@ export default function Interview() {
     if (data.country) setCountry(data.country);
     setPostProfileState("done");
     setShowPostQuestionnaire(false);
+  }
+
+  /** Finishing (or skipping) the pre-interview questionnaire. Same component
+   *  and same persistence as the post-interview path; the only difference is
+   *  that it continues into screening/interview instead of ending. */
+  async function handlePreQuestionnaireComplete(data: QuestionnaireResult) {
+    setPanelConsentGiven(data.panelConsent);
+    if (data.firstName) {
+      setProfile((p) => ({ ...p, firstName: data.firstName }));
+      setDisplayName(data.firstName);
+    }
+    if (data.ageRange) setAgeRange(data.ageRange);
+    if (data.country) setCountry(data.country);
+    setDidPreQuestionnaire(true);
+    setShowPreQuestionnaire(false);
+    await routeAfterProfile();
   }
 
   /** Post-interview panel opt-in for participants who declined earlier. Flips
@@ -1257,8 +1307,6 @@ export default function Interview() {
   async function submitAnswer(payload: Blob | string) {
     const isTyped = typeof payload === "string";
     setProcessing(true);
-    setShowTranscript(false);
-    setLastTranscript(null);
     setError("");
     setNotice(null);
 
@@ -1269,13 +1317,6 @@ export default function Interview() {
         applyCompletion(res, false);
       } else if (res.question_text) {
         const nextTurn = turnCount + 1;
-        if (res.transcript) {
-          setLastTranscript(res.transcript);
-          setShowTranscript(true);
-          setTranscriptDismissed(false);
-          setTranscriptExpanded(false);
-          setTranscriptFading(false);
-        }
         // PF-3: surface the engine's coaching hint (or clear it if Claude
         // decided the participant is back on track). Stays dismissed if the
         // user explicitly closed the previous one for this turn.
@@ -1485,7 +1526,7 @@ export default function Interview() {
       <div className="interview-page">
         <div className="interview-container" style={{ textAlign: "center", paddingTop: 60 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: "var(--primary, #6366f1)", marginBottom: 32 }}>QualiPulse</div>
-          <div style={{ fontSize: 48, marginBottom: 16 }}><span aria-hidden="true">🔗</span></div>
+          <div style={{ marginBottom: 16 }}><IconLink size={48} /></div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>{t("linkInactive.title")}</h1>
           <p style={{ color: "var(--text-secondary, #6b7280)", fontSize: 15, maxWidth: 380, margin: "0 auto 20px" }}>
             {t("linkInactive.expiredHelp")}
@@ -1542,7 +1583,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container mic-test-card">
-          <div className="mic-prompt-icon"><span aria-hidden="true">🧭</span></div>
+          <div className="mic-prompt-icon"><IconCompass size={40} /></div>
           <h2 className="mic-test-title">{t("inAppBrowser.title")}</h2>
           <p className="mic-test-subtitle">
             {browserEnv.appName
@@ -1627,7 +1668,7 @@ export default function Interview() {
           )}
           {info?.incentive_text && (
             <p className="interview-duration" style={{ textAlign: "center", marginTop: 6 }} title={t("consent.incentiveNote")}>
-              🎁 {t("consent.incentiveLabel")} {info.incentive_text}
+              <IconGift /> {t("consent.incentiveLabel")} {info.incentive_text}
             </p>
           )}
           <p style={{ color: "var(--text-secondary, #6b7280)", marginBottom: 28, lineHeight: 1.6, textAlign: "center" }}>
@@ -1711,7 +1752,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container otp-screen" style={{ maxWidth: 440 }}>
-          <div className="otp-icon"><span aria-hidden="true">📬</span></div>
+          <div className="otp-icon"><IconMail size={52} /></div>
           <h1 className="otp-title">{t("emailSent.title")}</h1>
           <p
             className="otp-desc"
@@ -1975,6 +2016,19 @@ export default function Interview() {
   // tagging happen in the post-completion panel funnel (PF-4), not here —
   // pre-interview should stay near-frictionless.
 
+  if (showPreQuestionnaire) {
+    return (
+      <ParticipantQuestionnaire
+        linkToken={token!}
+        email={email}
+        sessionToken={sessionToken}
+        participantId={participantId || null}
+        initialFirstName={profile.firstName}
+        onComplete={handlePreQuestionnaireComplete}
+      />
+    );
+  }
+
   if (phase === "profile") {
     const trimmed = profile.firstName.trim();
     return (
@@ -2122,7 +2176,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container interview-complete">
-          <div className="complete-icon disqualified-icon"><span aria-hidden="true">🙏</span></div>
+          <div className="complete-icon disqualified-icon"><IconHeart size={48} /></div>
           <h1 className="interview-complete-title">{t("screening.disqualified.title")}</h1>
           <p className="interview-complete-text" dangerouslySetInnerHTML={{ __html: t("screening.disqualified.desc", { projectName: info?.project_name ?? "" }) }} />
           <p className="interview-complete-text" style={{ marginTop: 12 }}>
@@ -2161,7 +2215,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container interview-complete">
-          <div className="complete-icon"><span aria-hidden="true">🙏</span></div>
+          <div className="complete-icon"><IconHeart size={48} /></div>
           <h1 className="interview-complete-title">{t("studyUnavailable.title")}</h1>
           <p className="interview-complete-text">
             {studyUnavailableMsg || t("studyUnavailable.body")}
@@ -2180,7 +2234,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container interview-complete">
-          <div className="complete-icon"><span aria-hidden="true">🙏</span></div>
+          <div className="complete-icon"><IconHeart size={48} /></div>
           <h1 className="interview-complete-title">{t(`${key}.title`)}</h1>
           <p className="interview-complete-text">{t(`${key}.body`)}</p>
           <p className="muted-text" style={{ marginTop: 24 }}>{t("studyUnavailable.close")}</p>
@@ -2195,7 +2249,7 @@ export default function Interview() {
     return (
       <div className="interview-page">
         <div className="interview-container mic-test-card">
-          <div className="mic-prompt-icon"><span aria-hidden="true">🎙️</span></div>
+          <div className="mic-prompt-icon"><IconMic size={40} /></div>
           <h2 className="mic-test-title">{t("micPrompt.title")}</h2>
           <p className="mic-test-subtitle" dangerouslySetInnerHTML={{ __html: t("micPrompt.subtitle") }} />
           <div className="mic-prompt-steps">
@@ -2436,7 +2490,7 @@ export default function Interview() {
                   else setTtsBlocked(false);
                 }}
               >
-                <span aria-hidden="true">🔊</span> {t("interview.playQuestion", { defaultValue: "Play the question" })}
+                <IconSpeaker /> {t("interview.playQuestion", { defaultValue: "Play the question" })}
               </button>
             </div>
           )}
@@ -2469,7 +2523,7 @@ export default function Interview() {
               <button
                 type="button"
                 className="interview-notice__close"
-                aria-label={t("interview.transcriptDismiss")}
+                aria-label={t("interview.dismiss")}
                 onClick={() => setNotice(null)}
               >
                 ×
@@ -2543,49 +2597,18 @@ export default function Interview() {
 
           {coachingHint && !coachingHintDismissed && (
             <div className="coaching-hint">
-              <span className="coaching-hint__icon" aria-hidden="true">💡</span>
+              <span className="coaching-hint__icon"><IconBulb /></span>
               <span className="coaching-hint__text">{coachingHint}</span>
               <button
                 type="button"
                 className="coaching-hint__close"
-                aria-label={t("interview.transcriptDismiss")}
+                aria-label={t("interview.dismiss")}
                 onClick={() => setCoachingHintDismissed(true)}
               >
                 ×
               </button>
             </div>
           )}
-
-          {showTranscript && !transcriptDismissed && lastTranscript && (() => {
-            const TRUNCATE = 200;
-            const isLong = lastTranscript.length > TRUNCATE;
-            const display = isLong && !transcriptExpanded
-              ? lastTranscript.slice(0, TRUNCATE).trimEnd() + "…"
-              : lastTranscript;
-            return (
-              <div className={`transcript-flash${transcriptFading ? " transcript-flash--fading" : ""}`}>
-                <span className="transcript-flash-label">{t("interview.transcript")}</span>
-                <span className="transcript-flash-text">"{display}"</span>
-                {isLong && (
-                  <button
-                    type="button"
-                    className="transcript-flash__readmore"
-                    onClick={() => setTranscriptExpanded((v) => !v)}
-                  >
-                    {transcriptExpanded ? t("interview.transcriptReadLess") : t("interview.transcriptReadMore")}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="transcript-flash__close"
-                  aria-label={t("interview.transcriptDismiss")}
-                  onClick={() => setTranscriptDismissed(true)}
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })()}
 
           <div className="interview-controls">
             {processing ? (
@@ -2745,7 +2768,6 @@ export default function Interview() {
                 <button
                   className={`record-btn ${ttsPlaying ? "record-btn--waiting" : ttsEnded ? "record-btn--ready" : ""}`}
                   onClick={ttsPlaying ? undefined : () => {
-                    setTranscriptDismissed(true);
                     setNotice(null);
                     startRecording();
                   }}
@@ -2936,7 +2958,7 @@ export default function Interview() {
             <strong style={{ color: "var(--text-primary)" }}>{t("completion.postProfile.thanksTitle")}</strong>{" "}
             {t("completion.postProfile.thanksBody")}
           </div>
-        ) : postProfileState === "idle" && !profileComplete && participantId ? (
+        ) : postProfileState === "idle" && !profileComplete && !didPreQuestionnaire && participantId ? (
           <div className="interview-complete-future interview-complete-future--prompt">
             <strong style={{ color: "var(--text-primary)" }}>{t("completion.postProfile.title")}</strong>
             <p style={{ margin: "8px 0 14px" }}>{t("completion.postProfile.body")}</p>

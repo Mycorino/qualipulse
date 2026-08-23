@@ -96,6 +96,14 @@ class Project(Base):
     # to get the participant talking. When False, the engine jumps straight
     # to the first guide question (legacy behaviour).
     warmup_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
+    # Where the socio-demographic questionnaire sits in the participant flow.
+    # False (default): after the interview, so nothing stands between the
+    # participant and the first question. True: before it, for researchers
+    # who need the profile to interpret or segment answers, or who screen on
+    # it, and who accept the drop-off that front-loading costs.
+    profile_before_interview: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0"
+    )
     # True when this project was auto-seeded by the onboarding flow as a
     # showcase/example. Demo projects are excluded from the tier project
     # count so they never block a user from creating their real first

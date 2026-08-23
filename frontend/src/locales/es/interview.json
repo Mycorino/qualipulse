@@ -328,10 +328,7 @@
       "listening": "Escuchando tu respuesta…",
       "stillWorking": "Seguimos trabajando, gracias por tu paciencia"
     },
-    "transcript": "Esto es lo que oímos:",
-    "transcriptDismiss": "Descartar",
-    "transcriptReadMore": "Leer más",
-    "transcriptReadLess": "Leer menos",
+    "dismiss": "Descartar",
     "networkError": "Problema de conexión. Tu respuesta está guardada, toca Enviar para reintentar.",
     "ttsFailedWarning": "No pudimos reproducir el audio de la pregunta. Puedes leer la pregunta arriba y grabar tu respuesta.",
     "ttsReplay": "Reproducir de nuevo",

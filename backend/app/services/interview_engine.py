@@ -340,12 +340,19 @@ def _language_instruction(language_code: str | None) -> str:
     """
     code = (language_code or "en").lower()
     name = LANGUAGE_NAMES.get(code, "English")
-    if code == "en":
-        return ""  # default, no extra instruction
+    # English used to return "" here on the assumption it was the model's
+    # default and needed no instruction. That is exactly backwards when the
+    # guide is written in another language: with no instruction the model
+    # wrote its own callback in English and then read the guide question out
+    # VERBATIM in French, so the participant heard one sentence of English
+    # followed by one of French. The instruction is what carries "translate
+    # the guide as you go", so it has to be emitted for every language.
     return (
         f"\n\nIMPORTANT, Language: You MUST conduct this entire interview in {name}. "
-        f"Ask every question in {name}, even if the interview guide questions are "
-        f"written in another language (translate them naturally as you go). "
+        f"Every single sentence you speak, including short acknowledgements, callbacks "
+        f"and transitions, must be in {name}. The interview guide may be written in a "
+        f"different language: translate each question into natural {name} as you ask it, "
+        f"and NEVER read a guide question out in its original language. "
         f"If the participant replies in a different language, gently continue in {name} "
         f"unless they explicitly ask to switch. Keep your tone warm and idiomatic: "
         f"use natural {name} phrasing, not literal translations."
