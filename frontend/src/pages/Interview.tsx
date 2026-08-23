@@ -1831,6 +1831,23 @@ export default function Interview() {
 
   // ── Consent phase ────────────────────────────────────────────────────────
 
+  // Rendered BEFORE the consent branch on purpose. Accepting consent on a
+  // study with profile_before_interview only flips showPreQuestionnaire, it
+  // does not change `phase`. With this check below the consent branch the
+  // consent screen simply re-rendered and the button appeared to do nothing.
+  if (showPreQuestionnaire) {
+    return (
+      <ParticipantQuestionnaire
+        linkToken={token!}
+        email={email}
+        sessionToken={sessionToken}
+        participantId={participantId || null}
+        initialFirstName={profile.firstName}
+        onComplete={handlePreQuestionnaireComplete}
+      />
+    );
+  }
+
   if (phase === "consent" && info) {
     return (
       <div className="interview-page">
@@ -2019,19 +2036,6 @@ export default function Interview() {
   // Minimal "what's your first name?" capture. Heavier demographics + interest
   // tagging happen in the post-completion panel funnel (PF-4), not here —
   // pre-interview should stay near-frictionless.
-
-  if (showPreQuestionnaire) {
-    return (
-      <ParticipantQuestionnaire
-        linkToken={token!}
-        email={email}
-        sessionToken={sessionToken}
-        participantId={participantId || null}
-        initialFirstName={profile.firstName}
-        onComplete={handlePreQuestionnaireComplete}
-      />
-    );
-  }
 
   if (phase === "profile") {
     const trimmed = profile.firstName.trim();
