@@ -344,5 +344,26 @@
       "created_study": "Étude créée",
       "first_interview": "Premier entretien"
     }
+  },
+  "traffic": {
+    "title": "Tunnel marketing",
+    "hint": "Événements first-party du site marketing, rattachés aux inscriptions par attribution au premier contact.",
+    "loading": "Chargement…",
+    "empty": "Aucune page vue pour l'instant. Les événements arrivent une fois la build analytics déployée et le site marketing visité.",
+    "pageViews": "Pages vues",
+    "visits": "Visites",
+    "visitsHint": "Pas des personnes uniques : l'empreinte visiteur change chaque jour.",
+    "pricingViews": "Page tarifs vue",
+    "ctaClicks": "Clics CTA inscription",
+    "signups": "Inscriptions",
+    "conversion": "Taux d'inscription",
+    "dailyTitle": "Pages vues et inscriptions par jour",
+    "byCta": "Quel CTA obtient le clic",
+    "bySource": "Visites par canal",
+    "signupsBySource": "Inscriptions par canal",
+    "paidBySource": "Clients payants par canal",
+    "paidNote": "Depuis le début, hors période : le premier contact garde le crédit, quelle que soit la durée du cycle.",
+    "topReferrers": "Sites référents",
+    "topPaths": "Pages les plus vues"
   }
 }

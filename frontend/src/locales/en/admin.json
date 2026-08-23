@@ -344,5 +344,26 @@
       "created_study": "Created a study",
       "first_interview": "First interview"
     }
+  },
+  "traffic": {
+    "title": "Marketing funnel",
+    "hint": "First-party events from the marketing site, stitched to signups by first-touch attribution.",
+    "loading": "Loading…",
+    "empty": "No pageviews recorded yet. Events start landing once the analytics build is deployed and someone visits the marketing site.",
+    "pageViews": "Pageviews",
+    "visits": "Visits",
+    "visitsHint": "Not unique people: the visitor hash rotates daily.",
+    "pricingViews": "Pricing viewed",
+    "ctaClicks": "Signup CTA clicks",
+    "signups": "Signups",
+    "conversion": "Signup rate",
+    "dailyTitle": "Pageviews and signups per day",
+    "byCta": "Which CTA earns the click",
+    "bySource": "Visits by channel",
+    "signupsBySource": "Signups by channel",
+    "paidBySource": "Paying customers by channel",
+    "paidNote": "All time, not windowed: first touch keeps its credit however long the deal takes.",
+    "topReferrers": "Top referrers",
+    "topPaths": "Top pages"
   }
 }
