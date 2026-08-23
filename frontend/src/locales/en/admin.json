@@ -9,12 +9,35 @@
     "signIn": "Sign in",
     "errorIdentityRequired": "Enter your name so actions are traceable",
     "errorInvalidKey": "Invalid admin key",
-    "errorConnect": "Could not connect to backend"
+    "errorConnect": "Could not connect to backend",
+    "loading": "Checking your account…",
+    "signedInAs": "Signed in as",
+    "codeLabel": "Authenticator code",
+    "codeHint": "A fresh code is required every time, even if you just signed in. The admin session lasts {{minutes}} minutes.",
+    "openSession": "Open admin session",
+    "opening": "Opening…",
+    "errorCode": "That code is not valid.",
+    "errorLocked": "Too many attempts. Try again in 15 minutes.",
+    "errorNotAdmin": "This account is not an admin.",
+    "error2faRequired": "Enable two-factor authentication on your account first.",
+    "need2faTitle": "Two-factor authentication is required",
+    "need2faBody": "Admin access needs an authenticator app on your account. Set it up once, then come back here.",
+    "need2faCta": "Set up 2FA",
+    "nothingHere": "Nothing to see here",
+    "nothingHereBody": "This page is not available for your account.",
+    "backToApp": "Back to the app",
+    "signInFirst": "Sign in to your account first",
+    "signInFirstBody": "Admins use their normal QualiPulse account plus an authenticator code.",
+    "goToLogin": "Go to sign in",
+    "legacyToggle": "Use the shared admin key instead (being retired)",
+    "sessionExpired": "Your admin session expired. Enter a new code to continue."
   },
   "header": {
     "title": "QualiPulse Admin",
     "internalBadge": "INTERNAL",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "expiresIn": "{{minutes}} min left",
+    "sharedKeySession": "Shared-key session (legacy)"
   },
   "costs": {
     "title": "AI spend",
@@ -365,5 +388,19 @@
     "paidNote": "All time, not windowed: first touch keeps its credit however long the deal takes.",
     "topReferrers": "Top referrers",
     "topPaths": "Top pages"
+  },
+  "stepUp": {
+    "title": "Confirm with your authenticator",
+    "body": "{{action}} needs a fresh code, even inside an open admin session.",
+    "invalid": "That code is not valid.",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "working": "Working…",
+    "actions": {
+      "credits": "Adjusting credits",
+      "delete": "Deleting an account",
+      "suspend": "Suspending an account",
+      "impersonate": "Impersonating a customer"
+    }
   }
 }

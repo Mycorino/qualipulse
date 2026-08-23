@@ -376,7 +376,8 @@ RATE_LIMIT_AUTH=10/minute
 RATE_LIMIT_DEFAULT=120/minute
 
 # Admin
-ADMIN_SECRET_KEY=                              # Required for /admin and /affiliates/admin endpoints
+ADMIN_SECRET_KEY=                              # Service key for the cron endpoints (scheduled-emails, retention). Also opens /admin for humans while ADMIN_ALLOW_SHARED_KEY=true
+ADMIN_ALLOW_SHARED_KEY=true                    # Rollout switch. Set false once every admin has an account with is_admin + 2FA (scripts/grant_admin.py)
 ```
 
 See `.env.example` at repo root for Docker/production template.
@@ -1580,6 +1581,35 @@ All copilot POST endpoints return **SSE** (`text/event-stream`) — events `stat
 | POST | `/panel/opt-out` | No (20/min) | Withdraw recontact consent via signed token from the invite email footer |
 
 ### Admin (`/admin`)
+
+**Auth: named staff accounts + mandatory TOTP** (`services/admin_auth.py`).
+There is no separate admin user table: `Company.is_admin` marks staff, and it
+is only ever set by `python scripts/grant_admin.py --email …` (`--revoke`,
+`--list`, `--reset-2fa` break-glass), never through the API. Staff log in to
+the app normally (password + their 2FA), open `/admin`, and present a *fresh*
+authenticator code to `POST /admin/session`, which mints a **30-minute admin
+token** (`type: "admin"`, carries `tv`). The SPA keeps it in React state only
+(never storage): a refresh asks for a new code, a 401 drops back to the gate.
+Every `/admin/*` + `/affiliates/admin/*` endpoint goes through `require_admin`,
+which re-reads the row per call, so revoking `is_admin`, suspending, or
+`logout-all` kills a live session immediately. The audit identity is the
+verified email (the old self-declared `X-Admin-Identity` is ignored for
+account sessions). **Destructive actions** (delete user, impersonate, credits
+adjust, suspend, delete panelist) additionally require `require_step_up`: a
+fresh code in the `X-Admin-Step-Up` header, verified on the spot (403
+`admin_step_up_required` / `admin_step_up_invalid`; the UI prompts in a modal).
+Wrong codes count toward the account's 5-strike / 15-min lockout. A plain 24h
+app access token is never accepted on `/admin`, even for an admin.
+
+**Rollout flag.** `ADMIN_ALLOW_SHARED_KEY` (default true) keeps the old shared
+`ADMIN_SECRET_KEY` login alive for humans (audit identity `shared-key:<name>`,
+no step-up possible, `GET /admin/auth-config` tells the SPA whether to show
+the legacy form). Flip it to false in Cloud Run once every admin has enrolled;
+after that the key only authenticates the **cron endpoints**
+(`require_service_key`: `/admin/scheduled-emails/run`, `/admin/retention/run`)
+and admin tokens are refused there. Rotate the key at that point. Schema:
+Alembic 0074. Tests: `tests/test_admin_ops.py::TestAdminAccounts`.
+
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/admin/users` | X-Admin-Key | List users (search, tier filter, pagination) |
@@ -1592,8 +1622,10 @@ All copilot POST endpoints return **SSE** (`text/event-stream`) — events `stat
 | GET | `/admin/costs` | X-Admin-Key | AI spend for `?days=` (0 = all time): by operation (tokens, avg/call), by product area, by model, daily, per-workspace rows (window + all-time spend, completed interviews, cost/interview, plan), and `interview_economics` (fully loaded cost per completed interview: avg / median / p90, STT/TTS/Claude split) |
 | GET | `/admin/traffic` | X-Admin-Key | Marketing-funnel rollup (`?days=`): traffic, CTA clicks, signups, signup rate, per-channel breakdowns |
 | GET | `/admin/costs/company/{company_id}` | X-Admin-Key | One workspace: spend by study (cost/interview, demo flagged), per-interview rows (turns, minutes, Claude/STT/TTS/other) and its own economics. `?days=` optional |
-| POST | `/admin/scheduled-emails/run` | X-Admin-Key | Run the lifecycle-email cron pass (Day-1, Day-7, Day-12). Supports `?dry_run=true`. Idempotent via `email_send_log` unique constraint. Hit hourly by Cloud Scheduler. Returns per-event sent/skipped counts. |
-| POST | `/admin/retention/run` | X-Admin-Key | Purge participant audio for interviews completed > `RETENTION_AUDIO_DAYS` days ago (0=disabled). `?dry_run=true`, `?days=` override. Transcripts kept; URLs nulled after file deletion. |
+| POST | `/admin/scheduled-emails/run` | Service key | Run the lifecycle-email cron pass (Day-1, Day-7, Day-12). Supports `?dry_run=true`. Idempotent via `email_send_log` unique constraint. Hit hourly by Cloud Scheduler. Returns per-event sent/skipped counts. |
+| GET | `/admin/auth-config` | No | `{shared_key_login, token_minutes}` for the sign-in gate |
+| POST | `/admin/session` | App JWT (5/min) | Step up to an admin session: `{code}` (TOTP or backup code) → `{admin_token, expires_in, identity}`. 403 `Not an admin` / `admin_2fa_required`, 401 bad code, 429 locked |
+| POST | `/admin/retention/run` | Service key | Purge participant audio for interviews completed > `RETENTION_AUDIO_DAYS` days ago (0=disabled). `?dry_run=true`, `?days=` override. Transcripts kept; URLs nulled after file deletion. |
 
 ### Lifecycle emails — scheduling
 The Wave 3B endpoint `/admin/scheduled-emails/run` is designed to be hit hourly by an external cron (Cloud Run scales to zero, no persistent worker). To wire it up:

@@ -163,48 +163,72 @@ export function BarChart({
 }: {
   data: Array<Record<string, number | string>>;
   series: BarSeries[];
+  /** "stack" piles the series; "overlay" draws them side by side on ONE shared scale. */
   mode?: "stack" | "overlay";
   height?: number;
 }) {
-  const peaks = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const s of series) out[s.key] = Math.max(1, ...data.map((d) => Number(d[s.key] ?? 0)));
-    return out;
-  }, [data, series]);
-  const stackPeak = useMemo(
-    () => Math.max(1, ...data.map((d) => series.reduce((sum, s) => sum + Number(d[s.key] ?? 0), 0))),
-    [data, series],
-  );
+  const [hover, setHover] = useState<number | null>(null);
+  const peak = useMemo(() => {
+    const per = (d: Record<string, number | string>) =>
+      mode === "stack"
+        ? series.reduce((sum, s) => sum + Number(d[s.key] ?? 0), 0)
+        : Math.max(...series.map((s) => Number(d[s.key] ?? 0)));
+    return Math.max(0, ...data.map(per));
+  }, [data, series, mode]);
   if (!data.length) return <div className="adm-empty">No data in this window.</div>;
+
+  const fmt = series[0]?.format ?? ((v: number) => v.toLocaleString());
+  const top = niceCeil(peak);
+  const ticks = top > 0 ? [top, top / 2, 0] : [0];
+  const scale = (v: number) => (top > 0 && v > 0 ? Math.max(2, (v / top) * height) : 0);
   const first = String(data[0].date ?? "");
   const last = String(data[data.length - 1].date ?? "");
+  const active = hover !== null ? data[hover] : null;
+  const tipLeft = hover !== null ? ((hover + 0.5) / data.length) * 100 : 0;
+
   return (
     <div className="adm-chart">
-      <div className="adm-chart__bars" style={{ height }}>
-        {data.map((d) => {
-          const title = [String(d.date), ...series.map((s) => `${s.label}: ${(s.format ?? String)(Number(d[s.key] ?? 0))}`)].join("\n");
-          return (
-            <div key={String(d.date)} className={`adm-chart__col${mode === "overlay" ? " adm-chart__col--overlay" : ""}`} title={title}>
-              {mode === "stack"
-                ? [...series].reverse().map((s) => {
-                    const v = Number(d[s.key] ?? 0);
-                    const h = v > 0 ? Math.max(2, (v / stackPeak) * height) : 0;
-                    return <div key={s.key} className={`adm-chart__bar adm-chart__bar--${s.tone}`} style={{ height: h }} />;
-                  })
-                : series.map((s, i) => {
-                    const v = Number(d[s.key] ?? 0);
-                    const h = v > 0 ? Math.max(2, (v / peaks[s.key]) * height) : 0;
-                    return (
-                      <div
-                        key={s.key}
-                        className={`adm-chart__bar adm-chart__bar--${s.tone}`}
-                        style={{ height: h, position: "absolute", bottom: 0, left: `${i * 20}%`, right: `${i * 20}%`, width: "auto", zIndex: i + 1 }}
-                      />
-                    );
-                  })}
+      <div className="adm-chart__plot" style={{ height }}>
+        <div className="adm-chart__grid" aria-hidden>
+          {ticks.map((tk) => (
+            <div key={tk} className="adm-chart__gridline" style={{ bottom: top > 0 ? `${(tk / top) * 100}%` : 0 }}>
+              <span>{fmt(tk)}</span>
             </div>
-          );
-        })}
+          ))}
+        </div>
+        <div className="adm-chart__bars" onMouseLeave={() => setHover(null)}>
+          {data.map((d, i) => (
+            <div
+              key={String(d.date)}
+              className={`adm-chart__col${mode === "overlay" ? " adm-chart__col--overlay" : ""}${hover === i ? " is-hover" : ""}`}
+              onMouseEnter={() => setHover(i)}
+            >
+              {mode === "stack"
+                ? [...series].reverse().map((s) => (
+                    <div key={s.key} className={`adm-chart__bar adm-chart__bar--${s.tone}`} style={{ height: scale(Number(d[s.key] ?? 0)) }} />
+                  ))
+                : series.map((s, si) => (
+                    <div
+                      key={s.key}
+                      className={`adm-chart__bar adm-chart__bar--${s.tone}`}
+                      style={{ height: scale(Number(d[s.key] ?? 0)), left: `${(si / series.length) * 100}%`, width: `${100 / series.length}%` }}
+                    />
+                  ))}
+            </div>
+          ))}
+        </div>
+        {active && (
+          <div className="adm-chart__tip" style={{ left: `${tipLeft}%` }} role="status">
+            <div className="adm-chart__tip-date">{String(active.date)}</div>
+            {series.map((s) => (
+              <div key={s.key} className="adm-chart__tip-row">
+                <i style={{ background: toneColor(s.tone) }} />
+                <span>{s.label}</span>
+                <b>{(s.format ?? ((v: number) => v.toLocaleString()))(Number(active[s.key] ?? 0))}</b>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="adm-chart__axis">
         <span>{first}</span>
@@ -220,6 +244,17 @@ export function BarChart({
       </div>
     </div>
   );
+}
+
+/** Round a chart peak up to a "nice" axis top (1, 2, 5 × 10^n) so the
+ *  gridline labels read as whole numbers instead of 37.4. */
+function niceCeil(v: number): number {
+  if (v <= 0) return 0;
+  const exp = Math.floor(Math.log10(v));
+  const base = Math.pow(10, exp);
+  const m = v / base;
+  const nice = m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10;
+  return nice * base;
 }
 
 function toneColor(tone: BarSeries["tone"]): string {

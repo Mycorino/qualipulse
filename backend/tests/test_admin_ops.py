@@ -175,7 +175,7 @@ class TestImpersonation:
         assert me.status_code == 200
         data = me.json()
         assert data["is_impersonation"] is True
-        assert data["impersonation_admin"] == ADMIN_IDENTITY
+        assert data["impersonation_admin"] == f"shared-key:{ADMIN_IDENTITY}"
 
     def test_impersonation_bypasses_suspension(self, client):
         tokens = _signup(client)
@@ -214,7 +214,7 @@ class TestAuditLog:
         entries = resp.json()
         suspend_entries = [e for e in entries if e["action"] == "suspend"]
         assert len(suspend_entries) >= 1
-        assert suspend_entries[0]["admin_identity"] == ADMIN_IDENTITY
+        assert suspend_entries[0]["admin_identity"] == f"shared-key:{ADMIN_IDENTITY}"
         assert suspend_entries[0]["target_company_email"] == "test@example.com"
 
     def test_impersonation_creates_audit_entry(self, client):
@@ -292,7 +292,7 @@ class TestAuditLog:
 
         resp = client.get("/admin/audit-log", headers=_admin_headers())
         entries = resp.json()
-        assert entries[0]["admin_identity"] == "corin"
+        assert entries[0]["admin_identity"] == "shared-key:corin"
 
     def test_audit_log_without_identity_header(self, client):
         tokens = _signup(client)
@@ -303,7 +303,7 @@ class TestAuditLog:
 
         resp = client.get("/admin/audit-log", headers=headers)
         entries = resp.json()
-        assert entries[0]["admin_identity"] == "unknown"
+        assert entries[0]["admin_identity"] == "shared-key:unknown"
 
 
 # ── Costs report ──────────────────────────────────────────────────────────────
@@ -474,3 +474,178 @@ class TestInterviewEconomics:
         assert body["kpis"]["studies_created"]["value"] == 1
         assert body["top_workspaces"][0]["interviews"] == 2
         assert body["funnel"][-1]["count"] == 1
+
+
+# ── Named admin accounts + TOTP ───────────────────────────────────────────────
+
+
+def _enable_2fa(client, db_session, tokens):
+    """Enrol the account in TOTP the way the UI does and return the secret."""
+    import pyotp
+
+    auth = {"Authorization": f"Bearer {tokens['access_token']}"}
+    setup = client.post("/auth/2fa/setup", headers=auth)
+    assert setup.status_code == 200, setup.text
+    secret = setup.json()["secret"]
+    enable = client.post("/auth/2fa/enable", json={"code": pyotp.TOTP(secret).now()}, headers=auth)
+    assert enable.status_code == 200, enable.text
+    return secret
+
+
+def _grant_admin(db_session, company_id: str) -> None:
+    company = db_session.query(Company).filter(Company.id == company_id).first()
+    company.is_admin = True
+    db_session.commit()
+
+
+def _open_admin_session(client, tokens, secret) -> str:
+    import pyotp
+
+    resp = client.post(
+        "/admin/session",
+        json={"code": pyotp.TOTP(secret).now()},
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()["admin_token"]
+
+
+class TestAdminAccounts:
+
+    def test_non_admin_cannot_open_session(self, client, db_session):
+        import pyotp
+
+        tokens = _signup(client)
+        secret = _enable_2fa(client, db_session, tokens)
+        resp = client.post(
+            "/admin/session",
+            json={"code": pyotp.TOTP(secret).now()},
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "Not an admin"
+
+    def test_admin_without_2fa_is_refused(self, client, db_session):
+        tokens = _signup(client)
+        _grant_admin(db_session, tokens["company_id"])
+        resp = client.post(
+            "/admin/session",
+            json={"code": "000000"},
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "admin_2fa_required"
+
+    def test_wrong_code_is_refused_and_audited(self, client, db_session):
+        tokens = _signup(client)
+        _enable_2fa(client, db_session, tokens)
+        _grant_admin(db_session, tokens["company_id"])
+        resp = client.post(
+            "/admin/session",
+            json={"code": "000000"},
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+        assert resp.status_code == 401
+        from app.models.admin_audit import AdminAuditLog
+        actions = [r.action for r in db_session.query(AdminAuditLog).all()]
+        assert "admin_session_denied" in actions
+
+    def test_admin_token_opens_panel_with_verified_identity(self, client, db_session):
+        tokens = _signup(client, email="staff@qualipulse.com")
+        secret = _enable_2fa(client, db_session, tokens)
+        _grant_admin(db_session, tokens["company_id"])
+        admin_token = _open_admin_session(client, tokens, secret)
+
+        # Works without any X-Admin-Identity header...
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        assert client.get("/admin/stats", headers=headers).status_code == 200
+
+        # ...and a self-declared identity header is ignored: the audit log
+        # gets the verified email.
+        victim = _signup(client, email="victim@example.com", name="Victim")
+        resp = client.patch(
+            f"/admin/users/{victim['company_id']}/tier", json={"tier": "team"},
+            headers={**headers, "X-Admin-Identity": "someone-else"},
+        )
+        assert resp.status_code == 200, resp.text
+        audit = client.get("/admin/audit-log", headers=headers).json()
+        assert audit[0]["admin_identity"] == "staff@qualipulse.com"
+
+    def test_app_session_token_is_not_an_admin_token(self, client, db_session):
+        tokens = _signup(client)
+        _enable_2fa(client, db_session, tokens)
+        _grant_admin(db_session, tokens["company_id"])
+        # A plain 24h app access token must never open /admin, even for an admin.
+        resp = client.get("/admin/stats", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+        assert resp.status_code == 401
+
+    def test_destructive_action_needs_fresh_step_up(self, client, db_session):
+        import pyotp
+
+        tokens = _signup(client, email="staff@qualipulse.com")
+        secret = _enable_2fa(client, db_session, tokens)
+        _grant_admin(db_session, tokens["company_id"])
+        admin_token = _open_admin_session(client, tokens, secret)
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        victim = _signup(client, email="victim@example.com", name="Victim")
+
+        resp = client.post(f"/admin/users/{victim['company_id']}/suspend", json={"reason": "x"}, headers=headers)
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "admin_step_up_required"
+
+        resp = client.post(
+            f"/admin/users/{victim['company_id']}/suspend", json={"reason": "x"},
+            headers={**headers, "X-Admin-Step-Up": "000000"},
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "admin_step_up_invalid"
+
+        resp = client.post(
+            f"/admin/users/{victim['company_id']}/suspend", json={"reason": "x"},
+            headers={**headers, "X-Admin-Step-Up": pyotp.TOTP(secret).now()},
+        )
+        assert resp.status_code == 200, resp.text
+
+    def test_revoking_admin_flag_kills_live_session(self, client, db_session):
+        tokens = _signup(client)
+        secret = _enable_2fa(client, db_session, tokens)
+        _grant_admin(db_session, tokens["company_id"])
+        admin_token = _open_admin_session(client, tokens, secret)
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        assert client.get("/admin/stats", headers=headers).status_code == 200
+
+        company = db_session.query(Company).filter(Company.id == tokens["company_id"]).first()
+        company.is_admin = False
+        db_session.commit()
+        assert client.get("/admin/stats", headers=headers).status_code == 403
+
+    def test_logout_everywhere_revokes_admin_token(self, client, db_session):
+        tokens = _signup(client)
+        secret = _enable_2fa(client, db_session, tokens)
+        _grant_admin(db_session, tokens["company_id"])
+        admin_token = _open_admin_session(client, tokens, secret)
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        assert client.get("/admin/stats", headers=headers).status_code == 200
+
+        client.post("/auth/logout-all", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+        assert client.get("/admin/stats", headers=headers).status_code == 401
+
+    def test_shared_key_refused_once_rollout_flag_is_off(self, client):
+        prev = settings.ADMIN_ALLOW_SHARED_KEY
+        settings.ADMIN_ALLOW_SHARED_KEY = False
+        try:
+            assert client.get("/admin/stats", headers=_admin_headers()).status_code == 401
+            # ...but the cron endpoints still take it as a service key.
+            resp = client.post("/admin/retention/run", params={"dry_run": "true"}, headers=_admin_headers())
+            assert resp.status_code == 200, resp.text
+        finally:
+            settings.ADMIN_ALLOW_SHARED_KEY = prev
+
+    def test_auth_config_reflects_rollout_flag(self, client):
+        assert client.get("/admin/auth-config").json()["shared_key_login"] is True
+        prev = settings.ADMIN_ALLOW_SHARED_KEY
+        settings.ADMIN_ALLOW_SHARED_KEY = False
+        try:
+            assert client.get("/admin/auth-config").json()["shared_key_login"] is False
+        finally:
+            settings.ADMIN_ALLOW_SHARED_KEY = prev

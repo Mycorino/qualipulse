@@ -212,6 +212,12 @@ class Company(Base):
         Integer, default=0, nullable=False, server_default="0"
     )
     locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Staff flag for /admin. Never settable through the API: only
+    # scripts/grant_admin.py flips it. An admin session additionally
+    # requires totp_enabled (see services/admin_auth.py).
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0"
+    )
 
     # Relationships
     projects = relationship("Project", back_populates="company", cascade="all, delete-orphan")

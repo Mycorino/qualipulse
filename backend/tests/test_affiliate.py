@@ -195,9 +195,11 @@ class TestAdminAuth:
         resp = client.get("/affiliates/admin/list", headers=_bearer_admin_headers())
         assert resp.status_code == 200
 
-    def test_admin_list_accepts_legacy_x_admin_key(self, client):
+    def test_admin_list_rejects_legacy_x_admin_key(self, client):
+        # The X-Admin-Key header was retired with named admin accounts:
+        # only Bearer (admin token, or shared key during rollout) is read.
         resp = client.get("/affiliates/admin/list", headers=_legacy_admin_headers())
-        assert resp.status_code == 200
+        assert resp.status_code == 401
 
     def test_admin_list_rejects_missing_key(self, client):
         resp = client.get("/affiliates/admin/list")
@@ -232,7 +234,7 @@ class TestAdminManagement:
             AdminAuditLog.action == "affiliate_status_change"
         ).all()
         assert len(audit) == 1
-        assert audit[0].admin_identity == ADMIN_IDENTITY
+        assert audit[0].admin_identity == f"shared-key:{ADMIN_IDENTITY}"
         assert audit[0].target_company_email == "jane@example.com"
 
     def test_cannot_reapprove_active(self, client):

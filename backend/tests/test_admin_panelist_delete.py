@@ -46,7 +46,7 @@ def test_delete_panelist_removes_profile_answers_tokens(client, db_session):
 
 
 def test_delete_panelist_requires_admin(client):
-    assert client.delete("/admin/panel/x@example.com").status_code == 403
+    assert client.delete("/admin/panel/x@example.com").status_code == 401
 
 
 def test_delete_missing_panelist_is_noop(client, db_session):

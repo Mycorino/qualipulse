@@ -25,6 +25,10 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const resetSuccess = searchParams.get("reset") === "success";
   const googleErrorParam = searchParams.get("google_error");
+  // Post-login destination. Same-origin relative paths only: a protocol or
+  // "//host" value would turn this into an open redirect.
+  const rawNext = searchParams.get("next") ?? "";
+  const nextPath = /^\/(?!\/)[\w\-./?=&%#]*$/.test(rawNext) ? rawNext : null;
   const [googleLoading, setGoogleLoading] = useState(false);
   const { i18n } = useTranslation();
 
@@ -92,10 +96,10 @@ export default function Login() {
       if (!me.onboarding_completed) {
         navigate("/welcome", { replace: true });
       } else {
-        navigate("/dashboard", { replace: true });
+        navigate(nextPath ?? "/dashboard", { replace: true });
       }
     } catch {
-      navigate("/dashboard", { replace: true });
+      navigate(nextPath ?? "/dashboard", { replace: true });
     }
   }
 

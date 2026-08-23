@@ -1,4 +1,3 @@
-import hmac
 import json
 import logging
 import re
@@ -137,35 +136,7 @@ def _validate_affiliate_code(code: str) -> str:
     return code
 
 
-def _get_admin_identity(
-    authorization: str | None = Header(default=None),
-    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
-    x_admin_identity: str | None = Header(default=None, alias="X-Admin-Identity"),
-) -> str:
-    """Verify the admin key (timing-safe) and return the admin identity for audit logging.
-
-    Accepts both `Authorization: Bearer <key>` (what the admin panel sends,
-    same as routers/admin.py) and the legacy `X-Admin-Key` header.
-    """
-    if not settings.ADMIN_SECRET_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access is disabled",
-        )
-    token = x_admin_key
-    if token is None and authorization and authorization.startswith("Bearer "):
-        token = authorization[len("Bearer "):]
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing admin key",
-        )
-    if not hmac.compare_digest(token, settings.ADMIN_SECRET_KEY):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid admin key",
-        )
-    return (x_admin_identity or "unknown").strip()[:100]
+from app.services.admin_auth import require_admin as _get_admin_identity  # noqa: E402
 
 
 def _record_affiliate_audit(
