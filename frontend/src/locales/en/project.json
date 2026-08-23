@@ -306,12 +306,15 @@
     "creditGateLower": "Set target to {{credits}} & continue",
     "creditGateLowered": "Target set to {{credits}}, you can generate the link now.",
     "creditGateUpgrade": "Get more credits",
-    "capSet": "Set a participant limit",
     "capUsage": "{{used}} / {{max}} participants",
     "capSave": "Save limit",
     "capNoLimit": "No limit",
-    "capAriaLabel": "Maximum participants for this link",
-    "capInvalid": "Enter a whole number of 1 or more, or leave it empty for no limit."
+    "capInvalid": "Enter a whole number of 1 or more, or leave it empty for no limit.",
+    "capOpen": "No participant limit",
+    "capEditLabel": "Maximum participants admitted on this link",
+    "capEditHint": "A safety cap for an over-shared link, separate from your study target. Leave empty for no limit.",
+    "capEditHintWithTarget": "A safety cap for an over-shared link, separate from your study target of {{target}}. Leave empty for no limit.",
+    "capBelowTarget": "This link stops admitting participants at {{max}}, below your study target of {{target}}. Raise the limit or remove it to reach your target."
   },
   "setup": {
     "brandingTitle": "Branding & identity",
