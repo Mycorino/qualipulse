@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, File, status
+from fastapi.responses import HTMLResponse
 from starlette.concurrency import run_in_threadpool
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -28,6 +29,10 @@ from app.schemas.interview import (
     ResumeSummaryResponse,
 )
 from app.services.feature_gates import require_participant_limit
+from app.services.interview_preview import (
+    normalise_lang as normalise_preview_lang,
+    render_link_preview_html,
+)
 from app.services.interview_engine import (
     _active_elapsed_minutes as engine_active_elapsed_minutes,
     ensure_turn_audio as engine_ensure_turn_audio,
@@ -624,6 +629,55 @@ def screen_participant(request: Request, token: str, body: ScreenRequest, db: Se
         if answer and answer in q.disqualifying_options_list:
             return {"qualified": False, "disqualified_on": q.question}
     return {"qualified": True}
+
+
+@router.get("/{token}/preview", response_class=HTMLResponse)
+@limiter.limit("60/minute")
+def link_preview(request: Request, token: str, db: Session = Depends(get_db)):
+    """Participant-facing link unfurl for `/i/{token}` and `/interview/{token}`.
+
+    The frontend nginx sends link unfurlers (iMessage, WhatsApp, Slack,
+    Facebook, LinkedIn, …) here; participants get the SPA untouched. See
+    `services/interview_preview.py` for what the document contains and why.
+
+    An unknown or deactivated token still renders a card (a "this link is no
+    longer active" one) rather than a 404, so a stale link degrades to a
+    useful message instead of a bare URL in the recipient's chat.
+    """
+    link = (
+        db.query(InterviewLink)
+        .filter(InterviewLink.token == token, InterviewLink.is_active.is_(True))
+        .first()
+    )
+    project = link.project if link else None
+
+    lang = normalise_preview_lang(getattr(project, "language", None))
+    study_name = None
+    inviter = None
+    minutes = None
+    if project is not None:
+        anonymous = (getattr(project, "branding_mode", "standard") or "standard") == "anonymous"
+        # Cache-only lookup: never trigger an on-demand AI translation for a
+        # crawler. The study's own language is what the participant sees.
+        study_name = project.localized_name(lang)
+        minutes = project.interview_duration_minutes
+        if not anonymous:
+            inviter = project.researcher_name or (project.company.name if project.company else None)
+
+    base = (settings.APP_BASE_URL or "").rstrip("/")
+    html_doc = render_link_preview_html(
+        lang=lang,
+        study_name=study_name,
+        inviter=inviter,
+        minutes=minutes,
+        canonical_url=f"{base}/i/{token}",
+        image_url=f"{base}/og-interview-{lang}.png",
+        active=link is not None,
+    )
+    return HTMLResponse(
+        content=html_doc,
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 @router.get("/{token}")

@@ -37,6 +37,7 @@ import PanelEnrichment from "../components/PanelEnrichment";
 import { SUPPORTED_LANGUAGES } from "../i18n";
 import { applyParticipantBranding } from "../utils/branding";
 import { detectInAppBrowser, androidChromeIntentUrl } from "../utils/inAppBrowser";
+import { useHead } from "../hooks/useHead";
 
 // A tiny valid silent WAV. Playing this from within a user gesture (the
 // "enable microphone" tap) "unlocks" the audio element on iOS Safari, so the
@@ -168,6 +169,18 @@ export default function Interview() {
   const [info, setInfo] = useState<InterviewInfo | null>(null);
   const [infoLoading, setInfoLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Participant-facing head: the static index.html tags sell the product to
+  // researchers. Link unfurlers never get here (nginx routes them to the
+  // backend preview, see services/interview_preview.py), this is for the
+  // browser tab and for keeping the token URL out of search indexes.
+  useHead({
+    title: info?.project_name || t("meta.title"),
+    metas: [
+      { name: "description", content: t("meta.description") },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  });
 
   // Verification / session
   const [verificationEmail, setVerificationEmail] = useState("");

@@ -803,6 +803,38 @@ Landing (name + profession + age_range + country + email)
   record. Tests: `backend/tests/test_screening_answers.py`.
 - Session-storage resume (same device) + email-based resume (cross-device)
 
+### Interview link previews (unfurls)
+
+Interview links are shared with **participants**, over iMessage, WhatsApp,
+Slack or email. Unfurled from the SPA shell they used to show the marketing
+card from `frontend/index.html` ("Stop guessing what your users want"),
+which is copy aimed at the researcher buying the product.
+
+`frontend/nginx.conf.template` (mirrored in `nginx.conf`) now matches
+`/i/{token}` and `/interview/{token}` and routes **link unfurlers only** to
+`GET /interview/{token}/preview` on the backend; every real visitor keeps
+getting the untouched SPA. Detection is a `map` on the user agent, verified
+against production logs: iOS Messages fetches with
+`… Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0`, so the
+`facebookexternalhit` token covers it alongside Slack / WhatsApp / LinkedIn /
+Discord / Telegram / search crawlers. A second `map` on `?app=1` opts out:
+that is the link the preview page's own CTA carries, so a human misdetected
+as a crawler still reaches the interview instead of looping.
+
+The card is rendered by `services/interview_preview.py`: study name as the
+title, "{researcher} invites you to a voice interview, about N minutes, in
+your browser" as the description, in the **study's own language** (6
+languages, cache-only name lookup so a crawler never triggers an on-demand
+AI translation), `noindex`, and per-language artwork
+`frontend/public/og-interview-{lang}.png` (regenerate with
+`python3 frontend/scripts/generate_og_interview.py`). Anonymous studies
+(`branding_mode == "anonymous"`) drop every identity field, exactly like
+`GET /interview/{token}`. An unknown or deactivated token still renders a
+card ("this link is no longer active") rather than 404ing, so a stale link
+degrades to a useful message. The SPA sets the same participant-facing title
++ `noindex` client-side via `useHead` (browser tab, not unfurls). Tests:
+`backend/tests/test_interview_preview.py`.
+
 ### Claude Interview Engine
 Claude decides after each response whether to:
 - `follow_up` — ask a follow-up on the current topic
@@ -1406,6 +1438,7 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | Method | Path | Rate Limit | Description |
 |---|---|---|---|
 | GET | `/interview/{token}` | 60/min | Validate link, get project info |
+| GET | `/interview/{token}/preview` | 60/min | HTML link-unfurl card for `/i/{token}` (participant-facing OG tags, study language). nginx routes only link unfurlers here |
 | GET | `/interview/{token}/screening-questions` | 60/min | Get screening questions |
 | POST | `/interview/{token}/screen` | 30/min | Check disqualification |
 | POST | `/interview/{token}/resume` | 60/min | Check for in-progress interview. **Requires the magic-link `session_token`** whose email matches — a bare email match no longer returns a participant_id (hijack fix) |

@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Sie sind zu einem Sprachinterview eingeladen",
+    "description": "Ein kurzes Sprachinterview, direkt in Ihrem Browser. Ohne Konto, ohne Installation."
+  },
   "emailEntry": {
     "title": "Am Interview teilnehmen",
     "subtitle": "Geben Sie Ihre E-Mail-Adresse ein, um einen Link zu erhalten und auf jedem Gerät fortzufahren.",

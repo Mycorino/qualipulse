@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Vous êtes invité·e à un entretien vocal",
+    "description": "Un court entretien vocal, directement dans votre navigateur. Sans compte, sans installation."
+  },
   "emailEntry": {
     "title": "Rejoindre l'entretien",
     "subtitle": "Saisissez votre email pour recevoir un lien et continuer depuis n'importe quel appareil.",
