@@ -1,3 +1,24 @@
+# ── Interview-link previews ────────────────────────────────────────────────
+# Interview links are shared with participants, so they must not unfurl with
+# the marketing card baked into index.html (that copy sells the product to a
+# researcher). Link unfurlers are routed to the backend, which renders a
+# participant-facing card in the study's own language; every real visitor
+# keeps getting the untouched SPA. See services/interview_preview.py.
+map $http_user_agent $qp_unfurler {
+    default 0;
+    "~*(facebookexternalhit|Facebot|Twitterbot|Slackbot|Slack-ImgProxy|WhatsApp|Discordbot|TelegramBot|LinkedInBot|Applebot|SkypeUriPreview|redditbot|Pinterest|Iframely|embedly|vkShare|Viber|Snapchat|Mastodon|Bluesky|Googlebot|Google-InspectionTool|bingbot|DuckDuckBot|YandexBot|Slurp|W3C_Validator)" 1;
+}
+# ?app=1 opts out: it is the link the preview page itself offers, so a real
+# person misdetected as a crawler still reaches the interview (no loop).
+map $arg_app $qp_app_param {
+    default 0;
+    "1" 1;
+}
+map "$qp_unfurler$qp_app_param" $qp_serve_preview {
+    default 0;
+    "10" 1;
+}
+
 server {
     listen 8080;
     root /usr/share/nginx/html;
@@ -46,6 +67,24 @@ server {
     }
     location ~ ^/blog/[A-Za-z0-9-]+$ {
         rewrite ^/blog/(.*)$ /blog/pages/$1 break;
+        proxy_pass ${BACKEND_URL};
+        proxy_set_header Host ${BACKEND_HOST};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Interview links: /i/{token} and /interview/{token}. Unfurlers get the
+    # server-rendered preview, everyone else gets the SPA shell.
+    location ~ ^/(?:i|interview)/(?<qp_token>[A-Za-z0-9_-]+)$ {
+        error_page 418 = @interview_preview;
+        if ($qp_serve_preview) {
+            return 418;
+        }
+        try_files /index.html =404;
+    }
+    location @interview_preview {
+        rewrite ^ /interview/$qp_token/preview break;
         proxy_pass ${BACKEND_URL};
         proxy_set_header Host ${BACKEND_HOST};
         proxy_set_header X-Real-IP $remote_addr;

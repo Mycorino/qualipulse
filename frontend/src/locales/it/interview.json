@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Sei invitato a un'intervista vocale",
+    "description": "Una breve intervista vocale, direttamente nel browser. Senza account, senza installazioni."
+  },
   "emailEntry": {
     "title": "Partecipa all'intervista",
     "subtitle": "Inserisca la sua email per ricevere un link e continuare da qualsiasi dispositivo.",
