@@ -43,10 +43,16 @@ client.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // A 401 from the login endpoints means "wrong credentials", not "session
+    // expired" — let the page show the error instead of hard-redirecting to /.
+    const isCredentialCheck =
+      originalRequest.url?.includes("/auth/login") ||
+      originalRequest.url?.includes("/auth/refresh");
+
     if (
       error.response?.status === 401 &&
       !originalRequest._retried &&
-      !originalRequest.url?.includes("/auth/refresh")
+      !isCredentialCheck
     ) {
       originalRequest._retried = true;
 
