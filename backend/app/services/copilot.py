@@ -39,6 +39,7 @@ from app.models.copilot import CopilotConversation, CopilotMemory
 from app.models.survey import QUESTION_TYPES, Survey
 from app.services.usage_logger import log_claude_usage
 from app.services import ai_models
+from app.services.text_style import strip_banned_dashes, strip_banned_dashes_deep
 
 MODEL = ai_models.opus()
 MAX_AGENT_TURNS = 8
@@ -110,7 +111,7 @@ def append_memory(
     scope. Memory is capped at ``MAX_MEMORY_CHARS`` (keeping the most
     recent tail) to prevent unbounded growth from long conversations.
     """
-    note = (note or "").strip()
+    note = strip_banned_dashes((note or "").strip())
     if not note:
         return
     row = get_memory(db, scope_kind, scope_id)
@@ -380,6 +381,11 @@ re-save what's there.
 
 Be concise and warm. The chat is for clarifying intent — the instrument \
 itself is where your work lands.
+
+House style (non-negotiable, applies to chat replies AND every proposal \
+field: questions, options, objectives, rationales, chips, memory notes):
+- Never use em dashes, en dashes, or double hyphens. Use a comma, a colon, \
+or a new sentence instead.
 
 Language:
 - Write your chat replies in the researcher's UI language (given in the \
@@ -706,7 +712,7 @@ def run_copilot_turn_stream(
             ) as stream:
                 for text in stream.text_stream:
                     iteration_text.append(text)
-                    yield {"type": "delta", "text": text}
+                    yield {"type": "delta", "text": strip_banned_dashes(text)}
                 response = stream.get_final_message()
 
             log_claude_usage(db, response, "copilot", company_id=company.id)
@@ -790,7 +796,7 @@ def run_copilot_turn_stream(
         )
         yield {
             "type": "done",
-            "reply": "\n\n".join(reply_parts).strip() or UNAVAILABLE_REPLY[lang],
+            "reply": strip_banned_dashes("\n\n".join(reply_parts).strip() or UNAVAILABLE_REPLY[lang]),
             "proposed_actions": [],
             "memory_updated": turn.memory_updated,
             "error": True,
@@ -803,7 +809,7 @@ def run_copilot_turn_stream(
         )
         yield {
             "type": "done",
-            "reply": "\n\n".join(reply_parts).strip() or ERROR_REPLY[lang],
+            "reply": strip_banned_dashes("\n\n".join(reply_parts).strip() or ERROR_REPLY[lang]),
             "proposed_actions": [],
             "memory_updated": turn.memory_updated,
             "error": True,
@@ -812,12 +818,14 @@ def run_copilot_turn_stream(
 
     yield {
         "type": "done",
-        "reply": (
+        "reply": strip_banned_dashes(
             "\n\n".join(reply_parts).strip()
             or adapter.default_reply.get(lang, adapter.default_reply["en"])
         ),
-        "proposed_actions": _filter_proposal_turn_actions(
-            _suppress_opening_chips(turn.actions, adapter, is_first_turn)
+        "proposed_actions": strip_banned_dashes_deep(
+            _filter_proposal_turn_actions(
+                _suppress_opening_chips(turn.actions, adapter, is_first_turn)
+            )
         ),
         "memory_updated": turn.memory_updated,
     }
@@ -1043,7 +1051,7 @@ def _survey_stub(survey: Survey, history: list[dict]) -> dict:
     if _live_questions(survey):
         return {
             "reply": (
-                "(Offline stub — set ANTHROPIC_API_KEY for the real copilot.) "
+                "(Offline stub: set ANTHROPIC_API_KEY for the real copilot.) "
                 "Tell me what you'd like to change and I'll propose edits."
             ),
             "proposed_actions": [],
@@ -1051,7 +1059,7 @@ def _survey_stub(survey: Survey, history: list[dict]) -> dict:
         }
     return {
         "reply": (
-            "(Offline stub — set ANTHROPIC_API_KEY for the real copilot.) "
+            "(Offline stub: set ANTHROPIC_API_KEY for the real copilot.) "
             "Here are two starter questions to review."
         ),
         "proposed_actions": [

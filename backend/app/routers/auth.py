@@ -62,6 +62,7 @@ from app.services.website_intelligence import (
     fetch_website_summary,
 )
 from app.services import ai_models
+from app.services.text_style import strip_banned_dashes_deep
 
 logger = logging.getLogger("auto_interview.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -944,11 +945,11 @@ def get_onboarding_suggestions(
         if not isinstance(profile_summary, str):
             profile_summary = None
 
-        return {
+        return strip_banned_dashes_deep({
             "use_cases": use_cases[:6],
             "profile_summary": profile_summary,
             "business_summary": summary or None,
-        }
+        })
 
     except Exception:
         logger.warning("Onboarding suggestions Haiku call failed", exc_info=True)
