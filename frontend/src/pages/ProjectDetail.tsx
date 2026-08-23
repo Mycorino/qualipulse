@@ -1726,10 +1726,12 @@ export default function ProjectDetail() {
     const turnTags = tags.filter((t) => t.turn_id === turnId)
       .sort((a, b) => a.start_index - b.start_index);
     const segRanges = computeSegmentRanges(text, segments);
+    const sugRanges = pendingSuggestionRanges(turnId, text.length);
 
     const boundaries = new Set<number>([0, text.length]);
     for (const s of segRanges) { boundaries.add(s.start); boundaries.add(s.end); }
     for (const t of turnTags) { boundaries.add(t.start_index); boundaries.add(t.end_index); }
+    for (const r of sugRanges) { boundaries.add(r.start); boundaries.add(r.end); }
     const points = Array.from(boundaries).filter(p => p >= 0 && p <= text.length).sort((a, b) => a - b);
 
     const parts: React.ReactNode[] = [];
@@ -1742,11 +1744,13 @@ export default function ProjectDetail() {
 
       const seg = segRanges.find(s => s.start <= start && end <= s.end);
       const tag = turnTags.find(t => t.start_index <= start && end <= t.end_index);
+      const sug = !tag ? sugRanges.find(r => r.start <= start && end <= r.end) : undefined;
 
       const tagColor = tag?.code_color || "#6366f1";
       const className = [
         seg ? "transcript-segment" : "",
         tag ? "transcript-tagged" : "",
+        sug ? "transcript-suggested" : "",
       ].filter(Boolean).join(" ");
 
       parts.push(
@@ -1759,8 +1763,8 @@ export default function ProjectDetail() {
             borderBottom: `2.5px solid ${tagColor}`,
             background: `${tagColor}22`,
             borderRadius: 2,
-          } : undefined}
-          title={tag ? `Tagged: ${tag.code_name}` : undefined}
+          } : sug ? { textDecorationColor: sug.color } : undefined}
+          title={tag ? `Tagged: ${tag.code_name}` : sug ? `${tProject("responses.suggestedTagHint", { defaultValue: "Suggested tag" })}: ${sug.label}` : undefined}
           onClick={seg ? () => {
             const audio = recordingAudioRefs.current[turnId];
             if (audio) {
@@ -1776,14 +1780,58 @@ export default function ProjectDetail() {
     return <span data-turn-text="" data-turn-id={turnId}>{parts}</span>;
   }
 
+  // Pending AI tag suggestions for a turn, as ordered, clipped ranges on the
+  // raw transcript. Offsets are against the raw STT text (same as tags).
+  function pendingSuggestionRanges(turnId: string, textLength: number) {
+    return tagSuggestions
+      .filter((s) => s.turn_id === turnId)
+      .map((s) => ({
+        id: s.id,
+        start: Math.max(0, Math.min(s.start_index, textLength)),
+        end: Math.max(0, Math.min(s.end_index, textLength)),
+        color: s.code_color || "var(--brand-500)",
+        label: s.code_name || s.proposed_code_name || "",
+      }))
+      .filter((r) => r.end > r.start)
+      .sort((a, b) => a.start - b.start);
+  }
+
+  // Render text[from, to) with every pending suggestion span inside that
+  // window drawn as a faint dotted underline, so the researcher can see
+  // *which* passage the accept/reject chip below refers to.
+  function renderSuggestedSpans(text: string, from: number, to: number, turnId: string): React.ReactNode[] {
+    const ranges = pendingSuggestionRanges(turnId, text.length);
+    const out: React.ReactNode[] = [];
+    let cursor = from;
+    for (const r of ranges) {
+      const start = Math.max(r.start, cursor);
+      const end = Math.min(r.end, to);
+      if (end <= start) continue;
+      if (start > cursor) out.push(text.slice(cursor, start));
+      out.push(
+        <span
+          key={`sug-${r.id}-${start}`}
+          className="transcript-suggested"
+          style={{ textDecorationColor: r.color }}
+          title={`${tProject("responses.suggestedTagHint", { defaultValue: "Suggested tag" })}: ${r.label}`}
+        >
+          {text.slice(start, end)}
+        </span>
+      );
+      cursor = end;
+    }
+    if (cursor < to) out.push(text.slice(cursor, to));
+    return out;
+  }
+
   function renderTaggedText(text: string, turnId: string): React.ReactNode {
     const turnTags = tags.filter((t) => t.turn_id === turnId).sort((a, b) => a.start_index - b.start_index);
-    if (!turnTags.length) return <span data-turn-text="">{text}</span>;
+    if (!turnTags.length) return <span data-turn-text="">{renderSuggestedSpans(text, 0, text.length, turnId)}</span>;
 
     const parts: React.ReactNode[] = [];
     let cursor = 0;
     for (const tag of turnTags) {
-      if (tag.start_index > cursor) parts.push(text.slice(cursor, tag.start_index));
+      if (tag.start_index > cursor) parts.push(...renderSuggestedSpans(text, cursor, tag.start_index, turnId));
       const color = tag.code_color || "#6366f1";
       parts.push(
         <span
@@ -1803,7 +1851,7 @@ export default function ProjectDetail() {
       );
       cursor = tag.end_index;
     }
-    if (cursor < text.length) parts.push(text.slice(cursor));
+    if (cursor < text.length) parts.push(...renderSuggestedSpans(text, cursor, text.length, turnId));
     return <span data-turn-text="">{parts}</span>;
   }
 
@@ -3560,6 +3608,7 @@ export default function ProjectDetail() {
                         {transcript.map((t) => {
                           const turnTags = tags.filter((tg) => tg.turn_id === t.id);
                           const isHighlighted = highlightTarget?.turnIndex === t.turn_index;
+                          const hasPendingSuggestion = tagSuggestions.some((s) => s.turn_id === t.id);
                           return (
                             <div
                               key={t.turn_index}
@@ -3595,7 +3644,7 @@ export default function ProjectDetail() {
                                 </div>
                               ) : t.response_transcript ? (
                                 <div
-                                  className={`transcript-a${(transcriptViewMode === "translated" && t.translated_response) || (transcriptViewMode === "cleaned" && t.cleaned_response) ? " transcript-a--translated" : ""}`}
+                                  className={`transcript-a${(transcriptViewMode === "translated" && t.translated_response) || (transcriptViewMode === "cleaned" && t.cleaned_response) ? " transcript-a--translated" : ""}${hasPendingSuggestion ? " transcript-a--has-suggestion" : ""}`}
                                   onMouseUp={() => transcriptViewMode === "original" && handleTranscriptMouseUp(t.id)}
                                   style={{ userSelect: "text" }}
                                 >
@@ -3603,7 +3652,7 @@ export default function ProjectDetail() {
                                     <>
                                       <div className="transcript-a__translated">{t.translated_response}</div>
                                       <div className="transcript-a__original" lang={project?.language || undefined}>
-                                        {t.response_transcript}
+                                        {renderSuggestedSpans(t.response_transcript, 0, t.response_transcript.length, t.id)}
                                       </div>
                                     </>
                                   ) : transcriptViewMode === "cleaned" && t.cleaned_response ? (
@@ -3619,7 +3668,7 @@ export default function ProjectDetail() {
                                         </span>
                                       </div>
                                       <div className="transcript-a__original" lang={project?.language || undefined}>
-                                        {t.response_transcript}
+                                        {renderSuggestedSpans(t.response_transcript, 0, t.response_transcript.length, t.id)}
                                       </div>
                                     </>
                                   ) : isHighlighted && highlightTarget

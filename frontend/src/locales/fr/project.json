@@ -480,6 +480,7 @@
     "noTagSuggestions": "Aucun passage clairement annotable dans cette transcription.",
     "suggestTagsFailed": "Impossible de suggérer des annotations. Veuillez réessayer.",
     "acceptSuggestion": "Accepter la suggestion",
+    "suggestedTagHint": "Annotation suggérée",
     "rejectSuggestion": "Ignorer la suggestion",
     "suggestedNewCode": "Nouveau : {{name}}",
     "suggestCodes": "Suggérer des codes",
