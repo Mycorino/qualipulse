@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -49,6 +49,16 @@ type ThreadItem =
        * to the model; renders an inline notice + retry. */
       error?: boolean;
     };
+
+/** Proposal types whose primary text can be rewritten before accepting. */
+const EDITABLE_TYPES = new Set([
+  "add_guide_question",
+  "add_question",
+  "edit_guide_question",
+  "edit_question",
+  "edit_objective",
+  "add_screening_question",
+]);
 
 /** The proactive dock popup — a fresh nudge wins over the static NBA. */
 type Teaser =
@@ -178,6 +188,14 @@ export function ResearchCopilotPanel({
   // A's reply into B's conversation.
   const turnToken = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  // Auto-grow the composer with its content (capped by CSS max-height so
+  // a long paste scrolls inside the box instead of eating the thread).
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
   // True while the user is scrolled to (near) the bottom — auto-scroll
   // only then, so reading an earlier proposal mid-stream isn't yanked.
   const isAtBottom = useRef(true);
@@ -507,14 +525,18 @@ export function ResearchCopilotPanel({
     send(v);
   };
 
-  const setStatus = (actionId: string, status: PendingAction["status"]) => {
+  const setStatus = (
+    actionId: string,
+    status: PendingAction["status"],
+    patch: Partial<PendingAction> = {},
+  ) => {
     updateThread((t) =>
       t.map((it) =>
         it.kind === "assistant"
           ? {
               ...it,
               actions: it.actions.map((a) =>
-                a.id === actionId ? { ...a, status } : a,
+                a.id === actionId ? ({ ...a, ...patch, status } as PendingAction) : a,
               ),
             }
           : it,
@@ -525,19 +547,24 @@ export function ResearchCopilotPanel({
   // Resolving a staged proposal should move the conversation to the next
   // step instead of leaving it idle — the Copilot reads the updated
   // snapshot and proposes whatever comes next (objective -> screener ->
-  // guide). These proposal types advance the staged flow; the guide is
-  // the terminal stage, so it deliberately does NOT auto-continue.
+  // guide -> launch). Analysis triggers and removals are one-off actions
+  // with nothing staged after them, so they deliberately do NOT continue.
   const AUTO_CONTINUE_AFTER = new Set([
     "edit_objective",
     "edit_settings",
     "add_screening_question",
+    "add_guide_question",
+    "edit_guide_question",
+    "add_question",
+    "edit_question",
   ]);
 
-  // A screener proposal stages a BATCH of add_screening_question cards.
-  // Fire the "what's next" turn once — after the last card in the batch is
-  // resolved and at least one was accepted — never once per card. Reads
-  // the synchronous thread ref, so accepting several cards fast can't fire
-  // it twice or miss on a stale closure.
+  // A proposal turn often stages a BATCH of cards. Fire the "what's next"
+  // turn once — after the last card in the batch is resolved — never once
+  // per card. Reads the synchronous thread ref, so resolving several cards
+  // fast can't fire it twice or miss on a stale closure. When everything
+  // was dismissed the conversation must still move on, so a different
+  // prompt asks for an alternative instead of stalling.
   const maybeAutoContinue = (action: PendingAction) => {
     if (!AUTO_CONTINUE_AFTER.has(action.type)) return;
     const turn = threadData.current.find(
@@ -549,17 +576,49 @@ export function ResearchCopilotPanel({
     const proposals = turn.actions.filter((a) => a.type !== "suggest_replies");
     // Wait until every proposal card in this turn is resolved…
     if (proposals.some((a) => a.status === "pending")) return;
-    // …and only continue if the user actually accepted something.
-    if (!proposals.some((a) => a.status === "accepted")) return;
-    send(t("copilot.continueAfterAccept"));
+    // …and only for the LAST assistant turn: resolving an old card after
+    // the conversation already moved on must not inject a stray prompt.
+    const lastAssistant = [...threadData.current]
+      .reverse()
+      .find((it) => it.kind === "assistant");
+    if (lastAssistant !== turn) return;
+    send(
+      proposals.some((a) => a.status === "accepted")
+        ? t("copilot.continueAfterAccept")
+        : t("copilot.continueAfterReject"),
+    );
   };
 
-  const accept = async (action: PendingAction) => {
+  /** Return a copy of the proposal with its editable text replaced. */
+  const withEditedText = (action: PendingAction, text: string): PendingAction => {
+    switch (action.type) {
+      case "add_guide_question":
+        return { ...action, question: { ...(action.question ?? {}), main_question: text } as ProposedGuideQuestion };
+      case "add_question":
+        return { ...action, question: { ...(action.question ?? {}), prompt: text } as ProposedSurveyQuestion };
+      case "edit_guide_question":
+        return { ...action, new_main_question: text };
+      case "edit_question":
+        return { ...action, new_prompt: text };
+      case "edit_objective":
+        return { ...action, new_objective: text };
+      case "add_screening_question":
+        return action.screening
+          ? { ...action, screening: { ...action.screening, question: text } }
+          : action;
+      default:
+        return action;
+    }
+  };
+
+  const accept = async (action: PendingAction, editedText?: string) => {
+    const trimmed = editedText?.trim();
+    const effective = trimmed ? withEditedText(action, trimmed) : action;
     try {
-      await target.applyAction(action);
-      setStatus(action.id, "accepted");
+      await target.applyAction(effective);
+      setStatus(action.id, "accepted", effective);
       onApplied();
-      maybeAutoContinue(action);
+      maybeAutoContinue(effective);
     } catch {
       toast(t("copilot.applyError"), "error");
     }
@@ -567,9 +626,9 @@ export function ResearchCopilotPanel({
 
   const reject = (action: PendingAction) => {
     setStatus(action.id, "rejected");
-    // Rejecting the last pending card in a batch where others were
-    // accepted still advances the flow — otherwise the conversation
-    // stalls after "accept 2, reject 1".
+    // Rejecting the last pending card in a batch still advances the flow —
+    // otherwise the conversation stalls after "accept 2, reject 1" (or
+    // after dismissing everything).
     maybeAutoContinue(action);
   };
 
@@ -799,7 +858,7 @@ export function ResearchCopilotPanel({
                   <ProposalCard
                     key={a.id}
                     action={a}
-                    onAccept={() => accept(a)}
+                    onAccept={(text) => accept(a, text)}
                     onReject={() => reject(a)}
                   />
                 ))}
@@ -883,7 +942,7 @@ export function ResearchCopilotPanel({
             }
           }}
           placeholder={t("copilot.inputPlaceholder")}
-          rows={2}
+          rows={1}
         />
         {busy ? (
           <button
@@ -915,10 +974,12 @@ function ProposalCard({
   onReject,
 }: {
   action: PendingAction;
-  onAccept: () => void;
+  onAccept: (editedText?: string) => void;
   onReject: () => void;
 }) {
   const { t } = useTranslation("dashboard");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
   let heading: string;
   let body: string | undefined;
 
@@ -1001,6 +1062,12 @@ function ProposalCard({
     );
   }
 
+  // Proposals whose main text the researcher can rewrite before applying.
+  const editable =
+    action.status === "pending" &&
+    EDITABLE_TYPES.has(action.type) &&
+    typeof body === "string";
+
   const rationale =
     action.question && "rationale" in action.question
       ? (action.question as { rationale?: string }).rationale
@@ -1012,26 +1079,71 @@ function ProposalCard({
       data-action={action.type}
     >
       <div className="copilot-proposal__eyebrow">{heading}</div>
-      <div className="copilot-proposal__body">{body}</div>
-      {rationale && (
+      {editing ? (
+        <textarea
+          className="copilot-proposal__edit"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={3}
+          autoFocus
+          aria-label={t("copilot.proposal.editLabel")}
+        />
+      ) : (
+        <div className="copilot-proposal__body">{body}</div>
+      )}
+      {rationale && !editing && (
         <div className="copilot-proposal__rationale">{rationale}</div>
       )}
       {action.status === "pending" ? (
         <div className="copilot-proposal__actions">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={onAccept}
-          >
-            {t("copilot.proposal.accept")}
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={onReject}
-          >
-            {t("copilot.proposal.dismiss")}
-          </button>
+          {editing ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => onAccept(draft)}
+                disabled={!draft.trim()}
+              >
+                {t("copilot.proposal.applyEdit")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setEditing(false)}
+              >
+                {t("copilot.proposal.cancelEdit")}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => onAccept()}
+              >
+                {t("copilot.proposal.accept")}
+              </button>
+              {editable && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setDraft(body ?? "");
+                    setEditing(true);
+                  }}
+                >
+                  {t("copilot.proposal.edit")}
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={onReject}
+              >
+                {t("copilot.proposal.dismiss")}
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="copilot-proposal__status">
