@@ -92,8 +92,8 @@ class TestBlogLifecycle:
         assert "<p>ok</p>" in content
 
     def test_admin_endpoints_require_key(self, client):
-        assert client.get("/admin/blog").status_code == 403
-        assert client.post("/admin/blog", json={"title": "x"}).status_code == 403
+        assert client.get("/admin/blog").status_code == 401
+        assert client.post("/admin/blog", json={"title": "x"}).status_code == 401
 
 
 # ── Image upload ──────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ class TestBlogImageUpload:
         assert self._upload(client, big, "image/png").status_code == 413
 
     def test_requires_admin_key(self, client):
-        assert self._upload(client, PNG_BYTES, "image/png", headers={}).status_code == 403
+        assert self._upload(client, PNG_BYTES, "image/png", headers={}).status_code == 401
 
     def test_files_route_blocks_traversal_and_non_images(self, client):
         assert client.get("/files/../secrets.txt").status_code in (403, 404)

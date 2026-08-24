@@ -227,4 +227,4 @@ class TestAdminTraffic:
         assert res.json()["signup_rate_pct"] == 0.0
 
     def test_requires_admin_key(self, client):
-        assert client.get("/admin/traffic").status_code == 403
+        assert client.get("/admin/traffic").status_code == 401

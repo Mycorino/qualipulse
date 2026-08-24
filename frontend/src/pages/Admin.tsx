@@ -1,7 +1,8 @@
-import { Fragment, useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import AdminBlog from "./AdminBlog";
+import { AdminGate, StepUpDialog, type AdminSession } from "./admin/AdminGate";
 import AdminOverview from "./admin/AdminOverview";
 import AdminCosts from "./admin/AdminCosts";
 import "./admin/admin.css";
@@ -115,10 +116,23 @@ type AdminTab = "overview" | "costs" | "users" | "traffic" | "affiliates" | "blo
 
 // ── API helpers ────────────────────────────────────────────────────────────
 
-function adminClient(key: string, identity?: string) {
-  const headers: Record<string, string> = { Authorization: `Bearer ${key}` };
-  if (identity) headers["X-Admin-Identity"] = identity;
+function adminClient(session: AdminSession | null, stepUpCode?: string) {
+  const headers: Record<string, string> = {};
+  if (session) {
+    headers.Authorization = `Bearer ${session.token}`;
+    // Only meaningful on the legacy shared-key path; ignored by the server
+    // for account sessions, whose identity is the verified email.
+    if (session.via === "shared_key") headers["X-Admin-Identity"] = session.identity.replace(/^shared-key:/, "");
+  }
+  if (stepUpCode) headers["X-Admin-Step-Up"] = stepUpCode;
   return axios.create({ baseURL: "/api", headers });
+}
+
+/** Server signal that a destructive call needs (or got a bad) fresh code. */
+function stepUpDetail(err: unknown): "required" | "invalid" | null {
+  if (!axios.isAxiosError(err) || err.response?.status !== 403) return null;
+  const d = err.response?.data?.detail;
+  return d === "admin_step_up_required" ? "required" : d === "admin_step_up_invalid" ? "invalid" : null;
 }
 
 // ── Tier badge ─────────────────────────────────────────────────────────────
@@ -217,16 +231,17 @@ function ConfirmDialog({
 
 export default function Admin() {
   const { t } = useTranslation("admin");
-  const [adminKey, setAdminKey] = useState<string>(
-    () => sessionStorage.getItem("admin_key") ?? ""
-  );
-  const [adminIdentity, setAdminIdentity] = useState<string>(
-    () => sessionStorage.getItem("admin_identity") ?? ""
-  );
-  const [keyInput, setKeyInput] = useState("");
-  const [identityInput, setIdentityInput] = useState("");
-  const [keyError, setKeyError] = useState("");
-  const [authed, setAuthed] = useState(false);
+  // Admin session lives in memory only (never storage): a refresh asks for a
+  // new authenticator code, which is the point.
+  const [session, setSession] = useState<AdminSession | null>(null);
+  const [gateNotice, setGateNotice] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const authed = session !== null;
+  const adminIdentity = session?.identity ?? "";
+
+  // Step-up: destructive actions ask for a fresh code through this promise.
+  const [stepUp, setStepUp] = useState<{ action: string; error: string | null; busy: boolean } | null>(null);
+  const stepUpResolver = useRef<((code: string | null) => void) | null>(null);
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
@@ -269,9 +284,11 @@ export default function Admin() {
     setPanelDeleting(true);
     setPanelResult(null);
     try {
-      const res = await client().delete(`/admin/panel/${encodeURIComponent(email)}`, {
-        params: { include_interviews: panelIncludeInterviews },
-      });
+      const res = await withStepUp("Deleting a panelist", (c) =>
+        c.delete(`/admin/panel/${encodeURIComponent(email)}`, { params: { include_interviews: panelIncludeInterviews } }),
+      );
+      setStepUp(null);
+      if (!res) return;
       const d = res.data;
       setPanelResult(`Deleted ${email} — profile: ${d.panel_profile}, answers: ${d.panel_answers}, magic tokens: ${d.magic_tokens}, participants: ${d.participants}, turns: ${d.interview_turns}`);
       setPanelEmail("");
@@ -307,40 +324,69 @@ export default function Admin() {
   const [suspendReason, setSuspendReason] = useState("");
   const [suspendSubmitting, setSuspendSubmitting] = useState(false);
 
-  const client = useCallback(
-    () => adminClient(adminKey, adminIdentity),
-    [adminKey, adminIdentity]
+  const signOut = useCallback((notice?: string) => {
+    setSession(null);
+    setGateNotice(notice ?? null);
+  }, []);
+
+  const client = useCallback(() => {
+    const c = adminClient(session);
+    // A 401 means the admin token expired or was revoked: back to the gate.
+    c.interceptors.response.use(undefined, (err) => {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        signOut(t("login.sessionExpired", "Your admin session expired. Enter a new code to continue."));
+      }
+      return Promise.reject(err);
+    });
+    return c;
+  }, [session, signOut, t]);
+
+  // Countdown for the header + auto sign-out at expiry.
+  useEffect(() => {
+    if (!session?.expiresAt) return;
+    const id = setInterval(() => {
+      setNow(Date.now());
+      if (session.expiresAt && Date.now() >= session.expiresAt) {
+        signOut(t("login.sessionExpired", "Your admin session expired. Enter a new code to continue."));
+      }
+    }, 15_000);
+    return () => clearInterval(id);
+  }, [session, signOut, t]);
+
+  /** Run a destructive call, prompting for a fresh authenticator code when
+   *  the server asks for one. Resolves to null if the admin cancels. */
+  const withStepUp = useCallback(
+    async <T,>(action: string, run: (c: ReturnType<typeof adminClient>) => Promise<T>): Promise<T | null> => {
+      let code: string | undefined;
+      for (;;) {
+        try {
+          return await run(adminClient(session, code));
+        } catch (err) {
+          const kind = stepUpDetail(err);
+          if (!kind) throw err;
+          const next = await new Promise<string | null>((resolve) => {
+            stepUpResolver.current = resolve;
+            setStepUp({ action, error: kind === "invalid" ? t("stepUp.invalid", "That code is not valid.") : null, busy: false });
+          });
+          if (next === null) {
+            setStepUp(null);
+            return null;
+          }
+          code = next;
+          setStepUp((s) => (s ? { ...s, busy: true, error: null } : s));
+        }
+      }
+    },
+    [session, t],
   );
 
-  // Verify key and load data
-  const login = useCallback(async (key: string, identity: string) => {
-    setKeyError("");
-    if (!identity.trim()) {
-      setKeyError(t("login.errorIdentityRequired"));
-      return;
-    }
-    try {
-      await adminClient(key, identity).get("/admin/stats");
-      sessionStorage.setItem("admin_key", key);
-      sessionStorage.setItem("admin_identity", identity.trim());
-      setAdminKey(key);
-      setAdminIdentity(identity.trim());
-      setAuthed(true);
-    } catch (err: unknown) {
-      if (axios.isAxiosError(err) && err.response?.status === 403) {
-        setKeyError(t("login.errorInvalidKey"));
-      } else {
-        setKeyError(t("login.errorConnect"));
-      }
-    }
-  }, [t]);
-
-  // Auto-login if key already in sessionStorage
-  useEffect(() => {
-    if (adminKey && adminIdentity) {
-      login(adminKey, adminIdentity);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const finishStepUp = (code: string | null) => {
+    const resolve = stepUpResolver.current;
+    stepUpResolver.current = null;
+    if (code !== null) setStepUp((s) => (s ? { ...s, busy: true } : s));
+    else setStepUp(null);
+    resolve?.(code);
+  };
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -495,10 +541,11 @@ export default function Admin() {
     setCreditDialogSubmitting(true);
     setCreditDialogError(null);
     try {
-      await client().post(`/admin/workspaces/${creditDialog.id}/credits/adjust`, {
-        credits_delta: delta,
-        reason: creditReason.trim(),
-      });
+      const done = await withStepUp(t("stepUp.actions.credits", "Adjusting credits"), (c) =>
+        c.post(`/admin/workspaces/${creditDialog.id}/credits/adjust`, { credits_delta: delta, reason: creditReason.trim() }),
+      );
+      setStepUp(null);
+      if (!done) return;
       showSuccess(
         t(delta > 0 ? "toasts.creditsGranted" : "toasts.creditsClawedBack", {
           count: Math.abs(delta),
@@ -519,7 +566,9 @@ export default function Admin() {
     setConfirmDelete(null);
     setActionLoading(`delete-${user.id}`);
     try {
-      await client().delete(`/admin/users/${user.id}`);
+      const done = await withStepUp(t("stepUp.actions.delete", "Deleting an account"), (c) => c.delete(`/admin/users/${user.id}`));
+      setStepUp(null);
+      if (!done) return;
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
       showSuccess(t("toasts.userDeleted"));
     } catch {
@@ -534,10 +583,11 @@ export default function Admin() {
     if (!suspendReason.trim()) return;
     setSuspendSubmitting(true);
     try {
-      const res = await client().post<AdminUser>(
-        `/admin/users/${suspendDialog.id}/suspend`,
-        { reason: suspendReason.trim() }
+      const res = await withStepUp(t("stepUp.actions.suspend", "Suspending an account"), (c) =>
+        c.post<AdminUser>(`/admin/users/${suspendDialog.id}/suspend`, { reason: suspendReason.trim() }),
       );
+      setStepUp(null);
+      if (!res) return;
       setUsers((prev) =>
         prev.map((u) =>
           u.id === suspendDialog.id
@@ -579,9 +629,11 @@ export default function Admin() {
   async function handleImpersonate(user: AdminUser) {
     setActionLoading(`impersonate-${user.id}`);
     try {
-      const res = await client().post<{ access_token: string; company_name: string; company_email: string }>(
-        `/admin/users/${user.id}/impersonate`
+      const res = await withStepUp(t("stepUp.actions.impersonate", "Impersonating a customer"), (c) =>
+        c.post<{ access_token: string; company_name: string; company_email: string }>(`/admin/users/${user.id}/impersonate`),
       );
+      setStepUp(null);
+      if (!res) return;
       const params = new URLSearchParams({
         access_token: res.data.access_token,
         name: res.data.company_name,
@@ -714,97 +766,8 @@ export default function Admin() {
 
   // ── Login gate ────────────────────────────────────────────────────────────
 
-  if (!authed) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--bg-base)",
-        }}
-      >
-        <div
-          style={{
-            background: "var(--bg-surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-lg)",
-            padding: 40,
-            width: 360,
-            boxShadow: "var(--shadow-md)",
-          }}
-        >
-          <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{t("login.title")}</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 24 }}>
-            {t("login.subtitle")}
-          </p>
-          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
-            {t("login.yourName")}
-          </label>
-          <input
-            type="text"
-            value={identityInput}
-            onChange={(e) => setIdentityInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && login(keyInput, identityInput)}
-            placeholder={t("login.namePlaceholder")}
-            style={{
-              display: "block",
-              width: "100%",
-              marginTop: 6,
-              marginBottom: 16,
-              padding: "10px 12px",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--border)",
-              fontSize: 14,
-              outline: "none",
-            }}
-          />
-          <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
-            {t("login.adminKey")}
-          </label>
-          <input
-            type="password"
-            value={keyInput}
-            onChange={(e) => setKeyInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && login(keyInput, identityInput)}
-            placeholder={t("login.adminKeyPlaceholder")}
-            style={{
-              display: "block",
-              width: "100%",
-              marginTop: 6,
-              marginBottom: 16,
-              padding: "10px 12px",
-              borderRadius: "var(--radius-sm)",
-              border: `1px solid ${keyError ? "var(--danger)" : "var(--border)"}`,
-              fontSize: 14,
-              outline: "none",
-            }}
-          />
-          {keyError && (
-            <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>
-              {keyError}
-            </p>
-          )}
-          <button
-            onClick={() => login(keyInput, identityInput)}
-            style={{
-              width: "100%",
-              background: "var(--primary)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "var(--radius-sm)",
-              padding: "10px 0",
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: "pointer",
-            }}
-          >
-            {t("login.signIn")}
-          </button>
-        </div>
-      </div>
-    );
+  if (!session) {
+    return <AdminGate notice={gateNotice} onSession={(sess) => { setGateNotice(null); setSession(sess); }} />;
   }
 
   // ── Main admin UI ─────────────────────────────────────────────────────────
@@ -833,17 +796,16 @@ export default function Admin() {
           <span className="adm-header__badge">{t("header.internalBadge")}</span>
         </div>
         <div className="adm-header__meta">
-          {adminIdentity && <span>{adminIdentity}</span>}
-          <button
-            type="button"
-            onClick={() => {
-              sessionStorage.removeItem("admin_key");
-              sessionStorage.removeItem("admin_identity");
-              setAuthed(false);
-              setAdminKey("");
-              setAdminIdentity("");
-            }}
-          >
+          <span className="adm-session" title={session.via === "shared_key" ? t("header.sharedKeySession", "Shared-key session (legacy)") : undefined}>
+            <i className={`adm-session__dot${session.expiresAt && session.expiresAt - now < 5 * 60_000 ? " adm-session__dot--warn" : ""}`} />
+            {session.via === "shared_key" ? adminIdentity.replace(/^shared-key:/, "") : adminIdentity}
+            {session.expiresAt && (
+              <span>
+                · {t("header.expiresIn", "{{minutes}} min left", { minutes: Math.max(0, Math.ceil((session.expiresAt - now) / 60_000)) })}
+              </span>
+            )}
+          </span>
+          <button type="button" onClick={() => signOut()}>
             {t("header.signOut")}
           </button>
         </div>
@@ -1601,7 +1563,7 @@ export default function Admin() {
         )}
 
         {/* Blog management tab */}
-        {tab === "blog" && <AdminBlog adminKey={adminKey} />}
+        {tab === "blog" && <AdminBlog adminKey={session.token} />}
 
         {/* Audit log tab */}
         {tab === "audit" && (
@@ -2248,6 +2210,16 @@ export default function Admin() {
             </div>
           </div>
         </div>
+      )}
+
+      {stepUp && (
+        <StepUpDialog
+          action={stepUp.action}
+          error={stepUp.error}
+          busy={stepUp.busy}
+          onSubmit={(code) => finishStepUp(code)}
+          onCancel={() => finishStepUp(null)}
+        />
       )}
 
       {/* Confirm delete dialog */}

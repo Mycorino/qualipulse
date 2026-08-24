@@ -1,4 +1,3 @@
-import hmac
 import json
 import logging
 import uuid
@@ -20,6 +19,16 @@ from app.models.billing import CreditLedger
 from app.models.coding import ManualCode, QuoteTag
 from app.models.company import Company, EmailVerificationToken, PasswordResetToken
 from app.services import admin_analytics, billing_service
+from app.services.admin_auth import (
+    check_admin_eligible,
+    create_admin_token,
+    require_admin,
+    require_service_key,
+    require_step_up,
+    verify_admin_code,
+    ADMIN_TOKEN_MINUTES,
+)
+from app.dependencies import get_current_company
 from app.services.auth import create_impersonation_token
 from app.models.interview import (
     AnalysisThemeAnnotation,
@@ -37,23 +46,6 @@ from app.services.deletion import delete_company_data
 from app.services.storage import delete_audio_by_url
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-# ── Auth dependency ───────────────────────────────────────────────────────────
-
-def require_admin(
-    authorization: Optional[str] = Header(default=None),
-    x_admin_identity: Optional[str] = Header(default=None, alias="X-Admin-Identity"),
-) -> str:
-    """Validate admin key and return the admin identity string for audit logging."""
-    if not settings.ADMIN_SECRET_KEY:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access is disabled")
-    if authorization is None or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin key required")
-    token = authorization[len("Bearer "):]
-    if not hmac.compare_digest(token, settings.ADMIN_SECRET_KEY):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin key")
-    return (x_admin_identity or "unknown").strip()[:100]
 
 
 # ── Audit helper ─────────────────────────────────────────────────────────────
@@ -248,6 +240,45 @@ def _build_user_summary(company: Company, db: Session) -> AdminUserSummary:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+class AdminSessionRequest(BaseModel):
+    code: str  # TOTP or single-use backup code
+
+
+@router.get("/auth-config")
+def admin_auth_config() -> dict:
+    """Public: tells the admin UI which sign-in paths are open."""
+    return {
+        "shared_key_login": bool(settings.ADMIN_SECRET_KEY and settings.ADMIN_ALLOW_SHARED_KEY),
+        "token_minutes": ADMIN_TOKEN_MINUTES,
+    }
+
+
+@router.post("/session")
+@limiter.limit("5/minute")
+def open_admin_session(
+    request: Request,
+    body: AdminSessionRequest,
+    company: Company = Depends(get_current_company),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Step up a normal app session to an admin session.
+
+    Requires ``Company.is_admin`` + enabled TOTP, and a fresh code right
+    now even if the user already passed 2FA at login. Returns a 30-minute
+    admin token the UI keeps in memory only.
+    """
+    check_admin_eligible(company)
+    if not verify_admin_code(db, company, body.code, allow_backup=True):
+        _record_audit(db, company.email, "admin_session_denied", company.id, company.email)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid code")
+    _record_audit(db, company.email, "admin_session_opened", company.id, company.email)
+    return {
+        "admin_token": create_admin_token(company),
+        "expires_in": ADMIN_TOKEN_MINUTES * 60,
+        "identity": company.email,
+    }
+
+
 @router.get("/users", response_model=list[AdminUserSummary])
 @limiter.limit("30/minute")
 def list_users(
@@ -433,7 +464,7 @@ def adjust_credits(
     workspace_id: str,
     body: CreditAdjustment,
     db: Session = Depends(get_db),
-    admin_id: str = Depends(require_admin),
+    admin_id: str = Depends(require_step_up),
 ):
     if body.credits_delta == 0:
         raise HTTPException(status_code=422, detail="credits_delta must be non-zero")
@@ -511,7 +542,7 @@ def delete_user(
     request: Request,
     company_id: str,
     db: Session = Depends(get_db),
-    admin_id: str = Depends(require_admin),
+    admin_id: str = Depends(require_step_up),
 ) -> None:
     company = db.query(Company).filter(Company.id == company_id).first()
     if company is None:
@@ -541,7 +572,7 @@ def run_retention_purge(
     dry_run: bool = Query(default=False),
     days: Optional[int] = Query(default=None, ge=1),
     db: Session = Depends(get_db),
-    admin_id: str = Depends(require_admin),
+    admin_id: str = Depends(require_service_key),
 ) -> dict:
     """Purge participant audio (recordings + TTS clips) for interviews
     completed more than N days ago. Transcripts are kept — the retention
@@ -610,7 +641,7 @@ def delete_panelist(
     email: str,
     include_interviews: bool = False,
     db: Session = Depends(get_db),
-    admin_id: str = Depends(require_admin),
+    admin_id: str = Depends(require_step_up),
 ) -> dict:
     """Delete a consumer / panelist account by email — their panel profile,
     all enrichment answers, and outstanding magic tokens. Doubles as GDPR
@@ -664,7 +695,7 @@ def suspend_user(
     company_id: str,
     body: SuspendRequest,
     db: Session = Depends(get_db),
-    admin_id: str = Depends(require_admin),
+    admin_id: str = Depends(require_step_up),
 ) -> AdminUserSummary:
     company = db.query(Company).filter(Company.id == company_id).first()
     if company is None:
@@ -720,7 +751,7 @@ def impersonate_user(
     request: Request,
     company_id: str,
     db: Session = Depends(get_db),
-    admin_id: str = Depends(require_admin),
+    admin_id: str = Depends(require_step_up),
 ):
     company = db.query(Company).filter(Company.id == company_id).first()
     if company is None:

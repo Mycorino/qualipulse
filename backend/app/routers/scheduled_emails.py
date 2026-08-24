@@ -41,7 +41,7 @@ from app.models.company import Company
 from app.models.email_log import EmailSendLog, ParticipantEmailLog
 from app.models.interview import InterviewLink, InterviewTurn, Participant
 from app.models.project import Project
-from app.routers.admin import require_admin
+from app.services.admin_auth import require_service_key
 from app.services.email import send_day_1_followup, send_interview_reminder
 from app.services.verification import magic_link_url, mint_magic_token
 
@@ -295,7 +295,7 @@ def run_scheduled_emails(
             "actually send. Counts are reported as if it ran."
         ),
     ),
-    _: None = Depends(require_admin),
+    _: str = Depends(require_service_key),
     db: Session = Depends(get_db),
 ) -> dict:
     """Cloud Scheduler hits this hourly. Idempotent, fire-and-forget per

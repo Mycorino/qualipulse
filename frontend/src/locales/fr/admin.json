@@ -9,12 +9,35 @@
     "signIn": "Se connecter",
     "errorIdentityRequired": "Saisissez votre nom pour que les actions soient traçables",
     "errorInvalidKey": "Clé admin invalide",
-    "errorConnect": "Impossible de se connecter au backend"
+    "errorConnect": "Impossible de se connecter au backend",
+    "loading": "Vérification de votre compte…",
+    "signedInAs": "Connecté en tant que",
+    "codeLabel": "Code d'authentification",
+    "codeHint": "Un nouveau code est demandé à chaque fois, même si vous venez de vous connecter. La session admin dure {{minutes}} minutes.",
+    "openSession": "Ouvrir la session admin",
+    "opening": "Ouverture…",
+    "errorCode": "Ce code n'est pas valide.",
+    "errorLocked": "Trop de tentatives. Réessayez dans 15 minutes.",
+    "errorNotAdmin": "Ce compte n'est pas administrateur.",
+    "error2faRequired": "Activez d'abord la double authentification sur votre compte.",
+    "need2faTitle": "La double authentification est obligatoire",
+    "need2faBody": "L'accès admin demande une application d'authentification sur votre compte. Configurez-la une fois, puis revenez ici.",
+    "need2faCta": "Activer la 2FA",
+    "nothingHere": "Rien à voir ici",
+    "nothingHereBody": "Cette page n'est pas disponible pour votre compte.",
+    "backToApp": "Retour à l'application",
+    "signInFirst": "Connectez-vous d'abord à votre compte",
+    "signInFirstBody": "Les admins utilisent leur compte QualiPulse habituel plus un code d'authentification.",
+    "goToLogin": "Aller à la connexion",
+    "legacyToggle": "Utiliser la clé admin partagée (en cours de retrait)",
+    "sessionExpired": "Votre session admin a expiré. Saisissez un nouveau code pour continuer."
   },
   "header": {
     "title": "Administration QualiPulse",
     "internalBadge": "INTERNE",
-    "signOut": "Se déconnecter"
+    "signOut": "Se déconnecter",
+    "expiresIn": "{{minutes}} min restantes",
+    "sharedKeySession": "Session par clé partagée (ancien mode)"
   },
   "costs": {
     "title": "Dépenses IA",
@@ -365,5 +388,19 @@
     "paidNote": "Depuis le début, hors période : le premier contact garde le crédit, quelle que soit la durée du cycle.",
     "topReferrers": "Sites référents",
     "topPaths": "Pages les plus vues"
+  },
+  "stepUp": {
+    "title": "Confirmez avec votre application d'authentification",
+    "body": "{{action}} demande un nouveau code, même dans une session admin ouverte.",
+    "invalid": "Ce code n'est pas valide.",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "working": "En cours…",
+    "actions": {
+      "credits": "L'ajustement de crédits",
+      "delete": "La suppression d'un compte",
+      "suspend": "La suspension d'un compte",
+      "impersonate": "L'usurpation d'un compte client"
+    }
   }
 }

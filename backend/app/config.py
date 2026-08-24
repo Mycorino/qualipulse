@@ -137,7 +137,12 @@ class Settings(BaseSettings):
     R2_JURISDICTION: str = ""  # "" (default) or "eu" / "fedramp" for region-locked buckets
 
     # Admin
-    ADMIN_SECRET_KEY: str = ""  # If empty, admin routes return 403
+    ADMIN_SECRET_KEY: str = ""  # Service key for cron endpoints (and legacy admin login while ADMIN_ALLOW_SHARED_KEY)
+    # Rollout switch: while True, the shared key still opens the human admin
+    # UI. Flip to False once every admin has an account with is_admin + 2FA
+    # (scripts/grant_admin.py); after that, humans only get in with a named
+    # account + TOTP and the key only drives Cloud Scheduler.
+    ADMIN_ALLOW_SHARED_KEY: bool = True
 
     # Sales Slack webhook — posts a message every time a new account
     # completes onboarding. Optional: if empty, notifications are skipped.
