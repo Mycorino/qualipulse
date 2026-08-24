@@ -5369,6 +5369,26 @@ export default function ProjectDetail() {
         }}
         mission={projectMission}
         nextAction={projectNextAction}
+        onRunNextAction={(a) => {
+          switch (a.actionType) {
+            case "draft_guide":
+              setTab("setup");
+              break;
+            case "create_link":
+            case "share_link":
+              setScrollToRecruit(true);
+              setTab("setup");
+              break;
+            case "run_analysis":
+            case "refresh_analysis":
+            case "review_themes":
+            case "refine_analysis":
+              setTab("analysis");
+              break;
+            default:
+              setTab("overview");
+          }
+        }}
         nudges={nudges}
         onDismissNudge={(nid) => {
           dismissNudge(nid);
