@@ -494,6 +494,9 @@
     "errorBody": "We couldn't reach the live interviewer. Check your connection and try again.",
     "retry": "Try again",
     "recordingNotice": "This conversation is recorded and transcribed for the research team.",
-    "fallback": "Continue without live voice"
+    "fallback": "Continue without live voice",
+    "pauseMic": "Pause, I need a moment",
+    "resume": "I'm ready, resume",
+    "pausedState": "Paused. Take all the time you need."
   }
 }

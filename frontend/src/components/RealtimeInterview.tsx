@@ -64,6 +64,11 @@ export default function RealtimeInterview({
   const [questionIndex, setQuestionIndex] = useState<number>(0);
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Participant-controlled mic pause: the audio track is disabled, so VAD
+  // hears silence, nothing commits, and there is no pressure to answer.
+  // The parallel session recording shares the same track and goes silent
+  // with it, which is the honest thing to record.
+  const [micPaused, setMicPaused] = useState(false);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -75,6 +80,14 @@ export default function RealtimeInterview({
   const finishedRef = useRef(false);
   const speakingRef = useRef(false);
   const setupSeqRef = useRef(0);
+
+  const toggleMicPause = useCallback(() => {
+    setMicPaused((prev) => {
+      const next = !prev;
+      micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = !next; });
+      return next;
+    });
+  }, []);
 
   const teardown = useCallback(() => {
     try { recorderRef.current?.state !== "inactive" && recorderRef.current?.stop(); } catch { /* already stopped */ }
@@ -265,7 +278,9 @@ export default function RealtimeInterview({
       ? t("realtime.connecting")
       : connState === "ending"
         ? t("realtime.wrappingUp")
-        : voiceState === "speaking"
+        : micPaused
+          ? t("realtime.pausedState")
+          : voiceState === "speaking"
           ? t("realtime.speaking")
           : voiceState === "listening"
             ? t("realtime.listening")
@@ -319,7 +334,7 @@ export default function RealtimeInterview({
           </p>
         )}
         <div
-          className={`realtime-orb realtime-orb--${connState === "connecting" ? "connecting" : voiceState}`}
+          className={`realtime-orb realtime-orb--${connState === "connecting" ? "connecting" : micPaused ? "paused" : voiceState}`}
           aria-hidden="true"
         />
         <p className="realtime-state" role="status" aria-live="polite">
@@ -327,6 +342,16 @@ export default function RealtimeInterview({
         </p>
         {caption && connState !== "connecting" && (
           <p className="realtime-caption">{caption}</p>
+        )}
+        {connState === "live" && (
+          <button
+            className={micPaused ? "btn btn-primary" : "btn btn-secondary"}
+            style={{ minHeight: 44, minWidth: 220 }}
+            onClick={toggleMicPause}
+            aria-pressed={micPaused}
+          >
+            {micPaused ? t("realtime.resume") : t("realtime.pauseMic")}
+          </button>
         )}
         <p className="realtime-recording-notice">{t("realtime.recordingNotice")}</p>
       </div>

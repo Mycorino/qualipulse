@@ -46,7 +46,7 @@ MIN_SESSION_MINUTES = 20.0
 # participant to resume before treating the answer as finished. Realtime VAD
 # commits on ~0.5-1s pauses; a thinking pause mid-answer is longer than that
 # but shorter than this.
-ANSWER_DRAIN_SECONDS = 1.2
+ANSWER_DRAIN_SECONDS = 2.0
 # If speech restarts inside the drain window, wait at most this long for its
 # transcription before advancing with what we have.
 ANSWER_CONTINUATION_TIMEOUT = 20.0
@@ -94,6 +94,23 @@ def build_session_config(project, participant, language: str | None) -> dict:
     lang2 = (language or "")[:2]
     if lang2:
         transcription["language"] = lang2
+    if settings.REALTIME_VAD_TYPE == "server_vad":
+        turn_detection = {
+            "type": "server_vad",
+            "create_response": False,
+            "interrupt_response": True,
+            "silence_duration_ms": settings.REALTIME_VAD_SILENCE_MS,
+        }
+    else:
+        # semantic_vad holds the turn open while a sentence sounds
+        # unfinished; low eagerness biases further toward letting the
+        # participant think out loud without being cut off.
+        turn_detection = {
+            "type": "semantic_vad",
+            "eagerness": settings.REALTIME_VAD_EAGERNESS,
+            "create_response": False,
+            "interrupt_response": True,
+        }
     return {
         "type": "realtime",
         "model": settings.REALTIME_MODEL,
@@ -101,12 +118,7 @@ def build_session_config(project, participant, language: str | None) -> dict:
         "audio": {
             "input": {
                 "transcription": transcription,
-                "turn_detection": {
-                    "type": "server_vad",
-                    "create_response": False,
-                    "interrupt_response": True,
-                    "silence_duration_ms": 800,
-                },
+                "turn_detection": turn_detection,
             },
             "output": {"voice": settings.REALTIME_VOICE},
         },
