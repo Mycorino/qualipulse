@@ -267,6 +267,7 @@
     "title": "Quick mic check",
     "desc": "Say anything to test your microphone before we begin.",
     "descClear": "Say a few words out loud, just so we know your mic is working.",
+    "recheckNotice": "We couldn't hear your last answer, so let's check your microphone. Your interview will continue right where it left off.",
     "autoPass": "Sounds great, you're ready",
     "speakPrompt": "Speak to see your mic level…",
     "speakPromptClear": "Waiting for your voice…",
@@ -466,5 +467,18 @@
     "tooLong": "That recording is too long to send. Please record a shorter answer.",
     "interruptedHidden": "Recording stopped because the screen turned off. Listen back to what we caught, or record again.",
     "interruptedDevice": "Your microphone stopped mid-answer. Listen back to what we caught, or record again."
+  },
+  "handoff": {
+    "button": "Continue on another device",
+    "desc": "Scan this QR code with your phone, or copy the link and open it on another device. Your interview continues right where it left off.",
+    "loading": "Preparing your link…",
+    "error": "We couldn't create the link. Please try again.",
+    "retry": "Try again",
+    "qrAlt": "QR code to continue this interview on another device",
+    "copy": "Copy link",
+    "copied": "Link copied",
+    "share": "Send the link",
+    "expires": "This link works for 30 minutes and is just for you.",
+    "claimExpired": "This continue link has expired. Please create a new one on the device where you started the interview."
   }
 }

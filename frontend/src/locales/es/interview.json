@@ -267,6 +267,7 @@
     "title": "Prueba rápida del micrófono",
     "desc": "Di cualquier cosa para probar tu micrófono antes de empezar.",
     "descClear": "Di unas palabras en voz alta, solo para comprobar que tu micrófono funciona.",
+    "recheckNotice": "No pudimos oír tu última respuesta, así que vamos a comprobar tu micrófono. Tu entrevista continuará justo donde la dejaste.",
     "autoPass": "Suena genial, estás listo",
     "speakPrompt": "Habla para ver el nivel de tu micrófono…",
     "speakPromptClear": "Esperando tu voz…",
@@ -466,5 +467,18 @@
     "tooLong": "La grabación es demasiado larga para enviarla. Graba una respuesta más corta.",
     "interruptedHidden": "La grabación se detuvo porque la pantalla se apagó. Escucha lo que captamos, o graba de nuevo.",
     "interruptedDevice": "Tu micrófono se detuvo a mitad de la respuesta. Escucha lo que captamos, o graba de nuevo."
+  },
+  "handoff": {
+    "button": "Continuar en otro dispositivo",
+    "desc": "Escanea este código QR con tu móvil, o copia el enlace y ábrelo en otro dispositivo. Tu entrevista continuará justo donde la dejaste.",
+    "loading": "Preparando tu enlace…",
+    "error": "No pudimos crear el enlace. Inténtalo de nuevo.",
+    "retry": "Reintentar",
+    "qrAlt": "Código QR para continuar esta entrevista en otro dispositivo",
+    "copy": "Copiar enlace",
+    "copied": "Enlace copiado",
+    "share": "Enviar el enlace",
+    "expires": "Este enlace funciona durante 30 minutos y es solo para ti.",
+    "claimExpired": "Este enlace para continuar ha caducado. Crea uno nuevo en el dispositivo donde empezaste la entrevista."
   }
 }

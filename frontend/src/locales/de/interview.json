@@ -267,6 +267,7 @@
     "title": "Kurzer Mikrofon-Check",
     "desc": "Sagen Sie irgendetwas, um Ihr Mikrofon zu testen, bevor wir beginnen.",
     "descClear": "Sagen Sie ein paar Worte laut, nur damit wir wissen, dass Ihr Mikrofon funktioniert.",
+    "recheckNotice": "Wir konnten Ihre letzte Antwort nicht hören, prüfen wir also kurz Ihr Mikrofon. Ihr Interview geht danach genau dort weiter, wo es aufgehört hat.",
     "autoPass": "Klingt super, Sie sind bereit",
     "speakPrompt": "Sprechen Sie, um Ihren Mikrofonpegel zu sehen…",
     "speakPromptClear": "Wir warten auf Ihre Stimme…",
@@ -466,5 +467,18 @@
     "tooLong": "Die Aufnahme ist zu lang zum Senden. Bitte nehmen Sie eine kürzere Antwort auf.",
     "interruptedHidden": "Die Aufnahme wurde gestoppt, weil sich der Bildschirm ausgeschaltet hat. Hören Sie sich an, was wir haben, oder nehmen Sie neu auf.",
     "interruptedDevice": "Ihr Mikrofon hat mitten in der Antwort gestoppt. Hören Sie sich an, was wir haben, oder nehmen Sie neu auf."
+  },
+  "handoff": {
+    "button": "Auf einem anderen Gerät fortsetzen",
+    "desc": "Scannen Sie diesen QR-Code mit Ihrem Handy oder kopieren Sie den Link und öffnen Sie ihn auf einem anderen Gerät. Ihr Interview geht genau dort weiter, wo es aufgehört hat.",
+    "loading": "Ihr Link wird vorbereitet…",
+    "error": "Der Link konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    "retry": "Erneut versuchen",
+    "qrAlt": "QR-Code, um dieses Interview auf einem anderen Gerät fortzusetzen",
+    "copy": "Link kopieren",
+    "copied": "Link kopiert",
+    "share": "Link senden",
+    "expires": "Dieser Link ist 30 Minuten gültig und nur für Sie bestimmt.",
+    "claimExpired": "Dieser Fortsetzungslink ist abgelaufen. Bitte erstellen Sie auf dem Gerät, auf dem Sie das Interview begonnen haben, einen neuen."
   }
 }

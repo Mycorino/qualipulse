@@ -397,6 +397,90 @@ def test_whisper_hallucination_raises(db_session, monkeypatch):
     assert pending.response_transcript is None
 
 
+@pytest.mark.parametrize("transcript", ["...", "… … … … …", ". . .", "-", "…"])
+def test_punctuation_only_transcript_raises(db_session, monkeypatch, transcript):
+    """Whisper renders muted-mic clips as dots-only filler, not empty strings.
+
+    Regression: a participant with a dead mic got '...' saved as an answer
+    on every turn and the interviewer rolled through the whole guide.
+    """
+    participant = _seed(db_session)
+    _patch_io(monkeypatch, transcript=transcript)
+
+    with pytest.raises(EmptyTranscriptError):
+        process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    pending = sorted(participant.turns, key=lambda t: t.turn_index)[-1]
+    assert pending.response_transcript is None
+
+
+def _patch_io_with_segments(monkeypatch, transcript, segments, decision=None):
+    _patch_io(monkeypatch, transcript=transcript, decision=decision)
+    monkeypatch.setattr(
+        interview_engine,
+        "transcribe_audio",
+        lambda data, filename, language=None, prompt=None: (transcript, 12.0, segments),
+    )
+
+
+def test_all_segments_no_speech_raises(db_session, monkeypatch):
+    """Whisper's own no_speech_prob catches hallucinations the phrase list misses."""
+    participant = _seed(db_session)
+    _patch_io_with_segments(
+        monkeypatch,
+        "Sottotitoli a cura di QTSS",  # novel hallucination, not in the phrase list
+        [{"start": 0.0, "end": 4.0, "text": "Sottotitoli a cura di QTSS", "no_speech_prob": 0.97}],
+    )
+
+    with pytest.raises(EmptyTranscriptError):
+        process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+
+def test_long_answer_with_high_no_speech_prob_is_kept(db_session, monkeypatch):
+    """The no_speech guard only applies to short clips: a real answer survives."""
+    participant = _seed(db_session)
+    long_answer = (
+        "Well I usually start my day by going through the reservations that came in "
+        "overnight and checking which rooms need attention before the morning rush."
+    )
+    _patch_io_with_segments(
+        monkeypatch,
+        long_answer,
+        [{"start": 0.0, "end": 10.0, "text": long_answer, "no_speech_prob": 0.99}],
+        decision={"action": "follow_up", "question": "What happens after that?"},
+    )
+
+    result = process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    assert result["is_complete"] is False
+    assert result["transcript"] == long_answer
+
+
+def test_segments_without_no_speech_prob_are_not_flagged(db_session, monkeypatch):
+    """Pre-upgrade segment shape (no no_speech_prob key) must never trip the guard."""
+    participant = _seed(db_session)
+    _patch_io_with_segments(
+        monkeypatch,
+        "Short but real answer",
+        [{"start": 0.0, "end": 2.0, "text": "Short but real answer"}],
+        decision={"action": "follow_up", "question": "Tell me more?"},
+    )
+
+    result = process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+
+    assert result["transcript"] == "Short but real answer"
+
+
+def test_typed_punctuation_only_answer_raises(db_session, monkeypatch):
+    participant = _seed(db_session)
+    _patch_io(monkeypatch)
+
+    with pytest.raises(EmptyTranscriptError):
+        process_interview_turn(
+            participant.id, None, None, db_session, transcript_override="..."
+        )
+
+
 # ── pacing clock ────────────────────────────────────────────────────────────
 
 def test_a_long_break_does_not_consume_the_time_budget(db_session):

@@ -261,6 +261,34 @@ export async function getResumeSummary(token: string, participantId: string): Pr
   return data;
 }
 
+export interface HandoffCreate {
+  handoff_token: string;
+  expires_in_seconds: number;
+}
+
+export interface HandoffClaim {
+  participant_id: string;
+  last_question: string | null;
+  turn_count: number;
+  question_index: number;
+  email: string | null;
+  session_token: string | null;
+}
+
+/** Mint a continue-on-another-device token for an in-progress interview. */
+export async function createHandoff(token: string, participantId: string): Promise<HandoffCreate> {
+  const { data } = await client.post<HandoffCreate>(`/interview/${token}/${participantId}/handoff`);
+  return data;
+}
+
+/** Adopt an in-progress interview on this device via a handoff token. */
+export async function claimHandoff(token: string, handoffToken: string): Promise<HandoffClaim> {
+  const { data } = await client.post<HandoffClaim>(`/interview/${token}/handoff/claim`, {
+    handoff_token: handoffToken,
+  });
+  return data;
+}
+
 export async function skipQuestion(
   token: string,
   participantId: string,

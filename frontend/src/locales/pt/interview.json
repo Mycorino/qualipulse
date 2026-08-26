@@ -267,6 +267,7 @@
     "title": "Teste rápido do microfone",
     "desc": "Diga qualquer coisa para testar o seu microfone antes de começarmos.",
     "descClear": "Diga algumas palavras em voz alta, só para sabermos que o seu microfone está a funcionar.",
+    "recheckNotice": "Não conseguimos ouvir a sua última resposta, por isso vamos verificar o seu microfone. A sua entrevista continuará exatamente onde parou.",
     "autoPass": "Soa muito bem, está tudo a postos",
     "speakPrompt": "Fale para ver o nível do seu microfone…",
     "speakPromptClear": "À espera da sua voz…",
@@ -466,5 +467,18 @@
     "tooLong": "A gravação é demasiado longa para enviar. Grave uma resposta mais curta.",
     "interruptedHidden": "A gravação parou porque o ecrã se desligou. Ouça o que captámos, ou grave de novo.",
     "interruptedDevice": "O seu microfone parou a meio da resposta. Ouça o que captámos, ou grave de novo."
+  },
+  "handoff": {
+    "button": "Continuar noutro dispositivo",
+    "desc": "Leia este código QR com o seu telemóvel, ou copie a ligação e abra-a noutro dispositivo. A sua entrevista continuará exatamente onde parou.",
+    "loading": "A preparar a sua ligação…",
+    "error": "Não foi possível criar a ligação. Tente novamente.",
+    "retry": "Tentar novamente",
+    "qrAlt": "Código QR para continuar esta entrevista noutro dispositivo",
+    "copy": "Copiar ligação",
+    "copied": "Ligação copiada",
+    "share": "Enviar a ligação",
+    "expires": "Esta ligação é válida durante 30 minutos e destina-se apenas a si.",
+    "claimExpired": "Esta ligação para continuar expirou. Crie uma nova no dispositivo onde começou a entrevista."
   }
 }

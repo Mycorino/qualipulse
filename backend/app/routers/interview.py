@@ -193,6 +193,32 @@ class VerifyCodeRequest(BaseModel):
     code: str
 
 
+# Device-handoff tokens: short-lived so a QR code screenshot or a link pasted
+# into the wrong chat doesn't stay live. Long enough to fetch a second device
+# and scan without rushing.
+HANDOFF_TOKEN_EXPIRE_MINUTES = 30
+
+
+class HandoffCreateResponse(BaseModel):
+    handoff_token: str
+    expires_in_seconds: int
+
+
+class HandoffClaimRequest(BaseModel):
+    handoff_token: str
+
+
+class HandoffClaimResponse(BaseModel):
+    participant_id: str
+    last_question: str | None = None
+    turn_count: int = 0
+    question_index: int = 0
+    email: str | None = None
+    # Minted when the participant has an email on file, so email-based
+    # flows (later resume, reminders) keep working from the new device.
+    session_token: str | None = None
+
+
 class VerificationRequest(BaseModel):
     email: str
     # Participant-chosen UI/interview language for the magic-link email copy.
@@ -275,6 +301,31 @@ def _decode_session_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "participant_session" or not payload.get("verified"):
+            return None
+        return payload
+    except JWTError:
+        return None
+
+
+def _create_handoff_token(participant_id: str, link_token: str) -> str:
+    """Signed continue-on-another-device token, bound to one in-progress
+    interview. Possession-scoped: it is only ever displayed on the screen of
+    the device already holding the interview session, so anyone who has it
+    could already drive the interview via the participant_id it carries."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=HANDOFF_TOKEN_EXPIRE_MINUTES)
+    payload = {
+        "pid": participant_id,
+        "link_token": link_token,
+        "exp": expire,
+        "type": "participant_handoff",
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _decode_handoff_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "participant_handoff":
             return None
         return payload
     except JWTError:
@@ -818,6 +869,74 @@ def check_resume_by_email(
         last_question=last_turn.question_text if last_turn else None,
         turn_count=len(turns),
         question_index=last_turn.question_index or 0 if last_turn else 0,
+    )
+
+
+@router.post("/{token}/{participant_id}/handoff", response_model=HandoffCreateResponse)
+@limiter.limit("10/minute")
+def create_device_handoff(
+    request: Request,
+    token: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+):
+    """Mint a continue-on-another-device token for an in-progress interview.
+
+    Shown as a QR code / copyable link on the current device (typically after
+    a mic failure) so the participant can pick the interview up on a phone or
+    another computer. Works for participants with no email on file, which the
+    email-based resume flow cannot.
+    """
+    link = _get_active_link_or_404(token, db)
+    participant = _get_participant_or_404(participant_id, link, db)
+    if participant.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Interview is already completed",
+        )
+    return HandoffCreateResponse(
+        handoff_token=_create_handoff_token(participant.id, token),
+        expires_in_seconds=HANDOFF_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+@router.post("/{token}/handoff/claim", response_model=HandoffClaimResponse)
+@limiter.limit("30/minute")
+def claim_device_handoff(
+    request: Request,
+    token: str,
+    body: HandoffClaimRequest,
+    db: Session = Depends(get_db),
+):
+    """Adopt an in-progress interview on a new device via a handoff token."""
+    link = _get_active_link_or_404(token, db)
+    payload = _decode_handoff_token(body.handoff_token)
+    if payload is None or payload.get("link_token") != token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "handoff_invalid", "message": "This link has expired. Please create a new one on the original device."},
+        )
+    participant = (
+        db.query(Participant)
+        .filter(Participant.id == payload.get("pid"), Participant.link_id == link.id)
+        .first()
+    )
+    if participant is None or participant.status != "in_progress":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "handoff_invalid", "message": "This interview is no longer in progress."},
+        )
+    turns = sorted(participant.turns, key=lambda t: t.turn_index)
+    last_turn = turns[-1] if turns else None
+    return HandoffClaimResponse(
+        participant_id=participant.id,
+        last_question=last_turn.question_text if last_turn else None,
+        turn_count=len(turns),
+        question_index=(last_turn.question_index or 0) if last_turn else 0,
+        email=participant.email,
+        session_token=(
+            _create_session_token(participant.email, token) if participant.email else None
+        ),
     )
 
 

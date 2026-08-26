@@ -1238,8 +1238,10 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Live time remaining countdown with warning/critical colour states
 - [x] Mic permission error UI with refresh prompt
 - [x] Mute TTS button
-- [x] Skip question (backend + UI button)
+- [x] No question skipping: the participant-facing Skip button was removed (market-research requirement: every question must be answered; the typed-answer fallback covers broken mics). The backend `/skip` endpoint remains but nothing calls it.
 - [x] Mic test with AudioContext level meter (auto-pass on speech, manual skip)
+- [x] Mic failure guardrails: the recorder watches the input level for the whole take and a flat-line (muted/wrong-device) take is rejected on-device and routes the participant back to the mic test with an explanatory banner (interview resumes on the same question); a second consecutive server-side `empty_transcript` rejection does the same. Server-side, the silence guard also rejects punctuation-only transcripts ("...") and short answers whose Whisper segments all carry `no_speech_prob ≥ 0.85` (segments now include `no_speech_prob`).
+- [x] Continue on another device: from the mic re-test screen (and the mic-permission-denied panel) the participant can mint a 30-min signed handoff token (`POST /interview/{token}/{pid}/handoff`), shown as a QR code + copy/share link (`components/DeviceHandoff.tsx`, `qrcode` npm lib, no external calls). Opening `/i/{token}?handoff=<jwt>` on the new device claims it (`POST /interview/{token}/handoff/claim`), adopts the in-progress interview (same question, clock resynced), runs the mic prompt + test there, and mints a participant session token when an email is on file. Works for email-less participants, which email-based resume cannot. Tests: `backend/tests/test_interview_handoff.py`.
 - [x] Re-record before submitting (preview state with Submit / ↺ Re-record)
 - [x] Retry on network error (blob preserved in lastBlobRef, resubmit without re-recording)
 - [x] TTS "done" signal gates record button (disabled during playback)
@@ -1446,6 +1448,8 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | POST | `/interview/{token}/screen` | 30/min | Check disqualification |
 | POST | `/interview/{token}/resume` | 60/min | Check for in-progress interview. **Requires the magic-link `session_token`** whose email matches — a bare email match no longer returns a participant_id (hijack fix) |
 | GET | `/interview/{token}/{pid}/resume-summary` | — | Covered topics + elapsed time |
+| POST | `/interview/{token}/{pid}/handoff` | 10/min | Mint a 30-min continue-on-another-device token (QR/link) |
+| POST | `/interview/{token}/handoff/claim` | 30/min | Adopt the in-progress interview on a new device |
 | POST | `/interview/{token}/start` | 30/min | Create participant + first question |
 | POST | `/interview/{token}/{pid}/respond` | 30/min | Submit audio OR typed `text` (exactly one), get next question. Gated by the daily spend ceiling (2x grace in-flight) |
 | POST | `/interview/{token}/{pid}/skip` | — | Skip current question |

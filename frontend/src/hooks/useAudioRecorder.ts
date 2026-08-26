@@ -25,6 +25,12 @@ function getFileExtension(mimeType: string): string {
  *  so NO English prose ever leaves this hook. */
 export const RECORDING_TOO_SHORT = "RECORDING_TOO_SHORT";
 export const NO_ACTIVE_RECORDING = "NO_ACTIVE_RECORDING";
+export const SILENT_RECORDING = "SILENT_RECORDING";
+
+/** Peak level (0-255 frequency-bin average) below which a whole take is
+ *  treated as a dead mic. A muted or OS-misrouted input stays at exactly 0;
+ *  even faint ambient room noise clears this, so quiet speakers are safe. */
+const SILENT_PEAK_THRESHOLD = 2;
 
 /** Why a recording stopped without the participant tapping stop. */
 export type RecordingInterruptReason = "hidden" | "device" | "error";
@@ -53,6 +59,9 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
   const rejectRef = useRef<((err: Error) => void) | null>(null);
   const interruptReasonRef = useRef<RecordingInterruptReason | null>(null);
   const wakeLockRef = useRef<WakeLockLike | null>(null);
+  const levelCtxRef = useRef<AudioContext | null>(null);
+  const levelTimerRef = useRef<number | null>(null);
+  const peakLevelRef = useRef(0);
   // Keep the latest callback without re-creating startRecording.
   const onInterruptedRef = useRef(options.onInterrupted);
   onInterruptedRef.current = options.onInterrupted;
@@ -75,6 +84,44 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
     }
   }, []);
 
+  /** Watch the input level for the whole take so a dead mic (muted, wrong
+   *  OS input device) is caught on-device instead of after a Whisper round
+   *  trip. Best-effort: any AudioContext failure leaves the peak at
+   *  Infinity so detection fails open and never blocks a real answer. */
+  const startLevelMeter = useCallback((stream: MediaStream) => {
+    peakLevelRef.current = Infinity;
+    try {
+      const AC =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AC();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      levelCtxRef.current = ctx;
+      peakLevelRef.current = 0;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      // setInterval, not rAF: rAF is throttled when the tab loses focus.
+      levelTimerRef.current = window.setInterval(() => {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        if (avg > peakLevelRef.current) peakLevelRef.current = avg;
+      }, 150);
+    } catch {
+      /* no meter: peak stays Infinity, take is never flagged silent */
+    }
+  }, []);
+
+  const stopLevelMeter = useCallback((): number => {
+    if (levelTimerRef.current !== null) {
+      window.clearInterval(levelTimerRef.current);
+      levelTimerRef.current = null;
+    }
+    levelCtxRef.current?.close().catch(() => {});
+    levelCtxRef.current = null;
+    return peakLevelRef.current;
+  }, []);
+
   /** Stop on the recorder's behalf; onstop routes the partial take to
    *  onInterrupted because nobody is awaiting stopRecording(). */
   const interrupt = useCallback((reason: RecordingInterruptReason) => {
@@ -88,9 +135,10 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       recorder.stream.getTracks().forEach((t) => t.stop());
       setIsRecording(false);
       releaseWakeLock();
+      stopLevelMeter();
       onInterruptedRef.current?.(null, reason);
     }
-  }, [releaseWakeLock]);
+  }, [releaseWakeLock, stopLevelMeter]);
 
   // Screen off / app switched on mobile: the OS usually suspends the mic, so
   // the take would silently go blank. Stop cleanly and keep what we have.
@@ -103,8 +151,11 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [isRecording, interrupt]);
 
-  // Never leave the wake lock held past unmount.
-  useEffect(() => () => releaseWakeLock(), [releaseWakeLock]);
+  // Never leave the wake lock or level meter held past unmount.
+  useEffect(() => () => {
+    releaseWakeLock();
+    stopLevelMeter();
+  }, [releaseWakeLock, stopLevelMeter]);
 
   const startRecording = useCallback(async () => {
     setError(null);
@@ -136,6 +187,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
         recorder.stream.getTracks().forEach((t) => t.stop());
         setIsRecording(false);
         releaseWakeLock();
+        const peakLevel = stopLevelMeter();
 
         const mimeType = mimeTypeRef.current || "audio/webm";
         const ext = getFileExtension(mimeType);
@@ -153,6 +205,10 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
 
         if (!named) {
           rejectRef.current?.(new Error(RECORDING_TOO_SHORT));
+        } else if (peakLevel < SILENT_PEAK_THRESHOLD) {
+          // The mic delivered a flat line for the whole take: nothing to
+          // transcribe. The consumer routes this back to the mic test.
+          rejectRef.current?.(new Error(SILENT_RECORDING));
         } else {
           resolveRef.current?.(named);
         }
@@ -162,6 +218,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       };
 
       mediaRecorderRef.current = recorder;
+      startLevelMeter(stream);
       recorder.start(250); // timeslice: fire ondataavailable every 250ms
       setIsRecording(true);
       void requestWakeLock();
@@ -181,7 +238,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       }
       setError(code);
     }
-  }, [interrupt, releaseWakeLock, requestWakeLock]);
+  }, [interrupt, releaseWakeLock, requestWakeLock, startLevelMeter, stopLevelMeter]);
 
   const stopRecording = useCallback((): Promise<Blob> => {
     return new Promise((resolve, reject) => {

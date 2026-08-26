@@ -11,7 +11,7 @@ import {
   submitAudio,
   checkResume,
   getResumeSummary,
-  skipQuestion,
+  claimHandoff,
   finishInterview,
   getTurnAudio,
   requestVerification,
@@ -29,8 +29,10 @@ import {
 import {
   useAudioRecorder,
   RECORDING_TOO_SHORT,
+  SILENT_RECORDING,
   RecordingInterruptReason,
 } from "../hooks/useAudioRecorder";
+import DeviceHandoff from "../components/DeviceHandoff";
 import LanguagePicker from "../components/LanguagePicker";
 import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/ParticipantQuestionnaire";
 import PanelEnrichment from "../components/PanelEnrichment";
@@ -308,6 +310,13 @@ export default function Interview() {
   const recordingStartTimeRef = useRef<number | null>(null);
   const MAX_RECORDING_SECONDS = 240;
   const [micTestDone, setMicTestDone] = useState(false);
+  // A mid-interview mic failure (flat-line take, or repeated "we didn't hear
+  // you" server rejections) sends the participant back to the mic test with
+  // an explanatory banner; the interview resumes on the same question.
+  const [micRecheck, setMicRecheck] = useState(false);
+  const emptyStreakRef = useRef(0);
+  // An expired/invalid ?handoff= claim: shown once on the landing screen.
+  const [handoffClaimError, setHandoffClaimError] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const micStreamRef = useRef<MediaStream | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -330,8 +339,6 @@ export default function Interview() {
   const [whyEmailOpen, setWhyEmailOpen] = useState(false);
   const [screeningErrorKind, setScreeningErrorKind] = useState<"network" | "server" | "ratelimit" | null>(null);
   const [screeningRetryCount, setScreeningRetryCount] = useState(0);
-  const [skipBtnReady, setSkipBtnReady] = useState(false);
-  const skipBtnTimerRef = useRef<number | null>(null);
   const beepFiredRef = useRef(false);
   const [showFutureStudies, setShowFutureStudies] = useState(false);
 
@@ -428,6 +435,55 @@ export default function Interview() {
     // Check URL for ?session param (from InterviewVerify redirect)
     const params = new URLSearchParams(location.search);
     const sessionParam = params.get("session");
+
+    // ?handoff param: this device is adopting an in-progress interview
+    // started elsewhere (QR code / link from the "continue on another
+    // device" panel). Claim it, then drop into the normal interview flow;
+    // the mic prompt + mic test run on THIS device before recording.
+    const handoffParam = params.get("handoff");
+    if (handoffParam) {
+      (async () => {
+        try {
+          const claim = await claimHandoff(token, handoffParam);
+          if (claim.email) setEmail(claim.email);
+          if (claim.session_token) {
+            setSessionToken(claim.session_token);
+            sessionStorage.setItem(`interview_session_${token}`, claim.session_token);
+          }
+          let summary: ResumeSummary | null = null;
+          try {
+            summary = await getResumeSummary(token, claim.participant_id);
+          } catch { /* summary is best-effort; the next turn resyncs the clock */ }
+          let duration = 0;
+          try {
+            duration = (await getInterviewInfo(token)).interview_duration_minutes ?? 0;
+          } catch { /* ditto */ }
+          lockInterviewLanguage(summary?.language);
+          setParticipantId(claim.participant_id);
+          setCurrentQuestion(claim.last_question ?? "");
+          setTurnCount(claim.turn_count ?? 1);
+          setQuestionIndex(claim.question_index ?? 0);
+          setTurnIndex(null);
+          const total = duration * 60;
+          setTotalSeconds(total);
+          setElapsedSeconds(Math.min((summary?.elapsed_minutes ?? 0) * 60, total));
+          saveSession(
+            claim.participant_id,
+            claim.last_question ?? "",
+            claim.turn_count ?? 1,
+            null,
+            claim.question_index ?? 0,
+          );
+          navigate(`/i/${token}`, { replace: true });
+          setPhase("interview");
+        } catch {
+          setHandoffClaimError(true);
+          navigate(`/i/${token}`, { replace: true });
+          setPhase("email_entry");
+        }
+      })();
+      return;
+    }
 
     // Read the returning-participant meta that InterviewVerify stashed
     // alongside the session.
@@ -526,20 +582,6 @@ export default function Interview() {
     const t = setTimeout(() => setResendCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [resendCountdown]);
-
-  // ── Skip-button gating: 5s grace period after each question ──────────────
-  // Frozen while paused: the grace period is about giving the participant a
-  // moment with the question, and a paused interview isn't that moment.
-  useEffect(() => {
-    if (phase !== "interview" || paused) return;
-    setSkipBtnReady(false);
-    if (skipBtnTimerRef.current) window.clearTimeout(skipBtnTimerRef.current);
-    if (!currentQuestion) return;
-    skipBtnTimerRef.current = window.setTimeout(() => setSkipBtnReady(true), 5000);
-    return () => {
-      if (skipBtnTimerRef.current) window.clearTimeout(skipBtnTimerRef.current);
-    };
-  }, [currentQuestion, phase, paused]);
 
   // ── Live countdown during interview ──────────────────────────────────────
   // This local ticker is only a between-turns *estimate*. The server paces on
@@ -1215,6 +1257,12 @@ export default function Interview() {
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
+      if (msg === SILENT_RECORDING) {
+        // The whole take was a flat line: the mic is muted or the OS is
+        // recording from the wrong device. Re-run the mic test right away.
+        triggerMicRecheck();
+        return;
+      }
       setError(
         msg === RECORDING_TOO_SHORT
           ? t("recording.tooShort")
@@ -1329,6 +1377,7 @@ export default function Interview() {
 
     try {
       const res = await submitAudio(token!, participantId, payload, turnIndex);
+      emptyStreakRef.current = 0;
       if (isTyped) setTypedAnswer("");
       if (res.is_complete) {
         applyCompletion(res, false);
@@ -1364,7 +1413,12 @@ export default function Interview() {
           setError(t("interview.textAnswer.emptyError", {
             defaultValue: "Please write an answer before sending.",
           }));
+        } else if (emptyStreakRef.current >= 1) {
+          // Second unusable take in a row: the problem is the mic, not the
+          // room. Stop the loop and send them back to the mic test.
+          triggerMicRecheck();
         } else {
+          emptyStreakRef.current += 1;
           setPendingBlob(null);
           lastBlobRef.current = null;
           setError(t("interview.emptyTranscript", {
@@ -1400,24 +1454,19 @@ export default function Interview() {
     setTtsEnded(true);
   }
 
-  async function handleSkip() {
-    if (!token) return;
-    setProcessing(true);
+  /** The mic is demonstrably not delivering audio: stop the interview and
+   *  re-run the mic test instead of letting the participant loop on failed
+   *  takes. Interview state is untouched, so passing the test resumes on
+   *  the exact same question. */
+  function triggerMicRecheck() {
+    emptyStreakRef.current = 0;
     setPendingBlob(null);
+    lastBlobRef.current = null;
+    setError("");
     setNotice(null);
-    try {
-      const res = await skipQuestion(token, participantId, turnIndex);
-      if (res.is_complete) {
-        applyCompletion(res, false);
-      } else if (res.question_text) {
-        applyNextTurn(res, turnCount + 1);
-      }
-    } catch (err: unknown) {
-      if (handleTurnMismatch(err)) return;
-      setError(t("interview.skipError"));
-    } finally {
-      setProcessing(false);
-    }
+    setTtsEnded(true);
+    setMicRecheck(true);
+    setMicTestDone(false);
   }
 
   /** Discreet pause: stops the question audio and any in-progress take (kept
@@ -1676,6 +1725,11 @@ export default function Interview() {
             <LanguagePicker onChange={lockInterviewLanguage} />
           </div>
           <ResearcherIdentity />
+          {handoffClaimError && (
+            <div className="error-banner" role="alert" style={{ marginBottom: 16 }}>
+              {t("handoff.claimExpired")}
+            </div>
+          )}
           <h1 className="interview-project-name" style={{ marginBottom: 8, textAlign: "center" }}>{info?.project_name}</h1>
           {info?.researcher_name && (
             <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24, textAlign: "center" }} dangerouslySetInnerHTML={{ __html: t("emailEntry.studyBy", { name: info.researcher_name }) }} />
@@ -2327,6 +2381,13 @@ export default function Interview() {
             </svg>
           </div>
           <h2 className="mic-test-title">{t("micTest.title")}</h2>
+          {micRecheck && (
+            <div className="error-banner" role="alert" style={{ marginBottom: 12 }}>
+              {t("micTest.recheckNotice", {
+                defaultValue: "We couldn't hear your last answer, so let's check your microphone. Your interview will continue right where it left off.",
+              })}
+            </div>
+          )}
           <p className="mic-test-subtitle">{t("micTest.descClear")}</p>
           <div className="mic-level-wrap">
             <div className={`mic-level-bar mic-level-bar--${micState}`} style={{ width: `${micLevel}%` }} />
@@ -2363,6 +2424,11 @@ export default function Interview() {
             >
               {t("micTest.skip")}
             </button>
+            {micRecheck && participantId && (
+              /* Mid-interview mic failure: the mic on THIS device is suspect,
+                 so offer to pick the interview up on another one. */
+              <DeviceHandoff token={token!} participantId={participantId} />
+            )}
           </div>
         </div>
       </div>
@@ -2607,6 +2673,11 @@ export default function Interview() {
               >
                 {t("micTest.refresh")}
               </button>
+              {participantId && (
+                <div style={{ marginTop: 8 }}>
+                  <DeviceHandoff token={token!} participantId={participantId} />
+                </div>
+              )}
             </div>
           ) : recError && !textMode ? (
             <div className="error-banner" role="alert">
@@ -2876,18 +2947,6 @@ export default function Interview() {
               }}
             >
               {t("interview.textAnswer.toggle")}
-            </button>
-          )}
-
-          {!processing && !isRecording && !pendingBlob && !hideCounter && (
-            <button
-              className={`skip-question-btn skip-question-btn--fade${skipBtnReady ? " skip-question-btn--visible" : ""}`}
-              onClick={handleSkip}
-              aria-label={t("interview.skipQuestion")}
-              aria-hidden={!skipBtnReady}
-              tabIndex={skipBtnReady ? 0 : -1}
-            >
-              {t("interview.skipQuestion")}
             </button>
           )}
 
