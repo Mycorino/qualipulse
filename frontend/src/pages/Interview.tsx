@@ -11,6 +11,7 @@ import {
   submitAudio,
   checkResume,
   getResumeSummary,
+  claimHandoff,
   finishInterview,
   getTurnAudio,
   requestVerification,
@@ -31,6 +32,7 @@ import {
   SILENT_RECORDING,
   RecordingInterruptReason,
 } from "../hooks/useAudioRecorder";
+import DeviceHandoff from "../components/DeviceHandoff";
 import LanguagePicker from "../components/LanguagePicker";
 import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/ParticipantQuestionnaire";
 import PanelEnrichment from "../components/PanelEnrichment";
@@ -313,6 +315,8 @@ export default function Interview() {
   // an explanatory banner; the interview resumes on the same question.
   const [micRecheck, setMicRecheck] = useState(false);
   const emptyStreakRef = useRef(0);
+  // An expired/invalid ?handoff= claim: shown once on the landing screen.
+  const [handoffClaimError, setHandoffClaimError] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const micStreamRef = useRef<MediaStream | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -431,6 +435,55 @@ export default function Interview() {
     // Check URL for ?session param (from InterviewVerify redirect)
     const params = new URLSearchParams(location.search);
     const sessionParam = params.get("session");
+
+    // ?handoff param: this device is adopting an in-progress interview
+    // started elsewhere (QR code / link from the "continue on another
+    // device" panel). Claim it, then drop into the normal interview flow;
+    // the mic prompt + mic test run on THIS device before recording.
+    const handoffParam = params.get("handoff");
+    if (handoffParam) {
+      (async () => {
+        try {
+          const claim = await claimHandoff(token, handoffParam);
+          if (claim.email) setEmail(claim.email);
+          if (claim.session_token) {
+            setSessionToken(claim.session_token);
+            sessionStorage.setItem(`interview_session_${token}`, claim.session_token);
+          }
+          let summary: ResumeSummary | null = null;
+          try {
+            summary = await getResumeSummary(token, claim.participant_id);
+          } catch { /* summary is best-effort; the next turn resyncs the clock */ }
+          let duration = 0;
+          try {
+            duration = (await getInterviewInfo(token)).interview_duration_minutes ?? 0;
+          } catch { /* ditto */ }
+          lockInterviewLanguage(summary?.language);
+          setParticipantId(claim.participant_id);
+          setCurrentQuestion(claim.last_question ?? "");
+          setTurnCount(claim.turn_count ?? 1);
+          setQuestionIndex(claim.question_index ?? 0);
+          setTurnIndex(null);
+          const total = duration * 60;
+          setTotalSeconds(total);
+          setElapsedSeconds(Math.min((summary?.elapsed_minutes ?? 0) * 60, total));
+          saveSession(
+            claim.participant_id,
+            claim.last_question ?? "",
+            claim.turn_count ?? 1,
+            null,
+            claim.question_index ?? 0,
+          );
+          navigate(`/i/${token}`, { replace: true });
+          setPhase("interview");
+        } catch {
+          setHandoffClaimError(true);
+          navigate(`/i/${token}`, { replace: true });
+          setPhase("email_entry");
+        }
+      })();
+      return;
+    }
 
     // Read the returning-participant meta that InterviewVerify stashed
     // alongside the session.
@@ -1672,6 +1725,11 @@ export default function Interview() {
             <LanguagePicker onChange={lockInterviewLanguage} />
           </div>
           <ResearcherIdentity />
+          {handoffClaimError && (
+            <div className="error-banner" role="alert" style={{ marginBottom: 16 }}>
+              {t("handoff.claimExpired")}
+            </div>
+          )}
           <h1 className="interview-project-name" style={{ marginBottom: 8, textAlign: "center" }}>{info?.project_name}</h1>
           {info?.researcher_name && (
             <p style={{ fontSize: 14, color: "var(--text-secondary, #6b7280)", marginBottom: 24, textAlign: "center" }} dangerouslySetInnerHTML={{ __html: t("emailEntry.studyBy", { name: info.researcher_name }) }} />
@@ -2366,6 +2424,11 @@ export default function Interview() {
             >
               {t("micTest.skip")}
             </button>
+            {micRecheck && participantId && (
+              /* Mid-interview mic failure: the mic on THIS device is suspect,
+                 so offer to pick the interview up on another one. */
+              <DeviceHandoff token={token!} participantId={participantId} />
+            )}
           </div>
         </div>
       </div>
@@ -2610,6 +2673,11 @@ export default function Interview() {
               >
                 {t("micTest.refresh")}
               </button>
+              {participantId && (
+                <div style={{ marginTop: 8 }}>
+                  <DeviceHandoff token={token!} participantId={participantId} />
+                </div>
+              )}
             </div>
           ) : recError && !textMode ? (
             <div className="error-banner" role="alert">

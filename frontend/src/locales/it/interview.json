@@ -467,5 +467,18 @@
     "tooLong": "La registrazione è troppo lunga per essere inviata. Registri una risposta più breve.",
     "interruptedHidden": "La registrazione si è interrotta perché lo schermo si è spento. Riascolti quello che abbiamo, o registri di nuovo.",
     "interruptedDevice": "Il microfono si è interrotto a metà risposta. Riascolti quello che abbiamo, o registri di nuovo."
+  },
+  "handoff": {
+    "button": "Continua su un altro dispositivo",
+    "desc": "Scansioni questo codice QR con il telefono, oppure copi il link e lo apra su un altro dispositivo. L'intervista riprenderà esattamente da dove si era interrotta.",
+    "loading": "Preparazione del link…",
+    "error": "Non è stato possibile creare il link. Riprovi.",
+    "retry": "Riprova",
+    "qrAlt": "Codice QR per continuare questa intervista su un altro dispositivo",
+    "copy": "Copia il link",
+    "copied": "Link copiato",
+    "share": "Invia il link",
+    "expires": "Questo link è valido per 30 minuti ed è riservato a lei.",
+    "claimExpired": "Questo link di ripresa è scaduto. Ne crei uno nuovo sul dispositivo dove ha iniziato l'intervista."
   }
 }

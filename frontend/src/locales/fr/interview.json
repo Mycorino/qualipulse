@@ -467,5 +467,18 @@
     "tooLong": "Cet enregistrement est trop long pour être envoyé. Enregistrez une réponse plus courte.",
     "interruptedHidden": "L'enregistrement s'est arrêté car l'écran s'est éteint. Réécoutez ce que nous avons capté, ou réenregistrez.",
     "interruptedDevice": "Votre microphone s'est arrêté en cours de réponse. Réécoutez ce que nous avons capté, ou réenregistrez."
+  },
+  "handoff": {
+    "button": "Continuer sur un autre appareil",
+    "desc": "Scannez ce QR code avec votre téléphone, ou copiez le lien pour l'ouvrir sur un autre appareil. Votre entretien reprendra exactement là où il s'est arrêté.",
+    "loading": "Préparation de votre lien…",
+    "error": "Impossible de créer le lien. Veuillez réessayer.",
+    "retry": "Réessayer",
+    "qrAlt": "QR code pour continuer cet entretien sur un autre appareil",
+    "copy": "Copier le lien",
+    "copied": "Lien copié",
+    "share": "Envoyer le lien",
+    "expires": "Ce lien est valable 30 minutes et vous est réservé.",
+    "claimExpired": "Ce lien de reprise a expiré. Créez-en un nouveau sur l'appareil où vous avez commencé l'entretien."
   }
 }
