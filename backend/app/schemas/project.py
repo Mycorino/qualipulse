@@ -132,6 +132,10 @@ class ProjectCreate(BrandingFieldsMixin):
     # Study grounding — used by AI analysis + interview engine
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
+    # Participant-facing context blurb. Set through PATCH /settings in the UI,
+    # but PUT /projects/{id} reuses this schema and reads the field, so it has
+    # to exist here.
+    research_context: str | None = None
     questions: list[QuestionCreate] = []
     screening_questions: list[ScreeningQuestionCreate] = []
 
