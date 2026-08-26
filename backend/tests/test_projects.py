@@ -206,3 +206,177 @@ class TestCreditsAccountProjectLimit:
                 headers=auth_headers,
             )
             assert resp.status_code == 201, f"project {i} should succeed: {resp.text}"
+
+
+class TestUpdateProject:
+    """PUT /projects/{id} — the Setup tab saves one section at a time, so the
+    endpoint has to be partial by field."""
+
+    def _create(self, client, auth_headers):
+        resp = client.post(
+            "/projects/",
+            json={**PROJECT_PAYLOAD, "screening_questions": [
+                {"question": "Do you work in hospitality?", "options": ["Yes", "No"],
+                 "disqualifying_options": ["No"]},
+            ]},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        return resp.json()["id"]
+
+    def test_saving_screening_questions_succeeds(self, client, auth_headers):
+        """Regression: the handler read `body.research_context`, a field that
+        did not exist on ProjectCreate, so every PUT raised AttributeError."""
+        project_id = self._create(client, auth_headers)
+        resp = client.put(
+            f"/projects/{project_id}",
+            json={
+                "name": "Test Project",
+                "language": "en",
+                "interview_duration_minutes": 20,
+                "research_objective": None,
+                "questions": [QUESTION],
+                "screening_questions": [
+                    {"question": "Do you work in hospitality?", "options": ["Yes", "No"],
+                     "disqualifying_options": ["No"]},
+                ],
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        screening = resp.json()["screening_questions"]
+        assert len(screening) == 1
+        assert screening[0]["disqualifying_options"] == ["No"]
+
+    def test_omitted_fields_are_left_alone(self, client, auth_headers):
+        """Saving the screening section must not wipe the welcome message,
+        the language or the interview settings it never sent."""
+        project_id = self._create(client, auth_headers)
+        client.patch(
+            f"/projects/{project_id}/settings",
+            json={"warmup_enabled": False, "target_customer_description": "Hotel managers"},
+            headers=auth_headers,
+        )
+        resp = client.put(
+            f"/projects/{project_id}",
+            json={
+                "name": "Test Project",
+                "welcome_message": "Merci",
+                "questions": [QUESTION],
+                "screening_questions": [],
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+
+        # Now save only the screening section, as the Setup tab does.
+        resp = client.put(
+            f"/projects/{project_id}",
+            json={
+                "name": "Test Project",
+                "language": "en",
+                "interview_duration_minutes": 20,
+                "questions": [QUESTION],
+                "screening_questions": [
+                    {"question": "Do you work in hospitality?", "options": ["Yes", "No"],
+                     "disqualifying_options": ["No"]},
+                ],
+            },
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["welcome_message"] == "Merci"
+        assert data["target_customer_description"] == "Hotel managers"
+        assert data["warmup_enabled"] is False
+        assert data["language"] == "en"
+        assert len(data["screening_questions"]) == 1
+
+    def test_explicit_null_still_clears(self, client, auth_headers):
+        """Sending the field explicitly is still how you clear it."""
+        project_id = self._create(client, auth_headers)
+        client.put(
+            f"/projects/{project_id}",
+            json={"name": "Test Project", "welcome_message": "Merci",
+                  "questions": [QUESTION]},
+            headers=auth_headers,
+        )
+        resp = client.put(
+            f"/projects/{project_id}",
+            json={"name": "Test Project", "welcome_message": None,
+                  "questions": [QUESTION]},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["welcome_message"] is None
+
+    def test_omitting_screening_keeps_it(self, client, auth_headers):
+        """A payload with no screening_questions key must not delete them."""
+        project_id = self._create(client, auth_headers)
+        resp = client.put(
+            f"/projects/{project_id}",
+            json={"name": "Renamed", "questions": [QUESTION]},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert len(resp.json()["screening_questions"]) == 1
+        assert resp.json()["name"] == "Renamed"
+
+
+class TestPatchProjectSettings:
+    """PATCH /projects/{id}/settings — participant-facing free text has cached
+    translations that must not outlive an edit."""
+
+    def _create(self, client, auth_headers):
+        resp = client.post("/projects/", json=PROJECT_PAYLOAD, headers=auth_headers)
+        assert resp.status_code == 201, resp.text
+        return resp.json()["id"]
+
+    def _project(self, db_session, project_id):
+        from app.models.project import Project
+        db_session.expire_all()
+        return db_session.query(Project).filter(Project.id == project_id).first()
+
+    def test_rename_drops_cached_name_translations(self, client, auth_headers, db_session):
+        project_id = self._create(client, auth_headers)
+        project = self._project(db_session, project_id)
+        project.name_translations = '{"fr": "Ancien titre"}'
+        db_session.commit()
+
+        resp = client.patch(
+            f"/projects/{project_id}/settings",
+            json={"name": "New title"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert self._project(db_session, project_id).name_translations is None
+
+    def test_editing_research_context_drops_its_translations(self, client, auth_headers, db_session):
+        project_id = self._create(client, auth_headers)
+        project = self._project(db_session, project_id)
+        project.research_context = "Old context"
+        project.research_context_translations = '{"fr": "Ancien contexte"}'
+        db_session.commit()
+
+        resp = client.patch(
+            f"/projects/{project_id}/settings",
+            json={"research_context": "New context"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert self._project(db_session, project_id).research_context_translations is None
+
+    def test_unchanged_text_keeps_its_translations(self, client, auth_headers, db_session):
+        """Re-saving the same text must not throw away work already paid for."""
+        project_id = self._create(client, auth_headers)
+        project = self._project(db_session, project_id)
+        project.name_translations = '{"fr": "Titre"}'
+        db_session.commit()
+
+        resp = client.patch(
+            f"/projects/{project_id}/settings",
+            json={"name": PROJECT_PAYLOAD["name"], "warmup_enabled": False},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert self._project(db_session, project_id).name_translations == '{"fr": "Titre"}'

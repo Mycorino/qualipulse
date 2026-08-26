@@ -2015,6 +2015,9 @@ export default function ProjectDetail() {
       setProject(updated);
       setEditingObjective(false);
       setEditingWelcome(false);
+      toast(tProject("toasts.studySaved"), "success");
+    } catch {
+      toast(tProject("toasts.studySaveFailed"), "error");
     } finally {
       setSavingMeta(false);
     }
@@ -2047,6 +2050,7 @@ export default function ProjectDetail() {
       setProject(updated);
       setEditingScreening(false);
       setExpandedSQ(null);
+      toast(tProject("toasts.screeningSaved"), "success");
     } catch { toast(tProject("toasts.screeningSaveFailed"), "error"); }
     finally { setScreeningSaving(false); }
   }

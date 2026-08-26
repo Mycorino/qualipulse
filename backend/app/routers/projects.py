@@ -400,32 +400,55 @@ def update_project(
 ) -> ProjectResponse:
     project = _get_editable_project_or_404(project_id, company.id, db)
 
+    # Partial by field: only keys actually present in the request body are
+    # written. The Setup tab saves one section at a time (objective + welcome
+    # message, then screening questions), so a payload that omits
+    # `welcome_message` must leave the saved welcome message alone rather than
+    # nulling it. Same for the questions / screening_questions collections,
+    # which are replaced wholesale but only when sent.
+    sent = body.model_fields_set
+
     # Editing participant-facing free text invalidates its cached translations.
-    if (project.name or "").strip() != (body.name or "").strip():
-        project.name_translations = None
-    if (project.research_context or "").strip() != ((body.research_context or "").strip()):
-        project.research_context_translations = None
-    project.name = body.name
-    project.language = body.language
-    project.interview_duration_minutes = body.interview_duration_minutes
-    project.research_objective = body.research_objective or None
-    project.welcome_message = body.welcome_message or None
-    project.decision_to_inform = body.decision_to_inform or None
-    project.target_customer_description = body.target_customer_description or None
-    project.panel_collection_enabled = body.panel_collection_enabled
-    project.warmup_enabled = body.warmup_enabled
-    project.profile_before_interview = body.profile_before_interview
+    if "name" in sent:
+        if (project.name or "").strip() != (body.name or "").strip():
+            project.name_translations = None
+        project.name = body.name
+    if "research_context" in sent:
+        if (project.research_context or "").strip() != ((body.research_context or "").strip()):
+            project.research_context_translations = None
+        project.research_context = body.research_context or None
+
+    # `language` is nullable on the schema to mean "inherit the workspace
+    # language" at creation time; on update an absent/blank value means
+    # "leave it as it is", never "clear it".
+    if body.language:
+        project.language = body.language
+    if "interview_duration_minutes" in sent:
+        project.interview_duration_minutes = body.interview_duration_minutes
+    for field in (
+        "research_objective",
+        "welcome_message",
+        "decision_to_inform",
+        "target_customer_description",
+    ):
+        if field in sent:
+            setattr(project, field, getattr(body, field) or None)
+    for flag in ("panel_collection_enabled", "warmup_enabled", "profile_before_interview"):
+        if flag in sent:
+            setattr(project, flag, getattr(body, flag))
     if body.system_prompt is not None:
         project.system_prompt = body.system_prompt
 
     # Replace all questions and screening questions
-    for q in list(project.guide_questions):
-        db.delete(q)
-    for sq in list(project.screening_questions):
-        db.delete(sq)
+    if "questions" in sent:
+        for q in list(project.guide_questions):
+            db.delete(q)
+    if "screening_questions" in sent:
+        for sq in list(project.screening_questions):
+            db.delete(sq)
     db.flush()
 
-    for idx, q in enumerate(body.questions):
+    for idx, q in enumerate(body.questions if "questions" in sent else []):
         question = InterviewGuideQuestion(
             project_id=project.id,
             section_index=q.section_index,
@@ -438,7 +461,7 @@ def update_project(
         )
         db.add(question)
 
-    for idx, sq in enumerate(body.screening_questions):
+    for idx, sq in enumerate(body.screening_questions if "screening_questions" in sent else []):
         db.add(ScreeningQuestion(
             project_id=project.id,
             sort_order=idx,
@@ -547,7 +570,14 @@ def patch_project_settings(
 ) -> ProjectResponse:
     """Update individual project settings (e.g. panel_collection_enabled)."""
     project = _get_editable_project_or_404(project_id, company.id, db)
+    # Editing participant-facing free text invalidates its cached translations,
+    # exactly as the full PUT does — otherwise a rename here keeps showing
+    # participants the old translated study name forever.
+    retranslate = False
     if body.name is not None and body.name.strip():
+        if (project.name or "").strip() != body.name.strip():
+            project.name_translations = None
+            retranslate = True
         project.name = body.name.strip()
     if body.panel_collection_enabled is not None:
         project.panel_collection_enabled = body.panel_collection_enabled
@@ -558,6 +588,9 @@ def patch_project_settings(
     if body.research_objective is not None:
         project.research_objective = body.research_objective
     if body.research_context is not None:
+        if (project.research_context or "").strip() != body.research_context.strip():
+            project.research_context_translations = None
+            retranslate = True
         project.research_context = body.research_context
     if body.decision_to_inform is not None:
         project.decision_to_inform = body.decision_to_inform
@@ -574,6 +607,11 @@ def patch_project_settings(
     _apply_branding_fields(project, body, company, db)
     db.commit()
     db.refresh(project)
+
+    if retranslate:
+        from app.services.screening_translation import schedule_screening_translation
+        schedule_screening_translation(project.id)
+
     return _project_to_response(project)
 
 
