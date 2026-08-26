@@ -104,6 +104,15 @@ class Project(Base):
     profile_before_interview: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, server_default="0"
     )
+    # Participant conversation transport for this study:
+    #   "classic"       — record → Whisper → Claude → TTS turn loop (default)
+    #   "realtime_beta" — live voice over the OpenAI Realtime API (WebRTC),
+    #                     with Claude still making every interview decision
+    #                     through the sideband bridge in
+    #                     services/realtime_interview.py. Beta, per-study opt-in.
+    interview_mode: Mapped[str] = mapped_column(
+        String(20), default="classic", nullable=False, server_default="classic"
+    )
     # True when this project was auto-seeded by the onboarding flow as a
     # showcase/example. Demo projects are excluded from the tier project
     # count so they never block a user from creating their real first

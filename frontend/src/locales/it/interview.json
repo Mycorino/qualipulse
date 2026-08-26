@@ -480,5 +480,19 @@
     "share": "Invia il link",
     "expires": "Questo link è valido per 30 minuti ed è riservato a lei.",
     "claimExpired": "Questo link di ripresa è scaduto. Ne crei uno nuovo sul dispositivo dove ha iniziato l'intervista."
+  },
+  "realtime": {
+    "beta": "Conversazione dal vivo",
+    "connecting": "Connessione con il suo intervistatore...",
+    "live": "È in diretta. Parli quando è pronto.",
+    "listening": "La stiamo ascoltando",
+    "speaking": "Il suo intervistatore sta parlando",
+    "thinking": "Un attimo...",
+    "wrappingUp": "Stiamo concludendo...",
+    "saving": "Salvataggio della conversazione...",
+    "errorTitle": "La connessione dal vivo non è riuscita",
+    "errorBody": "Non siamo riusciti a stabilire la connessione dal vivo. Controlli la connessione e riprovi.",
+    "retry": "Riprova",
+    "recordingNotice": "Questa conversazione viene registrata e trascritta per il team di ricerca."
   }
 }

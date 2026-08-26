@@ -480,5 +480,19 @@
     "share": "Enviar a ligação",
     "expires": "Esta ligação é válida durante 30 minutos e destina-se apenas a si.",
     "claimExpired": "Esta ligação para continuar expirou. Crie uma nova no dispositivo onde começou a entrevista."
+  },
+  "realtime": {
+    "beta": "Conversa ao vivo",
+    "connecting": "A ligar ao seu entrevistador...",
+    "live": "Está em direto. Fale quando estiver pronto.",
+    "listening": "Estamos a ouvir",
+    "speaking": "O seu entrevistador está a falar",
+    "thinking": "Um momento...",
+    "wrappingUp": "A terminar...",
+    "saving": "A guardar a sua conversa...",
+    "errorTitle": "A ligação ao vivo falhou",
+    "errorBody": "Não conseguimos estabelecer a ligação ao vivo. Verifique a sua internet e tente novamente.",
+    "retry": "Tentar novamente",
+    "recordingNotice": "Esta conversa é gravada e transcrita para a equipa de investigação."
   }
 }

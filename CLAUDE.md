@@ -835,6 +835,47 @@ degrades to a useful message. The SPA sets the same participant-facing title
 + `noindex` client-side via `useHead` (browser tab, not unfurls). Tests:
 `backend/tests/test_interview_preview.py`.
 
+### Realtime interview beta (per-study opt-in)
+`projects.interview_mode` (`classic` default | `realtime_beta`, Alembic 0075,
+Setup tab toggle) switches the participant flow to a live voice conversation
+over the **OpenAI Realtime API** while keeping Claude as the interview brain:
+
+- **Transport:** the browser runs WebRTC directly to `gpt-realtime` (listens,
+  VAD turn-taking, speaks). Signaling is proxied by the backend
+  (`POST /interview/{token}/{pid}/realtime/sdp`, raw SDP in/out) so the
+  standard API key never reaches the client and we capture the call id.
+- **Sideband bridge** (`services/realtime_interview.py`): a daemon thread
+  attaches a second WebSocket to the same call
+  (`wss://api.openai.com/v1/realtime?call_id=...`). The session is configured
+  with `turn_detection.create_response: false`, so the model never answers on
+  its own: each completed input transcription is fed into
+  `process_interview_turn(transcript_override=...)` (the typed-answer code
+  path — same pacing guards, follow-up caps, close gate, final check,
+  completion, credits, side effects), and the resulting question is spoken
+  via `response.create` with "say exactly" instructions. Turn rows carry
+  transcripts but no per-turn audio and no TTS (the live model is the voice).
+- **Audio:** the Realtime API never returns raw audio, so the client records
+  the whole session in parallel (mic + assistant track mixed via WebAudio →
+  MediaRecorder) and uploads it at completion to
+  `POST /interview/{token}/{pid}/realtime/recording` →
+  `participants.session_recording_url` (transcoded to mp3, R2/local). Shown
+  in the Responses transcript view as "Full session recording"; covered by
+  GDPR deletion and the audio-retention purge.
+- **Client:** `components/RealtimeInterview.tsx`, branched from
+  `Interview.tsx` for the whole interview phase (mic test and completion /
+  questionnaire screens are shared). Captions + speaking state come from the
+  WebRTC data channel; progress + completion from polling `GET .../status`
+  (which now also returns `question_index` / `is_follow_up`).
+- **Cost/guardrails:** every `response.done` logs an `AIUsageLog` row
+  (`operation="realtime_interview"`, audio+text token rates, cache-aware
+  estimate), which keeps `INTERVIEW_DAILY_COST_LIMIT_USD` effective. A
+  session watchdog (`REALTIME_MAX_SESSION_FACTOR` × study duration, min
+  20 min) hangs up abandoned calls. `REALTIME_INTERVIEW_ENABLED=false` is
+  the global kill switch (forces classic everywhere);
+  `REALTIME_MODEL` / `REALTIME_VOICE` / `REALTIME_TRANSCRIBE_MODEL` pin the
+  models. Expect roughly 3-5x the AI cost of a classic interview.
+- Tests: `backend/tests/test_realtime_interview.py` (transport mocked).
+
 ### Claude Interview Engine
 Claude decides after each response whether to:
 - `follow_up` — ask a follow-up on the current topic
@@ -1453,7 +1494,9 @@ Append-only audit trail. `id` (uuid str), `workspace_id` (FK Company, indexed), 
 | POST | `/interview/{token}/start` | 30/min | Create participant + first question |
 | POST | `/interview/{token}/{pid}/respond` | 30/min | Submit audio OR typed `text` (exactly one), get next question. Gated by the daily spend ceiling (2x grace in-flight) |
 | POST | `/interview/{token}/{pid}/skip` | — | Skip current question |
-| GET | `/interview/{token}/{pid}/status` | — | Interview status |
+| GET | `/interview/{token}/{pid}/status` | — | Interview status (+ `question_index` / `is_follow_up` for the realtime client) |
+| POST | `/interview/{token}/{pid}/realtime/sdp` | 30/min | Realtime beta: SDP offer in, SDP answer out; spawns the sideband bridge |
+| POST | `/interview/{token}/{pid}/realtime/recording` | 30/min | Realtime beta: upload the parallel full-session recording |
 
 ### Analysis (`/projects/{id}/analysis`)
 | Method | Path | Gate | Description |

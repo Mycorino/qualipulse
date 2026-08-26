@@ -1,5 +1,9 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
+# Realtime interview beta: the sideband bridge uses websockets' sync client
+# (services/realtime_interview.py). uvicorn[standard] already pulls the lib
+# in; the floor guarantees the sync client + additional_headers API exist.
+websockets>=13,<17
 sqlalchemy==2.0.25
 alembic==1.13.1
 python-jose[cryptography]==3.3.0

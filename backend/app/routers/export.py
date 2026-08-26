@@ -317,6 +317,7 @@ def get_transcript(
             review_note=participant.review_note,
             reviewed_at=participant.reviewed_at,
             reward_sent_at=participant.reward_sent_at,
+            session_recording_url=getattr(participant, "session_recording_url", None),
         ),
         turns=[
             TranscriptTurnResponse(

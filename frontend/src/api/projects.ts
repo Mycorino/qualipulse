@@ -78,6 +78,8 @@ export interface ProjectResponse {
   /** PF-3: when true (default), engine opens with a warm-up turn before the first guide question. */
   warmup_enabled?: boolean;
   profile_before_interview?: boolean;
+  /** Participant transport: "classic" turn loop or "realtime_beta" live voice. */
+  interview_mode?: "classic" | "realtime_beta";
   is_demo?: boolean;
   /** Participant-facing identity policy: standard | branded | anonymous. */
   branding_mode?: "standard" | "branded" | "anonymous";
@@ -178,6 +180,10 @@ export interface ParticipantResponse {
   reviewed_at?: string | null;
   /** Stamped when the researcher marked the incentive as sent. */
   reward_sent_at?: string | null;
+  /** Realtime-beta interviews: the browser's full-session recording
+   *  (participant + interviewer voice mixed). Classic interviews carry
+   *  per-turn audio_recording_url on each transcript turn instead. */
+  session_recording_url?: string | null;
   /** V4 paywall — true when this participant's transcript body is
    *  hidden behind the free-preview paywall for the current
    *  workspace. List view shows a locked row; transcript endpoint
@@ -435,6 +441,7 @@ export async function patchProjectSettings(
     panel_collection_enabled?: boolean;
     warmup_enabled?: boolean;
   profile_before_interview?: boolean;
+    interview_mode?: "classic" | "realtime_beta";
     research_objective?: string;
     research_context?: string;
     interview_duration_minutes?: number;

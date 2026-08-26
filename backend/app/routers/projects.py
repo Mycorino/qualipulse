@@ -585,6 +585,8 @@ def patch_project_settings(
         project.warmup_enabled = body.warmup_enabled
     if body.profile_before_interview is not None:
         project.profile_before_interview = body.profile_before_interview
+    if body.interview_mode is not None:
+        project.interview_mode = body.interview_mode
     if body.research_objective is not None:
         project.research_objective = body.research_objective
     if body.research_context is not None:
@@ -1023,6 +1025,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
         panel_collection_enabled=getattr(project, "panel_collection_enabled", True),
         warmup_enabled=getattr(project, "warmup_enabled", True),
         profile_before_interview=getattr(project, "profile_before_interview", False),
+        interview_mode=getattr(project, "interview_mode", "classic") or "classic",
         decision_to_inform=getattr(project, "decision_to_inform", None),
         target_customer_description=getattr(project, "target_customer_description", None),
         target_participants=getattr(project, "target_participants", None),

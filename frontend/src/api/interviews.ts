@@ -20,6 +20,9 @@ export interface InterviewInfo {
   /** Identity policy + theme. In "anonymous" mode the server already
    *  stripped company_name / researcher_name / researcher_logo_url. */
   branding?: ParticipantBranding;
+  /** "realtime_beta" switches the participant flow to the live-voice
+   *  conversation (WebRTC). Anything else (or absent) is the classic loop. */
+  interview_mode?: "classic" | "realtime_beta";
 }
 
 export interface ScreeningOption {
@@ -394,6 +397,69 @@ export async function savePanelProfile(
   const { data } = await client.post<{ saved: boolean }>(
     `/interview/${linkToken}/panel-profile`,
     profile
+  );
+  return data;
+}
+
+// ── Realtime interview beta ────────────────────────────────────────────────
+
+export interface InterviewStatus {
+  participant_id: string;
+  status: "in_progress" | "completed";
+  turn_count: number;
+  last_question: string | null;
+  question_index: number | null;
+  is_follow_up: boolean;
+  language: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export async function getInterviewStatus(
+  token: string,
+  participantId: string
+): Promise<InterviewStatus> {
+  const { data } = await client.get<InterviewStatus>(
+    `/interview/${token}/${participantId}/status`
+  );
+  return data;
+}
+
+/** WebRTC signaling: POST the browser's SDP offer, get OpenAI's SDP answer.
+ *  The backend proxies the exchange and attaches its sideband bridge, so the
+ *  client never sees an API key. */
+export async function createRealtimeSession(
+  token: string,
+  participantId: string,
+  sdpOffer: string
+): Promise<string> {
+  const { data } = await client.post<string>(
+    `/interview/${token}/${participantId}/realtime/sdp`,
+    sdpOffer,
+    {
+      headers: { "Content-Type": "application/sdp" },
+      responseType: "text",
+      // Axios would JSON.parse a text body by default; keep it verbatim.
+      transformResponse: [(d) => d],
+      timeout: 30_000,
+    }
+  );
+  return data;
+}
+
+/** Upload the parallel full-session recording (mic + interviewer voice). */
+export async function uploadSessionRecording(
+  token: string,
+  participantId: string,
+  blob: Blob
+): Promise<{ session_recording_url: string }> {
+  const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("ogg") ? "ogg" : "webm";
+  const form = new FormData();
+  form.append("audio", blob, `session.${ext}`);
+  const { data } = await client.post<{ session_recording_url: string }>(
+    `/interview/${token}/${participantId}/realtime/recording`,
+    form,
+    { headers: { "Content-Type": "multipart/form-data" }, timeout: 120_000 }
   );
   return data;
 }

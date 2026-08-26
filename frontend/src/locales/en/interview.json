@@ -480,5 +480,19 @@
     "share": "Send the link",
     "expires": "This link works for 30 minutes and is just for you.",
     "claimExpired": "This continue link has expired. Please create a new one on the device where you started the interview."
+  },
+  "realtime": {
+    "beta": "Live conversation",
+    "connecting": "Connecting you to your interviewer...",
+    "live": "You're live. Speak whenever you're ready.",
+    "listening": "Listening to you",
+    "speaking": "Your interviewer is speaking",
+    "thinking": "One moment...",
+    "wrappingUp": "Wrapping up...",
+    "saving": "Saving your conversation...",
+    "errorTitle": "The live connection failed",
+    "errorBody": "We couldn't reach the live interviewer. Check your connection and try again.",
+    "retry": "Try again",
+    "recordingNotice": "This conversation is recorded and transcribed for the research team."
   }
 }

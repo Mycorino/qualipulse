@@ -480,5 +480,19 @@
     "share": "Enviar el enlace",
     "expires": "Este enlace funciona durante 30 minutos y es solo para ti.",
     "claimExpired": "Este enlace para continuar ha caducado. Crea uno nuevo en el dispositivo donde empezaste la entrevista."
+  },
+  "realtime": {
+    "beta": "Conversación en directo",
+    "connecting": "Conectando con su entrevistador...",
+    "live": "Está en directo. Hable cuando quiera.",
+    "listening": "Le escuchamos",
+    "speaking": "Su entrevistador está hablando",
+    "thinking": "Un momento...",
+    "wrappingUp": "Terminando...",
+    "saving": "Guardando su conversación...",
+    "errorTitle": "La conexión en directo ha fallado",
+    "errorBody": "No hemos podido establecer la conexión en directo. Compruebe su conexión e inténtelo de nuevo.",
+    "retry": "Reintentar",
+    "recordingNotice": "Esta conversación se graba y se transcribe para el equipo de investigación."
   }
 }
