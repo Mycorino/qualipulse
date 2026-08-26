@@ -321,3 +321,62 @@ class TestUpdateProject:
         assert resp.status_code == 200, resp.text
         assert len(resp.json()["screening_questions"]) == 1
         assert resp.json()["name"] == "Renamed"
+
+
+class TestPatchProjectSettings:
+    """PATCH /projects/{id}/settings — participant-facing free text has cached
+    translations that must not outlive an edit."""
+
+    def _create(self, client, auth_headers):
+        resp = client.post("/projects/", json=PROJECT_PAYLOAD, headers=auth_headers)
+        assert resp.status_code == 201, resp.text
+        return resp.json()["id"]
+
+    def _project(self, db_session, project_id):
+        from app.models.project import Project
+        db_session.expire_all()
+        return db_session.query(Project).filter(Project.id == project_id).first()
+
+    def test_rename_drops_cached_name_translations(self, client, auth_headers, db_session):
+        project_id = self._create(client, auth_headers)
+        project = self._project(db_session, project_id)
+        project.name_translations = '{"fr": "Ancien titre"}'
+        db_session.commit()
+
+        resp = client.patch(
+            f"/projects/{project_id}/settings",
+            json={"name": "New title"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert self._project(db_session, project_id).name_translations is None
+
+    def test_editing_research_context_drops_its_translations(self, client, auth_headers, db_session):
+        project_id = self._create(client, auth_headers)
+        project = self._project(db_session, project_id)
+        project.research_context = "Old context"
+        project.research_context_translations = '{"fr": "Ancien contexte"}'
+        db_session.commit()
+
+        resp = client.patch(
+            f"/projects/{project_id}/settings",
+            json={"research_context": "New context"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert self._project(db_session, project_id).research_context_translations is None
+
+    def test_unchanged_text_keeps_its_translations(self, client, auth_headers, db_session):
+        """Re-saving the same text must not throw away work already paid for."""
+        project_id = self._create(client, auth_headers)
+        project = self._project(db_session, project_id)
+        project.name_translations = '{"fr": "Titre"}'
+        db_session.commit()
+
+        resp = client.patch(
+            f"/projects/{project_id}/settings",
+            json={"name": PROJECT_PAYLOAD["name"], "warmup_enabled": False},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert self._project(db_session, project_id).name_translations == '{"fr": "Titre"}'

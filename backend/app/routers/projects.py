@@ -570,7 +570,14 @@ def patch_project_settings(
 ) -> ProjectResponse:
     """Update individual project settings (e.g. panel_collection_enabled)."""
     project = _get_editable_project_or_404(project_id, company.id, db)
+    # Editing participant-facing free text invalidates its cached translations,
+    # exactly as the full PUT does — otherwise a rename here keeps showing
+    # participants the old translated study name forever.
+    retranslate = False
     if body.name is not None and body.name.strip():
+        if (project.name or "").strip() != body.name.strip():
+            project.name_translations = None
+            retranslate = True
         project.name = body.name.strip()
     if body.panel_collection_enabled is not None:
         project.panel_collection_enabled = body.panel_collection_enabled
@@ -581,6 +588,9 @@ def patch_project_settings(
     if body.research_objective is not None:
         project.research_objective = body.research_objective
     if body.research_context is not None:
+        if (project.research_context or "").strip() != body.research_context.strip():
+            project.research_context_translations = None
+            retranslate = True
         project.research_context = body.research_context
     if body.decision_to_inform is not None:
         project.decision_to_inform = body.decision_to_inform
@@ -597,6 +607,11 @@ def patch_project_settings(
     _apply_branding_fields(project, body, company, db)
     db.commit()
     db.refresh(project)
+
+    if retranslate:
+        from app.services.screening_translation import schedule_screening_translation
+        schedule_screening_translation(project.id)
+
     return _project_to_response(project)
 
 
