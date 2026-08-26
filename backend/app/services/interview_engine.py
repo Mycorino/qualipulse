@@ -67,6 +67,35 @@ class EmptyTranscriptError(Exception):
     """Raised when Whisper returns no speech in the participant's recording."""
 
 
+_SILENCE_MESSAGE = (
+    "No speech detected in the recording. Please try again in a quieter environment."
+)
+
+# Whisper's own per-segment estimate that the audio is not speech. On
+# muted-mic clips it sits near 1.0 while the text is hallucinated filler.
+_NO_SPEECH_PROB_FLOOR = 0.85
+
+
+def _has_verbal_content(text: str) -> bool:
+    """True when the transcript contains at least one letter or digit.
+
+    Whisper renders many silent or muted clips as punctuation-only filler
+    ("...", "… … …", ". . .") rather than an empty string, so a bare
+    strip() check lets them through as real answers.
+    """
+    return any(ch.isalnum() for ch in text)
+
+
+def _segments_look_silent(segments: list[dict] | None) -> bool:
+    """True when Whisper marks every segment as almost certainly non-speech."""
+    if not segments:
+        return False
+    probs = [seg.get("no_speech_prob") for seg in segments]
+    if any(p is None for p in probs):
+        return False  # pre-upgrade fixture or mocked STT: no signal, no verdict
+    return all(p >= _NO_SPEECH_PROB_FLOOR for p in probs)
+
+
 INTERVIEWER_SYSTEM_PROMPT = """\
 You are a senior qualitative interviewer running a live voice interview. You speak like a \
 warm, curious peer, not a survey script and not a therapist. You are time-bounded and the \
@@ -1840,10 +1869,8 @@ def process_interview_turn(
             data, filename, language=stt_language, prompt=_stt_glossary(participant.project)
         )
 
-    if not transcript or not transcript.strip():
-        raise EmptyTranscriptError(
-            "No speech detected in the recording. Please try again in a quieter environment."
-        )
+    if not transcript or not transcript.strip() or not _has_verbal_content(transcript):
+        raise EmptyTranscriptError(_SILENCE_MESSAGE)
 
     _HALLUCINATION_PHRASES = (
         "thank you for watching", "thanks for watching", "please subscribe",
@@ -1864,9 +1891,17 @@ def process_interview_turn(
         and len(_lower_transcript.split()) <= 12
         and any(p in _lower_transcript for p in _HALLUCINATION_PHRASES)
     ):
-        raise EmptyTranscriptError(
-            "No speech detected in the recording. Please try again in a quieter environment."
-        )
+        raise EmptyTranscriptError(_SILENCE_MESSAGE)
+
+    # 1c. Whisper's own verdict. The phrase list above can only cover known
+    # hallucinations; no_speech_prob catches the novel ones. Short answers
+    # only, so a real (if quiet) long answer is never discarded.
+    if (
+        transcript_override is None
+        and len(_lower_transcript.split()) <= 12
+        and _segments_look_silent(segments)
+    ):
+        raise EmptyTranscriptError(_SILENCE_MESSAGE)
 
     if audio_url_future is not None:
         try:

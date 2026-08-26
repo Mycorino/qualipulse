@@ -267,6 +267,7 @@
     "title": "Kurzer Mikrofon-Check",
     "desc": "Sagen Sie irgendetwas, um Ihr Mikrofon zu testen, bevor wir beginnen.",
     "descClear": "Sagen Sie ein paar Worte laut, nur damit wir wissen, dass Ihr Mikrofon funktioniert.",
+    "recheckNotice": "Wir konnten Ihre letzte Antwort nicht hören, prüfen wir also kurz Ihr Mikrofon. Ihr Interview geht danach genau dort weiter, wo es aufgehört hat.",
     "autoPass": "Klingt super, Sie sind bereit",
     "speakPrompt": "Sprechen Sie, um Ihren Mikrofonpegel zu sehen…",
     "speakPromptClear": "Wir warten auf Ihre Stimme…",

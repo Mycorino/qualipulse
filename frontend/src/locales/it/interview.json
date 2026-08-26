@@ -267,6 +267,7 @@
     "title": "Rapido controllo del microfono",
     "desc": "Dica qualcosa per testare il microfono prima di iniziare.",
     "descClear": "Pronunci qualche parola ad alta voce, solo per assicurarci che il microfono funzioni.",
+    "recheckNotice": "Non abbiamo sentito la sua ultima risposta, quindi controlliamo il microfono. L'intervista riprenderà esattamente da dove si era interrotta.",
     "autoPass": "Perfetto, è tutto pronto",
     "speakPrompt": "Parli per vedere il livello del microfono…",
     "speakPromptClear": "In attesa della sua voce…",

@@ -267,6 +267,7 @@
     "title": "Teste rápido do microfone",
     "desc": "Diga qualquer coisa para testar o seu microfone antes de começarmos.",
     "descClear": "Diga algumas palavras em voz alta, só para sabermos que o seu microfone está a funcionar.",
+    "recheckNotice": "Não conseguimos ouvir a sua última resposta, por isso vamos verificar o seu microfone. A sua entrevista continuará exatamente onde parou.",
     "autoPass": "Soa muito bem, está tudo a postos",
     "speakPrompt": "Fale para ver o nível do seu microfone…",
     "speakPromptClear": "À espera da sua voz…",

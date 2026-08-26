@@ -1238,8 +1238,9 @@ gcloud builds list --region=europe-west1 --limit=5
 - [x] Live time remaining countdown with warning/critical colour states
 - [x] Mic permission error UI with refresh prompt
 - [x] Mute TTS button
-- [x] Skip question (backend + UI button)
+- [x] No question skipping: the participant-facing Skip button was removed (market-research requirement: every question must be answered; the typed-answer fallback covers broken mics). The backend `/skip` endpoint remains but nothing calls it.
 - [x] Mic test with AudioContext level meter (auto-pass on speech, manual skip)
+- [x] Mic failure guardrails: the recorder watches the input level for the whole take and a flat-line (muted/wrong-device) take is rejected on-device and routes the participant back to the mic test with an explanatory banner (interview resumes on the same question); a second consecutive server-side `empty_transcript` rejection does the same. Server-side, the silence guard also rejects punctuation-only transcripts ("...") and short answers whose Whisper segments all carry `no_speech_prob ≥ 0.85` (segments now include `no_speech_prob`).
 - [x] Re-record before submitting (preview state with Submit / ↺ Re-record)
 - [x] Retry on network error (blob preserved in lastBlobRef, resubmit without re-recording)
 - [x] TTS "done" signal gates record button (disabled during playback)

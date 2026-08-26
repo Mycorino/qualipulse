@@ -25,10 +25,12 @@ def transcribe_audio(
 
     Returns (transcript_text, duration_seconds, segments).
     Each segment is a dict with keys: start (float seconds), end (float
-    seconds), text (str). Segments power sentence-level highlighting in
-    the researcher transcript view; if Whisper returns no segments
-    (very short audio), the list is empty and the transcript still
-    renders without highlighting.
+    seconds), text (str), no_speech_prob (float 0..1, Whisper's own
+    estimate that the segment is not speech; the interview engine uses it
+    to catch muted-mic clips whose text is hallucinated filler). Segments
+    power sentence-level highlighting in the researcher transcript view;
+    if Whisper returns no segments (very short audio), the list is empty
+    and the transcript still renders without highlighting.
     """
     client = openai.OpenAI(api_key=settings.OPENAI_API_KEY, timeout=httpx.Timeout(60.0))
 
@@ -63,6 +65,7 @@ def transcribe_audio(
                 "start": float(get("start") or 0.0),
                 "end": float(get("end") or 0.0),
                 "text": str(get("text") or "").strip(),
+                "no_speech_prob": float(get("no_speech_prob") or 0.0),
             })
         except (TypeError, ValueError):
             continue

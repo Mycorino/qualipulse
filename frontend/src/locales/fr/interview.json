@@ -267,6 +267,7 @@
     "title": "Test rapide du micro",
     "desc": "Dites quelque chose pour tester votre microphone avant de commencer.",
     "descClear": "Dites quelques mots à voix haute, juste pour qu'on vérifie votre micro.",
+    "recheckNotice": "Nous n'avons pas entendu votre dernière réponse, alors vérifions votre micro. Votre entretien reprendra exactement là où il s'est arrêté.",
     "autoPass": "Parfait, c'est prêt",
     "speakPrompt": "Parlez pour voir le niveau de votre micro…",
     "speakPromptClear": "En attente de votre voix…",

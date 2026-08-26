@@ -267,6 +267,7 @@
     "title": "Prueba rápida del micrófono",
     "desc": "Di cualquier cosa para probar tu micrófono antes de empezar.",
     "descClear": "Di unas palabras en voz alta, solo para comprobar que tu micrófono funciona.",
+    "recheckNotice": "No pudimos oír tu última respuesta, así que vamos a comprobar tu micrófono. Tu entrevista continuará justo donde la dejaste.",
     "autoPass": "Suena genial, estás listo",
     "speakPrompt": "Habla para ver el nivel de tu micrófono…",
     "speakPromptClear": "Esperando tu voz…",
