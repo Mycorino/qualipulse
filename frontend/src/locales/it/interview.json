@@ -493,6 +493,7 @@
     "errorTitle": "La connessione dal vivo non è riuscita",
     "errorBody": "Non siamo riusciti a stabilire la connessione dal vivo. Controlli la connessione e riprovi.",
     "retry": "Riprova",
-    "recordingNotice": "Questa conversazione viene registrata e trascritta per il team di ricerca."
+    "recordingNotice": "Questa conversazione viene registrata e trascritta per il team di ricerca.",
+    "fallback": "Continua senza la voce dal vivo"
   }
 }

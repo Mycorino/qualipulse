@@ -493,6 +493,7 @@
     "errorTitle": "A ligação ao vivo falhou",
     "errorBody": "Não conseguimos estabelecer a ligação ao vivo. Verifique a sua internet e tente novamente.",
     "retry": "Tentar novamente",
-    "recordingNotice": "Esta conversa é gravada e transcrita para a equipa de investigação."
+    "recordingNotice": "Esta conversa é gravada e transcrita para a equipa de investigação.",
+    "fallback": "Continuar sem a voz ao vivo"
   }
 }

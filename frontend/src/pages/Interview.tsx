@@ -14,6 +14,7 @@ import {
   claimHandoff,
   finishInterview,
   getTurnAudio,
+  getInterviewStatus,
   requestVerification,
   verifyInterviewCode,
   savePanelProfile,
@@ -175,6 +176,11 @@ export default function Interview() {
   // Stable mirror of `info` for callbacks that must not re-create on load.
   const infoRef = useRef<InterviewInfo | null>(null);
   useEffect(() => { infoRef.current = info; }, [info]);
+  // Realtime beta: set when the live transport failed and the participant
+  // chose to continue in the classic flow. Sticky for the session so a
+  // flaky network doesn't bounce them between the two experiences.
+  const [realtimeFallback, setRealtimeFallback] = useState(false);
+  const realtimeFallbackRef = useRef(false);
 
   // Participant-facing head: the static index.html tags sell the product to
   // researchers. Link unfurlers never get here (nginx routes them to the
@@ -724,8 +730,9 @@ export default function Interview() {
       if (!token || !pid || turnIdx === null || turnIdx === undefined) return;
       // Realtime beta: the live model speaks; fetching deferred TTS would
       // pointlessly synthesize a server-side mp3 for a question the
-      // participant already heard.
-      if (infoRef.current?.interview_mode === "realtime_beta") return;
+      // participant already heard. After a fallback to classic, the voice
+      // comes from deferred TTS again.
+      if (infoRef.current?.interview_mode === "realtime_beta" && !realtimeFallbackRef.current) return;
       const seq = ++ttsFetchSeqRef.current;
       const startedAt = Date.now();
       let url: string | null = null;
@@ -2450,7 +2457,7 @@ export default function Interview() {
   // permission + test above still apply; completion re-joins the classic
   // questionnaire + completion screens.
 
-  if (phase === "interview" && info?.interview_mode === "realtime_beta" && participantId) {
+  if (phase === "interview" && info?.interview_mode === "realtime_beta" && participantId && !realtimeFallback) {
     return (
       <RealtimeInterview
         token={token!}
@@ -2460,6 +2467,31 @@ export default function Interview() {
         onComplete={() => {
           clearSession();
           setPhase("complete");
+        }}
+        onFallback={async () => {
+          // Continue this same interview in the classic flow, from the
+          // question currently pending server-side. /respond is
+          // mode-agnostic, so nothing else changes.
+          realtimeFallbackRef.current = true;
+          setRealtimeFallback(true);
+          try {
+            const s = await getInterviewStatus(token!, participantId);
+            const qIdx = s.question_index ?? 0;
+            const lastTurnIdx = Math.max(0, s.turn_count - 1);
+            if (s.last_question) setCurrentQuestion(s.last_question);
+            setTurnCount(s.turn_count);
+            setTurnIndex(lastTurnIdx);
+            setQuestionIndex(Math.max(0, qIdx));
+            setIsFollowUp(Boolean(s.is_follow_up));
+            setIsWarmup(qIdx < 0);
+            saveSession(participantId, s.last_question ?? currentQuestion ?? "", s.turn_count, lastTurnIdx, Math.max(0, qIdx));
+            setTtsEnded(true);
+            void fetchDeferredTts(participantId, lastTurnIdx);
+          } catch {
+            // Status fetch failed: fall back on whatever state we already
+            // hold; the first /respond will resync via turn_mismatch.
+            setTtsEnded(true);
+          }
         }}
       />
     );

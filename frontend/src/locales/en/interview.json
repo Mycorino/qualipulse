@@ -493,6 +493,7 @@
     "errorTitle": "The live connection failed",
     "errorBody": "We couldn't reach the live interviewer. Check your connection and try again.",
     "retry": "Try again",
-    "recordingNotice": "This conversation is recorded and transcribed for the research team."
+    "recordingNotice": "This conversation is recorded and transcribed for the research team.",
+    "fallback": "Continue without live voice"
   }
 }

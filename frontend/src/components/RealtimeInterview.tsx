@@ -28,6 +28,9 @@ interface RealtimeInterviewProps {
   questionCount: number;
   firstQuestion: string | null;
   onComplete: () => void;
+  /** Give up on the live transport and continue this same interview in the
+   *  classic record/submit flow, from the question currently pending. */
+  onFallback: () => void;
 }
 
 type ConnState = "connecting" | "live" | "ending" | "error";
@@ -51,6 +54,7 @@ export default function RealtimeInterview({
   questionCount,
   firstQuestion,
   onComplete,
+  onFallback,
 }: RealtimeInterviewProps) {
   const { t } = useTranslation("interview");
 
@@ -282,6 +286,20 @@ export default function RealtimeInterview({
             onClick={() => void connect()}
           >
             {t("realtime.retry")}
+          </button>
+          <button
+            className="btn btn-ghost"
+            style={{ marginTop: 12, minHeight: 44, color: "var(--text-secondary)" }}
+            onClick={() => {
+              // Stop this component's timers/streams for good, then hand the
+              // interview back to the classic flow at the pending question.
+              finishedRef.current = true;
+              setupSeqRef.current += 1;
+              teardown();
+              onFallback();
+            }}
+          >
+            {t("realtime.fallback")}
           </button>
         </div>
       </div>

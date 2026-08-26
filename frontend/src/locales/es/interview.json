@@ -493,6 +493,7 @@
     "errorTitle": "La conexión en directo ha fallado",
     "errorBody": "No hemos podido establecer la conexión en directo. Compruebe su conexión e inténtelo de nuevo.",
     "retry": "Reintentar",
-    "recordingNotice": "Esta conversación se graba y se transcribe para el equipo de investigación."
+    "recordingNotice": "Esta conversación se graba y se transcribe para el equipo de investigación.",
+    "fallback": "Continuar sin la voz en directo"
   }
 }

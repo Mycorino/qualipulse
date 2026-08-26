@@ -1596,9 +1596,14 @@ async def create_realtime_session(
         )
     _check_interview_budget(db, project.company_id, in_flight=True)
 
-    sdp_offer = (await request.body()).decode("utf-8", errors="replace").strip()
-    if not sdp_offer.startswith("v="):
+    # Do NOT strip the body: SDP requires a terminating newline after the
+    # last attribute line, and OpenAI's parser rejects an offer without one
+    # ("failed to unmarshal SDP: EOF").
+    sdp_offer = (await request.body()).decode("utf-8", errors="replace")
+    if not sdp_offer.lstrip().startswith("v="):
         raise HTTPException(status_code=422, detail="Body must be an SDP offer")
+    if not sdp_offer.endswith("\n"):
+        sdp_offer += "\r\n"
 
     language = _effective_interview_language(participant)
     session_config = build_session_config(project, participant, language)

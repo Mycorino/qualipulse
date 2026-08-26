@@ -493,6 +493,7 @@
     "errorTitle": "La connexion en direct a échoué",
     "errorBody": "Impossible de joindre l'interviewer en direct. Vérifiez votre connexion et réessayez.",
     "retry": "Réessayer",
-    "recordingNotice": "Cette conversation est enregistrée et transcrite pour l'équipe de recherche."
+    "recordingNotice": "Cette conversation est enregistrée et transcrite pour l'équipe de recherche.",
+    "fallback": "Continuer sans la voix en direct"
   }
 }
