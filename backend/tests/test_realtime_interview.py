@@ -139,6 +139,9 @@ class TestSdpEndpoint:
 
         def fake_create(sdp_offer, session_config):
             assert sdp_offer.startswith("v=0")
+            # SDP must keep/gain its terminating newline: OpenAI rejects an
+            # offer without one ("failed to unmarshal SDP: EOF").
+            assert sdp_offer.endswith("\n")
             assert session_config["model"] == settings.REALTIME_MODEL
             td = session_config["audio"]["input"]["turn_detection"]
             assert td["create_response"] is False

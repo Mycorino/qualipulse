@@ -493,6 +493,7 @@
     "errorTitle": "Die Live-Verbindung ist fehlgeschlagen",
     "errorBody": "Wir konnten die Live-Verbindung nicht aufbauen. Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
     "retry": "Erneut versuchen",
-    "recordingNotice": "Dieses Gespräch wird für das Forschungsteam aufgezeichnet und transkribiert."
+    "recordingNotice": "Dieses Gespräch wird für das Forschungsteam aufgezeichnet und transkribiert.",
+    "fallback": "Ohne Live-Stimme fortfahren"
   }
 }
