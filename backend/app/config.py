@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     REALTIME_MODEL: str = "gpt-realtime"
     REALTIME_VOICE: str = "marin"
     REALTIME_TRANSCRIBE_MODEL: str = "gpt-4o-transcribe"
+    # Turn detection. semantic_vad understands unfinished sentences, so a
+    # thinking pause mid-answer no longer commits the turn (the #1 "it cut
+    # me off" complaint from the first live sessions) and the interviewer's
+    # audio is truncated (audible as crackling) far less often. server_vad
+    # remains available as a plain silence-timer fallback.
+    REALTIME_VAD_TYPE: str = "semantic_vad"  # semantic_vad | server_vad
+    REALTIME_VAD_EAGERNESS: str = "low"  # semantic_vad: low | medium | high | auto
+    REALTIME_VAD_SILENCE_MS: int = 1000  # server_vad only
     # Hard ceiling on one realtime session's lifetime, as a multiple of the
     # study's planned duration (minimum floor applied in the service). The
     # sideband closes the call when it trips, so an abandoned tab can't hold

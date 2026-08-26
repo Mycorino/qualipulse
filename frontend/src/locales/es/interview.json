@@ -494,6 +494,9 @@
     "errorBody": "No hemos podido establecer la conexión en directo. Compruebe su conexión e inténtelo de nuevo.",
     "retry": "Reintentar",
     "recordingNotice": "Esta conversación se graba y se transcribe para el equipo de investigación.",
-    "fallback": "Continuar sin la voz en directo"
+    "fallback": "Continuar sin la voz en directo",
+    "pauseMic": "Pausa, necesito un momento",
+    "resume": "Estoy listo, seguimos",
+    "pausedState": "En pausa. Tómese el tiempo que necesite."
   }
 }

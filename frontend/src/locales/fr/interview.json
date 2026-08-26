@@ -494,6 +494,9 @@
     "errorBody": "Impossible de joindre l'interviewer en direct. Vérifiez votre connexion et réessayez.",
     "retry": "Réessayer",
     "recordingNotice": "Cette conversation est enregistrée et transcrite pour l'équipe de recherche.",
-    "fallback": "Continuer sans la voix en direct"
+    "fallback": "Continuer sans la voix en direct",
+    "pauseMic": "Pause, j'ai besoin d'un instant",
+    "resume": "Je suis prêt, on reprend",
+    "pausedState": "En pause. Prenez tout votre temps."
   }
 }

@@ -15778,3 +15778,10 @@ select.field-input {
 }
 
 .session-recording-block { margin: 4px 2px 12px; }
+
+.realtime-orb--paused {
+  background: radial-gradient(circle at 32% 30%, #d1d5db, #6b7280);
+  box-shadow: none;
+  animation: none;
+  opacity: 0.8;
+}
