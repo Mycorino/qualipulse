@@ -480,5 +480,19 @@
     "share": "Link senden",
     "expires": "Dieser Link ist 30 Minuten gültig und nur für Sie bestimmt.",
     "claimExpired": "Dieser Fortsetzungslink ist abgelaufen. Bitte erstellen Sie auf dem Gerät, auf dem Sie das Interview begonnen haben, einen neuen."
+  },
+  "realtime": {
+    "beta": "Live-Gespräch",
+    "connecting": "Verbindung mit Ihrer Interviewerin wird hergestellt...",
+    "live": "Sie sind live. Sprechen Sie, wann immer Sie bereit sind.",
+    "listening": "Wir hören Ihnen zu",
+    "speaking": "Ihre Interviewerin spricht",
+    "thinking": "Einen Moment...",
+    "wrappingUp": "Wir kommen zum Ende...",
+    "saving": "Ihr Gespräch wird gespeichert...",
+    "errorTitle": "Die Live-Verbindung ist fehlgeschlagen",
+    "errorBody": "Wir konnten die Live-Verbindung nicht aufbauen. Prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
+    "retry": "Erneut versuchen",
+    "recordingNotice": "Dieses Gespräch wird für das Forschungsteam aufgezeichnet und transkribiert."
   }
 }

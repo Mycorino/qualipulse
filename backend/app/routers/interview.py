@@ -54,7 +54,9 @@ from app.services.verification import (
 logger = logging.getLogger("auto_interview")
 
 # Operations that make up the participant interview loop's AI spend.
-_INTERVIEW_COST_OPERATIONS = ("interview_turn", "interview_warmup", "stt", "tts")
+_INTERVIEW_COST_OPERATIONS = (
+    "interview_turn", "interview_warmup", "stt", "tts", "realtime_interview",
+)
 
 # How long an in-progress interview stays resumable (measured from the last
 # answered turn). Must cover the reminder-email schedule in
@@ -781,6 +783,14 @@ def validate_link(
         # Drives whether the participant UI runs the socio-demographic
         # questionnaire before the interview or after it.
         "profile_before_interview": getattr(project, "profile_before_interview", False),
+        # "realtime_beta" switches the participant UI to the live-voice flow
+        # (WebRTC to the OpenAI Realtime API). The global kill switch forces
+        # classic for everyone, so a flipped-off beta degrades gracefully.
+        "interview_mode": (
+            getattr(project, "interview_mode", "classic")
+            if settings.REALTIME_INTERVIEW_ENABLED
+            else "classic"
+        ),
         "branding": {
             "mode": branding_mode,
             "primary_color": getattr(project, "brand_primary_color", None) if branding_mode == "branded" else None,
@@ -1516,17 +1526,130 @@ def get_interview_status(
     participant = _get_participant_or_404(participant_id, link, db)
 
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
-    last_question = turns[-1].question_text if turns else None
+    last_turn = turns[-1] if turns else None
 
     return {
         "participant_id": participant.id,
         "status": participant.status,
         "turn_count": len(turns),
-        "last_question": last_question,
+        "last_question": last_turn.question_text if last_turn else None,
+        # Progress metadata for the realtime-beta client, which has no
+        # per-turn HTTP response to read them from.
+        "question_index": last_turn.question_index if last_turn else None,
+        "is_follow_up": bool(last_turn.is_follow_up) if last_turn else False,
         "language": _effective_interview_language(participant),
         "started_at": participant.started_at.isoformat() if participant.started_at else None,
         "completed_at": participant.completed_at.isoformat() if participant.completed_at else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Realtime interview beta (projects.interview_mode == "realtime_beta")
+# ---------------------------------------------------------------------------
+
+def _get_realtime_project_or_404(link: InterviewLink):
+    """The realtime endpoints exist only for studies opted into the beta."""
+    project = link.project
+    if (
+        not settings.REALTIME_INTERVIEW_ENABLED
+        or getattr(project, "interview_mode", "classic") != "realtime_beta"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Realtime interviews are not enabled for this study",
+        )
+    return project
+
+
+@router.post("/{token}/{participant_id}/realtime/sdp")
+@limiter.limit("30/minute")
+async def create_realtime_session(
+    request: Request,
+    token: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+):
+    """WebRTC signaling for the realtime beta.
+
+    The browser POSTs its SDP offer here; we forward it to the OpenAI
+    Realtime API together with the session config (standard API key,
+    server-side only), attach the sideband bridge to the returned call id,
+    and hand the SDP answer back. Media then flows browser <-> OpenAI
+    directly; every interview decision stays on this backend.
+    """
+    from fastapi.responses import Response as PlainResponse
+
+    from app.services.realtime_interview import (
+        RealtimeCallError,
+        build_session_config,
+        create_realtime_call,
+        spawn_sideband,
+    )
+
+    link = _get_active_link_or_404(token, db)
+    project = _get_realtime_project_or_404(link)
+    participant = _get_participant_or_404(participant_id, link, db)
+    if participant.status == "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This interview is already completed",
+        )
+    _check_interview_budget(db, project.company_id, in_flight=True)
+
+    sdp_offer = (await request.body()).decode("utf-8", errors="replace").strip()
+    if not sdp_offer.startswith("v="):
+        raise HTTPException(status_code=422, detail="Body must be an SDP offer")
+
+    language = _effective_interview_language(participant)
+    session_config = build_session_config(project, participant, language)
+    total_minutes = project.interview_duration_minutes
+    try:
+        answer_sdp, call_id = await run_in_threadpool(
+            create_realtime_call, sdp_offer, session_config
+        )
+    except RealtimeCallError:
+        logger.exception("realtime call creation failed for participant %s", participant_id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "realtime_unavailable", "message": "Live voice is unavailable right now."},
+        )
+    spawn_sideband(call_id, participant.id, total_minutes)
+    return PlainResponse(content=answer_sdp, media_type="application/sdp")
+
+
+@router.post("/{token}/{participant_id}/realtime/recording")
+@limiter.limit("30/minute")
+async def upload_realtime_recording(
+    request: Request,
+    token: str,
+    participant_id: str,
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Store the browser's parallel full-session recording (realtime beta).
+
+    The Realtime API never returns raw audio, so the client records the
+    conversation itself (mic + interviewer voice mixed) and uploads it here,
+    at completion or when the tab is closed. Re-uploads overwrite: the last,
+    longest capture wins.
+    """
+    link = _get_active_link_or_404(token, db)
+    _get_realtime_project_or_404(link)
+    participant = _get_participant_or_404(participant_id, link, db)
+
+    from app.services.realtime_interview import store_session_recording
+
+    data = await audio.read()
+    if not data or len(data) < 500:
+        raise HTTPException(status_code=422, detail="Recording is empty")
+    if len(data) > settings.MAX_AUDIO_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Recording too large. Max size is {settings.MAX_AUDIO_SIZE_MB}MB.",
+        )
+    ext = os.path.splitext(audio.filename or "")[1].lower() or ".webm"
+    url = await run_in_threadpool(store_session_recording, participant, data, ext, db)
+    return {"session_recording_url": url}
 
 
 # ---------------------------------------------------------------------------

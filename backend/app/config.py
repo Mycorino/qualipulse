@@ -39,6 +39,22 @@ class Settings(BaseSettings):
     TTS_MODEL: str = "gpt-4o-mini-tts"
     TTS_VOICE: str = "coral"
 
+    # Realtime interview beta (per-study opt-in via projects.interview_mode).
+    # The browser talks WebRTC to the OpenAI Realtime API for voice; Claude
+    # still makes every interview decision through the sideband bridge in
+    # services/realtime_interview.py. REALTIME_INTERVIEW_ENABLED is the
+    # global kill switch: off, every study behaves as classic regardless of
+    # its interview_mode flag.
+    REALTIME_INTERVIEW_ENABLED: bool = True
+    REALTIME_MODEL: str = "gpt-realtime"
+    REALTIME_VOICE: str = "marin"
+    REALTIME_TRANSCRIBE_MODEL: str = "gpt-4o-transcribe"
+    # Hard ceiling on one realtime session's lifetime, as a multiple of the
+    # study's planned duration (minimum floor applied in the service). The
+    # sideband closes the call when it trips, so an abandoned tab can't hold
+    # a priced OpenAI session open for hours.
+    REALTIME_MAX_SESSION_FACTOR: float = 2.0
+
     # Claude model IDs — single source of truth (see services/ai_models.py).
     # Blank => use the pinned default in ai_models.py. Set these to swap a model
     # in production without a code deploy (e.g. when Anthropic retires one).

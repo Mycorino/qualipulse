@@ -416,7 +416,12 @@
     "brandingUpgradeDismiss": "Plus tard",
     "incentiveLabel": "Récompense participant (optionnel)",
     "incentivePlaceholder": "ex. bon d'achat Amazon de 20 €, envoyé sous 7 jours après validation",
-    "incentiveHint": "Affiché aux participants sur l'écran de consentement, mot pour mot. Définir une récompense active la validation : chaque entretien terminé attend votre accord avant de compter, et les participants validés apparaissent dans une liste de récompenses à payer. Qualipulse ne gère jamais l'argent."
+    "incentiveHint": "Affiché aux participants sur l'écran de consentement, mot pour mot. Définir une récompense active la validation : chaque entretien terminé attend votre accord avant de compter, et les participants validés apparaissent dans une liste de récompenses à payer. Qualipulse ne gère jamais l'argent.",
+    "realtimeLabel": "Conversation vocale en direct",
+    "realtimeBeta": "Bêta",
+    "realtimeHelp": "Les participants parlent avec l'interviewer en temps réel au lieu d'enregistrer réponse par réponse. Même guide d'entretien, même rythme, même analyse ; la conversation complète est enregistrée et transcrite. S'applique aux entretiens démarrés après le changement.",
+    "realtimeOnSaved": "Voix en direct activée pour les nouveaux entretiens",
+    "realtimeOffSaved": "Retour au déroulé classique"
   },
   "responses": {
     "title": "Réponses",
@@ -555,7 +560,9 @@
       "markAllDone": "{{count}} récompenses marquées envoyées.",
       "noneToReview": "Rien à valider. Les nouveaux entretiens terminés apparaîtront ici.",
       "noneToReward": "Aucune récompense en attente. Validez des entretiens pour constituer la liste de paiement."
-    }
+    },
+    "sessionRecording": "Enregistrement complet de la session (entretien en direct)",
+    "sessionRecordingLabel": "Enregistrement complet de la session"
   },
   "transcript": {
     "title": "Transcription",

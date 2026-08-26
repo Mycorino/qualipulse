@@ -1,0 +1,317 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  createRealtimeSession,
+  getInterviewStatus,
+  uploadSessionRecording,
+} from "../api/interviews";
+
+/**
+ * Realtime voice interview (beta).
+ *
+ * The browser talks WebRTC directly to the OpenAI Realtime API: the model
+ * listens, detects turns and speaks, while the backend's sideband bridge
+ * runs the actual interview logic (Claude decisions, pacing, completion).
+ * This component owns three client-side jobs:
+ *
+ * 1. Signaling: SDP offer -> backend proxy -> SDP answer.
+ * 2. The parallel session recording: the Realtime API never returns raw
+ *    audio, so we mix the mic + the interviewer's voice through a
+ *    WebAudio graph into one MediaRecorder and upload the file at the end.
+ * 3. Progress: the data channel gives live captions and speaking state;
+ *    a light poll of /status gives question progress and completion.
+ */
+
+interface RealtimeInterviewProps {
+  token: string;
+  participantId: string;
+  questionCount: number;
+  firstQuestion: string | null;
+  onComplete: () => void;
+}
+
+type ConnState = "connecting" | "live" | "ending" | "error";
+type VoiceState = "idle" | "speaking" | "listening" | "thinking";
+
+const RECORDER_MIME_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/ogg;codecs=opus",
+];
+
+// How long we keep waiting for the goodbye line to finish playing after the
+// backend marks the interview completed, before wrapping up anyway.
+const ENDING_GRACE_MS = 25_000;
+const STATUS_POLL_MS = 3_500;
+
+export default function RealtimeInterview({
+  token,
+  participantId,
+  questionCount,
+  firstQuestion,
+  onComplete,
+}: RealtimeInterviewProps) {
+  const { t } = useTranslation("interview");
+
+  const [connState, setConnState] = useState<ConnState>("connecting");
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const [caption, setCaption] = useState<string | null>(firstQuestion);
+  const [questionIndex, setQuestionIndex] = useState<number>(0);
+  const [isFollowUp, setIsFollowUp] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const captionRef = useRef("");
+  const finishedRef = useRef(false);
+  const speakingRef = useRef(false);
+  const setupSeqRef = useRef(0);
+
+  const teardown = useCallback(() => {
+    try { recorderRef.current?.state !== "inactive" && recorderRef.current?.stop(); } catch { /* already stopped */ }
+    recorderRef.current = null;
+    try { pcRef.current?.close(); } catch { /* already closed */ }
+    pcRef.current = null;
+    micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+    micStreamRef.current = null;
+    void audioCtxRef.current?.close().catch(() => undefined);
+    audioCtxRef.current = null;
+  }, []);
+
+  const startRecorder = useCallback((mic: MediaStream, remote: MediaStream) => {
+    try {
+      const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new Ctx();
+      audioCtxRef.current = ctx;
+      const dest = ctx.createMediaStreamDestination();
+      ctx.createMediaStreamSource(mic).connect(dest);
+      ctx.createMediaStreamSource(remote).connect(dest);
+      const mime = RECORDER_MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m));
+      const recorder = new MediaRecorder(dest.stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.start(3000);
+      recorderRef.current = recorder;
+    } catch {
+      // Recording is a research artefact, never a participant blocker: the
+      // interview continues audio-less on our side (transcripts still land
+      // server-side through the realtime transcription events).
+    }
+  }, []);
+
+  const finishUp = useCallback(async () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    setConnState("ending");
+    setUploading(true);
+    const recorder = recorderRef.current;
+    const blob: Blob | null = await new Promise((resolve) => {
+      if (!recorder || recorder.state === "inactive") {
+        resolve(chunksRef.current.length ? new Blob(chunksRef.current, { type: chunksRef.current[0].type }) : null);
+        return;
+      }
+      recorder.onstop = () => {
+        resolve(chunksRef.current.length ? new Blob(chunksRef.current, { type: chunksRef.current[0].type }) : null);
+      };
+      try { recorder.stop(); } catch { resolve(null); }
+    });
+    teardown();
+    if (blob && blob.size > 500) {
+      try {
+        await uploadSessionRecording(token, participantId, blob);
+      } catch {
+        // Best-effort: losing the recording never blocks the completion screen.
+      }
+    }
+    setUploading(false);
+    onComplete();
+  }, [onComplete, participantId, teardown, token]);
+
+  const handleDataChannelEvent = useCallback((raw: string) => {
+    let event: { type?: string; delta?: string } | null = null;
+    try { event = JSON.parse(raw); } catch { return; }
+    if (!event || typeof event.type !== "string") return;
+    switch (event.type) {
+      case "response.output_audio_transcript.delta":
+        if (typeof event.delta === "string") {
+          if (!speakingRef.current) captionRef.current = "";
+          speakingRef.current = true;
+          captionRef.current += event.delta;
+          setCaption(captionRef.current);
+          setVoiceState("speaking");
+        }
+        break;
+      case "response.done":
+        speakingRef.current = false;
+        setVoiceState("idle");
+        break;
+      case "input_audio_buffer.speech_started":
+        setVoiceState("listening");
+        break;
+      case "input_audio_buffer.speech_stopped":
+        setVoiceState("thinking");
+        break;
+      default:
+        break;
+    }
+  }, []);
+
+  const connect = useCallback(async () => {
+    const seq = ++setupSeqRef.current;
+    setConnState("connecting");
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (seq !== setupSeqRef.current) { mic.getTracks().forEach((tr) => tr.stop()); return; }
+      micStreamRef.current = mic;
+
+      const pc = new RTCPeerConnection();
+      pcRef.current = pc;
+      pc.addTrack(mic.getAudioTracks()[0], mic);
+      pc.ontrack = (e) => {
+        const remote = e.streams[0];
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remote;
+          void remoteAudioRef.current.play().catch(() => undefined);
+        }
+        startRecorder(mic, remote);
+      };
+      const dc = pc.createDataChannel("oai-events");
+      dc.onmessage = (e) => handleDataChannelEvent(String(e.data));
+      pc.onconnectionstatechange = () => {
+        if (finishedRef.current) return;
+        if (pc.connectionState === "connected") setConnState("live");
+        if (pc.connectionState === "failed") setConnState("error");
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      // Wait briefly for ICE gathering so the offer carries our candidates
+      // (the exchange is non-trickle: one POST, one answer).
+      await new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === "complete") { resolve(); return; }
+        const timer = setTimeout(resolve, 1500);
+        pc.onicegatheringstatechange = () => {
+          if (pc.iceGatheringState === "complete") { clearTimeout(timer); resolve(); }
+        };
+      });
+      const sdp = pc.localDescription?.sdp;
+      if (!sdp) throw new Error("no local SDP");
+      const answer = await createRealtimeSession(token, participantId, sdp);
+      if (seq !== setupSeqRef.current) return;
+      await pc.setRemoteDescription({ type: "answer", sdp: answer });
+    } catch {
+      if (seq === setupSeqRef.current && !finishedRef.current) {
+        teardown();
+        setConnState("error");
+      }
+    }
+  }, [handleDataChannelEvent, participantId, startRecorder, teardown, token]);
+
+  // Connect once on mount; tear everything down on unmount.
+  useEffect(() => {
+    void connect();
+    return () => {
+      setupSeqRef.current += 1;
+      teardown();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Progress + completion polling. The backend flips the participant to
+  // "completed" the moment Claude's closing turn is persisted; we then let
+  // the goodbye finish playing before stopping the recorder and uploading.
+  useEffect(() => {
+    if (connState === "error") return;
+    const timer = setInterval(async () => {
+      if (finishedRef.current) return;
+      try {
+        const status = await getInterviewStatus(token, participantId);
+        if (typeof status.question_index === "number" && status.question_index >= 0) {
+          setQuestionIndex(status.question_index);
+        }
+        setIsFollowUp(Boolean(status.is_follow_up));
+        if (status.status === "completed") {
+          clearInterval(timer);
+          const startedWaiting = Date.now();
+          const waitForGoodbye = setInterval(() => {
+            if (!speakingRef.current || Date.now() - startedWaiting > ENDING_GRACE_MS) {
+              clearInterval(waitForGoodbye);
+              // Small tail so the last audio frames land in the recording.
+              setTimeout(() => void finishUp(), 800);
+            }
+          }, 500);
+        }
+      } catch {
+        // Transient poll failures are fine; the next tick retries.
+      }
+    }, STATUS_POLL_MS);
+    return () => clearInterval(timer);
+  }, [connState, finishUp, participantId, token]);
+
+  const hideCounter = questionIndex < 0 || questionCount <= 0;
+  const stateLine =
+    connState === "connecting"
+      ? t("realtime.connecting")
+      : connState === "ending"
+        ? t("realtime.wrappingUp")
+        : voiceState === "speaking"
+          ? t("realtime.speaking")
+          : voiceState === "listening"
+            ? t("realtime.listening")
+            : voiceState === "thinking"
+              ? t("realtime.thinking")
+              : t("realtime.live");
+
+  if (connState === "error") {
+    return (
+      <div className="interview-page">
+        <div className="interview-container mic-test-card">
+          <div className="mic-prompt-icon"><span aria-hidden="true">📡</span></div>
+          <h2 className="mic-test-title">{t("realtime.errorTitle")}</h2>
+          <p className="mic-test-subtitle">{t("realtime.errorBody")}</p>
+          <button
+            className="btn btn-primary"
+            style={{ minHeight: 48, minWidth: 200 }}
+            onClick={() => void connect()}
+          >
+            {t("realtime.retry")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="interview-page">
+      <div className="interview-container interview-active realtime-live">
+        <audio ref={remoteAudioRef} autoPlay style={{ display: "none" }} />
+        <div className="realtime-beta-badge">{t("realtime.beta")}</div>
+        {!hideCounter && (
+          <p className="interview-progress">
+            {isFollowUp
+              ? t("interview.followUpLabel", { current: questionIndex + 1, total: questionCount })
+              : t("interview.progressLabel", { current: questionIndex + 1, total: questionCount })}
+          </p>
+        )}
+        <div
+          className={`realtime-orb realtime-orb--${connState === "connecting" ? "connecting" : voiceState}`}
+          aria-hidden="true"
+        />
+        <p className="realtime-state" role="status" aria-live="polite">
+          {uploading ? t("realtime.saving") : stateLine}
+        </p>
+        {caption && connState !== "connecting" && (
+          <p className="realtime-caption">{caption}</p>
+        )}
+        <p className="realtime-recording-notice">{t("realtime.recordingNotice")}</p>
+      </div>
+    </div>
+  );
+}

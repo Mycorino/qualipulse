@@ -34,6 +34,7 @@ import {
 } from "../hooks/useAudioRecorder";
 import DeviceHandoff from "../components/DeviceHandoff";
 import LanguagePicker from "../components/LanguagePicker";
+import RealtimeInterview from "../components/RealtimeInterview";
 import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/ParticipantQuestionnaire";
 import PanelEnrichment from "../components/PanelEnrichment";
 import { SUPPORTED_LANGUAGES } from "../i18n";
@@ -171,6 +172,9 @@ export default function Interview() {
   const [info, setInfo] = useState<InterviewInfo | null>(null);
   const [infoLoading, setInfoLoading] = useState(true);
   const [error, setError] = useState("");
+  // Stable mirror of `info` for callbacks that must not re-create on load.
+  const infoRef = useRef<InterviewInfo | null>(null);
+  useEffect(() => { infoRef.current = info; }, [info]);
 
   // Participant-facing head: the static index.html tags sell the product to
   // researchers. Link unfurlers never get here (nginx routes them to the
@@ -718,6 +722,10 @@ export default function Interview() {
   const fetchDeferredTts = useCallback(
     async (pid: string, turnIdx: number | null | undefined) => {
       if (!token || !pid || turnIdx === null || turnIdx === undefined) return;
+      // Realtime beta: the live model speaks; fetching deferred TTS would
+      // pointlessly synthesize a server-side mp3 for a question the
+      // participant already heard.
+      if (infoRef.current?.interview_mode === "realtime_beta") return;
       const seq = ++ttsFetchSeqRef.current;
       const startedAt = Date.now();
       let url: string | null = null;
@@ -2432,6 +2440,28 @@ export default function Interview() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // ── Realtime voice interview (beta) ──────────────────────────────────────
+  // Whole-conversation WebRTC flow: the live model listens and speaks while
+  // the backend sideband runs the interview logic. Replaces the classic
+  // record/submit UI (and its pause screen) for opted-in studies. Mic
+  // permission + test above still apply; completion re-joins the classic
+  // questionnaire + completion screens.
+
+  if (phase === "interview" && info?.interview_mode === "realtime_beta" && participantId) {
+    return (
+      <RealtimeInterview
+        token={token!}
+        participantId={participantId}
+        questionCount={info.question_count ?? 0}
+        firstQuestion={currentQuestion}
+        onComplete={() => {
+          clearSession();
+          setPhase("complete");
+        }}
+      />
     );
   }
 

@@ -573,9 +573,25 @@ def run_retention_purge(
         .all()
     )
 
-    participant_ids = {t.participant_id for t in turns}
+    # Realtime-beta full-session recordings age out under the same policy.
+    session_participants = (
+        db.query(Participant)
+        .filter(
+            Participant.status == "completed",
+            Participant.completed_at.isnot(None),
+            Participant.completed_at < cutoff,
+            Participant.session_recording_url.isnot(None),
+        )
+        .all()
+    )
+
+    participant_ids = {t.participant_id for t in turns} | {p.id for p in session_participants}
     files_deleted = 0
     if not dry_run:
+        for p in session_participants:
+            if delete_audio_by_url(p.session_recording_url):
+                files_deleted += 1
+            p.session_recording_url = None
         for turn in turns:
             if turn.audio_recording_url:
                 if delete_audio_by_url(turn.audio_recording_url):

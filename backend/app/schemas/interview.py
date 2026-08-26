@@ -138,6 +138,10 @@ class ParticipantResponse(BaseModel):
     # as failed. Distinct from quality_label, which is heuristic-backed and
     # therefore always present even when no assessment ever succeeded.
     quality_status: str | None = None
+    # Realtime-beta interviews: the browser's full-session capture
+    # (participant + interviewer voice mixed). Classic interviews use the
+    # per-turn audio_recording_url instead and leave this None.
+    session_recording_url: str | None = None
     key_takeaways: list[str] | None = None
     notable_quotes: list[str] | None = None
     avg_response_words: float | None = None

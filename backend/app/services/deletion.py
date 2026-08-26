@@ -105,6 +105,21 @@ def _delete_interview_graph(
     if not participant_ids:
         return counts
 
+    # Realtime-beta interviews store one full-session recording on the
+    # participant instead of per-turn clips; it is personal data like any
+    # other recording and goes with the same erasure.
+    if delete_files:
+        session_urls = [
+            row[0]
+            for row in db.query(Participant.session_recording_url)
+            .filter(
+                Participant.id.in_(participant_ids),
+                Participant.session_recording_url.isnot(None),
+            )
+            .all()
+        ]
+        counts["audio_files"] += _delete_turn_audio(session_urls)
+
     turn_ids = [
         row[0]
         for row in db.query(InterviewTurn.id)
@@ -120,7 +135,7 @@ def _delete_interview_graph(
         )
         counts["turns"] = result.rowcount or 0
         if delete_files:
-            counts["audio_files"] = _delete_turn_audio(audio_urls)
+            counts["audio_files"] += _delete_turn_audio(audio_urls)
 
     # AIUsageLog.participant_id is ON DELETE SET NULL on Postgres; mirror it
     # explicitly so SQLite dev behaves identically. Rows stay (cost audit).

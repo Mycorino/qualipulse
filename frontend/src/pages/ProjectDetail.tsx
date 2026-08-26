@@ -2826,6 +2826,43 @@ export default function ProjectDetail() {
                   </span>
                 </div>
               </label>
+              <label className="setting-toggle-row" htmlFor="realtime-mode-toggle">
+                <input
+                  id="realtime-mode-toggle"
+                  type="checkbox"
+                  checked={project.interview_mode === "realtime_beta"}
+                  onChange={async (e) => {
+                    const next = e.target.checked ? "realtime_beta" : "classic";
+                    try {
+                      const updated = await patchProjectSettings(project.id, { interview_mode: next });
+                      setProject(updated);
+                      toast(
+                        tProject(next === "realtime_beta" ? "setup.realtimeOnSaved" : "setup.realtimeOffSaved", {
+                          defaultValue:
+                            next === "realtime_beta"
+                              ? "Live voice enabled for new interviews"
+                              : "Back to the classic interview flow",
+                        }),
+                        "success"
+                      );
+                    } catch {
+                      toast(tProject("setup.warmupSaveError", { defaultValue: "Couldn't save. Please try again." }), "error");
+                    }
+                  }}
+                />
+                <div className="setting-toggle-row__copy">
+                  <strong>
+                    {tProject("setup.realtimeLabel", { defaultValue: "Live voice conversation" })}{" "}
+                    <span className="badge-beta">{tProject("setup.realtimeBeta", { defaultValue: "Beta" })}</span>
+                  </strong>
+                  <span className="muted-text" style={{ fontSize: 12 }}>
+                    {tProject("setup.realtimeHelp", {
+                      defaultValue:
+                        "Participants talk with the interviewer in real time instead of recording answer by answer. Same interview guide, pacing and analysis; the full conversation is recorded and transcribed. Applies to interviews started after the change.",
+                    })}
+                  </span>
+                </div>
+              </label>
             </section>
 
             {/* Interview plan — length + sample-size target. The Research
@@ -3658,6 +3695,20 @@ export default function ProjectDetail() {
                       <p className="muted-text" style={{ fontSize: 13, margin: "10px 2px 0" }}>
                         🎧 {tProject("responses.demoNoAudio")}
                       </p>
+                    )}
+
+                    {/* Realtime-beta interviews: one full-session recording
+                        instead of per-turn clips. */}
+                    {selectedParticipant.session_recording_url && (
+                      <div className="session-recording-block">
+                        <p className="muted-text" style={{ fontSize: 13, margin: "10px 2px 6px" }}>
+                          🎙 {tProject("responses.sessionRecording", { defaultValue: "Full session recording (live voice interview)" })}
+                        </p>
+                        <AudioClip
+                          src={selectedParticipant.session_recording_url}
+                          label={tProject("responses.sessionRecordingLabel", { defaultValue: "Full session recording" })}
+                        />
+                      </div>
                     )}
 
                     {/* Two-column: transcript left, tools right */}

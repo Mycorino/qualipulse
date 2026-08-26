@@ -113,6 +113,11 @@ class Participant(Base):
     # Stamped when the researcher marks the incentive as sent. We track the
     # promise, we never move money.
     reward_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Realtime-beta interviews: URL of the full-session recording the browser
+    # captured in parallel with the WebRTC call (participant + interviewer
+    # voice mixed, mp3 in R2). Classic interviews keep per-turn
+    # InterviewTurn.audio_recording_url instead and leave this NULL.
+    session_recording_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     quality_label: Mapped[str | None] = mapped_column(String(20), nullable=True)
     quality_summary: Mapped[str | None] = mapped_column(Text, nullable=True)

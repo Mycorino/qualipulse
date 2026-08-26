@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator
 
 BRANDING_MODES = {"standard", "branded", "anonymous"}
+INTERVIEW_MODES = {"classic", "realtime_beta"}
 # Curated font-stack keys — resolved to CSS stacks client-side so the
 # participant page never loads external fonts.
 BRAND_FONTS = {"system", "humanist", "serif", "elegant"}
@@ -145,6 +146,17 @@ class ProjectSettingsPatch(BrandingFieldsMixin):
     panel_collection_enabled: bool | None = None
     warmup_enabled: bool | None = None
     profile_before_interview: bool | None = None
+    # Participant transport: "classic" (turn-based) or "realtime_beta"
+    # (live voice over the OpenAI Realtime API, Claude still deciding).
+    interview_mode: str | None = None
+
+    @field_validator("interview_mode")
+    @classmethod
+    def _validate_interview_mode(cls, v: str | None) -> str | None:
+        if v is not None and v not in INTERVIEW_MODES:
+            raise ValueError(f"interview_mode must be one of {sorted(INTERVIEW_MODES)}")
+        return v
+
     # How long each interview should run and how many we're aiming to
     # collect. The Research Copilot recommends + sets these so it can own
     # interview-round setup ("let's do 1h in-depth interviews, ~10 people").
@@ -205,6 +217,7 @@ class ProjectResponse(BaseModel):
     panel_collection_enabled: bool = True
     warmup_enabled: bool = True
     profile_before_interview: bool = False
+    interview_mode: str = "classic"
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
     target_participants: int | None = None

@@ -480,5 +480,19 @@
     "share": "Envoyer le lien",
     "expires": "Ce lien est valable 30 minutes et vous est réservé.",
     "claimExpired": "Ce lien de reprise a expiré. Créez-en un nouveau sur l'appareil où vous avez commencé l'entretien."
+  },
+  "realtime": {
+    "beta": "Conversation en direct",
+    "connecting": "Connexion avec votre interviewer...",
+    "live": "Vous êtes en direct. Parlez quand vous êtes prêt.",
+    "listening": "On vous écoute",
+    "speaking": "Votre interviewer parle",
+    "thinking": "Un instant...",
+    "wrappingUp": "On termine...",
+    "saving": "Enregistrement de votre conversation...",
+    "errorTitle": "La connexion en direct a échoué",
+    "errorBody": "Impossible de joindre l'interviewer en direct. Vérifiez votre connexion et réessayez.",
+    "retry": "Réessayer",
+    "recordingNotice": "Cette conversation est enregistrée et transcrite pour l'équipe de recherche."
   }
 }

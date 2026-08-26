@@ -416,7 +416,12 @@
     "brandingUpgradeDismiss": "Not now",
     "incentiveLabel": "Participant incentive (optional)",
     "incentivePlaceholder": "e.g. €20 Amazon voucher, sent within 7 days of approval",
-    "incentiveHint": "Shown to participants on the consent screen, word for word. Setting an incentive turns on review: each completed interview waits for your approval before it counts, and approved participants appear in a reward list for you to pay. Qualipulse never handles the money."
+    "incentiveHint": "Shown to participants on the consent screen, word for word. Setting an incentive turns on review: each completed interview waits for your approval before it counts, and approved participants appear in a reward list for you to pay. Qualipulse never handles the money.",
+    "realtimeLabel": "Live voice conversation",
+    "realtimeBeta": "Beta",
+    "realtimeHelp": "Participants talk with the interviewer in real time instead of recording answer by answer. Same interview guide, pacing and analysis; the full conversation is recorded and transcribed. Applies to interviews started after the change.",
+    "realtimeOnSaved": "Live voice enabled for new interviews",
+    "realtimeOffSaved": "Back to the classic interview flow"
   },
   "responses": {
     "title": "Responses",
@@ -555,7 +560,9 @@
       "markAllDone": "{{count}} rewards marked as sent.",
       "noneToReview": "Nothing to review. New completed interviews will appear here.",
       "noneToReward": "No rewards pending. Approve interviews to build the payout list."
-    }
+    },
+    "sessionRecording": "Full session recording (live voice interview)",
+    "sessionRecordingLabel": "Full session recording"
   },
   "transcript": {
     "title": "Transcript",
