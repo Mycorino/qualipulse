@@ -80,6 +80,9 @@ export interface ProjectResponse {
   profile_before_interview?: boolean;
   /** Participant transport: "classic" turn loop or "realtime_beta" live voice. */
   interview_mode?: "classic" | "realtime_beta";
+  /** Workspace opted into beta features (Account settings). Read-only —
+   *  gates whether the Setup tab offers beta controls at all. */
+  beta_features_enabled?: boolean;
   is_demo?: boolean;
   /** Participant-facing identity policy: standard | branded | anonymous. */
   branding_mode?: "standard" | "branded" | "anonymous";

@@ -2826,6 +2826,10 @@ export default function ProjectDetail() {
                   </span>
                 </div>
               </label>
+              {/* Beta transport, shown only to workspaces that opted into
+                  beta features in Account settings (the backend refuses the
+                  patch otherwise, so this is not the only guard). */}
+              {project.beta_features_enabled && (
               <label className="setting-toggle-row" htmlFor="realtime-mode-toggle">
                 <input
                   id="realtime-mode-toggle"
@@ -2863,6 +2867,7 @@ export default function ProjectDetail() {
                   </span>
                 </div>
               </label>
+              )}
             </section>
 
             {/* Interview plan — length + sample-size target. The Research

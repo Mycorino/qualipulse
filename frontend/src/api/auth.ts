@@ -30,6 +30,9 @@ export interface CompanyResponse {
   primary_region: string | null;
   goals_freeform: string | null;
   preferred_language: string;
+  /** Account opt-in to beta features (today: live-voice interviews).
+   *  Off by default; gates the beta controls in study Setup. */
+  beta_features_enabled?: boolean;
   slack_webhook_url: string | null;
   // Business context
   value_proposition?: string | null;

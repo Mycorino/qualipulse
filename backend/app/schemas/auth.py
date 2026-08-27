@@ -109,6 +109,7 @@ class CompanyResponse(BaseModel):
     primary_region: Optional[str] = None
     goals_freeform: Optional[str] = None
     preferred_language: str = "fr"
+    beta_features_enabled: bool = False
     slack_webhook_url: Optional[str] = None
     value_proposition: Optional[str] = None
     primary_competitors: Optional[str] = None
@@ -138,6 +139,7 @@ class CompanyResponse(BaseModel):
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     preferred_language: Optional[str] = None
+    beta_features_enabled: Optional[bool] = None
 
 
 class SlackWebhookUpdate(BaseModel):

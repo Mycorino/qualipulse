@@ -274,5 +274,13 @@
     }
   },
   "loadErrorTitle": "Unable to load account settings",
-  "loadErrorMessage": "Something went wrong while loading your account data. Please try again."
+  "loadErrorMessage": "Something went wrong while loading your account data. Please try again.",
+  "beta": {
+    "title": "Beta features",
+    "help": "Try features we are still refining, before they are released to everyone. They work, but expect rough edges, and tell us what you find. You can turn this off at any time.",
+    "toggleLabel": "Enable beta features",
+    "toggleHelp": "Currently unlocks live voice interviews, a real-time spoken conversation instead of the record-and-send flow. Turning this off returns every study to the standard interview.",
+    "enabled": "Beta features enabled",
+    "disabled": "Beta features disabled"
+  }
 }

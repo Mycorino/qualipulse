@@ -505,11 +505,13 @@ def update_profile(
     company: Company = Depends(get_current_company),
     db: Session = Depends(get_db),
 ):
-    """Update the authenticated company's profile (name, preferred_language)."""
+    """Update the profile (name, preferred_language, beta opt-in)."""
     if "name" in body and body["name"]:
         company.name = str(body["name"]).strip()
     if "preferred_language" in body and body["preferred_language"] in ("en", "fr"):
         company.preferred_language = body["preferred_language"]
+    if "beta_features_enabled" in body:
+        company.beta_features_enabled = bool(body["beta_features_enabled"])
     db.commit()
     db.refresh(company)
     return CompanyResponse.model_validate(company)
