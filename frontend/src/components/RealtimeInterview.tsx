@@ -64,10 +64,10 @@ export default function RealtimeInterview({
   const [questionIndex, setQuestionIndex] = useState<number>(0);
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [uploading, setUploading] = useState(false);
-  // Participant-controlled mic pause: the audio track is disabled, so VAD
-  // hears silence, nothing commits, and there is no pressure to answer.
-  // The parallel session recording shares the same track and goes silent
-  // with it, which is the honest thing to record.
+  // Participant-controlled pause: VAD is switched off in the session and
+  // the input buffer cleared (see toggleMicPause), so nothing can commit
+  // and the interviewer stays silent until resume. The mic track is also
+  // disabled, so the session recording goes honestly silent with it.
   const [micPaused, setMicPaused] = useState(false);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -78,16 +78,47 @@ export default function RealtimeInterview({
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const captionRef = useRef("");
   const finishedRef = useRef(false);
+  const dcRef = useRef<RTCDataChannel | null>(null);
+  // turn_detection config from the SDP exchange, needed to re-arm VAD after
+  // a pause (pause = session.update turn_detection null: true push-to-talk
+  // off-switch — merely muting the track feeds VAD silence, which it reads
+  // as "done talking" and commits the half-said answer).
+  const turnDetectionRef = useRef<unknown | null>(null);
+  const uploadBusyRef = useRef(false);
+  const uploadedBytesRef = useRef(0);
   const speakingRef = useRef(false);
   const setupSeqRef = useRef(0);
 
+  const sendEvent = useCallback((event: Record<string, unknown>) => {
+    const dc = dcRef.current;
+    if (dc && dc.readyState === "open") {
+      try { dc.send(JSON.stringify(event)); } catch { /* channel closing */ }
+    }
+  }, []);
+
   const toggleMicPause = useCallback(() => {
+    // A click is a user gesture: use it to rescue a suspended AudioContext
+    // (Safari starts them suspended when created outside a gesture, which
+    // silently produced empty session recordings).
+    void audioCtxRef.current?.resume().catch(() => undefined);
     setMicPaused((prev) => {
       const next = !prev;
-      micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = !next; });
+      if (next) {
+        micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = false; });
+        // Turn VAD off entirely and drop any half-captured speech, so the
+        // interviewer cannot commit a turn (and speak) while paused.
+        sendEvent({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: null } } } });
+        sendEvent({ type: "input_audio_buffer.clear" });
+      } else {
+        sendEvent({ type: "input_audio_buffer.clear" });
+        if (turnDetectionRef.current) {
+          sendEvent({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: turnDetectionRef.current } } } });
+        }
+        micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = true; });
+      }
       return next;
     });
-  }, []);
+  }, [sendEvent]);
 
   const teardown = useCallback(() => {
     try { recorderRef.current?.state !== "inactive" && recorderRef.current?.stop(); } catch { /* already stopped */ }
@@ -105,6 +136,11 @@ export default function RealtimeInterview({
       const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new Ctx();
       audioCtxRef.current = ctx;
+      // Safari (and some Chrome autoplay states) create the context
+      // suspended when instantiated outside a user gesture; a suspended
+      // graph records pure silence. Resume immediately, and again from the
+      // pause-button gesture as a fallback.
+      void ctx.resume().catch(() => undefined);
       const dest = ctx.createMediaStreamDestination();
       ctx.createMediaStreamSource(mic).connect(dest);
       ctx.createMediaStreamSource(remote).connect(dest);
@@ -122,6 +158,38 @@ export default function RealtimeInterview({
       // server-side through the realtime transcription events).
     }
   }, []);
+
+  // Upload whatever the recorder has so far. The server overwrites, so the
+  // last (longest) upload wins; a participant who abandons the tab now
+  // costs us the final seconds, not the whole recording.
+  const uploadPartial = useCallback(async () => {
+    if (uploadBusyRef.current || chunksRef.current.length === 0) return;
+    const blob = new Blob(chunksRef.current, { type: chunksRef.current[0].type || "audio/webm" });
+    if (blob.size < 500 || blob.size <= uploadedBytesRef.current) return;
+    uploadBusyRef.current = true;
+    try {
+      await uploadSessionRecording(token, participantId, blob);
+      uploadedBytesRef.current = blob.size;
+    } catch {
+      // Next tick retries with a bigger blob.
+    } finally {
+      uploadBusyRef.current = false;
+    }
+  }, [participantId, token]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!finishedRef.current) void uploadPartial();
+    }, 45_000);
+    const onHide = () => { if (!finishedRef.current) void uploadPartial(); };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, [uploadPartial]);
 
   const finishUp = useCallback(async () => {
     if (finishedRef.current) return;
@@ -200,6 +268,7 @@ export default function RealtimeInterview({
         startRecorder(mic, remote);
       };
       const dc = pc.createDataChannel("oai-events");
+      dcRef.current = dc;
       dc.onmessage = (e) => handleDataChannelEvent(String(e.data));
       pc.onconnectionstatechange = () => {
         if (finishedRef.current) return;
@@ -220,9 +289,10 @@ export default function RealtimeInterview({
       });
       const sdp = pc.localDescription?.sdp;
       if (!sdp) throw new Error("no local SDP");
-      const answer = await createRealtimeSession(token, participantId, sdp);
+      const session = await createRealtimeSession(token, participantId, sdp);
+      turnDetectionRef.current = session.turnDetection;
       if (seq !== setupSeqRef.current) return;
-      await pc.setRemoteDescription({ type: "answer", sdp: answer });
+      await pc.setRemoteDescription({ type: "answer", sdp: session.sdp });
     } catch {
       if (seq === setupSeqRef.current && !finishedRef.current) {
         teardown();

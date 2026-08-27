@@ -161,6 +161,9 @@ class TestSdpEndpoint:
         assert res.status_code == 200
         assert res.headers["content-type"].startswith("application/sdp")
         assert res.text == "v=0\r\nanswer"
+        # The client restores VAD from this after a mic pause.
+        td = json.loads(res.headers["x-realtime-turn-detection"])
+        assert td["create_response"] is False
         assert spawned == {"call_id": "rtc_test123", "participant_id": participant.id, "total": 20}
 
     def test_completed_interviews_cannot_open_a_session(self, client, db_session):
@@ -191,6 +194,26 @@ class TestSessionRecording:
         assert res.json()["session_recording_url"] == "/audio/recordings/x/session.mp3"
         db_session.refresh(participant)
         assert participant.session_recording_url == "/audio/recordings/x/session.mp3"
+
+    def test_reupload_replaces_and_deletes_the_superseded_file(self, client, db_session):
+        """Incremental uploads must not litter R2 with unreferenced files."""
+        link, participant = _seed(db_session, "tok-rec-again")
+        participant.session_recording_url = "/audio/recordings/x/old.mp3"
+        db_session.commit()
+        deleted = []
+
+        with patch("app.services.storage.upload_audio", return_value="/audio/recordings/x/new.mp3"), \
+             patch("app.services.storage.delete_audio_by_url", side_effect=deleted.append), \
+             patch("app.services.transcode.needs_transcode", return_value=False):
+            res = client.post(
+                f"/interview/{link.token}/{participant.id}/realtime/recording",
+                files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+            )
+
+        assert res.status_code == 200
+        db_session.refresh(participant)
+        assert participant.session_recording_url == "/audio/recordings/x/new.mp3"
+        assert deleted == ["/audio/recordings/x/old.mp3"]
 
     def test_tiny_uploads_are_rejected(self, client, db_session):
         link, participant = _seed(db_session, "tok-rec-tiny")
