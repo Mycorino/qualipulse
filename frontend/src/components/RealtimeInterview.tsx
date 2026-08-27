@@ -46,6 +46,9 @@ const RECORDER_MIME_CANDIDATES = [
 // How long we keep waiting for the goodbye line to finish playing after the
 // backend marks the interview completed, before wrapping up anyway.
 const ENDING_GRACE_MS = 25_000;
+// Speaker tail: how long after the interviewer finishes before the mic is
+// re-armed, so the end of its own sentence is not heard as an answer.
+const MIC_REARM_DELAY_MS = 350;
 const STATUS_POLL_MS = 3_500;
 
 export default function RealtimeInterview({
@@ -77,6 +80,7 @@ export default function RealtimeInterview({
   const chunksRef = useRef<Blob[]>([]);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const captionRef = useRef("");
+  const captionOpenRef = useRef(false);
   const finishedRef = useRef(false);
   const dcRef = useRef<RTCDataChannel | null>(null);
   // turn_detection config from the SDP exchange, needed to re-arm VAD after
@@ -88,6 +92,17 @@ export default function RealtimeInterview({
   const uploadedBytesRef = useRef(0);
   const speakingRef = useRef(false);
   const setupSeqRef = useRef(0);
+  const micPausedRef = useRef(false);
+  const micRearmTimerRef = useRef<number | null>(null);
+
+  // Echo cancellation is imperfect on speakerphone and laptop speakers, so
+  // belt and braces: the microphone is physically muted while the
+  // interviewer speaks, then re-armed a beat after it stops (the beat lets
+  // the last audio drain out of the speaker before the mic reopens).
+  const setMicLive = useCallback((live: boolean) => {
+    if (micPausedRef.current && live) return; // participant paused: stay off
+    micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = live; });
+  }, []);
 
   const sendEvent = useCallback((event: Record<string, unknown>) => {
     const dc = dcRef.current;
@@ -96,6 +111,8 @@ export default function RealtimeInterview({
     }
   }, []);
 
+  useEffect(() => { micPausedRef.current = micPaused; }, [micPaused]);
+
   const toggleMicPause = useCallback(() => {
     // A click is a user gesture: use it to rescue a suspended AudioContext
     // (Safari starts them suspended when created outside a gesture, which
@@ -103,6 +120,10 @@ export default function RealtimeInterview({
     void audioCtxRef.current?.resume().catch(() => undefined);
     setMicPaused((prev) => {
       const next = !prev;
+      // Set the ref synchronously: the speaking gate's re-arm timer can fire
+      // before React flushes the state effect, and it must not reopen a mic
+      // the participant just paused.
+      micPausedRef.current = next;
       if (next) {
         micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = false; });
         // Turn VAD off entirely and drop any half-captured speech, so the
@@ -114,13 +135,21 @@ export default function RealtimeInterview({
         if (turnDetectionRef.current) {
           sendEvent({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: turnDetectionRef.current } } } });
         }
-        micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = true; });
+        // Resuming mid-sentence must not reopen the mic into the speaker:
+        // the speaking gate re-arms it when the interviewer finishes.
+        if (!speakingRef.current) {
+          micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = true; });
+        }
       }
       return next;
     });
   }, [sendEvent]);
 
   const teardown = useCallback(() => {
+    if (micRearmTimerRef.current) {
+      window.clearTimeout(micRearmTimerRef.current);
+      micRearmTimerRef.current = null;
+    }
     try { recorderRef.current?.state !== "inactive" && recorderRef.current?.stop(); } catch { /* already stopped */ }
     recorderRef.current = null;
     try { pcRef.current?.close(); } catch { /* already closed */ }
@@ -224,10 +253,19 @@ export default function RealtimeInterview({
     try { event = JSON.parse(raw); } catch { return; }
     if (!event || typeof event.type !== "string") return;
     switch (event.type) {
+      case "response.created":
+        speakingRef.current = true;
+        if (micRearmTimerRef.current) {
+          window.clearTimeout(micRearmTimerRef.current);
+          micRearmTimerRef.current = null;
+        }
+        setMicLive(false);
+        setVoiceState("speaking");
+        break;
       case "response.output_audio_transcript.delta":
         if (typeof event.delta === "string") {
-          if (!speakingRef.current) captionRef.current = "";
-          speakingRef.current = true;
+          if (!captionOpenRef.current) captionRef.current = "";
+          captionOpenRef.current = true;
           captionRef.current += event.delta;
           setCaption(captionRef.current);
           setVoiceState("speaking");
@@ -235,7 +273,13 @@ export default function RealtimeInterview({
         break;
       case "response.done":
         speakingRef.current = false;
+        captionOpenRef.current = false;
         setVoiceState("idle");
+        // Re-arm after the tail of the sentence has left the speaker.
+        micRearmTimerRef.current = window.setTimeout(() => {
+          micRearmTimerRef.current = null;
+          setMicLive(true);
+        }, MIC_REARM_DELAY_MS);
         break;
       case "input_audio_buffer.speech_started":
         setVoiceState("listening");
@@ -246,13 +290,24 @@ export default function RealtimeInterview({
       default:
         break;
     }
-  }, []);
+  }, [setMicLive]);
 
   const connect = useCallback(async () => {
     const seq = ++setupSeqRef.current;
     setConnState("connecting");
     try {
-      const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Explicit constraints: without echoCancellation the interviewer's
+      // voice comes back through the microphone, gets transcribed as if the
+      // participant had said it, and (with barge-in) cuts the interviewer
+      // off mid-sentence. Browsers usually default these on, but "usually"
+      // is not good enough for the one thing that breaks the conversation.
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       if (seq !== setupSeqRef.current) { mic.getTracks().forEach((tr) => tr.stop()); return; }
       micStreamRef.current = mic;
 

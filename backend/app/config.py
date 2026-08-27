@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     # spoken the moment the participant's answer commits, so the 2-4s the
     # Claude decision takes doesn't read as dead air.
     REALTIME_ACK_ENABLED: bool = True
+    # Let the participant's voice cut the interviewer off mid-sentence. Off:
+    # speakers leak into the microphone, so with barge-in on, the interviewer
+    # interrupts ITSELF a few words into every question. Questions are short
+    # and there is a pause button, so waiting is the better trade.
+    REALTIME_ALLOW_BARGE_IN: bool = False
     # Hard ceiling on one realtime session's lifetime, as a multiple of the
     # study's planned duration (minimum floor applied in the service). The
     # sideband closes the call when it trips, so an abandoned tab can't hold
