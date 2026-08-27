@@ -300,6 +300,37 @@ class TestBridgeTurns:
         )
         assert abs(row.cost_usd - expected) < 1e-9
 
+    def test_echo_of_the_interviewers_own_line_is_dropped(self, db_session, bridge_sessions):
+        """Speakers leak into the mic: the question must never come back as
+        the participant's answer and reach Claude."""
+        _, participant = _seed(db_session, "tok-echo", turns=1)
+        bridge = rt.SidebandBridge("rtc_echo", participant.id, 20)
+        bridge.last_spoken = "Qu'est-ce qui vous a poussé à changer d'outil cette année ?"
+        bridge.response_active = True
+
+        assert bridge._is_echo("Qu'est-ce qui vous a poussé à changer d'outil cette année") is True
+        # A real answer during the same window is not echo.
+        assert bridge._is_echo("On a changé parce que la facturation était devenue ingérable") is False
+        # Once the interviewer has been quiet a while, nothing is echo.
+        bridge.response_active = False
+        bridge.last_response_ended_at = 0.0
+        assert bridge._is_echo("Qu'est-ce qui vous a poussé à changer d'outil cette année") is False
+
+    def test_short_answers_are_never_mistaken_for_echo(self, db_session, bridge_sessions):
+        _, participant = _seed(db_session, "tok-echo-short", turns=1)
+        bridge = rt.SidebandBridge("rtc_short", participant.id, 20)
+        bridge.last_spoken = "Est-ce que vous utilisez cet outil toutes les semaines ?"
+        bridge.response_active = True
+        # Content-word overlap only, so filler words in a real answer do not
+        # trip the guard.
+        assert bridge._is_echo("Oui") is False
+        assert bridge._is_echo("Oui, tous les jours en fait") is False
+
+    def test_barge_in_is_off_so_the_interviewer_cannot_cut_itself_off(self, db_session):
+        _, participant = _seed(db_session, "tok-barge")
+        cfg = rt.build_session_config(participant.project, participant, "fr")
+        assert cfg["audio"]["input"]["turn_detection"]["interrupt_response"] is False
+
     def test_session_config_carries_language_and_vad(self, db_session):
         _, participant = _seed(db_session, "tok-config")
         cfg = rt.build_session_config(participant.project, participant, "fr")

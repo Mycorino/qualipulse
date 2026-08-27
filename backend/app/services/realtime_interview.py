@@ -25,6 +25,7 @@ translation, cleanup all run this way on Cloud Run with CPU always on).
 
 import json
 import logging
+import re
 import threading
 import time
 import uuid
@@ -51,6 +52,16 @@ ANSWER_DRAIN_SECONDS = 1.0
 # If speech restarts inside the drain window, wait at most this long for its
 # transcription before advancing with what we have.
 ANSWER_CONTINUATION_TIMEOUT = 20.0
+
+# Speaker-to-mic echo: for this long after the interviewer stops speaking, a
+# transcript that echoes what it just said is treated as the room hearing the
+# interviewer, not the participant answering.
+ECHO_TAIL_SECONDS = 2.0
+# Word overlap with the just-spoken line above which a transcript is echo.
+ECHO_OVERLAP_RATIO = 0.6
+# How long a queued line waits for the in-flight response to finish before
+# giving up and sending anyway.
+RESPONSE_IDLE_TIMEOUT = 20.0
 
 # Estimated per-token USD rates for gpt-realtime (audio/text, cached input
 # discounted). Estimates for the admin cost dashboards and the daily
@@ -99,7 +110,7 @@ def build_session_config(project, participant, language: str | None) -> dict:
         turn_detection = {
             "type": "server_vad",
             "create_response": False,
-            "interrupt_response": True,
+            "interrupt_response": settings.REALTIME_ALLOW_BARGE_IN,
             "silence_duration_ms": settings.REALTIME_VAD_SILENCE_MS,
         }
     else:
@@ -110,7 +121,7 @@ def build_session_config(project, participant, language: str | None) -> dict:
             "type": "semantic_vad",
             "eagerness": settings.REALTIME_VAD_EAGERNESS,
             "create_response": False,
-            "interrupt_response": True,
+            "interrupt_response": settings.REALTIME_ALLOW_BARGE_IN,
         }
     return {
         "type": "realtime",
@@ -243,6 +254,27 @@ def _ack_instruction(language: str | None) -> str:
     )
 
 
+def _normalise_for_echo(text: str) -> list[str]:
+    return [w for w in re.sub(r"[^\w\s]", " ", (text or "").lower()).split() if len(w) > 2]
+
+
+def _looks_like_echo(transcript: str, spoken: str) -> bool:
+    """True when a transcript is mostly the interviewer's own last line.
+
+    Speakers leak into the microphone, so the interviewer's question can come
+    back as if the participant had said it. Feeding that to Claude produces an
+    interview where the AI answers itself, so drop it. Compared on content
+    words only, and only ever consulted while (or just after) the interviewer
+    was actually speaking, so a genuine short answer is never discarded.
+    """
+    said = _normalise_for_echo(transcript)
+    mine = set(_normalise_for_echo(spoken))
+    if not said or not mine:
+        return False
+    overlap = sum(1 for w in said if w in mine)
+    return overlap / len(said) >= ECHO_OVERLAP_RATIO
+
+
 def _repeat_line(language: str | None) -> str:
     lang = (language or "en")[:2]
     lines = {
@@ -304,6 +336,12 @@ class SidebandBridge:
         self.deadline = time.monotonic() + budget * 60
         self.language = _interview_language(participant_id)
         self.closing = False
+        # Half-duplex bookkeeping: what the interviewer is saying right now
+        # (so its echo can be recognised) and whether a response is in
+        # flight (so two lines never race for the same audio channel).
+        self.response_active = False
+        self.last_spoken = ""
+        self.last_response_ended_at = 0.0
 
     # -- websocket plumbing -------------------------------------------------
 
@@ -321,6 +359,15 @@ class SidebandBridge:
         ws.send(json.dumps(payload))
 
     def _speak(self, ws, text: str) -> None:
+        """Queue one spoken line, after whatever is playing has finished.
+
+        Two overlapping ``response.create`` calls (the acknowledgment and the
+        question that follows it) leave the model with two lines for one
+        audio channel, which it resolves by cutting the first one off
+        mid-sentence. Waiting for the channel keeps them sequential.
+        """
+        self._wait_for_response_idle(ws)
+        self.last_spoken = text
         self._send(
             ws,
             {
@@ -334,6 +381,38 @@ class SidebandBridge:
                 },
             },
         )
+
+    def _wait_for_response_idle(self, ws) -> None:
+        """Pump events until nothing is being spoken (bounded)."""
+        deadline = min(time.monotonic() + RESPONSE_IDLE_TIMEOUT, self.deadline)
+        while self.response_active and time.monotonic() < deadline:
+            event = self._recv_event(ws, timeout=0.25)
+            if event is not None:
+                self._note_event(event)
+
+    def _note_event(self, event: dict) -> str:
+        """Update speaking state from any event; returns its type."""
+        etype = event.get("type", "")
+        if etype == "response.created":
+            self.response_active = True
+        elif etype == "response.done":
+            self.response_active = False
+            self.last_response_ended_at = time.monotonic()
+            self._on_response_done(event)
+        elif etype == "error":
+            logger.warning(
+                "realtime event error for participant %s: %s",
+                self.participant_id, json.dumps(event)[:500],
+            )
+        return etype
+
+    def _is_echo(self, transcript: str) -> bool:
+        """Was this the interviewer's own voice coming back through the mic?"""
+        speaking_recently = (
+            self.response_active
+            or (time.monotonic() - self.last_response_ended_at) < ECHO_TAIL_SECONDS
+        )
+        return speaking_recently and _looks_like_echo(transcript, self.last_spoken)
 
     def _recv_event(self, ws, timeout: float) -> dict | None:
         try:
@@ -360,26 +439,19 @@ class SidebandBridge:
         if speech restarts inside the window, wait for its transcription.
         """
         parts = [first]
-        waiting_for_continuation = False
         wait_until = time.monotonic() + ANSWER_DRAIN_SECONDS
         while time.monotonic() < min(wait_until, self.deadline):
             event = self._recv_event(ws, timeout=0.25)
             if event is None:
-                if not waiting_for_continuation:
-                    continue
                 continue
-            etype = event.get("type", "")
+            etype = self._note_event(event)
             if etype == "input_audio_buffer.speech_started":
-                waiting_for_continuation = True
                 wait_until = time.monotonic() + ANSWER_CONTINUATION_TIMEOUT
             elif self._is_transcript_done(event):
                 text = (event.get("transcript") or "").strip()
-                if text:
+                if text and not self._is_echo(text):
                     parts.append(text)
-                waiting_for_continuation = False
                 wait_until = time.monotonic() + ANSWER_DRAIN_SECONDS
-            elif etype == "response.done":
-                self._on_response_done(event)
         return " ".join(p for p in parts if p)
 
     def _on_response_done(self, event: dict) -> None:
@@ -392,14 +464,24 @@ class SidebandBridge:
 
     def _handle_transcript(self, ws, event: dict) -> None:
         transcript = (event.get("transcript") or "").strip()
+        if transcript and self._is_echo(transcript):
+            # The interviewer hearing itself. Not an answer: say nothing,
+            # ask nothing, and leave the turn open for the participant.
+            logger.info(
+                "realtime: dropped echo of the interviewer's own line (participant=%s)",
+                self.participant_id,
+            )
+            return
         transcript = self._collect_answer(ws, transcript) if transcript else ""
         if not transcript:
             self._speak(ws, _repeat_line(self.language))
             return
         if settings.REALTIME_ACK_ENABLED:
             # Fill the Claude-decision gap with a human "I heard you" beat
-            # instead of silence. Queued responses play in order, so the
-            # real question follows right after.
+            # instead of silence. _speak below waits for this to finish, so
+            # the question never talks over the acknowledgment.
+            self.response_active = True
+            self.last_spoken = ""
             self._send(
                 ws,
                 {"type": "response.create", "response": {"instructions": _ack_instruction(self.language)}},
@@ -428,18 +510,11 @@ class SidebandBridge:
                     event = self._recv_event(ws, timeout=30.0)
                     if event is None:
                         continue
-                    etype = event.get("type", "")
+                    etype = self._note_event(event)
                     if self._is_transcript_done(event):
                         self._handle_transcript(ws, event)
                     elif etype.endswith("input_audio_transcription.failed"):
                         self._speak(ws, _repeat_line(self.language))
-                    elif etype == "response.done":
-                        self._on_response_done(event)
-                    elif etype == "error":
-                        logger.warning(
-                            "realtime event error for participant %s: %s",
-                            self.participant_id, json.dumps(event)[:500],
-                        )
                 else:
                     logger.warning(
                         "realtime session deadline reached for participant %s; hanging up",
