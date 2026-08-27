@@ -87,6 +87,15 @@ class Company(Base):
     storage_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     preferred_language: Mapped[str] = mapped_column(String(5), default="fr", nullable=False)
 
+    # Opt-in to features still in beta (today: the realtime live-voice
+    # interview mode). Off by default, so beta surfaces stay hidden for
+    # every account that has not asked for them. Workspace-scoped: studies
+    # resolve it through their owning company, so a workspace either has
+    # beta on for all its studies or none.
+    beta_features_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0"
+    )
+
     # Integrations
     slack_webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 

@@ -218,6 +218,9 @@ class ProjectResponse(BaseModel):
     warmup_enabled: bool = True
     profile_before_interview: bool = False
     interview_mode: str = "classic"
+    # Whether the owning workspace opted into beta features. Read-only here
+    # (set from Account settings); gates the Setup tab's beta controls.
+    beta_features_enabled: bool = False
     decision_to_inform: str | None = None
     target_customer_description: str | None = None
     target_participants: int | None = None

@@ -784,13 +784,11 @@ def validate_link(
         # questionnaire before the interview or after it.
         "profile_before_interview": getattr(project, "profile_before_interview", False),
         # "realtime_beta" switches the participant UI to the live-voice flow
-        # (WebRTC to the OpenAI Realtime API). The global kill switch forces
-        # classic for everyone, so a flipped-off beta degrades gracefully.
-        "interview_mode": (
-            getattr(project, "interview_mode", "classic")
-            if settings.REALTIME_INTERVIEW_ENABLED
-            else "classic"
-        ),
+        # (WebRTC to the OpenAI Realtime API). Resolved server-side through
+        # both gates, so a workspace that leaves (or never joins) the beta,
+        # or a flipped-off kill switch, degrades every study to classic
+        # without touching stored study settings.
+        "interview_mode": _effective_interview_mode(project),
         "branding": {
             "mode": branding_mode,
             "primary_color": getattr(project, "brand_primary_color", None) if branding_mode == "branded" else None,
@@ -1547,13 +1545,28 @@ def get_interview_status(
 # Realtime interview beta (projects.interview_mode == "realtime_beta")
 # ---------------------------------------------------------------------------
 
+def _effective_interview_mode(project) -> str:
+    """The transport a participant actually gets for this study.
+
+    Three gates, all of which must agree on realtime: the global kill
+    switch, the owning workspace's beta opt-in
+    (``Company.beta_features_enabled``), and the study's own setting.
+    Anything else resolves to "classic", which always works.
+    """
+    if not settings.REALTIME_INTERVIEW_ENABLED:
+        return "classic"
+    if getattr(project, "interview_mode", "classic") != "realtime_beta":
+        return "classic"
+    owner = getattr(project, "company", None)
+    if not getattr(owner, "beta_features_enabled", False):
+        return "classic"
+    return "realtime_beta"
+
+
 def _get_realtime_project_or_404(link: InterviewLink):
     """The realtime endpoints exist only for studies opted into the beta."""
     project = link.project
-    if (
-        not settings.REALTIME_INTERVIEW_ENABLED
-        or getattr(project, "interview_mode", "classic") != "realtime_beta"
-    ):
+    if _effective_interview_mode(project) != "realtime_beta":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Realtime interviews are not enabled for this study",

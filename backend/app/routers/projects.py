@@ -586,6 +586,19 @@ def patch_project_settings(
     if body.profile_before_interview is not None:
         project.profile_before_interview = body.profile_before_interview
     if body.interview_mode is not None:
+        if body.interview_mode == "realtime_beta" and not getattr(
+            company, "beta_features_enabled", False
+        ):
+            # The Setup toggle is hidden without the opt-in; enforce it here
+            # too so a hand-crafted request cannot switch a study onto a
+            # beta transport the workspace never agreed to.
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "beta_features_disabled",
+                    "message": "Enable beta features in Account settings first.",
+                },
+            )
         project.interview_mode = body.interview_mode
     if body.research_objective is not None:
         project.research_objective = body.research_objective
@@ -1026,6 +1039,11 @@ def _project_to_response(project: Project) -> ProjectResponse:
         warmup_enabled=getattr(project, "warmup_enabled", True),
         profile_before_interview=getattr(project, "profile_before_interview", False),
         interview_mode=getattr(project, "interview_mode", "classic") or "classic",
+        # Workspace-level beta opt-in, resolved through the owning company:
+        # the Setup tab shows the beta transport toggle only when this is on.
+        beta_features_enabled=bool(
+            getattr(getattr(project, "company", None), "beta_features_enabled", False)
+        ),
         decision_to_inform=getattr(project, "decision_to_inform", None),
         target_customer_description=getattr(project, "target_customer_description", None),
         target_participants=getattr(project, "target_participants", None),

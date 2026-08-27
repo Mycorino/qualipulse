@@ -835,9 +835,29 @@ degrades to a useful message. The SPA sets the same participant-facing title
 + `noindex` client-side via `useHead` (browser tab, not unfurls). Tests:
 `backend/tests/test_interview_preview.py`.
 
-### Realtime interview beta (per-study opt-in)
+### Beta features opt-in
+`companies.beta_features_enabled` (Alembic 0076, default **off**) is the
+account-level switch for features still in beta. Account > Profile > "Beta
+features" toggles it (`PATCH /auth/me`), and it is workspace-scoped: studies
+resolve it through their owning company, so a workspace has beta on for all
+its studies or none. Today it gates exactly one thing, the realtime
+interview transport:
+
+- The Setup tab renders the "Live voice conversation (Beta)" toggle only
+  when `ProjectResponse.beta_features_enabled` is true.
+- `PATCH /projects/{id}/settings` refuses `interview_mode="realtime_beta"`
+  with 403 `beta_features_disabled` when the workspace has not opted in.
+- `_effective_interview_mode()` in `routers/interview.py` is the single
+  resolver for what a participant actually gets: kill switch AND workspace
+  opt-in AND study setting must all say realtime, otherwise classic. So
+  turning the account toggle off reverts every study to the classic flow
+  immediately, without touching stored study settings (re-enabling restores
+  them).
+
+### Realtime interview beta (per-study opt-in, gated by the account beta flag)
 `projects.interview_mode` (`classic` default | `realtime_beta`, Alembic 0075,
-Setup tab toggle) switches the participant flow to a live voice conversation
+Setup tab toggle, only offered to workspaces with `beta_features_enabled`)
+switches the participant flow to a live voice conversation
 over the **OpenAI Realtime API** while keeping Claude as the interview brain:
 
 - **Transport:** the browser runs WebRTC directly to `gpt-realtime` (listens,

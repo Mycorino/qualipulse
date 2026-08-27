@@ -274,5 +274,13 @@
     }
   },
   "loadErrorTitle": "Impossible de charger les paramètres du compte",
-  "loadErrorMessage": "Une erreur s'est produite lors du chargement de vos données. Veuillez réessayer."
+  "loadErrorMessage": "Une erreur s'est produite lors du chargement de vos données. Veuillez réessayer.",
+  "beta": {
+    "title": "Fonctionnalités bêta",
+    "help": "Essayez les fonctionnalités que nous peaufinons encore, avant leur sortie pour tout le monde. Elles fonctionnent, mais attendez-vous à quelques aspérités, et dites-nous ce que vous trouvez. Vous pouvez désactiver à tout moment.",
+    "toggleLabel": "Activer les fonctionnalités bêta",
+    "toggleHelp": "Débloque actuellement les entretiens en voix directe, une conversation parlée en temps réel au lieu du flux enregistrer puis envoyer. En désactivant, toutes vos études reviennent à l'entretien standard.",
+    "enabled": "Fonctionnalités bêta activées",
+    "disabled": "Fonctionnalités bêta désactivées"
+  }
 }

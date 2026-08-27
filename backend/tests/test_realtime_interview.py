@@ -30,9 +30,10 @@ def bridge_sessions(db_session):
         yield
 
 
-def _seed(db, token="tok-rt", *, mode="realtime_beta", turns=1):
+def _seed(db, token="tok-rt", *, mode="realtime_beta", turns=1, beta=True):
     company = Company(
-        name="Acme", email=f"{token}@acme.com", password_hash="x", email_verified=True
+        name="Acme", email=f"{token}@acme.com", password_hash="x", email_verified=True,
+        beta_features_enabled=beta,
     )
     db.add(company)
     db.flush()
@@ -98,6 +99,7 @@ class TestModeFlag:
         project_id = res.json()["id"]
         assert res.json()["interview_mode"] == "classic"
 
+        client.patch("/auth/me", json={"beta_features_enabled": True}, headers=auth_headers)
         res = client.patch(
             f"/projects/{project_id}/settings",
             json={"interview_mode": "realtime_beta"},
@@ -112,6 +114,79 @@ class TestModeFlag:
             headers=auth_headers,
         )
         assert res.status_code == 422
+
+
+class TestBetaOptIn:
+    """The beta transport is invisible and unreachable without the
+    workspace-level opt-in, whatever a study's stored flag says."""
+
+    def test_participant_payload_falls_back_to_classic_without_opt_in(self, client, db_session):
+        link, _ = _seed(db_session, "tok-nobeta", beta=False)
+        res = client.get(f"/interview/{link.token}")
+        assert res.status_code == 200
+        assert res.json()["interview_mode"] == "classic"
+
+    def test_realtime_endpoints_404_without_opt_in(self, client, db_session):
+        link, participant = _seed(db_session, "tok-nobeta-sdp", beta=False)
+        res = client.post(
+            f"/interview/{link.token}/{participant.id}/realtime/sdp",
+            content="v=0\r\n",
+            headers={"Content-Type": "application/sdp"},
+        )
+        assert res.status_code == 404
+
+    def test_turning_beta_off_reverts_live_studies(self, client, db_session):
+        """A workspace leaving the beta must not strand participants on a
+        transport the account no longer wants."""
+        link, participant = _seed(db_session, "tok-beta-off")
+        assert client.get(f"/interview/{link.token}").json()["interview_mode"] == "realtime_beta"
+
+        participant.project.company.beta_features_enabled = False
+        db_session.commit()
+
+        assert client.get(f"/interview/{link.token}").json()["interview_mode"] == "classic"
+        # The study's own setting is untouched, so re-joining the beta
+        # restores it without reconfiguring anything.
+        assert participant.project.interview_mode == "realtime_beta"
+
+    def test_settings_patch_refuses_realtime_without_opt_in(self, client, auth_headers, db_session):
+        res = client.post(
+            "/projects/",
+            json={"name": "Gated", "questions": [
+                {"section_index": 0, "section_title": "S", "question_index": 0, "main_question": "Why?"}
+            ]},
+            headers=auth_headers,
+        )
+        assert res.status_code == 201, res.text
+        project_id = res.json()["id"]
+        assert res.json()["beta_features_enabled"] is False
+
+        res = client.patch(
+            f"/projects/{project_id}/settings",
+            json={"interview_mode": "realtime_beta"},
+            headers=auth_headers,
+        )
+        assert res.status_code == 403
+        assert res.json()["detail"]["code"] == "beta_features_disabled"
+
+        # Opt in, and the same patch is accepted.
+        assert client.patch("/auth/me", json={"beta_features_enabled": True}, headers=auth_headers).status_code == 200
+        res = client.patch(
+            f"/projects/{project_id}/settings",
+            json={"interview_mode": "realtime_beta"},
+            headers=auth_headers,
+        )
+        assert res.status_code == 200
+        assert res.json()["interview_mode"] == "realtime_beta"
+        assert res.json()["beta_features_enabled"] is True
+
+    def test_opt_in_defaults_off_and_round_trips_on_me(self, client, auth_headers):
+        assert client.get("/auth/me", headers=auth_headers).json()["beta_features_enabled"] is False
+        res = client.patch("/auth/me", json={"beta_features_enabled": True}, headers=auth_headers)
+        assert res.status_code == 200
+        assert res.json()["beta_features_enabled"] is True
+        res = client.patch("/auth/me", json={"beta_features_enabled": False}, headers=auth_headers)
+        assert res.json()["beta_features_enabled"] is False
 
 
 class TestSdpEndpoint:

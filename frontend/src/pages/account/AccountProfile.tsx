@@ -10,6 +10,7 @@ export default function AccountProfile() {
   const { toast } = useToast();
   const [name, setName] = useState(me?.name ?? "");
   const [saving, setSaving] = useState(false);
+  const [betaSaving, setBetaSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(false);
 
@@ -45,6 +46,24 @@ export default function AccountProfile() {
       // Persisting failed — revert so the UI never lies about the saved value.
       i18n.changeLanguage(previous);
       toast(t("profile.saveError", { defaultValue: "Could not save — please try again." }), "error");
+    }
+  }
+
+  async function handleToggleBeta(next: boolean) {
+    setBetaSaving(true);
+    try {
+      await client.patch("/auth/me", { beta_features_enabled: next });
+      setMe((prev) => (prev ? { ...prev, beta_features_enabled: next } : prev));
+      toast(
+        next
+          ? t("beta.enabled", { defaultValue: "Beta features enabled" })
+          : t("beta.disabled", { defaultValue: "Beta features disabled" }),
+        "success"
+      );
+    } catch {
+      toast(t("profile.saveError", { defaultValue: "Could not save — please try again." }), "error");
+    } finally {
+      setBetaSaving(false);
     }
   }
 
@@ -107,6 +126,36 @@ export default function AccountProfile() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="settings-card" style={{ marginTop: 20 }}>
+        <h2 className="settings-section-title">
+          {t("beta.title", { defaultValue: "Beta features" })}
+        </h2>
+        <p className="muted-text" style={{ marginBottom: 12, fontSize: 13 }}>
+          {t("beta.help", {
+            defaultValue:
+              "Try features we are still refining, before they are released to everyone. They work, but expect rough edges, and tell us what you find. You can turn this off at any time.",
+          })}
+        </p>
+        <label className="setting-toggle-row" htmlFor="beta-features-toggle">
+          <input
+            id="beta-features-toggle"
+            type="checkbox"
+            checked={me?.beta_features_enabled === true}
+            disabled={betaSaving}
+            onChange={(e) => void handleToggleBeta(e.target.checked)}
+          />
+          <div className="setting-toggle-row__copy">
+            <strong>{t("beta.toggleLabel", { defaultValue: "Enable beta features" })}</strong>
+            <span className="muted-text" style={{ fontSize: 12 }}>
+              {t("beta.toggleHelp", {
+                defaultValue:
+                  "Currently unlocks live voice interviews, a real-time spoken conversation instead of the record-and-send flow. Turning this off returns every study to the standard interview.",
+              })}
+            </span>
+          </div>
+        </label>
       </div>
     </div>
   );
