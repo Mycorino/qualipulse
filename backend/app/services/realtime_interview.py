@@ -43,10 +43,11 @@ REALTIME_WS_URL = "wss://api.openai.com/v1/realtime"
 MIN_SESSION_MINUTES = 20.0
 
 # How long after a VAD-committed transcript we keep listening for the
-# participant to resume before treating the answer as finished. Realtime VAD
-# commits on ~0.5-1s pauses; a thinking pause mid-answer is longer than that
-# but shorter than this.
-ANSWER_DRAIN_SECONDS = 2.0
+# participant to resume before treating the answer as finished. With
+# semantic_vad the model already waits out unfinished sentences, so this is
+# only a short net for back-to-back commits; every extra tenth of a second
+# here is dead air the participant sits through on EVERY turn.
+ANSWER_DRAIN_SECONDS = 1.0
 # If speech restarts inside the drain window, wait at most this long for its
 # transcription before advancing with what we have.
 ANSWER_CONTINUATION_TIMEOUT = 20.0
@@ -222,6 +223,26 @@ def _pending_question(participant_id: str) -> str | None:
         return last.question_text
 
 
+_ACK_EXAMPLES = {
+    "en": "'Okay.', 'I see.', 'Got it.'",
+    "fr": "'D'accord.', 'Je vois.', 'Très bien.'",
+    "de": "'Okay.', 'Verstehe.', 'Alles klar.'",
+    "es": "'Vale.', 'Entiendo.', 'Muy bien.'",
+    "it": "'Va bene.', 'Capisco.', 'Certo.'",
+    "pt": "'Certo.', 'Entendo.', 'Muito bem.'",
+}
+
+
+def _ack_instruction(language: str | None) -> str:
+    lang = (language or "en")[:2]
+    examples = _ACK_EXAMPLES.get(lang, _ACK_EXAMPLES["en"])
+    return (
+        f"Say ONE very brief, natural acknowledgment in the interview language "
+        f"({lang}), one to three words, in a warm listening tone, for example "
+        f"{examples} Vary it. Say nothing else and ask nothing."
+    )
+
+
 def _repeat_line(language: str | None) -> str:
     lang = (language or "en")[:2]
     lines = {
@@ -375,6 +396,14 @@ class SidebandBridge:
         if not transcript:
             self._speak(ws, _repeat_line(self.language))
             return
+        if settings.REALTIME_ACK_ENABLED:
+            # Fill the Claude-decision gap with a human "I heard you" beat
+            # instead of silence. Queued responses play in order, so the
+            # real question follows right after.
+            self._send(
+                ws,
+                {"type": "response.create", "response": {"instructions": _ack_instruction(self.language)}},
+            )
         result = _advance_turn(self.participant_id, transcript)
         if result is None:
             self._speak(ws, _repeat_line(self.language))
@@ -443,8 +472,15 @@ def spawn_sideband(call_id: str, participant_id: str, total_minutes: int | None)
 
 
 def store_session_recording(participant, data: bytes, ext: str, db) -> str:
-    """Transcode (if needed) and store the browser's full-session capture."""
-    from app.services.storage import upload_audio
+    """Transcode (if needed) and store the browser's full-session capture.
+
+    The client uploads incrementally (every ~45s and on tab hide), so this
+    runs repeatedly per interview: each upload gets a fresh key (no stale
+    browser/CDN caching of a shorter file) and the superseded file is
+    deleted afterwards, so exactly one recording remains referenced and on
+    disk — the GDPR cascade only knows about the referenced URL.
+    """
+    from app.services.storage import delete_audio_by_url, upload_audio
     from app.services.transcode import needs_transcode, transcode_to_mp3
 
     if needs_transcode(ext):
@@ -453,6 +489,12 @@ def store_session_recording(participant, data: bytes, ext: str, db) -> str:
             data, ext = converted, ".mp3"
     key = f"recordings/{participant.id}/session-{uuid.uuid4().hex}{ext}"
     url = upload_audio(data, key)
+    previous = participant.session_recording_url
     participant.session_recording_url = url
     db.commit()
+    if previous and previous != url:
+        try:
+            delete_audio_by_url(previous)
+        except Exception:
+            logger.warning("could not delete superseded session recording %s", previous)
     return url

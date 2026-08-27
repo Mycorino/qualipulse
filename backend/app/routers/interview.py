@@ -1619,7 +1619,18 @@ async def create_realtime_session(
             detail={"code": "realtime_unavailable", "message": "Live voice is unavailable right now."},
         )
     spawn_sideband(call_id, participant.id, total_minutes)
-    return PlainResponse(content=answer_sdp, media_type="application/sdp")
+    # The client needs the exact turn_detection config to restore VAD after
+    # a mic pause (pause = session.update turn_detection null, the
+    # documented push-to-talk pattern; resume = put this back).
+    return PlainResponse(
+        content=answer_sdp,
+        media_type="application/sdp",
+        headers={
+            "X-Realtime-Turn-Detection": json.dumps(
+                session_config["audio"]["input"]["turn_detection"]
+            )
+        },
+    )
 
 
 @router.post("/{token}/{participant_id}/realtime/recording")

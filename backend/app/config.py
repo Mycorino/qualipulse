@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     REALTIME_VAD_TYPE: str = "semantic_vad"  # semantic_vad | server_vad
     REALTIME_VAD_EAGERNESS: str = "low"  # semantic_vad: low | medium | high | auto
     REALTIME_VAD_SILENCE_MS: int = 1000  # server_vad only
+    # Immediate one-to-three-word acknowledgment ("D'accord", "Je vois")
+    # spoken the moment the participant's answer commits, so the 2-4s the
+    # Claude decision takes doesn't read as dead air.
+    REALTIME_ACK_ENABLED: bool = True
     # Hard ceiling on one realtime session's lifetime, as a multiple of the
     # study's planned duration (minimum floor applied in the service). The
     # sideband closes the call when it trips, so an abandoned tab can't hold

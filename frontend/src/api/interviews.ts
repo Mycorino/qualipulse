@@ -425,6 +425,13 @@ export async function getInterviewStatus(
   return data;
 }
 
+export interface RealtimeSession {
+  sdp: string;
+  /** The session's turn_detection config, needed to restore VAD after a
+   *  mic pause (pause = session.update turn_detection null). */
+  turnDetection: unknown | null;
+}
+
 /** WebRTC signaling: POST the browser's SDP offer, get OpenAI's SDP answer.
  *  The backend proxies the exchange and attaches its sideband bridge, so the
  *  client never sees an API key. */
@@ -432,8 +439,8 @@ export async function createRealtimeSession(
   token: string,
   participantId: string,
   sdpOffer: string
-): Promise<string> {
-  const { data } = await client.post<string>(
+): Promise<RealtimeSession> {
+  const res = await client.post<string>(
     `/interview/${token}/${participantId}/realtime/sdp`,
     sdpOffer,
     {
@@ -444,7 +451,12 @@ export async function createRealtimeSession(
       timeout: 30_000,
     }
   );
-  return data;
+  let turnDetection: unknown | null = null;
+  try {
+    const raw = res.headers["x-realtime-turn-detection"];
+    if (raw) turnDetection = JSON.parse(String(raw));
+  } catch { /* header optional */ }
+  return { sdp: res.data, turnDetection };
 }
 
 /** Upload the parallel full-session recording (mic + interviewer voice). */
