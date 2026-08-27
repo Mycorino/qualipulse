@@ -1663,8 +1663,21 @@ async def upload_realtime_recording(
     longest capture wins.
     """
     link = _get_active_link_or_404(token, db)
-    _get_realtime_project_or_404(link)
     participant = _get_participant_or_404(participant_id, link, db)
+    # Deliberately looser than the SDP gate: gate flips (workspace leaving
+    # the beta, the kill switch) must stop NEW sessions, never reject the
+    # audio of one already running — that is how a deploy mid-interview
+    # silently lost a session's recording once. The stored study setting
+    # (or an existing recording being replaced) is proof enough that this
+    # participant legitimately ran a realtime session.
+    if (
+        getattr(link.project, "interview_mode", "classic") != "realtime_beta"
+        and not participant.session_recording_url
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Realtime interviews are not enabled for this study",
+        )
 
     from app.services.realtime_interview import store_session_recording
 

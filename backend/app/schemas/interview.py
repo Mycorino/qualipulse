@@ -176,6 +176,8 @@ class TranscriptTurnResponse(BaseModel):
     edited_at: datetime | None = None
     created_at: datetime
     audio_recording_url: str | None = None
+    # Realtime-beta: where this turn starts inside session_recording_url.
+    audio_offset_seconds: float | None = None
     tts_audio_url: str | None = None
     translated_response: str | None = None
     translated_question: str | None = None

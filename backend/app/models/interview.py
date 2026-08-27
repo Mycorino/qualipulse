@@ -252,6 +252,11 @@ class InterviewTurn(Base):
     # Cleared on manual edit because character offsets no longer match.
     response_segments: Mapped[str | None] = mapped_column(Text, nullable=True)
     audio_recording_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Realtime-beta turns: seconds into the participant's full-session
+    # recording at which this turn's question begins. Lets the researcher
+    # jump the session player to any turn even though realtime interviews
+    # have no per-turn audio files. Stamped by the sideband bridge.
+    audio_offset_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     tts_audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     manually_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

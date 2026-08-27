@@ -562,7 +562,8 @@
       "noneToReward": "No rewards pending. Approve interviews to build the payout list."
     },
     "sessionRecording": "Full session recording (live voice interview)",
-    "sessionRecordingLabel": "Full session recording"
+    "sessionRecordingLabel": "Full session recording",
+    "listenFromTurn": "Play the session recording from this point"
   },
   "transcript": {
     "title": "Transcript",

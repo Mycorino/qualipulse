@@ -288,6 +288,8 @@ export default function ProjectDetail() {
   // Map of turnId → recording <audio> element so transcript spans can seek
   // playback by clicking a segment.
   const recordingAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
+  // Realtime-beta full-session player — per-turn "listen" buttons seek it.
+  const sessionRecordingRef = useRef<HTMLAudioElement | null>(null);
 
   // ── Iterative analysis state ───────────────────────────────────────────────
   const [themeAnnotations, setThemeAnnotations] = useState<Record<string, ThemeAnnotation>>({});
@@ -3710,6 +3712,7 @@ export default function ProjectDetail() {
                           🎙 {tProject("responses.sessionRecording", { defaultValue: "Full session recording (live voice interview)" })}
                         </p>
                         <AudioClip
+                          ref={sessionRecordingRef}
                           src={selectedParticipant.session_recording_url}
                           label={tProject("responses.sessionRecordingLabel", { defaultValue: "Full session recording" })}
                         />
@@ -3852,6 +3855,26 @@ export default function ProjectDetail() {
                                       <span className="badge" style={{ fontSize: 10, background: "var(--warning-bg)", color: "var(--warning-text)" }}>{tProject("responses.edited")}</span>
                                     )}
                                   </span>
+                                  {!t.audio_recording_url &&
+                                    t.audio_offset_seconds != null &&
+                                    selectedParticipant.session_recording_url && (
+                                    /* Realtime turn: no per-turn file, but we know where this
+                                       turn starts in the session recording — jump the player. */
+                                    <button
+                                      className="btn btn-ghost"
+                                      style={{ fontSize: 12, minHeight: 32, padding: "2px 10px" }}
+                                      onClick={() => {
+                                        const el = sessionRecordingRef.current;
+                                        if (!el) return;
+                                        el.currentTime = Math.max(0, (t.audio_offset_seconds ?? 0) - 1);
+                                        void el.play().catch(() => undefined);
+                                        document.querySelector(".session-recording-block")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                                      }}
+                                      title={tProject("responses.listenFromTurn", { defaultValue: "Play the session recording from this point" })}
+                                    >
+                                      ▶ {Math.floor((t.audio_offset_seconds ?? 0) / 60)}:{String(Math.floor((t.audio_offset_seconds ?? 0) % 60)).padStart(2, "0")}
+                                    </button>
+                                  )}
                                   {t.audio_recording_url && (
                                     <AudioClip
                                       ref={(el) => {

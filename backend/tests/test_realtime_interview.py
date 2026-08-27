@@ -406,6 +406,60 @@ class TestBridgeTurns:
         cfg = rt.build_session_config(participant.project, participant, "fr")
         assert cfg["audio"]["input"]["turn_detection"]["interrupt_response"] is False
 
+    def test_turn_offsets_are_stamped_into_the_recording_timeline(self, db_session, bridge_sessions):
+        _, participant = _seed(db_session, "tok-offset", turns=2)
+        rt._stamp_turn_offset(participant.id, 1, 42.37)
+        db_session.expire_all()
+        turns = {t.turn_index: t for t in participant.turns}
+        assert turns[1].audio_offset_seconds == 42.4
+        assert turns[0].audio_offset_seconds is None
+        # First write wins — a reconnect must not rewrite history against a
+        # recording that no longer matches.
+        rt._stamp_turn_offset(participant.id, 1, 99.9)
+        db_session.expire_all()
+        assert {t.turn_index: t for t in participant.turns}[1].audio_offset_seconds == 42.4
+
+    def test_recording_upload_survives_gate_flips_mid_session(self, client, db_session):
+        """Leaving the beta (or the kill switch) stops NEW sessions, never
+        the audio of one already running."""
+        link, participant = _seed(db_session, "tok-rec-flip", beta=False)
+        with patch.object(settings, "REALTIME_INTERVIEW_ENABLED", False), \
+             patch("app.services.storage.upload_audio", return_value="/audio/recordings/x/s.mp3"), \
+             patch("app.services.transcode.needs_transcode", return_value=False):
+            res = client.post(
+                f"/interview/{link.token}/{participant.id}/realtime/recording",
+                files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+            )
+        assert res.status_code == 200
+
+        # But a plain classic study with no recording still has no endpoint.
+        link2, p2 = _seed(db_session, "tok-rec-classic2", mode="classic")
+        res = client.post(
+            f"/interview/{link2.token}/{p2.id}/realtime/recording",
+            files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+        )
+        assert res.status_code == 404
+
+    def test_transcript_payload_carries_turn_offsets(self, client, db_session, auth_headers, registered_company):
+        from app.models.company import Company as _C
+        link, participant = _seed(db_session, "tok-offset-api", turns=2)
+        # Re-home the seeded project under the authenticated company so the
+        # researcher transcript endpoint can read it.
+        me = db_session.query(_C).filter(_C.email == "test@example.com").first()
+        participant.project.company_id = me.id
+        turns = sorted(participant.turns, key=lambda t: t.turn_index)
+        turns[0].audio_offset_seconds = 3.2
+        db_session.commit()
+
+        res = client.get(
+            f"/projects/{participant.project_id}/participants/{participant.id}/transcript",
+            headers=auth_headers,
+        )
+        assert res.status_code == 200, res.text
+        got = {t["turn_index"]: t.get("audio_offset_seconds") for t in res.json()["turns"]}
+        assert got[0] == 3.2
+        assert got[1] is None
+
     def test_session_config_carries_language_and_vad(self, db_session):
         _, participant = _seed(db_session, "tok-config")
         cfg = rt.build_session_config(participant.project, participant, "fr")
