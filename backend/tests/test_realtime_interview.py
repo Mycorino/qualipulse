@@ -19,6 +19,29 @@ from app.models.project import Project
 from app.services import realtime_interview as rt
 
 
+class _FakeWs:
+    """Sideband stand-in: hands out queued events, times out otherwise."""
+
+    def __init__(self, events=None, delay_calls=0):
+        self.sent = []
+        self.events = list(events or [])
+        self.delay_calls = delay_calls
+
+    def send(self, payload):
+        self.sent.append(json.loads(payload))
+
+    def recv(self, timeout=None):
+        import time
+
+        time.sleep(0.01)
+        if self.delay_calls > 0:
+            self.delay_calls -= 1
+            raise TimeoutError
+        if self.events:
+            return json.dumps(self.events.pop(0))
+        raise TimeoutError
+
+
 @pytest.fixture
 def bridge_sessions(db_session):
     """Point session_scope() (used by the bridge's own sessions) at the
@@ -400,6 +423,53 @@ class TestBridgeTurns:
         # trip the guard.
         assert bridge._is_echo("Oui") is False
         assert bridge._is_echo("Oui, tous les jours en fait") is False
+
+    def test_hesitation_fragments_are_not_answers(self):
+        """VAD commits "So" / "Ah." while the participant lines up a thought;
+        treating those as answers makes Claude probe mid-thought."""
+        assert rt._is_hesitation_only("So", "en") is True
+        assert rt._is_hesitation_only("Ah.", "en") is True
+        assert rt._is_hesitation_only("Okay, so, um...", "en") is True
+        # The spoken acknowledgment's echo, should it ever reach the mic.
+        assert rt._is_hesitation_only("Gotcha.", "en") is True
+        assert rt._is_hesitation_only("Euh... alors...", "fr") is True
+        assert rt._is_hesitation_only("D'accord.", "fr") is True
+        assert rt._is_hesitation_only("", "en") is True
+        # Real short answers keep flowing.
+        assert rt._is_hesitation_only("No", "en") is False
+        assert rt._is_hesitation_only("Netflix mostly", "en") is False
+        assert rt._is_hesitation_only("Oui", "fr") is False
+        assert rt._is_hesitation_only("So basically the billing broke", "en") is False
+
+    def test_hesitation_fragment_holds_the_turn_open(self, db_session, bridge_sessions, monkeypatch):
+        monkeypatch.setattr(rt, "ANSWER_DRAIN_SECONDS", 0.05)
+        _, participant = _seed(db_session, "tok-hesit", turns=1)
+        pending_before = rt._pending_question(participant.id)
+        bridge = rt.SidebandBridge("rtc_hesit", participant.id, 20)
+        ws = _FakeWs()
+        bridge._handle_transcript(
+            ws,
+            {"type": "conversation.item.input_audio_transcription.completed", "transcript": "So"},
+        )
+        # No ack, no next question, no "could you repeat": total silence,
+        # the turn stays open for the real answer.
+        assert ws.sent == []
+        assert rt._pending_question(participant.id) == pending_before
+
+    def test_short_answer_waits_for_the_rest_of_the_sentence(self, db_session, bridge_sessions, monkeypatch):
+        monkeypatch.setattr(rt, "ANSWER_DRAIN_SECONDS", 0.05)
+        monkeypatch.setattr(rt, "SHORT_ANSWER_EXTRA_WAIT", 0.6)
+        _, participant = _seed(db_session, "tok-short2", turns=1)
+        bridge = rt.SidebandBridge("rtc_short2", participant.id, 20)
+        continuation = {
+            "type": "conversation.item.input_audio_transcription.completed",
+            "transcript": "and Disney for the kids",
+        }
+        # The continuation only arrives after the normal drain window: a
+        # fixed 1s drain would have answered "Netflix mostly" on its own.
+        ws = _FakeWs(events=[continuation], delay_calls=15)
+        combined = bridge._collect_answer(ws, "Netflix mostly")
+        assert combined == "Netflix mostly and Disney for the kids"
 
     def test_barge_in_is_off_so_the_interviewer_cannot_cut_itself_off(self, db_session):
         _, participant = _seed(db_session, "tok-barge")

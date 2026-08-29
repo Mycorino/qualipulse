@@ -46,9 +46,14 @@ const RECORDER_MIME_CANDIDATES = [
 // How long we keep waiting for the goodbye line to finish playing after the
 // backend marks the interview completed, before wrapping up anyway.
 const ENDING_GRACE_MS = 25_000;
-// Speaker tail: how long after the interviewer finishes before the mic is
-// re-armed, so the end of its own sentence is not heard as an answer.
+// Speaker tail: how long after the interviewer's audio finishes PLAYING
+// (output_audio_buffer.stopped) before the mic is re-armed, so the room's
+// reverb of its own sentence is not heard as an answer.
 const MIC_REARM_DELAY_MS = 350;
+// Safety net: response.done fires when generation ends, which can be seconds
+// before playback ends. If output_audio_buffer.stopped never arrives, re-arm
+// this long after response.done rather than staying muted forever.
+const RESPONSE_DONE_FALLBACK_MS = 6_000;
 const STATUS_POLL_MS = 3_500;
 
 export default function RealtimeInterview({
@@ -272,10 +277,31 @@ export default function RealtimeInterview({
         }
         break;
       case "response.done":
-        speakingRef.current = false;
         captionOpenRef.current = false;
+        // Generation is done but the speaker is still playing the buffered
+        // tail; the real re-arm happens on output_audio_buffer.stopped.
+        // This long timer only covers that event never arriving.
+        if (!micRearmTimerRef.current) {
+          micRearmTimerRef.current = window.setTimeout(() => {
+            micRearmTimerRef.current = null;
+            speakingRef.current = false;
+            setVoiceState("idle");
+            setMicLive(true);
+          }, RESPONSE_DONE_FALLBACK_MS);
+        }
+        break;
+      case "output_audio_buffer.started":
+        speakingRef.current = true;
+        setMicLive(false);
+        break;
+      case "output_audio_buffer.stopped":
+      case "output_audio_buffer.cleared":
+        // Playback has actually left the speaker: now it is safe to listen.
+        speakingRef.current = false;
         setVoiceState("idle");
-        // Re-arm after the tail of the sentence has left the speaker.
+        if (micRearmTimerRef.current) {
+          window.clearTimeout(micRearmTimerRef.current);
+        }
         micRearmTimerRef.current = window.setTimeout(() => {
           micRearmTimerRef.current = null;
           setMicLive(true);

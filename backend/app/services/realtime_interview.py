@@ -31,6 +31,7 @@ import time
 import uuid
 
 import httpx
+from websockets.exceptions import ConnectionClosed
 
 from app.config import settings
 
@@ -53,10 +54,18 @@ ANSWER_DRAIN_SECONDS = 1.0
 # transcription before advancing with what we have.
 ANSWER_CONTINUATION_TIMEOUT = 20.0
 
+# An answer this short (in words) is usually a thought being formed, not a
+# finished answer: give the participant one extra beat before advancing.
+SHORT_ANSWER_WORDS = 4
+SHORT_ANSWER_EXTRA_WAIT = 4.0
+
 # Speaker-to-mic echo: for this long after the interviewer stops speaking, a
 # transcript that echoes what it just said is treated as the room hearing the
-# interviewer, not the participant answering.
-ECHO_TAIL_SECONDS = 2.0
+# interviewer, not the participant answering. Measured from response.done,
+# which fires when *generation* ends — the phone's speaker keeps playing the
+# buffered tail for a while after that, and the echo's transcription takes a
+# few more seconds to come back, so this window has to absorb both lags.
+ECHO_TAIL_SECONDS = 6.0
 # Word overlap with the just-spoken line above which a transcript is echo.
 ECHO_OVERLAP_RATIO = 0.6
 # How long a queued line waits for the in-flight response to finish before
@@ -263,6 +272,38 @@ def _ack_instruction(language: str | None) -> str:
         f"({lang}), one to three words, in a warm listening tone, for example "
         f"{examples} Vary it. Say nothing else and ask nothing."
     )
+
+
+# Hesitation particles and bare acknowledgments, per language. A transcript
+# made ONLY of these is someone thinking out loud (or the interviewer's own
+# "Got it." leaking through the speaker), never a finished answer. Real short
+# answers ("No.", "Netflix.") contain at least one word outside these sets.
+_UNIVERSAL_FILLERS = {"ah", "eh", "er", "hm", "hmm", "mm", "mmm", "uh", "um", "oh", "ok", "okay"}
+_HESITATION_WORDS = {
+    "en": {"so", "well", "like", "gotcha", "right", "sure", "alright", "see", "got", "it", "i"},
+    "fr": {"euh", "ben", "bah", "hum", "alors", "donc", "bon", "hein", "voila", "voilà",
+           "d'accord", "daccord", "compris", "entendu", "vois", "je", "bien", "très", "tres", "parfait"},
+    "de": {"äh", "ähm", "also", "tja", "na", "gut", "klar", "verstehe", "alles"},
+    "es": {"em", "este", "pues", "bueno", "vale", "entiendo", "ver", "muy", "bien", "a"},
+    "it": {"ehm", "mah", "beh", "allora", "dunque", "cioè", "cioe", "capisco", "va", "bene", "certo"},
+    "pt": {"hum", "então", "entao", "pois", "bem", "tipo", "certo", "entendo", "muito"},
+}
+
+
+def _is_hesitation_only(transcript: str, language: str | None) -> bool:
+    """True when a transcript carries no answer content at all.
+
+    "So", "Ah.", "Euh..." are the sound of a participant lining up a thought;
+    treating them as answers makes the interviewer barrel ahead mid-thought
+    (Claude probes "take your time..." while the participant is taking it).
+    Such fragments must hold the turn open, silently.
+    """
+    words = re.sub(r"[^\w\s'À-ÿ]", " ", (transcript or "").lower()).split()
+    if not words:
+        return True
+    lang = (language or "en")[:2]
+    fillers = _UNIVERSAL_FILLERS | _HESITATION_WORDS.get(lang, _HESITATION_WORDS["en"])
+    return all(w in fillers for w in words)
 
 
 def _normalise_for_echo(text: str) -> list[str]:
@@ -487,8 +528,25 @@ class SidebandBridge:
         if speech restarts inside the window, wait for its transcription.
         """
         parts = [first]
+        extended = False
         wait_until = time.monotonic() + ANSWER_DRAIN_SECONDS
-        while time.monotonic() < min(wait_until, self.deadline):
+        while True:
+            now = time.monotonic()
+            if now >= min(wait_until, self.deadline):
+                combined = " ".join(p for p in parts if p)
+                if (
+                    not extended
+                    and now < self.deadline
+                    and 0 < len(combined.split()) < SHORT_ANSWER_WORDS
+                    and not _is_hesitation_only(combined, self.language)
+                ):
+                    # A couple of words is usually a thought being formed;
+                    # one longer beat catches the rest of the sentence
+                    # instead of answering half of it.
+                    extended = True
+                    wait_until = now + SHORT_ANSWER_EXTRA_WAIT
+                    continue
+                return combined
             event = self._recv_event(ws, timeout=0.25)
             if event is None:
                 continue
@@ -500,7 +558,6 @@ class SidebandBridge:
                 if text and not self._is_echo(text):
                     parts.append(text)
                 wait_until = time.monotonic() + ANSWER_DRAIN_SECONDS
-        return " ".join(p for p in parts if p)
 
     def _on_response_done(self, event: dict) -> None:
         usage = (event.get("response") or {}).get("usage")
@@ -524,12 +581,24 @@ class SidebandBridge:
         if not transcript:
             self._speak(ws, _repeat_line(self.language))
             return
+        if _is_hesitation_only(transcript, self.language):
+            # "So", "Ah.", a stray "Okay" from the speaker: not an answer.
+            # Say nothing, ask nothing, keep the turn open — the real answer
+            # arrives as its own transcription event when they get there.
+            logger.info(
+                "realtime: holding turn open, hesitation-only fragment %r (participant=%s)",
+                transcript[:60], self.participant_id,
+            )
+            return
         if settings.REALTIME_ACK_ENABLED:
             # Fill the Claude-decision gap with a human "I heard you" beat
             # instead of silence. _speak below waits for this to finish, so
-            # the question never talks over the acknowledgment.
+            # the question never talks over the acknowledgment. last_spoken
+            # deliberately keeps the previous question: the ack's own words
+            # are unknown (the model improvises them), its echo is caught by
+            # the hesitation gate instead, and the question's echo can still
+            # arrive late and must stay matchable.
             self.response_active = True
-            self.last_spoken = ""
             self._send(
                 ws,
                 {"type": "response.create", "response": {"instructions": _ack_instruction(self.language)}},
@@ -576,6 +645,14 @@ class SidebandBridge:
         except _SessionDone:
             logger.info(
                 "realtime interview completed call=%s participant=%s",
+                self.call_id, self.participant_id,
+            )
+        except ConnectionClosed:
+            # The participant closed the page (or OpenAI ended the call), so
+            # the socket died under us: ordinary teardown, not a crash. The
+            # interview stays resumable like any in-progress interview.
+            logger.info(
+                "realtime call closed call=%s participant=%s",
                 self.call_id, self.participant_id,
             )
         except Exception:
