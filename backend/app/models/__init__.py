@@ -7,7 +7,12 @@ from app.models.interview import (
     ProjectAnalysis,
     RealtimeRecordingSegment,
 )
-from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
+from app.models.project import (
+    InterviewGuideQuestion,
+    Project,
+    ScreeningQuestion,
+    StimulusAsset,
+)
 from app.models.coding import ManualCode, QuoteTag, TagSuggestion
 from app.models.memo import ProjectMemo
 from app.models.usage import AIUsageLog
@@ -81,6 +86,7 @@ __all__ = [
     "Project",
     "ProjectAnalysis",
     "ScreeningQuestion",
+    "StimulusAsset",
     "ProjectMemo",
     "TagSuggestion",
     "QuoteTag",

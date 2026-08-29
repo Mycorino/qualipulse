@@ -9,6 +9,9 @@ INTERVIEW_MODES = {"classic", "realtime_beta"}
 # participant page never loads external fonts.
 BRAND_FONTS = {"system", "humanist", "serif", "elegant"}
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+# Mirrors models.project.STIMULUS_KINDS. Kept as a literal here so the
+# schema layer does not import the ORM.
+STIMULUS_KINDS = {"image", "text"}
 
 
 class BrandingFieldsMixin(BaseModel):
@@ -85,6 +88,10 @@ class QuestionPatch(BaseModel):
     deprecated_at: datetime | None = None
     interview_notes: str | None = None
     desired_learning: str | None = None
+    # Tri-state, same shape as the link max_participants patch: absent =
+    # unchanged, a value = attach that asset, `clear_stimulus` = detach.
+    stimulus_id: str | None = None
+    clear_stimulus: bool = False
 
 
 class ScreeningQuestionCreate(BaseModel):
@@ -175,6 +182,47 @@ class ProjectSettingsPatch(BrandingFieldsMixin):
     target_customer_description: str | None = None
 
 
+class StimulusCreate(BaseModel):
+    """Create a text stimulus. Images arrive through the upload endpoint."""
+
+    name: str
+    kind: str = "text"
+    body: str | None = None
+    caption: str | None = None
+    ai_description: str | None = None
+
+    @field_validator("kind")
+    @classmethod
+    def _valid_kind(cls, v: str) -> str:
+        if v not in STIMULUS_KINDS:
+            raise ValueError(f"kind must be one of {sorted(STIMULUS_KINDS)}")
+        return v
+
+
+class StimulusPatch(BaseModel):
+    name: str | None = None
+    body: str | None = None
+    caption: str | None = None
+    ai_description: str | None = None
+    sort_order: int | None = None
+
+
+class StimulusResponse(BaseModel):
+    id: str
+    name: str
+    kind: str
+    url: str | None = None
+    body: str | None = None
+    caption: str | None = None
+    ai_description: str | None = None
+    sort_order: int = 0
+    # How many live guide questions currently show this asset. Lets the
+    # Setup tab warn before a delete that would blank a question.
+    question_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
 class QuestionResponse(BaseModel):
     id: str
     section_index: int
@@ -185,6 +233,7 @@ class QuestionResponse(BaseModel):
     desired_learning: str | None = None
     researcher_notes: str | None = None
     deprecated_at: datetime | None = None
+    stimulus_id: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -235,6 +284,7 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     questions: list[QuestionResponse] = []
     screening_questions: list[ScreeningQuestionResponse] = []
+    stimuli: list[StimulusResponse] = []
     plan_context: PlanContext | None = None
 
     model_config = {"from_attributes": True}

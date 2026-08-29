@@ -370,7 +370,10 @@
       "confirmNo": "Continua",
       "finishing": "Chiusura in corso…",
       "error": "Non siamo riusciti a concludere l'intervista. Riprovi."
-    }
+    },
+    "stimulusAlt": "Materiale mostrato per questa domanda",
+    "stimulusZoom": "Apri l'immagine a schermo intero",
+    "stimulusClose": "Chiudi"
   },
   "completion": {
     "title": "Grazie, {{name}}!",

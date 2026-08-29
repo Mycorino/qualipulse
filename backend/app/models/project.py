@@ -149,6 +149,10 @@ class Project(Base):
         "ScreeningQuestion", back_populates="project", cascade="all, delete-orphan",
         order_by="ScreeningQuestion.sort_order",
     )
+    stimuli = relationship(
+        "StimulusAsset", back_populates="project", cascade="all, delete-orphan",
+        order_by="StimulusAsset.sort_order",
+    )
 
     @property
     def name_translations_dict(self) -> dict:
@@ -199,9 +203,17 @@ class InterviewGuideQuestion(Base):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     researcher_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     deprecated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Optional artefact the participant is shown while this question is on
+    # screen (concept board, pack shot, written concept). SET NULL rather
+    # than CASCADE: deleting an asset must never delete the question that
+    # referenced it, it just unsticks the picture.
+    stimulus_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("stimulus_assets.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Relationships
     project = relationship("Project", back_populates="guide_questions")
+    stimulus = relationship("StimulusAsset", back_populates="questions")
 
 
 class ScreeningQuestion(Base):
@@ -256,3 +268,77 @@ class ScreeningQuestion(Base):
             for i, opt in enumerate(canonical)
         ]
         return q, opts
+
+
+# What a stimulus can be. "image" covers packaging, ad creative, screenshots
+# and mockups; "text" covers a written concept statement or positioning line.
+# Video is deliberately out of scope for now: it needs its own player,
+# transcoding and bandwidth story on the participant side.
+STIMULUS_KINDS = {"image", "text"}
+
+
+class StimulusAsset(Base):
+    """Something the participant is shown before answering a guide question.
+
+    Concept tests, packaging tests and ad-creative reactions all need an
+    artefact on screen at a precise moment in the conversation. A stimulus is
+    that artefact, owned by the study and attached to zero or more guide
+    questions.
+
+    Assets are addressed by URL rather than stored inline: images go through
+    the same R2/local-disk path as branding logos (`services.storage.upload_image`),
+    so nothing new is needed to serve them.
+    """
+
+    __tablename__ = "stimulus_assets"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Researcher-facing label ("Pack A", "Concept 2: refill pouch"). Never
+    # shown to the participant, so it can carry cell names without priming.
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="image")
+    # Set for kind="image": the stored public URL.
+    url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Set for kind="text": the concept statement shown verbatim.
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optional line rendered under the asset for the participant ("Take a
+    # moment to look at this pack"). Participant-facing, so it is localized
+    # the same way the rest of the interview chrome is: researcher's words.
+    caption: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Researcher's note to the AI interviewer about what this asset is and
+    # what to watch for. Never spoken aloud, never shown to the participant.
+    # For images this rides alongside the picture itself, which the model
+    # also sees, so it is a hint rather than a substitute for looking.
+    ai_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    project = relationship("Project", back_populates="stimuli")
+    questions = relationship("InterviewGuideQuestion", back_populates="stimulus")
+
+    @property
+    def is_image(self) -> bool:
+        return self.kind == "image" and bool(self.url)
+
+    def prompt_line(self) -> str:
+        """One-line description for the interviewer prompt.
+
+        Kept terse: this lands inside the guide block, which is cached, and
+        the model gets the image itself in the message when there is one.
+        """
+        bits = [f"{self.name}"]
+        if self.kind == "text" and self.body:
+            body = self.body.strip().replace("\n", " ")
+            bits.append(f'concept text shown to the participant: "{body}"')
+        elif self.kind == "image":
+            bits.append("an image the participant is looking at right now")
+        if self.ai_description:
+            bits.append(self.ai_description.strip())
+        return "; ".join(bits)

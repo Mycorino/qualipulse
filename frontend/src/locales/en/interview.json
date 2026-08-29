@@ -370,7 +370,10 @@
       "confirmNo": "Keep going",
       "finishing": "Wrapping up…",
       "error": "We couldn't wrap up the interview. Please try again."
-    }
+    },
+    "stimulusAlt": "Material shown for this question",
+    "stimulusZoom": "Open the image full screen",
+    "stimulusClose": "Close"
   },
   "completion": {
     "title": "Thank you, {{name}}!",

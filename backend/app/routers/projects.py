@@ -14,7 +14,13 @@ from app.dependencies import (
     get_db,
 )
 from app.models.company import Company
-from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
+from app.models.project import (
+    STIMULUS_KINDS,
+    InterviewGuideQuestion,
+    Project,
+    ScreeningQuestion,
+    StimulusAsset,
+)
 from app.schemas.project import (
     GuideQuestionAdd,
     ProjectCreate,
@@ -26,6 +32,9 @@ from app.schemas.project import (
     ScreeningQuestionCreate,
     ScreeningQuestionResponse,
     ScreeningTranslationPatch,
+    StimulusCreate,
+    StimulusPatch,
+    StimulusResponse,
 )
 from app.services.analytics import emit_event
 from app.services.demo_seeder import (
@@ -947,6 +956,13 @@ def patch_question(
     # Allow setting deprecated_at to a value or clearing it (None = un-deprecate)
     if "deprecated_at" in body.model_fields_set:
         question.deprecated_at = body.deprecated_at
+    if body.clear_stimulus:
+        question.stimulus_id = None
+    elif body.stimulus_id is not None:
+        # Attaching someone else's asset would leak it into this study's
+        # interview payload, so the ownership check is not optional.
+        if _get_stimulus_or_404(body.stimulus_id, project.id, db) is not None:
+            question.stimulus_id = body.stimulus_id
 
     db.commit()
     db.refresh(question)
@@ -961,7 +977,197 @@ def patch_question(
         desired_learning=question.desired_learning,
         researcher_notes=question.researcher_notes,
         deprecated_at=question.deprecated_at,
+        stimulus_id=question.stimulus_id,
     )
+
+
+# ---------------------------------------------------------------------------
+# Stimulus assets
+# ---------------------------------------------------------------------------
+
+def _get_stimulus_or_404(
+    stimulus_id: str, project_id: str, db: Session
+) -> StimulusAsset:
+    asset = (
+        db.query(StimulusAsset)
+        .filter(
+            StimulusAsset.id == stimulus_id,
+            StimulusAsset.project_id == project_id,
+        )
+        .first()
+    )
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Stimulus not found")
+    return asset
+
+
+def _stimulus_to_response(asset: StimulusAsset) -> StimulusResponse:
+    return StimulusResponse(
+        id=asset.id,
+        name=asset.name,
+        kind=asset.kind,
+        url=asset.url,
+        body=asset.body,
+        caption=asset.caption,
+        ai_description=asset.ai_description,
+        sort_order=asset.sort_order,
+        question_count=sum(
+            1 for q in asset.questions if q.deprecated_at is None
+        ),
+    )
+
+
+def _next_stimulus_sort_order(project: Project) -> int:
+    return max((a.sort_order for a in project.stimuli), default=-1) + 1
+
+
+@router.get("/{project_id}/stimuli", response_model=list[StimulusResponse])
+def list_stimuli(
+    project_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> list[StimulusResponse]:
+    """The study's stimulus library."""
+    project = _get_project_or_404(project_id, company.id, db)
+    return [
+        _stimulus_to_response(a)
+        for a in sorted(project.stimuli, key=lambda a: a.sort_order)
+    ]
+
+
+@router.post(
+    "/{project_id}/stimuli",
+    response_model=StimulusResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_stimulus(
+    project_id: str,
+    body: StimulusCreate,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> StimulusResponse:
+    """Create a text stimulus (a written concept statement).
+
+    Images come in through ``/stimuli/upload`` instead, which needs the
+    multipart body and the magic-byte check.
+    """
+    project = _get_editable_project_or_404(project_id, company.id, db)
+    if body.kind == "image":
+        raise HTTPException(
+            status_code=400,
+            detail="Image stimuli are created through /stimuli/upload.",
+        )
+    if not (body.body or "").strip():
+        raise HTTPException(
+            status_code=400, detail="A text stimulus needs its concept text."
+        )
+    asset = StimulusAsset(
+        project_id=project.id,
+        name=body.name.strip() or "Concept",
+        kind="text",
+        body=body.body,
+        caption=body.caption,
+        ai_description=body.ai_description,
+        sort_order=_next_stimulus_sort_order(project),
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return _stimulus_to_response(asset)
+
+
+@router.post(
+    "/{project_id}/stimuli/upload",
+    response_model=StimulusResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_stimulus_image(
+    project_id: str,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    caption: str | None = Form(None),
+    ai_description: str | None = Form(None),
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> StimulusResponse:
+    """Upload an image stimulus (pack shot, ad creative, screen mockup).
+
+    Same storage path and validation as the branding logo: R2 in production,
+    UPLOAD_DIR locally, content-type checked against the file's magic bytes.
+    """
+    project = _get_editable_project_or_404(project_id, company.id, db)
+    ext = IMAGE_EXTENSIONS.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(
+            status_code=415,
+            detail="Unsupported image type. Allowed: PNG, JPEG, WebP, GIF.",
+        )
+    data = await file.read()
+    if len(data) > MAX_IMAGE_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image too large. Max size is {MAX_IMAGE_UPLOAD_MB}MB.",
+        )
+    if not matches_image_magic(data, ext):
+        raise HTTPException(
+            status_code=415, detail="File content does not match its image type."
+        )
+    key = f"stimuli/{project.id}/{uuid.uuid4()}{ext}"
+    asset = StimulusAsset(
+        project_id=project.id,
+        name=(name or "").strip() or "Stimulus",
+        kind="image",
+        url=upload_image(data, key),
+        caption=caption,
+        ai_description=ai_description,
+        sort_order=_next_stimulus_sort_order(project),
+    )
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return _stimulus_to_response(asset)
+
+
+@router.patch("/{project_id}/stimuli/{stimulus_id}", response_model=StimulusResponse)
+def patch_stimulus(
+    project_id: str,
+    stimulus_id: str,
+    body: StimulusPatch,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> StimulusResponse:
+    project = _get_editable_project_or_404(project_id, company.id, db)
+    asset = _get_stimulus_or_404(stimulus_id, project.id, db)
+    if body.name is not None:
+        asset.name = body.name
+    if body.body is not None:
+        asset.body = body.body
+    if body.caption is not None:
+        asset.caption = body.caption
+    if body.ai_description is not None:
+        asset.ai_description = body.ai_description
+    if body.sort_order is not None:
+        asset.sort_order = body.sort_order
+    db.commit()
+    db.refresh(asset)
+    return _stimulus_to_response(asset)
+
+
+@router.delete(
+    "/{project_id}/stimuli/{stimulus_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_stimulus(
+    project_id: str,
+    stimulus_id: str,
+    db: Session = Depends(get_db),
+    company: Company = Depends(get_current_company),
+) -> None:
+    """Delete a stimulus. Questions and past turns that referenced it keep
+    their rows; the reference is nulled by the FK."""
+    project = _get_editable_project_or_404(project_id, company.id, db)
+    asset = _get_stimulus_or_404(stimulus_id, project.id, db)
+    db.delete(asset)
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -1010,6 +1216,7 @@ def _project_to_response(project: Project) -> ProjectResponse:
             desired_learning=q.desired_learning,
             researcher_notes=q.researcher_notes,
             deprecated_at=q.deprecated_at,
+            stimulus_id=q.stimulus_id,
         )
         for q in sorted(project.guide_questions, key=lambda q: (q.section_index, q.question_index))
     ]
@@ -1058,5 +1265,9 @@ def _project_to_response(project: Project) -> ProjectResponse:
         created_at=project.created_at,
         questions=questions,
         screening_questions=screening,
+        stimuli=[
+            _stimulus_to_response(a)
+            for a in sorted(project.stimuli, key=lambda a: a.sort_order)
+        ],
         plan_context=_plan_context_for_project(project),
     )

@@ -318,6 +318,13 @@ class InterviewTurn(Base):
     # display + translation-source reading aid, same principle as translation.
     cleaned_response: Mapped[str | None] = mapped_column(Text, nullable=True)
     cleaned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Which stimulus was on the participant's screen while they answered this
+    # turn. Provenance, not configuration: the guide question's attachment can
+    # change after fielding starts, so the analysis needs to know what this
+    # person actually saw. SET NULL on asset deletion.
+    stimulus_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("stimulus_assets.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -332,4 +339,7 @@ class InterviewTurn(Base):
 
     # Relationships
     participant = relationship("Participant", back_populates="turns")
+    # No back_populates: the asset does not need to know every turn it was
+    # shown for, and loading that list would be pointless on a busy study.
+    stimulus = relationship("StimulusAsset")
     quote_tags = relationship("QuoteTag", back_populates="turn", cascade="all, delete-orphan")

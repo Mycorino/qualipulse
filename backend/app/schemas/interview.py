@@ -49,6 +49,20 @@ class LinkInviteResponse(BaseModel):
     failed: list[str]
 
 
+class StimulusPayload(BaseModel):
+    """What the participant is shown while a question is on screen.
+
+    Carries no ``ai_description``: that field briefs the AI interviewer and
+    is not participant-facing copy.
+    """
+
+    id: str
+    kind: str
+    url: str | None = None
+    body: str | None = None
+    caption: str | None = None
+
+
 class StartInterviewRequest(BaseModel):
     display_name: str | None = None
     age_range: str | None = None
@@ -77,6 +91,9 @@ class StartInterviewResponse(BaseModel):
     # icebreaker) before the first guide question. Frontend uses this to
     # soften the chrome on turn 0 — no progress count, no skip button.
     is_warmup: bool = False
+    # The artefact to show alongside this question, when the guide attaches
+    # one. Null on warm-up, closing and every question without a stimulus.
+    stimulus: StimulusPayload | None = None
     # The authoritative language the AI interviewer + voice are actually using
     # for this participant (participant choice, else the study default). The
     # frontend locks its UI chrome (progress labels, completion screen) to this
@@ -106,6 +123,9 @@ class TurnResponse(BaseModel):
     # the chrome (no progress count, no skip button) and the engine knows not
     # to count it against the time budget.
     is_warmup: bool = False
+    # The artefact on screen for the question this turn asks. Null when the
+    # guide question has no stimulus attached.
+    stimulus: StimulusPayload | None = None
 
 
 class ParticipantResponse(BaseModel):
@@ -210,12 +230,17 @@ class TranscriptResponse(BaseModel):
     recording_segments: list[RecordingSegmentResponse] = []
 
 
+# A participant resuming a concept test needs the concept back on screen,
+# not just the question about it, so every resume path carries the artefact
+# that was showing for the last turn.
 class ResumeCheckResponse(BaseModel):
     found: bool
     participant_id: str | None = None
     last_question: str | None = None
     turn_count: int = 0
     question_index: int = 0
+    last_stimulus: StimulusPayload | None = None
+
 
 class ResumeSummaryResponse(BaseModel):
     questions_covered: list[str]
@@ -225,6 +250,7 @@ class ResumeSummaryResponse(BaseModel):
     # Authoritative interview language (see StartInterviewResponse.language) so a
     # resumed session re-locks the UI to whatever language the AI is speaking.
     language: str = "en"
+    last_stimulus: StimulusPayload | None = None
 
 
 class QualityAssessment(BaseModel):

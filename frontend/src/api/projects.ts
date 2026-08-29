@@ -56,6 +56,24 @@ export interface QuestionResponse {
   desired_learning?: string;
   researcher_notes?: string | null;
   deprecated_at?: string | null;
+  /** Artefact shown to the participant while this question is on screen. */
+  stimulus_id?: string | null;
+}
+
+/** An artefact in the study's stimulus library: a pack shot, ad creative,
+ *  screen mockup, or a written concept statement. */
+export interface StimulusResponse {
+  id: string;
+  name: string;
+  kind: "image" | "text";
+  url?: string | null;
+  body?: string | null;
+  caption?: string | null;
+  /** Briefing for the AI interviewer. Never shown to the participant. */
+  ai_description?: string | null;
+  sort_order: number;
+  /** How many live guide questions currently show this asset. */
+  question_count: number;
 }
 
 export interface ProjectResponse {
@@ -97,6 +115,7 @@ export interface ProjectResponse {
   created_at: string;
   questions: QuestionResponse[];
   screening_questions: ScreeningQuestionResponse[];
+  stimuli?: StimulusResponse[];
   plan_context?: PlanContext | null;
 }
 
@@ -502,7 +521,7 @@ export async function deleteProject(id: string): Promise<void> {
 export async function patchQuestion(
   projectId: string,
   questionId: string,
-  body: { main_question?: string | null; question_index?: number | null; section_title?: string | null; section_index?: number | null; researcher_notes?: string | null; deprecated_at?: string | null; interview_notes?: string | null; desired_learning?: string | null }
+  body: { main_question?: string | null; question_index?: number | null; section_title?: string | null; section_index?: number | null; researcher_notes?: string | null; deprecated_at?: string | null; interview_notes?: string | null; desired_learning?: string | null; stimulus_id?: string | null; clear_stimulus?: boolean }
 ): Promise<QuestionResponse> {
   const { data } = await client.patch<QuestionResponse>(
     `/projects/${projectId}/questions/${questionId}`,
@@ -1021,4 +1040,58 @@ export async function promoteThemeToCode(
     { analysis_id: analysisId, theme_title: themeTitle, color }
   );
   return data;
+}
+
+// ── Stimulus library ───────────────────────────────────────────────────────
+// Artefacts the participant is shown mid-interview. Images go through the
+// multipart upload so the server can check the bytes match the declared type;
+// text concepts are plain JSON.
+
+export async function listStimuli(projectId: string): Promise<StimulusResponse[]> {
+  const { data } = await client.get<StimulusResponse[]>(`/projects/${projectId}/stimuli`);
+  return data;
+}
+
+export async function createTextStimulus(
+  projectId: string,
+  body: { name: string; body: string; caption?: string | null; ai_description?: string | null }
+): Promise<StimulusResponse> {
+  const { data } = await client.post<StimulusResponse>(`/projects/${projectId}/stimuli`, {
+    ...body,
+    kind: "text",
+  });
+  return data;
+}
+
+export async function uploadStimulusImage(
+  projectId: string,
+  file: File,
+  meta: { name: string; caption?: string | null; ai_description?: string | null }
+): Promise<StimulusResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("name", meta.name);
+  if (meta.caption) form.append("caption", meta.caption);
+  if (meta.ai_description) form.append("ai_description", meta.ai_description);
+  const { data } = await client.post<StimulusResponse>(
+    `/projects/${projectId}/stimuli/upload`,
+    form
+  );
+  return data;
+}
+
+export async function patchStimulus(
+  projectId: string,
+  stimulusId: string,
+  body: { name?: string; body?: string; caption?: string | null; ai_description?: string | null; sort_order?: number }
+): Promise<StimulusResponse> {
+  const { data } = await client.patch<StimulusResponse>(
+    `/projects/${projectId}/stimuli/${stimulusId}`,
+    body
+  );
+  return data;
+}
+
+export async function deleteStimulus(projectId: string, stimulusId: string): Promise<void> {
+  await client.delete(`/projects/${projectId}/stimuli/${stimulusId}`);
 }

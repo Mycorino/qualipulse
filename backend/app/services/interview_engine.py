@@ -452,7 +452,127 @@ def _build_interview_guide_str(project: Project) -> str:
             lines.append(f"    Notes: {q.interview_notes}")
         if q.desired_learning:
             lines.append(f"    Desired learning: {q.desired_learning}")
+        stim = getattr(q, "stimulus", None)
+        if stim is not None:
+            lines.append(f"    Stimulus on screen: {stim.prompt_line()}")
     return "\n".join(lines)
+
+
+def stimulus_for_question_index(project: Project, question_index: int | None):
+    """The asset shown while guide question ``question_index`` is on screen.
+
+    ``question_index`` is the global ordinal the turns store, which indexes
+    into the same flattened, non-deprecated guide the model reads. Warm-up
+    and final-check turns use sentinel indices and carry no stimulus.
+    """
+    if question_index is None or question_index < 0:
+        return None
+    guide = sorted(
+        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
+        key=lambda q: (q.section_index, q.question_index),
+    )
+    if question_index >= len(guide):
+        return None
+    return getattr(guide[question_index], "stimulus", None)
+
+
+# Base64 image blocks, keyed by asset URL. An interview asks several turns
+# about the same pack shot, and every turn would otherwise re-read it from
+# R2 before Claude even starts thinking. Bounded so a long-lived instance
+# fielding many studies cannot grow without limit.
+_STIMULUS_IMAGE_CACHE: dict[str, dict] = {}
+_STIMULUS_IMAGE_CACHE_MAX = 32
+# Anthropic rejects images above 5MB base64-encoded; our upload cap is
+# lower, but a legacy or hand-set URL could point anywhere.
+_STIMULUS_MAX_IMAGE_BYTES = 3 * 1024 * 1024
+
+_STIMULUS_MEDIA_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+
+
+def _stimulus_image_block(asset) -> dict | None:
+    """Load an image stimulus as an Anthropic image content block.
+
+    Returns None on any failure. A missing picture must degrade to a
+    text-only prompt, never to a failed interview turn: the participant is
+    already looking at the image, so the worst case is an interviewer who
+    probes a little less specifically.
+    """
+    url = getattr(asset, "url", None)
+    if not url:
+        return None
+    cached = _STIMULUS_IMAGE_CACHE.get(url)
+    if cached is not None:
+        return cached or None
+
+    import base64
+
+    media_type = _STIMULUS_MEDIA_TYPES.get(os.path.splitext(url)[1].lower())
+    if media_type is None:
+        return None
+
+    data: bytes | None = None
+    try:
+        if url.startswith("http://") or url.startswith("https://"):
+            resp = httpx.get(url, timeout=10.0, follow_redirects=True)
+            resp.raise_for_status()
+            data = resp.content
+        else:
+            # Local dev: upload_image returns "/api/files/{key}" and the
+            # bytes live under UPLOAD_DIR.
+            key = url.split("/files/", 1)[-1].lstrip("/")
+            path = os.path.normpath(os.path.join(settings.UPLOAD_DIR, key))
+            root = os.path.normpath(settings.UPLOAD_DIR)
+            if not path.startswith(root + os.sep):
+                return None
+            with open(path, "rb") as fh:
+                data = fh.read()
+    except Exception:
+        logger.warning("stimulus image unavailable url=%s", url, exc_info=True)
+        # Cache the failure too, so a dead URL is not re-fetched every turn.
+        _remember_stimulus_block(url, None)
+        return None
+
+    if not data or len(data) > _STIMULUS_MAX_IMAGE_BYTES:
+        _remember_stimulus_block(url, None)
+        return None
+
+    block = {
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": media_type,
+            "data": base64.b64encode(data).decode("ascii"),
+        },
+    }
+    _remember_stimulus_block(url, block)
+    return block
+
+
+def _remember_stimulus_block(url: str, block: dict | None) -> None:
+    if len(_STIMULUS_IMAGE_CACHE) >= _STIMULUS_IMAGE_CACHE_MAX:
+        _STIMULUS_IMAGE_CACHE.pop(next(iter(_STIMULUS_IMAGE_CACHE)), None)
+    _STIMULUS_IMAGE_CACHE[url] = block or {}
+
+
+def stimulus_payload(asset) -> dict | None:
+    """Participant-facing shape. Deliberately omits ``ai_description``:
+    that is the researcher briefing the interviewer, not copy for the
+    person being interviewed."""
+    if asset is None:
+        return None
+    return {
+        "id": asset.id,
+        "kind": asset.kind,
+        "url": asset.url,
+        "body": asset.body,
+        "caption": asset.caption,
+    }
 
 
 def _build_conversation_history(turns: list[InterviewTurn]) -> str:
@@ -834,6 +954,7 @@ def decide_next_action(
     after_final_check: bool = False,
     current_learning_goal: str | None = None,
     section_change_hint: str | None = None,
+    stimulus=None,
 ) -> dict:
     """Call Claude to decide the next interview action.
 
@@ -846,7 +967,10 @@ def decide_next_action(
     follow-up while silently advancing the guide. ``after_final_check`` tells
     the model the closing check question has been asked and answered, so it
     may close now (or ask one follow-up if the participant raised something
-    new). Raises ``InterviewAIUnavailable`` after exhausting retries.
+    new). ``stimulus`` is the asset currently on the participant's screen; an
+    image one is attached to the message so the model probes what the person
+    is actually looking at rather than a description of it. Raises
+    ``InterviewAIUnavailable`` after exhausting retries.
     """
     client = get_anthropic_client(60.0)
 
@@ -1026,6 +1150,17 @@ WHY: they asked to stop; never negotiate.
             + "\n</host_override>\n\n"
         )
 
+    if stimulus is not None:
+        user_message += (
+            f"<stimulus>\n"
+            f"The participant is looking at this right now: {stimulus.prompt_line()}\n"
+            f"Probe what they actually see. Reference concrete details of it when you "
+            f"follow up, and never describe it back to them as though they cannot see it. "
+            f"Do not lead: ask what they notice and what they make of it before you ask "
+            f"whether they like it.\n"
+            f"</stimulus>\n\n"
+        )
+
     user_message += "Decide the next action and write the words the participant will hear, via the interview_decision tool."
 
     base_system = _effective_system_prompt(system_prompt, language)
@@ -1036,6 +1171,17 @@ WHY: they asked to stop; never negotiate.
         {"type": "text", "text": base_system, "cache_control": {"type": "ephemeral"}},
         {"type": "text", "text": stable_context, "cache_control": {"type": "ephemeral"}},
     ]
+
+    # The image goes first and carries the cache breakpoint: it is the one
+    # part of the message that is identical on every turn of this question,
+    # so after the first turn it is read from cache rather than re-uploaded.
+    message_content: list[dict] = []
+    if stimulus is not None and getattr(stimulus, "is_image", False):
+        image_block = _stimulus_image_block(stimulus)
+        if image_block is not None:
+            image_block = {**image_block, "cache_control": {"type": "ephemeral"}}
+            message_content.append(image_block)
+    message_content.append({"type": "text", "text": user_message})
 
     import time as _time
 
@@ -1050,7 +1196,7 @@ WHY: they asked to stop; never negotiate.
                 system=system_blocks,
                 tools=[DECISION_TOOL],
                 tool_choice={"type": "tool", "name": "interview_decision"},
-                messages=[{"role": "user", "content": user_message}],
+                messages=[{"role": "user", "content": message_content}],
             )
             break
         except (
@@ -1522,7 +1668,10 @@ def start_interview(participant_id: str, db: Session) -> dict:
     except Exception:
         logger.warning("TTS failed for start_interview participant=%s; text-only fallback", participant_id)
 
-    # Save the interviewer turn
+    # Save the interviewer turn. A warm-up turn carries no stimulus: the
+    # point of it is to get the participant talking before anything is put
+    # in front of them.
+    opening_stimulus = stimulus_for_question_index(project, q_index)
     turn = InterviewTurn(
         participant_id=participant_id,
         turn_index=0,
@@ -1531,6 +1680,7 @@ def start_interview(participant_id: str, db: Session) -> dict:
         follow_up_index=0,
         question_text=question_text,
         tts_audio_url=tts_audio_url,
+        stimulus_id=opening_stimulus.id if opening_stimulus is not None else None,
     )
     db.add(turn)
     db.commit()
@@ -1542,6 +1692,7 @@ def start_interview(participant_id: str, db: Session) -> dict:
         "turn": turn,
         "turn_index": turn.turn_index,
         "is_warmup": use_warmup,
+        "stimulus": stimulus_payload(opening_stimulus),
     }
 
 
@@ -1965,6 +2116,7 @@ def process_interview_turn(
             return None
 
     def _persist_turn(*, question_text, tts_url, question_index, is_follow_up, follow_up_index=0):
+        asset = stimulus_for_question_index(_proj, question_index)
         new_turn = InterviewTurn(
             participant_id=participant_id,
             turn_index=(turns[-1].turn_index + 1) if turns else 0,
@@ -1973,6 +2125,7 @@ def process_interview_turn(
             follow_up_index=follow_up_index,
             question_text=question_text,
             tts_audio_url=tts_url,
+            stimulus_id=asset.id if asset is not None else None,
         )
         db.add(new_turn)
         return new_turn
@@ -1989,6 +2142,9 @@ def process_interview_turn(
             "total_seconds": (context["total_minutes"] or 0) * 60,
             "coaching_hint": coaching_hint,
             "transcript": transcript,
+            "stimulus": stimulus_payload(
+                stimulus_for_question_index(_proj, new_turn.question_index)
+            ),
         }
 
     # Warm-up handoff: play the first real guide question, no Claude decision.
@@ -2044,6 +2200,9 @@ def process_interview_turn(
         after_final_check=after_final_check,
         current_learning_goal=context.get("current_learning_goal"),
         section_change_hint=context.get("section_change_hint"),
+        # What is on screen for the question they just answered, so the
+        # follow-up can be about the artefact and not about the abstraction.
+        stimulus=stimulus_for_question_index(_proj, cur_q),
     )
 
     def _fallback():
@@ -2395,6 +2554,7 @@ def skip_question(participant_id: str, db) -> dict:
         }
 
     question_text = next_questions[0].main_question
+    next_stimulus = getattr(next_questions[0], "stimulus", None)
     new_turn = InterviewTurn(
         participant_id=participant_id,
         turn_index=(turns[-1].turn_index + 1) if turns else 0,
@@ -2403,6 +2563,7 @@ def skip_question(participant_id: str, db) -> dict:
         is_follow_up=False,
         follow_up_index=0,
         question_text=question_text,
+        stimulus_id=next_stimulus.id if next_stimulus is not None else None,
     )
     db.add(new_turn)
     db.flush()
@@ -2427,4 +2588,5 @@ def skip_question(participant_id: str, db) -> dict:
         "turn_index": new_turn.turn_index,
         "elapsed_seconds": int(context["elapsed_minutes"] * 60),
         "total_seconds": (context["total_minutes"] or 0) * 60,
+        "stimulus": stimulus_payload(next_stimulus),
     }

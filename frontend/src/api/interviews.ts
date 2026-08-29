@@ -1,6 +1,19 @@
 import client from "./client";
 import type { ParticipantBranding } from "../utils/branding";
 
+/** An artefact shown to the participant while a question is on screen:
+ *  a concept board, pack shot or written concept statement. */
+export interface Stimulus {
+  id: string;
+  kind: "image" | "text";
+  /** Set for kind="image". */
+  url?: string | null;
+  /** Set for kind="text": the concept statement, shown verbatim. */
+  body?: string | null;
+  /** Optional researcher line rendered under the artefact. */
+  caption?: string | null;
+}
+
 export interface InterviewInfo {
   project_name: string;
   company_name?: string;
@@ -54,6 +67,8 @@ export interface StartInterviewResponse {
   turn_index?: number;
   /** Guide question index of the opening turn (<0 = non-counting turn). */
   question_index?: number;
+  /** Artefact to show with the opening question. Null on warm-up turns. */
+  stimulus?: Stimulus | null;
 }
 
 export interface SubmitAudioResponse {
@@ -75,6 +90,9 @@ export interface SubmitAudioResponse {
    *  client echoes it back on the next /respond or /skip so a retried
    *  upload can never be applied to the wrong question. */
   turn_index?: number;
+  /** Artefact to show with the new question. Null clears whatever the
+   *  previous question was showing, so always assign it, never merge. */
+  stimulus?: Stimulus | null;
 }
 
 /** Body of the HTTP 409 `turn_mismatch` error from /respond or /skip. */
@@ -97,6 +115,9 @@ export interface ResumeCheck {
   last_question?: string;
   turn_count?: number;
   question_index?: number;
+  /** Artefact that was on screen for the last question, so a resumed
+   *  concept test shows the concept again and not just the question. */
+  last_stimulus?: Stimulus | null;
 }
 
 export interface ResumeSummary {
@@ -106,6 +127,7 @@ export interface ResumeSummary {
   elapsed_minutes: number;
   /** Authoritative interview language; UI re-locks to this on resume. */
   language?: string;
+  last_stimulus?: Stimulus | null;
 }
 
 export interface PanelTag {
@@ -274,6 +296,7 @@ export interface HandoffClaim {
   last_question: string | null;
   turn_count: number;
   question_index: number;
+  last_stimulus?: Stimulus | null;
   email: string | null;
   session_token: string | null;
 }
@@ -408,6 +431,7 @@ export interface InterviewStatus {
   status: "in_progress" | "completed";
   turn_count: number;
   last_question: string | null;
+  last_stimulus?: Stimulus | null;
   question_index: number | null;
   is_follow_up: boolean;
   language: string;
