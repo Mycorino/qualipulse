@@ -109,7 +109,12 @@ for (const file of walk(srcDir)) {
   const src = readFileSync(file, "utf8");
   for (const m of src.matchAll(/\bt[A-Za-z]*\(\s*"([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)"/g)) {
     const id = m[1];
-    if (seen.has(id) || definedEn.has(id)) continue;
+    // i18next resolves a plural key to `id_one` / `id_other` at runtime, so
+    // source only ever references the base. Treat the base as defined when
+    // either plural form exists, otherwise every plural key looks missing.
+    const defined =
+      definedEn.has(id) || definedEn.has(`${id}_one`) || definedEn.has(`${id}_other`);
+    if (seen.has(id) || defined) continue;
     seen.add(id);
     if (baseline.has(id)) continue; // known debt, tracked in the baseline
     undefinedKeys.push(`${id}  (${file.replace(srcDir, "src")})`);
