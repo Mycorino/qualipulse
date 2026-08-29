@@ -331,6 +331,7 @@ def get_transcript(
                 edited_at=t.edited_at,
                 created_at=t.created_at,
                 audio_recording_url=t.audio_recording_url,
+                audio_offset_seconds=getattr(t, "audio_offset_seconds", None),
                 tts_audio_url=t.tts_audio_url,
                 translated_response=t.translated_response,
                 translated_question=t.translated_question,

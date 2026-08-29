@@ -562,7 +562,8 @@
       "noneToReward": "Aucune récompense en attente. Validez des entretiens pour constituer la liste de paiement."
     },
     "sessionRecording": "Enregistrement complet de la session (entretien en direct)",
-    "sessionRecordingLabel": "Enregistrement complet de la session"
+    "sessionRecordingLabel": "Enregistrement complet de la session",
+    "listenFromTurn": "Lire l'enregistrement de la session à partir de ce moment"
   },
   "transcript": {
     "title": "Transcription",

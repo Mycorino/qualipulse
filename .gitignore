@@ -40,3 +40,8 @@ auto_interview.db.bak-*
 # Symlinked node_modules (worktree previews reuse the main checkout deps);
 # the trailing-slash pattern above does not match a symlink.
 frontend/node_modules
+
+# macOS Finder / file-sync duplicate copies ("foo 2.py"). They are stale
+# snapshots that shadow real modules and twice nearly rode into a commit —
+# a duplicated alembic migration would double-head the migration chain.
+* 2.*

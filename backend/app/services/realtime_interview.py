@@ -216,6 +216,17 @@ def _log_realtime_usage(participant_id: str, usage: dict) -> None:
         logger.exception("realtime usage logging failed for participant %s", participant_id)
 
 
+def _last_turn_index(participant_id: str) -> int | None:
+    from app.database import session_scope
+    from app.models.interview import Participant
+
+    with session_scope() as db:
+        participant = db.query(Participant).filter(Participant.id == participant_id).first()
+        if participant is None or not participant.turns:
+            return None
+        return max(t.turn_index for t in participant.turns)
+
+
 def _pending_question(participant_id: str) -> str | None:
     """The question the participant has not answered yet (supports resume)."""
     from app.database import session_scope
@@ -303,6 +314,35 @@ def _interview_language(participant_id: str) -> str:
         )
 
 
+def _stamp_turn_offset(participant_id: str, turn_index: int | None, seconds: float) -> None:
+    """Record where a turn's question starts inside the session recording.
+
+    The recording starts when the browser receives the remote audio track,
+    within a second or two of the sideband attaching, so seconds-since-
+    attach lands the player just before the question. Best-effort.
+    """
+    if turn_index is None:
+        return
+    try:
+        from app.database import session_scope
+        from app.models.interview import InterviewTurn
+
+        with session_scope() as db:
+            turn = (
+                db.query(InterviewTurn)
+                .filter(
+                    InterviewTurn.participant_id == participant_id,
+                    InterviewTurn.turn_index == turn_index,
+                )
+                .first()
+            )
+            if turn is not None and turn.audio_offset_seconds is None:
+                turn.audio_offset_seconds = round(max(0.0, seconds), 1)
+                db.commit()
+    except Exception:
+        logger.exception("could not stamp audio offset for participant %s", participant_id)
+
+
 def _advance_turn(participant_id: str, transcript: str) -> dict | None:
     """Run one interview turn on the shared engine. Returns the engine result,
     or None when the transcript was rejected as silence/noise."""
@@ -342,6 +382,9 @@ class SidebandBridge:
         self.response_active = False
         self.last_spoken = ""
         self.last_response_ended_at = 0.0
+        # Set when the sideband attaches — the zero point for per-turn
+        # offsets into the client's session recording.
+        self.session_started_at: float | None = None
 
     # -- websocket plumbing -------------------------------------------------
 
@@ -357,6 +400,11 @@ class SidebandBridge:
 
     def _send(self, ws, payload: dict) -> None:
         ws.send(json.dumps(payload))
+
+    def _session_elapsed(self) -> float:
+        if self.session_started_at is None:
+            return 0.0
+        return time.monotonic() - self.session_started_at
 
     def _speak(self, ws, text: str) -> None:
         """Queue one spoken line, after whatever is playing has finished.
@@ -493,6 +541,7 @@ class SidebandBridge:
         if result.get("is_complete"):
             self.closing = True
         self._speak(ws, result["question_text"])
+        _stamp_turn_offset(self.participant_id, result.get("turn_index"), self._session_elapsed())
 
     # -- main loop ----------------------------------------------------------
 
@@ -503,9 +552,13 @@ class SidebandBridge:
                     "realtime sideband attached call=%s participant=%s",
                     self.call_id, self.participant_id,
                 )
+                self.session_started_at = time.monotonic()
                 opening = _pending_question(self.participant_id)
                 if opening:
                     self._speak(ws, opening)
+                    _stamp_turn_offset(
+                        self.participant_id, _last_turn_index(self.participant_id), self._session_elapsed()
+                    )
                 while time.monotonic() < self.deadline:
                     event = self._recv_event(ws, timeout=30.0)
                     if event is None:

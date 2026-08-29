@@ -236,6 +236,9 @@ export interface TranscriptTurn {
   edited_at: string | null;
   created_at: string;
   audio_recording_url: string | null;
+  /** Realtime-beta: seconds into the participant's session recording at
+   *  which this turn's question begins (null for classic turns). */
+  audio_offset_seconds?: number | null;
   tts_audio_url: string | null;
   translated_response: string | null;
   translated_question: string | null;
