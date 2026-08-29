@@ -360,7 +360,13 @@ def _interview_language(participant_id: str) -> str:
         )
 
 
-def _stamp_turn_offset(participant_id: str, turn_index: int | None, seconds: float) -> None:
+def _stamp_turn_offset(
+    participant_id: str,
+    turn_index: int | None,
+    seconds: float,
+    segment_key: str | None = None,
+    overwrite: bool = False,
+) -> None:
     """Record where a turn's question starts inside the session recording.
 
     The recording starts when the browser receives the remote audio track,
@@ -382,8 +388,10 @@ def _stamp_turn_offset(participant_id: str, turn_index: int | None, seconds: flo
                 )
                 .first()
             )
-            if turn is not None and turn.audio_offset_seconds is None:
+            if turn is not None and (overwrite or turn.audio_offset_seconds is None):
                 turn.audio_offset_seconds = round(max(0.0, seconds), 1)
+                if segment_key:
+                    turn.audio_segment_key = segment_key
                 db.commit()
     except Exception:
         logger.exception("could not stamp audio offset for participant %s", participant_id)
@@ -415,9 +423,19 @@ class SidebandBridge:
     completed input transcription into a Claude-decided next line.
     """
 
-    def __init__(self, call_id: str, participant_id: str, total_minutes: int | None):
+    def __init__(
+        self,
+        call_id: str,
+        participant_id: str,
+        total_minutes: int | None,
+        segment_key: str | None = None,
+    ):
         self.call_id = call_id
         self.participant_id = participant_id
+        # This connection's recording segment: stamped onto every turn so
+        # its offset seeks into the right part of a multi-connection
+        # (resumed) interview.
+        self.segment_key = segment_key
         budget = max(MIN_SESSION_MINUTES, (total_minutes or 0) * settings.REALTIME_MAX_SESSION_FACTOR)
         self.deadline = time.monotonic() + budget * 60
         self.language = _interview_language(participant_id)
@@ -624,7 +642,9 @@ class SidebandBridge:
         if result.get("is_complete"):
             self.closing = True
         self._speak(ws, result["question_text"])
-        _stamp_turn_offset(self.participant_id, result.get("turn_index"), self._session_elapsed())
+        _stamp_turn_offset(
+            self.participant_id, result.get("turn_index"), self._session_elapsed(), self.segment_key
+        )
 
     # -- main loop ----------------------------------------------------------
 
@@ -640,7 +660,14 @@ class SidebandBridge:
                 if opening:
                     self._speak(ws, opening)
                     _stamp_turn_offset(
-                        self.participant_id, _last_turn_index(self.participant_id), self._session_elapsed()
+                        self.participant_id,
+                        _last_turn_index(self.participant_id),
+                        self._session_elapsed(),
+                        self.segment_key,
+                        # A resumed session re-asks the pending question in
+                        # THIS connection's recording; the old offset points
+                        # into the previous segment, where no answer follows.
+                        overwrite=True,
                     )
                 while time.monotonic() < self.deadline:
                     event = self._recv_event(ws, timeout=30.0)
@@ -683,22 +710,36 @@ class _SessionDone(Exception):
     """Internal: the closing line finished playing; hang up cleanly."""
 
 
-def spawn_sideband(call_id: str, participant_id: str, total_minutes: int | None) -> None:
-    bridge = SidebandBridge(call_id, participant_id, total_minutes)
+def spawn_sideband(
+    call_id: str,
+    participant_id: str,
+    total_minutes: int | None,
+    segment_key: str | None = None,
+) -> None:
+    bridge = SidebandBridge(call_id, participant_id, total_minutes, segment_key)
     threading.Thread(
         target=bridge.run, daemon=True, name=f"realtime-{participant_id[:8]}"
     ).start()
 
 
-def store_session_recording(participant, data: bytes, ext: str, db) -> str:
+def store_session_recording(
+    participant, data: bytes, ext: str, db, segment_key: str | None = None
+) -> str:
     """Transcode (if needed) and store the browser's full-session capture.
 
     The client uploads incrementally (every ~45s and on tab hide), so this
-    runs repeatedly per interview: each upload gets a fresh key (no stale
-    browser/CDN caching of a shorter file) and the superseded file is
-    deleted afterwards, so exactly one recording remains referenced and on
-    disk — the GDPR cascade only knows about the referenced URL.
+    runs repeatedly per interview. Each browser connection owns one
+    **segment** (identified by the segment_key minted at the SDP exchange):
+    an upload replaces only its OWN segment's previous file, so a resumed
+    session or a second tab can never overwrite or delete another
+    connection's audio. That single-slot overwrite is exactly how a
+    resumed interview once lost its morning recording, and a race between
+    the interval upload and the tab-close flush once left the DB pointing
+    at a deleted file. Fresh object key per upload (no stale CDN caching of
+    a shorter file); participant.session_recording_url tracks the newest
+    upload for legacy consumers.
     """
+    from app.models.interview import RealtimeRecordingSegment
     from app.services.storage import delete_audio_by_url, upload_audio
     from app.services.transcode import needs_transcode, transcode_to_mp3
 
@@ -708,7 +749,38 @@ def store_session_recording(participant, data: bytes, ext: str, db) -> str:
             data, ext = converted, ".mp3"
     key = f"recordings/{participant.id}/session-{uuid.uuid4().hex}{ext}"
     url = upload_audio(data, key)
-    previous = participant.session_recording_url
+
+    previous: str | None = None
+    if segment_key:
+        segment = (
+            db.query(RealtimeRecordingSegment)
+            .filter(
+                RealtimeRecordingSegment.participant_id == participant.id,
+                RealtimeRecordingSegment.segment_key == segment_key,
+            )
+            .first()
+        )
+        if segment is None:
+            segment = RealtimeRecordingSegment(
+                participant_id=participant.id, segment_key=segment_key, url=url
+            )
+            db.add(segment)
+        else:
+            previous = segment.url
+            segment.url = url
+    else:
+        # Legacy client (pre-segments bundle): single-slot behaviour — but
+        # never delete a file that a segment row owns (mixed old/new clients
+        # can briefly coexist across a deploy).
+        previous = participant.session_recording_url
+        if previous is not None:
+            owned = (
+                db.query(RealtimeRecordingSegment)
+                .filter(RealtimeRecordingSegment.url == previous)
+                .first()
+            )
+            if owned is not None:
+                previous = None
     participant.session_recording_url = url
     db.commit()
     if previous and previous != url:

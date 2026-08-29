@@ -563,6 +563,7 @@
     },
     "sessionRecording": "Full session recording (live voice interview)",
     "sessionRecordingLabel": "Full session recording",
+    "sessionRecordingPart": "Part {{n}}",
     "listenFromTurn": "Play the session recording from this point"
   },
   "transcript": {

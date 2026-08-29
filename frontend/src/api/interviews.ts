@@ -430,6 +430,9 @@ export interface RealtimeSession {
   /** The session's turn_detection config, needed to restore VAD after a
    *  mic pause (pause = session.update turn_detection null). */
   turnDetection: unknown | null;
+  /** This connection's recording segment key: tag every recording upload
+   *  with it so a resumed session never overwrites earlier audio. */
+  segmentId: string | null;
 }
 
 /** WebRTC signaling: POST the browser's SDP offer, get OpenAI's SDP answer.
@@ -456,14 +459,17 @@ export async function createRealtimeSession(
     const raw = res.headers["x-realtime-turn-detection"];
     if (raw) turnDetection = JSON.parse(String(raw));
   } catch { /* header optional */ }
-  return { sdp: res.data, turnDetection };
+  const segmentId = res.headers["x-realtime-segment"] ? String(res.headers["x-realtime-segment"]) : null;
+  return { sdp: res.data, turnDetection, segmentId };
 }
 
-/** Upload the parallel full-session recording (mic + interviewer voice). */
+/** Upload the parallel full-session recording (mic + interviewer voice).
+ *  segmentId scopes the upload to this connection's own recording part. */
 export async function uploadSessionRecording(
   token: string,
   participantId: string,
-  blob: Blob
+  blob: Blob,
+  segmentId?: string | null
 ): Promise<{ session_recording_url: string }> {
   const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("ogg") ? "ogg" : "webm";
   const form = new FormData();
@@ -471,7 +477,11 @@ export async function uploadSessionRecording(
   const { data } = await client.post<{ session_recording_url: string }>(
     `/interview/${token}/${participantId}/realtime/recording`,
     form,
-    { headers: { "Content-Type": "multipart/form-data" }, timeout: 120_000 }
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+      params: segmentId ? { segment: segmentId } : undefined,
+      timeout: 120_000,
+    }
   );
   return data;
 }

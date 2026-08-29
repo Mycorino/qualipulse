@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -1631,7 +1632,12 @@ async def create_realtime_session(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={"code": "realtime_unavailable", "message": "Live voice is unavailable right now."},
         )
-    spawn_sideband(call_id, participant.id, total_minutes)
+    # One segment per connection: the browser tags its recording uploads
+    # with this key and the sideband stamps it onto turns, so a resumed
+    # session or second tab records alongside earlier audio instead of
+    # overwriting it.
+    segment_key = uuid.uuid4().hex
+    spawn_sideband(call_id, participant.id, total_minutes, segment_key)
     # The client needs the exact turn_detection config to restore VAD after
     # a mic pause (pause = session.update turn_detection null, the
     # documented push-to-talk pattern; resume = put this back).
@@ -1641,7 +1647,8 @@ async def create_realtime_session(
         headers={
             "X-Realtime-Turn-Detection": json.dumps(
                 session_config["audio"]["input"]["turn_detection"]
-            )
+            ),
+            "X-Realtime-Segment": segment_key,
         },
     )
 
@@ -1653,15 +1660,19 @@ async def upload_realtime_recording(
     token: str,
     participant_id: str,
     audio: UploadFile = File(...),
+    segment: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Store the browser's parallel full-session recording (realtime beta).
 
     The Realtime API never returns raw audio, so the client records the
-    conversation itself (mic + interviewer voice mixed) and uploads it here,
-    at completion or when the tab is closed. Re-uploads overwrite: the last,
-    longest capture wins.
+    conversation itself (mic + interviewer voice mixed) and uploads it here
+    incrementally. `segment` identifies the browser connection (minted at
+    the SDP exchange): re-uploads replace only that segment's file, so a
+    resumed session keeps every connection's audio as its own part.
     """
+    if segment is not None and not re.fullmatch(r"[0-9a-f]{8,40}", segment):
+        raise HTTPException(status_code=422, detail="Invalid segment key")
     link = _get_active_link_or_404(token, db)
     participant = _get_participant_or_404(participant_id, link, db)
     # Deliberately looser than the SDP gate: gate flips (workspace leaving
@@ -1690,7 +1701,7 @@ async def upload_realtime_recording(
             detail=f"Recording too large. Max size is {settings.MAX_AUDIO_SIZE_MB}MB.",
         )
     ext = os.path.splitext(audio.filename or "")[1].lower() or ".webm"
-    url = await run_in_threadpool(store_session_recording, participant, data, ext, db)
+    url = await run_in_threadpool(store_session_recording, participant, data, ext, db, segment)
     return {"session_recording_url": url}
 
 
