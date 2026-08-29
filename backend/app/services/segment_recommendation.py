@@ -178,7 +178,7 @@ def _haiku_argument(survey: Survey, d: Discovery, lg: str, db: Session | None) -
         resp = client.messages.create(
             model=model,
             max_tokens=500,
-            **ai_models.temperature_kwargs(model, 0.2),
+            **ai_models.sampling_kwargs(model, 0.2),
             system=system,
             messages=[{"role": "user", "content": user}],
         )

@@ -43,7 +43,7 @@ def _fallback_summary(label: str, language: str) -> str:
 # long by construction. 1024 tokens used to cut a rich interview's reply off
 # mid-JSON, and the JSONDecodeError threw the whole (already paid for) pass
 # away. Budget for the real shape, then salvage anything that still overruns.
-_MAX_ASSESSMENT_TOKENS = 2000
+_MAX_ASSESSMENT_TOKENS = 2600
 
 _RETRY_NUDGE = (
     "\n\nYour previous reply ran out of room before the JSON closed. Answer "
@@ -365,7 +365,7 @@ is never cut off mid-field.
         response = client.messages.create(
             model=ai_models.sonnet(),
             max_tokens=_MAX_ASSESSMENT_TOKENS,
-            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
+            **ai_models.sampling_kwargs(ai_models.sonnet(), 0.3),
             messages=[
                 {"role": "user", "content": prompt + (_RETRY_NUDGE if attempt else "")}
             ],

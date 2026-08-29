@@ -89,7 +89,7 @@ def backfill_business_from_name(
         resp = client.messages.create(
             model=_MODEL,
             max_tokens=300,
-            **ai_models.temperature_kwargs(_MODEL, 0.1),
+            **ai_models.sampling_kwargs(_MODEL, 0.1),
             system=system,
             messages=[{"role": "user", "content": user}],
         )

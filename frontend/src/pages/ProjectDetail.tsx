@@ -3831,6 +3831,14 @@ export default function ProjectDetail() {
                               className={`transcript-turn${isHighlighted ? " transcript-turn--highlighted" : ""}`}
                             >
                               <div className="transcript-q">
+                                {t.stimulus_name && (
+                                  <span
+                                    className="transcript-stimulus-chip"
+                                    title={tProject("responses.stimulusShownTitle")}
+                                  >
+                                    {tProject("responses.stimulusShown", { name: t.stimulus_name })}
+                                  </span>
+                                )}
                                 {transcriptViewMode === "translated" && t.translated_question
                                   ? t.translated_question
                                   : t.question_text}

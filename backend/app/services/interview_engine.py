@@ -482,6 +482,11 @@ def stimulus_for_question_index(project: Project, question_index: int | None):
 # fielding many studies cannot grow without limit.
 _STIMULUS_IMAGE_CACHE: dict[str, dict] = {}
 _STIMULUS_IMAGE_CACHE_MAX = 32
+# Failed fetches are cached so a dead URL is not re-fetched every turn, but
+# only for a bounded window: a transient R2 blip must not blind the
+# interviewer to a perfectly good image for the life of the process.
+_STIMULUS_FAILURE_TTL_SECONDS = 300.0
+_STIMULUS_FAILURE_AT: dict[str, float] = {}
 # Anthropic rejects images above 5MB base64-encoded; our upload cap is
 # lower, but a legacy or hand-set URL could point anywhere.
 _STIMULUS_MAX_IMAGE_BYTES = 3 * 1024 * 1024
@@ -508,7 +513,16 @@ def _stimulus_image_block(asset) -> dict | None:
         return None
     cached = _STIMULUS_IMAGE_CACHE.get(url)
     if cached is not None:
-        return cached or None
+        if cached:
+            return cached
+        # Cached failure: honour it only inside the TTL, then retry.
+        import time as _t
+
+        failed_at = _STIMULUS_FAILURE_AT.get(url, 0.0)
+        if _t.monotonic() - failed_at < _STIMULUS_FAILURE_TTL_SECONDS:
+            return None
+        _STIMULUS_IMAGE_CACHE.pop(url, None)
+        _STIMULUS_FAILURE_AT.pop(url, None)
 
     import base64
 
@@ -556,8 +570,14 @@ def _stimulus_image_block(asset) -> dict | None:
 
 def _remember_stimulus_block(url: str, block: dict | None) -> None:
     if len(_STIMULUS_IMAGE_CACHE) >= _STIMULUS_IMAGE_CACHE_MAX:
-        _STIMULUS_IMAGE_CACHE.pop(next(iter(_STIMULUS_IMAGE_CACHE)), None)
+        evicted = next(iter(_STIMULUS_IMAGE_CACHE))
+        _STIMULUS_IMAGE_CACHE.pop(evicted, None)
+        _STIMULUS_FAILURE_AT.pop(evicted, None)
     _STIMULUS_IMAGE_CACHE[url] = block or {}
+    if block is None:
+        import time as _t
+
+        _STIMULUS_FAILURE_AT[url] = _t.monotonic()
 
 
 def stimulus_payload(asset) -> dict | None:
@@ -1191,8 +1211,8 @@ WHY: they asked to stop; never negotiate.
         try:
             response = client.messages.create(
                 model=ai_models.sonnet(),
-                max_tokens=512,
-                **ai_models.temperature_kwargs(ai_models.sonnet(), 0.4),
+                max_tokens=768,
+                **ai_models.sampling_kwargs(ai_models.sonnet(), 0.4),
                 system=system_blocks,
                 tools=[DECISION_TOOL],
                 tool_choice={"type": "tool", "name": "interview_decision"},
@@ -1492,8 +1512,8 @@ def _get_warmup_question(
         )
         response = client.messages.create(
             model=ai_models.sonnet(),
-            max_tokens=180,
-            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.6),
+            max_tokens=256,
+            **ai_models.sampling_kwargs(ai_models.sonnet(), 0.6),
             system=effective_system_prompt,
             messages=[
                 {
@@ -1598,8 +1618,8 @@ def _get_first_question(
 
     response = client.messages.create(
         model=ai_models.sonnet(),
-        max_tokens=256,
-        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.5),
+        max_tokens=384,
+        **ai_models.sampling_kwargs(ai_models.sonnet(), 0.5),
         system=effective_system_prompt,
         messages=[{"role": "user", "content": user_prompt}],
     )

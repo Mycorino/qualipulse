@@ -49,7 +49,7 @@ A SaaS platform that lets companies create AI-driven voice interviews. Researche
 - **Backend:** FastAPI (Python) + SQLAlchemy + PostgreSQL (prod) / SQLite (dev), JWT auth
 - **Frontend:** React 18 + Vite + TypeScript
 - **AI:** all model ids resolve through `services/ai_models.py` (env-overridable pins; see that file for the source of truth)
-  - Interview orchestration + analysis + translation etc.: Claude Sonnet (`claude-sonnet-4-6`)
+  - Interview orchestration + translation + quality etc.: Claude Sonnet (`claude-sonnet-5`, $2/$10 per MTok, vision-capable for stimulus questions). Sonnet 5 runs adaptive thinking when `thinking` is omitted, so every legacy no-thinking call site splats `ai_models.sampling_kwargs()` (pins thinking off on adaptive-default models, passes the tuned `temperature` on older ones); callers that set `thinking` explicitly keep `temperature_kwargs()`. Its tokenizer yields ~30% more tokens for the same text (tight `max_tokens` were bumped accordingly; `usage_logger` has a dedicated sonnet-5 rate row).
   - Research Copilot (survey + interview-guide surfaces): Claude **Opus** (`claude-opus-4-8`) with adaptive thinking (`thinking: {type: "adaptive"}`), `output_config: {effort: "high"}`, and a split system prompt: stable base+methodology block behind the prompt-cache breakpoint, volatile memory+snapshot block after it, plus a cache marker on the message tail per agent-loop iteration
   - Lightweight tasks (transcript cleanup, name lookup, question coach, onboarding suggestions): Claude Haiku (`claude-haiku-4-5`)
   - Sampling params go through `ai_models.temperature_kwargs()` so model upgrades can't 400 on removed `temperature`
@@ -896,6 +896,31 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
   models. Expect roughly 3-5x the AI cost of a classic interview.
 - Tests: `backend/tests/test_realtime_interview.py` (transport mocked).
 
+### Stimulus-aware interviews (concept / packaging / creative tests)
+A guide question can carry a **stimulus**: an image (pack shot, ad creative,
+mockup, magic-byte-checked upload to R2 under `stimuli/{project_id}/`) or a
+written concept, from a project-scoped library (`StimulusAsset`, Alembic
+0078). The participant sees it while that question is asked (`StimulusCard`,
+full-screen zoom; classic flow via per-turn payloads, realtime flow via the
+`/status` poll's `last_stimulus`), and **Claude sees it too**:
+`decide_next_action` prepends the image as a cache-controlled message prefix
+plus a `<stimulus>` block (probe what they see, never describe it back, ask
+what they notice before whether they like it). A missing/oversized image
+degrades to the text briefing, never a failed turn (failures cached with a
+5-min TTL). `InterviewTurn.stimulus_id` stamps provenance at persist time
+(both flows share `_persist_turn`); resume/handoff restore the artefact from
+the stamp. `ai_description` briefs the interviewer only and never reaches
+the participant payload. Analysis is stimulus-aware: transcript Q-lines are
+labelled `[material shown: "X"]` and a MATERIALS SHOWN glossary block
+(`_build_stimulus_block`) rides both synthesis prompts so reactions
+attribute to the named material. The transcript viewer shows a
+"Shown: X" chip per turn and the CSV export carries a `stimulus_shown`
+column. Setup tab: "Materials shown to participants" library +
+per-question picker (`StimulusManager.tsx`; `clear_stimulus` tri-state
+patch, ownership-checked attach). The Copilot snapshot lists the library
+(advice-only; it cannot attach). The demo seeds one unattached example
+concept. Tests: `backend/tests/test_stimulus.py`.
+
 ### Claude Interview Engine
 Claude decides after each response whether to:
 - `follow_up` — ask a follow-up on the current topic
@@ -1350,10 +1375,13 @@ gcloud builds list --region=europe-west1 --limit=5
 `id` (uuid str), `plan_id` (FK ResearchPlan, indexed), `order_index` (unique within plan), `method` (`voice_interview` | `quant_survey` | `workshop` | `desk_research` | `usability_test`), `title`, `purpose`, `deliverable`, `n_participants`, `duration_weeks`, `project_id` (FK Project, nullable — set when the step has been drafted as a real study), `status` (`pending` | `drafted` | `in_progress` | `completed`), `created_at`. Today V1 only drafts the first `voice_interview` step (regardless of position) as an immediate Project; other-method steps stay `pending` placeholders until those product surfaces ship.
 
 ### InterviewGuideQuestion
-`id`, `project_id`, `section_index`, `section_title`, `question_index`, `main_question`, `interview_notes`, `desired_learning`, `researcher_notes`, `deprecated_at`, `sort_order`
+`id`, `project_id`, `section_index`, `section_title`, `question_index`, `main_question`, `interview_notes`, `desired_learning`, `researcher_notes`, `deprecated_at`, `sort_order`, `stimulus_id` (FK StimulusAsset, SET NULL)
 
 ### ScreeningQuestion
 `id`, `project_id`, `question`, `options` (JSON), `disqualifying_options` (JSON), `sort_order`
+
+### StimulusAsset
+`id` (uuid str), `project_id` (FK Project, CASCADE, indexed), `name` (researcher-facing label, can carry cell names), `kind` (`image` | `text`), `url` (image kind: R2/local public URL, immutable per upload), `body` (text kind: the concept statement shown verbatim), `caption` (participant-facing line under the artefact), `ai_description` (researcher briefing for the AI interviewer, never sent to participants), `sort_order`, `created_at`. Attached via `InterviewGuideQuestion.stimulus_id` (SET NULL) and stamped per turn on `InterviewTurn.stimulus_id` (SET NULL, provenance). Alembic 0078.
 
 ### InterviewLink
 `id`, `project_id`, `token` (unique, urlsafe), `is_active`, `created_at`
@@ -1362,7 +1390,7 @@ gcloud builds list --region=europe-west1 --limit=5
 `id`, `link_id`, `project_id`, `display_name`, `email`, `profession`, `age_range`, `country`, `screening_answers` (JSON snapshot of screener clicks, Alembic 0061), `status` (in_progress/completed), `quality_score`, `quality_label`, `quality_summary`, `quality_strengths`, `quality_issues`, `key_takeaways` (JSON list), `notable_quotes` (JSON list, verbatim), `started_at`, `completed_at`
 
 ### InterviewTurn
-`id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `translated_response`, `translated_question`, `translation_language`, `translation_source_language`, `cleaned_response`, `cleaned_at`, `created_at`
+`id`, `participant_id`, `turn_index`, `question_index`, `is_follow_up`, `follow_up_index`, `question_text`, `response_transcript`, `audio_recording_url`, `tts_audio_url`, `manually_edited`, `edited_at`, `translated_response`, `translated_question`, `translation_language`, `translation_source_language`, `cleaned_response`, `cleaned_at`, `stimulus_id` (FK StimulusAsset, SET NULL, provenance), `created_at`
 
 ### ProjectAnalysis
 `id`, `project_id`, `version`, `status` (generating/ready/failed), `participant_count`, `report` (JSON), `filters` (JSON), `researcher_context`, `version_label` (ai_discovery/researcher_refined), `parent_version_id`, `share_token`, `generated_at`, `error`

@@ -107,12 +107,55 @@ def _build_transcripts_block(participants: list[Participant]) -> tuple[str, dict
         turns = sorted(p.turns, key=lambda t: t.turn_index)
         lines = [header]
         for t in turns:
-            lines.append(f"Q (turn {t.turn_index}): {t.question_text}")
+            # Stimulus provenance: the turn stamps which artefact was on the
+            # participant's screen when they answered (see the MATERIALS
+            # SHOWN block). Labelling the Q line is what lets the report
+            # attribute a reaction to "Pack A" rather than to the abstract
+            # question about it.
+            stim = getattr(t, "stimulus", None)
+            stim_label = f' [material shown: "{stim.name}"]' if stim is not None else ""
+            lines.append(f"Q (turn {t.turn_index}){stim_label}: {t.question_text}")
             if t.response_transcript:
                 lines.append(f"A: {t.response_transcript}")
         blocks.append("\n".join(lines))
 
     return "\n\n".join(blocks), participant_map
+
+
+def _build_stimulus_block(participants: list[Participant]) -> str:
+    """Glossary of the artefacts participants were shown, from turn provenance.
+
+    Built from ``InterviewTurn.stimulus_id`` stamps rather than the current
+    guide, so a mid-fielding re-attachment cannot misattribute a reaction.
+    Empty string when the study showed nothing, keeping non-stimulus studies'
+    prompts byte-identical to before.
+    """
+    seen: dict[str, object] = {}
+    for p in participants:
+        for t in p.turns:
+            stim = getattr(t, "stimulus", None)
+            if stim is not None and stim.id not in seen:
+                seen[stim.id] = stim
+    if not seen:
+        return ""
+    lines = [
+        "MATERIALS SHOWN TO PARTICIPANTS (concept / packaging / creative tests):",
+        "Turns labelled [material shown: ...] were answered while that artefact was",
+        "on the participant's screen. Attribute reactions to the NAMED material, not",
+        "to the question in the abstract; when materials differ, compare them by name.",
+        "A finding about a material must cite quotes only from turns where it was shown.",
+    ]
+    for stim in seen.values():
+        bits = [f'- "{stim.name}" ({stim.kind})']
+        if stim.kind == "text" and stim.body:
+            body = " ".join(stim.body.split())
+            bits.append(f'shown text: "{body[:400]}"')
+        if stim.caption:
+            bits.append(f"caption: {stim.caption}")
+        if stim.ai_description:
+            bits.append(f"researcher briefing: {stim.ai_description}")
+        lines.append("; ".join(bits))
+    return "\n".join(lines) + "\n\n"
 
 
 _CODEBOOK_QUOTE_SAMPLE = 4  # sample quotes per code fed to the prompt
@@ -1094,6 +1137,9 @@ def run_analysis(
         # not researcher-reviewed), framed strictly weaker than the codebook.
         suggestion_block = _build_suggestion_block(_suggestion_stats(db, completed))
 
+        # Concept/packaging/creative tests: what each named artefact was.
+        stimulus_block = _build_stimulus_block(completed)
+
         lang_instruction = _lang_instruction(lang)
 
         # Static blocks first (rules + schema + examples) → cached prefix.
@@ -1104,7 +1150,7 @@ def run_analysis(
             f"<task>\nSynthesize the interviews below into a research report. "
             f"Apply the rules above without exception. Confidence MUST be calibrated to N "
             f"(N={len(completed)} here).{lang_instruction}\n</task>\n\n"
-            f"{context_block}{objective_block}{filter_note}{codebook_block}{suggestion_block}"
+            f"{context_block}{objective_block}{filter_note}{stimulus_block}{codebook_block}{suggestion_block}"
             f"<transcripts count=\"{len(completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
             f"Return the JSON object now. participant_count must be {len(completed)}."
         )
@@ -1293,6 +1339,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
         # matters even more here.
         codebook_stats = _codebook_stats(db, project_id, all_completed)
         codebook_block = _build_codebook_block(codebook_stats)
+        stimulus_block = _build_stimulus_block(all_completed)
 
         lang = getattr(company, "preferred_language", None) or "en"
         lang_instruction = _lang_instruction(lang)
@@ -1316,7 +1363,7 @@ def run_refined_analysis(project_id: str, new_analysis_id: str, parent_analysis_
             f"named participants in frequency, disconfirming evidence, object-shaped falsifiable "
             f"recommendations, personas grounded in ≥2 named participants, journey only when the "
             f"experience is temporal) still apply without exception.{lang_instruction}\n</task>\n\n"
-            f"{context_block}{objective_block}{annotations_block}\n{codebook_block}"
+            f"{context_block}{objective_block}{annotations_block}\n{stimulus_block}{codebook_block}"
             f"<transcripts count=\"{len(all_completed)}\">\n{transcripts_block}\n</transcripts>\n\n"
             f"Return the JSON object now. participant_count must be {len(all_completed)}."
         )

@@ -134,7 +134,7 @@ Return ONLY a JSON array with the same length and order. Each item:
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=8192,
-        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.2),
+        **ai_models.sampling_kwargs(ai_models.sonnet(), 0.2),
         messages=[{"role": "user", "content": prompt}],
     )
 

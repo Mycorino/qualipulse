@@ -479,3 +479,155 @@ class TestDecisionCall:
             url="/api/files/../secret.png",
         )
         assert interview_engine._stimulus_image_block(asset) is None
+
+
+class TestAnalysisAwareness:
+    """The synthesis prompt knows what each named material was and which
+    turns were answered in front of it."""
+
+    def _seed_interview(self, db_session, *, with_stimulus=True):
+        from app.models.company import Company
+        from app.models.interview import InterviewLink, InterviewTurn, Participant
+        from app.models.project import Project, StimulusAsset
+
+        company = Company(name="C", email="an@example.com", password_hash="x")
+        db_session.add(company)
+        db_session.flush()
+        project = Project(company_id=company.id, name="P")
+        db_session.add(project)
+        db_session.flush()
+        link = InterviewLink(project_id=project.id, token="tok-analysis-1")
+        db_session.add(link)
+        db_session.flush()
+        participant = Participant(
+            link_id=link.id, project_id=project.id,
+            display_name="Ana", status="completed",
+        )
+        db_session.add(participant)
+        db_session.flush()
+
+        stim = None
+        if with_stimulus:
+            stim = StimulusAsset(
+                project_id=project.id, name="Pack A", kind="text",
+                body="Refill pouch, 30% cheaper.",
+                caption="Take a look.",
+                ai_description="Watch for format reactions.",
+            )
+            db_session.add(stim)
+            db_session.flush()
+
+        db_session.add(
+            InterviewTurn(
+                participant_id=participant.id, turn_index=0, question_index=0,
+                is_follow_up=False, follow_up_index=0,
+                question_text="What stands out?",
+                response_transcript="The pouch looks cheap to me.",
+                stimulus_id=stim.id if stim else None,
+            )
+        )
+        db_session.commit()
+        db_session.refresh(participant)
+        return participant
+
+    def test_transcript_q_lines_carry_the_material_label(self, db_session):
+        from app.services.analysis import _build_transcripts_block
+
+        participant = self._seed_interview(db_session)
+        block, _ = _build_transcripts_block([participant])
+        assert '[material shown: "Pack A"]' in block
+
+    def test_stimulus_block_glosses_each_material(self, db_session):
+        from app.services.analysis import _build_stimulus_block
+
+        participant = self._seed_interview(db_session)
+        block = _build_stimulus_block([participant])
+        assert "MATERIALS SHOWN" in block
+        assert '"Pack A" (text)' in block
+        assert "Refill pouch, 30% cheaper." in block
+        assert "Watch for format reactions." in block
+
+    def test_no_stimulus_leaves_prompt_untouched(self, db_session):
+        from app.services.analysis import (
+            _build_stimulus_block,
+            _build_transcripts_block,
+        )
+
+        participant = self._seed_interview(db_session, with_stimulus=False)
+        assert _build_stimulus_block([participant]) == ""
+        block, _ = _build_transcripts_block([participant])
+        assert "[material shown" not in block
+
+
+class TestResearcherSurface:
+    def test_transcript_endpoint_names_the_material(
+        self, client, auth_headers, project, db_session
+    ):
+        """The Responses view can say what was on screen for each turn."""
+        from app.models.interview import InterviewLink, InterviewTurn, Participant
+        from app.models.project import StimulusAsset
+
+        stim = StimulusAsset(project_id=project["id"], name="Pack A", kind="text", body="B.")
+        db_session.add(stim)
+        db_session.flush()
+        link = InterviewLink(project_id=project["id"], token="tok-surface-1")
+        db_session.add(link)
+        db_session.flush()
+        participant = Participant(
+            link_id=link.id, project_id=project["id"],
+            display_name="Sam", status="completed",
+        )
+        db_session.add(participant)
+        db_session.flush()
+        db_session.add(
+            InterviewTurn(
+                participant_id=participant.id, turn_index=0, question_index=0,
+                is_follow_up=False, follow_up_index=0,
+                question_text="What stands out?",
+                response_transcript="Looks fine.",
+                stimulus_id=stim.id,
+            )
+        )
+        db_session.commit()
+
+        resp = client.get(
+            f"/projects/{project['id']}/participants/{participant.id}/transcript",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        turn = resp.json()["turns"][0]
+        assert turn["stimulus_name"] == "Pack A"
+        assert turn["stimulus_kind"] == "text"
+
+
+class TestFailureCacheTtl:
+    def test_failed_fetch_is_retried_after_the_ttl(self, monkeypatch, tmp_path):
+        """A transient blip must not blind the interviewer for the process
+        lifetime: the cached failure expires and the next turn retries."""
+        from app.config import settings
+        from app.models.project import StimulusAsset
+        from app.services import interview_engine
+
+        (tmp_path / "stimuli").mkdir()
+        img = tmp_path / "stimuli" / "pack.png"
+        monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+        interview_engine._STIMULUS_IMAGE_CACHE.clear()
+        interview_engine._STIMULUS_FAILURE_AT.clear()
+
+        asset = StimulusAsset(
+            project_id="p", name="Pack A", kind="image",
+            url="/api/files/stimuli/pack.png",
+        )
+        # First read fails (file absent) and the failure is cached.
+        assert interview_engine._stimulus_image_block(asset) is None
+        # The file appears (blip over), but the failure cache still holds.
+        img.write_bytes(PNG_BYTES)
+        assert interview_engine._stimulus_image_block(asset) is None
+        # Past the TTL the failure entry expires and the image loads.
+        stale = next(iter(interview_engine._STIMULUS_FAILURE_AT))
+        interview_engine._STIMULUS_FAILURE_AT[stale] -= (
+            interview_engine._STIMULUS_FAILURE_TTL_SECONDS + 1
+        )
+        block = interview_engine._stimulus_image_block(asset)
+        assert block is not None
+        assert block["source"]["media_type"] == "image/png"

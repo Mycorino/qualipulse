@@ -48,7 +48,12 @@ from app.models.interview import (
     ProjectAnalysis,
 )
 from app.models.memo import ProjectMemo
-from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
+from app.models.project import (
+    InterviewGuideQuestion,
+    Project,
+    ScreeningQuestion,
+    StimulusAsset,
+)
 from app.models.study import Study, StudyAnalysis
 from app.models.survey import (
     Survey,
@@ -1680,6 +1685,54 @@ def seed_demo_project(db: Session, company_id: str) -> Project:
                 )
             )
             sort_order += 1
+
+    # Stimulus library: one example written concept so the "Materials shown
+    # to participants" section in Setup is never an empty mystery. Kept
+    # UNATTACHED on purpose — the demo interviews never discuss it, and a
+    # material stamped onto questions the transcripts ignore would make the
+    # showcase incoherent. It advertises the concept-test capability instead.
+    if lang == "fr":
+        db.add(
+            StimulusAsset(
+                project_id=project.id,
+                name="Concept : abonnement anti-gaspi",
+                kind="text",
+                body=(
+                    "Un abonnement hebdomadaire qui compose automatiquement "
+                    "votre panier avec les produits proches de leur date, "
+                    "à moitié prix. Vous validez ou ajustez en un clic "
+                    "avant chaque livraison."
+                ),
+                caption="Prenez un moment pour lire ce concept.",
+                ai_description=(
+                    "Exemple de support pour un test de concept. Observer ce "
+                    "qui est remarqué en premier : le prix, l'aspect "
+                    "anti-gaspillage, ou la perte de contrôle sur le panier."
+                ),
+                sort_order=0,
+            )
+        )
+    else:
+        db.add(
+            StimulusAsset(
+                project_id=project.id,
+                name="Concept: StreamPass bundle",
+                kind="text",
+                body=(
+                    "One subscription that unlocks the top shows from every "
+                    "major streaming service, with a single watchlist and "
+                    "one monthly bill. Cancel or pause any time."
+                ),
+                caption="Take a moment to read this concept.",
+                ai_description=(
+                    "Example material for a concept test. Watch what gets "
+                    "noticed first: the single bill, the shared watchlist, "
+                    "or scepticism that the catalogue would really be 'top "
+                    "shows from every service'."
+                ),
+                sort_order=0,
+            )
+        )
 
     # Screening question
     db.add(

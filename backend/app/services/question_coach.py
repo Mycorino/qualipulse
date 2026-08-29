@@ -226,7 +226,7 @@ def _maybe_call_claude_for_rewrite(
         resp = client.messages.create(
             model=ai_models.haiku(),
             max_tokens=200,
-            **ai_models.temperature_kwargs(ai_models.haiku(), 0.2),
+            **ai_models.sampling_kwargs(ai_models.haiku(), 0.2),
             system=_REWRITE_PROMPT,
             messages=[{"role": "user", "content": user}],
         )

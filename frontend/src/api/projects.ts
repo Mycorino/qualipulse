@@ -274,6 +274,10 @@ export interface TranscriptTurn {
   translation_language: string | null;
   cleaned_response: string | null;
   cleaned_at: string | null;
+  /** Name of the material on the participant's screen for this turn
+   *  (concept test provenance), or null. */
+  stimulus_name?: string | null;
+  stimulus_kind?: string | null;
 }
 
 // ── Analysis types ─────────────────────────────────────────────────────────

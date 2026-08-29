@@ -183,7 +183,7 @@ Return ONLY a JSON object, no markdown fences, no preamble:
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=1500,
-        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.2),
+        **ai_models.sampling_kwargs(ai_models.sonnet(), 0.2),
         messages=[{"role": "user", "content": prompt}],
     )
     log_claude_usage(
@@ -366,7 +366,7 @@ Return ONLY a JSON object, no markdown fences:
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=700,
-        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.4),
+        **ai_models.sampling_kwargs(ai_models.sonnet(), 0.4),
         messages=[{"role": "user", "content": prompt}],
     )
     log_claude_usage(

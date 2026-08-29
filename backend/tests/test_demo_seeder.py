@@ -47,6 +47,27 @@ class TestDemoSeeder:
         assert project.research_objective
         assert project.welcome_message
 
+    def test_seed_includes_one_unattached_example_stimulus(self, db_session):
+        """The demo advertises the concept-test capability with one written
+        concept in the library, deliberately not attached to any question
+        (the demo transcripts never discuss it)."""
+        company = _make_company(db_session)
+        project = seed_demo_project(db_session, company.id)
+
+        assert len(project.stimuli) == 1
+        stim = project.stimuli[0]
+        assert stim.kind == "text"
+        assert stim.body
+        assert stim.ai_description
+        assert all(q.stimulus_id is None for q in project.guide_questions)
+
+    def test_seed_stimulus_is_french_for_fr_company(self, db_session):
+        company = _make_company(db_session, preferred_language="fr")
+        project = seed_demo_project(db_session, company.id)
+
+        assert len(project.stimuli) == 1
+        assert "anti-gaspi" in project.stimuli[0].name
+
     def test_seed_creates_full_relationship_graph(self, db_session):
         company = _make_company(db_session)
         project = seed_demo_project(db_session, company.id)

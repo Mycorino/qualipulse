@@ -294,7 +294,7 @@ def _generate_ai_headline(
         response = client.messages.create(
             model=_STATE_MODEL,
             max_tokens=_STATE_MAX_TOKENS,
-            **ai_models.temperature_kwargs(_STATE_MODEL, 0.3),
+            **ai_models.sampling_kwargs(_STATE_MODEL, 0.3),
             system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )

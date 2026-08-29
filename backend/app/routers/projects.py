@@ -960,9 +960,10 @@ def patch_question(
         question.stimulus_id = None
     elif body.stimulus_id is not None:
         # Attaching someone else's asset would leak it into this study's
-        # interview payload, so the ownership check is not optional.
-        if _get_stimulus_or_404(body.stimulus_id, project.id, db) is not None:
-            question.stimulus_id = body.stimulus_id
+        # interview payload, so the ownership check is not optional (raises
+        # 404 for a foreign or unknown asset).
+        _get_stimulus_or_404(body.stimulus_id, project.id, db)
+        question.stimulus_id = body.stimulus_id
 
     db.commit()
     db.refresh(question)
