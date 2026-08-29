@@ -56,6 +56,18 @@ const MIC_REARM_DELAY_MS = 350;
 const RESPONSE_DONE_FALLBACK_MS = 6_000;
 const STATUS_POLL_MS = 3_500;
 
+// Explicit constraints: without echoCancellation the interviewer's voice
+// comes back through the microphone, gets transcribed as if the participant
+// had said it, and (with barge-in) cuts the interviewer off mid-sentence.
+// Browsers usually default these on, but "usually" is not good enough for
+// the one thing that breaks the conversation. Shared by the initial connect
+// and the pause/resume reacquisition.
+const MIC_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+};
+
 export default function RealtimeInterview({
   token,
   participantId,
@@ -73,9 +85,10 @@ export default function RealtimeInterview({
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [uploading, setUploading] = useState(false);
   // Participant-controlled pause: VAD is switched off in the session and
-  // the input buffer cleared (see toggleMicPause), so nothing can commit
-  // and the interviewer stays silent until resume. The mic track is also
-  // disabled, so the session recording goes honestly silent with it.
+  // the input buffer cleared (see pauseMic), so nothing can commit and the
+  // interviewer stays silent until resume. The mic track is fully STOPPED
+  // (not just disabled) so the device is released and the phone's
+  // mic-in-use indicator goes off; resume reacquires it via replaceTrack.
   const [micPaused, setMicPaused] = useState(false);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -99,6 +112,13 @@ export default function RealtimeInterview({
   const setupSeqRef = useRef(0);
   const micPausedRef = useRef(false);
   const micRearmTimerRef = useRef<number | null>(null);
+  // The RTCRtpSender carrying the mic track: pause fully STOPS the track
+  // (releasing the device, so the phone's mic-in-use indicator goes off) and
+  // resume swaps a freshly acquired track back in via replaceTrack.
+  const micSenderRef = useRef<RTCRtpSender | null>(null);
+  // The recorder's mixing destination, so a resumed mic can be wired back
+  // into the session recording.
+  const recorderDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
 
   // Echo cancellation is imperfect on speakerphone and laptop speakers, so
   // belt and braces: the microphone is physically muted while the
@@ -118,37 +138,65 @@ export default function RealtimeInterview({
 
   useEffect(() => { micPausedRef.current = micPaused; }, [micPaused]);
 
-  const toggleMicPause = useCallback(() => {
+  const pauseMic = useCallback(() => {
+    // Set the ref synchronously: the speaking gate's re-arm timer can fire
+    // before React flushes the state effect, and it must not reopen a mic
+    // the participant just paused.
+    micPausedRef.current = true;
+    setMicPaused(true);
+    // Turn VAD off entirely and drop any half-captured speech, so the
+    // interviewer cannot commit a turn (and speak) while paused: the
+    // documented push-to-talk off-switch (merely muting the track feeds VAD
+    // silence, which it reads as "done talking").
+    sendEvent({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: null } } } });
+    // Fully STOP the track rather than disable it: the phone keeps its
+    // mic-in-use indicator lit for a live-but-muted track, and "pause"
+    // must visibly let go of the microphone.
+    micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+    micStreamRef.current = null;
+    sendEvent({ type: "input_audio_buffer.clear" });
+  }, [sendEvent]);
+
+  const resumeMic = useCallback(async () => {
     // A click is a user gesture: use it to rescue a suspended AudioContext
     // (Safari starts them suspended when created outside a gesture, which
     // silently produced empty session recordings).
     void audioCtxRef.current?.resume().catch(() => undefined);
-    setMicPaused((prev) => {
-      const next = !prev;
-      // Set the ref synchronously: the speaking gate's re-arm timer can fire
-      // before React flushes the state effect, and it must not reopen a mic
-      // the participant just paused.
-      micPausedRef.current = next;
-      if (next) {
-        micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = false; });
-        // Turn VAD off entirely and drop any half-captured speech, so the
-        // interviewer cannot commit a turn (and speak) while paused.
-        sendEvent({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: null } } } });
-        sendEvent({ type: "input_audio_buffer.clear" });
-      } else {
-        sendEvent({ type: "input_audio_buffer.clear" });
-        if (turnDetectionRef.current) {
-          sendEvent({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: turnDetectionRef.current } } } });
-        }
-        // Resuming mid-sentence must not reopen the mic into the speaker:
-        // the speaking gate re-arms it when the interviewer finishes.
-        if (!speakingRef.current) {
-          micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = true; });
-        }
+    try {
+      // Pause stopped the track, so reacquire the device (already granted
+      // this session, so no new permission prompt) and swap it into the
+      // existing peer connection.
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS });
+      const track = mic.getAudioTracks()[0];
+      // Resuming mid-sentence must not reopen the mic into the speaker:
+      // the speaking gate re-arms it when the interviewer finishes.
+      track.enabled = !speakingRef.current;
+      micStreamRef.current = mic;
+      await micSenderRef.current?.replaceTrack(track);
+      // Wire the fresh mic back into the session recording mix.
+      const ctx = audioCtxRef.current;
+      const dest = recorderDestRef.current;
+      if (ctx && dest) {
+        try { ctx.createMediaStreamSource(mic).connect(dest); } catch { /* recorder gone */ }
       }
-      return next;
-    });
+      micPausedRef.current = false;
+      setMicPaused(false);
+      sendEvent({ type: "input_audio_buffer.clear" });
+      if (turnDetectionRef.current) {
+        sendEvent({ type: "session.update", session: { type: "realtime", audio: { input: { turn_detection: turnDetectionRef.current } } } });
+      }
+    } catch {
+      // The mic could not be reacquired (permission withdrawn while
+      // paused): surface the error state, which offers retry + the classic
+      // flow instead of a silently dead conversation.
+      setConnState("error");
+    }
   }, [sendEvent]);
+
+  const toggleMicPause = useCallback(() => {
+    if (micPausedRef.current) void resumeMic();
+    else pauseMic();
+  }, [pauseMic, resumeMic]);
 
   const teardown = useCallback(() => {
     if (micRearmTimerRef.current) {
@@ -161,6 +209,8 @@ export default function RealtimeInterview({
     pcRef.current = null;
     micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
     micStreamRef.current = null;
+    micSenderRef.current = null;
+    recorderDestRef.current = null;
     void audioCtxRef.current?.close().catch(() => undefined);
     audioCtxRef.current = null;
   }, []);
@@ -176,6 +226,7 @@ export default function RealtimeInterview({
       // pause-button gesture as a fallback.
       void ctx.resume().catch(() => undefined);
       const dest = ctx.createMediaStreamDestination();
+      recorderDestRef.current = dest;
       ctx.createMediaStreamSource(mic).connect(dest);
       ctx.createMediaStreamSource(remote).connect(dest);
       const mime = RECORDER_MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m));
@@ -322,24 +373,13 @@ export default function RealtimeInterview({
     const seq = ++setupSeqRef.current;
     setConnState("connecting");
     try {
-      // Explicit constraints: without echoCancellation the interviewer's
-      // voice comes back through the microphone, gets transcribed as if the
-      // participant had said it, and (with barge-in) cuts the interviewer
-      // off mid-sentence. Browsers usually default these on, but "usually"
-      // is not good enough for the one thing that breaks the conversation.
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS });
       if (seq !== setupSeqRef.current) { mic.getTracks().forEach((tr) => tr.stop()); return; }
       micStreamRef.current = mic;
 
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
-      pc.addTrack(mic.getAudioTracks()[0], mic);
+      micSenderRef.current = pc.addTrack(mic.getAudioTracks()[0], mic);
       pc.ontrack = (e) => {
         const remote = e.streams[0];
         if (remoteAudioRef.current) {

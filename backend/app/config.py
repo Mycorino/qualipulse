@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     REALTIME_VAD_TYPE: str = "semantic_vad"  # semantic_vad | server_vad
     REALTIME_VAD_EAGERNESS: str = "low"  # semantic_vad: low | medium | high | auto
     REALTIME_VAD_SILENCE_MS: int = 1000  # server_vad only
+    # Input noise reduction runs BEFORE VAD, so room noise and speaker bleed
+    # are less likely to be committed as participant speech. far_field suits
+    # phone/laptop speakers (our participants); near_field is for headsets.
+    # Empty string disables.
+    REALTIME_NOISE_REDUCTION: str = "far_field"  # far_field | near_field | ""
     # Immediate one-to-three-word acknowledgment ("D'accord", "Je vois")
     # spoken the moment the participant's answer commits, so the 2-4s the
     # Claude decision takes doesn't read as dead air.
