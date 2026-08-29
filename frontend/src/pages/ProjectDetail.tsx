@@ -67,6 +67,7 @@ import {
   InterviewLink,
   ParticipantResponse,
   TranscriptTurn,
+  RecordingSegment,
   AnalysisResponse,
   ManualCode,
   QuoteTag,
@@ -149,6 +150,7 @@ export default function ProjectDetail() {
   const [availableCredits, setAvailableCredits] = useState<number | null>(null);
   const [participants, setParticipants] = useState<ParticipantResponse[]>([]);
   const [transcript, setTranscript] = useState<TranscriptTurn[] | null>(null);
+  const [recordingSegments, setRecordingSegments] = useState<RecordingSegment[]>([]);
   const [selectedParticipant, setSelectedParticipant] = useState<ParticipantResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -288,8 +290,10 @@ export default function ProjectDetail() {
   // Map of turnId → recording <audio> element so transcript spans can seek
   // playback by clicking a segment.
   const recordingAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
-  // Realtime-beta full-session player — per-turn "listen" buttons seek it.
-  const sessionRecordingRef = useRef<HTMLAudioElement | null>(null);
+  // Realtime-beta full-session players, one per recording segment (a
+  // resumed interview has several parts; "legacy" = pre-segment single
+  // file). Per-turn "listen" buttons seek the right one.
+  const sessionRecordingRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
   // ── Iterative analysis state ───────────────────────────────────────────────
   const [themeAnnotations, setThemeAnnotations] = useState<Record<string, ThemeAnnotation>>({});
@@ -1023,6 +1027,7 @@ export default function ProjectDetail() {
       const result = await getTranscript(id!, p.id);
       setSelectedParticipant(result.participant);
       setTranscript(result.turns);
+      setRecordingSegments(result.recording_segments ?? []);
       // Default to the corrected view when the ASR sense-check produced any
       // fixes — it's strictly more readable, and the raw STT stays one click
       // away (and is still shown beneath each corrected turn).
@@ -3706,16 +3711,33 @@ export default function ProjectDetail() {
 
                     {/* Realtime-beta interviews: one full-session recording
                         instead of per-turn clips. */}
-                    {selectedParticipant.session_recording_url && (
+                    {(recordingSegments.length > 0 || selectedParticipant.session_recording_url) && (
                       <div className="session-recording-block">
                         <p className="muted-text" style={{ fontSize: 13, margin: "10px 2px 6px" }}>
                           🎙 {tProject("responses.sessionRecording", { defaultValue: "Full session recording (live voice interview)" })}
                         </p>
-                        <AudioClip
-                          ref={sessionRecordingRef}
-                          src={selectedParticipant.session_recording_url}
-                          label={tProject("responses.sessionRecordingLabel", { defaultValue: "Full session recording" })}
-                        />
+                        {recordingSegments.length > 0 ? (
+                          recordingSegments.map((seg, i) => (
+                            <div key={seg.segment_key} style={{ marginBottom: 6 }}>
+                              {recordingSegments.length > 1 && (
+                                <p className="muted-text" style={{ fontSize: 12, margin: "0 2px 2px" }}>
+                                  {tProject("responses.sessionRecordingPart", { n: i + 1, defaultValue: "Part {{n}}" })}
+                                </p>
+                              )}
+                              <AudioClip
+                                ref={(el) => { sessionRecordingRefs.current[seg.segment_key] = el; }}
+                                src={seg.url}
+                                label={tProject("responses.sessionRecordingLabel", { defaultValue: "Full session recording" })}
+                              />
+                            </div>
+                          ))
+                        ) : (
+                          <AudioClip
+                            ref={(el) => { sessionRecordingRefs.current.legacy = el; }}
+                            src={selectedParticipant.session_recording_url!}
+                            label={tProject("responses.sessionRecordingLabel", { defaultValue: "Full session recording" })}
+                          />
+                        )}
                       </div>
                     )}
 
@@ -3857,15 +3879,21 @@ export default function ProjectDetail() {
                                   </span>
                                   {!t.audio_recording_url &&
                                     t.audio_offset_seconds != null &&
-                                    selectedParticipant.session_recording_url && (
+                                    (recordingSegments.length > 0 || selectedParticipant.session_recording_url) && (
                                     /* Realtime turn: no per-turn file, but we know where this
-                                       turn starts in the session recording — jump the player. */
+                                       turn starts in its recording segment — jump that player. */
                                     <button
                                       className="btn btn-ghost"
                                       style={{ fontSize: 12, minHeight: 32, padding: "2px 10px" }}
                                       onClick={() => {
-                                        const el = sessionRecordingRef.current;
+                                        const refs = sessionRecordingRefs.current;
+                                        const el =
+                                          (t.audio_segment_key ? refs[t.audio_segment_key] : null) ??
+                                          refs.legacy ??
+                                          Object.values(refs).find(Boolean) ??
+                                          null;
                                         if (!el) return;
+                                        Object.values(refs).forEach((other) => { if (other && other !== el) other.pause(); });
                                         el.currentTime = Math.max(0, (t.audio_offset_seconds ?? 0) - 1);
                                         void el.play().catch(() => undefined);
                                         document.querySelector(".session-recording-block")?.scrollIntoView({ behavior: "smooth", block: "nearest" });

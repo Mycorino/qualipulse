@@ -111,6 +111,9 @@ export default function RealtimeInterview({
   const speakingRef = useRef(false);
   const setupSeqRef = useRef(0);
   const micPausedRef = useRef(false);
+  // This connection's recording segment (from the SDP exchange): tags
+  // every upload so a resumed session never overwrites earlier audio.
+  const segmentIdRef = useRef<string | null>(null);
   const micRearmTimerRef = useRef<number | null>(null);
   // The RTCRtpSender carrying the mic track: pause fully STOPS the track
   // (releasing the device, so the phone's mic-in-use indicator goes off) and
@@ -253,7 +256,7 @@ export default function RealtimeInterview({
     if (blob.size < 500 || blob.size <= uploadedBytesRef.current) return;
     uploadBusyRef.current = true;
     try {
-      await uploadSessionRecording(token, participantId, blob);
+      await uploadSessionRecording(token, participantId, blob, segmentIdRef.current);
       uploadedBytesRef.current = blob.size;
     } catch {
       // Next tick retries with a bigger blob.
@@ -295,7 +298,7 @@ export default function RealtimeInterview({
     teardown();
     if (blob && blob.size > 500) {
       try {
-        await uploadSessionRecording(token, participantId, blob);
+        await uploadSessionRecording(token, participantId, blob, segmentIdRef.current);
       } catch {
         // Best-effort: losing the recording never blocks the completion screen.
       }
@@ -412,6 +415,7 @@ export default function RealtimeInterview({
       if (!sdp) throw new Error("no local SDP");
       const session = await createRealtimeSession(token, participantId, sdp);
       turnDetectionRef.current = session.turnDetection;
+      segmentIdRef.current = session.segmentId;
       if (seq !== setupSeqRef.current) return;
       await pc.setRemoteDescription({ type: "answer", sdp: session.sdp });
     } catch {

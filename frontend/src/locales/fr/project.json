@@ -563,6 +563,7 @@
     },
     "sessionRecording": "Enregistrement complet de la session (entretien en direct)",
     "sessionRecordingLabel": "Enregistrement complet de la session",
+    "sessionRecordingPart": "Partie {{n}}",
     "listenFromTurn": "Lire l'enregistrement de la session à partir de ce moment"
   },
   "transcript": {

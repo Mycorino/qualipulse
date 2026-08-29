@@ -44,6 +44,7 @@ from app.models.interview import (
     InterviewTurn,
     Participant,
     ProjectAnalysis,
+    RealtimeRecordingSegment,
 )
 from app.models.memo import ProjectMemo
 from app.models.project import InterviewGuideQuestion, Project, ScreeningQuestion
@@ -109,7 +110,7 @@ def _delete_interview_graph(
     # participant instead of per-turn clips; it is personal data like any
     # other recording and goes with the same erasure.
     if delete_files:
-        session_urls = [
+        session_urls = {
             row[0]
             for row in db.query(Participant.session_recording_url)
             .filter(
@@ -117,8 +118,21 @@ def _delete_interview_graph(
                 Participant.session_recording_url.isnot(None),
             )
             .all()
-        ]
-        counts["audio_files"] += _delete_turn_audio(session_urls)
+        }
+        # Per-connection recording segments (deduped: the participant's
+        # legacy pointer usually references one of the segment files).
+        session_urls |= {
+            row[0]
+            for row in db.query(RealtimeRecordingSegment.url)
+            .filter(RealtimeRecordingSegment.participant_id.in_(participant_ids))
+            .all()
+        }
+        counts["audio_files"] += _delete_turn_audio(sorted(session_urls))
+    db.execute(
+        sql_delete(RealtimeRecordingSegment).where(
+            RealtimeRecordingSegment.participant_id.in_(participant_ids)
+        )
+    )
 
     turn_ids = [
         row[0]

@@ -225,6 +225,14 @@ export interface TranscriptSegment {
   text: string;
 }
 
+/** Realtime-beta: one browser connection's slice of the session
+ *  recording (a resumed interview has several parts). */
+export interface RecordingSegment {
+  segment_key: string;
+  url: string;
+  created_at: string;
+}
+
 export interface TranscriptTurn {
   id: string;
   turn_index: number;
@@ -239,6 +247,8 @@ export interface TranscriptTurn {
   /** Realtime-beta: seconds into the participant's session recording at
    *  which this turn's question begins (null for classic turns). */
   audio_offset_seconds?: number | null;
+  /** Which recording segment (browser connection) the offset seeks into. */
+  audio_segment_key?: string | null;
   tts_audio_url: string | null;
   translated_response: string | null;
   translated_question: string | null;
@@ -623,8 +633,8 @@ export async function getParticipants(projectId: string): Promise<ParticipantRes
 export async function getTranscript(
   projectId: string,
   participantId: string
-): Promise<{ participant: ParticipantResponse; turns: TranscriptTurn[]; translation_language: string | null }> {
-  const { data } = await client.get<{ participant: ParticipantResponse; turns: TranscriptTurn[]; translation_language: string | null }>(
+): Promise<{ participant: ParticipantResponse; turns: TranscriptTurn[]; translation_language: string | null; recording_segments?: RecordingSegment[] }> {
+  const { data } = await client.get<{ participant: ParticipantResponse; turns: TranscriptTurn[]; translation_language: string | null; recording_segments?: RecordingSegment[] }>(
     `/projects/${projectId}/participants/${participantId}/transcript`
   );
   return data;

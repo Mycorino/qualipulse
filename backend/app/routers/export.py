@@ -18,6 +18,7 @@ from app.models.interview import REVIEW_REJECTED, InterviewTurn, Participant
 from app.models.project import Project
 from app.schemas.interview import (
     ParticipantResponse,
+    RecordingSegmentResponse,
     TranscriptResponse,
     TranscriptTurnResponse,
 )
@@ -332,6 +333,7 @@ def get_transcript(
                 created_at=t.created_at,
                 audio_recording_url=t.audio_recording_url,
                 audio_offset_seconds=getattr(t, "audio_offset_seconds", None),
+                audio_segment_key=getattr(t, "audio_segment_key", None),
                 tts_audio_url=t.tts_audio_url,
                 translated_response=t.translated_response,
                 translated_question=t.translated_question,
@@ -342,6 +344,10 @@ def get_transcript(
         translation_language=next(
             (t.translation_language for t in turns if t.translation_language), None
         ),
+        recording_segments=[
+            RecordingSegmentResponse.model_validate(s)
+            for s in getattr(participant, "recording_segments", []) or []
+        ],
     )
 
 

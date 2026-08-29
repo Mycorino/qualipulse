@@ -176,8 +176,10 @@ class TranscriptTurnResponse(BaseModel):
     edited_at: datetime | None = None
     created_at: datetime
     audio_recording_url: str | None = None
-    # Realtime-beta: where this turn starts inside session_recording_url.
+    # Realtime-beta: where this turn starts inside its recording segment
+    # (or, for pre-segment turns, inside session_recording_url).
     audio_offset_seconds: float | None = None
+    audio_segment_key: str | None = None
     tts_audio_url: str | None = None
     translated_response: str | None = None
     translated_question: str | None = None
@@ -188,10 +190,24 @@ class TranscriptTurnResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RecordingSegmentResponse(BaseModel):
+    """One browser connection's slice of a realtime session recording."""
+
+    segment_key: str
+    url: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class TranscriptResponse(BaseModel):
     participant: ParticipantResponse
     turns: list[TranscriptTurnResponse] = []
     translation_language: str | None = None
+    # Realtime-beta: every connection's recording, oldest first. Empty for
+    # classic interviews and for realtime interviews recorded before
+    # segments existed (those fall back to session_recording_url).
+    recording_segments: list[RecordingSegmentResponse] = []
 
 
 class ResumeCheckResponse(BaseModel):

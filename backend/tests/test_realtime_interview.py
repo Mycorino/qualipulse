@@ -245,8 +245,11 @@ class TestSdpEndpoint:
             assert td["create_response"] is False
             return "v=0\r\nanswer", "rtc_test123"
 
-        def fake_spawn(call_id, participant_id, total_minutes):
-            spawned.update(call_id=call_id, participant_id=participant_id, total=total_minutes)
+        def fake_spawn(call_id, participant_id, total_minutes, segment_key=None):
+            spawned.update(
+                call_id=call_id, participant_id=participant_id,
+                total=total_minutes, segment_key=segment_key,
+            )
 
         with patch("app.services.realtime_interview.create_realtime_call", fake_create), \
              patch("app.services.realtime_interview.spawn_sideband", fake_spawn):
@@ -262,7 +265,13 @@ class TestSdpEndpoint:
         # The client restores VAD from this after a mic pause.
         td = json.loads(res.headers["x-realtime-turn-detection"])
         assert td["create_response"] is False
-        assert spawned == {"call_id": "rtc_test123", "participant_id": participant.id, "total": 20}
+        # The recording segment for this connection reaches both the client
+        # (upload tag) and the sideband (turn stamping).
+        assert res.headers["x-realtime-segment"] == spawned["segment_key"]
+        assert len(spawned["segment_key"]) == 32
+        assert spawned["call_id"] == "rtc_test123"
+        assert spawned["participant_id"] == participant.id
+        assert spawned["total"] == 20
 
     def test_completed_interviews_cannot_open_a_session(self, client, db_session):
         link, participant = _seed(db_session, "tok-done-sdp")
@@ -312,6 +321,106 @@ class TestSessionRecording:
         db_session.refresh(participant)
         assert participant.session_recording_url == "/audio/recordings/x/new.mp3"
         assert deleted == ["/audio/recordings/x/old.mp3"]
+
+    def test_segments_record_side_by_side_without_deleting_each_other(self, client, db_session):
+        """A resumed session (or second tab) is its own segment: uploading it
+        must never overwrite or delete another connection's audio — the
+        single-slot design once lost a morning recording to an afternoon
+        resume, and a race left the DB pointing at a deleted file."""
+        from app.models.interview import RealtimeRecordingSegment
+
+        link, participant = _seed(db_session, "tok-seg")
+        deleted = []
+        urls = iter(["/audio/r/seg-a-1.mp3", "/audio/r/seg-b-1.mp3", "/audio/r/seg-a-2.mp3"])
+
+        with patch("app.services.storage.upload_audio", side_effect=lambda *a, **k: next(urls)), \
+             patch("app.services.storage.delete_audio_by_url", side_effect=deleted.append), \
+             patch("app.services.transcode.needs_transcode", return_value=False):
+            for seg in ("a" * 12, "b" * 12, "a" * 12):
+                res = client.post(
+                    f"/interview/{link.token}/{participant.id}/realtime/recording?segment={seg}",
+                    files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+                )
+                assert res.status_code == 200
+
+        rows = (
+            db_session.query(RealtimeRecordingSegment)
+            .filter(RealtimeRecordingSegment.participant_id == participant.id)
+            .all()
+        )
+        by_key = {r.segment_key: r.url for r in rows}
+        # Segment a was replaced by its own re-upload; segment b untouched.
+        assert by_key == {"a" * 12: "/audio/r/seg-a-2.mp3", "b" * 12: "/audio/r/seg-b-1.mp3"}
+        assert deleted == ["/audio/r/seg-a-1.mp3"]
+
+    def test_transcript_lists_recording_segments(self, client, db_session, auth_headers, registered_company):
+        from app.models.company import Company
+        from app.models.interview import RealtimeRecordingSegment
+
+        link, participant = _seed(db_session, "tok-seg-list")
+        db_session.add_all([
+            RealtimeRecordingSegment(
+                participant_id=participant.id, segment_key="k1", url="/audio/r/p1.mp3"
+            ),
+            RealtimeRecordingSegment(
+                participant_id=participant.id, segment_key="k2", url="/audio/r/p2.mp3"
+            ),
+        ])
+        turn = participant.turns[0]
+        turn.audio_offset_seconds = 12.5
+        turn.audio_segment_key = "k2"
+        # Rehome the seeded project under the authed company so the
+        # researcher transcript endpoint accepts it.
+        company = db_session.query(Company).filter(Company.email == registered_company["email"]).first()
+        participant.project.company_id = company.id
+        db_session.commit()
+
+        res = client.get(
+            f"/projects/{participant.project_id}/participants/{participant.id}/transcript",
+            headers=auth_headers,
+        )
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert [s["segment_key"] for s in body["recording_segments"]] == ["k1", "k2"]
+        assert body["turns"][0]["audio_segment_key"] == "k2"
+        assert body["turns"][0]["audio_offset_seconds"] == 12.5
+
+    def test_invalid_segment_key_is_rejected(self, client, db_session):
+        link, participant = _seed(db_session, "tok-seg-bad")
+        res = client.post(
+            f"/interview/{link.token}/{participant.id}/realtime/recording?segment=../evil",
+            files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+        )
+        assert res.status_code == 422
+
+    def test_gdpr_deletion_removes_segment_files(self, db_session):
+        from app.models.interview import RealtimeRecordingSegment
+        from app.services import deletion
+
+        _, participant = _seed(db_session, "tok-seg-gdpr")
+        participant.session_recording_url = "/audio/r/g1.mp3"
+        db_session.add(
+            RealtimeRecordingSegment(
+                participant_id=participant.id, segment_key="g1", url="/audio/r/g1.mp3"
+            )
+        )
+        db_session.add(
+            RealtimeRecordingSegment(
+                participant_id=participant.id, segment_key="g2", url="/audio/r/g2.mp3"
+            )
+        )
+        db_session.commit()
+        deleted = []
+        with patch.object(deletion, "delete_audio_by_url", side_effect=lambda u: deleted.append(u) or True):
+            deletion.delete_participant_data(db_session, participant)
+        # Both segment files gone, the legacy pointer deduped (same file).
+        assert sorted(deleted) == ["/audio/r/g1.mp3", "/audio/r/g2.mp3"]
+        assert (
+            db_session.query(RealtimeRecordingSegment)
+            .filter(RealtimeRecordingSegment.participant_id == participant.id)
+            .count()
+            == 0
+        )
 
     def test_tiny_uploads_are_rejected(self, client, db_session):
         link, participant = _seed(db_session, "tok-rec-tiny")

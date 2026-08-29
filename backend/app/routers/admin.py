@@ -27,6 +27,7 @@ from app.models.interview import (
     InterviewTurn,
     Participant,
     ProjectAnalysis,
+    RealtimeRecordingSegment,
 )
 from app.models.memo import ProjectMemo
 from app.models.panel import PanelAnswer, PanelProfile, ParticipantMagicToken
@@ -589,8 +590,15 @@ def run_retention_purge(
     files_deleted = 0
     if not dry_run:
         for p in session_participants:
-            if delete_audio_by_url(p.session_recording_url):
-                files_deleted += 1
+            segment_urls = {
+                s.url for s in getattr(p, "recording_segments", []) or []
+            }
+            for url in sorted({p.session_recording_url} | segment_urls):
+                if url and delete_audio_by_url(url):
+                    files_deleted += 1
+            db.query(RealtimeRecordingSegment).filter(
+                RealtimeRecordingSegment.participant_id == p.id
+            ).delete(synchronize_session=False)
             p.session_recording_url = None
         for turn in turns:
             if turn.audio_recording_url:

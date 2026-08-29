@@ -152,6 +152,12 @@ class Participant(Base):
     @counts_for_research.expression
     def counts_for_research(cls):
         return and_(cls.status == "completed", cls.review_status != REVIEW_REJECTED)
+    recording_segments = relationship(
+        "RealtimeRecordingSegment",
+        back_populates="participant",
+        cascade="all, delete-orphan",
+        order_by="RealtimeRecordingSegment.created_at",
+    )
     turns = relationship(
         "InterviewTurn", back_populates="participant", cascade="all, delete-orphan"
     )
@@ -166,6 +172,43 @@ class Participant(Base):
             return parsed if isinstance(parsed, list) else []
         except Exception:
             return []
+
+
+class RealtimeRecordingSegment(Base):
+    """One browser connection's slice of a realtime interview recording.
+
+    A realtime interview can span several connections (resume after a break,
+    a device change, a second tab), each recording its own audio. One row per
+    connection: uploads only ever replace their OWN segment's file, so
+    concurrent or resumed sessions can never overwrite or delete each
+    other's audio (which a single participants.session_recording_url slot
+    did). Turns carry audio_segment_key + audio_offset_seconds to seek into
+    the right segment.
+    """
+
+    __tablename__ = "realtime_recording_segments"
+    __table_args__ = (
+        UniqueConstraint(
+            "participant_id", "segment_key", name="uq_recording_segment_per_participant"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    participant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("participants.id"), nullable=False, index=True
+    )
+    segment_key: Mapped[str] = mapped_column(String(40), nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    participant = relationship("Participant", back_populates="recording_segments")
 
 
 class ProjectAnalysis(Base):
@@ -257,6 +300,10 @@ class InterviewTurn(Base):
     # jump the session player to any turn even though realtime interviews
     # have no per-turn audio files. Stamped by the sideband bridge.
     audio_offset_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Which recording segment (browser connection) the offset above seeks
+    # into. NULL for classic turns and for realtime turns recorded before
+    # segments existed (those seek the legacy session_recording_url).
+    audio_segment_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
     tts_audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     manually_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
