@@ -114,6 +114,13 @@ export default function RealtimeInterview({
   // This connection's recording segment (from the SDP exchange): tags
   // every upload so a resumed session never overwrites earlier audio.
   const segmentIdRef = useRef<string | null>(null);
+  // The OpenAI call died under us (data channel closed / ICE failed) — set
+  // while paused so resume knows to rebuild the call instead of talking
+  // into a dead one. A 10-minute pause on a locked phone reliably kills
+  // the call (iOS suspends the page; OpenAI hangs up the idle session).
+  const deadCallRef = useRef(false);
+  // Filled once reconnect() exists (it is declared after connect()).
+  const reconnectRef = useRef<(() => Promise<void>) | null>(null);
   const micRearmTimerRef = useRef<number | null>(null);
   // The RTCRtpSender carrying the mic track: pause fully STOPS the track
   // (releasing the device, so the phone's mic-in-use indicator goes off) and
@@ -165,6 +172,21 @@ export default function RealtimeInterview({
     // (Safari starts them suspended when created outside a gesture, which
     // silently produced empty session recordings).
     void audioCtxRef.current?.resume().catch(() => undefined);
+    // A long pause (locked phone, backgrounded tab) usually killed the
+    // call: iOS suspends the page and OpenAI hangs up. Reacquiring the mic
+    // alone would leave the participant talking to a dead connection, so
+    // rebuild the whole call — new SDP exchange, new sideband (it re-asks
+    // the pending question), new recording segment.
+    if (
+      deadCallRef.current ||
+      dcRef.current?.readyState !== "open" ||
+      pcRef.current?.connectionState !== "connected"
+    ) {
+      micPausedRef.current = false;
+      setMicPaused(false);
+      await reconnectRef.current?.();
+      return;
+    }
     try {
       // Pause stopped the track, so reacquire the device (already granted
       // this session, so no new permission prompt) and swap it into the
@@ -394,10 +416,22 @@ export default function RealtimeInterview({
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
       dc.onmessage = (e) => handleDataChannelEvent(String(e.data));
+      // The data channel closing while the interview is still running means
+      // the call ended under us (idle hangup, session cap, network death).
+      // Mid-conversation that is the error screen; while paused we stay on
+      // the calm paused screen and let resume rebuild the call.
+      dc.onclose = () => {
+        if (finishedRef.current || seq !== setupSeqRef.current) return;
+        deadCallRef.current = true;
+        if (!micPausedRef.current) setConnState("error");
+      };
       pc.onconnectionstatechange = () => {
-        if (finishedRef.current) return;
+        if (finishedRef.current || seq !== setupSeqRef.current) return;
         if (pc.connectionState === "connected") setConnState("live");
-        if (pc.connectionState === "failed") setConnState("error");
+        if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+          deadCallRef.current = true;
+          if (!micPausedRef.current) setConnState("error");
+        }
       };
 
       const offer = await pc.createOffer();
@@ -418,6 +452,7 @@ export default function RealtimeInterview({
       segmentIdRef.current = session.segmentId;
       if (seq !== setupSeqRef.current) return;
       await pc.setRemoteDescription({ type: "answer", sdp: session.sdp });
+      deadCallRef.current = false;
     } catch {
       if (seq === setupSeqRef.current && !finishedRef.current) {
         teardown();
@@ -425,6 +460,17 @@ export default function RealtimeInterview({
       }
     }
   }, [handleDataChannelEvent, participantId, startRecorder, teardown, token]);
+
+  // Full rebuild of a dead call: flush what the recorder holds to the OLD
+  // segment first (segmentIdRef still points at it), then tear down and
+  // dial a fresh call — new sideband, new recording segment.
+  const reconnect = useCallback(async () => {
+    setConnState("connecting");
+    try { await uploadPartial(); } catch { /* best-effort flush */ }
+    teardown();
+    await connect();
+  }, [connect, teardown, uploadPartial]);
+  useEffect(() => { reconnectRef.current = reconnect; }, [reconnect]);
 
   // Connect once on mount; tear everything down on unmount.
   useEffect(() => {
@@ -493,7 +539,7 @@ export default function RealtimeInterview({
           <button
             className="btn btn-primary"
             style={{ minHeight: 48, minWidth: 200 }}
-            onClick={() => void connect()}
+            onClick={() => void reconnect()}
           >
             {t("realtime.retry")}
           </button>
