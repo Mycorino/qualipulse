@@ -304,6 +304,12 @@ class InterviewTurn(Base):
     # into. NULL for classic turns and for realtime turns recorded before
     # segments existed (those seek the legacy session_recording_url).
     audio_segment_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Realtime-beta: where this turn's ANSWER starts/ends inside its
+    # recording segment. Stamped by the sideband from speech events; the
+    # completion-time slicer cuts these spans into per-turn answer clips
+    # (audio_recording_url) so the researcher view matches classic.
+    answer_offset_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    answer_end_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     tts_audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     manually_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

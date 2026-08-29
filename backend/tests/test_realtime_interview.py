@@ -580,6 +580,92 @@ class TestBridgeTurns:
         combined = bridge._collect_answer(ws, "Netflix mostly")
         assert combined == "Netflix mostly and Disney for the kids"
 
+    def test_answer_span_opens_on_participant_speech_only(self, db_session, bridge_sessions):
+        _, participant = _seed(db_session, "tok-span", turns=1)
+        bridge = rt.SidebandBridge("rtc_span", participant.id, 20)
+        import time as _time
+        bridge.session_started_at = _time.monotonic() - 10.0
+        # Speech while the interviewer is talking is its own voice, not the
+        # answer starting.
+        bridge.response_active = True
+        bridge._note_event({"type": "input_audio_buffer.speech_started"})
+        assert bridge._answer_span_start is None
+        bridge.response_active = False
+        bridge._note_event({"type": "input_audio_buffer.speech_started"})
+        assert bridge._answer_span_start is not None
+        first = bridge._answer_span_start
+        # A second speech burst does not restart the span.
+        bridge._note_event({"type": "input_audio_buffer.speech_started"})
+        assert bridge._answer_span_start == first
+
+    def test_answer_span_is_stamped_onto_the_answered_turn(self, db_session, bridge_sessions):
+        _, participant = _seed(db_session, "tok-span2", turns=2)
+        rt._stamp_answer_span(participant.id, 0, 14.2, 41.8)
+        db_session.expire_all()
+        turn = next(t for t in participant.turns if t.turn_index == 0)
+        assert turn.answer_offset_seconds == 14.2
+        assert turn.answer_end_seconds == 41.8
+        # No observed speech start = no stamp (no clip beats a wrong clip).
+        rt._stamp_answer_span(participant.id, 1, None, 60.0)
+        db_session.expire_all()
+        turn1 = next(t for t in participant.turns if t.turn_index == 1)
+        assert turn1.answer_offset_seconds is None
+
+    def test_completed_upload_slices_turn_clips_and_whisper_segments(self, db_session, bridge_sessions):
+        """Parity with classic: once sliced, the turn carries the same
+        audio_recording_url + response_segments fields the classic
+        Responses view renders — per-turn player and sentence highlighting
+        light up with zero UI changes."""
+        from app.services import realtime_slices as rs
+
+        _, participant = _seed(db_session, "tok-slice", turns=2)
+        participant.status = "completed"
+        answered = next(t for t in participant.turns if t.turn_index == 0)
+        answered.response_transcript = "we mostly watch Netflix"
+        answered.audio_segment_key = "seg1"
+        answered.answer_offset_seconds = 10.0
+        answered.answer_end_seconds = 32.5
+        db_session.commit()
+
+        segments = [{"start": 0.0, "end": 3.1, "text": "we mostly watch Netflix", "no_speech_prob": 0.01}]
+        with patch.object(rs, "_slice_mp3", return_value=b"c" * 2000) as slicer, \
+             patch("app.services.storage.upload_audio", return_value="/audio/recordings/x/turn-0.mp3"), \
+             patch("app.services.stt.transcribe_audio", return_value=("we mostly watch Netflix", 22.5, segments)):
+            assert rs.slice_turn_clips(participant.id, b"mp3" * 1000, "seg1") == 1
+            # Padded span, so the first word is never clipped mid-syllable.
+            start, end = slicer.call_args[0][1], slicer.call_args[0][2]
+            assert start == 10.0 - rs.CLIP_PAD_SECONDS
+            assert end == 32.5 + rs.CLIP_PAD_SECONDS
+            # Idempotent: the clipped turn is not re-sliced.
+            assert rs.slice_turn_clips(participant.id, b"mp3" * 1000, "seg1") == 0
+            # Another segment's file cannot produce clips for this turn.
+            assert rs.slice_turn_clips(participant.id, b"mp3" * 1000, "other") == 0
+
+        db_session.expire_all()
+        assert answered.audio_recording_url == "/audio/recordings/x/turn-0.mp3"
+        assert json.loads(answered.response_segments)[0]["text"] == "we mostly watch Netflix"
+        # The live transcript stays the record.
+        assert answered.response_transcript == "we mostly watch Netflix"
+
+    def test_recording_upload_triggers_slicing_once_completed(self, client, db_session):
+        link, participant = _seed(db_session, "tok-slice-trig")
+        spawned = []
+        with patch("app.services.storage.upload_audio", return_value="/audio/recordings/x/s.mp3"), \
+             patch("app.services.transcode.needs_transcode", return_value=False), \
+             patch("app.services.realtime_slices.spawn_turn_slicer", side_effect=lambda pid, d, seg: spawned.append(seg)):
+            client.post(
+                f"/interview/{link.token}/{participant.id}/realtime/recording?segment={'c' * 12}",
+                files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+            )
+            assert spawned == []  # still in_progress: nothing to slice yet
+            participant.status = "completed"
+            db_session.commit()
+            client.post(
+                f"/interview/{link.token}/{participant.id}/realtime/recording?segment={'c' * 12}",
+                files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+            )
+        assert spawned == ["c" * 12]
+
     def test_barge_in_is_off_so_the_interviewer_cannot_cut_itself_off(self, db_session):
         _, participant = _seed(db_session, "tok-barge")
         cfg = rt.build_session_config(participant.project, participant, "fr")
