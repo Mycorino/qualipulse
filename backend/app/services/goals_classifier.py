@@ -84,8 +84,8 @@ Output the keys now."""
         client = get_anthropic_client(30.0)
         response = client.messages.create(
             model=ai_models.sonnet(),
-            max_tokens=64,
-            **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
+            max_tokens=96,
+            **ai_models.sampling_kwargs(ai_models.sonnet(), 0.3),
             system=system_msg,
             messages=[{"role": "user", "content": prompt}],
         )

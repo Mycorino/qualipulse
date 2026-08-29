@@ -891,7 +891,11 @@ def get_onboarding_suggestions(
 
         resp = client.messages.create(
             model=model_id,
-            max_tokens=400,
+            max_tokens=520,
+            # Keeps thinking pinned off on adaptive-default models (Sonnet 5)
+            # so the tight token budget goes to the suggestions themselves.
+            # 1.0 is the API default, so older models see no behaviour change.
+            **ai_models.sampling_kwargs(model_id, 1.0),
             messages=[{
                 "role": "user",
                 "content": (

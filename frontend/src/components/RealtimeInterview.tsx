@@ -4,7 +4,9 @@ import {
   createRealtimeSession,
   getInterviewStatus,
   uploadSessionRecording,
+  type Stimulus,
 } from "../api/interviews";
+import StimulusCard from "./StimulusCard";
 
 /**
  * Realtime voice interview (beta).
@@ -83,6 +85,11 @@ export default function RealtimeInterview({
   const [caption, setCaption] = useState<string | null>(firstQuestion);
   const [questionIndex, setQuestionIndex] = useState<number>(0);
   const [isFollowUp, setIsFollowUp] = useState(false);
+  // The artefact on screen for the current question (concept test). The
+  // realtime flow has no per-turn HTTP response to read it from, so it
+  // rides the same /status poll as progress; assigned wholesale so a
+  // question without one clears the previous artefact.
+  const [stimulus, setStimulus] = useState<Stimulus | null>(null);
   const [uploading, setUploading] = useState(false);
   // Participant-controlled pause: VAD is switched off in the session and
   // the input buffer cleared (see pauseMic), so nothing can commit and the
@@ -487,7 +494,7 @@ export default function RealtimeInterview({
   // the goodbye finish playing before stopping the recorder and uploading.
   useEffect(() => {
     if (connState === "error") return;
-    const timer = setInterval(async () => {
+    const tick = async () => {
       if (finishedRef.current) return;
       try {
         const status = await getInterviewStatus(token, participantId);
@@ -495,6 +502,7 @@ export default function RealtimeInterview({
           setQuestionIndex(status.question_index);
         }
         setIsFollowUp(Boolean(status.is_follow_up));
+        setStimulus(status.last_stimulus ?? null);
         if (status.status === "completed") {
           clearInterval(timer);
           const startedWaiting = Date.now();
@@ -509,7 +517,11 @@ export default function RealtimeInterview({
       } catch {
         // Transient poll failures are fine; the next tick retries.
       }
-    }, STATUS_POLL_MS);
+    };
+    // Fire once right away so a stimulus pending at connect time (or after
+    // a reload) shows without waiting a full poll interval.
+    void tick();
+    const timer = setInterval(() => void tick(), STATUS_POLL_MS);
     return () => clearInterval(timer);
   }, [connState, finishUp, participantId, token]);
 
@@ -574,6 +586,9 @@ export default function RealtimeInterview({
               : t("interview.progressLabel", { current: questionIndex + 1, total: questionCount })}
           </p>
         )}
+        {/* Concept-test artefact for the current question. Same card as the
+            classic flow, fed from the /status poll. */}
+        {connState !== "connecting" && <StimulusCard stimulus={stimulus} />}
         <div
           className={`realtime-orb realtime-orb--${connState === "connecting" ? "connecting" : micPaused ? "paused" : voiceState}`}
           aria-hidden="true"

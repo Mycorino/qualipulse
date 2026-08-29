@@ -31,7 +31,14 @@ logger = logging.getLogger("auto_interview")
 
 # Pinned, known-good current models (verified live). Keep these current.
 _DEFAULTS = {
-    "sonnet": "claude-sonnet-4-6",
+    # Sonnet 5 is both stronger and cheaper than 4.6 ($2/$10 vs $3/$15 per
+    # MTok). Two surface changes matter here and are both guarded below:
+    # non-default temperature/top_p 400s (see _NO_SAMPLING_MARKERS), and
+    # omitting `thinking` now runs ADAPTIVE thinking by default, which the
+    # legacy tight-max_tokens call sites must opt out of (sampling_kwargs).
+    # Its tokenizer also yields ~30% more tokens for the same text, priced
+    # lower per token; usage_logger carries a dedicated sonnet-5 rate row.
+    "sonnet": "claude-sonnet-5",
     "opus": "claude-opus-4-8",  # same $5/$25 pricing + request surface as 4.7
     "haiku": "claude-haiku-4-5",
 }
@@ -120,6 +127,38 @@ def temperature_kwargs(model_id: str, temperature: float) -> dict:
     if any(marker in lowered for marker in _NO_SAMPLING_MARKERS):
         return {}
     return {"temperature": temperature}
+
+
+# Models that run ADAPTIVE thinking when the `thinking` param is omitted.
+# Every pre-Sonnet-5 call site in this codebase was written for thinking-off
+# models with tight max_tokens budgets (a 512-token interview decision, a
+# 64-token classifier) — adaptive thinking would spend those budgets on
+# reasoning and truncate the answer, and adds seconds of latency to the
+# participant-facing interview loop. Fable/Mythos are NOT listed: they
+# reject `{"type": "disabled"}` outright, so for them we can only omit.
+_ADAPTIVE_DEFAULT_MARKERS = (
+    "sonnet-5",
+    "opus-5",
+)
+
+
+def sampling_kwargs(model_id: str, temperature: float) -> dict:
+    """Request kwargs for the legacy no-thinking call sites.
+
+    Splat this (``**ai_models.sampling_kwargs(model, 0.3)``) at call sites
+    that do NOT pass ``thinking`` themselves. Older models get their tuned
+    ``temperature``; adaptive-by-default models get ``thinking`` pinned off
+    instead (they reject non-default temperature), preserving each call's
+    latency and max_tokens assumptions across a pin flip.
+
+    Callers that opt into adaptive thinking explicitly (Copilot, analysis
+    synthesis) must keep using ``temperature_kwargs`` — combining this with
+    an explicit ``thinking=`` argument would raise a duplicate-kwarg error.
+    """
+    lowered = (model_id or "").lower()
+    if any(marker in lowered for marker in _ADAPTIVE_DEFAULT_MARKERS):
+        return {"thinking": {"type": "disabled"}}
+    return temperature_kwargs(model_id, temperature)
 
 
 def log_resolved() -> None:

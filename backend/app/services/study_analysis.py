@@ -337,7 +337,7 @@ def _generate_report(db: Session, study: Study) -> tuple[str, str]:
     response = client.messages.create(
         model=ai_models.sonnet(),
         max_tokens=4096,
-        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
+        **ai_models.sampling_kwargs(ai_models.sonnet(), 0.3),
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
@@ -502,6 +502,8 @@ def _integration_llm(db: Session, study: Study, inputs: dict) -> dict:
         thinking={"type": "adaptive"},
         system=INTEGRATION_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user}],
+        # temperature_kwargs, not sampling_kwargs: thinking is set explicitly
+        # above, and sampling_kwargs would try to set it again.
         **ai_models.temperature_kwargs(model, 0.3),
     )
     for use_schema in (True, False):

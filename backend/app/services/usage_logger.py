@@ -16,6 +16,9 @@ TTS_PER_CHARACTER = 0.000015           # $15 per 1M characters
 # undercounted ~40% by the old flat Sonnet rate.
 _CLAUDE_RATES: list[tuple[str, float, float]] = [
     ("opus", 0.000005, 0.000025),
+    # Ordered before the generic "sonnet" row: first match wins, and
+    # Sonnet 5 is priced below the 4.x line ($2/$10 vs $3/$15 per MTok).
+    ("sonnet-5", 0.000002, 0.000010),
     ("sonnet", 0.000003, 0.000015),
     ("haiku", 0.000001, 0.000005),
 ]

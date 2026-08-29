@@ -206,6 +206,11 @@ class TranscriptTurnResponse(BaseModel):
     translation_language: str | None = None
     cleaned_response: str | None = None
     cleaned_at: datetime | None = None
+    # What was on the participant's screen for this turn (provenance stamp).
+    # Name + kind only: the researcher already has the full asset in the
+    # study library; the transcript just needs to say which one was showing.
+    stimulus_name: str | None = None
+    stimulus_kind: str | None = None
 
     model_config = {"from_attributes": True}
 

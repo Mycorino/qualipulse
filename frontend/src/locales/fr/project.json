@@ -507,6 +507,8 @@
     "selectTextToTag": "Sélectionnez du texte dans une réponse pour l'annoter avec un code.",
     "noTranscript": "Aucune transcription disponible.",
     "demoNoAudio": "Données d'exemple, les enregistrements audio ne sont pas inclus dans la démo. Dans une vraie étude, chaque réponse est accompagnée de l'enregistrement vocal du participant et de l'audio des questions de l'interviewer IA.",
+    "stimulusShown": "Support affiché : {{name}}",
+    "stimulusShownTitle": "Le participant regardait ce support pendant sa réponse à cette question.",
     "discardChanges": "Abandonner vos modifications ? Les changements non enregistrés seront perdus.",
     "edited": "modifié",
     "tagAs": "Annoter comme :",

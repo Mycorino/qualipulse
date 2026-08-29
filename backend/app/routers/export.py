@@ -338,6 +338,8 @@ def get_transcript(
                 translated_response=t.translated_response,
                 translated_question=t.translated_question,
                 translation_language=t.translation_language,
+                stimulus_name=(t.stimulus.name if getattr(t, "stimulus", None) else None),
+                stimulus_kind=(t.stimulus.kind if getattr(t, "stimulus", None) else None),
             )
             for t in turns
         ],
@@ -387,6 +389,7 @@ def export_transcripts_csv(
         "question_index",
         "is_follow_up",
         "question_text",
+        "stimulus_shown",
         "response_transcript",
         "created_at",
     ])
@@ -418,7 +421,7 @@ def export_transcripts_csv(
                 p.status,
                 _fmt_dt(p.started_at),
                 _fmt_dt(p.completed_at),
-                "", "", "", "", "", "",
+                "", "", "", "", "", "", "",
             ])
         else:
             for t in turns:
@@ -435,6 +438,7 @@ def export_transcripts_csv(
                     t.question_index if t.question_index is not None else "",
                     t.is_follow_up,
                     _csv_safe(t.question_text),
+                    _csv_safe(t.stimulus.name if getattr(t, "stimulus", None) else ""),
                     _csv_safe(t.response_transcript or ""),
                     _fmt_dt(t.created_at),
                 ])

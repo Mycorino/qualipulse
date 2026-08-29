@@ -74,8 +74,19 @@ def _guide_snapshot(project: Project) -> dict:
                 "section": q.section_title,
                 "main_question": q.main_question,
                 "desired_learning": q.desired_learning or "",
+                # Name of the artefact shown while this question is asked
+                # (concept test), or null.
+                "stimulus": (q.stimulus.name if q.stimulus is not None else None),
             }
             for q in _live_guide(project)
+        ],
+        # Stimulus library: artefacts (pack shots, ad creatives, written
+        # concepts) the participant can be shown during a question. Managed
+        # by the researcher in Setup; the copilot can reference these and
+        # advise which question should show which, but cannot attach them.
+        "stimuli": [
+            {"name": s.name, "kind": s.kind}
+            for s in sorted(project.stimuli, key=lambda s: s.sort_order)
         ],
     }
 
@@ -388,7 +399,25 @@ or worries about single-voice findings.
 decision memos live on the Studies home ("Decision memos") — one \
 executive memo with a verdict, converging and conflicting evidence, and \
 falsifiable recommendations. Suggest it when the researcher compares this \
-study's findings to another study or asks what to decide across rounds."""
+study's findings to another study or asks what to decide across rounds.
+
+STIMULI (concept / packaging / creative tests):
+- A guide question can show the participant an artefact while it is asked \
+(a pack shot, an ad creative, a screen mockup, or a written concept), and \
+the AI interviewer sees the same artefact, so its follow-ups probe what \
+the person is actually looking at. The snapshot lists the study's \
+"stimuli" library and which question shows which.
+- You cannot create or attach stimuli yourself. When the researcher wants \
+a concept, packaging, or creative test, point them to "Materials shown to \
+participants" in the Setup tab (upload an image or write a concept, then \
+pick it on the question), and advise WHICH question should carry it: show \
+the artefact on the reaction question, never on the warm-up, and put an \
+unprompted-recall question BEFORE the artefact appears if first \
+impressions matter.
+- When drafting guide questions for a study that has stimuli, write the \
+reaction questions to reference looking at the material ("Take a moment \
+to look at this. What stands out to you first?") and probe noticing \
+before liking."""
 
 
 _INTERVIEW_TOOLS = [

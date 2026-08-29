@@ -120,7 +120,7 @@ Return ONLY a JSON array, same length and order. Each item:
     response = client.messages.create(
         model=ai_models.haiku(),
         max_tokens=8192,
-        **ai_models.temperature_kwargs(ai_models.haiku(), 0.0),
+        **ai_models.sampling_kwargs(ai_models.haiku(), 0.0),
         messages=[{"role": "user", "content": prompt}],
     )
 

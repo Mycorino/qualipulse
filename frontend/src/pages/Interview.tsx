@@ -2501,7 +2501,7 @@ export default function Interview() {
             setQuestionIndex(Math.max(0, qIdx));
             setIsFollowUp(Boolean(s.is_follow_up));
             setIsWarmup(qIdx < 0);
-            saveSession(participantId, s.last_question ?? currentQuestion ?? "", s.turn_count, lastTurnIdx, Math.max(0, qIdx));
+            saveSession(participantId, s.last_question ?? currentQuestion ?? "", s.turn_count, lastTurnIdx, Math.max(0, qIdx), s.last_stimulus ?? null);
             setTtsEnded(true);
             void fetchDeferredTts(participantId, lastTurnIdx);
           } catch {

@@ -89,7 +89,7 @@ def generate_personalized_welcome(
         response = client.messages.create(
             model=_MODEL,
             max_tokens=_MAX_TOKENS,
-            **ai_models.temperature_kwargs(_MODEL, 0.7),
+            **ai_models.sampling_kwargs(_MODEL, 0.7),
             timeout=15.0,
             system=system_msg,
             messages=[{"role": "user", "content": prompt}],

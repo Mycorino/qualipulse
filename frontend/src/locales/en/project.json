@@ -507,6 +507,8 @@
     "selectTextToTag": "Select any text in an answer to tag it with a code.",
     "noTranscript": "No transcript available.",
     "demoNoAudio": "Example data, audio recordings aren't included in the demo. In a real study, every answer comes with the participant's voice recording and the AI interviewer's question audio.",
+    "stimulusShown": "Shown: {{name}}",
+    "stimulusShownTitle": "The participant was looking at this material while answering this question.",
     "discardChanges": "Discard your edits? Unsaved changes will be lost.",
     "edited": "edited",
     "tagAs": "Tag as:",

@@ -171,7 +171,7 @@ def _call_claude(prompt: str, db: Session, company_id: str) -> str:
         model=ai_models.sonnet(),
         max_tokens=4096,
         # Same rationale as per-study analysis: judgment, not creativity.
-        **ai_models.temperature_kwargs(ai_models.sonnet(), 0.3),
+        **ai_models.sampling_kwargs(ai_models.sonnet(), 0.3),
         system=MEMO_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
     )
