@@ -2713,8 +2713,12 @@ select.field-input {
 .interview-question-area {
   flex: 1;
   display: flex;
+  /* Column so a stimulus can stack above the question. With a single child
+     this centres exactly as it did before the stimulus feature. */
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 20px;
   padding: 24px 0;
 }
 
@@ -2724,6 +2728,95 @@ select.field-input {
   line-height: 1.5;
   color: var(--text);
   max-width: 480px;
+}
+
+/* ── Stimulus: the artefact shown with a question (concept test, pack shot,
+   ad creative, written concept). Sits above the question, deliberately
+   quiet: it is the thing being reacted to, not decoration. ───────────── */
+
+.stimulus-card {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.stimulus-image-button {
+  display: block;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-white);
+  cursor: zoom-in;
+  overflow: hidden;
+  line-height: 0;
+  max-width: 100%;
+}
+
+.stimulus-image-button:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 2px;
+}
+
+.stimulus-image {
+  display: block;
+  max-width: 100%;
+  /* Capped so the record button stays above the fold on a phone: a
+     participant who has to scroll to answer is a participant who drops out. */
+  max-height: 38vh;
+  object-fit: contain;
+}
+
+.stimulus-card-text {
+  align-items: stretch;
+}
+
+.stimulus-text-body {
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--brand-600);
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.6;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.stimulus-caption {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.stimulus-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  cursor: zoom-out;
+}
+
+.stimulus-zoom-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.stimulus-zoom-close {
+  min-height: 44px;
 }
 
 .interview-controls {
@@ -15784,4 +15877,127 @@ select.field-input {
   box-shadow: none;
   animation: none;
   opacity: 0.8;
+}
+
+/* ── Stimulus library (Setup tab) ─────────────────────────────────────────
+   The researcher-side manager for the artefacts participants are shown.
+   Participant-facing stimulus styles live with the interview rules above. */
+
+.stimulus-library {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+}
+
+.stimulus-library__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stimulus-library__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.stimulus-library__hint {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  max-width: 62ch;
+}
+
+.stimulus-library__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-white);
+}
+
+.stimulus-library__empty {
+  margin: 12px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.stimulus-library__list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stimulus-library__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-white);
+}
+
+.stimulus-library__thumb {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+}
+
+.stimulus-library__thumb--text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+}
+
+.stimulus-library__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.stimulus-library__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.stimulus-library__usage {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.stimulus-picker {
+  width: 100%;
+  font-size: 12px;
+}
+
+.stimulus-picker__empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
 }

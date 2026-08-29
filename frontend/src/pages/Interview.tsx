@@ -26,7 +26,9 @@ import {
   ResumeSummary,
   SubmitAudioResponse,
   TurnMismatchDetail,
+  Stimulus,
 } from "../api/interviews";
+import StimulusCard from "../components/StimulusCard";
 import {
   useAudioRecorder,
   RECORDING_TOO_SHORT,
@@ -252,6 +254,10 @@ export default function Interview() {
   const [country, setCountry] = useState("");
   const [participantId, setParticipantId] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
+  // The artefact shown alongside the current question (concept test,
+  // pack shot, ad creative). Always assigned wholesale on a turn change,
+  // never merged: a question without a stimulus must clear the previous one.
+  const [stimulus, setStimulus] = useState<Stimulus | null>(null);
   const [processing, setProcessing] = useState(false);
   const [starting, setStarting] = useState(false);
   // Mute preference survives reloads/resume — an unexpected replay of TTS
@@ -471,6 +477,7 @@ export default function Interview() {
           lockInterviewLanguage(summary?.language);
           setParticipantId(claim.participant_id);
           setCurrentQuestion(claim.last_question ?? "");
+          setStimulus(claim.last_stimulus ?? null);
           setTurnCount(claim.turn_count ?? 1);
           setQuestionIndex(claim.question_index ?? 0);
           setTurnIndex(null);
@@ -852,11 +859,12 @@ export default function Interview() {
 
   const sessionKey = token ? `interview_progress_${token}` : null;
 
-  function saveSession(pid: string, question: string, turn: number, ti?: number | null, qi?: number) {
+  function saveSession(pid: string, question: string, turn: number, ti?: number | null, qi?: number, st?: Stimulus | null) {
     if (!sessionKey) return;
     sessionStorage.setItem(sessionKey, JSON.stringify({
       participantId: pid, currentQuestion: question, turnCount: turn,
       turnIndex: ti ?? null, questionIndex: qi ?? 0,
+      stimulus: st ?? null,
     }));
   }
 
@@ -864,7 +872,7 @@ export default function Interview() {
     if (sessionKey) sessionStorage.removeItem(sessionKey);
   }
 
-  function getSavedSession(): { participantId: string; currentQuestion: string; turnCount: number; turnIndex?: number | null; questionIndex?: number } | null {
+  function getSavedSession(): { participantId: string; currentQuestion: string; turnCount: number; turnIndex?: number | null; questionIndex?: number; stimulus?: Stimulus | null } | null {
     if (!sessionKey) return null;
     try {
       const raw = sessionStorage.getItem(sessionKey);
@@ -1157,6 +1165,7 @@ export default function Interview() {
     lockInterviewLanguage(res.language);
     setParticipantId(res.participant_id);
     setCurrentQuestion(res.first_question);
+    setStimulus(res.stimulus ?? null);
     setTurnCount(1);
     setQuestionIndex(res.question_index ?? 0);
     setIsFollowUp(false);
@@ -1165,7 +1174,7 @@ export default function Interview() {
     const total = (info?.interview_duration_minutes ?? 0) * 60;
     setTotalSeconds(total);
     setElapsedSeconds(0);
-    saveSession(res.participant_id, res.first_question, 1, res.turn_index ?? null, res.question_index ?? 0);
+    saveSession(res.participant_id, res.first_question, 1, res.turn_index ?? null, res.question_index ?? 0, res.stimulus ?? null);
     setPhase("interview");
     if (res.tts_audio_url) {
       pendingFirstTtsRef.current = res.tts_audio_url;
@@ -1178,6 +1187,7 @@ export default function Interview() {
   function restoreSavedSession(saved: NonNullable<ReturnType<typeof getSavedSession>>) {
     setParticipantId(saved.participantId);
     setCurrentQuestion(saved.currentQuestion);
+    setStimulus(saved.stimulus ?? null);
     setTurnCount(saved.turnCount);
     setTurnIndex(saved.turnIndex ?? null);
     setQuestionIndex(saved.questionIndex ?? 0);
@@ -1196,6 +1206,7 @@ export default function Interview() {
     lockInterviewLanguage(resumeSummary?.language);
     setParticipantId(resumeCheck.participant_id);
     setCurrentQuestion(resumeCheck.last_question ?? "");
+    setStimulus(resumeCheck.last_stimulus ?? null);
     setTurnCount(resumeCheck.turn_count ?? 1);
     setQuestionIndex(resumeCheck.question_index ?? 0);
     setTurnIndex(null);
@@ -1203,7 +1214,7 @@ export default function Interview() {
     setTotalSeconds(total);
     const alreadyElapsed = (resumeSummary?.elapsed_minutes ?? 0) * 60;
     setElapsedSeconds(Math.min(alreadyElapsed, total));
-    saveSession(resumeCheck.participant_id, resumeCheck.last_question ?? "", resumeCheck.turn_count ?? 1);
+    saveSession(resumeCheck.participant_id, resumeCheck.last_question ?? "", resumeCheck.turn_count ?? 1, null, resumeCheck.question_index ?? 0, resumeCheck.last_stimulus ?? null);
     setResumeCheck(null);
     setResumeSummary(null);
     setPhase("interview");
@@ -1312,6 +1323,7 @@ export default function Interview() {
   /** Apply a TurnResponse that carries the next (non-complete) question. */
   function applyNextTurn(res: SubmitAudioResponse, nextTurn: number) {
     setCurrentQuestion(res.question_text ?? "");
+    setStimulus(res.stimulus ?? null);
     setTurnCount(nextTurn);
     setQuestionIndex(res.question_index ?? questionIndex);
     setIsFollowUp(res.is_follow_up ?? false);
@@ -1328,7 +1340,7 @@ export default function Interview() {
       el.pause();
       el.removeAttribute("src");
     } catch { /* element not created yet */ }
-    saveSession(participantId, res.question_text ?? "", nextTurn, res.turn_index ?? null, res.question_index ?? questionIndex);
+    saveSession(participantId, res.question_text ?? "", nextTurn, res.turn_index ?? null, res.question_index ?? questionIndex, res.stimulus ?? null);
     if (res.tts_audio_url) {
       playTTS(res.tts_audio_url);
     } else {
@@ -2483,6 +2495,7 @@ export default function Interview() {
             const qIdx = s.question_index ?? 0;
             const lastTurnIdx = Math.max(0, s.turn_count - 1);
             if (s.last_question) setCurrentQuestion(s.last_question);
+            setStimulus(s.last_stimulus ?? null);
             setTurnCount(s.turn_count);
             setTurnIndex(lastTurnIdx);
             setQuestionIndex(Math.max(0, qIdx));
@@ -2626,7 +2639,10 @@ export default function Interview() {
                 <p>{t("interview.preparingFirst")}</p>
               </div>
             ) : (
-              <p className="interview-question-text">{currentQuestion}</p>
+              <>
+                <StimulusCard stimulus={stimulus} />
+                <p className="interview-question-text">{currentQuestion}</p>
+              </>
             )}
           </div>
 

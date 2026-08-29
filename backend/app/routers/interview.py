@@ -28,6 +28,7 @@ from app.schemas.interview import (
     TurnResponse,
     ResumeCheckResponse,
     ResumeSummaryResponse,
+    StimulusPayload,
 )
 from app.services.feature_gates import require_participant_limit
 from app.services.interview_preview import (
@@ -216,6 +217,9 @@ class HandoffClaimResponse(BaseModel):
     last_question: str | None = None
     turn_count: int = 0
     question_index: int = 0
+    # The artefact showing for the last turn, so continuing on a second
+    # device restores what the participant was looking at.
+    last_stimulus: StimulusPayload | None = None
     email: str | None = None
     # Minted when the participant has an email on file, so email-based
     # flows (later resume, reminders) keep working from the new device.
@@ -878,6 +882,7 @@ def check_resume_by_email(
         last_question=last_turn.question_text if last_turn else None,
         turn_count=len(turns),
         question_index=last_turn.question_index or 0 if last_turn else 0,
+        last_stimulus=_stimulus_payload_for_turn(last_turn),
     )
 
 
@@ -942,6 +947,7 @@ def claim_device_handoff(
         last_question=last_turn.question_text if last_turn else None,
         turn_count=len(turns),
         question_index=(last_turn.question_index or 0) if last_turn else 0,
+        last_stimulus=_stimulus_payload_for_turn(last_turn),
         email=participant.email,
         session_token=(
             _create_session_token(participant.email, token) if participant.email else None
@@ -986,6 +992,7 @@ def get_resume_summary(
         turn_count=len(turns),
         elapsed_minutes=round(elapsed_minutes, 1),
         language=_effective_interview_language(participant),
+        last_stimulus=_stimulus_payload_for_turn(last_turn),
     )
 
 
@@ -1180,6 +1187,7 @@ def start_interview_session(
         tts_audio_url=result["tts_audio_url"],
         turn_index=int(result.get("turn_index", 0)),
         is_warmup=bool(result.get("is_warmup", False)),
+        stimulus=result.get("stimulus"),
         language=_effective_interview_language(participant),
     )
 
@@ -1355,6 +1363,7 @@ async def respond_to_question(
         coaching_hint=result.get("coaching_hint"),
         transcript=result.get("transcript"),
         is_warmup=False,
+        stimulus=result.get("stimulus"),
     )
 
 
@@ -1396,6 +1405,7 @@ async def skip_question(
                     is_follow_up=pending.is_follow_up or False,
                     question_index=pending.question_index or 0,
                     turn_index=pending.turn_index,
+                    stimulus=_stimulus_payload_for_turn(pending),
                 ).model_dump(),
             },
         )
@@ -1418,6 +1428,7 @@ async def skip_question(
         turn_index=result.get("turn_index", 0),
         elapsed_seconds=result.get("elapsed_seconds", 0),
         total_seconds=result.get("total_seconds", 0),
+        stimulus=result.get("stimulus"),
     )
 
 
@@ -1532,6 +1543,7 @@ def get_interview_status(
         "status": participant.status,
         "turn_count": len(turns),
         "last_question": last_turn.question_text if last_turn else None,
+        "last_stimulus": _stimulus_payload_for_turn(last_turn),
         # Progress metadata for the realtime-beta client, which has no
         # per-turn HTTP response to read them from.
         "question_index": last_turn.question_index if last_turn else None,
@@ -1723,6 +1735,21 @@ def _get_active_link_or_404(token: str, db: Session) -> InterviewLink:
     return link
 
 
+def _stimulus_payload_for_turn(turn: InterviewTurn | None) -> dict | None:
+    """Resolve a turn's stimulus from the row itself.
+
+    Resume and race-recovery paths rebuild a response from a stored turn
+    rather than from an engine result, so they read the stamp the turn
+    carries. That is also the honest answer: it is what this participant was
+    shown, even if the guide has been re-attached since.
+    """
+    from app.services.interview_engine import stimulus_payload
+
+    if turn is None:
+        return None
+    return stimulus_payload(getattr(turn, "stimulus", None))
+
+
 def _turn_response(participant: Participant, turn: InterviewTurn, *, transcript: str | None = None) -> TurnResponse:
     return TurnResponse(
         question_text=turn.question_text,
@@ -1734,6 +1761,7 @@ def _turn_response(participant: Participant, turn: InterviewTurn, *, transcript:
         elapsed_seconds=0,
         total_seconds=0,
         transcript=transcript,
+        stimulus=_stimulus_payload_for_turn(turn),
     )
 
 

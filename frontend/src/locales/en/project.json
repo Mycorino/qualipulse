@@ -728,5 +728,27 @@
     "sentToast_one": "{{count}} invitation sent",
     "sentToast_other": "{{count}} invitations sent",
     "allSkipped": "No invitations were sent. Check the reasons next to each person."
+  },
+  "stimulus": {
+    "title": "Materials shown to participants",
+    "hint": "Attach a concept, pack shot or ad creative to a guide question. The participant sees it while that question is asked, and the AI interviewer sees it too, so it can probe what they are actually looking at.",
+    "addImage": "Upload an image",
+    "addText": "Write a concept",
+    "empty": "No materials yet. Add one to run a concept test.",
+    "untitled": "Untitled",
+    "namePlaceholder": "Internal name, for example: Concept A, refill pouch",
+    "bodyPlaceholder": "The concept text the participant reads, word for word.",
+    "captionPlaceholder": "Optional line under the material, for example: take a moment to read this",
+    "aiDescriptionPlaceholder": "Optional briefing for the AI interviewer. Never shown to the participant.",
+    "textBadge": "Text",
+    "usedOn_one": "Shown on 1 question",
+    "usedOn_other": "Shown on {{count}} questions",
+    "unused": "Not attached yet",
+    "deleteConfirm": "Delete this material?",
+    "deleteAttachedConfirm_one": "This material is shown on 1 question. Deleting it removes it from that question. Continue?",
+    "deleteAttachedConfirm_other": "This material is shown on {{count}} questions. Deleting it removes it from those questions. Continue?",
+    "pickerLabel": "Material shown with this question",
+    "pickerNone": "None",
+    "pickerEmpty": "Add a material below to attach one here."
   }
 }

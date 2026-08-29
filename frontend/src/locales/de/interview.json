@@ -370,7 +370,10 @@
       "confirmNo": "Weitermachen",
       "finishing": "Wird abgeschlossen…",
       "error": "Wir konnten das Interview nicht abschließen. Bitte versuchen Sie es erneut."
-    }
+    },
+    "stimulusAlt": "Material zu dieser Frage",
+    "stimulusZoom": "Bild im Vollbild öffnen",
+    "stimulusClose": "Schließen"
   },
   "completion": {
     "title": "Vielen Dank, {{name}}!",

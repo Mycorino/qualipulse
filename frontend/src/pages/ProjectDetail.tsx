@@ -12,6 +12,7 @@ import { InstrumentShell } from "../components/InstrumentShell";
 import { getMe } from "../api/auth";
 import {
   getProject,
+  listStimuli,
   getLinks,
   getParticipants,
   createLink,
@@ -78,6 +79,8 @@ import {
 } from "../api/projects";
 import { getTranscript, translateTranscript, patchProjectSettings, createGuideQuestion, createScreeningQuestion, regenerateScreeningTranslations, recommendationText, type PaywallDetail } from "../api/projects";
 import ScreeningTranslationsEditor from "../components/ScreeningTranslationsEditor";
+import { StimulusLibrary, StimulusPicker } from "../components/StimulusManager";
+import type { StimulusResponse } from "../api/projects";
 import BrandingSettings from "../components/BrandingSettings";
 import DemoTour, { getDemoTourPhase, isDemoTourArmed } from "../components/DemoTour";
 import { getCreditUsage } from "../api/billing";
@@ -1501,6 +1504,51 @@ export default function ProjectDetail() {
   }
 
   // ── P5: Guide annotation ───────────────────────────────────────────────────
+
+  /** Attach (or detach) a stimulus on one guide question.
+   *
+   *  ``clear_stimulus`` is a separate flag rather than a null stimulus_id:
+   *  an absent stimulus_id has to mean "unchanged", because the Setup tab
+   *  patches wording and notes constantly and must not blank the attachment
+   *  every time it does. */
+  async function saveQuestionStimulus(questionId: string, stimulusId: string | null) {
+    try {
+      const updated = await patchQuestion(
+        id!,
+        questionId,
+        stimulusId ? { stimulus_id: stimulusId } : { clear_stimulus: true }
+      );
+      setProject((prev) =>
+        prev
+          ? {
+              ...prev,
+              questions: prev.questions.map((q) =>
+                q.id === questionId ? { ...q, stimulus_id: updated.stimulus_id } : q
+              ),
+            }
+          : prev
+      );
+      // question_count on the library rows is now stale.
+      void refreshStimulusUsage();
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    }
+  }
+
+  /** Re-read the library so the "used on N questions" counts stay honest
+   *  after an attach or detach. */
+  async function refreshStimulusUsage() {
+    try {
+      const next = await listStimuli(id!);
+      setProject((prev) => (prev ? { ...prev, stimuli: next } : prev));
+    } catch {
+      /* Non-critical: the counts are advisory. */
+    }
+  }
+
+  function setStimuli(next: StimulusResponse[]) {
+    setProject((prev) => (prev ? { ...prev, stimuli: next } : prev));
+  }
 
   async function saveInterviewNotes(questionId: string, field: "interview_notes" | "desired_learning") {
     try {
@@ -3259,6 +3307,20 @@ export default function ProjectDetail() {
                                         </div>
                                       );
                                     })}
+
+                                    {/* What the participant looks at while
+                                        this question is on screen. */}
+                                    <div className="guide-question-card__detail-field">
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                        <span className="guide-question-card__detail-label">{tProject("stimulus.pickerLabel")}</span>
+                                      </div>
+                                      <StimulusPicker
+                                        stimuli={project.stimuli ?? []}
+                                        value={q.stimulus_id}
+                                        disabled={project.is_demo}
+                                        onSelect={(sid) => saveQuestionStimulus(q.id, sid)}
+                                      />
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -3291,6 +3353,12 @@ export default function ProjectDetail() {
                       </div>
                     </details>
                   )}
+                  <StimulusLibrary
+                    projectId={project.id}
+                    stimuli={project.stimuli ?? []}
+                    onChange={setStimuli}
+                    readOnly={project.is_demo}
+                  />
                 </>
               )}
             </section>

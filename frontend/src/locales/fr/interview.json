@@ -370,7 +370,10 @@
       "confirmNo": "Continuer",
       "finishing": "Clôture en cours…",
       "error": "Nous n'avons pas pu clôturer l'entretien. Veuillez réessayer."
-    }
+    },
+    "stimulusAlt": "Support présenté pour cette question",
+    "stimulusZoom": "Ouvrir l'image en plein écran",
+    "stimulusClose": "Fermer"
   },
   "completion": {
     "title": "Merci, {{name}} !",

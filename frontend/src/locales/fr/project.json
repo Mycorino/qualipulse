@@ -728,5 +728,27 @@
     "sentToast_one": "{{count}} invitation envoyée",
     "sentToast_other": "{{count}} invitations envoyées",
     "allSkipped": "Aucune invitation envoyée. Consultez les raisons à côté de chaque personne."
+  },
+  "stimulus": {
+    "title": "Supports présentés aux participants",
+    "hint": "Associez un concept, un visuel de packaging ou une création publicitaire à une question du guide. Le participant le voit pendant cette question, et l'IA qui mène l'entretien le voit aussi, ce qui lui permet de creuser ce que la personne regarde vraiment.",
+    "addImage": "Importer une image",
+    "addText": "Rédiger un concept",
+    "empty": "Aucun support pour l'instant. Ajoutez-en un pour lancer un test de concept.",
+    "untitled": "Sans titre",
+    "namePlaceholder": "Nom interne, par exemple : Concept A, recharge souple",
+    "bodyPlaceholder": "Le texte du concept que le participant lit, mot pour mot.",
+    "captionPlaceholder": "Ligne facultative sous le support, par exemple : prenez le temps de lire",
+    "aiDescriptionPlaceholder": "Consigne facultative pour l'IA qui mène l'entretien. Jamais montrée au participant.",
+    "textBadge": "Texte",
+    "usedOn_one": "Utilisé sur 1 question",
+    "usedOn_other": "Utilisé sur {{count}} questions",
+    "unused": "Pas encore associé",
+    "deleteConfirm": "Supprimer ce support ?",
+    "deleteAttachedConfirm_one": "Ce support est utilisé sur 1 question. Le supprimer le retirera de cette question. Continuer ?",
+    "deleteAttachedConfirm_other": "Ce support est utilisé sur {{count}} questions. Le supprimer le retirera de ces questions. Continuer ?",
+    "pickerLabel": "Support présenté avec cette question",
+    "pickerNone": "Aucun",
+    "pickerEmpty": "Ajoutez un support ci-dessous pour pouvoir l'associer ici."
   }
 }
