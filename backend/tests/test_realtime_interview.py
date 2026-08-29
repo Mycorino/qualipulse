@@ -535,5 +535,8 @@ class TestBridgeTurns:
         cfg = rt.build_session_config(participant.project, participant, "fr")
         assert cfg["audio"]["input"]["transcription"]["language"] == "fr"
         assert cfg["audio"]["input"]["turn_detection"]["create_response"] is False
+        # Noise reduction runs before VAD, so room noise and speaker bleed
+        # are filtered before they can commit as participant speech.
+        assert cfg["audio"]["input"]["noise_reduction"] == {"type": "far_field"}
         assert "verbatim" in cfg["instructions"].lower() or "exact" in cfg["instructions"].lower()
         assert json.dumps(cfg)  # serialisable

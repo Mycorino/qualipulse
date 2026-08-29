@@ -132,15 +132,20 @@ def build_session_config(project, participant, language: str | None) -> dict:
             "create_response": False,
             "interrupt_response": settings.REALTIME_ALLOW_BARGE_IN,
         }
+    audio_input: dict = {
+        "transcription": transcription,
+        "turn_detection": turn_detection,
+    }
+    if settings.REALTIME_NOISE_REDUCTION:
+        # Filters the input buffer before it reaches VAD, so room noise and
+        # speaker bleed are less likely to commit as participant speech.
+        audio_input["noise_reduction"] = {"type": settings.REALTIME_NOISE_REDUCTION}
     return {
         "type": "realtime",
         "model": settings.REALTIME_MODEL,
         "instructions": _session_instructions(language),
         "audio": {
-            "input": {
-                "transcription": transcription,
-                "turn_detection": turn_detection,
-            },
+            "input": audio_input,
             "output": {"voice": settings.REALTIME_VOICE},
         },
     }
@@ -601,7 +606,16 @@ class SidebandBridge:
             self.response_active = True
             self._send(
                 ws,
-                {"type": "response.create", "response": {"instructions": _ack_instruction(self.language)}},
+                {
+                    "type": "response.create",
+                    "response": {
+                        # Out-of-band: the ack is a filler beat, not part of
+                        # the interview; keeping it out of conversation state
+                        # keeps the context clean for the verbatim questions.
+                        "conversation": "none",
+                        "instructions": _ack_instruction(self.language),
+                    },
+                },
             )
         result = _advance_turn(self.participant_id, transcript)
         if result is None:
