@@ -872,15 +872,31 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
   `process_interview_turn(transcript_override=...)` (the typed-answer code
   path — same pacing guards, follow-up caps, close gate, final check,
   completion, credits, side effects), and the resulting question is spoken
-  via `response.create` with "say exactly" instructions. Turn rows carry
-  transcripts but no per-turn audio and no TTS (the live model is the voice).
+  via `response.create` with "say exactly" instructions. Turn rows carry no
+  TTS (the live model is the voice); per-turn audio is reconstructed after
+  completion (below).
 - **Audio:** the Realtime API never returns raw audio, so the client records
   the whole session in parallel (mic + assistant track mixed via WebAudio →
-  MediaRecorder) and uploads it at completion to
-  `POST /interview/{token}/{pid}/realtime/recording` →
-  `participants.session_recording_url` (transcoded to mp3, R2/local). Shown
-  in the Responses transcript view as "Full session recording"; covered by
-  GDPR deletion and the audio-retention purge.
+  MediaRecorder) and uploads it incrementally to
+  `POST /interview/{token}/{pid}/realtime/recording?segment=...`. Each
+  browser connection is its own **recording segment**
+  (`realtime_recording_segments`, key minted at the SDP exchange via the
+  `X-Realtime-Segment` header): a resumed session or second tab records as
+  its own "Part N" and can never overwrite or delete another connection's
+  audio (Alembic 0078). Transcoded to mp3, R2/local; covered by GDPR
+  deletion and the audio-retention purge.
+- **Researcher parity (`services/realtime_slices.py`):** the sideband stamps
+  each turn with `audio_segment_key` + `audio_offset_seconds` (question
+  start) and `answer_offset_seconds`/`answer_end_seconds` (the answer's
+  span, from speech events; Alembic 0077/0079). When a completed
+  interview's recording is uploaded, a daemon thread cuts each answer span
+  into a per-turn mp3 clip (ffmpeg, ±0.75s pad) and runs Whisper over it —
+  filling `audio_recording_url` + `response_segments` exactly like classic,
+  so the Responses view (per-turn players, sentence highlight/seek) is
+  identical for both transports. `response_transcript` stays the live
+  transcriber's text (the record of what the engine responded to).
+  Idempotent per turn; ~$0.05–0.10 Whisper cost per interview, logged as
+  `stt` usage.
 - **Client:** `components/RealtimeInterview.tsx`, branched from
   `Interview.tsx` for the whole interview phase (mic test and completion /
   questionnaire screens are shared). Captions + speaking state come from the

@@ -397,6 +397,42 @@ def _stamp_turn_offset(
         logger.exception("could not stamp audio offset for participant %s", participant_id)
 
 
+def _stamp_answer_span(
+    participant_id: str,
+    turn_index: int | None,
+    start: float | None,
+    end: float,
+) -> None:
+    """Record where a turn's ANSWER sits inside its recording segment.
+
+    Last write wins (a resumed session re-answers the pending turn in a new
+    segment, and the clip must come from where the kept answer lives). When
+    no speech-start was observed, nothing is stamped — better no clip than
+    a wrong one.
+    """
+    if turn_index is None or start is None or end <= start:
+        return
+    try:
+        from app.database import session_scope
+        from app.models.interview import InterviewTurn
+
+        with session_scope() as db:
+            turn = (
+                db.query(InterviewTurn)
+                .filter(
+                    InterviewTurn.participant_id == participant_id,
+                    InterviewTurn.turn_index == turn_index,
+                )
+                .first()
+            )
+            if turn is not None:
+                turn.answer_offset_seconds = round(max(0.0, start), 1)
+                turn.answer_end_seconds = round(end, 1)
+                db.commit()
+    except Exception:
+        logger.exception("could not stamp answer span for participant %s", participant_id)
+
+
 def _advance_turn(participant_id: str, transcript: str) -> dict | None:
     """Run one interview turn on the shared engine. Returns the engine result,
     or None when the transcript was rejected as silence/noise."""
@@ -449,6 +485,10 @@ class SidebandBridge:
         # Set when the sideband attaches — the zero point for per-turn
         # offsets into the client's session recording.
         self.session_started_at: float | None = None
+        # When the participant started speaking the current answer (seconds
+        # into this segment). With the answer-end time it becomes the span
+        # the completion-time slicer cuts into a per-turn answer clip.
+        self._answer_span_start: float | None = None
 
     # -- websocket plumbing -------------------------------------------------
 
@@ -511,6 +551,12 @@ class SidebandBridge:
             self.response_active = False
             self.last_response_ended_at = time.monotonic()
             self._on_response_done(event)
+        elif etype == "input_audio_buffer.speech_started":
+            # First speech after the interviewer went quiet = the answer
+            # starting. Not reset by hesitation fragments — "So..." is the
+            # beginning of the answer, and the clip should include it.
+            if not self.response_active and self._answer_span_start is None:
+                self._answer_span_start = self._session_elapsed()
         elif etype == "error":
             logger.warning(
                 "realtime event error for participant %s: %s",
@@ -602,6 +648,7 @@ class SidebandBridge:
             return
         transcript = self._collect_answer(ws, transcript) if transcript else ""
         if not transcript:
+            self._answer_span_start = None
             self._speak(ws, _repeat_line(self.language))
             return
         if _is_hesitation_only(transcript, self.language):
@@ -635,10 +682,17 @@ class SidebandBridge:
                     },
                 },
             )
+        # The turn being answered is the current pending one; capture it (and
+        # the answer's span in this segment) before the engine advances.
+        answered_index = _last_turn_index(self.participant_id)
+        span_start, span_end = self._answer_span_start, self._session_elapsed()
         result = _advance_turn(self.participant_id, transcript)
         if result is None:
+            self._answer_span_start = None
             self._speak(ws, _repeat_line(self.language))
             return
+        self._answer_span_start = None
+        _stamp_answer_span(self.participant_id, answered_index, span_start, span_end)
         if result.get("is_complete"):
             self.closing = True
         self._speak(ws, result["question_text"])
@@ -788,4 +842,12 @@ def store_session_recording(
             delete_audio_by_url(previous)
         except Exception:
             logger.warning("could not delete superseded session recording %s", previous)
+    if participant.status == "completed":
+        # The interview is done and this upload holds the full segment:
+        # cut per-turn answer clips + Whisper segments so the researcher
+        # view matches classic. Idempotent per turn; a later, longer
+        # upload retries any turn still missing its clip.
+        from app.services.realtime_slices import spawn_turn_slicer
+
+        spawn_turn_slicer(participant.id, data, segment_key)
     return url
