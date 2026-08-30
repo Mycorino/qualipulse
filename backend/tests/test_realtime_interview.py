@@ -555,6 +555,7 @@ class TestBridgeTurns:
         _, participant = _seed(db_session, "tok-hesit", turns=1)
         pending_before = rt._pending_question(participant.id)
         bridge = rt.SidebandBridge("rtc_hesit", participant.id, 20)
+        bridge.awaiting_answer = True
         ws = _FakeWs()
         bridge._handle_transcript(
             ws,
@@ -563,7 +564,70 @@ class TestBridgeTurns:
         # No ack, no next question, no "could you repeat": total silence,
         # the turn stays open for the real answer.
         assert ws.sent == []
+        assert bridge.awaiting_answer is True
         assert rt._pending_question(participant.id) == pending_before
+
+    def test_out_of_turn_transcripts_are_dropped(self, db_session, bridge_sessions):
+        """The tail of a VAD-split answer (or words spoken into the
+        ack/thinking gap) arrives while no question awaits an answer. It
+        must never become the answer to the question still being asked —
+        that is how the interviewer ended up re-asking near-identical
+        questions seven seconds apart."""
+        _, participant = _seed(db_session, "tok-gate", turns=1)
+        pending_before = rt._pending_question(participant.id)
+        bridge = rt.SidebandBridge("rtc_gate", participant.id, 20)
+        assert bridge.awaiting_answer is False  # gate closed until a question completes
+        ws = _FakeWs()
+        bridge._handle_transcript(
+            ws,
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "transcript": "et j'ai mes projets de data",
+            },
+        )
+        assert ws.sent == []
+        assert rt._pending_question(participant.id) == pending_before
+
+    def test_answer_gate_arms_on_question_done_not_on_ack(self, db_session, bridge_sessions):
+        _, participant = _seed(db_session, "tok-gate2", turns=1)
+        bridge = rt.SidebandBridge("rtc_gate2", participant.id, 20)
+        ws = _FakeWs()
+        # Ack-style response (nothing armed): done must NOT open the gate.
+        bridge._arm_on_response_done = False
+        bridge._note_event({"type": "response.done", "response": {}})
+        assert bridge.awaiting_answer is False
+        # A spoken question arms the flag; its done opens the gate.
+        bridge._speak(ws, "Quelle IA utilisez-vous ?")
+        assert bridge._arm_on_response_done is True
+        bridge._note_event({"type": "response.done", "response": {}})
+        assert bridge.awaiting_answer is True
+
+    def test_accepted_answer_closes_the_gate_and_flushes_the_buffer(self, db_session, bridge_sessions, monkeypatch):
+        monkeypatch.setattr(rt, "ANSWER_DRAIN_SECONDS", 0.05)
+        _, participant = _seed(db_session, "tok-gate3", turns=1)
+        bridge = rt.SidebandBridge("rtc_gate3", participant.id, 20)
+        bridge.awaiting_answer = True
+        ws = _FakeWs()
+        with patch(
+            "app.services.interview_engine.decide_next_action",
+            return_value={"action": "follow_up", "question": "Tell me more?", "coaching": None},
+        ):
+            bridge._handle_transcript(
+                ws,
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "transcript": "We mostly use spreadsheets for everything.",
+                },
+            )
+        # Gate closed the moment the answer was accepted; spillover audio
+        # flushed before the ack; the question re-arms via response.done.
+        assert bridge.awaiting_answer is False
+        types = [e["type"] for e in ws.sent]
+        assert types[0] == "input_audio_buffer.clear"
+        assert types.count("response.create") == 2  # ack + question
+        assert ws.sent[1]["response"].get("conversation") == "none"  # the ack
+        assert "Tell me more?" in ws.sent[2]["response"]["instructions"]
+        assert bridge._arm_on_response_done is True
 
     def test_short_answer_waits_for_the_rest_of_the_sentence(self, db_session, bridge_sessions, monkeypatch):
         monkeypatch.setattr(rt, "ANSWER_DRAIN_SECONDS", 0.05)

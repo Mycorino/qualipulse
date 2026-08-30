@@ -489,6 +489,16 @@ class SidebandBridge:
         # into this segment). With the answer-end time it becomes the span
         # the completion-time slicer cuts into a per-turn answer clip.
         self._answer_span_start: float | None = None
+        # The answer gate: transcripts only count while a question is
+        # actually awaiting its answer. Armed when a question (or repeat
+        # request) finishes generating; disarmed the moment an answer is
+        # accepted. Without it, the tail of an answer that VAD split — or
+        # words spoken into the ack/thinking gap — arrives seconds later
+        # and gets attributed to the question the participant has not
+        # finished hearing, making the interviewer immediately re-ask a
+        # near-identical question.
+        self.awaiting_answer = False
+        self._arm_on_response_done = False
 
     # -- websocket plumbing -------------------------------------------------
 
@@ -520,6 +530,9 @@ class SidebandBridge:
         """
         self._wait_for_response_idle(ws)
         self.last_spoken = text
+        # Every _speak line is a question or a repeat request — something
+        # that expects an answer. Its response.done re-opens the gate.
+        self._arm_on_response_done = True
         self._send(
             ws,
             {
@@ -632,12 +645,29 @@ class SidebandBridge:
         usage = (event.get("response") or {}).get("usage")
         if usage:
             _log_realtime_usage(self.participant_id, usage)
+        if self._arm_on_response_done:
+            # A question (or repeat request) has finished generating: from
+            # here transcripts are answers. Playback still lags a little,
+            # but the echo guard covers that tail.
+            self._arm_on_response_done = False
+            self.awaiting_answer = True
         if self.closing:
             # The wrap-up line has been fully spoken: the call is over.
             raise _SessionDone()
 
     def _handle_transcript(self, ws, event: dict) -> None:
         transcript = (event.get("transcript") or "").strip()
+        if not self.awaiting_answer:
+            # No question is waiting for an answer right now: this is the
+            # tail of an already-accepted answer, or words spoken into the
+            # ack/thinking gap, or the interviewer's own voice. Attributing
+            # it to the question still being asked makes the interviewer
+            # immediately re-ask a near-identical question — drop it.
+            logger.info(
+                "realtime: dropped out-of-turn transcript %r (participant=%s)",
+                transcript[:80], self.participant_id,
+            )
+            return
         if transcript and self._is_echo(transcript):
             # The interviewer hearing itself. Not an answer: say nothing,
             # ask nothing, and leave the turn open for the participant.
@@ -648,6 +678,7 @@ class SidebandBridge:
             return
         transcript = self._collect_answer(ws, transcript) if transcript else ""
         if not transcript:
+            self.awaiting_answer = False
             self._answer_span_start = None
             self._speak(ws, _repeat_line(self.language))
             return
@@ -660,6 +691,12 @@ class SidebandBridge:
                 transcript[:60], self.participant_id,
             )
             return
+        # This transcript IS the answer: close the gate and flush any audio
+        # captured since the commit, so the trailing half-sentence of a
+        # VAD-split answer can never surface later as a phantom reply to
+        # the next question.
+        self.awaiting_answer = False
+        self._send(ws, {"type": "input_audio_buffer.clear"})
         if settings.REALTIME_ACK_ENABLED:
             # Fill the Claude-decision gap with a human "I heard you" beat
             # instead of silence. _speak below waits for this to finish, so
@@ -667,7 +704,10 @@ class SidebandBridge:
             # deliberately keeps the previous question: the ack's own words
             # are unknown (the model improvises them), its echo is caught by
             # the hesitation gate instead, and the question's echo can still
-            # arrive late and must stay matchable.
+            # arrive late and must stay matchable. The ack's own
+            # response.done must NOT re-open the answer gate — only the
+            # question that follows may (its _speak arms the flag).
+            self._arm_on_response_done = False
             self.response_active = True
             self._send(
                 ws,
@@ -731,7 +771,12 @@ class SidebandBridge:
                     if self._is_transcript_done(event):
                         self._handle_transcript(ws, event)
                     elif etype.endswith("input_audio_transcription.failed"):
-                        self._speak(ws, _repeat_line(self.language))
+                        # Only ask to repeat when an answer was actually
+                        # due — a failed transcription of spillover audio
+                        # must not interrupt the question being asked.
+                        if self.awaiting_answer:
+                            self.awaiting_answer = False
+                            self._speak(ws, _repeat_line(self.language))
                 else:
                     logger.warning(
                         "realtime session deadline reached for participant %s; hanging up",
