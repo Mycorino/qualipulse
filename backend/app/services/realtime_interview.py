@@ -159,8 +159,9 @@ def build_session_config(project, participant, language: str | None) -> dict:
         }
     else:
         # semantic_vad holds the turn open while a sentence sounds
-        # unfinished; low eagerness biases further toward letting the
-        # participant think out loud without being cut off.
+        # unfinished. Eagerness only sets how promptly it reports the end
+        # of speech; the burst patience lives in _collect_answer, measured
+        # from that event, so the VAD no longer needs to be slow as well.
         turn_detection = {
             "type": "semantic_vad",
             "eagerness": settings.REALTIME_VAD_EAGERNESS,

@@ -905,7 +905,7 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
 - **Turn-taking (patience):** semantic VAD commits at every sentence
   boundary, but people narrate in bursts with 2-5s thinks between them. The
   sideband therefore treats an answer as finished only after
-  `REALTIME_ANSWER_SILENCE_SECONDS` (3.5s) of quiet measured from the
+  `REALTIME_ANSWER_SILENCE_SECONDS` (3.0s) of quiet measured from the
   participant's last `speech_stopped` (never from a transcript's arrival),
   with every committed burst transcribed (`_pending_transcripts`); short
   answers earn `SHORT_ANSWER_EXTRA_WAIT` more. Midway (1.5s) a soft
