@@ -42,6 +42,32 @@ class _FakeWs:
         raise TimeoutError
 
 
+class _ScheduledWs(_FakeWs):
+    """Events land on specific recv() call numbers (each call ~10ms), so a
+    test can shape the participant's timing: speak, pause, speak again."""
+
+    def __init__(self, schedule):
+        super().__init__()
+        self.schedule = dict(schedule)
+        self.calls = 0
+
+    def recv(self, timeout=None):
+        import time
+
+        time.sleep(0.01)
+        self.calls += 1
+        event = self.schedule.pop(self.calls, None)
+        if event is None:
+            raise TimeoutError
+        return json.dumps(event)
+
+
+def _quiet(monkeypatch, *, silence=0.05, backchannel=False, backchannel_after=0.1):
+    monkeypatch.setattr(settings, "REALTIME_ANSWER_SILENCE_SECONDS", silence)
+    monkeypatch.setattr(settings, "REALTIME_BACKCHANNEL_ENABLED", backchannel)
+    monkeypatch.setattr(settings, "REALTIME_BACKCHANNEL_AFTER_SECONDS", backchannel_after)
+
+
 @pytest.fixture
 def bridge_sessions(db_session):
     """Point session_scope() (used by the bridge's own sessions) at the
@@ -551,7 +577,7 @@ class TestBridgeTurns:
         assert rt._is_hesitation_only("So basically the billing broke", "en") is False
 
     def test_hesitation_fragment_holds_the_turn_open(self, db_session, bridge_sessions, monkeypatch):
-        monkeypatch.setattr(rt, "ANSWER_DRAIN_SECONDS", 0.05)
+        _quiet(monkeypatch)
         _, participant = _seed(db_session, "tok-hesit", turns=1)
         pending_before = rt._pending_question(participant.id)
         bridge = rt.SidebandBridge("rtc_hesit", participant.id, 20)
@@ -603,7 +629,7 @@ class TestBridgeTurns:
         assert bridge.awaiting_answer is True
 
     def test_accepted_answer_closes_the_gate_and_flushes_the_buffer(self, db_session, bridge_sessions, monkeypatch):
-        monkeypatch.setattr(rt, "ANSWER_DRAIN_SECONDS", 0.05)
+        _quiet(monkeypatch)
         _, participant = _seed(db_session, "tok-gate3", turns=1)
         bridge = rt.SidebandBridge("rtc_gate3", participant.id, 20)
         bridge.awaiting_answer = True
@@ -626,23 +652,80 @@ class TestBridgeTurns:
         assert types[0] == "input_audio_buffer.clear"
         assert types.count("response.create") == 2  # ack + question
         assert ws.sent[1]["response"].get("conversation") == "none"  # the ack
+        # Tagged so the client never captions "Gotcha." as the question.
+        assert ws.sent[1]["response"]["metadata"] == {"kind": "ack"}
         assert "Tell me more?" in ws.sent[2]["response"]["instructions"]
         assert bridge._arm_on_response_done is True
 
     def test_short_answer_waits_for_the_rest_of_the_sentence(self, db_session, bridge_sessions, monkeypatch):
-        monkeypatch.setattr(rt, "ANSWER_DRAIN_SECONDS", 0.05)
-        monkeypatch.setattr(rt, "SHORT_ANSWER_EXTRA_WAIT", 0.6)
+        _quiet(monkeypatch)
+        monkeypatch.setattr(rt, "SHORT_ANSWER_EXTRA_WAIT", 0.3)
         _, participant = _seed(db_session, "tok-short2", turns=1)
         bridge = rt.SidebandBridge("rtc_short2", participant.id, 20)
         continuation = {
             "type": "conversation.item.input_audio_transcription.completed",
             "transcript": "and Disney for the kids",
         }
-        # The continuation only arrives after the normal drain window: a
-        # fixed 1s drain would have answered "Netflix mostly" on its own.
+        # The continuation only arrives after the base silence window: a
+        # short answer earns extra patience, a full one would not have.
         ws = _FakeWs(events=[continuation], delay_calls=15)
         combined = bridge._collect_answer(ws, "Netflix mostly")
         assert combined == "Netflix mostly and Disney for the kids"
+
+    def test_silence_is_measured_from_speech_end_not_transcript_arrival(self, db_session, bridge_sessions, monkeypatch):
+        """The cut-off bug: a sentence, a think, the next sentence. While
+        the participant is mid-burst no amount of elapsed time counts as
+        silence, and a committed burst whose transcription is still in
+        flight holds the answer open."""
+        _quiet(monkeypatch, silence=0.3)
+        _, participant = _seed(db_session, "tok-patience", turns=1)
+        bridge = rt.SidebandBridge("rtc_patience", participant.id, 20)
+        ws = _ScheduledWs({
+            5: {"type": "input_audio_buffer.speech_started"},
+            # Speaking until ~0.4s: longer than the 0.3s silence window, but
+            # speech in progress is the opposite of silence.
+            40: {"type": "input_audio_buffer.speech_stopped"},
+            41: {"type": "input_audio_buffer.committed"},
+            # Transcription lags the burst: quiet since 0.4s, so at ~0.7s
+            # the silence is satisfied, but one transcript is still owed.
+            85: {"type": "conversation.item.input_audio_transcription.completed",
+                 "transcript": "and then I checked the numbers myself"},
+        })
+        combined = bridge._collect_answer(ws, "I used it for the deck")
+        assert combined == "I used it for the deck and then I checked the numbers myself"
+        assert not ws.schedule  # every scheduled burst was consumed, none cut off
+
+    def test_backchannel_once_while_the_participant_thinks(self, db_session, bridge_sessions, monkeypatch):
+        _quiet(monkeypatch, silence=0.5, backchannel=True, backchannel_after=0.1)
+        _, participant = _seed(db_session, "tok-mmhm", turns=1)
+        bridge = rt.SidebandBridge("rtc_mmhm", participant.id, 20)
+        ws = _FakeWs()
+        bridge._collect_answer(ws, "I mostly use it for slides")
+        fillers = [e for e in ws.sent if e["type"] == "response.create"]
+        assert len(fillers) == 1
+        assert fillers[0]["response"]["metadata"] == {"kind": "backchannel"}
+        assert fillers[0]["response"]["conversation"] == "none"
+        # Its response.done must not arm the answer gate.
+        assert bridge._arm_on_response_done is False
+        # A hesitation-only fragment earns no backchannel: they have not
+        # said anything to nod at yet.
+        ws2 = _FakeWs()
+        bridge.response_active = False
+        bridge._collect_answer(ws2, "So")
+        assert ws2.sent == []
+
+    def test_live_turns_ask_the_engine_for_spoken_brevity(self, db_session, bridge_sessions):
+        _, participant = _seed(db_session, "tok-brief", turns=1)
+        seen = {}
+
+        def fake_turn(pid, **kwargs):
+            seen.update(kwargs)
+            return {"question_text": "And then?", "is_complete": False, "turn_index": 1}
+
+        with patch("app.services.interview_engine.process_interview_turn", side_effect=fake_turn):
+            rt._advance_turn(participant.id, "we use it daily")
+        assert seen["spoken_live"] is True
+        assert seen["transcript_override"] == "we use it daily"
 
     def test_answer_span_opens_on_participant_speech_only(self, db_session, bridge_sessions):
         _, participant = _seed(db_session, "tok-span", turns=1)

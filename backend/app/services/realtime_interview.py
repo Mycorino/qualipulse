@@ -44,20 +44,18 @@ REALTIME_WS_URL = "wss://api.openai.com/v1/realtime"
 # before the sideband hangs up, so setup fumbling never kills a real session.
 MIN_SESSION_MINUTES = 20.0
 
-# How long after a VAD-committed transcript we keep listening for the
-# participant to resume before treating the answer as finished. With
-# semantic_vad the model already waits out unfinished sentences, so this is
-# only a short net for back-to-back commits; every extra tenth of a second
-# here is dead air the participant sits through on EVERY turn.
-ANSWER_DRAIN_SECONDS = 1.0
-# If speech restarts inside the drain window, wait at most this long for its
-# transcription before advancing with what we have.
+# End-of-answer detection lives in settings.REALTIME_ANSWER_SILENCE_SECONDS:
+# silence measured from the participant's last speech_stopped, not from a
+# transcript's arrival (transcription lags speech by 1-2s and says nothing
+# about whether they are still thinking). Once quiet long enough, we still
+# wait at most this long for any committed burst whose transcription has not
+# come back yet before advancing with what we have.
 ANSWER_CONTINUATION_TIMEOUT = 20.0
 
 # An answer this short (in words) is usually a thought being formed, not a
-# finished answer: give the participant one extra beat before advancing.
+# finished answer: require this much extra silence before advancing.
 SHORT_ANSWER_WORDS = 4
-SHORT_ANSWER_EXTRA_WAIT = 4.0
+SHORT_ANSWER_EXTRA_WAIT = 2.0
 
 # Speaker-to-mic echo: for this long after the interviewer stops speaking, a
 # transcript that echoes what it just said is treated as the room hearing the
@@ -279,6 +277,15 @@ def _ack_instruction(language: str | None) -> str:
     )
 
 
+def _backchannel_instruction(language: str | None) -> str:
+    lang = (language or "en")[:2]
+    return (
+        f"Make ONE soft, short listening sound in the interview language ({lang}), "
+        f"like 'Mm-hm.' — under one second, warm, a nod rather than a word. "
+        f"No words, no question, nothing else."
+    )
+
+
 # Hesitation particles and bare acknowledgments, per language. A transcript
 # made ONLY of these is someone thinking out loud (or the interviewer's own
 # "Got it." leaking through the speaker), never a finished answer. Real short
@@ -447,6 +454,9 @@ def _advance_turn(participant_id: str, transcript: str) -> dict | None:
                 audio_url=None,
                 db=db,
                 transcript_override=transcript,
+                # The line will be spoken aloud: ask the engine for a
+                # conversational, sub-25-word question, not a written one.
+                spoken_live=True,
             )
     except EmptyTranscriptError:
         return None
@@ -499,6 +509,13 @@ class SidebandBridge:
         # near-identical question.
         self.awaiting_answer = False
         self._arm_on_response_done = False
+        # Patience bookkeeping: is the participant mid-burst, when did their
+        # last burst end, and how many committed bursts still owe us their
+        # transcription. "Done answering" = quiet since the last burst for
+        # REALTIME_ANSWER_SILENCE_SECONDS with nothing left in flight.
+        self._speech_open = False
+        self._last_speech_stopped_at: float | None = None
+        self._pending_transcripts = 0
 
     # -- websocket plumbing -------------------------------------------------
 
@@ -565,11 +582,21 @@ class SidebandBridge:
             self.last_response_ended_at = time.monotonic()
             self._on_response_done(event)
         elif etype == "input_audio_buffer.speech_started":
+            self._speech_open = True
             # First speech after the interviewer went quiet = the answer
             # starting. Not reset by hesitation fragments — "So..." is the
             # beginning of the answer, and the clip should include it.
             if not self.response_active and self._answer_span_start is None:
                 self._answer_span_start = self._session_elapsed()
+        elif etype == "input_audio_buffer.speech_stopped":
+            self._speech_open = False
+            self._last_speech_stopped_at = time.monotonic()
+        elif etype == "input_audio_buffer.committed":
+            self._pending_transcripts += 1
+        elif etype.endswith("input_audio_transcription.completed") or etype.endswith(
+            "input_audio_transcription.failed"
+        ):
+            self._pending_transcripts = max(0, self._pending_transcripts - 1)
         elif etype == "error":
             logger.warning(
                 "realtime event error for participant %s: %s",
@@ -602,44 +629,79 @@ class SidebandBridge:
     def _is_transcript_done(event: dict) -> bool:
         return event.get("type", "").endswith("input_audio_transcription.completed")
 
-    def _collect_answer(self, ws, first: str) -> str:
-        """Concatenate transcripts until the participant stays quiet.
+    def _backchannel(self, ws) -> None:
+        """A soft "Mm-hm." while the participant thinks: we are listening.
 
-        VAD commits on short pauses, so one spoken answer can arrive as two
-        or three transcription events. Keep draining briefly after each one;
-        if speech restarts inside the window, wait for its transcription.
+        Out-of-band and tagged so the client neither captions it nor mutes
+        the mic for it — the whole point is that they can keep talking.
+        Its own response.done must not touch the answer gate.
+        """
+        if self.response_active:
+            return
+        self._arm_on_response_done = False
+        self.response_active = True
+        self._send(
+            ws,
+            {
+                "type": "response.create",
+                "response": {
+                    "conversation": "none",
+                    "metadata": {"kind": "backchannel"},
+                    "instructions": _backchannel_instruction(self.language),
+                },
+            },
+        )
+
+    def _collect_answer(self, ws, first: str) -> str:
+        """Concatenate transcripts until the participant has clearly finished.
+
+        People narrate in bursts: a sentence, a 2-5s think, the next
+        sentence. Semantic VAD commits at every sentence boundary, so "done"
+        cannot mean "a transcript arrived" — it means
+        REALTIME_ANSWER_SILENCE_SECONDS of quiet since their last words, with
+        every committed burst transcribed. Answering the first burst alone
+        was the cut-off the participants kept reporting: the rest of the
+        thought landed on a muted mic and a closed gate.
         """
         parts = [first]
-        extended = False
-        wait_until = time.monotonic() + ANSWER_DRAIN_SECONDS
+        entered = time.monotonic()
+        silence = settings.REALTIME_ANSWER_SILENCE_SECONDS
+        backchanneled = False
         while True:
             now = time.monotonic()
-            if now >= min(wait_until, self.deadline):
-                combined = " ".join(p for p in parts if p)
-                if (
-                    not extended
-                    and now < self.deadline
-                    and 0 < len(combined.split()) < SHORT_ANSWER_WORDS
-                    and not _is_hesitation_only(combined, self.language)
-                ):
-                    # A couple of words is usually a thought being formed;
-                    # one longer beat catches the rest of the sentence
-                    # instead of answering half of it.
-                    extended = True
-                    wait_until = now + SHORT_ANSWER_EXTRA_WAIT
-                    continue
-                return combined
+            if now >= self.deadline:
+                break
+            anchor = self._last_speech_stopped_at if self._last_speech_stopped_at is not None else entered
+            quiet_for = 0.0 if self._speech_open else now - anchor
+            combined = " ".join(p for p in parts if p)
+            substantive = bool(combined) and not _is_hesitation_only(combined, self.language)
+            if (
+                settings.REALTIME_BACKCHANNEL_ENABLED
+                and not backchanneled
+                and substantive
+                and quiet_for >= settings.REALTIME_BACKCHANNEL_AFTER_SECONDS
+            ):
+                backchanneled = True
+                self._backchannel(ws)
+            required = silence
+            if substantive and len(combined.split()) < SHORT_ANSWER_WORDS:
+                # A couple of words is usually a thought being formed.
+                required += SHORT_ANSWER_EXTRA_WAIT
+            if quiet_for >= required and (
+                self._pending_transcripts == 0 or now - anchor >= ANSWER_CONTINUATION_TIMEOUT
+            ):
+                break
             event = self._recv_event(ws, timeout=0.25)
             if event is None:
                 continue
-            etype = self._note_event(event)
-            if etype == "input_audio_buffer.speech_started":
-                wait_until = time.monotonic() + ANSWER_CONTINUATION_TIMEOUT
-            elif self._is_transcript_done(event):
+            self._note_event(event)
+            if self._is_transcript_done(event):
                 text = (event.get("transcript") or "").strip()
-                if text and not self._is_echo(text):
+                # Hesitation-only bursts ("euh", the backchannel's own echo)
+                # add nothing to the answer text.
+                if text and not self._is_echo(text) and not _is_hesitation_only(text, self.language):
                     parts.append(text)
-                wait_until = time.monotonic() + ANSWER_DRAIN_SECONDS
+        return " ".join(p for p in parts if p)
 
     def _on_response_done(self, event: dict) -> None:
         usage = (event.get("response") or {}).get("usage")
@@ -717,7 +779,9 @@ class SidebandBridge:
                         # Out-of-band: the ack is a filler beat, not part of
                         # the interview; keeping it out of conversation state
                         # keeps the context clean for the verbatim questions.
+                        # Tagged so the client does not caption it.
                         "conversation": "none",
+                        "metadata": {"kind": "ack"},
                         "instructions": _ack_instruction(self.language),
                     },
                 },
