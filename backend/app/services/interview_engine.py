@@ -104,6 +104,10 @@ participant can hear silence; aim for one focused question at a time.
 Voice & stance:
 - Express genuine interest in what the participant just said. Be brief: they speak more when you speak less.
 - Stay neutral. Never approve, disapprove, or evaluate an answer. Never suggest an answer inside the question.
+- Never open with agreement or praise ("Exactly", "Absolutely", "Perfect", "Great", "Exactement", "Absolument", \
+"Super", "Parfait", "Génial"), and never tell the participant they are doing well. Praise steers what they say next.
+- Never summarise their answer back to them as a statement. A line that only restates or affirms what they said is \
+not a question: every follow_up and next_question line ends with exactly one open question.
 - Use the participant's own words and terminology. Mirror their language register.
 - Avoid "why" questions, they invite rationalisation. Prefer "walk me through", "tell me about \
 the last time", "what was happening when".
@@ -882,7 +886,7 @@ DECISION_TOOL = {
             },
             "question": {
                 "type": "string",
-                "description": "The spoken text the participant will hear. One question, conversational, no dashes.",
+                "description": "The spoken text the participant will hear. Conversational, no dashes. For follow_up and next_question it ends with exactly one open question and never opens with agreement or praise.",
             },
             "coaching": {
                 "type": "string",
@@ -1146,9 +1150,11 @@ WHY: they asked to stop; never negotiate.
         user_message += (
             "<delivery>\n"
             "LIVE VOICE: your line is spoken aloud, in real time, not read. "
-            "Keep it under 25 words: at most a six-word acknowledgment (never a "
-            "restatement of what they said), then exactly ONE question. Silence "
-            "while they think is fine; never fill it.\n"
+            "Keep it under 25 words: at most a six-word neutral bridge (never a "
+            "restatement of what they said, never agreement or praise), then exactly "
+            "ONE question, and the line ends with it. Do not use the reflect_back probe "
+            "out loud: spoken back, a restatement sounds like the interviewer agreeing. "
+            "Silence while they think is fine; never fill it.\n"
             "</delivery>\n\n"
         )
 
@@ -1291,9 +1297,17 @@ def _parse_decision_response(response, language: str | None) -> dict:
     question = result.get("question")
     if not isinstance(question, str) or not question.strip():
         question = _fallback_follow_up(language)
+    question = _strip_banned_dashes(question.strip())
+    if action in ("follow_up", "next_question"):
+        question = _strip_leading_evaluation(question)
+        if "?" not in question and "？" not in question:
+            # Visibility only: a line that never asks anything is the
+            # "interviewer just agrees with me" drift. The prompt forbids it;
+            # log it so the rate is measurable in production.
+            logger.warning("interview decision %s carries no question: %r", action, question[:120])
     out = {
         "action": action,
-        "question": _strip_banned_dashes(question.strip()),
+        "question": question,
         "stop_quote": result.get("stop_quote") if isinstance(result.get("stop_quote"), str) else None,
         "coaching": _sanitize_coaching(result.get("coaching")),
         "probe": result.get("probe") if isinstance(result.get("probe"), str) else None,
@@ -1303,6 +1317,64 @@ def _parse_decision_response(response, language: str | None) -> dict:
 
 
 _strip_banned_dashes = strip_banned_dashes  # shared house-style guard
+
+
+# Evaluative openers a model slips in front of a question ("Exactement, et
+# au final..."). Spoken aloud, turn after turn, they read as the interviewer
+# agreeing with everything, which steers the participant. Matched only at the
+# very start of the line and only when followed by punctuation, so "Right
+# now, what..." or "Good morning" are untouched. Multi-word entries first so
+# the alternation prefers the longest match.
+_EVALUATIVE_OPENERS = (
+    # en
+    "that's great", "that's right", "that makes sense", "makes sense", "love that", "love it",
+    "well said", "good point", "great point", "fair enough", "fair point", "exactly", "absolutely",
+    "perfect", "great", "awesome", "excellent", "wonderful", "fantastic", "brilliant", "amazing",
+    "lovely", "good", "nice", "right", "correct", "true", "indeed",
+    # fr
+    "tout à fait", "tout a fait", "très bien", "tres bien", "c'est ça", "c'est ca", "c'est exact",
+    "c'est vrai", "c'est clair", "très juste", "tres juste", "bien sûr", "bien sur", "exactement",
+    "absolument", "parfait", "super", "génial", "genial", "excellent", "formidable", "magnifique",
+    "effectivement", "bravo", "top", "bien",
+    # de
+    "sehr gut", "sehr schön", "das stimmt", "genau", "perfekt", "toll", "richtig", "absolut",
+    "wunderbar", "klasse", "stimmt",
+    # es
+    "muy bien", "es verdad", "tiene sentido", "exacto", "exactamente", "perfecto", "estupendo",
+    "claro", "correcto",
+    # it
+    "è vero", "e vero", "ha senso", "esatto", "esattamente", "perfetto", "ottimo", "benissimo",
+    "bravo", "brava", "certo", "giusto",
+    # pt
+    "muito bem", "é verdade", "e verdade", "faz sentido", "exato", "exatamente", "perfeito",
+    "ótimo", "otimo", "correto",
+)
+_EVALUATIVE_OPENER_RE = re.compile(
+    r"^(?:" + "|".join(re.escape(w) for w in sorted(_EVALUATIVE_OPENERS, key=len, reverse=True))
+    + r")\s*[,.!:;…]+\s*",
+    re.IGNORECASE,
+)
+
+
+def _strip_leading_evaluation(text: str) -> str:
+    """Drop agreement / praise interjections from the start of a question.
+
+    Only the opener goes; the rest of the line is kept as the model wrote it
+    (first letter re-capitalised). A line that is nothing but praise is
+    returned untouched rather than emptied.
+    """
+    stripped = text.lstrip()
+    while True:
+        m = _EVALUATIVE_OPENER_RE.match(stripped)
+        if not m:
+            break
+        rest = stripped[m.end():]
+        if len(rest.split()) < 3:
+            break
+        stripped = rest
+    if stripped == text.lstrip():
+        return text
+    return stripped[:1].upper() + stripped[1:]
 
 
 def _sanitize_coaching(value) -> str | None:

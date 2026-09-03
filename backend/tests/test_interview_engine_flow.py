@@ -892,3 +892,63 @@ def test_forced_close_without_regeneration_speaks_a_closing(db_session, monkeypa
     spoken = result["question_text"]
     assert spoken == interview_engine._final_check_question("en")
     assert "?" in spoken  # the closing check, never a stale probe
+
+
+# ---------------------------------------------------------------------------
+# Neutral stance: no agreement / praise openers, questions stay questions
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw, cleaned",
+    [
+        ("Exactement, et au final, c'est vous qui validez ?", "Et au final, c'est vous qui validez ?"),
+        ("Super, exactement. Et la dernière fois, comment ça s'est passé ?", "Et la dernière fois, comment ça s'est passé ?"),
+        ("Absolutely! Walk me through the last time that happened.", "Walk me through the last time that happened."),
+        ("Très bien. Racontez-moi la dernière fois.", "Racontez-moi la dernière fois."),
+        ("Genau, und wie lief das beim letzten Mal ab?", "Und wie lief das beim letzten Mal ab?"),
+        # Untouched: not an opener, or the word is part of the sentence.
+        ("Right now, what do you do first?", "Right now, what do you do first?"),
+        ("Good morning, how did the week start?", "Good morning, how did the week start?"),
+        ("Walk me through the last time that happened.", "Walk me through the last time that happened."),
+        # Nothing but praise is left alone rather than emptied.
+        ("Great!", "Great!"),
+    ],
+)
+def test_leading_evaluation_is_stripped_from_questions(raw, cleaned):
+    assert interview_engine._strip_leading_evaluation(raw) == cleaned
+
+
+def _tool_response(**inp):
+    class _Block:
+        type = "tool_use"
+        input = inp
+
+    class _Resp:
+        content = [_Block()]
+
+    return _Resp()
+
+
+def test_decision_parser_strips_praise_from_follow_ups_and_transitions():
+    out = interview_engine._parse_decision_response(
+        _tool_response(action="follow_up", question="Exactement, comment ça se passe concrètement ?"), "fr"
+    )
+    assert out["question"] == "Comment ça se passe concrètement ?"
+    out = interview_engine._parse_decision_response(
+        _tool_response(action="next_question", question="Perfect. Let's talk about onboarding: how did it go?"), "en"
+    )
+    assert out["question"] == "Let's talk about onboarding: how did it go?"
+    # A wrap-up keeps its warmth.
+    out = interview_engine._parse_decision_response(
+        _tool_response(action="close", question="Perfect, that wraps it up. Thank you so much."), "en"
+    )
+    assert out["question"] == "Perfect, that wraps it up. Thank you so much."
+
+
+def test_prompt_forbids_affirmations_and_demands_a_question():
+    prompt = interview_engine.INTERVIEWER_SYSTEM_PROMPT
+    assert "Never open with agreement or praise" in prompt
+    assert "ends with exactly one open question" in prompt
+    desc = interview_engine.DECISION_TOOL["input_schema"]["properties"]["question"]["description"]
+    assert "never opens with agreement or praise" in desc

@@ -14,6 +14,17 @@ identically to classic interviews. The realtime model is only the mouth: it
 is instructed to speak the host-provided line verbatim and never invent
 content (``create_response: false`` on VAD, belt and braces).
 
+Every line the model speaks is an **isolated** response (``input: []``): the
+model is handed the text and nothing else. Given the running conversation as
+context, gpt-realtime stops reading the host line verbatim once the
+conversation has some history, and starts answering the participant itself:
+it paraphrases the question into a validating summary ("Exactly, so you
+coordinate and check the agents' work, and that keeps you in control..."),
+and turns the two-word acknowledgment into a whole improvised follow-up the
+participant hears but never sees captioned. That is the "every question is
+asked twice, and the interviewer keeps agreeing with me" failure. With no
+context there is nothing to react to, so the line comes out verbatim.
+
 Audio: the Realtime API neither returns nor stores raw audio, so the browser
 records the whole session in parallel (mic + assistant voice mixed) and
 uploads it at the end — see the /realtime/recording endpoint. Turn rows
@@ -99,6 +110,32 @@ def _session_instructions(language: str | None) -> str:
         f"The interview language is: {lang}. "
         "Never use em dashes in anything you say."
     )
+
+
+def _verbatim_instruction(text: str, language: str | None) -> str:
+    """Response instructions for one spoken line.
+
+    ``response.instructions`` REPLACES the session instructions for that
+    response, and the response is created with no conversation context, so
+    the persona and the language have to travel with every line.
+    """
+    return (
+        _session_instructions(language)
+        + " Say exactly the following line to the participant, verbatim, "
+        "warmly and naturally. Do not add, remove, or change anything:\n"
+        + text
+    )
+
+
+def _isolated_response(instructions: str, **extra) -> dict:
+    """A ``response.create`` payload with an empty context.
+
+    ``input: []`` is the load-bearing bit (see the module docstring): the
+    model sees only these instructions, never the conversation, so it cannot
+    react to the participant, paraphrase, or improvise a second question.
+    """
+    payload = {"type": "response.create", "response": {"instructions": instructions, "input": [], **extra}}
+    return payload
 
 
 def build_session_config(project, participant, language: str | None) -> dict:
@@ -257,31 +294,37 @@ def _pending_question(participant_id: str) -> str | None:
         return last.question_text
 
 
-_ACK_EXAMPLES = {
-    "en": "'Okay.', 'I see.', 'Got it.'",
-    "fr": "'D'accord.', 'Je vois.', 'Très bien.'",
-    "de": "'Okay.', 'Verstehe.', 'Alles klar.'",
-    "es": "'Vale.', 'Entiendo.', 'Muy bien.'",
-    "it": "'Va bene.', 'Capisco.', 'Certo.'",
-    "pt": "'Certo.', 'Entendo.', 'Muito bem.'",
+# The "I heard you" beat spoken while Claude decides the next line. Fixed,
+# neutral listening words (never praise, never agreement): every one of them
+# is also in the hesitation sets below, so should the speaker leak one back
+# into the microphone it is held as a non-answer rather than fed to Claude.
+# Rotated per turn so the participant does not hear the same word every time.
+_ACK_LINES = {
+    "en": ("Okay.", "I see.", "Got it."),
+    "fr": ("D'accord.", "Je vois.", "Entendu."),
+    "de": ("Okay.", "Verstehe.", "Alles klar."),
+    "es": ("Vale.", "Entiendo.", "Ya veo."),
+    "it": ("Va bene.", "Capisco.", "Certo."),
+    "pt": ("Certo.", "Entendo.", "Estou a ver."),
 }
 
 
-def _ack_instruction(language: str | None) -> str:
+def _ack_line(language: str | None, turn: int) -> str:
     lang = (language or "en")[:2]
-    examples = _ACK_EXAMPLES.get(lang, _ACK_EXAMPLES["en"])
-    return (
-        f"Say ONE very brief, natural acknowledgment in the interview language "
-        f"({lang}), one to three words, in a warm listening tone, for example "
-        f"{examples} Vary it. Say nothing else and ask nothing."
-    )
+    lines = _ACK_LINES.get(lang, _ACK_LINES["en"])
+    return lines[turn % len(lines)]
+
+
+def _ack_instruction(language: str | None, turn: int = 0) -> str:
+    return _verbatim_instruction(_ack_line(language, turn), language)
 
 
 def _backchannel_instruction(language: str | None) -> str:
     lang = (language or "en")[:2]
     return (
-        f"Make ONE soft, short listening sound in the interview language ({lang}), "
-        f"like 'Mm-hm.' — under one second, warm, a nod rather than a word. "
+        _session_instructions(language)
+        + f" Make ONE soft, short listening sound in the interview language ({lang}), "
+        f"like 'Mm-hm.', under one second, warm, a nod rather than a word. "
         f"No words, no question, nothing else."
     )
 
@@ -296,9 +339,9 @@ _HESITATION_WORDS = {
     "fr": {"euh", "ben", "bah", "hum", "alors", "donc", "bon", "hein", "voila", "voilà",
            "d'accord", "daccord", "compris", "entendu", "vois", "je", "bien", "très", "tres", "parfait"},
     "de": {"äh", "ähm", "also", "tja", "na", "gut", "klar", "verstehe", "alles"},
-    "es": {"em", "este", "pues", "bueno", "vale", "entiendo", "ver", "muy", "bien", "a"},
+    "es": {"em", "este", "pues", "bueno", "vale", "entiendo", "ver", "muy", "bien", "a", "ya", "veo"},
     "it": {"ehm", "mah", "beh", "allora", "dunque", "cioè", "cioe", "capisco", "va", "bene", "certo"},
-    "pt": {"hum", "então", "entao", "pois", "bem", "tipo", "certo", "entendo", "muito"},
+    "pt": {"hum", "então", "entao", "pois", "bem", "tipo", "certo", "entendo", "muito", "estou", "a", "ver"},
 }
 
 
@@ -491,7 +534,13 @@ class SidebandBridge:
         # flight (so two lines never race for the same audio channel).
         self.response_active = False
         self.last_spoken = ""
+        # What the model ACTUALLY said in its last few responses (from its
+        # own output transcripts), acks included: the echo guard matches
+        # against these as well as the planned line, so a leaked
+        # acknowledgment or a slightly off rendering is still recognised.
+        self.recent_outputs: list[str] = []
         self.last_response_ended_at = 0.0
+        self._ack_turn = 0
         # Set when the sideband attaches — the zero point for per-turn
         # offsets into the client's session recording.
         self.session_started_at: float | None = None
@@ -550,19 +599,7 @@ class SidebandBridge:
         # Every _speak line is a question or a repeat request — something
         # that expects an answer. Its response.done re-opens the gate.
         self._arm_on_response_done = True
-        self._send(
-            ws,
-            {
-                "type": "response.create",
-                "response": {
-                    "instructions": (
-                        "Say exactly the following line to the participant, "
-                        "verbatim, warmly and naturally. Do not add, remove, "
-                        "or change anything:\n" + text
-                    ),
-                },
-            },
-        )
+        self._send(ws, _isolated_response(_verbatim_instruction(text, self.language)))
 
     def _wait_for_response_idle(self, ws) -> None:
         """Pump events until nothing is being spoken (bounded)."""
@@ -581,6 +618,10 @@ class SidebandBridge:
             self.response_active = False
             self.last_response_ended_at = time.monotonic()
             self._on_response_done(event)
+        elif etype == "response.output_audio_transcript.done":
+            said = (event.get("transcript") or "").strip()
+            if said:
+                self.recent_outputs = (self.recent_outputs + [said])[-3:]
         elif etype == "input_audio_buffer.speech_started":
             self._speech_open = True
             # First speech after the interviewer went quiet = the answer
@@ -610,7 +651,13 @@ class SidebandBridge:
             self.response_active
             or (time.monotonic() - self.last_response_ended_at) < ECHO_TAIL_SECONDS
         )
-        return speaking_recently and _looks_like_echo(transcript, self.last_spoken)
+        if not speaking_recently:
+            return False
+        return any(
+            _looks_like_echo(transcript, mine)
+            for mine in [self.last_spoken, *self.recent_outputs]
+            if mine
+        )
 
     def _recv_event(self, ws, timeout: float) -> dict | None:
         try:
@@ -642,14 +689,11 @@ class SidebandBridge:
         self.response_active = True
         self._send(
             ws,
-            {
-                "type": "response.create",
-                "response": {
-                    "conversation": "none",
-                    "metadata": {"kind": "backchannel"},
-                    "instructions": _backchannel_instruction(self.language),
-                },
-            },
+            _isolated_response(
+                _backchannel_instruction(self.language),
+                conversation="none",
+                metadata={"kind": "backchannel"},
+            ),
         )
 
     def _collect_answer(self, ws, first: str) -> str:
@@ -762,30 +806,27 @@ class SidebandBridge:
         if settings.REALTIME_ACK_ENABLED:
             # Fill the Claude-decision gap with a human "I heard you" beat
             # instead of silence. _speak below waits for this to finish, so
-            # the question never talks over the acknowledgment. last_spoken
-            # deliberately keeps the previous question: the ack's own words
-            # are unknown (the model improvises them), its echo is caught by
-            # the hesitation gate instead, and the question's echo can still
-            # arrive late and must stay matchable. The ack's own
-            # response.done must NOT re-open the answer gate — only the
-            # question that follows may (its _speak arms the flag).
+            # the question never talks over the acknowledgment. The ack is a
+            # fixed neutral word spoken verbatim with no context (given the
+            # conversation, the model turned "Got it." into a whole
+            # improvised follow-up question of its own). last_spoken keeps
+            # the previous question so its late echo stays matchable; the
+            # ack's echo is caught by the hesitation gate and by
+            # recent_outputs. The ack's own response.done must NOT re-open
+            # the answer gate; only the question that follows may (its
+            # _speak arms the flag).
             self._arm_on_response_done = False
             self.response_active = True
             self._send(
                 ws,
-                {
-                    "type": "response.create",
-                    "response": {
-                        # Out-of-band: the ack is a filler beat, not part of
-                        # the interview; keeping it out of conversation state
-                        # keeps the context clean for the verbatim questions.
-                        # Tagged so the client does not caption it.
-                        "conversation": "none",
-                        "metadata": {"kind": "ack"},
-                        "instructions": _ack_instruction(self.language),
-                    },
-                },
+                _isolated_response(
+                    _ack_instruction(self.language, self._ack_turn),
+                    # Out-of-band and tagged so the client does not caption it.
+                    conversation="none",
+                    metadata={"kind": "ack"},
+                ),
             )
+            self._ack_turn += 1
         # The turn being answered is the current pending one; capture it (and
         # the answer's span in this segment) before the engine advances.
         answered_index = _last_turn_index(self.participant_id)

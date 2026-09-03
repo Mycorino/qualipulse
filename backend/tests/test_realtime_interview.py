@@ -882,3 +882,109 @@ class TestBridgeTurns:
         assert cfg["audio"]["input"]["noise_reduction"] == {"type": "far_field"}
         assert "verbatim" in cfg["instructions"].lower() or "exact" in cfg["instructions"].lower()
         assert json.dumps(cfg)  # serialisable
+
+
+class TestVerbatimIsolation:
+    """gpt-realtime only reads the host line verbatim when it has nothing
+    else to react to. Given the conversation as context it paraphrased
+    Claude's question into a validating summary and turned the two-word
+    ack into a whole improvised follow-up (heard, never captioned): the
+    "every question asked twice, interviewer keeps agreeing" bug."""
+
+    def test_every_spoken_line_is_isolated_from_the_conversation(self, db_session, bridge_sessions, monkeypatch):
+        _quiet(monkeypatch)
+        _, participant = _seed(db_session, "tok-isolated", turns=1)
+        bridge = rt.SidebandBridge("rtc_isolated", participant.id, 20)
+        bridge.awaiting_answer = True
+        ws = _FakeWs()
+        with patch(
+            "app.services.interview_engine.decide_next_action",
+            return_value={"action": "follow_up", "question": "Tell me more?", "coaching": None},
+        ):
+            bridge._handle_transcript(
+                ws,
+                {
+                    "type": "conversation.item.input_audio_transcription.completed",
+                    "transcript": "We mostly use spreadsheets for everything.",
+                },
+            )
+        creates = [e["response"] for e in ws.sent if e["type"] == "response.create"]
+        assert len(creates) == 2  # ack + question
+        for r in creates:
+            assert r["input"] == [], "a spoken line must never see the conversation"
+            # response.instructions replace the session ones: the persona
+            # and language have to travel with every line.
+            assert "verbatim" in r["instructions"].lower()
+        ack, question = creates
+        assert ack["metadata"] == {"kind": "ack"}
+        assert ack["instructions"].endswith(rt._ack_line("en", 0))
+        assert question["instructions"].endswith("Tell me more?")
+        assert "metadata" not in question  # untagged = captioned as the question
+
+    def test_repeat_request_and_opening_are_isolated_too(self, db_session, bridge_sessions):
+        _, participant = _seed(db_session, "tok-isolated2", turns=1)
+        bridge = rt.SidebandBridge("rtc_isolated2", participant.id, 20)
+        ws = _FakeWs()
+        bridge._speak(ws, rt._repeat_line("fr"))
+        assert ws.sent[-1]["response"]["input"] == []
+        assert ws.sent[-1]["response"]["instructions"].endswith(rt._repeat_line("fr"))
+
+    def test_backchannel_is_isolated(self, db_session, bridge_sessions, monkeypatch):
+        _quiet(monkeypatch, silence=0.5, backchannel=True, backchannel_after=0.1)
+        _, participant = _seed(db_session, "tok-mmhm2", turns=1)
+        bridge = rt.SidebandBridge("rtc_mmhm2", participant.id, 20)
+        ws = _FakeWs()
+        bridge._collect_answer(ws, "I mostly use it for slides")
+        fillers = [e["response"] for e in ws.sent if e["type"] == "response.create"]
+        assert len(fillers) == 1
+        assert fillers[0]["input"] == []
+        assert fillers[0]["metadata"] == {"kind": "backchannel"}
+
+    def test_ack_lines_are_neutral_rotate_and_never_count_as_answers(self, db_session, bridge_sessions, monkeypatch):
+        for lang, lines in rt._ACK_LINES.items():
+            # Should the speaker leak an ack back into the mic, the
+            # hesitation gate must hold it rather than feed it to Claude.
+            for line in lines:
+                assert rt._is_hesitation_only(line, lang), (lang, line)
+            assert {rt._ack_line(lang, i) for i in range(len(lines))} == set(lines)
+        # The bridge rotates through them turn after turn.
+        _quiet(monkeypatch)
+        _, participant = _seed(db_session, "tok-ackrot", turns=1)
+        bridge = rt.SidebandBridge("rtc_ackrot", participant.id, 20)
+        heard = []
+        with patch(
+            "app.services.interview_engine.decide_next_action",
+            return_value={"action": "follow_up", "question": "And then?", "coaching": None},
+        ):
+            for i in range(3):
+                bridge.awaiting_answer = True
+                ws = _FakeWs()
+                bridge._handle_transcript(
+                    ws,
+                    {
+                        "type": "conversation.item.input_audio_transcription.completed",
+                        "transcript": f"Then we checked the numbers again, round {i}.",
+                    },
+                )
+                ack = next(e["response"] for e in ws.sent if e["type"] == "response.create")
+                heard.append(ack["instructions"].rsplit("\n", 1)[-1])
+        assert heard == list(rt._ACK_LINES["en"])
+
+    def test_echo_guard_matches_what_was_actually_spoken(self, db_session, bridge_sessions):
+        """The model's own output transcript is the ground truth of what
+        the speaker played, acks included."""
+        _, participant = _seed(db_session, "tok-echo-actual", turns=1)
+        bridge = rt.SidebandBridge("rtc_echo_actual", participant.id, 20)
+        bridge.last_spoken = "Comment ça se passe concrètement, la dernière fois ?"
+        bridge._note_event(
+            {"type": "response.output_audio_transcript.done",
+             "transcript": "Vous jouez le rôle du chef d'orchestre qui coordonne et valide le travail des agents."}
+        )
+        bridge.response_active = True
+        assert bridge._is_echo("vous jouez le rôle du chef d'orchestre qui coordonne et valide") is True
+        assert bridge._is_echo("Comment ça se passe concrètement la dernière fois") is True
+        assert bridge._is_echo("En fait je délègue tout à mon équipe depuis janvier") is False
+        # Only the last few outputs are remembered.
+        for i in range(5):
+            bridge._note_event({"type": "response.output_audio_transcript.done", "transcript": f"line {i} spoken aloud"})
+        assert len(bridge.recent_outputs) == 3

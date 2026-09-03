@@ -911,8 +911,20 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
   answers earn `SHORT_ANSWER_EXTRA_WAIT` more. Midway (1.5s) a soft
   out-of-band backchannel ("Mm-hm.", `metadata.kind="backchannel"`) says
   we're listening; the client neither captions it nor mutes the mic for it,
-  so the participant can talk through it. The ack is tagged
-  `metadata.kind="ack"` (muted, never captioned). Hesitation-only bursts
+  so the participant can talk through it. The ack is a fixed neutral word
+  per language (`_ACK_LINES`, rotated per turn; every one is also in the
+  hesitation sets so a leaked ack never becomes an answer), tagged
+  `metadata.kind="ack"` (muted, never captioned). **Every spoken response
+  is isolated (`input: []`)**: given the running conversation as context,
+  gpt-realtime stopped reading Claude's line verbatim once the call had
+  some history and started answering the participant itself (validating
+  paraphrases, "Exactement, vous jouez le rôle du chef d'orchestre..."),
+  and the free-form ack grew into a whole improvised follow-up the
+  participant heard but never saw captioned: the "every question asked
+  twice, interviewer keeps agreeing" bug. With no context the line comes
+  out verbatim (probed 8/8 against the live API). The echo guard matches
+  against the planned line AND the model's own output transcripts
+  (`recent_outputs`). Hesitation-only bursts
   hold the turn open silently; an explicit answer gate (`awaiting_answer`)
   drops any transcript that arrives while no question is pending, so an
   answer's tail can never become a phantom reply that triggers a second,
