@@ -1030,3 +1030,49 @@ class TestVerbatimIsolation:
         for i in range(5):
             bridge._note_event({"type": "response.output_audio_transcript.done", "transcript": f"line {i} spoken aloud"})
         assert len(bridge.recent_outputs) == 3
+
+
+class TestClipBackfill:
+    def test_backfill_slices_every_stored_segment_of_a_named_participant(self, db_session, bridge_sessions):
+        """Interviews recorded before incremental slicing: walk their stored
+        segments, run the slicer on each with the completed flag, skip
+        participants that already have every clip."""
+        from app.models.interview import RealtimeRecordingSegment
+        from scripts import backfill_realtime_clips as bf
+
+        _, participant = _seed(db_session, "tok-backfill", turns=3)
+        participant.display_name = "Joe"
+        turns = {t.turn_index: t for t in participant.turns}
+        # Turn 0 answered in the first connection, turn 1 in the resumed one.
+        for idx, seg in ((0, "segA"), (1, "segB")):
+            turns[idx].response_transcript = f"answer {idx}"
+            turns[idx].audio_segment_key = seg
+            turns[idx].answer_offset_seconds = 3.0
+            turns[idx].answer_end_seconds = 9.0
+        db_session.add(RealtimeRecordingSegment(participant_id=participant.id, segment_key="segA", url="/audio/recordings/p/session-a.mp3"))
+        db_session.add(RealtimeRecordingSegment(participant_id=participant.id, segment_key="segB", url="/audio/recordings/p/session-b.mp4"))
+        db_session.commit()
+
+        calls = []
+
+        def fake_slice(pid, data, segment_key, ext=".mp3", *, completed=False):
+            calls.append((data, segment_key, ext, completed))
+            return 1
+
+        with patch("app.services.realtime_slices.slice_turn_clips", side_effect=fake_slice), \
+             patch("app.services.storage.download_audio", side_effect=lambda key: key.encode()):
+            # Name lookup is case-insensitive; dry run touches nothing.
+            dry = bf.run(db_session, name="joe", dry_run=True)
+            assert dry["participants"] == 1 and dry["segments"] == 2 and calls == []
+            summary = bf.run(db_session, name="joe")
+        assert summary["sliced"] == 2 and summary["failed"] == 0
+        assert calls == [
+            (b"recordings/p/session-a.mp3", "segA", ".mp3", True),
+            (b"recordings/p/session-b.mp4", "segB", ".mp4", True),
+        ]
+        # Nobody else matches, and a participant with no missing clips is skipped.
+        assert bf.run(db_session, name="nobody")["participants"] == 0
+        for t in (turns[0], turns[1]):
+            t.audio_recording_url = "/audio/x.mp3"
+        db_session.commit()
+        assert bf.run(db_session, participant_id=participant.id)["participants"] == 0
