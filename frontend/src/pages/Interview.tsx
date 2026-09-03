@@ -42,6 +42,12 @@ import ParticipantQuestionnaire, { QuestionnaireResult } from "../components/Par
 import PanelEnrichment from "../components/PanelEnrichment";
 import { SUPPORTED_LANGUAGES } from "../i18n";
 import { applyParticipantBranding } from "../utils/branding";
+import {
+  getInterviewLangPick,
+  getPersistedInterviewLang,
+  normaliseInterviewLang,
+  setInterviewLangPick,
+} from "../utils/interviewLanguage";
 import { detectInAppBrowser, androidChromeIntentUrl } from "../utils/inAppBrowser";
 import { useHead } from "../hooks/useHead";
 
@@ -420,10 +426,15 @@ export default function Interview() {
     // re-asked, and one who declined last time IS asked (see the reprompt).
     if (meta.panel_consent) setPanelConsentGiven(true);
     if (meta.first_name) setProfile((p) => ({ ...p, firstName: meta.first_name as string }));
-    const ml = (meta.preferred_language || "").slice(0, 2);
-    if (ml && (SUPPORTED_LANGUAGES as readonly string[]).includes(ml)) {
-      localStorage.setItem("qp_interview_lang", ml);
-      i18n.changeLanguage(ml);
+    // The language remembered on their panel profile is a default, not a
+    // decision: if they picked one for this visit (picker, or the `?lang` the
+    // magic link carried over from that pick), that wins. Otherwise a
+    // returning EN panelist selecting Français would be dragged back to
+    // English right after verifying, and the AI would interview in English.
+    const ml = normaliseInterviewLang(meta.preferred_language);
+    if (ml && !getInterviewLangPick()) {
+      setInterviewLangPick(ml);
+      if (i18n.language?.slice(0, 2) !== ml) i18n.changeLanguage(ml);
     }
   }
 
@@ -436,7 +447,7 @@ export default function Interview() {
       JSON.stringify({
         profile_complete: res.profile_complete,
         first_name: res.first_name,
-        preferred_language: res.preferred_language,
+        preferred_language: getInterviewLangPick() || res.preferred_language,
       })
     );
     setEmail(res.email);
@@ -562,7 +573,7 @@ export default function Interview() {
     // Best-guess language we already know before the round-trip (explicit pick
     // or browser) so the study name comes back localized on the first fetch.
     const supported = SUPPORTED_LANGUAGES as readonly string[];
-    const manual = localStorage.getItem("qp_interview_lang") || "";
+    const manual = getInterviewLangPick() || getPersistedInterviewLang() || "";
     const browser = (i18n.language || "en").slice(0, 2);
     const guess = supported.includes(manual) ? manual : supported.includes(browser) ? browser : "";
     getInterviewInfo(token, guess || undefined)
@@ -632,9 +643,8 @@ export default function Interview() {
   // so a mid-interview remount re-resolves to the same language.
   const lockInterviewLanguage = useCallback(
     (lang?: string | null) => {
-      const code = (lang || "").slice(0, 2);
-      if (!code || !(SUPPORTED_LANGUAGES as readonly string[]).includes(code)) return;
-      localStorage.setItem("qp_interview_lang", code);
+      const code = setInterviewLangPick(lang);
+      if (!code) return;
       if (i18n.language?.slice(0, 2) !== code) i18n.changeLanguage(code);
       // Refetch study info in the locked language so participant-facing copy
       // (the study name on the completion screen, etc.) is localized too.
