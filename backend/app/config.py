@@ -55,7 +55,14 @@ class Settings(BaseSettings):
     # audio is truncated (audible as crackling) far less often. server_vad
     # remains available as a plain silence-timer fallback.
     REALTIME_VAD_TYPE: str = "semantic_vad"  # semantic_vad | server_vad
-    REALTIME_VAD_EAGERNESS: str = "low"  # semantic_vad: low | medium | high | auto
+    # Eagerness sets how long semantic VAD holds the turn open after speech
+    # goes quiet before it fires speech_stopped. That hold sits UNDER the
+    # sideband's own answer-silence window below, so the two stacked up:
+    # "low" was chosen before the sideband had any patience of its own and
+    # cost 1-3s of dead air per turn on top of it. "medium" lets the VAD
+    # report the end of speech promptly and leaves the burst patience to
+    # REALTIME_ANSWER_SILENCE_SECONDS, which is measured from that event.
+    REALTIME_VAD_EAGERNESS: str = "medium"  # semantic_vad: low | medium | high | auto
     REALTIME_VAD_SILENCE_MS: int = 1000  # server_vad only
     # Input noise reduction runs BEFORE VAD, so room noise and speaker bleed
     # are less likely to be committed as participant speech. far_field suits
@@ -72,7 +79,9 @@ class Settings(BaseSettings):
     # since their last words, not "a transcript arrived". Every tenth of a
     # second is dead air on every turn, but cutting people off mid-thought
     # is the #1 complaint from live sessions; a human interviewer waits.
-    REALTIME_ANSWER_SILENCE_SECONDS: float = 3.5
+    # 3.0s (was 3.5) with the VAD at medium eagerness: the backchannel at
+    # 1.5s already tells a participant mid-think that the floor is theirs.
+    REALTIME_ANSWER_SILENCE_SECONDS: float = 3.0
     # Midway through that wait, a soft listening sound ("Mm-hm.") tells the
     # participant we are still with them, the way an interviewer nods rather
     # than jumping in. Once per answer; never during their speech.

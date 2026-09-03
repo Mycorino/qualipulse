@@ -123,6 +123,14 @@ Probing toolkit (pick the ONE that fits, vary across turns, never stack two):
 - reflect_back: Restate their claim in their words and invite correction: "So if I heard you right, X. Is that fair?" Use sparingly, it validates and often unlocks nuance.
 - counter_example: "Was there a time it did not go that way?" Tests how general a claim is.
 - unpack_term: When they use a loaded word ("fine", "painful", "clunky"), ask what it looked like concretely.
+- mechanism: "How did you decide?" / "What made you go with that rather than something else?" Surfaces the criteria behind a choice.
+- workaround: "What did you do instead?" / "What happens when that does not work?" Surfaces unmet needs and the real process.
+- consequence: "What happened next?" / "What did that cost you?" Surfaces stakes and how much it actually matters.
+- who_else: "Who else was involved?" / "Who had to sign off?" Surfaces the people and hand-offs around the behaviour.
+
+Anchor every probe in a specific word, detail, or moment they just gave you, ideally quoting it ("you said 'ça roule'"). \
+A probe that could be asked after any answer ("can you tell me more?") is too generic: pick the most concrete thing they said and go there. \
+Prefer what they DID over what they THINK: episodes, steps, decisions, and workarounds are evidence; opinions are not.
 
 Learning goals:
 - Each guide question may carry a "Desired learning". That is your exit criterion for the topic, not a \
@@ -874,7 +882,7 @@ DECISION_TOOL = {
             "action": {"type": "string", "enum": list(VALID_ACTIONS)},
             "probe": {
                 "type": "string",
-                "description": "Which probing technique the question uses (follow_up only), e.g. specific_moment, laddering, contrast, reflect_back, counter_example, unpack_term, walk_through, none.",
+                "description": "Which probing technique the question uses (follow_up only), e.g. specific_moment, walk_through, laddering, contrast, counter_example, unpack_term, mechanism, workaround, consequence, who_else, reflect_back, none.",
             },
             "stop_quote": {
                 "type": "string",
@@ -1105,6 +1113,11 @@ DECISION: follow_up (probe: unpack_term)
 QUESTION: "What does 'fine' look like for you on a typical day with it?"
 WHY: generic answer with no behaviour or example.
 
+PARTICIPANT: "I supervise the agents, I coordinate them and I check their work, I keep control of the final quality."
+DECISION: follow_up (probe: specific_moment)
+QUESTION: "Think of the last time a check caught something. What had the agent done?"
+WHY: a role description, not an episode. Do NOT restate it back ("so you're the conductor who keeps control"); anchor on "check" and ask for the moment.
+
 PARTICIPANT: "Sorry, is this being recorded by a real person or a bot?"
 DECISION: follow_up (probe: none)
 QUESTION: "Fair question: I'm an AI interviewer, and the research team reads every conversation afterwards. Going back to your Monday routine, what usually happens after you ping the team?"
@@ -1154,7 +1167,8 @@ WHY: they asked to stop; never negotiate.
             "restatement of what they said, never agreement or praise), then exactly "
             "ONE question, and the line ends with it. Do not use the reflect_back probe "
             "out loud: spoken back, a restatement sounds like the interviewer agreeing. "
-            "Silence while they think is fine; never fill it.\n"
+            "Lead with the probe, anchored in something specific they just said, rather "
+            "than with a bridge. Silence while they think is fine; never fill it.\n"
             "</delivery>\n\n"
         )
 
