@@ -70,9 +70,14 @@ steps:
       # 1Gi: concurrent ffmpeg transcodes + audio blobs in /tmp (tmpfs counts
       # against the memory limit) were OOM territory at 512Mi.
       - --memory=1Gi
-      # min 1: the cold boot (alembic + seeds + Neon resume) took 15-40s and
-      # hit whichever user arrived first after an idle period.
-      - --min-instances=1
+      # min 0 while pre-launch: --no-cpu-throttling below puts this service on
+      # instance-based billing (which has no free tier), so a pinned instance
+      # bills a full vCPU + 1GiB every second of the month whether or not
+      # anyone shows up. That was ~EUR 45/mo against ~1k requests/day, i.e.
+      # essentially the entire GCP bill. Scale-to-zero trades that for the
+      # 15-40s cold boot (alembic + seeds + Neon resume) on the first request
+      # after an idle period. Set this back to 1 before real traffic arrives.
+      - --min-instances=0
       - --max-instances=15
       - --timeout=300s
       # concurrency must reflect real capacity or the autoscaler never fires:
