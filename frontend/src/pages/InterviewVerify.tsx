@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { verifyInterviewToken } from "../api/interviews";
-import { SUPPORTED_LANGUAGES } from "../i18n";
+import { normaliseInterviewLang, setInterviewLangPick } from "../utils/interviewLanguage";
 
 export default function InterviewVerify() {
   const { t, i18n } = useTranslation("shell");
@@ -14,10 +14,10 @@ export default function InterviewVerify() {
   // immediately — before redirecting to /i — so the pre-interview screens
   // (email/consent/questionnaire/screening) render natively even in a fresh
   // webview that never saw the original tab's language pick.
-  const urlLang = (new URLSearchParams(window.location.search).get("lang") || "").slice(0, 2);
+  const urlLang = normaliseInterviewLang(new URLSearchParams(window.location.search).get("lang"));
   useEffect(() => {
-    if (urlLang && (SUPPORTED_LANGUAGES as readonly string[]).includes(urlLang)) {
-      localStorage.setItem("qp_interview_lang", urlLang);
+    if (urlLang) {
+      setInterviewLangPick(urlLang);
       if (i18n.language?.slice(0, 2) !== urlLang) i18n.changeLanguage(urlLang);
     }
   }, [urlLang, i18n]);
@@ -30,10 +30,12 @@ export default function InterviewVerify() {
         sessionStorage.setItem(`interview_session_${link_token}`, session_token);
         // Stash returning-participant meta so Interview.tsx can skip the
         // profiling questionnaire and restore the participant's language.
-        // The URL lang is the fallback when the panel profile has none yet.
+        // The URL lang is the language they chose for THIS interview, so it
+        // outranks whatever their panel profile remembers; the profile value
+        // only fills in when the link carried no choice.
         sessionStorage.setItem(
           `interview_profile_meta_${link_token}`,
-          JSON.stringify({ profile_complete, first_name, preferred_language: preferred_language || urlLang || null })
+          JSON.stringify({ profile_complete, first_name, preferred_language: urlLang || preferred_language || null })
         );
         navigate(`/i/${link_token}`, { replace: true });
       })
