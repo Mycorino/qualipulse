@@ -902,6 +902,24 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
   questionnaire screens are shared). Captions + speaking state come from the
   WebRTC data channel; progress + completion from polling `GET .../status`
   (which now also returns `question_index` / `is_follow_up`).
+- **Turn-taking (patience):** semantic VAD commits at every sentence
+  boundary, but people narrate in bursts with 2-5s thinks between them. The
+  sideband therefore treats an answer as finished only after
+  `REALTIME_ANSWER_SILENCE_SECONDS` (3.5s) of quiet measured from the
+  participant's last `speech_stopped` (never from a transcript's arrival),
+  with every committed burst transcribed (`_pending_transcripts`); short
+  answers earn `SHORT_ANSWER_EXTRA_WAIT` more. Midway (1.5s) a soft
+  out-of-band backchannel ("Mm-hm.", `metadata.kind="backchannel"`) says
+  we're listening; the client neither captions it nor mutes the mic for it,
+  so the participant can talk through it. The ack is tagged
+  `metadata.kind="ack"` (muted, never captioned). Hesitation-only bursts
+  hold the turn open silently; an explicit answer gate (`awaiting_answer`)
+  drops any transcript that arrives while no question is pending, so an
+  answer's tail can never become a phantom reply that triggers a second,
+  rephrased question. Live turns call the engine with `spoken_live=True`,
+  which adds a `<delivery>` block asking for sub-25-word spoken lines. The
+  pacing clock is shared with classic and discounts gaps between turns
+  beyond `MAX_TURN_GAP_MINUTES` (5), so a pause never burns the budget.
 - **Cost/guardrails:** every `response.done` logs an `AIUsageLog` row
   (`operation="realtime_interview"`, audio+text token rates, cache-aware
   estimate), which keeps `INTERVIEW_DAILY_COST_LIMIT_USD` effective. A

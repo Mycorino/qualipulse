@@ -106,6 +106,9 @@ export default function RealtimeInterview({
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const captionRef = useRef("");
   const captionOpenRef = useRef(false);
+  // Which filler response (if any) is in flight: "ack" | "backchannel".
+  // Fillers are never captioned; a backchannel also never mutes the mic.
+  const sideKindRef = useRef<"ack" | "backchannel" | null>(null);
   const finishedRef = useRef(false);
   const dcRef = useRef<RTCDataChannel | null>(null);
   // turn_detection config from the SDP exchange, needed to re-arm VAD after
@@ -337,11 +340,23 @@ export default function RealtimeInterview({
   }, [onComplete, participantId, teardown, token]);
 
   const handleDataChannelEvent = useCallback((raw: string) => {
-    let event: { type?: string; delta?: string } | null = null;
+    let event: {
+      type?: string;
+      delta?: string;
+      response?: { metadata?: { kind?: string } | null } | null;
+    } | null = null;
     try { event = JSON.parse(raw); } catch { return; }
     if (!event || typeof event.type !== "string") return;
     switch (event.type) {
-      case "response.created":
+      case "response.created": {
+        // The sideband tags its filler responses: "ack" (spoken after an
+        // answer, muted like a question but never captioned) and
+        // "backchannel" (a soft "mm-hm" while the participant thinks: not
+        // captioned AND the mic stays live, because the whole point is
+        // that they can keep talking through it). Untagged = a question.
+        const kind = event.response?.metadata?.kind ?? "question";
+        sideKindRef.current = kind === "ack" || kind === "backchannel" ? kind : null;
+        if (kind === "backchannel") break;
         speakingRef.current = true;
         if (micRearmTimerRef.current) {
           window.clearTimeout(micRearmTimerRef.current);
@@ -350,7 +365,9 @@ export default function RealtimeInterview({
         setMicLive(false);
         setVoiceState("speaking");
         break;
+      }
       case "response.output_audio_transcript.delta":
+        if (sideKindRef.current) break;
         if (typeof event.delta === "string") {
           if (!captionOpenRef.current) captionRef.current = "";
           captionOpenRef.current = true;
@@ -361,6 +378,10 @@ export default function RealtimeInterview({
         break;
       case "response.done":
         captionOpenRef.current = false;
+        if (sideKindRef.current === "backchannel") {
+          sideKindRef.current = null;
+          break;
+        }
         // Generation is done but the speaker is still playing the buffered
         // tail; the real re-arm happens on output_audio_buffer.stopped.
         // This long timer only covers that event never arriving.
@@ -374,11 +395,17 @@ export default function RealtimeInterview({
         }
         break;
       case "output_audio_buffer.started":
+        if (sideKindRef.current === "backchannel") break;
         speakingRef.current = true;
         setMicLive(false);
         break;
       case "output_audio_buffer.stopped":
       case "output_audio_buffer.cleared":
+        if (sideKindRef.current === "backchannel") {
+          sideKindRef.current = null;
+          break;
+        }
+        sideKindRef.current = null;
         // Playback has actually left the speaker: now it is safe to listen.
         speakingRef.current = false;
         setVoiceState("idle");

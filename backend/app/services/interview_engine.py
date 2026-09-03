@@ -975,6 +975,7 @@ def decide_next_action(
     current_learning_goal: str | None = None,
     section_change_hint: str | None = None,
     stimulus=None,
+    spoken_live: bool = False,
 ) -> dict:
     """Call Claude to decide the next interview action.
 
@@ -1137,6 +1138,19 @@ WHY: they asked to stop; never negotiate.
         f"- Close gate: {'OPEN, you may close' if (can_close and not after_final_check) else close_instruction}\n"
         f"</state>\n\n"
     )
+    if spoken_live:
+        # Realtime beta: the line is spoken aloud in a live conversation, not
+        # read on a screen. Written-style questions (a full restatement of
+        # the answer, then a two-clause question) sound chatty out loud and
+        # were the participant's top complaint after cut-offs.
+        user_message += (
+            "<delivery>\n"
+            "LIVE VOICE: your line is spoken aloud, in real time, not read. "
+            "Keep it under 25 words: at most a six-word acknowledgment (never a "
+            "restatement of what they said), then exactly ONE question. Silence "
+            "while they think is fine; never fill it.\n"
+            "</delivery>\n\n"
+        )
 
     if short_answer_state and short_answer_state.get("is_short_run") and pace_delta >= -0.5 and not forced_action:
         run = short_answer_state.get("run_length", 0)
@@ -2005,6 +2019,7 @@ def process_interview_turn(
     transcript_override: str | None = None,
     audio_bytes: bytes | None = None,
     audio_url_future=None,
+    spoken_live: bool = False,
 ) -> dict:
     """Process a participant's answer and generate the next question.
 
@@ -2223,6 +2238,7 @@ def process_interview_turn(
         # What is on screen for the question they just answered, so the
         # follow-up can be about the artefact and not about the abstraction.
         stimulus=stimulus_for_question_index(_proj, cur_q),
+        spoken_live=spoken_live,
     )
 
     def _fallback():

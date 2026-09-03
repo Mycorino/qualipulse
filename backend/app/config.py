@@ -66,6 +66,18 @@ class Settings(BaseSettings):
     # spoken the moment the participant's answer commits, so the 2-4s the
     # Claude decision takes doesn't read as dead air.
     REALTIME_ACK_ENABLED: bool = True
+    # End-of-answer patience. People narrate in bursts (a sentence, a 2-5s
+    # think, the next sentence) and semantic VAD commits at every sentence
+    # boundary, so "the participant is done" must mean this much silence
+    # since their last words, not "a transcript arrived". Every tenth of a
+    # second is dead air on every turn, but cutting people off mid-thought
+    # is the #1 complaint from live sessions; a human interviewer waits.
+    REALTIME_ANSWER_SILENCE_SECONDS: float = 3.5
+    # Midway through that wait, a soft listening sound ("Mm-hm.") tells the
+    # participant we are still with them, the way an interviewer nods rather
+    # than jumping in. Once per answer; never during their speech.
+    REALTIME_BACKCHANNEL_ENABLED: bool = True
+    REALTIME_BACKCHANNEL_AFTER_SECONDS: float = 1.5
     # Let the participant's voice cut the interviewer off mid-sentence. Off:
     # speakers leak into the microphone, so with barge-in on, the interviewer
     # interrupts ITSELF a few words into every question. Questions are short
