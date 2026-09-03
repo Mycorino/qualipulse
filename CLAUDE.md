@@ -877,14 +877,19 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
   completion (below).
 - **Audio:** the Realtime API never returns raw audio, so the client records
   the whole session in parallel (mic + assistant track mixed via WebAudio →
-  MediaRecorder) and uploads it incrementally to
+  MediaRecorder at 48 kbps, speech-grade) and uploads it incrementally to
   `POST /interview/{token}/{pid}/realtime/recording?segment=...`. Each
   browser connection is its own **recording segment**
   (`realtime_recording_segments`, key minted at the SDP exchange via the
   `X-Realtime-Segment` header): a resumed session or second tab records as
   its own "Part N" and can never overwrite or delete another connection's
   audio (Alembic 0078). Transcoded to mp3, R2/local; covered by GDPR
-  deletion and the audio-retention purge.
+  deletion and the audio-retention purge. **Every upload re-sends the whole
+  recording so far and Cloud Run rejects requests over 32 MB at the edge**
+  (never reaching the app or its logs): at the browser-default bitrate a
+  25-minute session hit that wall and lost its last eight minutes, hence
+  the 48 kbps cap (~22 MB/hour) and the adaptive upload cadence (45s to
+  180s, scaled by how long the previous upload took).
 - **Researcher parity (`services/realtime_slices.py`):** the sideband stamps
   each turn with `audio_segment_key` + `audio_offset_seconds` (question
   start) and `answer_offset_seconds`/`answer_end_seconds` (the answer's

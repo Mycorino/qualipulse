@@ -44,6 +44,22 @@ const RECORDER_MIME_CANDIDATES = [
   "audio/mp4",
   "audio/ogg;codecs=opus",
 ];
+// Speech-grade bitrate for the session recording. Left to the browser's
+// default (iOS Safari: ~170 kbps) a 25-minute interview reached 32 MB, which
+// is Cloud Run's hard request-size limit: every later upload was rejected
+// at the edge and the last eight minutes of a 32-minute interview were
+// lost. 48 kbps mono keeps an hour under ~22 MB and is transparent for
+// voice; Whisper and the per-turn clip slicer are unaffected.
+const RECORDER_BITS_PER_SECOND = 48_000;
+// Upload cadence. Every upload re-sends the whole recording so far, so the
+// cost grows with the session: a 30 MB file took 52 s to upload against a
+// 45 s timer, back to back. The next upload waits a multiple of how long
+// the last one took, within these bounds, so a long session uploads less
+// often rather than continuously (the tab-hide flush and the completion
+// upload still catch the tail).
+const UPLOAD_MIN_INTERVAL_MS = 45_000;
+const UPLOAD_MAX_INTERVAL_MS = 180_000;
+const UPLOAD_BACKOFF_FACTOR = 3;
 
 // How long we keep waiting for the goodbye line to finish playing after the
 // backend marks the interview completed, before wrapping up anyway.
@@ -118,6 +134,8 @@ export default function RealtimeInterview({
   const turnDetectionRef = useRef<unknown | null>(null);
   const uploadBusyRef = useRef(false);
   const uploadedBytesRef = useRef(0);
+  // Earliest time the periodic upload may run again (adaptive backoff).
+  const nextUploadAtRef = useRef(0);
   const speakingRef = useRef(false);
   const setupSeqRef = useRef(0);
   const micPausedRef = useRef(false);
@@ -265,7 +283,10 @@ export default function RealtimeInterview({
       ctx.createMediaStreamSource(mic).connect(dest);
       ctx.createMediaStreamSource(remote).connect(dest);
       const mime = RECORDER_MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m));
-      const recorder = new MediaRecorder(dest.stream, mime ? { mimeType: mime } : undefined);
+      const recorder = new MediaRecorder(dest.stream, {
+        ...(mime ? { mimeType: mime } : {}),
+        audioBitsPerSecond: RECORDER_BITS_PER_SECOND,
+      });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
@@ -287,6 +308,7 @@ export default function RealtimeInterview({
     const blob = new Blob(chunksRef.current, { type: chunksRef.current[0].type || "audio/webm" });
     if (blob.size < 500 || blob.size <= uploadedBytesRef.current) return;
     uploadBusyRef.current = true;
+    const startedAt = Date.now();
     try {
       await uploadSessionRecording(token, participantId, blob, segmentIdRef.current);
       uploadedBytesRef.current = blob.size;
@@ -294,13 +316,17 @@ export default function RealtimeInterview({
       // Next tick retries with a bigger blob.
     } finally {
       uploadBusyRef.current = false;
+      const took = Date.now() - startedAt;
+      nextUploadAtRef.current =
+        Date.now() +
+        Math.min(UPLOAD_MAX_INTERVAL_MS, Math.max(UPLOAD_MIN_INTERVAL_MS, took * UPLOAD_BACKOFF_FACTOR));
     }
   }, [participantId, token]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (!finishedRef.current) void uploadPartial();
-    }, 45_000);
+      if (!finishedRef.current && Date.now() >= nextUploadAtRef.current) void uploadPartial();
+    }, UPLOAD_MIN_INTERVAL_MS);
     const onHide = () => { if (!finishedRef.current) void uploadPartial(); };
     window.addEventListener("pagehide", onHide);
     document.addEventListener("visibilitychange", onHide);
