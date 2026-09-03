@@ -888,15 +888,20 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
 - **Researcher parity (`services/realtime_slices.py`):** the sideband stamps
   each turn with `audio_segment_key` + `audio_offset_seconds` (question
   start) and `answer_offset_seconds`/`answer_end_seconds` (the answer's
-  span, from speech events; Alembic 0077/0079). When a completed
-  interview's recording is uploaded, a daemon thread cuts each answer span
-  into a per-turn mp3 clip (ffmpeg, ±0.75s pad) and runs Whisper over it —
+  span, from speech events; Alembic 0077/0079). On **every** recording
+  upload (~45s, tab-hide, completion) a daemon thread cuts each answer span
+  that is fully inside the uploaded audio (ffprobe duration, 0.5s end
+  margin; the completed upload cuts everything left) into a per-turn mp3
+  clip (ffmpeg on a temp file, ±0.75s pad) and runs Whisper over it,
   filling `audio_recording_url` + `response_segments` exactly like classic,
   so the Responses view (per-turn players, sentence highlight/seek) is
-  identical for both transports. `response_transcript` stays the live
-  transcriber's text (the record of what the engine responded to).
-  Idempotent per turn; ~$0.05–0.10 Whisper cost per interview, logged as
-  `stt` usage.
+  identical for both transports and lights up while the interview is still
+  running. (Slicing only at completion meant every abandoned or cut-short
+  live session, i.e. every test session, never got a single clip.)
+  `response_transcript` stays the live transcriber's text (the record of
+  what the engine responded to). Idempotent per turn, serialised per
+  participant; ~$0.05–0.10 Whisper cost per interview, logged as `stt`
+  usage.
 - **Client:** `components/RealtimeInterview.tsx`, branched from
   `Interview.tsx` for the whole interview phase (mic test and completion /
   questionnaire screens are shared). Captions + speaking state come from the

@@ -993,12 +993,14 @@ def store_session_recording(
             delete_audio_by_url(previous)
         except Exception:
             logger.warning("could not delete superseded session recording %s", previous)
-    if participant.status == "completed":
-        # The interview is done and this upload holds the full segment:
-        # cut per-turn answer clips + Whisper segments so the researcher
-        # view matches classic. Idempotent per turn; a later, longer
-        # upload retries any turn still missing its clip.
-        from app.services.realtime_slices import spawn_turn_slicer
+    # Cut per-turn answer clips + Whisper segments from what has been
+    # uploaded so far, so the researcher view matches classic while the
+    # interview is still running (and for sessions that never reach the
+    # closing line). Idempotent per turn; each upload cuts the answers now
+    # fully inside the file, the completed upload cuts everything left.
+    from app.services.realtime_slices import spawn_turn_slicer
 
-        spawn_turn_slicer(participant.id, data, segment_key)
+    spawn_turn_slicer(
+        participant.id, data, segment_key, ext, completed=participant.status == "completed"
+    )
     return url

@@ -758,7 +758,7 @@ class TestBridgeTurns:
         turn1 = next(t for t in participant.turns if t.turn_index == 1)
         assert turn1.answer_offset_seconds is None
 
-    def test_completed_upload_slices_turn_clips_and_whisper_segments(self, db_session, bridge_sessions):
+    def test_upload_slices_turn_clips_and_whisper_segments(self, db_session, bridge_sessions):
         """Parity with classic: once sliced, the turn carries the same
         audio_recording_url + response_segments fields the classic
         Responses view renders — per-turn player and sentence highlighting
@@ -766,7 +766,6 @@ class TestBridgeTurns:
         from app.services import realtime_slices as rs
 
         _, participant = _seed(db_session, "tok-slice", turns=2)
-        participant.status = "completed"
         answered = next(t for t in participant.turns if t.turn_index == 0)
         answered.response_transcript = "we mostly watch Netflix"
         answered.audio_segment_key = "seg1"
@@ -775,7 +774,8 @@ class TestBridgeTurns:
         db_session.commit()
 
         segments = [{"start": 0.0, "end": 3.1, "text": "we mostly watch Netflix", "no_speech_prob": 0.01}]
-        with patch.object(rs, "_slice_mp3", return_value=b"c" * 2000) as slicer, \
+        with patch.object(rs, "_probe_duration", return_value=60.0), \
+             patch.object(rs, "_slice_clip", return_value=b"c" * 2000) as slicer, \
              patch("app.services.storage.upload_audio", return_value="/audio/recordings/x/turn-0.mp3"), \
              patch("app.services.stt.transcribe_audio", return_value=("we mostly watch Netflix", 22.5, segments)):
             assert rs.slice_turn_clips(participant.id, b"mp3" * 1000, "seg1") == 1
@@ -794,24 +794,66 @@ class TestBridgeTurns:
         # The live transcript stays the record.
         assert answered.response_transcript == "we mostly watch Netflix"
 
-    def test_recording_upload_triggers_slicing_once_completed(self, client, db_session):
+    def test_in_progress_upload_cuts_only_answers_inside_the_audio(self, db_session, bridge_sessions):
+        """Clips appear while the interview runs: each ~45s upload cuts the
+        answers now fully inside the file, and an answer that ended too
+        close to (or past) the end of the upload waits for the next one.
+        A session that never reaches its closing line still gets clips."""
+        from app.services import realtime_slices as rs
+
+        _, participant = _seed(db_session, "tok-slice-live", turns=3)
+        turns = {t.turn_index: t for t in participant.turns}
+        for idx, (start, end) in {0: (5.0, 20.0), 1: (30.0, 44.0)}.items():
+            turns[idx].response_transcript = f"answer {idx}"
+            turns[idx].audio_segment_key = "seg1"
+            turns[idx].answer_offset_seconds = start
+            turns[idx].answer_end_seconds = end
+        db_session.commit()
+
+        with patch.object(rs, "_slice_clip", return_value=b"c" * 2000) as slicer, \
+             patch("app.services.storage.upload_audio", side_effect=lambda clip, key: "/audio/" + key), \
+             patch("app.services.stt.transcribe_audio", return_value=("x", 1.0, [])):
+            # 45s uploaded: turn 0 (ends 20.75 padded) is safe, turn 1
+            # (ends 44.75 padded, margin 0.5) is not.
+            with patch.object(rs, "_probe_duration", return_value=45.0):
+                assert rs.slice_turn_clips(participant.id, b"a" * 3000, "seg1", ".mp4") == 1
+            assert slicer.call_count == 1
+            # Next upload, 90s: turn 1 is now inside the audio.
+            with patch.object(rs, "_probe_duration", return_value=90.0):
+                assert rs.slice_turn_clips(participant.id, b"a" * 6000, "seg1", ".mp4") == 1
+            # Unknown duration on an in-progress upload: cut nothing blind.
+            turns[1].audio_recording_url = None
+            db_session.commit()
+            with patch.object(rs, "_probe_duration", return_value=None):
+                assert rs.slice_turn_clips(participant.id, b"a" * 6000, "seg1") == 0
+                # The completed upload cuts everything regardless.
+                assert rs.slice_turn_clips(participant.id, b"a" * 6000, "seg1", completed=True) == 1
+        db_session.expire_all()
+        assert turns[0].audio_recording_url and turns[1].audio_recording_url
+        assert turns[2].audio_recording_url is None  # never answered
+
+    def test_recording_upload_triggers_slicing_on_every_upload(self, client, db_session):
         link, participant = _seed(db_session, "tok-slice-trig")
         spawned = []
         with patch("app.services.storage.upload_audio", return_value="/audio/recordings/x/s.mp3"), \
              patch("app.services.transcode.needs_transcode", return_value=False), \
-             patch("app.services.realtime_slices.spawn_turn_slicer", side_effect=lambda pid, d, seg: spawned.append(seg)):
+             patch(
+                 "app.services.realtime_slices.spawn_turn_slicer",
+                 side_effect=lambda pid, d, seg, ext=".mp3", completed=False: spawned.append((seg, ext, completed)),
+             ):
             client.post(
                 f"/interview/{link.token}/{participant.id}/realtime/recording?segment={'c' * 12}",
-                files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+                files={"audio": ("session.mp4", b"a" * 2048, "audio/mp4")},
             )
-            assert spawned == []  # still in_progress: nothing to slice yet
+            # Still in_progress: sliced incrementally, end margin applied.
+            assert spawned == [("c" * 12, ".mp4", False)]
             participant.status = "completed"
             db_session.commit()
             client.post(
                 f"/interview/{link.token}/{participant.id}/realtime/recording?segment={'c' * 12}",
-                files={"audio": ("session.webm", b"a" * 2048, "audio/webm")},
+                files={"audio": ("session.mp4", b"a" * 2048, "audio/mp4")},
             )
-        assert spawned == ["c" * 12]
+        assert spawned[-1] == ("c" * 12, ".mp4", True)
 
     def test_barge_in_is_off_so_the_interviewer_cannot_cut_itself_off(self, db_session):
         _, participant = _seed(db_session, "tok-barge")
