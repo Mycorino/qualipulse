@@ -43,7 +43,7 @@ gcloud run deploy auto-interview-api \
   --port=8080 \
   --cpu=1 \
   --memory=1Gi \
-  --min-instances=1 \
+  --min-instances=0 \
   --max-instances=15 \
   --timeout=300s \
   --concurrency=16 \

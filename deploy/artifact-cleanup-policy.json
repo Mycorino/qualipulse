@@ -1,0 +1,18 @@
+[
+  {
+    "name": "keep-recent-10",
+    "action": { "type": "Keep" },
+    "mostRecentVersions": {
+      "packageNamePrefixes": ["auto-interview-backend", "auto-interview-frontend"],
+      "keepCount": 10
+    }
+  },
+  {
+    "name": "delete-older-than-30d",
+    "action": { "type": "Delete" },
+    "condition": {
+      "tagState": "ANY",
+      "olderThan": "30d"
+    }
+  }
+]

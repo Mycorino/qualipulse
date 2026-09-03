@@ -1109,6 +1109,23 @@ Tests: `backend/tests/test_analysis_stages.py`. Schema: Alembic 0060
 - **Repository:** `europe-west1-docker.pkg.dev/qualipulse-prod/auto-interview`
 - Backend image: `auto-interview-backend:{tag}`
 - Frontend image: `auto-interview-frontend:{tag}`
+- **Retention.** Every push to `main` adds two images and nothing used to
+  delete them, so the repo reached **102 GiB / 829 images** (about EUR 9/month
+  at EUR 0.08582/GiB/mo above the 0.5 GiB free tier, and growing ~1 GiB per
+  10 builds). A cleanup policy now keeps the 10 most recent versions per
+  package and deletes anything older than 30 days:
+
+  ```bash
+  gcloud artifacts repositories set-cleanup-policies auto-interview \
+    --location=europe-west1 --policy=deploy/artifact-cleanup-policy.json
+  ```
+
+  Add `--dry-run` to stage it without deleting (`--no-dry-run` to arm it);
+  `gcloud artifacts repositories describe auto-interview
+  --location=europe-west1` reports `cleanupPolicyDryRun`. Deleting an image a
+  Cloud Run revision still references means that revision can no longer cold
+  start, so the keep-10 rule exists to protect the live tag and its recent
+  rollback targets.
 
 ### Secrets in Secret Manager
 | Secret Name | Description |
@@ -1161,7 +1178,7 @@ gcloud builds submit --tag="${REGISTRY}/auto-interview-frontend:${TAG}" ./fronte
 gcloud run deploy auto-interview-api \
   --image="${REGISTRY}/auto-interview-backend:${TAG}" \
   --region=${REGION} --platform=managed --allow-unauthenticated \
-  --port=8080 --cpu=1 --memory=1Gi --min-instances=1 --max-instances=15 \
+  --port=8080 --cpu=1 --memory=1Gi --min-instances=0 --max-instances=15 \
   --timeout=300s --concurrency=16 --no-cpu-throttling --cpu-boost \
   --set-secrets="SECRET_KEY=secret-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,DATABASE_URL=database-url:latest,SENDGRID_API_KEY=sendgrid-api-key:latest" \
   --set-env-vars="ENVIRONMENT=production,UPLOAD_DIR=/tmp/uploads,ALLOWED_ORIGINS=https://app.qualipulse.com,APP_BASE_URL=https://app.qualipulse.com"
@@ -1199,18 +1216,30 @@ The backend container uses `start.sh` which handles both fresh and existing data
 | Service name | `auto-interview-api` | `auto-interview-web` |
 | CPU | 1 (always allocated, startup boost) | 1 |
 | Memory | 1Gi | 256Mi |
-| Min instances | 1 | 0 |
+| Min instances | 0 (see cost note) | 0 |
 | Max instances | 15 | 5 |
 | Timeout | 300s (for Claude/TTS) | 60s |
 | Concurrency | 16 | 200 |
 
 > Backend tuning rationale: `--no-cpu-throttling` keeps CPU allocated between
 > requests so the in-process daemon threads (analysis, translation, memos,
-> transcript cleanup) actually run after their 202 returns; `min-instances=1`
-> removes the 15-40s cold start the first user after an idle period used to
-> eat; `concurrency=16` reflects real capacity (sync endpoints hold a
-> threadpool worker for the whole Whisper→Claude→TTS chain) so the
-> autoscaler adds instances before saturation instead of after.
+> transcript cleanup) actually run after their 202 returns; `concurrency=16`
+> reflects real capacity (sync endpoints hold a threadpool worker for the whole
+> Whisper→Claude→TTS chain) so the autoscaler adds instances before saturation
+> instead of after.
+>
+> **Cost note (min-instances is 0 while pre-launch).** `--no-cpu-throttling`
+> puts the backend on Cloud Run **instance-based billing**, which bills CPU +
+> memory for the instance's whole lifetime and **has no free tier**. Combined
+> with `min-instances=1` that pinned one instance 24/7: 2.6M instance-seconds
+> over 30 days, about **EUR 45/month** (europe-west1: EUR 0.0000154470/vCPU-s +
+> EUR 0.0000017160/GiB-s) against roughly 1k requests/day. It was essentially
+> the entire GCP bill. It is now `0`, which trades that for the 15-40s cold
+> boot (alembic + seeds + Neon resume) on the first request after an idle
+> period. **Set it back to `1` before real traffic arrives** - the flag lives
+> in `cloudbuild.yaml` and `deploy/deploy.sh`, and any deploy re-applies it,
+> so changing it only via `gcloud run services update` gets reverted by the
+> next push to `main`.
 | Port | 8080 | 8080 |
 | CORS | `https://app.qualipulse.com` | — |
 
