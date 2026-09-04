@@ -982,6 +982,57 @@ class TestVerbatimIsolation:
         assert fillers[0]["input"] == []
         assert fillers[0]["metadata"] == {"kind": "backchannel"}
 
+    def test_backchannel_is_a_verbatim_line_and_reads_as_hesitation(self, db_session, bridge_sessions, monkeypatch):
+        """Asked to 'make a listening sound' with no line, the model
+        improvised whole survey questions (heard, never captioned). It now
+        reads a fixed line, and a leaked one is held as a non-answer."""
+        _quiet(monkeypatch, silence=0.5, backchannel=True, backchannel_after=0.1)
+        _, participant = _seed(db_session, "tok-mmhm3", turns=1)
+        bridge = rt.SidebandBridge("rtc_mmhm3", participant.id, 20)
+        ws = _FakeWs()
+        bridge._collect_answer(ws, "I mostly use it for slides")
+        filler = next(e["response"] for e in ws.sent if e["type"] == "response.create")
+        assert filler["instructions"].endswith(rt.BACKCHANNEL_LINE)
+        assert "verbatim" in filler["instructions"].lower()
+        assert filler["input"] == []
+        for lang in ("en", "fr", "de", "es", "it", "pt"):
+            assert rt._is_hesitation_only(rt.BACKCHANNEL_LINE, lang)
+
+    def test_an_improvised_filler_disables_fillers_for_the_session(self, db_session, bridge_sessions, monkeypatch):
+        _quiet(monkeypatch, silence=0.5, backchannel=True, backchannel_after=0.1)
+        _, participant = _seed(db_session, "tok-improv", turns=1)
+        bridge = rt.SidebandBridge("rtc_improv", participant.id, 20)
+        # A backchannel is in flight and comes back as a whole question.
+        bridge._inflight_kind = "backchannel"
+        bridge._note_event({"type": "response.output_audio_transcript.done",
+                            "transcript": "Combien de fois avez-vous voyagé à l'étranger au cours des douze derniers mois ?"})
+        assert bridge.fillers_ok is False
+        # No more backchannel...
+        ws = _FakeWs()
+        bridge.response_active = False
+        bridge._collect_answer(ws, "I mostly use it for slides")
+        assert ws.sent == []
+        # ...and no more ack: the answer goes straight to the question.
+        bridge.awaiting_answer = True
+        ws = _FakeWs()
+        with patch(
+            "app.services.interview_engine.decide_next_action",
+            return_value={"action": "follow_up", "question": "And then?", "coaching": None},
+        ):
+            bridge._handle_transcript(
+                ws, {"type": "conversation.item.input_audio_transcription.completed",
+                     "transcript": "We mostly use spreadsheets for everything."},
+            )
+        creates = [e["response"] for e in ws.sent if e["type"] == "response.create"]
+        assert len(creates) == 1 and creates[0]["instructions"].endswith("And then?")
+        # A question's transcript never trips it, and a short filler is fine.
+        fresh = rt.SidebandBridge("rtc_improv2", participant.id, 20)
+        fresh._inflight_kind = "question"
+        fresh._note_event({"type": "response.output_audio_transcript.done", "transcript": "And when a check turns up a mistake, what do you do with it?"})
+        fresh._inflight_kind = "ack"
+        fresh._note_event({"type": "response.output_audio_transcript.done", "transcript": "D'accord."})
+        assert fresh.fillers_ok is True
+
     def test_ack_lines_are_neutral_rotate_and_never_count_as_answers(self, db_session, bridge_sessions, monkeypatch):
         for lang, lines in rt._ACK_LINES.items():
             # Should the speaker leak an ack back into the mic, the
