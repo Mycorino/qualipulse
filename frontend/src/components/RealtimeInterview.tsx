@@ -73,6 +73,20 @@ const MIC_REARM_DELAY_MS = 350;
 // this long after response.done rather than staying muted forever.
 const RESPONSE_DONE_FALLBACK_MS = 6_000;
 const STATUS_POLL_MS = 3_500;
+// Stall watchdog. The backend sideband is a separate process from the
+// OpenAI call: a deploy, restart or crash kills it while the audio call
+// stays up, and the participant's answers then go nowhere (the screen sat
+// on "One moment" forever in exactly that case). After the participant's
+// audio commits, some response (ack, backchannel or question) normally
+// follows within ~5-8s; a hesitation-only fragment deliberately gets none,
+// so the window is long. Past it, the call is rebuilt (new SDP, new
+// sideband, which re-asks the pending question), a bounded number of times.
+const STALL_AFTER_ANSWER_MS = 45_000;
+// The opening line normally arrives within seconds of the data channel
+// opening; without it the sideband never attached.
+const STALL_AFTER_OPEN_MS = 25_000;
+const STALL_CHECK_MS = 5_000;
+const MAX_AUTO_RECONNECTS = 2;
 
 // Explicit constraints: without echoCancellation the interviewer's voice
 // comes back through the microphone, gets transcribed as if the participant
@@ -149,6 +163,11 @@ export default function RealtimeInterview({
   const deadCallRef = useRef(false);
   // Filled once reconnect() exists (it is declared after connect()).
   const reconnectRef = useRef<(() => Promise<void>) | null>(null);
+  // Stall watchdog: when the server was last given something it owes a
+  // response for (audio committed, channel opened), null once it responds.
+  const awaitingSinceRef = useRef<{ at: number; limit: number } | null>(null);
+  const autoReconnectsRef = useRef(0);
+  const [reconnecting, setReconnecting] = useState(false);
   const micRearmTimerRef = useRef<number | null>(null);
   // The RTCRtpSender carrying the mic track: pause fully STOPS the track
   // (releasing the device, so the phone's mic-in-use indicator goes off) and
@@ -182,6 +201,7 @@ export default function RealtimeInterview({
     // the participant just paused.
     micPausedRef.current = true;
     setMicPaused(true);
+    awaitingSinceRef.current = null;
     // Turn VAD off entirely and drop any half-captured speech, so the
     // interviewer cannot commit a turn (and speak) while paused: the
     // documented push-to-talk off-switch (merely muting the track feeds VAD
@@ -375,6 +395,7 @@ export default function RealtimeInterview({
     if (!event || typeof event.type !== "string") return;
     switch (event.type) {
       case "response.created": {
+        awaitingSinceRef.current = null;
         // The sideband tags its filler responses: "ack" (spoken after an
         // answer, muted like a question but never captioned) and
         // "backchannel" (a soft "mm-hm" while the participant thinks: not
@@ -449,6 +470,10 @@ export default function RealtimeInterview({
       case "input_audio_buffer.speech_stopped":
         setVoiceState("thinking");
         break;
+      case "input_audio_buffer.committed":
+        // The server now holds an answer it owes a reaction to.
+        if (!micPausedRef.current) awaitingSinceRef.current = { at: Date.now(), limit: STALL_AFTER_ANSWER_MS };
+        break;
       default:
         break;
     }
@@ -476,6 +501,10 @@ export default function RealtimeInterview({
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
       dc.onmessage = (e) => handleDataChannelEvent(String(e.data));
+      dc.onopen = () => {
+        if (seq !== setupSeqRef.current) return;
+        awaitingSinceRef.current = { at: Date.now(), limit: STALL_AFTER_OPEN_MS };
+      };
       // The data channel closing while the interview is still running means
       // the call ended under us (idle hangup, session cap, network death).
       // Mid-conversation that is the error screen; while paused we stay on
@@ -526,11 +555,34 @@ export default function RealtimeInterview({
   // dial a fresh call — new sideband, new recording segment.
   const reconnect = useCallback(async () => {
     setConnState("connecting");
+    awaitingSinceRef.current = null;
     try { await uploadPartial(); } catch { /* best-effort flush */ }
     teardown();
     await connect();
+    setReconnecting(false);
   }, [connect, teardown, uploadPartial]);
   useEffect(() => { reconnectRef.current = reconnect; }, [reconnect]);
+
+  // Stall watchdog (see STALL_AFTER_ANSWER_MS): the call is up but nothing
+  // has answered the participant for too long, so the sideband is gone.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const pending = awaitingSinceRef.current;
+      if (!pending || finishedRef.current || micPausedRef.current) return;
+      if (Date.now() - pending.at < pending.limit) return;
+      if (dcRef.current?.readyState !== "open") return; // a dead channel is handled by onclose
+      awaitingSinceRef.current = null;
+      if (autoReconnectsRef.current >= MAX_AUTO_RECONNECTS) {
+        deadCallRef.current = true;
+        setConnState("error");
+        return;
+      }
+      autoReconnectsRef.current += 1;
+      setReconnecting(true);
+      void reconnectRef.current?.();
+    }, STALL_CHECK_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   // Connect once on mount; tear everything down on unmount.
   useEffect(() => {
@@ -581,7 +633,7 @@ export default function RealtimeInterview({
   const hideCounter = questionIndex < 0 || questionCount <= 0;
   const stateLine =
     connState === "connecting"
-      ? t("realtime.connecting")
+      ? (reconnecting ? t("realtime.reconnecting") : t("realtime.connecting"))
       : connState === "ending"
         ? t("realtime.wrappingUp")
         : micPaused

@@ -500,6 +500,7 @@
     "fallback": "Continuar sin la voz en directo",
     "pauseMic": "Pausa, necesito un momento",
     "resume": "Estoy listo, seguimos",
-    "pausedState": "En pausa. Tómese el tiempo que necesite."
+    "pausedState": "En pausa. Tómese el tiempo que necesite.",
+    "reconnecting": "Reconectando con su entrevistador..."
   }
 }

@@ -2440,6 +2440,7 @@ def process_interview_turn(
     # fall back to deterministic wording if that fails.
     forced: str | None = None
     action = decision["action"]
+    model_action = action
 
     if action == "close" and not can_close:
         forced = "next_question" if has_next_question else "follow_up"
@@ -2516,6 +2517,19 @@ def process_interview_turn(
         else:
             decision = {"action": forced, "question": _fallback_follow_up(language), "coaching": None}
         action = decision["action"]
+
+    # One line per turn with everything a tuning question needs: what the
+    # model wanted, what the host made of it and why, where the interview
+    # stood. Greppable in prod ("interview decision"), so pacing and depth
+    # can be audited from the logs instead of replaying transcripts.
+    logger.info(
+        "interview decision participant=%s q=%s action=%s model=%s forced=%s probe=%s "
+        "goals_met=%s followups=%s/%s pace=%s elapsed=%.1f/%s live=%s answer_words=%s words=%s",
+        participant_id, cur_q, action, model_action, forced or "-", decision.get("probe") or "-",
+        decision.get("learning_goals_met"), existing_followups, allowance,
+        f"{pace_delta:+.2f}" if pace_delta is not None else "-", elapsed, total, spoken_live,
+        len((transcript or "").split()), len((decision.get("question") or "").split()),
+    )
 
     # Closing check: before the first "close", ask once whether anything was
     # missed. The answer is treated like any other turn; on the next turn the
