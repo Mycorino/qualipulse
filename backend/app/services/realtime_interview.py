@@ -320,14 +320,22 @@ def _ack_instruction(language: str | None, turn: int = 0) -> str:
     return _verbatim_instruction(_ack_line(language, turn), language)
 
 
+# The listening sound made while the participant thinks. A fixed line read
+# verbatim, exactly like the ack: asked to "make a listening sound" with no
+# line and no context, gpt-realtime improvised whole survey questions
+# ("Combien de fois avez-vous voyagé à l'étranger... ?") in 2 of 4 tries,
+# heard by the participant but never captioned, which is why the spoken
+# interview and the on-screen question stopped lining up.
+BACKCHANNEL_LINE = "Mm-hm."
+
+# A filler (ack or backchannel) that comes back longer than this many words
+# was improvised, not read. The line already spoken cannot be unsaid, but
+# the session then runs without fillers rather than risk another.
+MAX_FILLER_WORDS = 4
+
+
 def _backchannel_instruction(language: str | None) -> str:
-    lang = (language or "en")[:2]
-    return (
-        _session_instructions(language)
-        + f" Make ONE soft, short listening sound in the interview language ({lang}), "
-        f"like 'Mm-hm.', under one second, warm, a nod rather than a word. "
-        f"No words, no question, nothing else."
-    )
+    return _verbatim_instruction(BACKCHANNEL_LINE, language)
 
 
 # Hesitation particles and bare acknowledgments, per language. A transcript
@@ -542,6 +550,13 @@ class SidebandBridge:
         self.recent_outputs: list[str] = []
         self.last_response_ended_at = 0.0
         self._ack_turn = 0
+        # What the in-flight response is ("question" | "ack" | "backchannel"),
+        # so its output transcript can be checked against what was asked
+        # for. One audio channel, responses strictly sequential.
+        self._inflight_kind = "question"
+        # Cleared for the rest of the session the first time a filler comes
+        # back improvised (see MAX_FILLER_WORDS).
+        self.fillers_ok = True
         # Set when the sideband attaches — the zero point for per-turn
         # offsets into the client's session recording.
         self.session_started_at: float | None = None
@@ -600,6 +615,7 @@ class SidebandBridge:
         # Every _speak line is a question or a repeat request — something
         # that expects an answer. Its response.done re-opens the gate.
         self._arm_on_response_done = True
+        self._inflight_kind = "question"
         self._send(ws, _isolated_response(_verbatim_instruction(text, self.language)))
 
     def _wait_for_response_idle(self, ws) -> None:
@@ -623,6 +639,7 @@ class SidebandBridge:
             said = (event.get("transcript") or "").strip()
             if said:
                 self.recent_outputs = (self.recent_outputs + [said])[-3:]
+                self._check_filler(said)
         elif etype == "input_audio_buffer.speech_started":
             self._speech_open = True
             # First speech after the interviewer went quiet = the answer
@@ -645,6 +662,18 @@ class SidebandBridge:
                 self.participant_id, json.dumps(event)[:500],
             )
         return etype
+
+    def _check_filler(self, said: str) -> None:
+        """A filler that came back as a sentence was improvised: stop
+        sending fillers for this session and say so in the logs."""
+        if self._inflight_kind == "question" or not self.fillers_ok:
+            return
+        if len(said.split()) > MAX_FILLER_WORDS:
+            self.fillers_ok = False
+            logger.warning(
+                "realtime: %s came back improvised %r; fillers disabled for the session (participant=%s)",
+                self._inflight_kind, said[:120], self.participant_id,
+            )
 
     def _is_echo(self, transcript: str) -> bool:
         """Was this the interviewer's own voice coming back through the mic?"""
@@ -684,10 +713,11 @@ class SidebandBridge:
         the mic for it — the whole point is that they can keep talking.
         Its own response.done must not touch the answer gate.
         """
-        if self.response_active:
+        if self.response_active or not self.fillers_ok:
             return
         self._arm_on_response_done = False
         self.response_active = True
+        self._inflight_kind = "backchannel"
         self._send(
             ws,
             _isolated_response(
@@ -804,7 +834,7 @@ class SidebandBridge:
         # the next question.
         self.awaiting_answer = False
         self._send(ws, {"type": "input_audio_buffer.clear"})
-        if settings.REALTIME_ACK_ENABLED:
+        if settings.REALTIME_ACK_ENABLED and self.fillers_ok:
             # Fill the Claude-decision gap with a human "I heard you" beat
             # instead of silence. _speak below waits for this to finish, so
             # the question never talks over the acknowledgment. The ack is a
@@ -818,6 +848,7 @@ class SidebandBridge:
             # _speak arms the flag).
             self._arm_on_response_done = False
             self.response_active = True
+            self._inflight_kind = "ack"
             self._send(
                 ws,
                 _isolated_response(

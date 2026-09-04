@@ -919,9 +919,13 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
   participant's last `speech_stopped` (never from a transcript's arrival),
   with every committed burst transcribed (`_pending_transcripts`); short
   answers earn `SHORT_ANSWER_EXTRA_WAIT` more. Midway (1.5s) a soft
-  out-of-band backchannel ("Mm-hm.", `metadata.kind="backchannel"`) says
-  we're listening; the client neither captions it nor mutes the mic for it,
-  so the participant can talk through it. The ack is a fixed neutral word
+  out-of-band backchannel (`metadata.kind="backchannel"`) says we're
+  listening; the client neither captions it nor mutes the mic for it, so
+  the participant can talk through it. It reads a fixed `BACKCHANNEL_LINE`
+  verbatim, like the ack: asked to "make a listening sound" with no line,
+  the model improvised whole survey questions that the participant heard
+  but never saw captioned. A filler transcript longer than
+  `MAX_FILLER_WORDS` disables both fillers for the rest of the session. The ack is a fixed neutral word
   per language (`_ACK_LINES`, rotated per turn; every one is also in the
   hesitation sets so a leaked ack never becomes an answer), tagged
   `metadata.kind="ack"` (muted, never captioned). **Every spoken response
