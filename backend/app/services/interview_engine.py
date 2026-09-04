@@ -108,6 +108,10 @@ Voice & stance:
 "Super", "Parfait", "Génial"), and never tell the participant they are doing well. Praise steers what they say next.
 - Never summarise their answer back to them as a statement. A line that only restates or affirms what they said is \
 not a question: every follow_up and next_question line ends with exactly one open question.
+- Show you heard them by REFLECTING, never by JUDGING. A reflection repeats their own words or detail in a short \
+neutral clause ("Eight hours lost." / "You said you'd never let it do your taxes."). A verdict rates the answer \
+("that point is useful", "that's a striking cost", "that's telling", "that makes sense"): it turns the interview into a \
+form being ticked, and it is banned. If you cannot reflect without judging, skip the bridge and just ask.
 - Use the participant's own words and terminology. Mirror their language register.
 - Avoid "why" questions, they invite rationalisation. Prefer "walk me through", "tell me about \
 the last time", "what was happening when".
@@ -149,6 +153,14 @@ stop_quote with their exact words. Be careful: "I'm done" / "that's all" about t
 end the interview, it means move on to the next question.
 - If they switch language, continue in the interview language unless they explicitly ask to switch.
 
+Following the thread (this is what makes a participant feel heard, and what produces depth):
+- The first answer to a guide question is almost never the end of that topic. Unless it already contains a specific \
+episode (what happened, what they did, what it cost them), probe at least once before you move on.
+- Stay on a topic while the answer still holds a hook you have not explored: a story mentioned but not told, a \
+claim without an example, an emotion, a loaded word, a workaround, a cost, a person. Pick the strongest hook and go there.
+- Move on when the topic is saturated (they have given the episode and the why), when they signal they are done with it, \
+or when the host says pacing requires it. Never move on merely because one follow-up has been asked.
+
 Continuity (critical, the participant hears every turn):
 - The greeting belongs to the OPENING question only. You have already greeted them. NEVER open a later \
 turn with a fresh welcome ("thanks for being here", "merci d'être là", "to start / pour commencer"). \
@@ -172,8 +184,8 @@ Decision rules (you MUST output exactly one action):
    - The learning goals for the current topic are met, or the topic has yielded a concrete example and you have nothing sharper to ask.
    - Pacing is behind (the host system will tell you).
    - You have already asked 2 follow-ups on this topic without new information.
-   When transitioning, OPEN with a one-sentence callback to something specific the participant \
-just said (use their exact words where natural), THEN introduce the new topic. This makes them feel heard.
+   When transitioning, OPEN with a short reflection of something specific the participant just said (their exact \
+words where natural, never a verdict on it), THEN introduce the new topic. This makes them feel heard.
 
 3. close: wrap up warmly. ONLY available when the host system tells you the close gate is open. If the host says close is \
 NOT available, you MUST NOT return "close" no matter how exhausted the conversation feels. When you close, thank them \
@@ -238,6 +250,16 @@ MINUTES_PER_EXCHANGE = 1.25
 # enforcement the guide is raced through and the leftover time pools on the
 # last question as filler probes.
 AHEAD_PACE_QUESTIONS = 1.0
+
+# Minimum-depth guard: an answer with at least this many words to a guide
+# question's FIRST ask is treated as substantive, and the host holds the
+# topic for at least one probe before the guide may advance (unless the
+# interview is behind schedule). The prompt already says "the first answer
+# is almost never the end of the topic", but that is advisory: replayed
+# against a real transcript the model still moved on after one rich answer
+# in a third of the topics, which is exactly what participants describe as
+# "one question after another, it doesn't feel heard".
+MIN_DEPTH_ANSWER_WORDS = 15
 
 # Share of the time budget that must be spent before the model is allowed to
 # close an interview whose guide is already fully covered. Interviews that pace
@@ -441,13 +463,34 @@ def _language_instruction(language_code: str | None) -> str:
     )
 
 
+# Text the Setup tab gives a freshly added guide question. A researcher who
+# never edits it leaves a topic with no question in the guide, and the
+# interviewer dutifully invents one for it ("is there anything else...?").
+# Such rows are ignored the same way deprecated ones are.
+_PLACEHOLDER_QUESTIONS = {"nouvelle question", "new question", "question", "neue frage", "nueva pregunta", "nuova domanda", "nova pergunta"}
+
+
+def _is_placeholder_question(q) -> bool:
+    text = re.sub(r"[\s.!?…]+$", "", (getattr(q, "main_question", "") or "").strip()).lower()
+    return not text or text in _PLACEHOLDER_QUESTIONS
+
+
+def _active_guide_questions(project) -> list:
+    """Guide questions the interviewer should actually ask: not deprecated,
+    not an untouched placeholder. Unsorted; callers order as they need."""
+    return [
+        q for q in project.guide_questions
+        if not getattr(q, "deprecated_at", None) and not _is_placeholder_question(q)
+    ]
+
+
 def _build_interview_guide_str(project: Project) -> str:
     """Build a formatted string representation of the interview guide.
 
     Skips questions that have been deprecated by the researcher.
     """
     guide_questions: list[InterviewGuideQuestion] = sorted(
-        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
+        _active_guide_questions(project),
         key=lambda q: (q.section_index, q.question_index),
     )
     if not guide_questions:
@@ -480,7 +523,7 @@ def stimulus_for_question_index(project: Project, question_index: int | None):
     if question_index is None or question_index < 0:
         return None
     guide = sorted(
-        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
+        _active_guide_questions(project),
         key=lambda q: (q.section_index, q.question_index),
     )
     if question_index >= len(guide):
@@ -765,7 +808,7 @@ def get_interview_context(
     turns = sorted(participant.turns, key=lambda t: t.turn_index)
 
     guide_questions = sorted(
-        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
+        _active_guide_questions(project),
         key=lambda q: (q.section_index, q.question_index),
     )
     total_questions = len(guide_questions)
@@ -1035,8 +1078,9 @@ def decide_next_action(
     elif pace_delta < -0.5:
         pacing_instruction = (
             "PACING: You are slightly behind schedule. "
-            "Only ask a follow-up if the participant's answer was genuinely too brief or unclear. "
-            "Otherwise move to the next main question now."
+            "One more probe only if the answer holds an important hook you have not explored "
+            "(a story mentioned but not told, a claim without an example). Otherwise move on, "
+            "opening with a reflection of what they just said."
         )
     elif pace_delta >= AHEAD_PACE_QUESTIONS:
         # Far enough ahead that the host will now REFUSE next_question (see the
@@ -1059,11 +1103,18 @@ def decide_next_action(
             "Only move to the next main question once this topic is genuinely exhausted."
         )
     else:
-        fu_word = "may" if slack_minutes > 0 else "should not"
-        pacing_instruction = (
-            f"PACING: You are on schedule. "
-            f"You {fu_word} ask one follow-up if it genuinely adds value, then move to the next question."
-        )
+        if slack_minutes > 0:
+            pacing_instruction = (
+                "PACING: You are on schedule. Follow the thread: while their answer holds a hook you "
+                "have not explored, stay on it; move on once the topic is saturated (they gave the "
+                "episode and the why), not because one follow-up has been asked."
+            )
+        else:
+            pacing_instruction = (
+                "PACING: You are on schedule with no slack. One more probe only for a hook that "
+                "matters to the learning goal; otherwise move on, opening with a reflection of "
+                "what they just said."
+            )
 
     can_close = _close_gate_open(
         all_questions_done=all_questions_done,
@@ -1163,12 +1214,14 @@ WHY: they asked to stop; never negotiate.
         user_message += (
             "<delivery>\n"
             "LIVE VOICE: your line is spoken aloud, in real time, not read. "
-            "Keep it under 25 words: at most a six-word neutral bridge (never a "
-            "restatement of what they said, never agreement or praise), then exactly "
-            "ONE question, and the line ends with it. Do not use the reflect_back probe "
-            "out loud: spoken back, a restatement sounds like the interviewer agreeing. "
-            "Lead with the probe, anchored in something specific they just said, rather "
-            "than with a bridge. Silence while they think is fine; never fill it.\n"
+            "Keep it under 28 words: an optional short reflection of their own words "
+            "(a few words, their detail, no verdict, no agreement, no praise), then exactly "
+            "ONE question, and the line ends with it. One question means one: never two "
+            "question clauses joined by 'and' or a comma, never 'what X and what Y'. "
+            "Do not use the reflect_back probe "
+            "out loud: a full restatement sounds like the interviewer agreeing. Anchor "
+            "the question in something specific they just said. Silence while they think "
+            "is fine; never fill it.\n"
             "</delivery>\n\n"
         )
 
@@ -1313,7 +1366,7 @@ def _parse_decision_response(response, language: str | None) -> dict:
         question = _fallback_follow_up(language)
     question = _strip_banned_dashes(question.strip())
     if action in ("follow_up", "next_question"):
-        question = _strip_leading_evaluation(question)
+        question = _strip_leading_verdict(_strip_leading_evaluation(question))
         if "?" not in question and "？" not in question:
             # Visibility only: a line that never asks anything is the
             # "interviewer just agrees with me" drift. The prompt forbids it;
@@ -1368,6 +1421,30 @@ _EVALUATIVE_OPENER_RE = re.compile(
     + r")\s*[,.!:;…]+\s*",
     re.IGNORECASE,
 )
+
+
+# A leading sentence that rates the answer ("That validation step idea is
+# useful." / "That eight hours lost is a striking cost.") before the real
+# question. The prompt bans it; this removes it when it slips through, only
+# when a question follows, so a line is never emptied.
+_VERDICT_SENTENCE_RE = re.compile(
+    r"^(?:that|this|what a|the|your|ce|cette|ça|ca|votre)\b[^.!?\n]{3,90}?\b(?:useful|helpful|clear|telling|striking|interesting|"
+    r"insightful|revealing|fascinating|important|valuable|good to (?:hear|know)|great to hear|"
+    r"stands? out|makes sense|says a lot|worth noting|well put|utile|intéressant|interessant|"
+    r"parlant|frappant|marquant|précieux|precieux|clair|révélateur|revelateur)\b[^.!?\n]{0,40}[.!]\s+",
+    re.IGNORECASE,
+)
+
+
+def _strip_leading_verdict(text: str) -> str:
+    """Drop a first sentence that rates the answer, keeping the question."""
+    m = _VERDICT_SENTENCE_RE.match(text.lstrip())
+    if not m:
+        return text
+    rest = text.lstrip()[m.end():]
+    if "?" not in rest and "？" not in rest:
+        return text
+    return rest[:1].upper() + rest[1:]
 
 
 def _strip_leading_evaluation(text: str) -> str:
@@ -1590,7 +1667,7 @@ def _get_warmup_question(
     # question twice in a row (classic case: warm-up "what do you do
     # day-to-day?" followed by guide Q1 "tell me about your role").
     guide_questions = sorted(
-        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
+        _active_guide_questions(project),
         key=lambda q: (q.section_index, q.question_index),
     )
     first_guide_q = guide_questions[0].main_question if guide_questions else ""
@@ -1660,7 +1737,7 @@ def _get_first_question(
     anything it already covered.
     """
     guide_questions = sorted(
-        [q for q in project.guide_questions if not getattr(q, "deprecated_at", None)],
+        _active_guide_questions(project),
         key=lambda q: (q.section_index, q.question_index),
     )
     language_code = (language_override or getattr(project, "language", None) or "en").lower()
@@ -2395,6 +2472,17 @@ def process_interview_turn(
             and not (short_answer_state or {}).get("is_short_run")
         ):
             forced = "follow_up"
+        elif (
+            existing_followups == 0
+            and cur_q >= 0
+            and pace_delta > -0.5
+            and has_next_question
+            and len((transcript or "").split()) >= MIN_DEPTH_ANSWER_WORDS
+            and not (short_answer_state or {}).get("is_short_run")
+        ):
+            # Minimum depth (see MIN_DEPTH_ANSWER_WORDS): a substantive first
+            # answer is followed up at least once before the guide moves on.
+            forced = "follow_up"
 
     if action == "follow_up" and forced is None:
         if existing_followups >= allowance and has_next_question:
@@ -2586,7 +2674,7 @@ def finish_interview(participant_id: str, db: Session) -> dict:
     )
     db.add(new_turn)
 
-    total_q = len([q for q in participant.project.guide_questions if not getattr(q, "deprecated_at", None)])
+    total_q = len(_active_guide_questions(participant.project))
     answered = _answered_main_questions(turns)
     billing = _mark_completed(
         participant, db,

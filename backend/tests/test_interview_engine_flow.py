@@ -952,3 +952,115 @@ def test_prompt_forbids_affirmations_and_demands_a_question():
     assert "ends with exactly one open question" in prompt
     desc = interview_engine.DECISION_TOOL["input_schema"]["properties"]["question"]["description"]
     assert "never opens with agreement or praise" in desc
+
+
+@pytest.mark.parametrize(
+    "raw, cleaned",
+    [
+        ("That validation step idea is useful. Looking ahead, what would need to change for you to hand over more?",
+         "Looking ahead, what would need to change for you to hand over more?"),
+        ("That eight hours of wrong-track work is a striking cost. When an AI gives you an answer, what makes you rely on it?",
+         "When an AI gives you an answer, what makes you rely on it?"),
+        ("That overconfidence point is telling. Is there anything else we haven't touched on?",
+         "Is there anything else we haven't touched on?"),
+        ("The thought process mattering more than the result is clear. Are there decisions where you want a human in the loop?",
+         "Are there decisions where you want a human in the loop?"),
+        ("Ce point sur la validation est très utile. Qu'est-ce qui devrait changer pour vous ?",
+         "Qu'est-ce qui devrait changer pour vous ?"),
+        # A reflection in their words is not a verdict: kept.
+        ("Eight hours lost. What happened after you restarted?", "Eight hours lost. What happened after you restarted?"),
+        ("You said you'd never let it do your taxes. What makes taxes different?",
+         "You said you'd never let it do your taxes. What makes taxes different?"),
+        # A verdict with no question after it is left alone rather than emptied.
+        ("That point is useful.", "That point is useful."),
+    ],
+)
+def test_leading_verdict_sentence_is_stripped_but_reflections_stay(raw, cleaned):
+    assert interview_engine._strip_leading_verdict(raw) == cleaned
+
+
+def test_prompt_follows_the_thread_and_bans_verdicts():
+    prompt = interview_engine.INTERVIEWER_SYSTEM_PROMPT
+    assert "Following the thread" in prompt
+    assert "probe at least once before you move on" in prompt
+    assert "REFLECTING, never by JUDGING" in prompt
+
+
+# ---------------------------------------------------------------------------
+# Minimum depth: a topic's first substantive answer gets at least one probe
+# ---------------------------------------------------------------------------
+
+RICH_ANSWER = (
+    "I am always checking for the full reasoning behind it, if I do not see the thought "
+    "process I get skeptical and I go and verify the numbers myself before I use anything."
+)
+
+
+def test_first_substantive_answer_is_probed_before_the_guide_moves_on(db_session, monkeypatch):
+    """Replayed against a real transcript the model moved on after one rich
+    answer in a third of the topics: the host now holds the topic for one
+    probe, with regenerated wording for the forced follow-up."""
+    participant = _seed(db_session, followups_on_current=0)
+    calls = _patch_io(
+        monkeypatch,
+        transcript=RICH_ANSWER,
+        decision={"action": "next_question", "question": "Moving on: next topic?"},
+    )
+    process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+    new_turn = sorted(participant.turns, key=lambda t: t.turn_index)[-1]
+    assert new_turn.is_follow_up is True
+    assert new_turn.question_index == 0
+    assert new_turn.question_text == "[regenerated for follow_up]"
+    assert any(c.get("forced_action") == "follow_up" for c in calls)
+
+
+def test_short_or_second_answers_do_not_trigger_the_depth_guard(db_session, monkeypatch):
+    # A brief first answer: the model's next_question stands.
+    participant = _seed(db_session, followups_on_current=0)
+    _patch_io(monkeypatch, transcript="Not really, no.", decision={"action": "next_question", "question": "Next topic?"})
+    process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+    assert sorted(participant.turns, key=lambda t: t.turn_index)[-1].question_index == 1
+
+
+def test_a_rich_answer_to_a_follow_up_does_not_trigger_the_depth_guard(db_session, monkeypatch):
+    # The topic has already been probed once: the model's next_question stands.
+    participant = _seed(db_session, followups_on_current=1)
+    _patch_io(monkeypatch, transcript=RICH_ANSWER, decision={"action": "next_question", "question": "Next topic?"})
+    process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+    assert sorted(participant.turns, key=lambda t: t.turn_index)[-1].question_index == 1
+
+
+def test_depth_guard_yields_when_behind_schedule(db_session, monkeypatch):
+    from datetime import datetime, timedelta
+
+    participant = _seed(db_session, followups_on_current=0)
+    now = datetime.utcnow()
+    # 12 of 20 minutes gone while still on question 0: behind, so a rich
+    # first answer no longer holds the topic.
+    participant.started_at = now - timedelta(minutes=12)
+    for turn in participant.turns:
+        turn.created_at = now - timedelta(minutes=12)
+    db_session.commit()
+    _patch_io(monkeypatch, transcript=RICH_ANSWER, decision={"action": "next_question", "question": "Next topic?"})
+    process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+    assert sorted(participant.turns, key=lambda t: t.turn_index)[-1].question_index == 1
+
+
+def test_untouched_placeholder_guide_questions_are_not_topics(db_session):
+    """A "New question" row the researcher never edited must not become a
+    topic the interviewer invents a question for."""
+    from app.models.project import InterviewGuideQuestion
+
+    participant = _seed(db_session, question_count=2)
+    project = participant.project
+    db_session.add(InterviewGuideQuestion(project_id=project.id, section_index=0, section_title="S", question_index=2,
+                                          main_question="Nouvelle question", sort_order=99))
+    db_session.add(InterviewGuideQuestion(project_id=project.id, section_index=0, section_title="S", question_index=3,
+                                          main_question="  New question. ", sort_order=100))
+    db_session.commit()
+    db_session.refresh(project)
+    active = interview_engine._active_guide_questions(project)
+    assert len(active) == 2
+    assert "Nouvelle question" not in interview_engine._build_interview_guide_str(project)
+    ctx = interview_engine.get_interview_context(participant.id, db_session)
+    assert ctx["total_questions"] == 2
