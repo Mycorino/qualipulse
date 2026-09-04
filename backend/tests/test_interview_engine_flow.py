@@ -1064,3 +1064,20 @@ def test_untouched_placeholder_guide_questions_are_not_topics(db_session):
     assert "Nouvelle question" not in interview_engine._build_interview_guide_str(project)
     ctx = interview_engine.get_interview_context(participant.id, db_session)
     assert ctx["total_questions"] == 2
+
+
+def test_every_turn_logs_one_decision_line(db_session, monkeypatch, caplog):
+    """Pacing and depth are audited from prod logs, not by replaying transcripts."""
+    import logging
+
+    participant = _seed(db_session, followups_on_current=0)
+    _patch_io(monkeypatch, decision={"action": "follow_up", "question": "Tell me more?", "probe": "specific_moment"})
+    with caplog.at_level(logging.INFO, logger="app.services.interview_engine"):
+        process_interview_turn(participant.id, "audio/x.mp3", "/audio/x.mp3", db_session)
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("interview decision")]
+    assert len(lines) == 1
+    line = lines[0]
+    assert f"participant={participant.id}" in line
+    assert "action=follow_up model=follow_up forced=-" in line
+    assert "probe=specific_moment" in line
+    assert "followups=0/" in line and "pace=" in line and "live=False" in line

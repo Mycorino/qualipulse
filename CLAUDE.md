@@ -911,7 +911,15 @@ over the **OpenAI Realtime API** while keeping Claude as the interview brain:
   `Interview.tsx` for the whole interview phase (mic test and completion /
   questionnaire screens are shared). Captions + speaking state come from the
   WebRTC data channel; progress + completion from polling `GET .../status`
-  (which now also returns `question_index` / `is_follow_up`).
+  (which now also returns `question_index` / `is_follow_up`). **Stall
+  watchdog:** the sideband is a separate process from the OpenAI call, so a
+  deploy/restart/crash kills it while the audio call stays up and answers go
+  nowhere. After `input_audio_buffer.committed` the client expects some
+  `response.created` within `STALL_AFTER_ANSWER_MS` (45s; opening line
+  within 25s of the channel opening); past that it rebuilds the call via the
+  pause/resume `reconnect` path (new SDP, new sideband re-asks the pending
+  question, new recording segment), at most `MAX_AUTO_RECONNECTS` (2) times,
+  showing `realtime.reconnecting`, then the error screen.
 - **Turn-taking (patience):** semantic VAD commits at every sentence
   boundary, but people narrate in bursts with 2-5s thinks between them. The
   sideband therefore treats an answer as finished only after
@@ -986,6 +994,13 @@ Claude decides after each response whether to:
 - `follow_up` — ask a follow-up on the current topic
 - `next_question` — move to the next guide question
 - `close` — wrap up warmly when all questions are covered or time is up
+
+Every turn logs one INFO line `interview decision participant=… q=… action=…
+model=… forced=… probe=… goals_met=… followups=n/allowance pace=±x.xx
+elapsed=…/… live=… answer_words=… words=…` (what the model chose, what the host
+made of it and why, where the interview stood), so pacing and depth can be
+audited from prod logs (`textPayload:"interview decision"`) without replaying
+transcripts.
 
 Pacing safety guards:
 - Forces `next_question` if behind schedule

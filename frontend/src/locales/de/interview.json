@@ -500,6 +500,7 @@
     "fallback": "Ohne Live-Stimme fortfahren",
     "pauseMic": "Pause, ich brauche einen Moment",
     "resume": "Ich bin bereit, weiter",
-    "pausedState": "Pausiert. Lassen Sie sich Zeit."
+    "pausedState": "Pausiert. Lassen Sie sich Zeit.",
+    "reconnecting": "Verbindung zu Ihrem Interviewer wird wiederhergestellt..."
   }
 }

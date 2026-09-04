@@ -500,6 +500,7 @@
     "fallback": "Continue without live voice",
     "pauseMic": "Pause, I need a moment",
     "resume": "I'm ready, resume",
-    "pausedState": "Paused. Take all the time you need."
+    "pausedState": "Paused. Take all the time you need.",
+    "reconnecting": "Reconnecting to your interviewer..."
   }
 }
