@@ -989,8 +989,26 @@ Claude decides after each response whether to:
 
 Pacing safety guards:
 - Forces `next_question` if behind schedule
+- **Minimum depth** (`MIN_DEPTH_ANSWER_WORDS`, 15): a guide question's first
+  answer of 15+ words is followed up at least once before the guide may
+  advance, unless the interview is behind schedule or the participant is in a
+  short-answer run. Advisory prompt text alone left the model moving on after
+  one rich answer in a third of topics (replayed on a real transcript), which
+  is what participants describe as "one question after another, not heard".
+- Follow-up allowance per topic (`_followup_allowance`, budget-derived, 3-6)
+  and the ahead-of-schedule hold
 - Close gate: requires 80% time elapsed + all questions covered
-- System prompt customizable per project
+- Untouched "New question" / "Nouvelle question" placeholder rows are ignored
+  like deprecated ones (`_active_guide_questions`)
+- System prompt customizable per project, layered under the methodology
+
+Stance rules the prompt enforces and the parser backs deterministically:
+no agreement/praise openers (`_strip_leading_evaluation`), no verdict on the
+answer before the question ("That point is useful." → `_strip_leading_verdict`),
+reflect the participant's own words instead. Prompt changes are measured with
+`backend/scripts/interviewer_bench.py`: teacher-forced replay of a real
+transcript through `process_interview_turn`, then a blind pairwise Opus judge
+on a five-criterion qualitative-interviewing rubric.
 
 ### Analysis Pipeline
 1. Researcher triggers analysis (optional demographic filters). Before
