@@ -52,15 +52,15 @@
       "steps": [
         {
           "label": "Recruit and screen",
-          "time": "1 week"
-        },
-        {
-          "label": "Schedule calls",
           "time": "4 days"
         },
         {
-          "label": "Moderate",
-          "time": "6 h per interview"
+          "label": "Schedule calls",
+          "time": "3 days"
+        },
+        {
+          "label": "Moderate 10 interviews",
+          "time": "1 week"
         },
         {
           "label": "Transcribe",
@@ -68,7 +68,7 @@
         },
         {
           "label": "Synthesise and write up",
-          "time": "1 week"
+          "time": "4 days"
         }
       ]
     },

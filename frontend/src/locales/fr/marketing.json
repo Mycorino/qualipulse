@@ -52,15 +52,15 @@
       "steps": [
         {
           "label": "Recruter et sélectionner",
-          "time": "1 semaine"
-        },
-        {
-          "label": "Planifier les appels",
           "time": "4 jours"
         },
         {
-          "label": "Animer",
-          "time": "6 h par entretien"
+          "label": "Planifier les appels",
+          "time": "3 jours"
+        },
+        {
+          "label": "Animer 10 entretiens",
+          "time": "1 semaine"
         },
         {
           "label": "Retranscrire",
@@ -68,7 +68,7 @@
         },
         {
           "label": "Synthétiser et rédiger",
-          "time": "1 semaine"
+          "time": "4 jours"
         }
       ]
     },
