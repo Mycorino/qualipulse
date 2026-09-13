@@ -29,6 +29,9 @@ router = APIRouter(tags=["seo"])
 # or token-scoped and is disallowed in robots.txt.
 _STATIC_ROUTES: list[tuple[str, str, str]] = [
     ("/", "weekly", "1.0"),
+    ("/use-cases/churn", "monthly", "0.9"),
+    ("/use-cases/message-testing", "monthly", "0.9"),
+    ("/use-cases/nps", "monthly", "0.9"),
     ("/signup", "monthly", "0.9"),
     ("/blog", "weekly", "0.8"),
     ("/login", "monthly", "0.4"),

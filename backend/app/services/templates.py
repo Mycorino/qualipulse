@@ -159,7 +159,7 @@ TEMPLATES: List[ProjectTemplate] = [
             {"section_index": 0, "section_title": "First impressions", "question_index": 1, "main_question": "Walk me through your first session. What did you try to do first?", "interview_notes": "Chronological — first click, first action.", "desired_learning": "Initial path through product"},
             {"section_index": 1, "section_title": "Friction", "question_index": 2, "main_question": "Was there a moment you felt stuck or confused? What was happening?", "interview_notes": "Probe for specifics. 'What did the screen look like?'", "desired_learning": "Friction points"},
             {"section_index": 1, "section_title": "Friction", "question_index": 3, "main_question": "What did you do when you got stuck? Did you figure it out, ask for help, or give up?", "interview_notes": "", "desired_learning": "Self-serve vs. dropout"},
-            {"section_index": 2, "section_title": "First value", "question_index": 4, "main_question": "Was there a moment the product clicked for you — where you saw 'oh, this is useful'?", "interview_notes": "", "desired_learning": "Aha moment (or absence of one)"},
+            {"section_index": 2, "section_title": "First value", "question_index": 4, "main_question": "Was there a moment the product clicked for you, where you thought 'oh, this is useful'?", "interview_notes": "", "desired_learning": "Aha moment (or absence of one)"},
             {"section_index": 2, "section_title": "First value", "question_index": 5, "main_question": "What would have made your first session smoother or faster?", "interview_notes": "", "desired_learning": "Concrete improvement ideas"},
         ],
         "goals_buckets": ["onboarding_optimization", "usability_testing"],
@@ -294,6 +294,42 @@ TEMPLATES: List[ProjectTemplate] = [
         ],
         "goals_buckets": ["positioning", "competitor_research"],
         "product_stages": ["mvp", "growth", "scale"],
+        "customer_types": ["b2c", "b2b", "b2b2c"],
+    },
+    {
+        # Marketing "NPS deep dive" entry point (/use-cases/nps). Turns a
+        # score and a four-word survey comment into the story behind it.
+        "id": "nps-deep-dive",
+        "name": "NPS & CSAT Deep Dive",
+        "category": "research",
+        "icon": "💬",
+        "description": "Your survey gave you a score. Find out the story behind it: the exact moment, what they expected, and what would change the number.",
+        "best_for": "CX and insights teams with a survey signal that needs a why",
+        "duration_minutes": 12,
+        "research_objective": "Understand the concrete experiences behind our recent NPS / CSAT scores, so we can fix the root causes instead of the symptoms and prioritise the CX backlog on evidence.",
+        "target_audience": "People who answered our recent satisfaction survey, across detractors, passives and promoters (aim for a balanced mix so the drivers of each group can be compared).",
+        "learning_goals": [
+            "Which specific moment or incident explains the score they gave?",
+            "What did they expect at that moment, and what happened instead?",
+            "What single change would move their score, in their own words?",
+        ],
+        "screening_questions": [
+            {
+                "question": "Which score did you give us in the recent survey?",
+                "options": ["0 to 6", "7 or 8", "9 or 10", "I did not answer the survey"],
+                "disqualifying_options": ["I did not answer the survey"],
+            },
+        ],
+        "questions": [
+            {"section_index": 0, "section_title": "Your score", "question_index": 0, "main_question": "You gave us a score in our recent survey. What was going through your mind when you picked that number?", "interview_notes": "Warm-up. Do not defend the product; let them explain the number in their own terms.", "desired_learning": "The reasoning behind the score"},
+            {"section_index": 0, "section_title": "Your score", "question_index": 1, "main_question": "Was there one moment or interaction that weighed most on that score?", "interview_notes": "Push for one specific episode with a date, a channel, a person or a screen.", "desired_learning": "The anchoring incident"},
+            {"section_index": 1, "section_title": "The moment", "question_index": 2, "main_question": "Walk me through that moment from the start. What did you expect to happen?", "interview_notes": "Reconstruct the sequence step by step. Ask 'and then?' until the story is complete.", "desired_learning": "Expectation vs. what actually happened"},
+            {"section_index": 1, "section_title": "The moment", "question_index": 3, "main_question": "What did it cost you, practically speaking? Time, money, having to chase someone, something else?", "interview_notes": "Look for the consequence, not the feeling. This is what makes the driver actionable.", "desired_learning": "Concrete consequence of the incident"},
+            {"section_index": 2, "section_title": "What would change it", "question_index": 4, "main_question": "How does that compare with what you get from alternatives or from other companies you deal with?", "interview_notes": "Do not lead. Let them pick the comparison point.", "desired_learning": "The benchmark they judge us against"},
+            {"section_index": 2, "section_title": "What would change it", "question_index": 5, "main_question": "If we could change one thing, what would move your score, and by how much?", "interview_notes": "Ask for one thing, then probe how much it would actually move the number.", "desired_learning": "The single highest-leverage fix"},
+        ],
+        "goals_buckets": ["customer_retention", "usability_testing"],
+        "product_stages": ["growth", "scale"],
         "customer_types": ["b2c", "b2b", "b2b2c"],
     },
 ]

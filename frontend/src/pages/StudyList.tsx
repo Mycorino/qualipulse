@@ -14,6 +14,8 @@ import { useToast } from "../components/Toast";
 import { HubShell } from "../components/HubShell";
 import { AccountNudges } from "../components/AccountNudges";
 import { NewStudyModal } from "../components/NewStudyModal";
+import { getPendingTemplate } from "../utils/pendingTemplate";
+import { consumePendingTemplateStudy } from "../utils/templateStudy";
 import { NextActionChip } from "../components/NextActionChip";
 import { ResearchCopilotPanel } from "../components/ResearchCopilotPanel";
 import type { CopilotTarget } from "../api/copilot";
@@ -156,7 +158,7 @@ interface StudyRow {
 }
 
 export default function StudyList() {
-  const { t } = useTranslation("dashboard");
+  const { t, i18n } = useTranslation("dashboard");
   const [studies, setStudies] = useState<StudySummary[] | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   // ?new=1 opens the picker directly — used by the demo tour's final CTA.
@@ -174,6 +176,18 @@ export default function StudyList() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const announce = useNudgeAnnounce(nudges);
+
+  // A marketing use-case CTA stashes a template id (see utils/pendingTemplate)
+  // and new accounts consume it at the onboarding handoff. A returning user
+  // who clicked the same CTA lands here instead, so honour it once: create
+  // the study from the template and open it. No-op when nothing is pending.
+  useEffect(() => {
+    if (!getPendingTemplate()) return;
+    consumePendingTemplateStudy(i18n.language).then((projectId) => {
+      if (projectId) navigate(`/projects/${projectId}?tab=setup`, { replace: true });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The shell's palette routes "New study" here as /studies?new=1 — react
   // to the param appearing while mounted, then strip it so refresh/back

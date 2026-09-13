@@ -39,7 +39,7 @@ class TestSitemap:
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("application/xml")
         locs = _locs(resp.text)
-        for path in ("/", "/signup", "/blog", "/terms", "/privacy", "/retention-policy"):
+        for path in ("/", "/signup", "/blog", "/terms", "/privacy", "/retention-policy", "/use-cases/churn", "/use-cases/message-testing", "/use-cases/nps"):
             assert any(loc.endswith(path) for loc in locs), path
 
     def test_lists_published_posts_only(self, client, posts):
@@ -63,4 +63,4 @@ class TestSitemap:
 
     def test_empty_blog_still_renders(self, client):
         locs = _locs(client.get("/sitemap.xml").text)
-        assert len(locs) == 11
+        assert len(locs) == 14  # 11 static routes + 3 use-case pages

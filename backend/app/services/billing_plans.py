@@ -390,30 +390,37 @@ class CreditPackSpec:
     description: str = ""
 
 
-# Pay-as-you-go packs sit at a deliberate premium over every subscription's
-# per-credit rate (€12 / €11 / €10 per credit vs €5.33–8.90 in-plan) so a
-# subscription is always the cheaper way to buy interviews. Packs are the
-# no-commitment escape hatch (one-off study, top-up), priced for convenience.
+# Pay-as-you-go packs are priced at the matching plan's overage rate
+# (€7 / €6 / €5 per credit, same as Exploration / Team / Agency overage) so a
+# subscriber is never charged more for prepaying than for going over. They
+# stay above every plan's included per-credit rate (€5.33–8.90 in-plan), so a
+# subscription is still the cheaper way to buy interviews month after month.
+# Packs are the no-commitment escape hatch: one-off study, busy-month top-up.
+#
+# The Stripe Price objects behind these packs must carry the same
+# unit_amount: ``create_credit_pack_checkout`` refuses to open a checkout
+# when the catalogue and Stripe disagree, so a stale price can't silently
+# overcharge. Update the ``STRIPE_PRICE_PACK_*`` secrets when you touch these.
 CREDIT_PACKS: tuple[CreditPackSpec, ...] = (
     CreditPackSpec(
         id="pack_25",
         public_name="25 credits",
         credits=25,
-        price_cents=30000,  # €300 — €12/credit
+        price_cents=17500,  # €175 — €7/credit (= Exploration overage)
         description="Top-up for Exploration workspaces.",
     ),
     CreditPackSpec(
         id="pack_50",
         public_name="50 credits",
         credits=50,
-        price_cents=55000,  # €550 — €11/credit
+        price_cents=30000,  # €300 — €6/credit (= Team overage)
         description="Top-up for Team workspaces.",
     ),
     CreditPackSpec(
         id="pack_100",
         public_name="100 credits",
         credits=100,
-        price_cents=100000,  # €1000 — €10/credit
+        price_cents=50000,  # €500 — €5/credit (= Agency overage)
         description="Top-up for Agency workspaces.",
     ),
 )

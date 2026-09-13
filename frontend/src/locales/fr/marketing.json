@@ -10,12 +10,13 @@
     "faq": "FAQ",
     "login": "Se connecter",
     "startTrial": "Essai gratuit",
-    "toggleMenu": "Ouvrir le menu"
+    "toggleMenu": "Ouvrir le menu",
+    "useCases": "Cas d'usage"
   },
   "hero": {
-    "eyebrow": "Entretiens vocaux menés par une IA",
-    "title": "Vos entretiens utilisateurs, menés à la voix par une IA. Terminés d'ici vendredi.",
-    "sub": "QualiPulse <b>dialogue avec vos participants comme un chercheur</b> : il échange à l'oral pour affiner chaque réponse, puis vous livre une <b>synthèse claire, appuyée par les verbatims</b>. Sans planification, sans modérateur, sans week-end de retranscription.",
+    "eyebrow": "Entretiens vocaux IA avec les clients que vous avez déjà",
+    "title": "Transformez les clients que vous avez déjà en trente vraies conversations. Terminées d'ici vendredi.",
+    "sub": "Sans panel, sans planification. Envoyez un lien à vos clients partis, à vos répondants NPS ou à votre liste bêta. QualiPulse <b>mène chaque entretien à la voix comme un chercheur</b>, puis vous livre une <b>synthèse où chaque conclusion renvoie à un verbatim</b>.",
     "cta": "Commencer mon essai gratuit",
     "secondaryCta": "Voir un exemple de synthèse",
     "facts": [
@@ -37,7 +38,7 @@
     "a2": "Bonne question. Sûrement la planification du lundi. Quand je la saute, l'abonnement perd tout son sens."
   },
   "strip": {
-    "audience": "Conçu pour les <b>équipes produit</b>, les <b>chercheurs UX</b>, les <b>agences</b> et tous ceux qui écoutent la voix du client",
+    "audience": "Conçu pour les <b>responsables produit</b>, les <b>product marketers</b>, les <b>équipes CX et insights</b> et les <b>agences</b> qui les accompagnent",
     "credit": "1 crédit = 1 entretien terminé",
     "speed": "Du lancement à la première réponse : <b>le jour même</b>"
   },
@@ -160,7 +161,7 @@
     "billedAnnuallyAs": "Facturé {{amount}} € par an",
     "creditsPerMonth": "entretiens / mois",
     "surveyResponsesPerMonth": "réponses de sondage / mois",
-    "creditNote": "Un mois chargé ? Les packs de crédits prépayés (25 / 50 / 100) n'expirent jamais.",
+    "creditNote": "Un mois chargé ? Les packs prépayés n'expirent jamais : 25 entretiens pour {{p25}}, 50 pour {{p50}}, 100 pour {{p100}}.",
     "enterprise": "Un programme de recherche à grande échelle, avec volume sur mesure, SSO et revue de DPA ?",
     "enterpriseCta": "Parlons-en",
     "trial": {
@@ -238,7 +239,7 @@
       },
       {
         "question": "Les données sont-elles hébergées en Europe ?",
-        "answer": "Oui. Les bases de données sont hébergées dans l'UE, l'audio est chiffré au repos, et nous n'entraînons jamais de modèles d'IA sur vos recherches. Traitement conforme au RGPD, avec DPA signé, liste de sous-traitants et notice participants à disposition."
+        "answer": "Oui. Les bases de données sont hébergées dans l'UE, l'audio est chiffré au repos, et nous n'entraînons jamais de modèles d'IA sur vos recherches. Traitement conforme au RGPD, avec DPA signé, liste de sous-traitants et notice participants à disposition. La transcription et l'analyse par IA passent par OpenAI et Anthropic dans le cadre de clauses contractuelles types, listées sur notre page sous-traitants."
       },
       {
         "question": "Peut-on exporter les résultats ?",
@@ -258,7 +259,6 @@
     "productTitle": "Produit",
     "companyTitle": "Entreprise",
     "legalTitle": "Légal",
-    "features": "Fonctionnalités",
     "copilotLink": "Copilote de recherche",
     "pricingLink": "Tarifs",
     "blog": "Blog",
@@ -275,27 +275,187 @@
     "affiliate": "Programme d'affiliation",
     "contact": "Contact",
     "copy": "© 2026 QualiPulse · Conforme RGPD",
-    "interviewLink": "Vous avez un lien d'entretien ?"
+    "interviewLink": "Vous avez un lien d'entretien ?",
+    "useCases": "Cas d'usage"
   },
-  "features": {
-    "eyebrow": "Fonctionnalités",
-    "title": "Un intervieweur IA autonome, du guide d'entretien à la synthèse.",
+  "useCases": {
+    "eyebrow": "Partez d'une question",
+    "title": "Trois questions que les équipes nous posent. Trois études prêtes à lancer.",
+    "subtitle": "Chacune arrive avec un guide d'entretien, un questionnaire de sélection et un format de synthèse. Choisissez la question, envoyez le lien, lisez les réponses cette semaine.",
+    "learnMore": "Voir le protocole",
+    "sampleLabel": "L'intervieweur demande",
+    "items": {
+      "churn": {
+        "persona": "Pour les responsables produit",
+        "trigger": "Le churn monte, l'activation baisse. Le dashboard dit où, pas pourquoi.",
+        "title": "Pourquoi vos utilisateurs partent-ils ?",
+        "desc": "Envoyez un lien aux comptes résiliés le mois dernier. Obtenez le moment de rupture, le déclencheur et ce qui les aurait retenus, avec leurs mots.",
+        "sample": "Ramenez-moi à la semaine où vous avez décidé d'arrêter. Que s'est-il passé ?",
+        "cta": "Lancer une étude churn"
+      },
+      "messageTesting": {
+        "persona": "Pour les product marketers",
+        "trigger": "Trois accroches, un lancement dans deux semaines, et l'équipe vote à la préférence.",
+        "title": "Votre message est-il compris avant le lancement ?",
+        "desc": "Mettez deux ou trois propositions devant trente vrais acheteurs. Sachez laquelle ils comprennent, ce qu'ils objectent, et les mots qu'ils utilisent.",
+        "sample": "Avec vos mots, que fait cette entreprise ?",
+        "cta": "Tester un message"
+      },
+      "nps": {
+        "persona": "Pour les équipes CX et insights",
+        "trigger": "Le NPS a bougé. Les commentaires disent « livraison compliquée » et rien d'autre.",
+        "title": "Votre NPS a bougé. Découvrez pourquoi.",
+        "desc": "Invitez détracteurs, passifs et promoteurs à une conversation de douze minutes. Transformez une note et un commentaire de quatre mots en cause racine et en backlog priorisé.",
+        "sample": "Y a-t-il eu un moment qui a pesé plus que les autres dans votre note ?",
+        "cta": "Creuser votre NPS"
+      }
+    },
+    "pages": {
+      "common": {
+        "backHome": "QualiPulse",
+        "whenTitle": "Quand la lancer",
+        "designTitle": "Protocole de l'étude",
+        "rows": {
+          "participants": "Participants",
+          "duration": "Durée d'entretien",
+          "field": "Temps de terrain",
+          "deliverable": "Livrable"
+        },
+        "questionsTitle": "Les questions que pose l'intervieweur",
+        "questionsNote": "Chaque question est accompagnée de consignes de relance pour l'intervieweur IA. Modifiez ce que vous voulez avant d'envoyer le lien.",
+        "outputTitle": "À quoi ressemble un résultat",
+        "outputNote": "Exemple illustratif. Le thème, les chiffres et la citation sont fictifs ; les vôtres viendront de vos propres participants.",
+        "whatYouGetTitle": "Ce que vous obtenez",
+        "ctaTitle": "Trois entretiens offerts. Ce modèle préchargé.",
+        "ctaSub": "Créez votre compte, terminez une configuration de deux minutes, et votre première étude s'ouvre avec ce guide et ce questionnaire de sélection prêts à modifier.",
+        "ctaPrimary": "Lancer cette étude gratuitement",
+        "ctaSecondary": "Voir les tarifs",
+        "otherTitle": "Autres études prêtes à lancer"
+      },
+      "churn": {
+        "metaTitle": "Entretiens churn avec vos clients partis · QualiPulse",
+        "metaDescription": "Interrogez à la voix les utilisateurs partis le mois dernier, sans planification. Le moment de rupture, le déclencheur et ce qui les aurait retenus, reliés aux verbatims.",
+        "h1": "Pourquoi vos utilisateurs partent-ils ? Demandez-leur cette semaine.",
+        "sub": "Vos analytics montrent où les gens décrochent. Trente entretiens vocaux avec des comptes résiliés montrent pourquoi, et quel correctif les aurait retenus.",
+        "when": [
+          "Le churn ou les rétrogradations montent et le questionnaire de sortie dit « trop cher » sans détail.",
+          "Une cohorte bloque à la même étape d'onboarding et personne ne sait ce qu'elle attendait là.",
+          "Une fonctionnalité est sortie, l'adoption n'a pas bougé, et la réunion feuille de route est la semaine prochaine."
+        ],
+        "design": {
+          "participants": "24 à 36 entretiens terminés sur deux ou trois cohortes : partis, fragiles, engagés",
+          "duration": "10 à 15 minutes par entretien",
+          "field": "48 heures de terrain, synthèse au jour trois",
+          "deliverable": "Trois causes principales, moments déclencheurs, fonctionnalités de sauvetage, verbatims horodatés, une recommandation"
+        },
+        "questions": [
+          "Ramenez-moi à la semaine où vous avez décidé d'arrêter. Que s'est-il passé ?",
+          "Qu'espériez-vous accomplir en vous inscrivant ?",
+          "Que s'est-il passé à la place ?",
+          "Qu'avez-vous essayé ensuite ?",
+          "Qu'est-ce qui vous aurait fait rester ?"
+        ],
+        "output": {
+          "theme": "La décision se prend au renouvellement, pas pendant l'usage.",
+          "stat": "11 des 16 participants partis n'ont réévalué la valeur qu'à la réception de l'e-mail de renouvellement.",
+          "quote": "Je n'étais pas particulièrement mécontent. <m>Le renouvellement m'a juste forcé à me demander si je l'utilisais encore assez.</m>"
+        },
+        "whatYouGet": [
+          "Une liste classée des causes de départ, chacune appuyée par des participants nommés.",
+          "Les mots exacts des clients, prêts pour l'e-mail de rétention ou la page tarifs.",
+          "Une synthèse à transférer à la réunion feuille de route, chaque conclusion à un clic de sa citation."
+        ]
+      },
+      "messageTesting": {
+        "metaTitle": "Test de message et de concept avec de vrais acheteurs · QualiPulse",
+        "metaDescription": "Testez deux ou trois propositions auprès de trente vrais acheteurs avant le lancement. Compréhension spontanée, objections et mots utilisés, via des entretiens vocaux menés en quelques jours.",
+        "h1": "Lancez le message que vos clients comprennent, pas celui que votre équipe préfère.",
+        "sub": "Mettez vos propositions devant de vrais acheteurs avant la réunion de lancement. Sachez laquelle fonctionne, pour qui, et avec quels mots.",
+        "when": [
+          "Un lancement, un repositionnement ou une nouvelle landing page est dans deux semaines et le texte fait encore débat.",
+          "Le prix ou le packaging change et vous devez entendre comment les acheteurs décrivent la valeur.",
+          "Deux accroches divisent l'équipe et une réunion à cinq ne tranchera pas."
+        ],
+        "design": {
+          "participants": "30 à 45 personnes, 10 à 15 par segment stratégique",
+          "duration": "8 à 12 minutes par entretien",
+          "field": "Deux à trois jours",
+          "deliverable": "Message gagnant, mots des clients, objections principales, matrice segment par proposition, recommandation lancer ou retravailler"
+        },
+        "questions": [
+          "Avec vos mots, que fait cette entreprise ?",
+          "Quel problème cela résout-il pour vous, s'il y en a un ?",
+          "Qu'est-ce qui vous fait douter ?",
+          "Qu'utilisez-vous aujourd'hui pour ça ?",
+          "Voici une seconde version. Laquelle préféreriez-vous voir sur une landing page, et pourquoi ?"
+        ],
+        "output": {
+          "theme": "« Automatisation » décrit la technologie. « Ne plus courir après les validations » décrit le bénéfice.",
+          "stat": "9 acheteurs sur 12 ont choisi la formulation orientée résultat et l'ont restituée correctement.",
+          "quote": "« Automatisez votre workflow finance » me paraît générique. <m>« Plus besoin de relancer cinq personnes pour clôturer » me parle tout de suite.</m>"
+        },
+        "whatYouGet": [
+          "Un gagnant, avec pourquoi il gagne et pour quel segment.",
+          "Les objections à traiter sur la page avant qu'elles n'arrivent aux commerciaux.",
+          "Le langage client à coller dans le titre."
+        ]
+      },
+      "nps": {
+        "metaTitle": "Entretiens d'approfondissement NPS et CSAT · QualiPulse",
+        "metaDescription": "Transformez vos notes NPS et CSAT en conversations vocales avec détracteurs, passifs et promoteurs. Causes racines, moments de vérité et backlog CX priorisé en quelques jours.",
+        "h1": "Votre NPS vous donne une note. Obtenez l'histoire derrière.",
+        "sub": "Un commentaire de quatre mots n'est pas une cause racine. Invitez les répondants à une conversation de douze minutes et découvrez ce qui s'est vraiment passé.",
+        "when": [
+          "Le NPS ou le CSAT a baissé ce trimestre et la direction demande pourquoi.",
+          "Un nouveau motif de plainte apparaît dans les tickets et les commentaires libres sont trop courts pour agir.",
+          "Un point de contact post-achat ou d'onboarding sous-performe et le correctif n'est pas évident."
+        ],
+        "design": {
+          "participants": "36 à 60 répondants, ou 15 détracteurs, 15 passifs et 15 promoteurs",
+          "duration": "8 à 12 minutes par entretien",
+          "field": "Invitations au jour zéro, collecte sur deux à quatre jours, synthèse des causes au plus tard au jour cinq",
+          "deliverable": "Arbre des facteurs, moments de vérité, thèmes par segment, citations, backlog CX priorisé"
+        },
+        "questions": [
+          "Qu'aviez-vous en tête en choisissant ce chiffre ?",
+          "Y a-t-il eu un moment qui a pesé plus que les autres dans la note ?",
+          "Racontez-moi depuis le début. Qu'est-ce que vous attendiez ?",
+          "Concrètement, qu'est-ce que ça vous a coûté ?",
+          "Si nous ne changions qu'une chose, laquelle ferait bouger votre note ?"
+        ],
+        "output": {
+          "theme": "Le problème n'est pas la durée moyenne de livraison. C'est l'absence de nouvelle date fiable après un premier retard.",
+          "stat": "13 détracteurs sur 15 ont décrit une information manquante, pas une livraison lente.",
+          "quote": "Le retard, je pouvais vivre avec. <m>Ce qui m'a agacé, c'est que personne ne m'a donné la nouvelle date, alors je vérifiais sans arrêt.</m>"
+        },
+        "whatYouGet": [
+          "Des causes racines rattachées à un moment du parcours, pas à une tranche de note.",
+          "Des thèmes séparés entre détracteurs, passifs et promoteurs.",
+          "Un backlog ordonné selon le nombre de personnes qui butent sur le même obstacle."
+        ]
+      }
+    }
+  },
+  "founding": {
+    "eyebrow": "Clients fondateurs",
+    "title": "Nous préférons publier vos chiffres plutôt que nos promesses.",
+    "subtitle": "QualiPulse est jeune. Plutôt que des logos empruntés, nous accompagnons de près les dix premières équipes et publions ce que leurs études ont réellement trouvé.",
     "items": [
       {
-        "num": "01",
-        "title": "Des entretiens rapides, sans logistique",
-        "desc": "Un intervieweur IA autonome mène chaque entretien : sans modérateur, sans planification. Vous diffusez l'étude via un simple lien et les premières réponses arrivent le jour même."
+        "title": "Accompagnement main dans la main",
+        "desc": "Nous aidons à rédiger le premier guide, le questionnaire de sélection et l'invitation, puis nous relisons la synthèse avec vous."
       },
       {
-        "num": "02",
-        "title": "Des entretiens qualitatifs, à l'oral",
-        "desc": "L'IA prépare le guide d'entretien et les questions de sélection, puis dialogue avec chaque participant comme un chercheur : un échange qui affine les réponses, en 6 langues."
+        "title": "Votre mot à dire sur la feuille de route",
+        "desc": "Dites-nous ce qui bloque votre étude : nous le construisons avant tout le reste."
       },
       {
-        "num": "03",
-        "title": "Des analyses exploitables et traçables",
-        "desc": "Retranscription, synthèse, verbatims et recommandations : chaque conclusion est traçable jusqu'aux mots exacts du participant."
+        "title": "Un cas publié",
+        "desc": "En retour, nous rédigeons l'étude ensemble : la question posée, ce qui a été trouvé, ce qui a été livré. Vous validez chaque mot."
       }
-    ]
+    ],
+    "cta": "Candidater comme client fondateur",
+    "mailSubject": "Candidature client fondateur",
+    "note": "Dix places. Équipes produit, marketing et CX en Europe, avec une base clients active."
   }
 }
