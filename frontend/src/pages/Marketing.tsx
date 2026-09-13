@@ -363,7 +363,7 @@ export default function Marketing() {
   const howSteps = t("how.steps", { returnObjects: true }) as Array<{ num: string; title: string; desc: string }>;
   const guideLines = t("how.guideLines", { returnObjects: true }) as string[];
   const foundingItems = t("founding.items", { returnObjects: true }) as Array<{ title: string; desc: string }>;
-  const diffItems = t("diff.items", { returnObjects: true }) as Array<{ title: string; desc: string }>;
+  const diffItems = (t("diff.items", { returnObjects: true }) as Array<{ title: string; desc: string }>).slice(0, 3);
   const trialFeatures = t("pricing.trial.features", { returnObjects: true }) as string[];
   const faqs = t("faq.items", { returnObjects: true }) as Array<{ question: string; answer: string }>;
 
@@ -445,6 +445,47 @@ export default function Marketing() {
           <span><Trans t={t} i18nKey="strip.speed" components={{ b: <b /> }} /></span>
         </div>
       </div>
+
+      {/* ---- Use cases: three problem-led entry points ---- */}
+      <section
+        className={`mkt-section${useCasesAnim.visible ? " visible" : ""}`}
+        id="use-cases"
+        ref={useCasesAnim.ref as React.RefObject<HTMLElement>}
+      >
+        <div className="mkt-wrap">
+          <div className="mkt-section-head">
+            <span className="mkt-eyebrow">{t("useCases.eyebrow")}</span>
+            <h2>{t("useCases.title")}</h2>
+            <p>{t("useCases.subtitle")}</p>
+          </div>
+          <div className="mkt-uc-grid">
+            {USE_CASES.map((u) => (
+              <article key={u.slug} className="mkt-uc-card">
+                <span className="mkt-uc-persona">{t(`useCases.items.${u.key}.persona`)}</span>
+                <p className="mkt-uc-trigger">{t(`useCases.items.${u.key}.trigger`)}</p>
+                <h3>{t(`useCases.items.${u.key}.title`)}</h3>
+                <p>{t(`useCases.items.${u.key}.desc`)}</p>
+                <div className="mkt-uc-sample">
+                  <small>{t("useCases.sampleLabel")}</small>
+                  {t(`useCases.items.${u.key}.sample`)}
+                </div>
+                <div className="mkt-uc-actions">
+                  <Link
+                    to={signupPathForTemplate(u.templateId)}
+                    className="mkt-btn mkt-btn-primary"
+                    onClick={() => track("cta_signup_click", { location: `usecase_${u.slug}` })}
+                  >
+                    {t(`useCases.items.${u.key}.cta`)}
+                  </Link>
+                  <Link to={`/use-cases/${u.slug}`} className="mkt-uc-more">
+                    {t("useCases.learnMore")} →
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ---- Problem ---- */}
       <section
@@ -546,47 +587,6 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* ---- Use cases: three problem-led entry points ---- */}
-      <section
-        className={`mkt-section${useCasesAnim.visible ? " visible" : ""}`}
-        id="use-cases"
-        ref={useCasesAnim.ref as React.RefObject<HTMLElement>}
-      >
-        <div className="mkt-wrap">
-          <div className="mkt-section-head">
-            <span className="mkt-eyebrow">{t("useCases.eyebrow")}</span>
-            <h2>{t("useCases.title")}</h2>
-            <p>{t("useCases.subtitle")}</p>
-          </div>
-          <div className="mkt-uc-grid">
-            {USE_CASES.map((u) => (
-              <article key={u.slug} className="mkt-uc-card">
-                <span className="mkt-uc-persona">{t(`useCases.items.${u.key}.persona`)}</span>
-                <p className="mkt-uc-trigger">{t(`useCases.items.${u.key}.trigger`)}</p>
-                <h3>{t(`useCases.items.${u.key}.title`)}</h3>
-                <p>{t(`useCases.items.${u.key}.desc`)}</p>
-                <div className="mkt-uc-sample">
-                  <small>{t("useCases.sampleLabel")}</small>
-                  {t(`useCases.items.${u.key}.sample`)}
-                </div>
-                <div className="mkt-uc-actions">
-                  <Link
-                    to={signupPathForTemplate(u.templateId)}
-                    className="mkt-btn mkt-btn-primary"
-                    onClick={() => track("cta_signup_click", { location: `usecase_${u.slug}` })}
-                  >
-                    {t(`useCases.items.${u.key}.cta`)}
-                  </Link>
-                  <Link to={`/use-cases/${u.slug}`} className="mkt-uc-more">
-                    {t("useCases.learnMore")} →
-                  </Link>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ---- Evidence ---- */}
       <section
         className={`mkt-section mkt-dark${evidenceAnim.visible ? " visible" : ""}`}
@@ -603,6 +603,19 @@ export default function Marketing() {
           <p className="mkt-evi-note">
             <Trans t={t} i18nKey="evidence.note" components={{ b: <strong /> }} />
           </p>
+          <figure className="mkt-product">
+            <div className="mkt-product-frame">
+              <div className="mkt-product-bar" aria-hidden="true"><i /><i /><i /><span>app.qualipulse.com</span></div>
+              <img
+                src={isFr ? "/marketing/analysis-fr.png" : "/marketing/analysis-en.png"}
+                alt={t("product.alt")}
+                loading="lazy"
+                width={1280}
+                height={1000}
+              />
+            </div>
+            <figcaption>{t("product.caption")}</figcaption>
+          </figure>
         </div>
       </section>
 
@@ -624,41 +637,6 @@ export default function Marketing() {
                 <p>{item.desc}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ---- Founding customers (proof, honestly) ---- */}
-      <section
-        className={`mkt-section mkt-section-tight${foundingAnim.visible ? " visible" : ""}`}
-        id="founding"
-        ref={foundingAnim.ref as React.RefObject<HTMLElement>}
-      >
-        <div className="mkt-wrap">
-          <div className="mkt-founding">
-            <div>
-              <span className="mkt-eyebrow">{t("founding.eyebrow")}</span>
-              <h2>{t("founding.title")}</h2>
-              <p className="mkt-founding-intro">{t("founding.subtitle")}</p>
-            </div>
-            <div>
-              <ul className="mkt-founding-list">
-                {foundingItems.map((item) => (
-                  <li key={item.title}>
-                    <strong>{item.title}</strong>
-                    <span>{item.desc}</span>
-                  </li>
-                ))}
-              </ul>
-              <a
-                href={`mailto:hello@qualipulse.com?subject=${encodeURIComponent(t("founding.mailSubject"))}`}
-                className="mkt-btn mkt-btn-outline"
-                onClick={() => track("cta_signup_click", { location: "founding" })}
-              >
-                {t("founding.cta")}
-              </a>
-              <p className="mkt-founding-note">{t("founding.note")}</p>
-            </div>
           </div>
         </div>
       </section>
@@ -759,6 +737,41 @@ export default function Marketing() {
             {t("pricing.enterprise")}{" "}
             <a href="mailto:hello@qualipulse.com">{t("pricing.enterpriseCta")}</a>
           </p>
+        </div>
+      </section>
+
+      {/* ---- Founding customers (proof, honestly) ---- */}
+      <section
+        className={`mkt-section mkt-section-tight${foundingAnim.visible ? " visible" : ""}`}
+        id="founding"
+        ref={foundingAnim.ref as React.RefObject<HTMLElement>}
+      >
+        <div className="mkt-wrap">
+          <div className="mkt-founding">
+            <div>
+              <span className="mkt-eyebrow">{t("founding.eyebrow")}</span>
+              <h2>{t("founding.title")}</h2>
+              <p className="mkt-founding-intro">{t("founding.subtitle")}</p>
+            </div>
+            <div>
+              <ul className="mkt-founding-list">
+                {foundingItems.map((item) => (
+                  <li key={item.title}>
+                    <strong>{item.title}</strong>
+                    <span>{item.desc}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={`mailto:hello@qualipulse.com?subject=${encodeURIComponent(t("founding.mailSubject"))}`}
+                className="mkt-btn mkt-btn-outline"
+                onClick={() => track("cta_signup_click", { location: "founding" })}
+              >
+                {t("founding.cta")}
+              </a>
+              <p className="mkt-founding-note">{t("founding.note")}</p>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -584,6 +584,8 @@ html:has(.mkt) {
 }
 .mkt-diff:nth-child(3n) { border-right: none; }
 .mkt-diff:nth-child(n + 4) { border-bottom: none; }
+/* Three cells only: one row, no bottom rule. */
+.mkt-diff:nth-last-child(-n + 3) { border-bottom: none; }
 .mkt-diff h3 {
   font-size: 18.5px;
   margin-bottom: 8px;
@@ -1157,4 +1159,40 @@ html:has(.mkt) {
 }
 @media (max-width: 600px) {
   .mkt-timeline { grid-template-columns: 1fr; }
+}
+
+/* ---- Real product screenshot (evidence section) ---- */
+.mkt-product { margin: 56px 0 0; }
+.mkt-product-frame {
+  border: 1px solid var(--mk-hairline-dark);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--mk-ink-2);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+.mkt-product-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--mk-ink-3);
+  border-bottom: 1px solid var(--mk-hairline-dark);
+}
+.mkt-product-bar i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+}
+.mkt-product-bar span {
+  margin-left: 12px;
+  font-family: var(--mk-mono);
+  font-size: 11.5px;
+  color: var(--mk-muted-dark);
+}
+.mkt-product img { display: block; width: 100%; height: auto; }
+.mkt-product figcaption {
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--mk-muted-dark);
 }

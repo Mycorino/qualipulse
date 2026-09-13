@@ -1,6 +1,6 @@
 import { getTemplate } from "../api/templates";
 import { createProject, type ProjectResponse } from "../api/projects";
-import { clearPendingTemplate, getPendingTemplate } from "./pendingTemplate";
+import { clearPendingTemplate, getPendingTemplate, setPendingTemplate } from "./pendingTemplate";
 
 /** Researcher UI language → participant-facing project language. */
 export function projectLanguageFor(uiLanguage: string | undefined): "en" | "fr" {
@@ -60,12 +60,16 @@ export async function consumePendingTemplateStudy(
 ): Promise<string | null> {
   const templateId = getPendingTemplate();
   if (!templateId) return null;
+  // Clear synchronously, before the first await: two callers racing on the
+  // same stash (React StrictMode double-mounts effects in dev; a fast
+  // double navigation in prod) must not create the study twice. The
+  // unverified-email case restores it below.
+  clearPendingTemplate();
   try {
     const project = await createProjectFromTemplate(templateId, uiLanguage);
-    clearPendingTemplate();
     return project.id;
   } catch (err) {
-    if (!isEmailUnverifiedError(err)) clearPendingTemplate();
+    if (isEmailUnverifiedError(err)) setPendingTemplate(templateId);
     return null;
   }
 }

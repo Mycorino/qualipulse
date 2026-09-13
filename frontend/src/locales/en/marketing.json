@@ -176,18 +176,6 @@
       {
         "title": "Analysis grounded in evidence",
         "desc": "Themes, tensions and recommendations are backed by cited verbatims, never a general impression. You annotate; the analysis refines."
-      },
-      {
-        "title": "GDPR-compliant",
-        "desc": "Signed DPA, subprocessor list and participant notice available. Your data never trains AI models."
-      },
-      {
-        "title": "Data hosted in Europe",
-        "desc": "Databases live in the EU and audio is encrypted at rest. Your research belongs to you and exports whenever you want."
-      },
-      {
-        "title": "Available in multiple languages",
-        "desc": "Interviews in English, French, German, Spanish, Portuguese and Italian, and any transcript can be machine-translated as a reading aid."
       }
     ]
   },
@@ -497,5 +485,9 @@
     "cta": "Apply as a founding customer",
     "mailSubject": "Founding customer application",
     "note": "Ten places. Product, marketing and CX teams in Europe with a live customer base."
+  },
+  "product": {
+    "alt": "The QualiPulse analysis view: themes on the left, each with confidence, participant count and the verbatim quotes behind it.",
+    "caption": "The real thing, not a mock: the analysis view of the example study every new account starts with."
   }
 }

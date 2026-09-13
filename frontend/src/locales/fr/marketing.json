@@ -176,18 +176,6 @@
       {
         "title": "Une analyse fondée sur des preuves",
         "desc": "Thèmes, tensions et recommandations s'appuient sur des verbatims cités, jamais sur une impression générale. Vous annotez, l'analyse s'affine."
-      },
-      {
-        "title": "Conforme RGPD",
-        "desc": "DPA signé, liste des sous-traitants et notice participants à disposition. Vos données ne servent jamais à entraîner des modèles d'IA."
-      },
-      {
-        "title": "Données hébergées en Europe",
-        "desc": "Bases de données dans l'UE, audio chiffré au repos. Vos recherches vous appartiennent et s'exportent quand vous voulez."
-      },
-      {
-        "title": "Disponible en plusieurs langues",
-        "desc": "Entretiens en français, anglais, allemand, espagnol, portugais et italien, et chaque transcription peut être traduite comme aide à la lecture."
       }
     ]
   },
@@ -501,5 +489,9 @@
     "cta": "Candidater comme client fondateur",
     "mailSubject": "Candidature client fondateur",
     "note": "Dix places. Équipes produit, marketing et CX en Europe, avec une base clients active."
+  },
+  "product": {
+    "alt": "La vue d'analyse QualiPulse : les thèmes à gauche, chacun avec son niveau de confiance, le nombre de participants et les verbatims qui le soutiennent.",
+    "caption": "Pas une maquette : la vue d'analyse de l'étude exemple fournie à chaque nouveau compte."
   }
 }
