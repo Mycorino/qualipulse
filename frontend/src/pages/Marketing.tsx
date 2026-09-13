@@ -452,11 +452,32 @@ export default function Marketing() {
         id="problem"
         ref={problemAnim.ref as React.RefObject<HTMLElement>}
       >
-        <div className="mkt-wrap">
+        <div className="mkt-wrap mkt-problem-grid">
           <div className="mkt-section-head">
             <span className="mkt-eyebrow">{t("problem.eyebrow")}</span>
             <h2>{t("problem.title")}</h2>
             <p>{t("problem.subtitle")}</p>
+          </div>
+          <div className="mkt-timeline" aria-hidden="true">
+            {(["oldWay", "newWay"] as const).map((way) => {
+              const steps = t(`problem.${way}.steps`, { returnObjects: true }) as Array<{ label: string; time: string }>;
+              return (
+                <div key={way} className={`mkt-timeline-col mkt-timeline-${way}`}>
+                  <div className="mkt-timeline-head">
+                    <span>{t(`problem.${way}.title`)}</span>
+                    <strong>{t(`problem.${way}.total`)}</strong>
+                  </div>
+                  <ol>
+                    {steps.map((step) => (
+                      <li key={step.label}>
+                        <span>{step.label}</span>
+                        <small>{step.time}</small>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

@@ -45,7 +45,51 @@
   "problem": {
     "eyebrow": "The problem",
     "title": "Nobody skips research because they don’t care. They skip it because it’s slow.",
-    "subtitle": "Recruiting, scheduling, moderating, transcribing, synthesising: count three weeks and six hours per interview. By the time the study lands, the decision it was meant to inform has often already shipped."
+    "subtitle": "Recruiting, scheduling, moderating, transcribing, synthesising: count three weeks and six hours per interview. By the time the study lands, the decision it was meant to inform has often already shipped.",
+    "oldWay": {
+      "title": "The usual way",
+      "total": "3 weeks",
+      "steps": [
+        {
+          "label": "Recruit and screen",
+          "time": "1 week"
+        },
+        {
+          "label": "Schedule calls",
+          "time": "4 days"
+        },
+        {
+          "label": "Moderate",
+          "time": "6 h per interview"
+        },
+        {
+          "label": "Transcribe",
+          "time": "2 days"
+        },
+        {
+          "label": "Synthesise and write up",
+          "time": "1 week"
+        }
+      ]
+    },
+    "newWay": {
+      "title": "With QualiPulse",
+      "total": "This week",
+      "steps": [
+        {
+          "label": "Brief the study",
+          "time": "10 min, tonight"
+        },
+        {
+          "label": "Send one link",
+          "time": "first answers tomorrow"
+        },
+        {
+          "label": "Read the memo",
+          "time": "Friday"
+        }
+      ]
+    }
   },
   "how": {
     "eyebrow": "How it works",

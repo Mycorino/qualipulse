@@ -1087,3 +1087,74 @@ html:has(.mkt) {
   .mkt-uc-design dd { margin-bottom: 10px; }
   .mkt-uc-questions li { font-size: 16px; }
 }
+
+/* ---- Problem: old timeline vs QualiPulse week ---- */
+.mkt-problem-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 56px;
+  align-items: center;
+}
+.mkt-problem-grid .mkt-section-head { margin-bottom: 0; }
+.mkt-timeline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.mkt-timeline-col {
+  background: var(--mk-card);
+  border: 1px solid var(--mk-hairline);
+  border-radius: var(--mk-radius);
+  padding: 18px 18px 8px;
+}
+.mkt-timeline-newWay {
+  border-color: var(--mk-brand);
+  box-shadow: 0 12px 34px rgba(30, 63, 212, 0.10);
+}
+.mkt-timeline-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--mk-hairline);
+  margin-bottom: 6px;
+}
+.mkt-timeline-head span {
+  font-family: var(--mk-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mk-muted);
+}
+.mkt-timeline-head strong {
+  font-family: var(--mk-serif);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.mkt-timeline-newWay .mkt-timeline-head strong { color: var(--mk-brand-deep); }
+.mkt-timeline ol { list-style: none; margin: 0; padding: 0; }
+.mkt-timeline li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--mk-hairline);
+  font-size: 14px;
+}
+.mkt-timeline li:last-child { border-bottom: none; }
+.mkt-timeline li small {
+  font-family: var(--mk-mono);
+  font-size: 11.5px;
+  color: var(--mk-muted);
+}
+.mkt-timeline-oldWay li span { color: var(--mk-muted); }
+.mkt-timeline-newWay li span { font-weight: 600; }
+.mkt-timeline-newWay li small { color: var(--mk-brand-deep); }
+@media (max-width: 980px) {
+  .mkt-problem-grid { grid-template-columns: 1fr; gap: 36px; }
+}
+@media (max-width: 600px) {
+  .mkt-timeline { grid-template-columns: 1fr; }
+}

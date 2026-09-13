@@ -45,7 +45,51 @@
   "problem": {
     "eyebrow": "Le problème",
     "title": "Personne ne saute la recherche par désintérêt. On la saute parce qu'elle prend trop de temps.",
-    "subtitle": "Recruter, planifier, animer, retranscrire, synthétiser : comptez trois semaines et six heures par entretien. Le temps que l'étude arrive, la décision qu'elle devait éclairer est souvent déjà prise."
+    "subtitle": "Recruter, planifier, animer, retranscrire, synthétiser : comptez trois semaines et six heures par entretien. Le temps que l'étude arrive, la décision qu'elle devait éclairer est souvent déjà prise.",
+    "oldWay": {
+      "title": "La méthode habituelle",
+      "total": "3 semaines",
+      "steps": [
+        {
+          "label": "Recruter et sélectionner",
+          "time": "1 semaine"
+        },
+        {
+          "label": "Planifier les appels",
+          "time": "4 jours"
+        },
+        {
+          "label": "Animer",
+          "time": "6 h par entretien"
+        },
+        {
+          "label": "Retranscrire",
+          "time": "2 jours"
+        },
+        {
+          "label": "Synthétiser et rédiger",
+          "time": "1 semaine"
+        }
+      ]
+    },
+    "newWay": {
+      "title": "Avec QualiPulse",
+      "total": "Cette semaine",
+      "steps": [
+        {
+          "label": "Cadrer l'étude",
+          "time": "10 min, ce soir"
+        },
+        {
+          "label": "Envoyer un lien",
+          "time": "premières réponses demain"
+        },
+        {
+          "label": "Lire la synthèse",
+          "time": "vendredi"
+        }
+      ]
+    }
   },
   "how": {
     "eyebrow": "Comment ça marche",
