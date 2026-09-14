@@ -1,0 +1,291 @@
+{
+  "project_name": "[Démo] Courses alimentaires en ligne : habitudes & freins",
+  "participant_count": 10,
+  "generated_at": null,
+  "report": {
+    "summary": "Analyse affinée après revue chercheur. Le coût de switch invisible est confirmé comme le moteur principal de fidélité — c'est l'angle qui mérite le plus d'investissement produit. La friction des ruptures de stock est très actionnable et devrait être la priorité court terme : six participants sur dix l'ont mentionnée et une fonctionnalité simple (validation des substitutions) résoudrait le problème. Le thème de la sensibilité prix mérite plus de données — il est segmenté de façon nette par profil et il faudrait des entretiens supplémentaires sur des segments à plus faible revenu avant d'en faire une recommandation prioritaire.",
+    "themes": [
+      {
+        "title": "Le coût de switch invisible verrouille la fidélité",
+        "summary": "Sept participants sur dix décrivent leur fidélité à un service comme un effet d'inertie lié à l'historique stocké : panier type, listes, marques préférées. Changer d'enseigne, ce serait reconstruire des semaines de configuration — « repartir de zéro », dit Élodie. Ce coût n'est pas tarifé, ne sort pas dans les enquêtes prix, mais il pèse plus que les écarts de tarif sur la décision. Il disparaît chez les petits paniers, qui n'ont rien à reconstruire.",
+        "quotes": [
+          {
+            "text": "C'est une espèce de coût caché du switch que personne calcule mais qui est énorme",
+            "participant_display_name": "Camille D.",
+            "turn_index": 4
+          },
+          {
+            "text": "tout est déjà dedans chez U, changer c'est repartir de zéro",
+            "participant_display_name": "Élodie R.",
+            "turn_index": 4
+          },
+          {
+            "text": "Mes listes sont chez Carrefour, tout refaire ailleurs c'est une charge mentale que je veux pas me rajouter",
+            "participant_display_name": "Nadia T.",
+            "turn_index": 4
+          }
+        ],
+        "frequency": "7 participants sur 10"
+      },
+      {
+        "title": "Les ruptures de stock érodent la confiance plus que les frais",
+        "summary": "La frustration la plus citée n'est pas le prix de la livraison ou du service mais le sentiment que les Drives sont sous-stockés : 'ils ont jamais tout'. Sur un produit sensible (le lait infantile de Fatou), la rupture n'est plus un désagrément mais une rupture de confiance. Une fonctionnalité de validation des substitutions à l'avance résoudrait presque entièrement le problème mais aucune enseigne ne la propose.",
+        "quotes": [
+          {
+            "text": "ils ont jamais tout",
+            "participant_display_name": "Camille D.",
+            "turn_index": 2
+          },
+          {
+            "text": "je veux valider les remplacements avant, pas les découvrir dans le coffre",
+            "participant_display_name": "Nadia T.",
+            "turn_index": 3
+          },
+          {
+            "text": "Une rupture sur le lait du petit, c'est pas un désagrément, c'est une galère",
+            "participant_display_name": "Fatou D.",
+            "turn_index": 2
+          }
+        ],
+        "frequency": "6 participants sur 10"
+      },
+      {
+        "title": "La sensibilité prix dépend du profil, pas du service",
+        "summary": "Romain (famille de cinq) compare au centime près et reste chez Leclerc parce que c'est le moins cher ; Julien changerait d'enseigne pour cinq pour cent d'écart ; Fatou surveille le total à l'euro près. À l'autre extrême, Sophie et Anaïs (Genève) paient volontiers la fiabilité et la qualité du frais. Les enseignes qui se positionnent uniquement sur le prix captent un segment, pas le marché.",
+        "quotes": [
+          {
+            "text": "Leclerc est régulièrement le moins cher du marché",
+            "participant_display_name": "Romain B.",
+            "turn_index": 3
+          },
+          {
+            "text": "Pour cinq pour cent d'écart je change d'enseigne demain matin, sans état d'âme",
+            "participant_display_name": "Julien P.",
+            "turn_index": 4
+          },
+          {
+            "text": "je regarde le total à l'euro près, et si ça dépasse j'enlève des trucs du panier avant de valider",
+            "participant_display_name": "Fatou D.",
+            "turn_index": 4
+          }
+        ],
+        "frequency": "5 participants sur 10"
+      }
+    ],
+    "jobs_to_be_done": [
+      {
+        "job": "Quand je commande mes courses chaque semaine, je veux gagner du temps sans sacrifier la qualité, pour rendre du temps aux activités qui comptent vraiment.",
+        "insight": "Le gain de temps est la motivation racine, jamais le prix. Les services qui font perdre du temps (ruptures, retards) sont punis plus fort que ceux qui sont chers.",
+        "frequency": "9 participants sur 10"
+      },
+      {
+        "job": "Quand je change quelque chose dans ma vie (enfants, déménagement), je veux que mon service de courses s'adapte sans que je doive tout reconfigurer.",
+        "insight": "Le moment du changement de vie est aussi le moment où l'on change de service. C'est là que la concurrence peut gagner ou perdre.",
+        "frequency": "4 participants sur 10"
+      }
+    ],
+    "tensions": [
+      {
+        "tension": "Fiabilité vs flexibilité",
+        "detail": "Les utilisatrices veulent des créneaux fiables (Sophie) ET la possibilité de passer quand elles veulent (Camille avec le Drive). Aucune enseigne ne combine vraiment les deux — le Drive est flexible mais incertain sur le stock, la livraison est fiable mais rigide sur l'horaire."
+      },
+      {
+        "tension": "Confiance dans la sélection vs gain de temps",
+        "detail": "Plusieurs participantes déclarent ne pas vouloir qu'un livreur choisisse leurs fruits et légumes, ce qui les pousse vers le Drive. Mais le Drive n'élimine pas le problème : c'est le préparateur qui choisit. La promesse de gain de temps de la livraison est limitée par cette friction de confiance."
+      }
+    ],
+    "recommendations": [
+      {
+        "action": "Proposer une validation des substitutions à l'avance.",
+        "rationale": "La fonctionnalité la plus demandée et la plus simple à livrer.",
+        "owner_role": "Produit",
+        "horizon": "30d",
+        "impact": "high",
+        "effort": "low",
+        "kpi": "Taux de commandes sans litige de substitution.",
+        "falsifier": "Serait réfuté si les utilisatrices ignorent l'option et se plaignent quand même des substitutions."
+      },
+      {
+        "action": "Notifier proactivement les ruptures sur les produits récurrents, avec trois alternatives.",
+        "rationale": "Les ruptures découvertes à la livraison érodent la confiance plus que les frais.",
+        "owner_role": "Produit",
+        "horizon": "60_90d",
+        "impact": "high",
+        "effort": "medium",
+        "kpi": "Baisse des réclamations liées aux ruptures.",
+        "falsifier": "Serait réfuté si les notifications n'améliorent pas la satisfaction post-livraison."
+      },
+      {
+        "action": "Investir dans la fiabilité du créneau plutôt que dans la promotion.",
+        "rationale": "La fiabilité (modèle Coop@home) crée la fidélité long terme, pas la promo.",
+        "owner_role": "Opérations",
+        "horizon": "later",
+        "impact": "high",
+        "effort": "high",
+        "kpi": "Taux de créneaux tenus.",
+        "falsifier": "Serait réfuté si la fidélité ne bouge pas malgré une fiabilité accrue."
+      },
+      {
+        "action": "Permettre l'export et la portabilité de l'historique d'achats.",
+        "rationale": "Réduit la peur du switch et aide à capter les clients des enseignes concurrentes.",
+        "owner_role": "Produit",
+        "horizon": "later",
+        "impact": "medium",
+        "effort": "medium",
+        "kpi": "Taux de conversion des nouveaux venus important leur historique.",
+        "falsifier": "Serait réfuté si l'import d'historique n'augmente pas l'acquisition."
+      },
+      {
+        "action": "Cesser de se positionner uniquement sur le prix.",
+        "rationale": "Les segments aisés paient pour la fiabilité, pas pour la promo.",
+        "owner_role": "Marketing",
+        "horizon": "30d",
+        "impact": "medium",
+        "effort": "low",
+        "kpi": "Rétention des segments à fort panier.",
+        "falsifier": "Serait réfuté si les segments aisés réagissent surtout aux promotions."
+      }
+    ],
+    "personas": [
+      {
+        "name": "La Fidèle par inertie",
+        "grounded_in": [
+          "Camille D.",
+          "Nadia T.",
+          "Élodie R."
+        ],
+        "one_liner": "Reste par coût de switch et fiabilité, pas par prix.",
+        "segment": "Actives urbaines, usage installé",
+        "goals": [
+          "Gagner du temps sans tout reconfigurer"
+        ],
+        "frustrations": [
+          "Ruptures de stock",
+          "Peur de tout refaire ailleurs"
+        ],
+        "behaviours": [
+          "Réutilise un panier type chaque semaine"
+        ],
+        "primary_job": "Garder une routine de courses qui marche.",
+        "anchor_quote": {
+          "text": "C'est une espèce de coût caché du switch que personne calcule mais qui est énorme",
+          "participant_identifier": "Camille D."
+        }
+      },
+      {
+        "name": "L'Optimiseur familial",
+        "grounded_in": [
+          "Romain B.",
+          "Julien P.",
+          "Fatou D."
+        ],
+        "one_liner": "Compare au centime et choisit l'enseigne la moins chère.",
+        "segment": "Budgets serrés, paniers surveillés",
+        "goals": [
+          "Minimiser le coût du panier"
+        ],
+        "frustrations": [
+          "Écarts de prix entre enseignes",
+          "Frais de livraison"
+        ],
+        "behaviours": [
+          "Compare les prix avant de commander"
+        ],
+        "primary_job": "Nourrir le foyer au meilleur prix.",
+        "anchor_quote": {
+          "text": "Leclerc est régulièrement le moins cher du marché",
+          "participant_identifier": "Romain B."
+        }
+      },
+      {
+        "name": "L'Exigeante de la fiabilité",
+        "grounded_in": [
+          "Sophie L.",
+          "Élodie R.",
+          "Anaïs G."
+        ],
+        "one_liner": "Paie plus cher sans hésiter tant que le créneau et la qualité tiennent.",
+        "segment": "Organisation millimétrée, qualité d'abord",
+        "goals": [
+          "Un créneau qui ne saute jamais",
+          "Du frais qui tient la semaine"
+        ],
+        "frustrations": [
+          "Créneaux annulés",
+          "Frais choisi n'importe comment"
+        ],
+        "behaviours": [
+          "Reste des années chez l'enseigne qui livre à l'heure"
+        ],
+        "primary_job": "Pouvoir bâtir la semaine sur une livraison fiable.",
+        "anchor_quote": {
+          "text": "Coop livre dans le créneau, à chaque fois, depuis trois ans",
+          "participant_identifier": "Sophie L."
+        }
+      }
+    ],
+    "journey": {
+      "applicable": true,
+      "label": "Choisir et rester fidèle à un service de courses en ligne",
+      "stages": [
+        {
+          "name": "Essai",
+          "goal": "Tester un nouveau service",
+          "emotion": 1,
+          "quote": {
+            "text": "",
+            "participant_identifier": ""
+          },
+          "pain": "",
+          "opportunity": "Onboarding simple"
+        },
+        {
+          "name": "Routine",
+          "goal": "Installer son panier type",
+          "emotion": 2,
+          "quote": {
+            "text": "tout est déjà dedans chez U, changer c'est repartir de zéro",
+            "participant_identifier": "Élodie R."
+          },
+          "pain": "",
+          "opportunity": "Portabilité de l'historique"
+        },
+        {
+          "name": "Rupture",
+          "goal": "Recevoir la commande complète",
+          "emotion": -2,
+          "quote": {
+            "text": "ils ont jamais tout",
+            "participant_identifier": "Camille D."
+          },
+          "pain": "Ruptures de stock",
+          "opportunity": "Validation des substitutions"
+        },
+        {
+          "name": "Réévaluation",
+          "goal": "Comparer les enseignes",
+          "emotion": -1,
+          "quote": {
+            "text": "C'est une espèce de coût caché du switch que personne calcule mais qui est énorme",
+            "participant_identifier": "Camille D."
+          },
+          "pain": "Coût de switch invisible",
+          "opportunity": "Fiabilité du créneau"
+        },
+        {
+          "name": "Fidélisation",
+          "goal": "Rester par fiabilité",
+          "emotion": 1,
+          "quote": {
+            "text": "Coop livre dans le créneau, à chaque fois, depuis trois ans",
+            "participant_identifier": "Sophie L."
+          },
+          "pain": "",
+          "opportunity": ""
+        }
+      ]
+    },
+    "confidence": "high",
+    "participant_count": 10
+  }
+}

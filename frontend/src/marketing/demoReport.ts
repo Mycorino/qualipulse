@@ -1,22 +1,25 @@
-/**
- * Share tokens of the example study's report, one per language, embedded
- * under the evidence section of the homepage ("open the real report").
- *
- * They belong to a house account whose demo study was seeded in that
- * language; the report is read-only and public by design (share tokens are
- * the product's own sharing mechanism). Rotating a token here is the only
- * change needed if the house account is ever re-seeded.
- *
- * Empty string = no report for that language, the button is not rendered.
- */
-export const DEMO_REPORT_TOKENS: Record<"en" | "fr", string> = {
-  // TODO(prod): replace with the production house account's tokens before
-  // merging. These are the local preview database's tokens, so the panel
-  // works on localhost:5196 but will 404 in production until swapped.
-  en: "3isxN5_h_-yGgLmiagZOgtmYcfu1yKkDovMb4ldnaZI",
-  fr: "emgeAP4rW_IPKrgiOquzzWNZuq4LmyORiD-ounB0oFE",
-};
+import type { SharedReportData } from "../pages/SharedReport";
 
-export function demoReportToken(language: string | undefined): string {
-  return (language || "en").toLowerCase().startsWith("fr") ? DEMO_REPORT_TOKENS.fr : DEMO_REPORT_TOKENS.en;
+/**
+ * The example study's report, bundled for the homepage's "open the real
+ * report" panel.
+ *
+ * The JSON files are exported from the backend demo fixture
+ * (`demo_seeder._v2_report(lang)`, the researcher-refined analysis every
+ * new account's demo study ships with), so the panel shows exactly what a
+ * signup sees, with no house account, share token or network request.
+ * `backend/tests/test_demo_report_bundle.py` fails when the fixture and
+ * these files drift; re-export with:
+ *
+ *   cd backend && python -c "from scripts.export_demo_report import main; main()"
+ *
+ * Loaded lazily (dynamic import) so the ~10 KB per language never enters
+ * the marketing bundle or the prerender.
+ */
+export async function loadDemoReport(language: string | undefined): Promise<SharedReportData> {
+  const fr = (language || "en").toLowerCase().startsWith("fr");
+  const mod = fr
+    ? await import("./demoReport.fr.json")
+    : await import("./demoReport.en.json");
+  return mod.default as unknown as SharedReportData;
 }

@@ -1,0 +1,295 @@
+{
+  "project_name": "[Demo] How people choose streaming services",
+  "participant_count": 10,
+  "generated_at": null,
+  "report": {
+    "summary": "Refined after researcher review. The pause-state finding is the strongest retention insight in the dataset and is named or implied by seven of ten participants — ship it. The cancellation-friction theme is confirmed and immediately actionable. The catalogue-vs-curation theme is high-confidence for the smaller services but needs more evidence before we recommend Netflix-scale changes; their algorithm advantage may still outweigh the curation pull for their core users.",
+    "themes": [
+      {
+        "title": "Subscribers want a pause state, not a binary on/off",
+        "summary": "Seven of ten participants described cycling in and out of services around specific shows or seasons. The current subscribe/cancel binary makes leaving feel like a bigger decision than it is, which paradoxically increases churn because users cancel decisively rather than going dormant. A pause feature was named explicitly by two participants (Priya, Yuki) and the behaviour it would serve — seasonal or show-driven cycling — was described by five more.",
+        "quotes": [
+          {
+            "text": "let me have a pause button",
+            "participant_display_name": "Priya R.",
+            "turn_index": 5
+          },
+          {
+            "text": "I'd pause instead of cancel every single time",
+            "participant_display_name": "Yuki N.",
+            "turn_index": 5
+          },
+          {
+            "text": "I cancel Disney+ every June and sign back up in September, it's basically part of the school calendar at this point",
+            "participant_display_name": "Dana W.",
+            "turn_index": 1
+          }
+        ],
+        "frequency": "7 of 10 participants"
+      },
+      {
+        "title": "Cancellation friction is a re-acquisition tax",
+        "summary": "Participants notice and remember cancellation dark patterns. The friction doesn't prevent the cancellation — it just makes them less likely to come back later. This is a particularly costly trade-off given the cyclical subscribe-cancel-resubscribe behaviour the data reveals: Victor's 'starting from scratch like a stranger' captures how re-signup friction compounds the original cancellation friction.",
+        "quotes": [
+          {
+            "text": "The dark patterns on cancellation are something I notice and it actually affects whether I'll come back",
+            "participant_display_name": "Priya R.",
+            "turn_index": 3
+          },
+          {
+            "text": "It took me six screens and two guilt trips to cancel NOW",
+            "participant_display_name": "Tom O.",
+            "turn_index": 3
+          },
+          {
+            "text": "I was a customer six months ago, why am I starting from scratch like a stranger",
+            "participant_display_name": "Victor M.",
+            "turn_index": 2
+          }
+        ],
+        "frequency": "5 of 10 participants"
+      },
+      {
+        "title": "Loyalty lives at the catalogue, not at the brand",
+        "summary": "Subscribers stay for either exclusive content (NFL Sunday Ticket, Premier League football, Marvel/Star Wars) or for a service that has a clear editorial point of view (Netflix's deep recommendation history, Criterion's curation). Generic catalogues blur together and lose the moment the headliner show ends — Grace's forty minutes of scrolling that ends in a rewatch is what an undifferentiated catalogue feels like from the inside.",
+        "quotes": [
+          {
+            "text": "the ones that have something nobody else has",
+            "participant_display_name": "Marcus T.",
+            "turn_index": 3
+          },
+          {
+            "text": "I want a service that has a point of view",
+            "participant_display_name": "Alex K.",
+            "turn_index": 2
+          },
+          {
+            "text": "whoever has the football has me, it's as simple as that",
+            "participant_display_name": "Tom O.",
+            "turn_index": 4
+          },
+          {
+            "text": "I spend forty minutes scrolling and then just put on something I've already seen",
+            "participant_display_name": "Grace A.",
+            "turn_index": 3
+          }
+        ],
+        "frequency": "6 of 10 participants"
+      }
+    ],
+    "jobs_to_be_done": [
+      {
+        "job": "When I want to watch a specific show, I want to subscribe quickly, watch, and leave without feeling guilty, so I can match my spending to my actual viewing.",
+        "insight": "Show-driven subscribers are the modal pattern, not the exception. Services that fight this behaviour with retention friction lose them as future returnees.",
+        "frequency": "7 of 10 participants"
+      },
+      {
+        "job": "When a service raises my price, I want a moment to evaluate whether it's still worth it, so I don't keep paying out of inertia for something I don't use.",
+        "insight": "Price-increase emails are the single most common cancellation trigger — even when the service is still worth what users are paying. Timing the increase right after a flagship release lands could meaningfully reduce churn.",
+        "frequency": "6 of 10 participants"
+      }
+    ],
+    "tensions": [
+      {
+        "tension": "Algorithm vs editorial taste",
+        "detail": "Participants who use Netflix daily love its algorithm because it has years of behavioural data on them. Participants who try smaller services want curation and a point of view. The newer services are trying to be Netflix without the data advantage, and pleasing neither audience."
+      },
+      {
+        "tension": "Bundling convenience vs subscription overload",
+        "detail": "Bundles (Disney+/Hulu/ESPN, YouTube TV) reduce decision fatigue and create lock-in. But participants are also acutely aware of how stacked subscriptions have made streaming more expensive than the cable they replaced. Bundling solves the operator's retention problem and creates the user's budget problem."
+      }
+    ],
+    "recommendations": [
+      {
+        "action": "Ship a real pause feature (2–3 months, watchlist preserved).",
+        "rationale": "The most-requested unmet need — seven of ten cycle in and out around shows.",
+        "owner_role": "Product",
+        "horizon": "60_90d",
+        "impact": "high",
+        "effort": "high",
+        "kpi": "Reactivation rate of paused vs. cancelled accounts.",
+        "falsifier": "Wrong if paused users churn at the same rate as cancelled ones."
+      },
+      {
+        "action": "Audit and simplify the cancellation flow.",
+        "rationale": "The friction doesn't prevent churn — it prevents win-back.",
+        "owner_role": "Growth",
+        "horizon": "30d",
+        "impact": "high",
+        "effort": "low",
+        "kpi": "Re-subscription rate within 6 months of cancelling.",
+        "falsifier": "Wrong if win-back is unchanged after removing the dark patterns."
+      },
+      {
+        "action": "Time price increases to coincide with flagship releases.",
+        "rationale": "The price-increase email is the single biggest cancellation trigger.",
+        "owner_role": "Growth",
+        "horizon": "now",
+        "impact": "medium",
+        "effort": "low",
+        "kpi": "Churn in the 30 days after a price-change email.",
+        "falsifier": "Wrong if churn spikes regardless of release timing."
+      },
+      {
+        "action": "Invest in editorial curation as a differentiator.",
+        "rationale": "A point of view is what makes a service feel like more than a warehouse.",
+        "owner_role": "Product",
+        "horizon": "later",
+        "impact": "medium",
+        "effort": "high",
+        "kpi": "Retention of light users after the headliner show ends.",
+        "falsifier": "Wrong if curated services retain no better than algorithm-only ones."
+      },
+      {
+        "action": "Communicate proactively about what's coming (monthly).",
+        "rationale": "Subscribers want to be told what to watch, not left to the algorithm.",
+        "owner_role": "Marketing",
+        "horizon": "30d",
+        "impact": "medium",
+        "effort": "low",
+        "kpi": "Open + watch-through rate on 'coming soon' comms.",
+        "falsifier": "Wrong if proactive comms don't lift engagement between headliners."
+      }
+    ],
+    "personas": [
+      {
+        "name": "The Rotating Renter",
+        "grounded_in": [
+          "Priya R.",
+          "Marcus T.",
+          "Dana W.",
+          "Grace A."
+        ],
+        "one_liner": "Subscribes for a specific show, then leaves — wants to pause, not cancel.",
+        "segment": "Show-driven subscribers",
+        "goals": [
+          "Match spending to actual viewing"
+        ],
+        "frustrations": [
+          "Binary subscribe/cancel",
+          "Cancellation dark patterns"
+        ],
+        "behaviours": [
+          "Cancels the day the season ends"
+        ],
+        "primary_job": "Watch what I came for without paying for dead months.",
+        "anchor_quote": {
+          "text": "let me have a pause button",
+          "participant_identifier": "Priya R."
+        }
+      },
+      {
+        "name": "The Editorial Loyalist",
+        "grounded_in": [
+          "Alex K.",
+          "Marcus T.",
+          "Yuki N."
+        ],
+        "one_liner": "Stays for a clear point of view or exclusive content, not a generic catalogue.",
+        "segment": "Taste- and exclusivity-driven",
+        "goals": [
+          "A service with a distinct identity"
+        ],
+        "frustrations": [
+          "Interchangeable catalogues"
+        ],
+        "behaviours": [
+          "Leaves when the headliner ends"
+        ],
+        "primary_job": "Find things worth watching that nobody else has.",
+        "anchor_quote": {
+          "text": "I want a service that has a point of view",
+          "participant_identifier": "Alex K."
+        }
+      },
+      {
+        "name": "The Bill Auditor",
+        "grounded_in": [
+          "Victor M.",
+          "Tom O.",
+          "Sam B."
+        ],
+        "one_liner": "Tolerates the stack until a price-increase email forces a reckoning.",
+        "segment": "Household budget owners",
+        "goals": [
+          "Keep the total bill defensible"
+        ],
+        "frustrations": [
+          "Creeping price increases",
+          "Managing many logins"
+        ],
+        "behaviours": [
+          "Re-evaluates everything when one price moves"
+        ],
+        "primary_job": "Pay for what the household actually watches, nothing more.",
+        "anchor_quote": {
+          "text": "The minute one of those price increase emails lands, that service goes on trial in my head",
+          "participant_identifier": "Victor M."
+        }
+      }
+    ],
+    "journey": {
+      "applicable": true,
+      "label": "Reconsidering a streaming subscription",
+      "stages": [
+        {
+          "name": "Subscribe",
+          "goal": "Get access to a specific show",
+          "emotion": 1,
+          "quote": {
+            "text": "",
+            "participant_identifier": ""
+          },
+          "pain": "",
+          "opportunity": "Frictionless signup"
+        },
+        {
+          "name": "Binge",
+          "goal": "Watch the headliner",
+          "emotion": 2,
+          "quote": {
+            "text": "",
+            "participant_identifier": ""
+          },
+          "pain": "",
+          "opportunity": ""
+        },
+        {
+          "name": "Price nudge",
+          "goal": "Decide if it's still worth it",
+          "emotion": -1,
+          "quote": {
+            "text": "The minute one of those price increase emails lands, that service goes on trial in my head",
+            "participant_identifier": "Victor M."
+          },
+          "pain": "Price-increase email",
+          "opportunity": "Time increases to releases"
+        },
+        {
+          "name": "Cancel",
+          "goal": "Leave cleanly",
+          "emotion": -2,
+          "quote": {
+            "text": "The dark patterns on cancellation are something I notice and it actually affects whether I'll come back",
+            "participant_identifier": "Priya R."
+          },
+          "pain": "Dark-pattern cancel flow",
+          "opportunity": "Simplify cancellation"
+        },
+        {
+          "name": "Dormant",
+          "goal": "Come back for the next show",
+          "emotion": 0,
+          "quote": {
+            "text": "let me have a pause button",
+            "participant_identifier": "Priya R."
+          },
+          "pain": "No pause state",
+          "opportunity": "Ship a pause feature"
+        }
+      ]
+    },
+    "confidence": "high",
+    "participant_count": 10
+  }
+}

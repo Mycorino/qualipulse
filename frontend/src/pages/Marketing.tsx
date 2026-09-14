@@ -6,7 +6,8 @@ import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { track } from "../utils/analytics";
 import { USE_CASES, signupPathForTemplate } from "../marketing/useCases";
-import { demoReportToken } from "../marketing/demoReport";
+import { loadDemoReport } from "../marketing/demoReport";
+import type { SharedReportData } from "./SharedReport";
 
 // The real shared-report component, loaded only when a visitor opens the
 // panel (never during prerender, where the panel is closed).
@@ -328,15 +329,17 @@ export default function Marketing() {
   // place under the screenshot so the visitor never leaves the page (and
   // the signup CTA stays one click away in the panel bar).
   const [reportOpen, setReportOpen] = useState(false);
+  const [reportData, setReportData] = useState<SharedReportData | null>(null);
   const reportPanelRef = useRef<HTMLDivElement>(null);
-  const reportToken = demoReportToken(i18n.language);
   const openReport = useCallback(() => {
     setReportOpen(true);
     track("cta_signup_click", { location: "report_open" });
+    loadDemoReport(i18n.language).then(setReportData).catch(() => setReportOpen(false));
     window.requestAnimationFrame(() => {
       reportPanelRef.current?.scrollIntoView({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i18n.language]);
   const closeReport = useCallback(() => {
     setReportOpen(false);
     window.requestAnimationFrame(() => {
@@ -642,7 +645,7 @@ export default function Marketing() {
             </div>
             <figcaption>
               {t("product.caption")}
-              {reportToken && !reportOpen && (
+              {!reportOpen && (
                 <button type="button" className="mkt-btn mkt-btn-outline mkt-product-open" onClick={openReport}>
                   {t("product.openReport")}
                 </button>
@@ -650,7 +653,7 @@ export default function Marketing() {
             </figcaption>
           </figure>
 
-          {reportToken && reportOpen && (
+          {reportOpen && (
             <div className="mkt-report-panel" ref={reportPanelRef}>
               <div className="mkt-report-bar">
                 <span className="mkt-report-label">{t("product.panelLabel")}</span>
@@ -668,9 +671,13 @@ export default function Marketing() {
                 </div>
               </div>
               <div className="mkt-report-embed">
-                <Suspense fallback={<div className="mkt-report-loading">{t("product.loading")}</div>}>
-                  <SharedReportEmbed token={reportToken} />
-                </Suspense>
+                {reportData ? (
+                  <Suspense fallback={<div className="mkt-report-loading">{t("product.loading")}</div>}>
+                    <SharedReportEmbed data={reportData} />
+                  </Suspense>
+                ) : (
+                  <div className="mkt-report-loading">{t("product.loading")}</div>
+                )}
               </div>
               <div className="mkt-report-foot">
                 <button type="button" className="mkt-btn mkt-btn-outline" onClick={closeReport}>

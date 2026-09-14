@@ -6,7 +6,7 @@ import type { AnalysisReport, AttributedQuote } from "../api/projects";
 import { recommendationText } from "../api/projects";
 import { Skeleton } from "../components/Skeleton";
 
-interface SharedReportData {
+export interface SharedReportData {
   project_name: string | null;
   participant_count: number;
   generated_at: string | null;
@@ -19,19 +19,28 @@ export default function SharedReport() {
 }
 
 /**
- * The same report rendered inside another page (the marketing site embeds
- * the example study's report under its evidence section). No sticky
+ * The same report rendered inside another page with its data supplied by
+ * the host (the marketing site embeds the example study's report, bundled
+ * from the demo fixture, under its evidence section). No network, no sticky
  * header, no footer, no <head> changes: the host page owns its title and
  * robots meta, and a noindex leaking onto the homepage would be a disaster.
  */
-export function SharedReportEmbed({ token }: { token: string }) {
-  return <SharedReportView token={token} embedded />;
+export function SharedReportEmbed({ data }: { data: SharedReportData }) {
+  return <SharedReportView preloaded={data} embedded />;
 }
 
-function SharedReportView({ token, embedded = false }: { token?: string; embedded?: boolean }) {
+function SharedReportView({
+  token,
+  preloaded,
+  embedded = false,
+}: {
+  token?: string;
+  preloaded?: SharedReportData;
+  embedded?: boolean;
+}) {
   const { t, i18n } = useTranslation("analysis");
-  const [data, setData] = useState<SharedReportData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<SharedReportData | null>(preloaded ?? null);
+  const [loading, setLoading] = useState(!preloaded);
   const [error, setError] = useState<string | null>(null);
 
   // Token URLs are recipient-only; keep shared reports out of search.
@@ -46,7 +55,7 @@ function SharedReportView({ token, embedded = false }: { token?: string; embedde
   );
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || preloaded) return;
     fetch(`/api/reports/${token}`)
       .then((r) => {
         if (!r.ok) throw new Error(t("sharedReport.notFound"));
@@ -146,6 +155,7 @@ function SharedReportView({ token, embedded = false }: { token?: string; embedde
           <h1 className="shared-report-title">{data.project_name ?? t("sharedReport.researchReport")}</h1>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
             <span className="badge">{t("sharedReport.interviews", { count: report.participant_count })}</span>
+            {token && (
             <a
               className="btn btn-ghost btn-sm"
               href={`/api/reports/${token}/report.html`}
@@ -154,6 +164,7 @@ function SharedReportView({ token, embedded = false }: { token?: string; embedde
             >
               🖨 {t("sharedReport.printBtn")}
             </a>
+            )}
             {report.confidence && (
               <span
                 className="badge"

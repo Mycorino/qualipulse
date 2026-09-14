@@ -565,15 +565,17 @@ clears the stash and falls through to the normal landing.
 
 **Embedded real report.** The evidence section ends on a screenshot of the
 analysis view plus an "Open the real report" button that renders the example
-study's public shared report *in place* (`SharedReportEmbed` in
-`pages/SharedReport.tsx`, lazy-loaded; no page header/footer, and an empty
-`useHead` so the report's `noindex` never leaks onto the homepage). The panel
-carries the signup CTA in its bar and collapses back. Framing `/reports/...`
-in an iframe is impossible (`X-Frame-Options DENY` + `frame-ancestors 'none'`
-on the SPA), hence the in-tree render. Share tokens live in
-`frontend/src/marketing/demoReport.ts`, one per language, and must belong to
-a **house account** in production whose demo was seeded in that language;
-rotate them there if that account is ever re-seeded.
+study's report *in place* (`SharedReportEmbed` in `pages/SharedReport.tsx`,
+lazy-loaded; no page header/footer, and an empty `useHead` so the report's
+`noindex` never leaks onto the homepage). The panel carries the signup CTA in
+its bar and collapses back. The data is **bundled**, not fetched:
+`frontend/src/marketing/demoReport.{en,fr}.json` is exported from the seeder
+fixture (`demo_seeder._v2_report`) by `backend/scripts/export_demo_report.py`,
+so the panel needs no house account or share token and works in every
+environment. `backend/tests/test_demo_report_bundle.py` fails when the JSON
+drifts from the fixture: re-run the export after touching the demo report.
+Framing `/reports/...` in an iframe is impossible (`X-Frame-Options DENY` +
+`frame-ancestors 'none'` on the SPA), hence the in-tree render.
 
 Other homepage decisions from the September 2026 GTM review: the pricing
 toggle defaults to **monthly** (the annual view was being read as the list
