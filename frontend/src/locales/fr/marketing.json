@@ -492,6 +492,11 @@
   },
   "product": {
     "alt": "La vue d'analyse QualiPulse : les thèmes à gauche, chacun avec son niveau de confiance, le nombre de participants et les verbatims qui le soutiennent.",
-    "caption": "Pas une maquette : la vue d'analyse de l'étude exemple fournie à chaque nouveau compte."
+    "caption": "Pas une maquette : la vue d'analyse de l'étude exemple fournie à chaque nouveau compte.",
+    "openReport": "Ouvrir le vrai rapport",
+    "closeReport": "Fermer le rapport",
+    "panelLabel": "Rapport réel · l'étude exemple fournie à chaque compte",
+    "panelCta": "Lancer ça sur vos propres clients",
+    "loading": "Chargement du rapport…"
   }
 }

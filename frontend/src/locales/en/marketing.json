@@ -488,6 +488,11 @@
   },
   "product": {
     "alt": "The QualiPulse analysis view: themes on the left, each with confidence, participant count and the verbatim quotes behind it.",
-    "caption": "The real thing, not a mock: the analysis view of the example study every new account starts with."
+    "caption": "The real thing, not a mock: the analysis view of the example study every new account starts with.",
+    "openReport": "Open the real report",
+    "closeReport": "Close the report",
+    "panelLabel": "Live report · the example study every account starts with",
+    "panelCta": "Run this on your own customers",
+    "loading": "Loading the report…"
   }
 }

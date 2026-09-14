@@ -563,6 +563,18 @@ sends them there). Google signups are verified at creation and get the study
 straight from the handoff. Any other failure (unknown template, plan limit)
 clears the stash and falls through to the normal landing.
 
+**Embedded real report.** The evidence section ends on a screenshot of the
+analysis view plus an "Open the real report" button that renders the example
+study's public shared report *in place* (`SharedReportEmbed` in
+`pages/SharedReport.tsx`, lazy-loaded; no page header/footer, and an empty
+`useHead` so the report's `noindex` never leaks onto the homepage). The panel
+carries the signup CTA in its bar and collapses back. Framing `/reports/...`
+in an iframe is impossible (`X-Frame-Options DENY` + `frame-ancestors 'none'`
+on the SPA), hence the in-tree render. Share tokens live in
+`frontend/src/marketing/demoReport.ts`, one per language, and must belong to
+a **house account** in production whose demo was seeded in that language;
+rotate them there if that account is ever re-seeded.
+
 Other homepage decisions from the September 2026 GTM review: the pricing
 toggle defaults to **monthly** (the annual view was being read as the list
 price), pack prices are shown in the pricing note, the "Who owns the data"

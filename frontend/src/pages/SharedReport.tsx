@@ -15,16 +15,35 @@ interface SharedReportData {
 
 export default function SharedReport() {
   const { token } = useParams<{ token: string }>();
+  return <SharedReportView token={token} />;
+}
+
+/**
+ * The same report rendered inside another page (the marketing site embeds
+ * the example study's report under its evidence section). No sticky
+ * header, no footer, no <head> changes: the host page owns its title and
+ * robots meta, and a noindex leaking onto the homepage would be a disaster.
+ */
+export function SharedReportEmbed({ token }: { token: string }) {
+  return <SharedReportView token={token} embedded />;
+}
+
+function SharedReportView({ token, embedded = false }: { token?: string; embedded?: boolean }) {
   const { t, i18n } = useTranslation("analysis");
   const [data, setData] = useState<SharedReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Token URLs are recipient-only; keep shared reports out of search.
-  useHead({
-    title: `${data?.project_name ?? t("sharedReport.researchReport")} — QualiPulse`,
-    metas: [{ name: "robots", content: "noindex" }],
-  });
+  // Embedded: an empty spec, so the host page's head is left alone.
+  useHead(
+    embedded
+      ? {}
+      : {
+          title: `${data?.project_name ?? t("sharedReport.researchReport")} — QualiPulse`,
+          metas: [{ name: "robots", content: "noindex" }],
+        },
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -40,12 +59,14 @@ export default function SharedReport() {
 
   if (loading) {
     return (
-      <div className="shared-report-page">
+      <div className={`shared-report-page${embedded ? " shared-report-page--embedded" : ""}`}>
+        {!embedded && (
         <header className="shared-report-header">
           <div className="shared-report-header-inner">
             <div className="shared-report-brand">QualiPulse</div>
           </div>
         </header>
+        )}
         <main className="shared-report-main">
           <div className="shared-report-title-block">
             <Skeleton height="32px" width="60%" />
@@ -103,8 +124,9 @@ export default function SharedReport() {
   }
 
   return (
-    <div className="shared-report-page">
-      {/* Header */}
+    <div className={`shared-report-page${embedded ? " shared-report-page--embedded" : ""}`}>
+      {/* Header (page chrome: omitted when embedded in another page) */}
+      {!embedded && (
       <header className="shared-report-header">
         <div className="shared-report-header-inner">
           <div className="shared-report-brand">QualiPulse</div>
@@ -116,6 +138,7 @@ export default function SharedReport() {
           </div>
         </div>
       </header>
+      )}
 
       <main className="shared-report-main">
         {/* Title */}
@@ -249,9 +272,11 @@ export default function SharedReport() {
         )}
 
         {/* Footer */}
+        {!embedded && (
         <div style={{ textAlign: "center", padding: "32px 0 64px", color: "var(--text-tertiary)", fontSize: 13 }}>
           {t("sharedReport.generatedBy")} <strong>QualiPulse</strong> · {t("sharedReport.tagline")}
         </div>
+        )}
       </main>
     </div>
   );

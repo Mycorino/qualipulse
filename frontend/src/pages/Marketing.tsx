@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation, Trans } from "react-i18next";
 import { useHead } from "../hooks/useHead";
@@ -6,6 +6,13 @@ import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { track } from "../utils/analytics";
 import { USE_CASES, signupPathForTemplate } from "../marketing/useCases";
+import { demoReportToken } from "../marketing/demoReport";
+
+// The real shared-report component, loaded only when a visitor opens the
+// panel (never during prerender, where the panel is closed).
+const SharedReportEmbed = lazy(() =>
+  import("./SharedReport").then((m) => ({ default: m.SharedReportEmbed })),
+);
 
 // Credits-based plan catalogue (PR 3). Prices match the plans seeded in the
 // backend ``billing_plans.py``; keep in sync if either side changes.
@@ -317,6 +324,25 @@ export default function Marketing() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
+  // "Open the real report": the example study's shared report, rendered in
+  // place under the screenshot so the visitor never leaves the page (and
+  // the signup CTA stays one click away in the panel bar).
+  const [reportOpen, setReportOpen] = useState(false);
+  const reportPanelRef = useRef<HTMLDivElement>(null);
+  const reportToken = demoReportToken(i18n.language);
+  const openReport = useCallback(() => {
+    setReportOpen(true);
+    track("cta_signup_click", { location: "report_open" });
+    window.requestAnimationFrame(() => {
+      reportPanelRef.current?.scrollIntoView({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    });
+  }, []);
+  const closeReport = useCallback(() => {
+    setReportOpen(false);
+    window.requestAnimationFrame(() => {
+      document.getElementById("evidence")?.scrollIntoView({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+    });
+  }, []);
   const menuRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const initialHash = typeof window !== "undefined" ? window.location.hash : "";
@@ -614,8 +640,52 @@ export default function Marketing() {
                 height={1000}
               />
             </div>
-            <figcaption>{t("product.caption")}</figcaption>
+            <figcaption>
+              {t("product.caption")}
+              {reportToken && !reportOpen && (
+                <button type="button" className="mkt-btn mkt-btn-outline mkt-product-open" onClick={openReport}>
+                  {t("product.openReport")}
+                </button>
+              )}
+            </figcaption>
           </figure>
+
+          {reportToken && reportOpen && (
+            <div className="mkt-report-panel" ref={reportPanelRef}>
+              <div className="mkt-report-bar">
+                <span className="mkt-report-label">{t("product.panelLabel")}</span>
+                <div className="mkt-report-bar-actions">
+                  <Link
+                    to="/signup"
+                    className="mkt-btn mkt-btn-primary"
+                    onClick={() => track("cta_signup_click", { location: "report_embed" })}
+                  >
+                    {t("hero.cta")}
+                  </Link>
+                  <button type="button" className="mkt-btn mkt-btn-outline" onClick={closeReport}>
+                    {t("product.closeReport")}
+                  </button>
+                </div>
+              </div>
+              <div className="mkt-report-embed">
+                <Suspense fallback={<div className="mkt-report-loading">{t("product.loading")}</div>}>
+                  <SharedReportEmbed token={reportToken} />
+                </Suspense>
+              </div>
+              <div className="mkt-report-foot">
+                <button type="button" className="mkt-btn mkt-btn-outline" onClick={closeReport}>
+                  {t("product.closeReport")}
+                </button>
+                <Link
+                  to="/signup"
+                  className="mkt-btn mkt-btn-primary"
+                  onClick={() => track("cta_signup_click", { location: "report_embed_foot" })}
+                >
+                  {t("product.panelCta")}
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
