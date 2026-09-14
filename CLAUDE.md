@@ -460,6 +460,16 @@ lives on `credit_balances`; every credit movement is appended to
 | Agency | €799 | €7,990 | 150 / month | 8 | €5/credit |
 | Enterprise | custom | custom | custom annual | custom | per contract |
 
+**Prepaid credit packs** (`CREDIT_PACKS` in `billing_plans.py`, mirrored
+as `MARKETING_PACKS` on the pricing page and pinned by
+`tests/test_credit_packs.py`): 25 credits €175, 50 credits €300, 100 credits
+€500. Each pack is priced at the matching plan's overage rate (€7 / €6 /
+€5 per credit) so prepaying is never dearer than going over. The Stripe
+Price objects behind `STRIPE_PRICE_PACK_*` must carry the same
+`unit_amount`: `POST /billing/checkout/credits` retrieves the Price and
+returns 409 `credit_pack_price_mismatch` when catalogue and Stripe disagree,
+so a stale Stripe price surfaces as an error instead of a silent overcharge.
+
 Credits-based plans have **no active-project cap** — studies are unlimited
 on every plan; usage is gated by interview credits alone. The former
 `max_active_projects` column was dropped in Alembic 0055 (it was never
@@ -527,6 +537,39 @@ Each adapter exposes: `methodology` (system prompt fragment with rules and caps)
 - **HYBRID-WIZARD-AWARE.** The wizard captures role / company_size / use_case / decision_role before the chat starts. The agent must NEVER re-ask for these in turn 1 — it should reference them naturally and dive into the research goal.
 
 **Mission + NBA + Nudges.** Each surface declares a one-line **mission** shown in the panel header. A deterministic **NBA resolver** (`frontend/src/copilot/nextAction.ts` — `resolveProjectNextAction`, `resolveSurveyNextAction`, `resolveWorkspaceNextAction`, `resolveStudySummaryAction`) picks a single best next action from a priority ladder — **no LLM call**, runs on every render. Rendered as a chip in the dock or inline in empty states via `NextActionChip`. **Nudges** are localStorage-diffed events (`frontend/src/copilot/signals.ts`, key `copilot_signals_v2`): `analysis_ready`, `analysis_stale`, `data_milestone`, `quality_flag`, `study_report_ready`, `memo_ready`, `memo_stale`. 24h TTL, dismiss persists, and nudges for the current tab auto-suppress to avoid noise. The workspace NBA also carries two cross-study rungs (`generate_memo` when ≥2 studies have a ready analysis and no ready memo exists, `refresh_memo` when a ready memo went stale) — they fire only when no per-study action is more urgent, and route to the Decision-memos section with the create modal opened. New nudges are announced once via aria-live (`useNudgeAnnounce.ts`).
+
+### Marketing site: use-case entry points + template deep link
+The homepage leads with three problem-led entry points (`frontend/src/marketing/useCases.ts`):
+churn (`customer-churn` template), message testing (`brand-perception`) and
+NPS deep dive (`nps-deep-dive`). Each has a public landing page at
+`/use-cases/<slug>` (`pages/UseCasePage.tsx`, prerendered at build time via
+`prerender/entry.tsx`, listed in `/sitemap.xml`) and a card in the
+`#use-cases` section of `Marketing.tsx` (the old Features section). Copy lives
+under `useCases.*` in `locales/{en,fr}/marketing.json`.
+
+**Template deep link.** The "Start this study" CTAs go to
+`/signup?template=<id>`. `Signup.tsx` stashes the id in localStorage
+(`qp_pending_template`, 7-day TTL, `utils/pendingTemplate.ts`) so it survives
+the form and the Google OAuth round-trip. It is consumed by
+`consumePendingTemplateStudy` (`utils/templateStudy.ts`) at the onboarding
+handoff in `Welcome.tsx` and on the studies home (`StudyList.tsx`): the study
+is created from the template (objective + audience + screener + guide) and
+the user lands on `/projects/<id>?tab=setup`. **Study creation is gated on a
+verified email** (`require_verified_company`), so for a password signup the
+handoff attempt 403s with `email_unverified`; that specific error keeps the
+stash, the user gets the normal demo-tour handoff, and the study is created
+the first time they reach the studies home verified (the verify-email page
+sends them there). Google signups are verified at creation and get the study
+straight from the handoff. Any other failure (unknown template, plan limit)
+clears the stash and falls through to the normal landing.
+
+Other homepage decisions from the September 2026 GTM review: the pricing
+toggle defaults to **monthly** (the annual view was being read as the list
+price), pack prices are shown in the pricing note, the "Who owns the data"
+FAQ states that AI processing runs through OpenAI and Anthropic under SCCs,
+and a "Founding customers" band (`founding.*`) offers hands-on setup for a
+published case instead of borrowed logos. The wording of that offer is a
+business decision; adjust `founding.items` before launch if needed.
 
 ### Onboarding Flow
 > **Doc status:** everything below describing a *conversational* Phase 2 (ONBOARDING_ADAPTER, `/onboarding/copilot`, canonical reply chips, research-plan proposals, milestone bar) is a **design that was never merged** — none of it exists in the codebase. What ships today: `/welcome` is the structured wizard (`Welcome.tsx`), personalised via `GET /auth/onboarding/suggestions` (Haiku) and the company-name/domain backfills described below. The historical spec is kept for reference only.

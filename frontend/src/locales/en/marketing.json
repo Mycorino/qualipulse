@@ -10,12 +10,13 @@
     "faq": "FAQ",
     "login": "Log in",
     "startTrial": "Start free",
-    "toggleMenu": "Toggle menu"
+    "toggleMenu": "Toggle menu",
+    "useCases": "Use cases"
   },
   "hero": {
-    "eyebrow": "AI-moderated voice interviews",
-    "title": "Your customer interviews, run by an AI voice interviewer. Done by Friday.",
-    "sub": "QualiPulse <b>converses with your participants like a trained researcher</b>, a real spoken exchange that sharpens every answer, then delivers a <b>clear synthesis backed by verbatim quotes</b>. No scheduling, no moderating, no transcription weekend.",
+    "eyebrow": "AI voice interviews with the customers you already have",
+    "title": "Turn the customers you already have into thirty real conversations. Done by Friday.",
+    "sub": "No panel, no scheduling. Send one link to your churned users, your NPS respondents or your beta list. QualiPulse <b>interviews each of them by voice like a trained researcher</b>, then hands you a <b>decision memo where every claim links to a verbatim quote</b>.",
     "cta": "Start free with 3 interviews",
     "secondaryCta": "See the evidence trail",
     "facts": [
@@ -37,14 +38,58 @@
     "a2": "Good question. Probably the Monday planning thing. When I skip that, the whole subscription feels pointless."
   },
   "strip": {
-    "audience": "Built for <b>product teams</b>, <b>UX researchers</b>, <b>agencies</b> and anyone who listens to the voice of the customer",
+    "audience": "Built for <b>product leads</b>, <b>product marketers</b>, <b>CX and insights teams</b> and the <b>agencies</b> that serve them",
     "credit": "1 credit = 1 completed interview",
     "speed": "Brief to first response: <b>same day</b>"
   },
   "problem": {
     "eyebrow": "The problem",
     "title": "Nobody skips research because they don’t care. They skip it because it’s slow.",
-    "subtitle": "Recruiting, scheduling, moderating, transcribing, synthesising: count three weeks and six hours per interview. By the time the study lands, the decision it was meant to inform has often already shipped."
+    "subtitle": "Recruiting, scheduling, moderating, transcribing, synthesising: count three weeks, and about six hours of your team's time for every thirty minutes a participant actually talks. By the time the study lands, the decision it was meant to inform has often already shipped.",
+    "oldWay": {
+      "title": "The usual way",
+      "total": "3 weeks",
+      "steps": [
+        {
+          "label": "Recruit and screen",
+          "time": "4 days"
+        },
+        {
+          "label": "Schedule calls",
+          "time": "3 days"
+        },
+        {
+          "label": "Moderate 10 interviews",
+          "time": "1 week"
+        },
+        {
+          "label": "Transcribe",
+          "time": "2 days"
+        },
+        {
+          "label": "Synthesise and write up",
+          "time": "4 days"
+        }
+      ]
+    },
+    "newWay": {
+      "title": "With QualiPulse",
+      "total": "This week",
+      "steps": [
+        {
+          "label": "Brief the study",
+          "time": "10 min, tonight"
+        },
+        {
+          "label": "Send one link",
+          "time": "first answers tomorrow"
+        },
+        {
+          "label": "Read the memo",
+          "time": "Friday"
+        }
+      ]
+    }
   },
   "how": {
     "eyebrow": "How it works",
@@ -131,18 +176,6 @@
       {
         "title": "Analysis grounded in evidence",
         "desc": "Themes, tensions and recommendations are backed by cited verbatims, never a general impression. You annotate; the analysis refines."
-      },
-      {
-        "title": "GDPR-compliant",
-        "desc": "Signed DPA, subprocessor list and participant notice available. Your data never trains AI models."
-      },
-      {
-        "title": "Data hosted in Europe",
-        "desc": "Databases live in the EU and audio is encrypted at rest. Your research belongs to you and exports whenever you want."
-      },
-      {
-        "title": "Available in multiple languages",
-        "desc": "Interviews in English, French, German, Spanish, Portuguese and Italian, and any transcript can be machine-translated as a reading aid."
       }
     ]
   },
@@ -160,7 +193,7 @@
     "billedAnnuallyAs": "Billed €{{amount}} per year",
     "creditsPerMonth": "interviews / month",
     "surveyResponsesPerMonth": "survey responses / month",
-    "creditNote": "Need more in a busy month? Prepaid credit packs (25 / 50 / 100) never expire.",
+    "creditNote": "Need more in a busy month? Prepaid packs never expire: 25 interviews for {{p25}}, 50 for {{p50}}, 100 for {{p100}}.",
     "enterprise": "Running a large research program with custom volume, SSO and DPA reviews?",
     "enterpriseCta": "Talk to us about Enterprise",
     "trial": {
@@ -238,7 +271,7 @@
       },
       {
         "question": "Who owns the research data?",
-        "answer": "You do. Recordings, transcripts and reports belong to your workspace, databases live in the EU, audio is encrypted at rest, and we never train AI models on your research. GDPR-aligned processing with a signed DPA, subprocessor list and participant notice available."
+        "answer": "You do. Recordings, transcripts and reports belong to your workspace, databases live in the EU, audio is encrypted at rest, and we never train AI models on your research. GDPR-aligned processing with a signed DPA, subprocessor list and participant notice available. AI transcription and analysis run through OpenAI and Anthropic under standard contractual clauses, listed on our subprocessors page."
       }
     ]
   },
@@ -254,7 +287,6 @@
     "productTitle": "Product",
     "companyTitle": "Company",
     "legalTitle": "Legal",
-    "features": "Features",
     "copilotLink": "Research Copilot",
     "pricingLink": "Pricing",
     "blog": "Blog",
@@ -271,27 +303,191 @@
     "affiliate": "Affiliate program",
     "contact": "Contact",
     "copy": "© 2026 QualiPulse · GDPR-compliant",
-    "interviewLink": "Got an interview link?"
+    "interviewLink": "Got an interview link?",
+    "useCases": "Use cases"
   },
-  "features": {
-    "eyebrow": "Features",
-    "title": "An autonomous AI interviewer, from interview guide to synthesis.",
+  "useCases": {
+    "eyebrow": "Start from a question",
+    "title": "Three questions teams bring us. Three studies ready to launch.",
+    "subtitle": "Each one ships with an interview guide, a screener and a memo format. Pick the question, send the link, read the answers this week.",
+    "learnMore": "See the study design",
+    "sampleLabel": "The interviewer asks",
+    "items": {
+      "churn": {
+        "persona": "For product leads",
+        "trigger": "Churn is up. Activation is down. The dashboard says where, not why.",
+        "title": "Why are your users churning?",
+        "desc": "Send one link to last month's cancelled accounts. Get the switching moment, the trigger and what would have kept them, in their own words.",
+        "sample": "Take me back to the week you decided to cancel. What happened?",
+        "cta": "Start a churn study"
+      },
+      "messageTesting": {
+        "persona": "For product marketers",
+        "trigger": "Three taglines, one launch in two weeks, and the team is voting on preference.",
+        "title": "Is your message understood before launch?",
+        "desc": "Put two or three propositions in front of thirty real buyers. Learn which one they understand, what they object to, and the words they use for it.",
+        "sample": "In your own words, what does this company do?",
+        "cta": "Test a message"
+      },
+      "nps": {
+        "persona": "For CX and insights teams",
+        "trigger": "NPS moved. The open comments say \"delivery was complicated\" and nothing else.",
+        "title": "Your NPS moved. Find out why.",
+        "desc": "Invite detractors, passives and promoters to a twelve-minute conversation. Turn a score and a four-word comment into a root cause and a prioritised backlog.",
+        "sample": "Was there one moment that weighed most on the score you gave?",
+        "cta": "Dig into your NPS"
+      }
+    },
+    "pages": {
+      "common": {
+        "backHome": "QualiPulse",
+        "whenTitle": "When to run it",
+        "designTitle": "Study design",
+        "rows": {
+          "participants": "Participants",
+          "duration": "Interview length",
+          "field": "Field time",
+          "deliverable": "Deliverable"
+        },
+        "questionsTitle": "Questions the interviewer asks",
+        "questionsNote": "Every question comes with probing notes for the AI interviewer. Edit anything before you send the link.",
+        "outputTitle": "What a finding looks like",
+        "outputNote": "Illustrative example. The theme, figures and quote are fictional; yours will come from your own participants.",
+        "whatYouGetTitle": "What you get",
+        "ctaTitle": "Three free interviews. This template preloaded.",
+        "ctaSub": "Sign up, finish a two-minute setup, and your first study opens with this guide and screener ready to edit.",
+        "ctaPrimary": "Start this study free",
+        "ctaSecondary": "See pricing",
+        "otherTitle": "Other studies ready to launch"
+      },
+      "churn": {
+        "metaTitle": "Churn interviews with your cancelled users · QualiPulse",
+        "metaDescription": "Interview last month's churned users by voice, without scheduling. Get the switching moment, the trigger and what would have kept them, traced to verbatim quotes.",
+        "h1": "Why are your users churning? Ask them this week.",
+        "sub": "Your analytics show where people drop. Thirty voice interviews with cancelled accounts show why, and which fix would have kept them.",
+        "when": [
+          "Churn or downgrades are up and the exit survey says \"too expensive\" with no detail.",
+          "A cohort stalls at the same onboarding step and nobody knows what they expected there.",
+          "A feature shipped, adoption stayed flat, and the roadmap meeting is next week."
+        ],
+        "design": {
+          "participants": "24 to 36 completed interviews across two or three cohorts: churned, at-risk, engaged",
+          "duration": "10 to 15 minutes per interview",
+          "field": "48 hours of field time, memo on day three",
+          "deliverable": "Top three causes, trigger moments, rescue features, timestamped quotes, one recommendation"
+        },
+        "questions": [
+          "Take me back to the week you decided to cancel. What happened?",
+          "What were you hoping to accomplish when you signed up?",
+          "What happened instead?",
+          "What did you try next?",
+          "What would have made you stay?"
+        ],
+        "output": {
+          "theme": "The decision happens at renewal, not during usage.",
+          "stat": "11 of 16 churned participants only reassessed value when the renewal email landed.",
+          "quote": "I wasn't especially unhappy. <m>The renewal just made me ask whether I still used it enough.</m>"
+        },
+        "whatYouGet": [
+          "A ranked list of churn drivers, each backed by named participants.",
+          "The exact words customers use, ready for the retention email or the pricing page.",
+          "A memo you can forward to the roadmap meeting, with every claim one click from its quote."
+        ]
+      },
+      "messageTesting": {
+        "metaTitle": "Message and concept testing with real buyers · QualiPulse",
+        "metaDescription": "Test two or three propositions with thirty real buyers before launch. Unaided understanding, objections and the words they use, from voice interviews you run in days.",
+        "h1": "Launch the message your customers understand, not the one your team prefers.",
+        "sub": "Put your propositions in front of real buyers before the launch meeting. Learn which one lands, for whom, and in which words.",
+        "when": [
+          "A launch, repositioning or new landing page is two weeks out and the copy is still a debate.",
+          "Pricing or packaging is changing and you need to hear how buyers describe the value.",
+          "Two taglines split the team and a five-person call will not settle it."
+        ],
+        "design": {
+          "participants": "30 to 45 people, 10 to 15 per strategic segment",
+          "duration": "8 to 12 minutes per interview",
+          "field": "Two to three days",
+          "deliverable": "Winning message, the words customers use, top objections, segment by proposition heatmap, launch or rework recommendation"
+        },
+        "questions": [
+          "In your own words, what does this company do?",
+          "Which problem does this solve for you, if any?",
+          "What makes you doubt it?",
+          "What do you use today for this?",
+          "Here is a second version. Which one would you rather see on a landing page, and why?"
+        ],
+        "output": {
+          "theme": "\"Automation\" describes the technology. \"No more chasing approvals\" describes the benefit.",
+          "stat": "9 of 12 buyers picked the outcome-led line and repeated it back correctly.",
+          "quote": "\"Automate your finance workflow\" sounds generic. <m>\"Stop chasing five people to close the month\" speaks to me straight away.</m>"
+        },
+        "whatYouGet": [
+          "A winner, plus why it wins and for which segment.",
+          "The objections to answer on the page before they reach sales.",
+          "Customer language you can paste into the headline."
+        ]
+      },
+      "nps": {
+        "metaTitle": "NPS and CSAT deep-dive interviews · QualiPulse",
+        "metaDescription": "Turn NPS and CSAT scores into voice conversations with detractors, passives and promoters. Root causes, moments of truth and a prioritised CX backlog in days.",
+        "h1": "Your NPS gives you a score. Get the story behind it.",
+        "sub": "A four-word survey comment is not a root cause. Invite respondents to a twelve-minute conversation and find out what actually happened.",
+        "when": [
+          "NPS or CSAT dropped this quarter and leadership is asking why.",
+          "A new complaint theme shows up in tickets and the open comments are too short to act on.",
+          "A post-purchase or onboarding touchpoint is underperforming and the fix is not obvious."
+        ],
+        "design": {
+          "participants": "36 to 60 respondents, or 15 detractors, 15 passives and 15 promoters",
+          "duration": "8 to 12 minutes per interview",
+          "field": "Invites on day zero, collection over two to four days, root-cause memo by day five",
+          "deliverable": "Driver tree, moments of truth, themes by segment, quotes, prioritised CX backlog"
+        },
+        "questions": [
+          "What was going through your mind when you picked that number?",
+          "Was there one moment that weighed most on the score?",
+          "Walk me through it from the start. What did you expect to happen?",
+          "What did it cost you, practically speaking?",
+          "If we changed one thing, what would move your score?"
+        ],
+        "output": {
+          "theme": "The problem is not average delivery time. It is the absence of a reliable new date after a first delay.",
+          "stat": "13 of 15 detractors described a missed update, not a slow delivery.",
+          "quote": "I could live with the delay. <m>What got me was nobody telling me the new date, so I kept checking.</m>"
+        },
+        "whatYouGet": [
+          "Root causes tied to a moment in the journey, not to a score band.",
+          "Themes split by detractors, passives and promoters.",
+          "A backlog ordered by how many people hit the same wall."
+        ]
+      }
+    }
+  },
+  "founding": {
+    "eyebrow": "Founding customers",
+    "title": "We would rather publish your numbers than our promises.",
+    "subtitle": "QualiPulse is young. Instead of borrowed logos, we are working hands-on with the first ten teams and publishing what their studies actually found.",
     "items": [
       {
-        "num": "01",
-        "title": "Fast interviews, zero logistics",
-        "desc": "An autonomous AI interviewer runs every session: no moderator, no scheduling. Share the study through one link and the first responses arrive the same day."
+        "title": "Hands-on setup",
+        "desc": "We help draft your first guide, screener and invitation, and we review the memo with you."
       },
       {
-        "num": "02",
-        "title": "Qualitative interviews, out loud",
-        "desc": "The AI drafts your interview guide and screening questions, then converses with each participant like a researcher, a spoken exchange that sharpens every answer, in 6 languages."
+        "title": "A say in the roadmap",
+        "desc": "Tell us what blocks your study and we build it before anything else."
       },
       {
-        "num": "03",
-        "title": "Actionable, traceable analysis",
-        "desc": "Transcription, synthesis, verbatim quotes and recommendations: every conclusion traces back to the participant's exact words."
+        "title": "One published case",
+        "desc": "In return, we write up the study together: what you asked, what you found, what you shipped. You approve every word."
       }
-    ]
+    ],
+    "cta": "Apply as a founding customer",
+    "mailSubject": "Founding customer application",
+    "note": "Ten places. Product, marketing and CX teams in Europe with a live customer base."
+  },
+  "product": {
+    "alt": "The QualiPulse analysis view: themes on the left, each with confidence, participant count and the verbatim quotes behind it.",
+    "caption": "The real thing, not a mock: the analysis view of the example study every new account starts with."
   }
 }

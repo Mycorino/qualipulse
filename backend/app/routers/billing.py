@@ -509,6 +509,14 @@ def create_credit_pack_checkout(
         import stripe  # type: ignore
         stripe.api_key = stripe_key
 
+        # The catalogue price is what the UI shows; the Stripe Price is what
+        # the card is charged. Refuse to open a checkout when they disagree
+        # (a repriced pack whose STRIPE_PRICE_PACK_* secret was not rotated)
+        # so a stale price surfaces as a visible error, never as a silent
+        # overcharge. Raised as a PriceMismatch so the blanket handler below
+        # can pass it through as a 409 instead of remapping it to a 500.
+        _assert_pack_price_matches(stripe, price_id, pack)
+
         pack_metadata = {
             "company_id": company.id,
             "workspace_id": company.id,
@@ -544,9 +552,39 @@ def create_credit_pack_checkout(
         return {"checkout_url": session.url}
     except ImportError:
         raise HTTPException(status_code=503, detail="Stripe library not installed")
+    except _PackPriceMismatch as e:
+        logger.error("Credit-pack price mismatch: %s", e)
+        raise HTTPException(status_code=409, detail="credit_pack_price_mismatch")
     except Exception as e:  # pragma: no cover
         logger.error("Stripe credit-pack checkout error: %s", e)
         raise HTTPException(status_code=500, detail="Failed to create credit-pack checkout")
+
+
+class _PackPriceMismatch(Exception):
+    """Catalogue and Stripe disagree on what a credit pack costs."""
+
+
+def _assert_pack_price_matches(stripe_mod, price_id: str, pack) -> None:
+    """Compare the Stripe Price behind ``price_id`` with the catalogue pack.
+
+    A lookup failure (network, permissions) is logged and ignored so a
+    transient Stripe hiccup never blocks a purchase; only a *confirmed*
+    disagreement raises.
+    """
+    try:
+        price = stripe_mod.Price.retrieve(price_id)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning("Could not verify Stripe price %s for %s: %s", price_id, pack.id, e)
+        return
+    unit_amount = getattr(price, "unit_amount", None)
+    currency = (getattr(price, "currency", "") or "").upper()
+    if unit_amount is None:
+        return
+    if int(unit_amount) != int(pack.price_cents) or (currency and currency != pack.currency.upper()):
+        raise _PackPriceMismatch(
+            f"{pack.id}: catalogue {pack.price_cents} {pack.currency} vs Stripe "
+            f"{unit_amount} {currency} ({price_id})"
+        )
 
 
 @router.post("/portal")

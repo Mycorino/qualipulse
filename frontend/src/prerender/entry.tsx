@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server";
 import i18n from "../i18n";
@@ -10,6 +10,7 @@ import Signup from "../pages/Signup";
 import Terms from "../pages/Terms";
 import Privacy from "../pages/Privacy";
 import LegalDocument from "../pages/LegalDocument";
+import { UseCaseStatic } from "../pages/UseCasePage";
 
 /**
  * Build-time prerender entry (see scripts/prerender.mjs).
@@ -22,17 +23,22 @@ import LegalDocument from "../pages/LegalDocument";
  * Pages are rendered directly (not through App.tsx) to avoid the lazy() +
  * auth-redirect machinery, which is meaningless without a browser.
  */
-const ROUTES: Record<string, ComponentType> = {
-  "/": Marketing,
-  "/login": Login,
-  "/signup": Signup,
-  "/terms": Terms,
-  "/privacy": Privacy,
-  "/dpa": LegalDocument,
-  "/subprocessors": LegalDocument,
-  "/participant-notice": LegalDocument,
-  "/ai-use-policy": LegalDocument,
-  "/retention-policy": LegalDocument,
+const ROUTES: Record<string, () => ReactElement> = {
+  "/": () => <Marketing />,
+  "/login": () => <Login />,
+  "/signup": () => <Signup />,
+  "/terms": () => <Terms />,
+  "/privacy": () => <Privacy />,
+  "/dpa": () => <LegalDocument />,
+  "/subprocessors": () => <LegalDocument />,
+  "/participant-notice": () => <LegalDocument />,
+  "/ai-use-policy": () => <LegalDocument />,
+  "/retention-policy": () => <LegalDocument />,
+  // Pages are rendered outside <Routes>, so useParams() is empty here: the
+  // slug is passed explicitly.
+  "/use-cases/churn": () => <UseCaseStatic slug="churn" />,
+  "/use-cases/message-testing": () => <UseCaseStatic slug="message-testing" />,
+  "/use-cases/nps": () => <UseCaseStatic slug="nps" />,
   // /blog and /blog/:slug are NOT prerendered here: nginx proxies direct hits
   // to the backend's server-rendered pages (services/blog_render.py), which
   // can include per-post content and meta that a build-time snapshot cannot.
@@ -47,8 +53,8 @@ export interface RenderedRoute {
 }
 
 export async function renderRoute(path: string, lang: string): Promise<RenderedRoute> {
-  const Page = ROUTES[path];
-  if (!Page) throw new Error(`No prerender route registered for ${path}`);
+  const page = ROUTES[path];
+  if (!page) throw new Error(`No prerender route registered for ${path}`);
 
   await i18n.changeLanguage(lang);
 
@@ -59,7 +65,7 @@ export async function renderRoute(path: string, lang: string): Promise<RenderedR
     const html = renderToString(
       <StaticRouter location={path}>
         <ToastProvider>
-          <Page />
+          {page()}
         </ToastProvider>
       </StaticRouter>
     );

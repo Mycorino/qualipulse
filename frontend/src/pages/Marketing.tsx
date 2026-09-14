@@ -5,6 +5,7 @@ import { useHead } from "../hooks/useHead";
 import "./Marketing.css";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { track } from "../utils/analytics";
+import { USE_CASES, signupPathForTemplate } from "../marketing/useCases";
 
 // Credits-based plan catalogue (PR 3). Prices match the plans seeded in the
 // backend ``billing_plans.py``; keep in sync if either side changes.
@@ -33,6 +34,15 @@ const MARKETING_PLANS = [
     surveyResponses: 10000,
     highlight: false,
   },
+] as const;
+
+// Prepaid credit packs, mirrored from ``CREDIT_PACKS`` in billing_plans.py
+// (test_credit_packs.py pins these numbers). Priced at the matching plan's
+// overage rate so prepaying is never dearer than going over.
+const MARKETING_PACKS = [
+  { id: "pack_25", credits: 25, eur: 175 },
+  { id: "pack_50", credits: 50, eur: 300 },
+  { id: "pack_100", credits: 100, eur: 500 },
 ] as const;
 
 function prefersReducedMotion(): boolean {
@@ -306,14 +316,15 @@ export default function Marketing() {
   });
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("annual");
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
   const menuRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const initialHash = typeof window !== "undefined" ? window.location.hash : "";
 
   const problemAnim = useInView();
   const howAnim = useInView(0.12, initialHash === "#how");
-  const featuresAnim = useInView(0.12, initialHash === "#features");
+  const useCasesAnim = useInView(0.12, initialHash === "#use-cases");
+  const foundingAnim = useInView();
   const evidenceAnim = useInView(0.12, initialHash === "#evidence");
   const diffAnim = useInView();
   const pricingAnim = useInView(0.12, initialHash === "#pricing");
@@ -351,8 +362,8 @@ export default function Marketing() {
   const heroFacts = t("hero.facts", { returnObjects: true }) as string[];
   const howSteps = t("how.steps", { returnObjects: true }) as Array<{ num: string; title: string; desc: string }>;
   const guideLines = t("how.guideLines", { returnObjects: true }) as string[];
-  const featureItems = t("features.items", { returnObjects: true }) as Array<{ num: string; title: string; desc: string }>;
-  const diffItems = t("diff.items", { returnObjects: true }) as Array<{ title: string; desc: string }>;
+  const foundingItems = t("founding.items", { returnObjects: true }) as Array<{ title: string; desc: string }>;
+  const diffItems = (t("diff.items", { returnObjects: true }) as Array<{ title: string; desc: string }>).slice(0, 3);
   const trialFeatures = t("pricing.trial.features", { returnObjects: true }) as string[];
   const faqs = t("faq.items", { returnObjects: true }) as Array<{ question: string; answer: string }>;
 
@@ -369,6 +380,7 @@ export default function Marketing() {
           QualiPulse <span className="mkt-logo-dot" aria-hidden="true" />
         </Link>
         <div className="mkt-nav-links">
+          <a href="#use-cases">{t("nav.useCases")}</a>
           <a href="#how">{t("nav.howItWorks")}</a>
           <a href="#evidence">{t("nav.evidence")}</a>
           <a href="#pricing">{t("nav.pricing")}</a>
@@ -390,6 +402,7 @@ export default function Marketing() {
         </button>
         {mobileMenuOpen && (
           <div className="mkt-mobile-menu" ref={menuRef}>
+            <a href="#use-cases" onClick={closeMobileMenu}>{t("nav.useCases")}</a>
             <a href="#how" onClick={closeMobileMenu}>{t("nav.howItWorks")}</a>
             <a href="#evidence" onClick={closeMobileMenu}>{t("nav.evidence")}</a>
             <a href="#pricing" onClick={closeMobileMenu}>{t("nav.pricing")}</a>
@@ -433,17 +446,79 @@ export default function Marketing() {
         </div>
       </div>
 
+      {/* ---- Use cases: three problem-led entry points ---- */}
+      <section
+        className={`mkt-section${useCasesAnim.visible ? " visible" : ""}`}
+        id="use-cases"
+        ref={useCasesAnim.ref as React.RefObject<HTMLElement>}
+      >
+        <div className="mkt-wrap">
+          <div className="mkt-section-head">
+            <span className="mkt-eyebrow">{t("useCases.eyebrow")}</span>
+            <h2>{t("useCases.title")}</h2>
+            <p>{t("useCases.subtitle")}</p>
+          </div>
+          <div className="mkt-uc-grid">
+            {USE_CASES.map((u) => (
+              <article key={u.slug} className="mkt-uc-card">
+                <span className="mkt-uc-persona">{t(`useCases.items.${u.key}.persona`)}</span>
+                <p className="mkt-uc-trigger">{t(`useCases.items.${u.key}.trigger`)}</p>
+                <h3>{t(`useCases.items.${u.key}.title`)}</h3>
+                <p>{t(`useCases.items.${u.key}.desc`)}</p>
+                <div className="mkt-uc-sample">
+                  <small>{t("useCases.sampleLabel")}</small>
+                  {t(`useCases.items.${u.key}.sample`)}
+                </div>
+                <div className="mkt-uc-actions">
+                  <Link
+                    to={signupPathForTemplate(u.templateId)}
+                    className="mkt-btn mkt-btn-primary"
+                    onClick={() => track("cta_signup_click", { location: `usecase_${u.slug}` })}
+                  >
+                    {t(`useCases.items.${u.key}.cta`)}
+                  </Link>
+                  <Link to={`/use-cases/${u.slug}`} className="mkt-uc-more">
+                    {t("useCases.learnMore")} →
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ---- Problem ---- */}
       <section
         className={`mkt-section${problemAnim.visible ? " visible" : ""}`}
         id="problem"
         ref={problemAnim.ref as React.RefObject<HTMLElement>}
       >
-        <div className="mkt-wrap">
+        <div className="mkt-wrap mkt-problem-grid">
           <div className="mkt-section-head">
             <span className="mkt-eyebrow">{t("problem.eyebrow")}</span>
             <h2>{t("problem.title")}</h2>
             <p>{t("problem.subtitle")}</p>
+          </div>
+          <div className="mkt-timeline" aria-hidden="true">
+            {(["oldWay", "newWay"] as const).map((way) => {
+              const steps = t(`problem.${way}.steps`, { returnObjects: true }) as Array<{ label: string; time: string }>;
+              return (
+                <div key={way} className={`mkt-timeline-col mkt-timeline-${way}`}>
+                  <div className="mkt-timeline-head">
+                    <span>{t(`problem.${way}.title`)}</span>
+                    <strong>{t(`problem.${way}.total`)}</strong>
+                  </div>
+                  <ol>
+                    {steps.map((step) => (
+                      <li key={step.label}>
+                        <span>{step.label}</span>
+                        <small>{step.time}</small>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -512,29 +587,6 @@ export default function Marketing() {
         </div>
       </section>
 
-      {/* ---- Features (the three pillars) ---- */}
-      <section
-        className={`mkt-section${featuresAnim.visible ? " visible" : ""}`}
-        id="features"
-        ref={featuresAnim.ref as React.RefObject<HTMLElement>}
-      >
-        <div className="mkt-wrap">
-          <div className="mkt-section-head">
-            <span className="mkt-eyebrow">{t("features.eyebrow")}</span>
-            <h2>{t("features.title")}</h2>
-          </div>
-          <div className="mkt-cards-3">
-            {featureItems.map((item) => (
-              <div key={item.title} className="mkt-p-card">
-                <div className="mkt-p-figure">{item.num}</div>
-                <h3>{item.title}</h3>
-                <p>{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ---- Evidence ---- */}
       <section
         className={`mkt-section mkt-dark${evidenceAnim.visible ? " visible" : ""}`}
@@ -551,6 +603,19 @@ export default function Marketing() {
           <p className="mkt-evi-note">
             <Trans t={t} i18nKey="evidence.note" components={{ b: <strong /> }} />
           </p>
+          <figure className="mkt-product">
+            <div className="mkt-product-frame">
+              <div className="mkt-product-bar" aria-hidden="true"><i /><i /><i /><span>app.qualipulse.com</span></div>
+              <img
+                src={isFr ? "/marketing/analysis-fr.png" : "/marketing/analysis-en.png"}
+                alt={t("product.alt")}
+                loading="lazy"
+                width={1280}
+                height={1000}
+              />
+            </div>
+            <figcaption>{t("product.caption")}</figcaption>
+          </figure>
         </div>
       </section>
 
@@ -664,10 +729,49 @@ export default function Marketing() {
           </div>
           <p className="mkt-credit-note">
             {t("pricing.vatNoteLong")}{" "}
-            {t("pricing.creditNote")}{" "}
+            {t("pricing.creditNote", {
+              p25: formatEur(MARKETING_PACKS[0].eur),
+              p50: formatEur(MARKETING_PACKS[1].eur),
+              p100: formatEur(MARKETING_PACKS[2].eur),
+            })}{" "}
             {t("pricing.enterprise")}{" "}
             <a href="mailto:hello@qualipulse.com">{t("pricing.enterpriseCta")}</a>
           </p>
+        </div>
+      </section>
+
+      {/* ---- Founding customers (proof, honestly) ---- */}
+      <section
+        className={`mkt-section mkt-section-tight${foundingAnim.visible ? " visible" : ""}`}
+        id="founding"
+        ref={foundingAnim.ref as React.RefObject<HTMLElement>}
+      >
+        <div className="mkt-wrap">
+          <div className="mkt-founding">
+            <div>
+              <span className="mkt-eyebrow">{t("founding.eyebrow")}</span>
+              <h2>{t("founding.title")}</h2>
+              <p className="mkt-founding-intro">{t("founding.subtitle")}</p>
+            </div>
+            <div>
+              <ul className="mkt-founding-list">
+                {foundingItems.map((item) => (
+                  <li key={item.title}>
+                    <strong>{item.title}</strong>
+                    <span>{item.desc}</span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={`mailto:hello@qualipulse.com?subject=${encodeURIComponent(t("founding.mailSubject"))}`}
+                className="mkt-btn mkt-btn-outline"
+                onClick={() => track("cta_signup_click", { location: "founding" })}
+              >
+                {t("founding.cta")}
+              </a>
+              <p className="mkt-founding-note">{t("founding.note")}</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -716,7 +820,7 @@ export default function Marketing() {
             </div>
             <div className="mkt-footer-col">
               <h4>{t("footer.productTitle")}</h4>
-              <a href="#features">{t("footer.features")}</a>
+              <a href="#use-cases">{t("footer.useCases")}</a>
               <a href="#evidence">{t("footer.copilotLink")}</a>
               <a href="#pricing">{t("footer.pricingLink")}</a>
               <Link to="/blog">{t("footer.blog")}</Link>

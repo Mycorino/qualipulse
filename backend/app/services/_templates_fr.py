@@ -151,7 +151,7 @@ TEMPLATES_FR: dict[str, dict] = {
             {"section_title": "Premières impressions", "main_question": "Racontez-moi votre première session. Qu'avez-vous essayé de faire en premier ?", "interview_notes": "Chronologique — premier clic, première action.", "desired_learning": "Chemin initial dans le produit"},
             {"section_title": "Friction", "main_question": "Y a-t-il eu un moment où vous vous êtes senti bloqué ou confus ? Que se passait-il ?", "interview_notes": "Cherchez du concret. 'À quoi ressemblait l'écran ?'", "desired_learning": "Points de friction"},
             {"section_title": "Friction", "main_question": "Qu'avez-vous fait quand vous étiez bloqué ? Vous avez trouvé, demandé de l'aide, ou abandonné ?", "interview_notes": "", "desired_learning": "Autonomie vs. abandon"},
-            {"section_title": "Premier déclic", "main_question": "Y a-t-il eu un moment où le produit a fait 'tilt' — où vous vous êtes dit 'ah oui, c'est utile' ?", "interview_notes": "", "desired_learning": "Moment déclic (ou son absence)"},
+            {"section_title": "Premier déclic", "main_question": "Y a-t-il eu un moment où le produit a fait 'tilt', où vous vous êtes dit 'ah oui, c'est utile' ?", "interview_notes": "", "desired_learning": "Moment déclic (ou son absence)"},
             {"section_title": "Premier déclic", "main_question": "Qu'est-ce qui aurait rendu votre première session plus fluide ou plus rapide ?", "interview_notes": "", "desired_learning": "Idées d'amélioration concrètes"},
         ],
     },
@@ -307,6 +307,44 @@ TEMPLATES_FR: dict[str, dict] = {
             {"section_title": "Messages", "main_question": "Je vais vous lire une accroche. Dites-moi ce qu'elle vous fait ressentir ou penser : '[ACCROCHE]'", "interview_notes": "Pause après la lecture. Laissez-les réagir.", "desired_learning": "Réception de l'accroche"},
             {"section_title": "Messages", "main_question": "Est-ce que cette accroche rend plus clair ce que fait le produit, ou plus confus ?", "interview_notes": "", "desired_learning": "Clarté"},
             {"section_title": "Cadrage concurrentiel", "main_question": "Si vous deviez décrire ce que nous faisons à un ami, comment feriez-vous ?", "interview_notes": "", "desired_learning": "Formulation naturelle"},
+        ],
+    },
+    "nps-deep-dive": {
+        "name": "Comprendre une note NPS ou CSAT",
+        "description": (
+            "Votre enquête vous a donné une note. Découvrez l'histoire derrière : "
+            "le moment précis, ce qu'ils attendaient, et ce qui ferait bouger le chiffre."
+        ),
+        "best_for": "Équipes CX et insights qui ont un signal d'enquête et cherchent le pourquoi",
+        "research_objective": (
+            "Comprendre les expériences concrètes derrière nos dernières notes NPS / CSAT, "
+            "pour corriger les causes plutôt que les symptômes et prioriser le backlog "
+            "CX sur des preuves."
+        ),
+        "target_audience": (
+            "Personnes ayant répondu à notre dernière enquête de satisfaction, détracteurs, "
+            "passifs et promoteurs confondus (visez un mélange équilibré pour comparer "
+            "les moteurs de chaque groupe)."
+        ),
+        "learning_goals": [
+            "Quel moment ou incident précis explique la note donnée ?",
+            "Qu'attendaient-ils à ce moment-là, et que s'est-il passé à la place ?",
+            "Quel changement unique ferait bouger leur note, avec leurs mots ?",
+        ],
+        "screening_questions": [
+            {
+                "question": "Quelle note nous avez-vous donnée dans la dernière enquête ?",
+                "options": ["0 à 6", "7 ou 8", "9 ou 10", "Je n'ai pas répondu à l'enquête"],
+                "disqualifying_options": ["Je n'ai pas répondu à l'enquête"],
+            },
+        ],
+        "questions": [
+            {"section_title": "Votre note", "main_question": "Vous nous avez donné une note dans notre dernière enquête. Qu'aviez-vous en tête en choisissant ce chiffre ?", "interview_notes": "Échauffement. Ne défendez pas le produit ; laissez-les expliquer la note avec leurs mots.", "desired_learning": "Le raisonnement derrière la note"},
+            {"section_title": "Votre note", "main_question": "Y a-t-il eu un moment ou un échange qui a pesé plus que les autres dans cette note ?", "interview_notes": "Cherchez un épisode précis : une date, un canal, une personne ou un écran.", "desired_learning": "L'incident qui ancre la note"},
+            {"section_title": "Le moment", "main_question": "Racontez-moi ce moment depuis le début. Qu'est-ce que vous attendiez ?", "interview_notes": "Reconstituez la séquence étape par étape. Demandez 'et ensuite ?' jusqu'à avoir toute l'histoire.", "desired_learning": "Attente vs. ce qui s'est réellement passé"},
+            {"section_title": "Le moment", "main_question": "Concrètement, qu'est-ce que ça vous a coûté ? Du temps, de l'argent, des relances, autre chose ?", "interview_notes": "Cherchez la conséquence, pas l'émotion. C'est ce qui rend le levier actionnable.", "desired_learning": "Conséquence concrète de l'incident"},
+            {"section_title": "Ce qui ferait bouger la note", "main_question": "Comment ça se compare à ce que vous obtenez ailleurs, chez d'autres entreprises ou avec d'autres solutions ?", "interview_notes": "Ne menez pas. Laissez-les choisir leur point de comparaison.", "desired_learning": "Le référentiel auquel ils nous comparent"},
+            {"section_title": "Ce qui ferait bouger la note", "main_question": "Si nous ne pouvions changer qu'une seule chose, laquelle ferait bouger votre note, et de combien ?", "interview_notes": "Demandez une seule chose, puis creusez de combien la note bougerait vraiment.", "desired_learning": "Le correctif au plus fort levier"},
         ],
     },
 }

@@ -58,6 +58,7 @@ const PanelJoinConfirm = lazyWithRetry(() => import("./pages/PanelJoinConfirm"))
 const PanelOptOut = lazyWithRetry(() => import("./pages/PanelOptOut"));
 const ParticipantPool = lazyWithRetry(() => import("./pages/ParticipantPool"));
 const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
+const UseCasePage = lazyWithRetry(() => import("./pages/UseCasePage"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 const AccountLayout = lazyWithRetry(() => import("./pages/account/AccountLayout"));
 const AccountHome = lazyWithRetry(() => import("./pages/account/AccountHome"));
@@ -176,7 +177,11 @@ const PUBLIC_PAGEVIEW_PATHS = new Set([
 ]);
 
 function isPublicPageviewPath(pathname: string): boolean {
-  return PUBLIC_PAGEVIEW_PATHS.has(pathname) || pathname.startsWith("/blog/");
+  return (
+    PUBLIC_PAGEVIEW_PATHS.has(pathname) ||
+    pathname.startsWith("/blog/") ||
+    pathname.startsWith("/use-cases/")
+  );
 }
 
 export default function App() {
@@ -215,6 +220,7 @@ export default function App() {
       <Route path="/participant-notice" element={<LegalDocument />} />
       <Route path="/ai-use-policy" element={<LegalDocument />} />
       <Route path="/retention-policy" element={<LegalDocument />} />
+      <Route path="/use-cases/:slug" element={<UseCasePage />} />
       <Route
         path="/welcome"
         element={

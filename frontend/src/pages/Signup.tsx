@@ -7,6 +7,7 @@ import { useAuth, setCachedOnboarded } from "../hooks/useAuth";
 import { getErrorMessage } from "../utils/errorMessages";
 import { checkoutUrlForSelectedPlan } from "../utils/planCheckout";
 import { getStoredRefCode } from "../utils/referral";
+import { setPendingTemplate } from "../utils/pendingTemplate";
 import { getAttribution } from "../utils/attribution";
 import { useToast } from "../components/Toast";
 import LanguageSwitcher from "../components/LanguageSwitcher";
@@ -59,6 +60,10 @@ export default function Signup() {
   // Plan chosen on landing page (?plan=exploration|team|agency, ?interval=monthly|annual)
   const selectedPlan = searchParams.get("plan") ?? undefined;
   const selectedInterval = searchParams.get("interval") ?? undefined;
+  // Study template chosen on a marketing use-case card / page
+  // (?template=customer-churn). Consumed after onboarding to create the
+  // first study pre-filled instead of landing on a blank dashboard.
+  const selectedTemplate = searchParams.get("template") ?? undefined;
   // URL param wins; otherwise fall back to the code captured when the visitor
   // first landed on the marketing page (60-day attribution window).
   const refCode = searchParams.get("ref") ?? getStoredRefCode();
@@ -69,7 +74,8 @@ export default function Signup() {
   useEffect(() => {
     if (selectedPlan) localStorage.setItem("qp_selected_plan", selectedPlan);
     if (selectedInterval) localStorage.setItem("qp_selected_interval", selectedInterval);
-  }, [selectedPlan, selectedInterval]);
+    if (selectedTemplate) setPendingTemplate(selectedTemplate);
+  }, [selectedPlan, selectedInterval, selectedTemplate]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
