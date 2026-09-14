@@ -15,7 +15,7 @@
   },
   "hero": {
     "eyebrow": "AI voice interviews with the customers you already have",
-    "title": "Turn the customers you already have into thirty real conversations. Done by Friday.",
+    "title": "Turn the customers you already have into dozens of real conversations. Done by Friday.",
     "sub": "No panel, no scheduling. Send one link to your churned users, your NPS respondents or your beta list. QualiPulse <b>interviews each of them by voice like a trained researcher</b>, then hands you a <b>decision memo where every claim links to a verbatim quote</b>.",
     "cta": "Start free with 3 interviews",
     "secondaryCta": "See the evidence trail",
@@ -325,7 +325,7 @@
         "persona": "For product marketers",
         "trigger": "Three taglines, one launch in two weeks, and the team is voting on preference.",
         "title": "Is your message understood before launch?",
-        "desc": "Put two or three propositions in front of thirty real buyers. Learn which one they understand, what they object to, and the words they use for it.",
+        "desc": "Put two or three propositions in front of real buyers. Learn which one they understand, what makes them hesitate, and the words they use for it.",
         "sample": "In your own words, what does this company do?",
         "cta": "Test a message"
       },

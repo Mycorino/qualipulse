@@ -15,7 +15,7 @@
   },
   "hero": {
     "eyebrow": "Entretiens vocaux IA avec les clients que vous avez déjà",
-    "title": "Transformez les clients que vous avez déjà en trente vraies conversations. Terminées d'ici vendredi.",
+    "title": "Transformez les clients que vous avez déjà en dizaines de vraies conversations. Terminées d'ici vendredi.",
     "sub": "Sans panel, sans planification. Envoyez un lien à vos clients partis, à vos répondants NPS ou à votre liste bêta. QualiPulse <b>mène chaque entretien à la voix comme un chercheur</b>, puis vous livre une <b>synthèse où chaque conclusion renvoie à un verbatim</b>.",
     "cta": "Commencer mon essai gratuit",
     "secondaryCta": "Voir un exemple de synthèse",
@@ -329,7 +329,7 @@
         "persona": "Pour les product marketers",
         "trigger": "Trois accroches, un lancement dans deux semaines, et l'équipe vote à la préférence.",
         "title": "Votre message est-il compris avant le lancement ?",
-        "desc": "Mettez deux ou trois propositions devant trente vrais acheteurs. Sachez laquelle ils comprennent, ce qu'ils objectent, et les mots qu'ils utilisent.",
+        "desc": "Mettez deux ou trois propositions devant de vrais acheteurs. Découvrez laquelle ils comprennent, ce qui les fait hésiter, et les mots qu'ils emploient pour en parler.",
         "sample": "Avec vos mots, que fait cette entreprise ?",
         "cta": "Tester un message"
       },
